@@ -4,8 +4,12 @@
 #*
 #* SPDX-License-Identifier: GPL-3
 #*/
+srcs += files(
+  'Drivers/Serial.cpp'
+)
+
+ld_args += ['-Wl,-maarch64elf']
 cxx_args += [
-  '-m64',
   '-mgeneral-regs-only',
   '-mcmodel=small',
 ]

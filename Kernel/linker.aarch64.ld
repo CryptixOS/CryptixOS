@@ -11,9 +11,9 @@ ENTRY(kernelStart)
 PHDRS
 {
     limine_requests PT_LOAD;
-    text    PT_LOAD    FLAGS((1 << 0) | (1 << 2));
-    rodata  PT_LOAD    FLAGS((1 << 2));
-    data    PT_LOAD    FLAGS((1 << 1) | (1 << 2));
+    text    PT_LOAD;
+    rodata  PT_LOAD;
+    data    PT_LOAD;
     dynamic PT_DYNAMIC FLAGS((1 << 1) | (1 << 2)) ;
 }
 
@@ -64,5 +64,5 @@ SECTIONS
     data_end_addr = .;
 
     /* Discard .note.* and .eh_frame since they may cause issues on some hosts. */
-    /DISCARD/ : { *(.eh_frame) *(.note .note.*) }
+    /DISCARD/ : { *(.eh_frame*) *(.note .note.*) }
 }

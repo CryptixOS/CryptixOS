@@ -6,6 +6,8 @@
  */
 #include "Logger.hpp"
 
+#include "Drivers/Serial.hpp"
+
 #include <mutex>
 
 namespace E9
@@ -42,8 +44,7 @@ namespace Logger
     void LogString(std::string_view str)
     {
         if (enabledOutputs & LOG_OUTPUT_E9) E9::PrintString(str);
-        if (enabledOutputs & LOG_OUTPUT_SERIAL)
-            ; // Serial::Write(std::string_view(str.data(), len));
+        if (enabledOutputs & LOG_OUTPUT_SERIAL) Serial::Write(str);
         if (enabledOutputs & LOG_OUTPUT_TERMINAL)
             ; // terminal.PrintString(str.data(), len);
     }

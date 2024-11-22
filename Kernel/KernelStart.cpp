@@ -4,14 +4,15 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <cstddef>
+#include <cstdint>
 #include <icxxabi>
-#include <limine.h>
-#include <stddef.h>
-#include <stdint.h>
 
 #include <memory>
 
 #include "Common.hpp"
+
+#include "Drivers/Serial.hpp"
 
 // stubs
 void* operator new(size_t size) { return (void*)1; }
@@ -74,6 +75,18 @@ static void hcf()
 
 extern "C" void kernelStart()
 {
+    Framebuffer* framebuffer = BootInfo::GetFramebuffer();
+
+    // Note: we assume the framebuffer model is RGB with 32-bit pixels.
+    for (size_t i = 0; i < 100; i++)
+    {
+        volatile uint32_t* fb_ptr
+            = reinterpret_cast<volatile u32*>(framebuffer->address);
+        fb_ptr[i * (framebuffer->pitch / 4) + i] = 0xffffff;
+    }
+
+    Serial::Initialize();
+    Logger::EnableOutput(LOG_OUTPUT_SERIAL);
     LogInfo("test");
     for (;;) hcf();
 }

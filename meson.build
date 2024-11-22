@@ -118,7 +118,7 @@ subdir('Kernel')
 qemu_args = [
   '-cpu', 'max',
   '-net', 'none',
-  #'-serial', 'stdio',
+  '-serial', 'stdio',
   '-d', 'int,guest_errors',
   '-smp', '4',
   '-d', 'cpu_reset',
@@ -136,7 +136,7 @@ if arch == 'x86_64'
   qemu_args += [
     '-M', 'q35,smm=off',
     '-device', 'isa-debug-exit',
-    '-debugcon', 'stdio', #'file:' + meson.project_source_root() / 'debug.log',
+    '-debugcon', 'file:' + meson.project_source_root() / 'debug.log',
     '-enable-kvm',
     '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
     '-machine', 'pcspk-audiodev=audio',
@@ -157,7 +157,11 @@ if arch == 'x86_64'
 elif arch == 'aarch64'
   qemu_args += [
     '-M', 'virt',
+    '-cpu', 'cortex-a72',
     '-device', 'ramfb',
+    '-device', 'qemu-xhci',
+    '-device', 'usb-kbd',
+    '-device', 'usb-mouse'
   ]
   ovmf_id = 'AA64'
   xorriso_args = [
