@@ -11,6 +11,8 @@
 
 #include <type_traits>
 
+#define Bit(n) (1 << n)
+
 using usize  = size_t;
 using isize  = std::make_signed_t<usize>;
 

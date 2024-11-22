@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include "Utility/Logger.hpp"
 #include "Utility/Types.hpp"
 
 #include <format>

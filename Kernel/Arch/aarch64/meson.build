@@ -4,8 +4,6 @@
 #*
 #* SPDX-License-Identifier: GPL-3
 #*/
-srcs += files('Drivers/Serial.cpp', 'Arch.cpp', 'VMM.cpp')
-
 cxx_args += [
   '-m64',
   '-mgeneral-regs-only',

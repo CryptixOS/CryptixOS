@@ -11,7 +11,7 @@
 
 #include <memory>
 
-#include "Utility/Types.hpp"
+#include "Common.hpp"
 
 // stubs
 void* operator new(size_t size) { return (void*)1; }
@@ -24,8 +24,56 @@ void  operator delete(void* p, usize) noexcept {}
 void  operator delete[](void* p) noexcept {}
 void  operator delete[](void* p, std::align_val_t) noexcept {}
 
-extern "C" void kernelStart()
+namespace Arch
+{
+    void Pause()
+    {
+#if CTOS_ARCH == CTOS_ARCH_X86_64
+        __asm__ volatile("pause");
+#elif CTOS_ARCH == CTOS_ARCH_AARCH64
+        __asm__ volatile("isb" ::: "memory");
+#endif
+    }
+    bool ExchangeInterruptFlag(bool enabled)
+    {
+        bool interruptsEnabled = false;
+#if CTOS_ARCH == CTOS_ARCH_X86_64
+        u64 rflags;
+        __asm__ volatile(
+            "pushfq\n\t"
+            "pop %[rflags]"
+            : [rflags] "=r"(rflags));
+
+        interruptsEnabled = rflags & Bit(9);
+        if (enabled) __asm__ volatile("sti");
+        else __asm__ volatile("cli");
+#elif CTOS_ARCH == CTOS_ARCH_AARCH64
+        u64 val;
+        __asm__ volatile("mrs %0, daif" : "=r"(val));
+        interruptsEnabled = !val;
+
+        if (enabled) __asm__ volatile("msr daifclr, #0b1111");
+        else __asm__ volatile("msr daifset, #0b1111");
+#endif
+
+        return interruptsEnabled;
+    }
+} // namespace Arch
+
+static void hcf()
 {
     for (;;)
-        __asm__ volatile("outb %b0, %w1" : : "a"('H'), "Nd"(0xe9) : "memory");
+    {
+#if CTOS_ARCH == CTOS_ARCH_X86_64
+        __asm__("hlt");
+#elif CTOS_ARCH == CTOS_ARCH_AARCH64
+        __asm__("wfi");
+#endif
+    }
+}
+
+extern "C" void kernelStart()
+{
+    LogInfo("test");
+    for (;;) hcf();
 }

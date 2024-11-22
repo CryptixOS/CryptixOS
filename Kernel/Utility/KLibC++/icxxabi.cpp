@@ -7,7 +7,9 @@
 #include "Common.hpp"
 
 #include <cxxabi.h>
-#include <immintrin.h>
+#if CTOS_ARCH == CTOS_ARCH_X86_64
+    #include <immintrin.h>
+#endif
 
 using DestructorFunction = void (*)(void*);
 
@@ -93,8 +95,6 @@ extern "C"
                 reinterpret_cast<unsigned long long*>(&__stack_chk_guard))
             && __stack_chk_guard != 0)
             return;
-#else
-    #error 'Platform not supported!'
 #endif
         /* If a random generator can't be used, the protector switches the guard
            to the "terminator canary".  */
@@ -134,9 +134,6 @@ namespace icxxabi
 
     void                             Initialize()
     {
-        // TODO(v1tr10l7): logging
-#define LogTrace(...)
-#define LogInfo(...)
         LogTrace("icxxabi: Calling global constructors...");
         for (ConstructorFunction* entry = __init_array_start;
              entry < __init_array_end; entry++)

@@ -12,6 +12,12 @@
 #define _HandleError(error_code, error_message) Panic(error_message);
 #include "Common.hpp"
 
+namespace Arch
+{
+    void Pause();
+    bool ExchangeInterruptFlag(bool enabled);
+}
+
 namespace std
 {
     class mutex
@@ -23,7 +29,7 @@ namespace std
 
         void   lock()
         {
-            saved_ints = CPU::SetInterruptFlag(false);
+            saved_ints = Arch::ExchangeInterruptFlag(false);
             auto ticket = _next_ticket.fetch_add(1, std::memory_order_relaxed);
             while (_serving_ticket.load(std::memory_order_acquire) != ticket)
                 Arch::Pause();
@@ -41,7 +47,7 @@ namespace std
 
             auto current = _serving_ticket.load(std::memory_order_relaxed);
             _serving_ticket.store(current + 1, std::memory_order_release);
-            CPU::SetInterruptFlag(saved_ints);
+            Arch::ExchangeInterruptFlag(saved_ints);
             saved_ints = false;
         }
 

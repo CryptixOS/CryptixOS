@@ -6,6 +6,9 @@
 #*/
 srcs += files(
   'KernelStart.cpp',
+
+  'Utility/BootInfo.cpp',
+  'Utility/Logger.cpp'
 )
 
 cxx_args = []

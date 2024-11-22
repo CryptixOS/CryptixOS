@@ -8,6 +8,8 @@
 
 #include "Common.hpp"
 
+#include "Utility/Logger.hpp"
+
 #include <string.h>
 
 #define LIMINE_REQUEST                                                         \
@@ -146,8 +148,8 @@ namespace BootInfo
         (void)stackSizeRequest.response;
         (void)entryPointRequest.response;
 
-        __asm__ volatile("outb %0, %1" : : "a"('L'), "d"(0xe9));
-        // Logger::EnableE9Logging();
+        Logger::EnableOutput(LOG_OUTPUT_E9);
+        LogInfo("Yo");
         if (LIMINE_BASE_REVISION_SUPPORTED == false)
             Panic("Boot: Limine base revision is not supported");
         if (!framebufferRequest.response
