@@ -1,0 +1,17 @@
+/*
+ * Created by v1tr10l7 on 19.11.2024.
+ * Copyright (c) 2024-2024, Szymon Zemke <v1tr10l7@proton.me>
+ *
+ * SPDX-License-Identifier: GPL-3
+ */
+#pragma once
+
+#include <string_view>
+
+#include <parallel_hashmap/phmap.h>
+
+namespace std
+{
+    template<typename Key, typename Type, typename Hash = phmap::priv::hash_default_hash<Key>, typename KeyEqual = phmap::priv::hash_default_eq<Key>, typename Allocator = phmap::priv::Allocator<phmap::priv::Pair<const Key, Type>>>
+    using unordered_map = phmap::flat_hash_map<Key, Type, Hash, KeyEqual, Allocator>;
+} // namespace std
