@@ -2,6 +2,7 @@
 build/
 debug.log
 qemu.log
+serial.log
 
 subprojects/compiler_rt_builtins/
 subprojects/cwalk/

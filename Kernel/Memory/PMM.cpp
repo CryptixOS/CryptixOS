@@ -12,6 +12,8 @@
 #include "Utility/BootInfo.hpp"
 #include "Utility/Math.hpp"
 
+#include "Memory/KernelHeap.hpp"
+
 #include <mutex>
 
 namespace PhysicalMemoryManager
@@ -96,6 +98,11 @@ namespace PhysicalMemoryManager
         for (usize i = 0; i < entryCount; i++)
         {
             MemoryMapEntry* currentEntry = memoryMap[i];
+            Logger::Logf(LogLevel::eInfo,
+                         "MemoryMap[%zu]: base: %#zx, length: %#zx, %zu", i,
+                         currentEntry->base, currentEntry->length,
+                         currentEntry->type);
+
             if (currentEntry->type != MEMORY_MAP_USABLE) continue;
 
             for (uintptr_t page = 0; page < currentEntry->length;
@@ -104,13 +111,19 @@ namespace PhysicalMemoryManager
         }
 
         memoryTop = Math::AlignUp(memoryTop, 0x40000000);
+        KernelHeap::Initialize();
 
-        Logger::Logf(LogLevel::eInfo,
-                     "Memory Map entry count: %zu, Total Memory: %zuMiB, Free "
-                     "Memory: %zuMiB",
-                     entryCount, totalMemory / 1024 / 1024,
-                     GetFreeMemory() / 1024 / 1024);
+        // Logger::Logf(LogLevel::eInfo,
+        //              "Memory Map entry count: %zu, Total Memory: %zuMiB, Free
+        //              " "Memory: %zuMiB", entryCount, totalMemory / 1024 /
+        //              1024, GetFreeMemory() / 1024 / 1024);
+        LogInfo(
+            "Memory Map entry count: {}, Total Memory: %{}MiB, Free "
+            "Memory: %{}MiB",
+            entryCount, totalMemory / 1024 / 1024,
+            GetFreeMemory() / 1024 / 1024);
         LogInfo("PMM: Initialized");
+
         return true;
     }
 

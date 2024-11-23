@@ -25,6 +25,8 @@ inline constexpr u64 BIT(u64 n) { return (1ull << n); }
 [[noreturn]]
 inline void panic(std::string_view msg)
 {
+    LogFatal("Kernel Panic!\n\r{}\n\r", msg.data());
+
     // TODO(v1tr10l7): panic
 #if CTOS_ARCH == CTOS_ARCH_X86_64
     __asm__ volatile("cli;hlt");

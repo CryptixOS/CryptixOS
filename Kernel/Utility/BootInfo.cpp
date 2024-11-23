@@ -18,7 +18,7 @@
 namespace
 {
     __attribute__((
-        used, section(".limine_requests"))) volatile LIMINE_BASE_REVISION(3);
+        used, section(".limine_requests"))) volatile LIMINE_BASE_REVISION(0);
 }
 
 static constexpr const u32 DEFAULT_STACK_SIZE = 65536;
@@ -149,7 +149,6 @@ namespace BootInfo
         (void)entryPointRequest.response;
 
         Logger::EnableOutput(LOG_OUTPUT_E9);
-        LogInfo("Yo");
         if (LIMINE_BASE_REVISION_SUPPORTED == false)
             Panic("Boot: Limine base revision is not supported");
         if (!framebufferRequest.response

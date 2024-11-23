@@ -19,17 +19,6 @@
     #include "Arch/x86_64/GDT.hpp"
 #endif
 
-// stubs
-void* operator new(size_t size) { return (void*)1; }
-void* operator new(usize size, std::align_val_t) { return (void*)1; }
-void* operator new[](size_t size) { return (void*)1; }
-void* operator new[](size_t size, std::align_val_t) { return (void*)1; }
-void  operator delete(void* p) noexcept {}
-void  operator delete(void* p, std::align_val_t) noexcept {}
-void  operator delete(void* p, usize) noexcept {}
-void  operator delete[](void* p) noexcept {}
-void  operator delete[](void* p, std::align_val_t) noexcept {}
-
 namespace Arch
 {
     void Pause()
@@ -93,8 +82,8 @@ extern "C" void kernelStart()
     Serial::Initialize();
     Logger::EnableOutput(LOG_OUTPUT_SERIAL);
 
-    Logger::Logf(LogLevel::eInfo, "Test: %#p", framebuffer);
     Assert(PMM::Initialize());
+    icxxabi::Initialize();
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
     GDT::Initialize();
