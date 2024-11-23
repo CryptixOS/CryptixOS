@@ -6,20 +6,32 @@
 #*/
 srcs += files(
   'GDT.cpp',
+  'IDT.cpp',
+  'interrupts.x86_64.S',
   'Drivers/Serial.cpp'
 )
 
-cxx_args += [
-  '-m64',
+c_args += [
   '-march=x86-64',
+  '-msoft-float',
+  '-mno-mmx',
+  '-mno-sse',
+  '-mno-sse2',
+  '-mno-red-zone',
+  '-mcmodel=kernel',
+]
+cxx_args += [
+  '-march=x86-64',
+  #'-m64',
   '-msoft-float',
   #'-mno-80387',
   '-mno-mmx',
   '-mno-sse',
   '-mno-sse2',
   '-mno-red-zone',
+  '-mno-avx',
   '-mcmodel=kernel',
-  '-mrdrnd',
+  #'-mrdrnd',
 ]
 
-ld_args += ['-Wl,-z,noexecstack', '-Wl,-m,elf_x86_64', '-Wl,-static']
+ld_args += ['-Wl,-z,noexecstack']

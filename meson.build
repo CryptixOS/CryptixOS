@@ -45,13 +45,13 @@ add_global_arguments(
     '-fno-omit-frame-pointer',
     '-fno-lto',
     #'-fsanitize=undefined',
-    #'-fstack-protector-all',
-    #'-mstack-protector-guard=global',
-    '-fno-stack-protector',
-    '-fno-stack-check',
+    '-fstack-protector-all',
+    '-mstack-protector-guard=global',
+    '-fno-PIC',
     '-fPIE',
-    '-m64',
     '-Ofast',
+    '-nostdlib',
+    '-static',
   ],
   language: ['c', 'cpp'],
 )
@@ -97,6 +97,7 @@ deps = [
   cmake.subproject('frozen').dependency('frozen'),
 
   dependency('limine'),
+  dependency('flanterm'),
   dependency('libstdcxx_headers'),
   dependency(
     'compiler_rt_builtins',
@@ -124,24 +125,24 @@ qemu_args = [
   '-d', 'int,guest_errors',
   '-smp', '4',
   '-d', 'cpu_reset',
-  '-m', '2G',
+  '-m', '512M',
   '-rtc', 'base=localtime',
   '-no-shutdown', '-no-reboot',
   '-D', meson.project_source_root() / 'qemu.log',
   '-boot', 'order=d,menu=on,splash-time=100',
-  '-audiodev', 'id=audio,driver=alsa',
+  #'-audiodev', 'id=audio,driver=alsa',
+  '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
 ]
 qemu = 'qemu-system-' + arch
 
 if arch == 'x86_64'
   qemu_args += [
     '-M', 'q35,smm=off',
-    '-device', 'isa-debug-exit',
-    '-debugcon', 'file:' + meson.project_source_root() / 'debug.log',
-    '-enable-kvm',
-    '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
-    '-machine', 'pcspk-audiodev=audio',
-    '-cpu', 'host',
+    #'-device', 'isa-debug-exit',
+    #'-debugcon', 'file:' + meson.project_source_root() / 'debug.log',
+    #'-enable-kvm',
+    #'-machine', 'pcspk-audiodev=audio',
+    #'-cpu', 'host',
   ]
   ovmf_id = 'X64'
   xorriso_args = [
@@ -244,7 +245,6 @@ ovmf_binaries = subproject('ovmf_binaries')
 ovmf = ovmf_binaries.get_variable(ovmf_id)
 
 run_uefi = custom_target(
-  output: 'run_uefi',
   input: iso,
   output: 'run_uefi',
   command: [qemu, qemu_args, '-cdrom', '@INPUT@', '-bios', ovmf],

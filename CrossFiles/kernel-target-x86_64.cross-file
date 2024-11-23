@@ -1,6 +1,6 @@
 [binaries]
-c = 'clang'
-cpp = 'clang++'
+c = ['ccache', 'clang']
+cpp = ['ccache', 'clang++']
 c_ld = 'lld'
 cpp_ld = 'lld'
 ar = 'llvm-ar'
@@ -10,8 +10,8 @@ cmake = 'cmake'
 nasm = 'nasm'
 
 [built-in options]
-c_args = ['-target', 'x86_64-elf']
-cpp_args = ['-target', 'x86_64-elf']
+c_args = ['-target', 'x86_64-pc-elf']
+cpp_args = ['-target', 'x86_64-pc-elf']
 
 [host_machine]
 system = 'pc'

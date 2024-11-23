@@ -5,22 +5,21 @@
  * SPDX-License-Identifier: GPL-3
  */
 OUTPUT_FORMAT(elf64-x86-64)
-OUTPUT_ARCH(i386:x86-64)
 
 ENTRY(kernelStart)
 
 PHDRS
 {
     limine_requests PT_LOAD;
-    text    PT_LOAD    FLAGS((1 << 0) | (1 << 2)) ; /* Execute + Read */
-    rodata  PT_LOAD    FLAGS((1 << 2)) ;            /* Read only */
-    data    PT_LOAD    FLAGS((1 << 1) | (1 << 2)) ; /* Write + Read */
+    text    PT_LOAD;
+    rodata  PT_LOAD;
+    data    PT_LOAD;
     dynamic PT_DYNAMIC FLAGS((1 << 1) | (1 << 2)) ;
 }
 
 SECTIONS
 {
-    . = 0;
+    . = 0xffffffff80000000;
 
     .limine_requests : {
         KEEP(*(.limine_requests_start))
@@ -33,13 +32,12 @@ SECTIONS
     text_start_addr = .;
     .text : { *(.text .text.*) } :text
     text_end_addr = .;
+
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     rodata_start_addr = .;
     .rodata : { *(.rodata .rodata.*) } :rodata
     rodata_end_addr = .;
-
-    . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     .init_array :
     {
@@ -53,8 +51,7 @@ SECTIONS
     data_start_addr = .;
     .data : { *(.data .data.*) } :data
 
-    .dynamic : 
-    {
+    .dynamic : {
         *(.dynamic)
     } :data :dynamic
 
@@ -66,5 +63,5 @@ SECTIONS
     data_end_addr = .;
 
     /* Discard .note.* and .eh_frame since they may cause issues on some hosts. */
-    /DISCARD/ : { *(.eh_frame) *(.note .note.*) }
+    /DISCARD/ : { *(.eh_frame*) *(.note .note.*) }
 }
