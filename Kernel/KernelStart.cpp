@@ -13,6 +13,11 @@
 #include "Common.hpp"
 
 #include "Drivers/Serial.hpp"
+#include "Memory/PMM.hpp"
+
+#if CTOS_ARCH == CTOS_ARCH_X86_64
+    #include "Arch/x86_64/GDT.hpp"
+#endif
 
 // stubs
 void* operator new(size_t size) { return (void*)1; }
@@ -87,6 +92,13 @@ extern "C" void kernelStart()
 
     Serial::Initialize();
     Logger::EnableOutput(LOG_OUTPUT_SERIAL);
-    LogInfo("test");
+
+    Logger::Logf(LogLevel::eInfo, "Test: %#p", framebuffer);
+    Assert(PMM::Initialize());
+
+#if CTOS_ARCH == CTOS_ARCH_X86_64
+    GDT::Initialize();
+    GDT::Load(0);
+#endif
     for (;;) hcf();
 }

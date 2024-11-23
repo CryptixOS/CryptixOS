@@ -7,6 +7,8 @@
 srcs += files(
   'KernelStart.cpp',
 
+  'Memory/PMM.cpp',
+
   'Utility/BootInfo.cpp',
   'Utility/Logger.cpp'
 )
