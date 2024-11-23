@@ -44,7 +44,7 @@ add_global_arguments(
     '-ffreestanding',
     '-fno-omit-frame-pointer',
     '-fno-lto',
-    #'-fsanitize=undefined',
+    '-fsanitize=undefined',
     '-fstack-protector-all',
     '-mstack-protector-guard=global',
     '-fno-PIC',

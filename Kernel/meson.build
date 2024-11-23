@@ -15,6 +15,7 @@ srcs += files(
   'Utility/BootInfo.cpp',
   'Utility/Logger.cpp',
   'Utility/Stacktrace.cpp',
+  'Utility/Ubsan.cpp',
 )
 
 c_args = []
