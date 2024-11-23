@@ -7,6 +7,7 @@
 #include "Logger.hpp"
 
 #include "Drivers/Serial.hpp"
+#include "Drivers/Terminal.hpp"
 
 #include "Utility/Math.hpp"
 
@@ -32,6 +33,7 @@ namespace Logger
     {
         usize      enabledOutputs = 0;
         std::mutex lock;
+        Terminal   terminal;
 
         template <typename T>
         T ToNumber(const char* str, usize length)
@@ -295,7 +297,13 @@ namespace Logger
         }
     }; // namespace
 
-    void EnableOutput(usize output) { enabledOutputs |= output; }
+    void EnableOutput(usize output)
+    {
+        enabledOutputs |= output;
+
+        if (output == LOG_OUTPUT_TERMINAL)
+            terminal.Initialize(*BootInfo::GetFramebuffer());
+    }
     void DisableOutput(usize output) { enabledOutputs &= ~output; }
 
     void LogChar(u64 c)
@@ -311,8 +319,7 @@ namespace Logger
     {
         if (enabledOutputs & LOG_OUTPUT_E9) E9::PrintString(str);
         if (enabledOutputs & LOG_OUTPUT_SERIAL) Serial::Write(str);
-        if (enabledOutputs & LOG_OUTPUT_TERMINAL)
-            ; // terminal.PrintString(str.data(), len);
+        if (enabledOutputs & LOG_OUTPUT_TERMINAL) terminal.PrintString(str);
     }
 
     void Log(LogLevel logLevel, std::string_view string)

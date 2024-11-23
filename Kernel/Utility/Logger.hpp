@@ -73,6 +73,12 @@ namespace Logger
 
 #define ENABLE_LOGGING  true
 #if ENABLE_LOGGING == true
+    #define EarlyLogTrace(...) Logger::Logf(LogLevel::eTrace, __VA_ARGS__)
+    #define EarlyLogInfo(...)  Logger::Logf(LogLevel::eInfo, __VA_ARGS__)
+    #define EarlyLogWarn(...)  Logger::Logf(LogLevel::eWarn, __VA_ARGS__)
+    #define EarlyLogError(...) Logger::Logf(LogLevel::eError, __VA_ARGS__)
+    #define EarlyLogFatal(...) Logger::Logf(LogLevel::eFatal, __VA_ARGS__)
+
     #define LogTrace(...)                                                      \
         Logger::Log(LogLevel::eTrace, std::format(__VA_ARGS__))
     #define LogInfo(...) Logger::Log(LogLevel::eInfo, std::format(__VA_ARGS__))
@@ -82,6 +88,12 @@ namespace Logger
     #define LogFatal(...)                                                      \
         Logger::Log(LogLevel::eFatal, std::format(__VA_ARGS__))
 #else
+    #define EarlyLogTrace(...)
+    #define EarlyLogInfo(...)
+    #define EarlyLogWarn(...)
+    #define EarlyLogError(...)
+    #define EarlyLogFatal(...)
+
     #define LogTrace(...)
     #define LogInfo(...)
     #define LogWarn(...)

@@ -7,20 +7,22 @@
 srcs += files(
   'KernelStart.cpp',
 
+  'Drivers/Terminal.cpp',
+
   'Memory/KernelHeap.cpp',
   'Memory/PMM.cpp',
 
   'Utility/BootInfo.cpp',
-  'Utility/Logger.cpp'
+  'Utility/Logger.cpp',
 )
 
+c_args = []
 cxx_args = []
 
 ld_args = [
   '-nostdlib',
   '-static',
   '-fuse-ld=lld',
-  '-Wl,-z,text',
   '-Wl,-pie',
   '-Wl,-z,max-page-size=0x1000',
   '-Wl,-T,' + meson.current_source_dir() + '/linker.' + arch + '.ld',
@@ -46,6 +48,7 @@ kernel_elf = executable(
   dependencies: deps,
   link_depends: meson.current_source_dir() / 'linker.' + arch + '.ld',
   include_directories: include_directories,
+  c_args: c_args,
   cpp_args: cxx_args,
   link_args: ld_args,
   install: false,

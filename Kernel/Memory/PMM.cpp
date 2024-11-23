@@ -55,7 +55,7 @@ namespace PhysicalMemoryManager
         MemoryMap memoryMap  = BootInfo::GetMemoryMap(entryCount);
         if (entryCount == 0) return false;
 
-        LogTrace("PMM: Initializing...");
+        EarlyLogTrace("PMM: Initializing...");
         for (usize i = 0; i < entryCount; i++)
         {
             MemoryMapEntry* currentEntry = memoryMap[i];
@@ -98,8 +98,7 @@ namespace PhysicalMemoryManager
         for (usize i = 0; i < entryCount; i++)
         {
             MemoryMapEntry* currentEntry = memoryMap[i];
-            Logger::Logf(LogLevel::eInfo,
-                         "MemoryMap[%zu]: base: %#zx, length: %#zx, %zu", i,
+            EarlyLogInfo("MemoryMap[%zu]: base: %#zx, length: %#zx, %zu", i,
                          currentEntry->base, currentEntry->length,
                          currentEntry->type);
 
@@ -111,18 +110,15 @@ namespace PhysicalMemoryManager
         }
 
         memoryTop = Math::AlignUp(memoryTop, 0x40000000);
-        KernelHeap::Initialize();
+        EarlyLogInfo("PMM: Initialized");
 
-        // Logger::Logf(LogLevel::eInfo,
-        //              "Memory Map entry count: %zu, Total Memory: %zuMiB, Free
-        //              " "Memory: %zuMiB", entryCount, totalMemory / 1024 /
-        //              1024, GetFreeMemory() / 1024 / 1024);
-        LogInfo(
-            "Memory Map entry count: {}, Total Memory: %{}MiB, Free "
-            "Memory: %{}MiB",
+        EarlyLogInfo(
+            "PMM: Memory Map entry count: %zu, Total Memory: %zuMiB, Free "
+            "Memory%zuMiB ",
             entryCount, totalMemory / 1024 / 1024,
             GetFreeMemory() / 1024 / 1024);
-        LogInfo("PMM: Initialized");
+
+        KernelHeap::Initialize();
 
         return true;
     }

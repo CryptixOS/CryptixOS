@@ -72,10 +72,9 @@ namespace KernelHeap
       //
     void Initialize()
     {
-        // Logger::Logf(LogLevel::eTrace, "KernelHeap: Initializing...");
+        EarlyLogTrace("KernelHeap: Initializing...");
 
         allocator8.Initialize();
-        LogError("init");
         allocator16.Initialize();
         allocator32.Initialize();
         allocator64.Initialize();
@@ -84,8 +83,7 @@ namespace KernelHeap
         allocator512.Initialize();
         allocator1024.Initialize();
 
-        LogInfo("Initialized");
-        // Logger::Logf(LogLevel::eInfo, "KernelHeap: Initialized");
+        LogInfo("KernelHeap: Initialized");
     }
 
     void* Allocate(usize bytes) { return InternalAllocate(bytes); }

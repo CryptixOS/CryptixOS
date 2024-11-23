@@ -4,11 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <cstddef>
-#include <cstdint>
 #include <icxxabi>
-
-#include <memory>
 
 #include "Common.hpp"
 
@@ -17,10 +13,22 @@
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
     #include "Arch/x86_64/GDT.hpp"
+    #include "Arch/x86_64/IDT.hpp"
 #endif
 
 namespace Arch
 {
+    void Halt()
+    {
+        for (;;)
+        {
+#if CTOS_ARCH == CTOS_ARCH_X86_64
+            __asm__("hlt");
+#elif CTOS_ARCH == CTOS_ARCH_AARCH64
+            __asm__("wfi");
+#endif
+        }
+    }
     void Pause()
     {
 #if CTOS_ARCH == CTOS_ARCH_X86_64
@@ -55,39 +63,23 @@ namespace Arch
     }
 } // namespace Arch
 
-static void hcf()
-{
-    for (;;)
-    {
-#if CTOS_ARCH == CTOS_ARCH_X86_64
-        __asm__("hlt");
-#elif CTOS_ARCH == CTOS_ARCH_AARCH64
-        __asm__("wfi");
-#endif
-    }
-}
-
 extern "C" void kernelStart()
 {
-    Framebuffer* framebuffer = BootInfo::GetFramebuffer();
-
-    // Note: we assume the framebuffer model is RGB with 32-bit pixels.
-    for (size_t i = 0; i < 100; i++)
-    {
-        volatile uint32_t* fb_ptr
-            = reinterpret_cast<volatile u32*>(framebuffer->address);
-        fb_ptr[i * (framebuffer->pitch / 4) + i] = 0xffffff;
-    }
-
     Serial::Initialize();
     Logger::EnableOutput(LOG_OUTPUT_SERIAL);
 
-    Assert(PMM::Initialize());
-    icxxabi::Initialize();
+    Logger::EnableOutput(LOG_OUTPUT_TERMINAL);
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
     GDT::Initialize();
     GDT::Load(0);
+
+    IDT::Initialize();
+    IDT::Load();
 #endif
-    for (;;) hcf();
+
+    Assert(PMM::Initialize());
+    icxxabi::Initialize();
+
+    for (;;) Arch::Halt();
 }

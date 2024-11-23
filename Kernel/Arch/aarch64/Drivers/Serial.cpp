@@ -10,15 +10,19 @@
 
 namespace Serial
 {
-    constexpr const uintptr_t UART_BASE = 0x9000000;
-    static uintptr_t s_UartAddress      = UART_BASE + BootInfo::GetHHDMOffset();
+    constexpr const uintptr_t UART_BASE     = 0x9'000'000;
+    static uintptr_t          s_UartAddress = UART_BASE;
 
-    bool             Initialize() { return true; }
+    bool                      Initialize()
+    {
+        s_UartAddress += BootInfo::GetHHDMOffset();
+        return true;
+    }
 
-    u8               Read()
+    u8 Read()
     {
         while (*reinterpret_cast<u16*>(s_UartAddress + 0x18) & Bit(4))
-            asm volatile("isb" ::: "memory");
+            __asm__ volatile("isb" ::: "memory");
         // Arch::Pause();
 
         return *reinterpret_cast<u8*>(s_UartAddress);

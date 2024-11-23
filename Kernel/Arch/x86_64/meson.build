@@ -31,7 +31,7 @@ cxx_args += [
   '-mno-red-zone',
   '-mno-avx',
   '-mcmodel=kernel',
-  #'-mrdrnd',
+  '-mrdrnd',
 ]
 
 ld_args += ['-Wl,-z,noexecstack']

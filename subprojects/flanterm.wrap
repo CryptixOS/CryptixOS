@@ -1,0 +1,9 @@
+[wrap-git]
+url = https://github.com/mintsuki/flanterm
+revision = trunk
+depth = 1
+patch_filename = flanterm.tar
+
+[provide]
+flanterm = flanterm_dep
+

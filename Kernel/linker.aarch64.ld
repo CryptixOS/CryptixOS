@@ -46,7 +46,6 @@ SECTIONS
         KEEP(*(.init_array .ctors))
         PROVIDE_HIDDEN(__init_array_end = .);
     } :rodata
-
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     data_start_addr = .;
