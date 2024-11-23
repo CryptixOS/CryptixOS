@@ -58,6 +58,8 @@ namespace Logger
     void LogString(std::string_view, usize len);
 
     void Log(LogLevel logLevel, std::string_view string);
+    void Logf(LogLevel logLevel, const char* format, ...);
+    void Logv(LogLevel logLevel, const char* format, va_list& args);
 } // namespace Logger
 
 #ifdef CTOS_BUILD_DEBUG
