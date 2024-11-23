@@ -5,6 +5,7 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 srcs += files(
+  'Arch.cpp',
   'GDT.cpp',
   'IDT.cpp',
   'interrupts.x86_64.S',

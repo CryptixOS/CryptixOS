@@ -1,0 +1,29 @@
+/*
+ * Created by v1tr10l7 on 23.11.2024.
+ * Copyright (c) 2024-2024, Szymon Zemke <v1tr10l7@proton.me>
+ *
+ * SPDX-License-Identifier: GPL-3
+ */
+#pragma once
+
+#pragma once
+
+#include <ctype.h>
+
+namespace std
+{
+    using ::isalnum;
+    using ::isalpha;
+    using ::islower;
+    using ::isupper;
+    using ::isdigit;
+    using ::isxdigit;
+    using ::iscntrl;
+    using ::isgraph;
+    using ::isspace;
+    using ::isblank;
+    using ::isprint;
+    using ::ispunct;
+    using ::toupper;
+    using ::tolower;
+} // namespace std

@@ -107,6 +107,8 @@ deps = [
   dependency('veque'),
   dependency('fmt'),
   dependency('string'),
+  dependency('lai'),
+  dependency('demangler'),
 ]
 
 inc_deps = []

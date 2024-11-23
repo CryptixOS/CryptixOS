@@ -6,7 +6,10 @@
  */
 #pragma once
 
+#include "Arch/Arch.hpp"
+
 #include "Utility/Logger.hpp"
+#include "Utility/Stacktrace.hpp"
 #include "Utility/Types.hpp"
 
 #include <format>
@@ -26,13 +29,10 @@ inline constexpr u64 BIT(u64 n) { return (1ull << n); }
 inline void panic(std::string_view msg)
 {
     LogFatal("Kernel Panic!\n\r{}\n\r", msg.data());
+    Stacktrace::Print(32);
 
-    // TODO(v1tr10l7): panic
-#if CTOS_ARCH == CTOS_ARCH_X86_64
-    __asm__ volatile("cli;hlt");
-#elif CTOS_ARCH == CTOS_ARCH_AARCH64
-    __asm__ volatile("wfi");
-#endif
+    Arch::Halt();
+    // TODO(v1tr10l7): Halt all cpus
     CTOS_ASSERT_NOT_REACHED();
 }
 

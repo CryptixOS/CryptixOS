@@ -9,59 +9,14 @@
 #include "Common.hpp"
 
 #include "Drivers/Serial.hpp"
+
 #include "Memory/PMM.hpp"
+#include "Utility/Stacktrace.hpp"
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
     #include "Arch/x86_64/GDT.hpp"
     #include "Arch/x86_64/IDT.hpp"
 #endif
-
-namespace Arch
-{
-    void Halt()
-    {
-        for (;;)
-        {
-#if CTOS_ARCH == CTOS_ARCH_X86_64
-            __asm__("hlt");
-#elif CTOS_ARCH == CTOS_ARCH_AARCH64
-            __asm__("wfi");
-#endif
-        }
-    }
-    void Pause()
-    {
-#if CTOS_ARCH == CTOS_ARCH_X86_64
-        __asm__ volatile("pause");
-#elif CTOS_ARCH == CTOS_ARCH_AARCH64
-        __asm__ volatile("isb" ::: "memory");
-#endif
-    }
-    bool ExchangeInterruptFlag(bool enabled)
-    {
-        bool interruptsEnabled = false;
-#if CTOS_ARCH == CTOS_ARCH_X86_64
-        u64 rflags;
-        __asm__ volatile(
-            "pushfq\n\t"
-            "pop %[rflags]"
-            : [rflags] "=r"(rflags));
-
-        interruptsEnabled = rflags & Bit(9);
-        if (enabled) __asm__ volatile("sti");
-        else __asm__ volatile("cli");
-#elif CTOS_ARCH == CTOS_ARCH_AARCH64
-        u64 val;
-        __asm__ volatile("mrs %0, daif" : "=r"(val));
-        interruptsEnabled = !val;
-
-        if (enabled) __asm__ volatile("msr daifclr, #0b1111");
-        else __asm__ volatile("msr daifset, #0b1111");
-#endif
-
-        return interruptsEnabled;
-    }
-} // namespace Arch
 
 extern "C" void kernelStart()
 {
@@ -81,5 +36,16 @@ extern "C" void kernelStart()
     Assert(PMM::Initialize());
     icxxabi::Initialize();
 
+    LogInfo("Boot: Kernel loaded with {}-{} -> boot time: {}s",
+            BootInfo::GetBootloaderName(), BootInfo::GetBootloaderVersion(),
+            BootInfo::GetBootTime());
+
+    LogInfo("Boot: Kernel Physical Address: {:#x}",
+            BootInfo::GetKernelPhysicalAddress());
+    LogInfo("Boot: Kernel Virtual Address: {:#x}",
+            BootInfo::GetKernelVirtualAddress());
+    Stacktrace::Initialize();
+
+    Panic("Test Panic");
     for (;;) Arch::Halt();
 }

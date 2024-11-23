@@ -4,5 +4,11 @@
 #*
 #* SPDX-License-Identifier: GPL-3
 #*/
-srcs += files('assert.cpp', 'errno.cpp', 'stdio.cpp', 'stdlib.cpp', 'string.cpp')
+srcs += files(
+  'assert.cpp',
+  'ctype.cpp',
+  'errno.cpp',
+  'stdio.cpp',
+  'stdlib.cpp',
+  'string.cpp')
 include_directories += [include_directories('.')]

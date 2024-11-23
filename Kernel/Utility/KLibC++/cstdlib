@@ -1,0 +1,30 @@
+/*
+ * Created by v1tr10l7 on 23.11.2024.
+ * Copyright (c) 2024-2024, Szymon Zemke <v1tr10l7@proton.me>
+ *
+ * SPDX-License-Identifier: GPL-3
+ */
+#pragma once
+
+
+#include <stdlib.h>
+
+namespace std
+{
+    using ::malloc;
+    using ::calloc;
+    using ::realloc;
+    using ::free;
+
+    using ::atoi;
+    using ::atol;
+    using ::atoll;
+
+    using ::strtol;
+    using ::strtoll;
+
+    using ::strtoul;
+    using ::strtoull;
+
+    extern "C" __attribute__((noreturn)) void abort() throw();
+} // namespace std
