@@ -4,5 +4,5 @@
 #*
 #* SPDX-License-Identifier: GPL-3
 #*/
-srcs += files('icxxabi.cpp')
+srcs += files()
 include_directories += [include_directories('.')]

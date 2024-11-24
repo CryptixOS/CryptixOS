@@ -4,13 +4,14 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <icxxabi>
 
 #include "Common.hpp"
 
 #include "Drivers/Serial.hpp"
 
 #include "Memory/PMM.hpp"
+
+#include "Utility/ICxxAbi.hpp"
 #include "Utility/Stacktrace.hpp"
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64

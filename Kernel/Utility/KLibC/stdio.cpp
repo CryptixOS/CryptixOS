@@ -48,11 +48,40 @@ extern "C"
         return -1;
     }
 
-    int printf(const char* format, ...) { return -1; }
+    int printf(const char* format, ...)
+    {
+        va_list args;
+
+        va_start(args, format);
+        const int ret = vprintf(format, args);
+        va_end(args);
+
+        return ret;
+    }
     int vprintf(const char* format, va_list args) { return -1; }
-    int sprintf(char* s, const char* format, ...) { return -1; }
-    int vsprintf(char* s, const char* format, va_list args) { return -1; }
-    int snprintf(char* s, usize count, const char* format, ...) { return -1; }
+    int sprintf(char* s, const char* format, ...)
+    {
+        va_list args;
+
+        va_start(args, format);
+        const int ret = vsprintf(s, format, args);
+        va_end(args);
+
+        return ret;
+    }
+    int vsprintf(char* s, const char* format, va_list args)
+    {
+        return vsnprintf(s, std::numeric_limits<int>::max(), format, args);
+    }
+    int snprintf(char* s, usize count, const char* format, ...)
+    {
+        va_list args;
+        va_start(args, format);
+        const int ret = vsnprintf(s, count, format, args);
+        va_end(args);
+
+        return ret;
+    }
     int vsnprintf(char* s, usize count, const char* format, va_list args)
     {
         return -1;

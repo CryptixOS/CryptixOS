@@ -13,6 +13,7 @@ srcs += files(
   'Memory/PMM.cpp',
 
   'Utility/BootInfo.cpp',
+  'Utility/ICxxAbi.cpp',
   'Utility/Logger.cpp',
   'Utility/Stacktrace.cpp',
   'Utility/Ubsan.cpp',
