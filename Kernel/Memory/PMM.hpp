@@ -13,6 +13,8 @@ namespace PhysicalMemoryManager
     inline constexpr const usize PAGE_SIZE = 0x1000;
 
     bool                         Initialize();
+    bool                         IsInitialized();
+
     void*                        AllocatePages(usize count = 1);
     void*                        CallocatePages(usize count = 1);
     void                         FreePages(void* ptr, usize count);
