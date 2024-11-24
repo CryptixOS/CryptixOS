@@ -7,7 +7,7 @@
 echo 'generating ksyms.sym...'
 tmp=$(mktemp)
 NM="${NM:-nm}"
-nm -n Kernel/Cryptix.elf > "$tmp"
+llvm-nm -n Kernel/Cryptix.elf > "$tmp"
 printf "%08x
 " "$(wc -l "$tmp" | awk '{print $1}')" > ksyms.sym
 cat "$tmp" >> ksyms.sym
