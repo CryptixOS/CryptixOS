@@ -23,14 +23,13 @@ namespace Serial
     {
         while (*reinterpret_cast<u16*>(s_UartAddress + 0x18) & Bit(4))
             __asm__ volatile("isb" ::: "memory");
-        // Arch::Pause();
 
         return *reinterpret_cast<u8*>(s_UartAddress);
     }
     void Write(u8 byte)
     {
         while (*reinterpret_cast<u16*>(s_UartAddress + 0x18) & Bit(5))
-            asm volatile("isb" ::: "memory");
+            __asm__ volatile("isb" ::: "memory");
 
         *reinterpret_cast<u8*>(s_UartAddress) = byte;
     }

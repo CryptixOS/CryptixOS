@@ -137,13 +137,13 @@ namespace Arch::VMM
         else vaWidth = 48;
 
         std::pair<std::pair<usize, usize>, uintptr_t> map[]
-            = {{{PAGE_SIZE_4KIB, 48}, 0x0000FFFFFFFFF000},
-               {{PAGE_SIZE_16KIB, 48}, 0x0000FFFFFFFFC000},
-               {{PAGE_SIZE_64KIB, 48}, 0x0000FFFFFFFF0000},
+            = {{{PAGE_SIZE_4KIB, 48}, 0x0000fffffffff000},
+               {{PAGE_SIZE_16KIB, 48}, 0x0000ffffffffc000},
+               {{PAGE_SIZE_64KIB, 48}, 0x0000ffffffff0000},
 
-               {{PAGE_SIZE_4KIB, 52}, 0x0003FFFFFFFFF000},
-               {{PAGE_SIZE_16KIB, 52}, 0x0003FFFFFFFFC000},
-               {{PAGE_SIZE_64KIB, 52}, 0x0000FFFFFFFF0000}};
+               {{PAGE_SIZE_4KIB, 52}, 0x0003fffffffff000},
+               {{PAGE_SIZE_16KIB, 52}, 0x0003ffffffffc000},
+               {{PAGE_SIZE_64KIB, 52}, 0x0000ffffffff0000}};
 
         for (usize i = 0; i < std::size(map); i++)
         {

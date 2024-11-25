@@ -115,7 +115,6 @@ namespace VirtualMemoryManager
             virtualAddressSpace = base + 4_gib;
         }
 
-        kernelPageMap->Map(0, 0, (PageAttributes)0);
         kernelPageMap->Load();
         LogInfo("VMM: Loaded kernel page map");
     }

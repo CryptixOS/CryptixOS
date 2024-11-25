@@ -7,7 +7,9 @@
 
 #include "Common.hpp"
 
+#include "ACPI/ACPI.hpp"
 #include "Arch/InterruptManager.hpp"
+
 #include "Drivers/Serial.hpp"
 
 #include "Memory/PMM.hpp"
@@ -21,13 +23,12 @@ extern "C" void kernelStart()
     Logger::EnableOutput(LOG_OUTPUT_TERMINAL);
     InterruptManager::InstallExceptionHandlers();
 
-    Serial::Initialize();
-    Logger::EnableOutput(LOG_OUTPUT_SERIAL);
-
     Assert(PMM::Initialize());
     icxxabi::Initialize();
 
     VMM::Initialize();
+    Serial::Initialize();
+    Logger::EnableOutput(LOG_OUTPUT_SERIAL);
 
     LogInfo("Boot: Kernel loaded with {}-{} -> boot time: {}s",
             BootInfo::GetBootloaderName(), BootInfo::GetBootloaderVersion(),
@@ -38,6 +39,7 @@ extern "C" void kernelStart()
     LogInfo("Boot: Kernel Virtual Address: {:#x}",
             BootInfo::GetKernelVirtualAddress());
     Stacktrace::Initialize();
+    ACPI::Initialize();
 
     LogInfo("PagingMode: {}", BootInfo::GetPagingMode());
 

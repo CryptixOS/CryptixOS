@@ -7,6 +7,9 @@
 srcs += files(
   'KernelStart.cpp',
 
+  'ACPI/ACPI.cpp',
+  'ACPI/MADT.cpp',
+
   'Drivers/Terminal.cpp',
 
   'Memory/KernelHeap.cpp',
