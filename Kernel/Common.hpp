@@ -28,17 +28,39 @@ inline constexpr u64 BIT(u64 n) { return (1ull << n); }
 [[noreturn]]
 inline void panic(std::string_view msg)
 {
-    LogFatal("Kernel Panic!\n\r{}\n\r", msg.data());
+    Arch::DisableInterrupts();
+    // TODO(v1tr10l7): Halt all cpus
+
+    Logger::Log(LogLevel::eNone, "\n");
+    LogFatal("Kernel Panic!");
+    LogError("Error Message: {}\n", msg);
     Stacktrace::Print(32);
 
+    LogFatal("System Halted!\n");
     Arch::Halt();
-    // TODO(v1tr10l7): Halt all cpus
+    CTOS_ASSERT_NOT_REACHED();
+}
+inline void earlyPanic(const char* format, ...)
+{
+    Arch::DisableInterrupts();
+    EarlyLogError("Kernel Panic!");
+
+    va_list args;
+    va_start(args, format);
+    Logger::Logv(LogLevel::eError, format, args);
+    va_end(args);
+
+    Stacktrace::Print(32);
+
+    EarlyLogFatal("System Halted!");
+    Arch::Halt();
     CTOS_ASSERT_NOT_REACHED();
 }
 
-#define Panic(...)   panic(std::format(__VA_ARGS__))
+#define EarlyPanic(fmt, ...) earlyPanic("Error Message: " fmt, __VA_ARGS__)
+#define Panic(...)           panic(std::format(__VA_ARGS__))
 
-#define Assert(expr) AssertMsg(expr, #expr)
+#define Assert(expr)         AssertMsg(expr, #expr)
 #define AssertMsg(expr, msg)                                                   \
     !(expr) ? Panic("Assertion Failed: {}, In File: {}, At Line: {}", msg,     \
                     __FILE__, __LINE__)                                        \

@@ -6,6 +6,9 @@
 #*/
 srcs += files(
   'Arch.cpp',
+  'InterruptManager.cpp',
+  'interrupts.S',
+
   'Drivers/Serial.cpp'
 )
 

@@ -62,13 +62,14 @@ static void raiseException(CPUContext* ctx)
 {
     // TODO(v1tr10l7): Display valid cpu ids when smp will be implemented
     u64 cpuID = 0;
-    LogError("{}", exceptionNames[ctx->interruptVector]);
-    Panic(
-        "Captured exception[{:#x}] on cpu {}: '{}'\n\rError Code: "
-        "{:#b}\n\rrip: "
-        "{:#x}",
+    EarlyPanic(
+        "Captured exception[%#x] on cpu %zu: '%s'\n\rError Code: "
+        "%#b\n\rrip: "
+        "%#p",
         ctx->interruptVector, cpuID, exceptionNames[ctx->interruptVector],
         ctx->errorCode, ctx->rip);
+
+    Arch::Halt();
 }
 
 [[noreturn]]

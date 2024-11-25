@@ -20,6 +20,8 @@ namespace Arch
     }
     void Pause() { __asm__ volatile("pause"); }
 
+    void EnableInterrupts() { __asm__ volatile("sti"); }
+    void DisableInterrupts() { __asm__ volatile("cli"); }
     bool ExchangeInterruptFlag(bool enabled)
     {
         u64 rflags;
@@ -28,8 +30,8 @@ namespace Arch
             "pop %[rflags]"
             : [rflags] "=r"(rflags));
 
-        if (enabled) __asm__ volatile("sti");
-        else __asm__ volatile("cli");
+        if (enabled) EnableInterrupts();
+        else DisableInterrupts();
         return rflags & Bit(9);
     }
 }; // namespace Arch

@@ -107,7 +107,6 @@ deps = [
   dependency('veque'),
   dependency('fmt'),
   dependency('string'),
-  dependency('lai'),
   dependency('demangler'),
 ]
 
@@ -127,7 +126,7 @@ qemu_args = [
   '-d', 'int,guest_errors',
   '-smp', '4',
   '-d', 'cpu_reset',
-  '-m', '512M',
+  '-m', '2G',
   '-rtc', 'base=localtime',
   '-no-shutdown', '-no-reboot',
   '-D', meson.project_source_root() / 'qemu.log',
@@ -265,9 +264,9 @@ run_uefi_gdb = custom_target(
   depends: iso,
 )
 
-onlybuild = custom_target(
-  'onlybuild',
-  output: 'onlybuild',
+build = custom_target(
+  'build',
+  output: 'build',
   command: 'true',
   install: false,
   depends: iso,

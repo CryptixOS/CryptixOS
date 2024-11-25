@@ -11,8 +11,8 @@ run_gdb:
 run_bios: 
 	ninja -C build run_bios
 
-build:
-	ninja -C build
+build: 
+	ninja -C build build
 
 .PHONY: clean
 clean:

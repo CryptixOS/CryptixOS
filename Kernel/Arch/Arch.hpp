@@ -16,5 +16,8 @@ namespace Arch
 
     __attribute__((noreturn)) void Halt();
     void                           Pause();
+
+    void                           EnableInterrupts();
+    void                           DisableInterrupts();
     bool                           ExchangeInterruptFlag(bool enabled);
 }; // namespace Arch

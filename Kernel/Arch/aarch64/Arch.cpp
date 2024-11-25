@@ -16,13 +16,15 @@ namespace Arch
     }
     void Pause() { __asm__ volatile("isb" ::: "memory"); }
 
+    void EnableInterrupts() { __asm__ volatile("msr daifclr, #0b1111"); }
+    void DisableInterrupts() { __asm__ volatile("msr daifset, #0b1111"); }
     bool ExchangeInterruptFlag(bool enabled)
     {
         u64 interruptsDisabled;
         __asm__ volatile("mrs %0, daif" : "=r"(interruptsDisabled));
 
-        if (enabled) __asm__ volatile("msr daifclr, #0b1111");
-        else __asm__ volatile("msr daifset, #0b1111");
+        if (enabled) EnableInterrupts();
+        else DisableInterrupts();
         return !interruptsDisabled;
     }
 } // namespace Arch

@@ -88,7 +88,9 @@ namespace Stacktrace
             while (*(++current))
                 if (*current == '\n') break;
             auto& ksym   = symbols[currentSymbolIndex];
-            ksym.address = address + BootInfo::GetKernelVirtualAddress();
+            ksym.address = address == 0
+                             ? address + BootInfo::GetKernelVirtualAddress()
+                             : address;
             ksym.name    = startOfName;
 
             *current     = '\0';

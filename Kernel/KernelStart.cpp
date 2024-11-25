@@ -7,6 +7,7 @@
 
 #include "Common.hpp"
 
+#include "Arch/InterruptManager.hpp"
 #include "Drivers/Serial.hpp"
 
 #include "Memory/PMM.hpp"
@@ -14,25 +15,13 @@
 #include "Utility/ICxxAbi.hpp"
 #include "Utility/Stacktrace.hpp"
 
-#if CTOS_ARCH == CTOS_ARCH_X86_64
-    #include "Arch/x86_64/GDT.hpp"
-    #include "Arch/x86_64/IDT.hpp"
-#endif
-
 extern "C" void kernelStart()
 {
+    Logger::EnableOutput(LOG_OUTPUT_TERMINAL);
+    InterruptManager::InstallExceptionHandlers();
+
     Serial::Initialize();
     Logger::EnableOutput(LOG_OUTPUT_SERIAL);
-
-    Logger::EnableOutput(LOG_OUTPUT_TERMINAL);
-
-#if CTOS_ARCH == CTOS_ARCH_X86_64
-    GDT::Initialize();
-    GDT::Load(0);
-
-    IDT::Initialize();
-    IDT::Load();
-#endif
 
     Assert(PMM::Initialize());
     icxxabi::Initialize();
