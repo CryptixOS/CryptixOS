@@ -6,6 +6,8 @@
  */
 #pragma once
 
+#include "Common.hpp"
+
 #include "Utility/Types.hpp"
 
 #include <cstring>
@@ -25,6 +27,7 @@ struct Bitmap
     {
         const usize byte = index / 8;
         const usize bit  = index % 8;
+        Assert(byte < size);
 
         if (value) data[byte] |= Bit(bit);
         else data[byte] &= ~Bit(bit);

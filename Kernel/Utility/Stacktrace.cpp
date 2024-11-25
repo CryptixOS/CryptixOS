@@ -7,7 +7,12 @@
 #include "Stacktrace.hpp"
 
 #include "Common.hpp"
+
+#include "Memory/PMM.hpp"
+#include "Memory/VMM.hpp"
+
 #include "Utility/BootInfo.hpp"
+#include "Utility/Math.hpp"
 
 #include <demangler/Demangle.h>
 
@@ -87,10 +92,11 @@ namespace Stacktrace
             startOfName = current;
             while (*(++current))
                 if (*current == '\n') break;
-            auto& ksym   = symbols[currentSymbolIndex];
-            ksym.address = address == 0
-                             ? address + BootInfo::GetKernelVirtualAddress()
-                             : address;
+            auto& ksym = symbols[currentSymbolIndex];
+            if (address < BootInfo::GetKernelVirtualAddress())
+                address += BootInfo::GetKernelVirtualAddress();
+
+            ksym.address = address;
             ksym.name    = startOfName;
 
             *current     = '\0';
@@ -103,7 +109,9 @@ namespace Stacktrace
             ++currentSymbolIndex;
         }
 
-        // TODO: Free pages
+        PMM::FreePages(FromHigherHalfAddress<uintptr_t>(file->address),
+                       Math::AlignUp(file->size, PMM::PAGE_SIZE)
+                           / PMM::PAGE_SIZE);
         LogInfo("Stacktrace: kernel symbols loaded");
         return true;
     }

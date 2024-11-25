@@ -11,8 +11,6 @@
 
 #include <type_traits>
 
-#define Bit(n) (1 << n)
-
 using usize  = size_t;
 using isize  = std::make_signed_t<usize>;
 
@@ -27,3 +25,5 @@ using i32    = int32_t;
 using i64    = int64_t;
 
 using symbol = void*[];
+
+inline constexpr u64 Bit(u64 n) { return (1ull << n); }

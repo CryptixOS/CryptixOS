@@ -9,6 +9,7 @@ srcs += files(
   'GDT.cpp',
   'IDT.cpp',
   'InterruptManager.cpp',
+  'VMM.cpp',
   'interrupts.x86_64.S',
 
   'Drivers/Serial.cpp'

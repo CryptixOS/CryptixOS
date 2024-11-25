@@ -11,6 +11,7 @@ srcs += files(
 
   'Memory/KernelHeap.cpp',
   'Memory/PMM.cpp',
+  'Memory/VMM.cpp',
 
   'Utility/BootInfo.cpp',
   'Utility/ICxxAbi.cpp',

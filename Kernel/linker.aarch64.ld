@@ -19,13 +19,15 @@ PHDRS
 
 SECTIONS
 {
-    . = 0xffffffff80000000;
+    . = 0;
 
+    limine_start_addr = .;
     .limine_requests : {
         KEEP(*(.limine_requests_start))
         KEEP(*(.limine_requests))
         KEEP(*(.limine_requests_end))
     } :limine_requests
+    limine_end_addr = .;
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 

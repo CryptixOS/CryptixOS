@@ -108,7 +108,7 @@ namespace PhysicalMemoryManager
         }
 
         Assert(bitmap.size != 0);
-        auto entryTypeToString = [](u64 type)
+        [[maybe_unused]] auto entryTypeToString = [](u64 type)
         {
             switch (type)
             {
@@ -132,9 +132,9 @@ namespace PhysicalMemoryManager
         for (usize i = 0; i < entryCount; i++)
         {
             MemoryMapEntry* currentEntry = memoryMap[i];
-            EarlyLogInfo("MemoryMap[%zu]: base: %#zx, size: %zuKiB, type: %s",
-                         i, currentEntry->base, currentEntry->length / 1024,
-                         entryTypeToString(currentEntry->type));
+            /*EarlyLogTrace("MemoryMap[%zu]: base: %#zx, size: %zuKiB, type:
+               %s", i, currentEntry->base, currentEntry->length / 1024,
+                          entryTypeToString(currentEntry->type));*/
 
             if (currentEntry->type != MEMORY_MAP_USABLE) continue;
 

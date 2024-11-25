@@ -11,6 +11,7 @@
 #include "Drivers/Serial.hpp"
 
 #include "Memory/PMM.hpp"
+#include "Memory/VMM.hpp"
 
 #include "Utility/ICxxAbi.hpp"
 #include "Utility/Stacktrace.hpp"
@@ -26,6 +27,8 @@ extern "C" void kernelStart()
     Assert(PMM::Initialize());
     icxxabi::Initialize();
 
+    VMM::Initialize();
+
     LogInfo("Boot: Kernel loaded with {}-{} -> boot time: {}s",
             BootInfo::GetBootloaderName(), BootInfo::GetBootloaderVersion(),
             BootInfo::GetBootTime());
@@ -35,6 +38,8 @@ extern "C" void kernelStart()
     LogInfo("Boot: Kernel Virtual Address: {:#x}",
             BootInfo::GetKernelVirtualAddress());
     Stacktrace::Initialize();
+
+    LogInfo("PagingMode: {}", BootInfo::GetPagingMode());
 
     Panic("Test Panic");
     for (;;) Arch::Halt();
