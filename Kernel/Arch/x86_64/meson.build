@@ -6,13 +6,17 @@
 #*/
 srcs += files(
   'Arch.cpp',
+  'CPU.cpp',
   'GDT.cpp',
   'IDT.cpp',
   'InterruptManager.cpp',
+  'Syscall.cpp',
   'VMM.cpp',
   'interrupts.x86_64.S',
+  'syscall.S',
 
-  'Drivers/Serial.cpp'
+  'Drivers/PIC.cpp',
+  'Drivers/Serial.cpp',
 )
 
 c_args += [

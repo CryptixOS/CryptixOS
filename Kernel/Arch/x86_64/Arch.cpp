@@ -8,9 +8,18 @@
 
 #include "Common.hpp"
 
+#include "Arch/x86_64/CPU.hpp"
+#include "Arch/x86_64/Drivers/PIC.hpp"
+
 namespace Arch
 {
-    void                           Initialize() {}
+    void Initialize()
+    {
+        CPU::InitializeBSP();
+
+        PIC::Remap(0x20, 0x28);
+        PIC::MaskAllIRQs();
+    }
 
     __attribute__((noreturn)) void Halt()
     {

@@ -40,9 +40,7 @@ extern "C" void kernelStart()
             BootInfo::GetKernelVirtualAddress());
     Stacktrace::Initialize();
     ACPI::Initialize();
+    Arch::Initialize();
 
-    LogInfo("PagingMode: {}", BootInfo::GetPagingMode());
-
-    Panic("Test Panic");
     for (;;) Arch::Halt();
 }
