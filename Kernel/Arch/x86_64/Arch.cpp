@@ -10,6 +10,7 @@
 
 #include "Arch/x86_64/CPU.hpp"
 #include "Arch/x86_64/Drivers/PIC.hpp"
+#include "Arch/x86_64/Drivers/Timers/PIT.hpp"
 
 namespace Arch
 {
@@ -19,6 +20,8 @@ namespace Arch
 
         PIC::Remap(0x20, 0x28);
         PIC::MaskAllIRQs();
+
+        PIT::Initialize();
     }
 
     __attribute__((noreturn)) void Halt()

@@ -17,6 +17,8 @@ srcs += files(
 
   'Drivers/PIC.cpp',
   'Drivers/Serial.cpp',
+
+  'Drivers/Timers/PIT.cpp',
 )
 
 c_args += [
