@@ -8,8 +8,12 @@
 
 #include "Common.hpp"
 
+#include "ACPI/MADT.hpp"
+
 #include "Arch/x86_64/CPUContext.hpp"
 #include "Arch/x86_64/GDT.hpp"
+
+#include "Arch/InterruptHandler.hpp"
 
 extern const char*             exceptionNames[];
 
@@ -41,9 +45,10 @@ struct IDTEntry
 } __attribute__((packed));
 
 [[maybe_unused]] alignas(0x10) static IDTEntry idtEntries[256] = {};
-extern "C" void* interrupt_handlers[];
+extern "C" void*        interrupt_handlers[];
+static InterruptHandler interruptHandlers[256];
 
-static void      idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
+static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
 {
     Assert(vector < MAX_IDT_ENTRIES);
     IDTEntry* entry   = idtEntries + vector;
@@ -82,7 +87,15 @@ static void unhandledInterrupt(CPUContext* context)
 }
 extern "C" void raiseInterrupt(CPUContext* ctx)
 {
+    auto& handler = interruptHandlers[ctx->interruptVector];
+
     if (ctx->interruptVector < 0x20) raiseException(ctx);
+    else if (handler.IsUsed())
+    {
+        // TODO(v1tr10l7): send eoi
+        handler(ctx);
+    }
+
     unhandledInterrupt(ctx);
 }
 
@@ -94,6 +107,8 @@ namespace IDT
         {
             idtWriteEntry(i, reinterpret_cast<uintptr_t>(interrupt_handlers[i]),
                           0x80 | GATE_TYPE_INTERRUPT);
+
+            interruptHandlers[i].SetInterruptVector(i);
         }
 
         LogInfo("IDT: Initialized!");
@@ -110,6 +125,31 @@ namespace IDT
         __asm__ volatile("lidt %0" : : "m"(idtr));
     }
 
+    InterruptHandler* AllocateHandler(u8 hint)
+    {
+        LogTrace("IDT: Allocating handler...");
+        if (hint < 0x20) hint += 0x20;
+
+        if (MADT::LegacyPIC())
+        {
+            if ((hint >= 0x20 && hint <= (0x20 + 15))
+                && !interruptHandlers[hint].IsUsed())
+                return &interruptHandlers[hint];
+        }
+
+        for (usize i = hint; i < 256; i++)
+        {
+            if (!interruptHandlers[i].IsUsed()
+                && !interruptHandlers[i].IsReserved())
+            {
+                interruptHandlers[i].Reserve();
+                interruptHandlers[i].SetInterruptVector(i);
+                return &interruptHandlers[i];
+            }
+        }
+
+        Panic("IDT: Out of interrupt handlers");
+    }
 } // namespace IDT
 
 #pragma region exception_names

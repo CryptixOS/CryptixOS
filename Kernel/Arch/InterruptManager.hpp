@@ -8,7 +8,9 @@
 
 #include "Common.hpp"
 
+class InterruptHandler;
 namespace InterruptManager
 {
     void InstallExceptionHandlers();
-};
+    void RegisterInterruptHandler(InterruptHandler& interruptHandler);
+}; // namespace InterruptManager

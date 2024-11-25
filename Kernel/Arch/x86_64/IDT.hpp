@@ -8,11 +8,15 @@
 
 #include "Common.hpp"
 
+#include "Arch/InterruptHandler.hpp"
+
 inline constexpr const usize DPL_RING0 = 0x00;
 inline constexpr const usize DPL_RING3 = 0x03;
 
 namespace IDT
 {
-    void Initialize();
-    void Load();
+    void              Initialize();
+    void              Load();
+
+    InterruptHandler* AllocateHandler(u8 hint);
 }; // namespace IDT
