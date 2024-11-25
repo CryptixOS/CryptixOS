@@ -9,7 +9,6 @@
 #include "Arch/CPU.hpp"
 #include "Arch/InterruptHandler.hpp"
 #include "Arch/InterruptManager.hpp"
-#include "Arch/x86_64/IDT.hpp"
 
 #include "Memory/PMM.hpp"
 

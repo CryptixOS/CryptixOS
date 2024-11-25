@@ -25,6 +25,13 @@ srcs += files(
   'Utility/Logger.cpp',
   'Utility/Stacktrace.cpp',
   'Utility/Ubsan.cpp',
+
+  'VFS/INode.cpp',
+  'VFS/VFS.cpp',
+  'VFS/Initrd/Initrd.cpp',
+  'VFS/Initrd/Ustar.cpp',
+  'VFS/TmpFs/TmpFs.cpp',
+  'VFS/TmpFs/TmpFsINode.cpp',
 )
 
 c_args = []

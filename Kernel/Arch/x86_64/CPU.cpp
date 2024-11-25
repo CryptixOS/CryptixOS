@@ -26,7 +26,7 @@ namespace CPU
         GDT::Load(current->lapicID);
         IDT::Load();
 
-        EnablePAT();
+        // EnablePAT();
         VMM::GetKernelPageMap()->Load();
 
         if (current->lapicID != bspLapicId)

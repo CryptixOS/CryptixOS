@@ -24,6 +24,7 @@ arch = host_machine.cpu_family()
 qemulog = meson.project_source_root() / 'qemu.log'
 
 srcs = []
+initrd_dir = meson.project_source_root() / 'sysroot'
 
 include_directories = [
   include_directories('Kernel'),
@@ -197,9 +198,18 @@ iso_files = [
   limine.get_variable('limine_binaries'),
 ]
 
+initrd = custom_target(
+  'initrd',
+  input: initrd_dir / 'usr' / 'sbin' / 'init',
+  output: 'initrd.img.gz',
+  command: ['tar', '-cvf', '@OUTPUT@', '-C', initrd_dir, '.'],
+  build_by_default: true,
+  console: true,
+  install: false,
+)
 iso = custom_target(
   'iso',
-  input: [kernel_elf, 'limine.conf'],
+  input: [kernel_elf, initrd, 'limine.conf'],
   output: 'Cryptix.iso',
   command: [
     'mkdir',
@@ -208,6 +218,10 @@ iso = custom_target(
     'cp',
     '@INPUT0@',
     iso_dir / 'Cryptix.elf',
+    '&&',
+    'cp',
+    '@INPUT1@',
+    iso_dir / 'initrd.img.gz',
     '&&',
     'cp',
     iso_files,
@@ -229,7 +243,7 @@ iso = custom_target(
   build_by_default: true,
   console: true,
   install: false,
-  depends: [kernel_elf],
+  depends: [kernel_elf, initrd],
 )
 
 run_bios = custom_target(

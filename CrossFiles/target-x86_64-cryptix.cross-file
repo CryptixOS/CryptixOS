@@ -1,0 +1,12 @@
+[binaries]
+c = 'x86_64-cryptix-gcc'
+cpp = 'x86_64-cryptix-g++'
+ar = 'x86_64-cryptix-ar'
+strip = 'x86_64-cryptix-strip'
+pkgconfig = 'x86_64-cryptix-pkg-config'
+
+[host_machine]
+system = 'cryptix'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'

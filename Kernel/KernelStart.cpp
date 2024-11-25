@@ -22,8 +22,14 @@
 #include "Utility/ICxxAbi.hpp"
 #include "Utility/Stacktrace.hpp"
 
+#include "VFS/Initrd/Initrd.hpp"
+#include "VFS/VFS.hpp"
+
 void kernelThread()
 {
+    Assert(VFS::MountRoot("tmpfs"));
+    Initrd::Initialize();
+
     for (;;) LogInfo("Hello");
 }
 

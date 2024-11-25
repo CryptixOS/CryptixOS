@@ -1,0 +1,366 @@
+#*
+#* Created by v1tr10l7 on 16.11.2024.
+#* Copyright (c) 2024-2024, Szymon Zemke <v1tr10l7@proton.me>
+#*
+#* SPDX-License-Identifier: GPL-3
+#*/
+
+declare_options:
+  - name: arch
+    default: x86_64
+  - name: arch-triple
+    default: x86_64-cryptix
+
+sources:
+  - name: binutils
+    subdir: 'sources'
+    url: 'https://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.xz'
+    format: 'tar.xz'
+    extract_path: 'binutils-2.42'
+    version: '2.42'
+    patch-path-strip: 1
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+    regenerate:
+      - args: ['automake']
+        workdir: '@THIS_SOURCE_DIR@/ld'
+
+  - name: gcc
+    subdir: 'sources'
+    url: 'https://ftp.gnu.org/gnu/gcc/gcc-14.1.0/gcc-14.1.0.tar.xz'
+    format: 'tar.xz'
+    extract_path: 'gcc-14.1.0'
+    version: '14.1.0'
+    patch-path-strip: 1
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.11
+    regenerate:
+      - args: ['autoconf']
+        workdir: '@THIS_SOURCE_DIR@/gcc'
+      - args: ['autoconf']
+        workdir: '@THIS_SOURCE_DIR@/libstdc++-v3'
+
+  - name: mlibc
+    subdir: 'sources'
+    git: 'https://github.com/managarm/mlibc.git'
+    branch: 'release-5.0'
+    rolling_version: true
+    version: '0.0pl@ROLLING_ID@'
+
+
+tools:
+  - name: host-autoconf-v2.69
+    architecture: noarch
+    source:
+      name: autoconf-2v.69
+      subdir: 'sources'
+      url: 'https://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'autoconf-2.69'
+      version: '2.69'
+    revision: 2
+    configure:
+      - args: ['@THIS_SOURCE_DIR@/configure', '--prefix=@PREFIX@']
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+  - name: host-automake-v1.11
+    architecture: noarch
+    source:
+      name: automake-v1.11
+      subdir: 'sources'
+      url: 'https://ftp.gnu.org/gnu/automake/automake-1.11.6.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'automake-1.11.6'
+      version: '1.11.6'
+      patch-path-strip: 1
+    tools_required:
+      - host-autoconf-v2.69
+    revision: 2
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+      # Stop aclocal from complaining.
+      - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.11', '@PREFIX@/share/aclocal']
+
+  - name: host-automake-v1.15
+    architecture: noarch
+    source:
+      name: automake-v1.15
+      subdir: 'sources'
+      url: 'https://ftp.gnu.org/gnu/automake/automake-1.15.1.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'automake-1.15.1'
+      version: '1.15.1'
+      patch-path-strip: 1
+    tools_required:
+      - host-autoconf-v2.69
+    revision: 2
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+        - 'MAKEINFO=/bin/true'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+      # Stop aclocal from complaining.
+      - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.15', '@PREFIX@/share/aclocal']
+
+  - name: cross-binutils
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    from_source: binutils
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+        - '--target=@OPTION:arch-triple@'
+        - '--with-sysroot=@SYSROOT_DIR@'
+        - '--disable-werror'
+        - '--enable-targets=x86_64-elf,x86_64-pe'
+        # - '--enable-default-hash-style=gnu'
+        - 'CFLAGS=-O2'
+    compile:
+      - args: ['make', '-j@PARALLELISM@', 'all-binutils', 'all-gas', 'all-ld']
+    install:
+      - args: ['make', 'install-binutils', 'install-gas', 'install-ld']
+
+  - name: bootstrap-system-gcc
+    architecture: '@OPTION:arch@'
+    from_source: gcc
+    tools_required:
+      - tool: cross-binutils
+        recursive: true
+    revision: 2
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+        - '--target=@OPTION:arch-triple@'
+        - '--with-sysroot=@SYSROOT_DIR@'
+        - '--enable-languages=c,c++'
+        - '--disable-multilib'
+        - '--disable-shared'
+        - '--enable-initfini-array'
+        # -g blows up GCC's binary size.
+        - 'CFLAGS=-O2'
+        - 'CXXFLAGS=-O2'
+    stages:
+      - name: compiler
+        pkgs_required:
+         - mlibc-headers
+        compile:
+          # GCC complains if the include directory is non-existant.
+          - args: ['mkdir', '-p', '@SYSROOT_DIR@/usr/include']
+          - args: ['make', '-j@PARALLELISM@', 'inhibit_libc=true', 'all-gcc']
+        install:
+          - args: ['make', 'install-gcc']
+          # GCC does *not* look for target-prefixed LD/AS.
+          # Instead, it searches a list of prefix directories. Link AS/LD to make it happy.
+          - args: ['mkdir', '-p', '@PREFIX@/@OPTION:arch-triple@/bin']
+          - args: ['ln', '-sf', '../../../cross-binutils/@OPTION:arch-triple@/bin/as',
+                               '@PREFIX@/@OPTION:arch-triple@/bin/as']
+          - args: ['ln', '-sf', '../../../cross-binutils/@OPTION:arch-triple@/bin/ld',
+                               '@PREFIX@/@OPTION:arch-triple@/bin/ld']
+      - name: libgcc
+        tools_required:
+          - tool: bootstrap-system-gcc
+            stage_dependencies: [compiler]
+        compile:
+          - args: ['make', '-j@PARALLELISM@', 'inhibit_libc=true', 'all-target-libgcc']
+        install:
+          - args: ['make', 'install-target-libgcc']
+
+
+  - name: system-gcc
+    architecture: '@OPTION:arch@'
+    from_source: gcc
+    tools_required:
+      - tool: cross-binutils
+        recursive: true
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+        - '--target=@OPTION:arch-triple@'
+        - '--with-sysroot=@SYSROOT_DIR@'
+        - '--enable-languages=c,c++'
+        - '--disable-multilib'
+        - '--enable-initfini-array'
+        - '--enable-libstdcxx-filesystem-ts'
+        # -g blows up GCC's binary size.
+        - 'CFLAGS=-O2'
+        - 'CXXFLAGS=-O2'
+    stages:
+      - name: compiler
+        pkgs_required:
+        - mlibc-headers
+        compile:
+          # GCC complains if the include directory is non-existant.
+          - args: ['mkdir', '-p', '@SYSROOT_DIR@/usr/include']
+          - args: ['make', '-j@PARALLELISM@', 'all-gcc']
+        install:
+          - args: ['make', 'install-gcc']
+          # GCC does *not* look for target-prefixed LD/AS.
+          # Instead, it searches a list of prefix directories. Link AS/LD to make it happy.
+          - args: ['mkdir', '-p', '@PREFIX@/@OPTION:arch-triple@/bin']
+          - args: ['ln', '-sf', '../../../cross-binutils/@OPTION:arch-triple@/bin/as',
+                               '@PREFIX@/@OPTION:arch-triple@/bin/as']
+          - args: ['ln', '-sf', '../../../cross-binutils/@OPTION:arch-triple@/bin/ld',
+                               '@PREFIX@/@OPTION:arch-triple@/bin/ld']
+      - name: libgcc
+        tools_required:
+          - tool: system-gcc
+            stage_dependencies: [compiler]
+        pkgs_required:
+          - mlibc
+        compile:
+          - args: ['make', '-j@PARALLELISM@', 'all-target-libgcc']
+        install:
+          - args: ['make', 'install-target-libgcc']
+            #- name: libstdc++
+            #tools_required:
+            #- tool: system-gcc
+            #stage_dependencies: [libgcc]
+            #compile:
+            #- args: ['make', '-j@PARALLELISM@', 'all-target-libstdc++-v3']
+            #install:
+            #- args: ['make', 'install-target-libstdc++-v3']
+
+packages:
+  - name: base-files
+    architecture: noarch
+    source:
+      subdir: 'sources'
+      version: '1.0'
+    configure: []
+    build:
+      - args: ['rsync', '-al', '@SOURCE_ROOT@/BaseFiles/', '@THIS_COLLECT_DIR@']
+
+  - name: init
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      version: '1.0'
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - base-files
+      - mlibc
+    configure: []
+    build:
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/sbin']
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/root']
+      - args: ['@OPTION:arch-triple@-gcc', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/init.c', '-o', '@THIS_COLLECT_DIR@/usr/sbin/init']
+
+  - name: linux-headers
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      url: 'https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.1.10.tar.xz'
+      extract_path: 'linux-6.1.10'
+      format: 'tar.xz'
+      version: '6.1.10'
+    implict_package: true
+    configure:
+      - args: ['cp', '-Tr', '@THIS_SOURCE_DIR@', '.']
+    build:
+      - args: |
+          LINUX_ARCH="@OPTION:arch@"
+          case "$LINUX_ARCH" in
+            "aarch64")
+              LINUX_ARCH="arm64"
+              ;;
+          esac
+          make ARCH="$LINUX_ARCH" headers_install
+      - args: ['find', 'usr/include', '-type', 'f', '!', '-name', '*.h', '-delete']
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr']
+      # remove this file, as mlibc will override it with one suited to mlibc
+      - args: ['rm', 'usr/include/linux/libc-compat.h']
+      - args: ['cp', '-Tr', 'usr/include', '@THIS_COLLECT_DIR@/usr/include']
+
+  - name: mlibc-headers
+    architecture: '@OPTION:arch@'
+    from_source: mlibc
+    pkgs_required:
+      - linux-headers
+    implict_package: true
+    configure:
+      - args:
+        - 'meson'
+        - 'setup'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/target-@OPTION:arch-triple@.cross-file'
+        - '--prefix=/usr'
+        - '@THIS_SOURCE_DIR@'
+        - '--wrap-mode=nofallback'
+        - '-Dheaders_only=true'
+        - '-Dlinux_kernel_headers=@BUILD_ROOT@/packages/linux-headers/usr/include'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+
+  - name: mlibc
+    architecture: '@OPTION:arch@'
+    from_source: mlibc
+    tools_required:
+      - bootstrap-system-gcc
+      - virtual: pkgconfig-for-target
+        triple: "@OPTION:arch-triple@"
+    implict_package: true
+    pkgs_required:
+      - linux-headers
+      - mlibc-headers
+    configure:
+      - args:
+        - 'meson'
+        - 'setup'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/target-@OPTION:arch-triple@.cross-file'
+        - '--prefix=/usr'
+        - '--libdir=lib'
+        - '--buildtype=debugoptimized'
+        - '--wrap-mode=default'
+        - '-Dmlibc_no_headers=true'
+        - '-Ddisable_crypt_option=true'
+        - '-Ddisable_iconv_option=true'
+        - '-Ddisable_intl_option=true'
+        - '-Ddefault_library=both'
+        - '-Dlinux_kernel_headers=@BUILD_ROOT@/packages/linux-headers/usr/include'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+      - args: ['ln', '-sf', 'crt0.o', '@THIS_COLLECT_DIR@/usr/lib/crt1.o']
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/lib/@OPTION:arch-triple@']
+      - args: ['ln', '-sf', '../ld.so', '@THIS_COLLECT_DIR@/usr/lib/@OPTION:arch-triple@/ld.so']
+
+
+
+  - name: base
+    architecture: noarch
+    source:
+      subdir: 'sources'
+      version: '1.0'
+    pkgs_required:
+      - base-files
+      - mlibc
+      - init
+    configure: []
+    build: []

@@ -1,0 +1,142 @@
+diff --color -Naur gcc-clean/config.sub gcc/config.sub
+--- gcc-clean/config.sub	2024-05-07 08:51:37.000000000 +0200
++++ gcc/config.sub	2024-05-27 09:56:50.224907241 +0200
+@@ -1749,7 +1749,7 @@
+ 	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
+ 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
+ 	     | nsk* | powerunix* | genode* | zvmoe* | qnx* | emx* | zephyr* \
+-	     | fiwix* )
++	     | fiwix* | cryptix*)
+ 		;;
+ 	# This one is extra strict with allowed versions
+ 	sco3.2v2 | sco3.2v[4-9]* | sco5v6*)
+diff --color -Naur gcc-clean/fixincludes/mkfixinc.sh gcc/fixincludes/mkfixinc.sh
+--- gcc-clean/fixincludes/mkfixinc.sh	2024-05-07 08:51:37.000000000 +0200
++++ gcc/fixincludes/mkfixinc.sh	2024-05-27 10:09:32.104059803 +0200
+@@ -20,6 +20,7 @@
+     powerpcle-*-eabisim* | \
+     powerpcle-*-eabi* | \
+     *-*-vxworks7* | \
++    *-cryptix* | \
+     *-musl* )
+ 	#  IF there is no include fixing,
+ 	#  THEN create a no-op fixer and exit
+diff --color -Naur gcc-clean/gcc/config/cryptix.h gcc/gcc/config/cryptix.h
+--- gcc-clean/gcc/config/cryptix.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc/gcc/config/cryptix.h	2024-05-27 10:01:43.366631975 +0200
+@@ -0,0 +1,29 @@
++/* Useful if you wish to make target-specific GCC changes. */
++#undef TARGET_CRYPTIX
++#define TARGET_CRYPTIX 1
++
++/* Default arguments you want when running your
++   i686-myos-gcc/x86_64-myos-gcc toolchain */
++#undef LIB_SPEC
++#define LIB_SPEC "-lc" /* link against C standard library */
++
++/* Files that are linked before user code.
++   The %s tells GCC to look for these files in the library directory. */
++#undef STARTFILE_SPEC
++#define STARTFILE_SPEC                                                         \
++    "%{!shared:crt0.o%s} crti.o%s %{shared:crtbeginS.o%s;:crtbegin.o%s}"
++
++/* Files that are linked after user code. */
++#undef ENDFILE_SPEC
++#define ENDFILE_SPEC "%{shared:crtendS.o%s;:crtend.o%s} crtn.o%s"
++
++/* Additional predefined macros. */
++#undef TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS()                                               \
++    do {                                                                       \
++        builtin_define("__cryptix__");                                         \
++        builtin_define("__unix__");                                            \
++        builtin_assert("system=cryptix");                                      \
++        builtin_assert("system=unix");                                         \
++        builtin_assert("system=posix");                                        \
++    } while (0);
+diff --color -Naur gcc-clean/gcc/config/i386/i386-cryptix.h gcc/gcc/config/i386/i386-cryptix.h
+--- gcc-clean/gcc/config/i386/i386-cryptix.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc/gcc/config/i386/i386-cryptix.h	2024-05-27 10:02:50.329597852 +0200
+@@ -0,0 +1,10 @@
++#undef GCC_I386_CRYPTIX
++#define GCC_I386_CRYPTIX           1
++
++#define GNU_USER_LINK_EMULATION32  "elf_i386"
++#define GNU_USER_LINK_EMULATION64  "elf_x86_64"
++#define GNU_USER_LINK_EMULATIONX32 "elf32_x86_64"
++
++#define GNU_USER_DYNAMIC_LINKER32  "/lib/i386-cryptix/ld.so"
++#define GNU_USER_DYNAMIC_LINKER64  "/lib/x86_64-cryptix/ld.so"
++#define GNU_USER_DYNAMIC_LINKERX32 "/lib/x86_64-cryptix-x32/ld.so"
+diff --color -Naur gcc-clean/gcc/config.gcc gcc/gcc/config.gcc
+--- gcc-clean/gcc/config.gcc	2024-05-07 08:51:37.000000000 +0200
++++ gcc/gcc/config.gcc	2024-05-27 10:00:09.767145597 +0200
+@@ -884,6 +884,12 @@
+   rust_target_objs="${rust_target_objs} fuchsia-rust.o"
+   target_has_targetrustm=yes
+   ;;
++*-*-cryptix*)
++  gas=yes
++  gnu_ld=yes
++  default_use_cxa_atexit=yes
++  use_gcc_stdint=provide
++  ;;
+ *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)
+   extra_options="$extra_options gnu-user.opt"
+   gas=yes
+@@ -2040,6 +2046,9 @@
+ 		;;
+ 	esac
+ 	;;
++x86_64-*-cryptix*)
++    tm_file="${tm_file} i386/unix.h i386/att.h elfos.h glibc-stdint.h i386/i386elf.h i386/x86-64.h gnu-user.h i386/gnu-user-common.h i386/gnu-user64.h cryptix.h i386/i386-cryptix.h"
++    ;;
+ x86_64-*-linux* | x86_64-*-kfreebsd*-gnu | x86_64-*-gnu*)
+ 	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h gnu-user.h glibc-stdint.h \
+ 		 i386/x86-64.h i386/gnu-user-common.h i386/gnu-user64.h"
+diff --color -Naur gcc-clean/libgcc/config.host gcc/libgcc/config.host
+--- gcc-clean/libgcc/config.host	2024-05-07 08:51:41.000000000 +0200
++++ gcc/libgcc/config.host	2024-05-27 10:09:09.110852644 +0200
+@@ -304,6 +304,10 @@
+   tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-fuchsia"
+   extra_parts="crtbegin.o crtend.o"
+   ;;
++*-*-cryptix*)
++  extra_parts="$extra_parts crti.o crtbegin.o crtbeginS.o crtend.o crtendS.o crtn.o"
++  tmake_file="$tmake_file t-crtstuff-pic t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-libgcc-pic"
++  ;;
+ *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)
+   tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-linux"
+   extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
+@@ -778,6 +782,10 @@
+ 	;;
+ x86_64-*-openbsd*)
+ 	;;
++x86_64-*-cryptix*)
++    extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o crtfastmath.o"
++    tmake_file="$tmake_file i386/t-crtpc t-crtfm i386/t-crtstuff t-dfprules"
++    ;;
+ i[34567]86-*-linux*)
+ 	extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o crtfastmath.o"
+ 	tmake_file="${tmake_file} i386/t-crtpc t-crtfm i386/t-crtstuff t-dfprules"
+diff --color -Naur gcc-clean/libstdc++-v3/crossconfig.m4 gcc/libstdc++-v3/crossconfig.m4
+--- gcc-clean/libstdc++-v3/crossconfig.m4	2024-05-07 08:51:41.000000000 +0200
++++ gcc/libstdc++-v3/crossconfig.m4	2024-05-27 10:04:42.572315260 +0200
+@@ -174,6 +174,17 @@
+ 
+     GCC_CHECK_TLS
+     ;;
++  *-cryptix*)
++    GLIBCXX_CHECK_COMPILER_FEATURES
++    GLIBCXX_CHECK_LINKER_FEATURES
++    GLIBCXX_CHECK_MATH_SUPPORT
++    GLIBCXX_CHECK_STDLIB_SUPPORT
++    AC_DEFINE(_GLIBCXX_USE_DEV_RANDOM)
++    AC_DEFINE(_GLIBCXX_USE_RANDOM_TR1)
++    GCC_CHECK_TLS
++    AC_CHECK_FUNCS(aligned_alloc posix_memalign memalign _aligned_malloc)
++    AC_CHECK_FUNCS(timespec_get)
++    ;;
+   *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-cygwin* | *-solaris*)
+     GLIBCXX_CHECK_COMPILER_FEATURES
+     GLIBCXX_CHECK_LINKER_FEATURES
