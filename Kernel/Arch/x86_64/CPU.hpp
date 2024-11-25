@@ -8,6 +8,8 @@
 
 #include "Common.hpp"
 
+#include "Arch/CPU.hpp"
+
 #include "Arch/x86_64/CPUContext.hpp"
 #include "Arch/x86_64/GDT.hpp"
 #include "Arch/x86_64/IDT.hpp"
@@ -17,11 +19,9 @@
 
 #include <vector>
 
+struct Thread;
 namespace CPU
 {
-    constexpr usize KERNEL_STACK_SIZE = 64_kib;
-    constexpr usize USER_STACK_SIZE   = 2_mib;
-
     namespace MSR
     {
         constexpr usize IA32_APIC_BASE           = 0x1b;
@@ -43,24 +43,42 @@ namespace CPU
 
     struct CPU
     {
-        usize            lapicID;
         usize            id;
+        void*            empty = nullptr;
+
+        uintptr_t        threadStack;
+        uintptr_t        kernelStack;
+
+        usize            lapicID;
+        bool             isOnline = false;
         TaskStateSegment tss;
+
+        Thread*          idle;
+        Thread*          currentThread;
     };
 
-    void InitializeBSP();
+    void      InitializeBSP();
 
-    bool ID(u64 leaf, u64 subleaf, u64& rax, u64& rbx, u64& rcx, u64& rdx);
+    bool      ID(u64 leaf, u64 subleaf, u64& rax, u64& rbx, u64& rcx, u64& rdx);
+    void      Halt();
 
-    bool GetInterruptFlag();
-    void SetInterruptFlag();
-    void Halt();
+    u64       ReadMSR(u32 msr);
+    void      WriteMSR(u32 msr, u64 value);
 
-    void WriteMSR(u32 msr, u64 value);
-    u64  ReadMSR(u32 msr);
+    uintptr_t GetFSBase();
+    uintptr_t GetGSBase();
+    uintptr_t GetKernelGSBase();
 
-    void SetGSBase(uintptr_t address);
-    void SetKernelGSBase(uintptr_t address);
+    void      SetGSBase(uintptr_t address);
+    void      SetKernelGSBase(uintptr_t address);
 
-    void EnablePAT();
+    std::vector<CPU>& GetCPUs();
+    u64               GetOnlineCPUsCount();
+    u64               GetBSPID();
+    CPU&              GetBSP();
+
+    u64               GetCurrentID();
+    void              Reschedule(usize ms);
+
+    void              EnablePAT();
 }; // namespace CPU

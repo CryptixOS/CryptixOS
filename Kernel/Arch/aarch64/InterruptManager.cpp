@@ -6,6 +6,8 @@
  */
 #include "Common.hpp"
 
+#include "Arch/InterruptHandler.hpp"
+
 extern "C" void raiseSyncException()
 {
     while (true) __asm__ volatile("wfi");
@@ -42,4 +44,9 @@ namespace InterruptManager
             :
             : "x0", "x1", "memory");
     }
+
+    InterruptHandler* AllocateHandler(u8 hint) { return nullptr; }
+
+    void              Mask(u8 vector) { (void)(vector); }
+    void              Unmask(u8 vector) { (void)(vector); }
 } // namespace InterruptManager

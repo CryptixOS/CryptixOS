@@ -45,6 +45,7 @@ add_global_arguments(
     '-fno-omit-frame-pointer',
     '-fno-lto',
     '-fsanitize=undefined',
+    #'-fsanitize=kernel-address',
     '-fstack-protector-all',
     '-mstack-protector-guard=global',
     '-fno-PIC',
@@ -131,7 +132,7 @@ qemu_args = [
   '-no-shutdown', '-no-reboot',
   '-D', meson.project_source_root() / 'qemu.log',
   '-boot', 'order=d,menu=on,splash-time=100',
-  #'-audiodev', 'id=audio,driver=alsa',
+  '-audiodev', 'id=audio,driver=alsa',
   '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
 ]
 qemu = 'qemu-system-' + arch
@@ -139,11 +140,11 @@ qemu = 'qemu-system-' + arch
 if arch == 'x86_64'
   qemu_args += [
     '-M', 'q35,smm=off',
-    #'-device', 'isa-debug-exit',
-    #'-debugcon', 'file:' + meson.project_source_root() / 'debug.log',
-    #'-enable-kvm',
-    #'-machine', 'pcspk-audiodev=audio',
-    #'-cpu', 'host',
+    '-device', 'isa-debug-exit',
+    '-debugcon', 'file:' + meson.project_source_root() / 'debug.log',
+    '-enable-kvm',
+    '-machine', 'pcspk-audiodev=audio',
+    '-cpu', 'host',
   ]
   ovmf_id = 'X64'
   xorriso_args = [

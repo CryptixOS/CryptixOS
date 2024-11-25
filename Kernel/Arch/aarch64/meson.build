@@ -6,6 +6,7 @@
 #*/
 srcs += files(
   'Arch.cpp',
+  'CPU.cpp',
   'InterruptManager.cpp',
   'VMM.cpp',
   'interrupts.S',

@@ -11,6 +11,10 @@
 class InterruptHandler;
 namespace InterruptManager
 {
-    void InstallExceptionHandlers();
-    void RegisterInterruptHandler(InterruptHandler& interruptHandler);
+    void              InstallExceptionHandlers();
+
+    InterruptHandler* AllocateHandler(u8 hint = 0x20);
+
+    void              Mask(u8 vector);
+    void              Unmask(u8 vector);
 }; // namespace InterruptManager

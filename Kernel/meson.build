@@ -16,8 +16,12 @@ srcs += files(
   'Memory/PMM.cpp',
   'Memory/VMM.cpp',
 
+  'Scheduler/Scheduler.cpp',
+  'Scheduler/Thread.cpp',
+
   'Utility/BootInfo.cpp',
   'Utility/ICxxAbi.cpp',
+  'Utility/Kasan.cpp',
   'Utility/Logger.cpp',
   'Utility/Stacktrace.cpp',
   'Utility/Ubsan.cpp',

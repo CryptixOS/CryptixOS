@@ -6,13 +6,14 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include "Terminal.hpp"
+
 #include "Utility/BootInfo.hpp"
 
 #include <backends/fb.h>
 
 #include <cstring>
 
-bool Terminal::Initialize(Framebuffer& framebuffer)
+CTOS_NO_KASAN bool Terminal::Initialize(Framebuffer& framebuffer)
 {
     this->framebuffer = framebuffer;
     if (!framebuffer.address) return false;

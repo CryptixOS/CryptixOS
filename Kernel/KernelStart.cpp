@@ -15,10 +15,19 @@
 #include "Memory/PMM.hpp"
 #include "Memory/VMM.hpp"
 
+#include "Scheduler/Process.hpp"
+#include "Scheduler/Scheduler.hpp"
+#include "Scheduler/Thread.hpp"
+
 #include "Utility/ICxxAbi.hpp"
 #include "Utility/Stacktrace.hpp"
 
-extern "C" void kernelStart()
+void kernelThread()
+{
+    for (;;) LogInfo("Hello");
+}
+
+extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
 {
     Logger::EnableOutput(LOG_OUTPUT_TERMINAL);
     InterruptManager::InstallExceptionHandlers();
@@ -41,6 +50,13 @@ extern "C" void kernelStart()
     Stacktrace::Initialize();
     ACPI::Initialize();
     Arch::Initialize();
+
+    static Process* kernelProcess = new Process("Kernel Process");
+    kernelProcess->pageMap        = VMM::GetKernelPageMap();
+    Scheduler::EnqueueThread(new Thread(
+        kernelProcess, reinterpret_cast<uintptr_t>(kernelThread), false));
+
+    Scheduler::Initialize();
 
     for (;;) Arch::Halt();
 }

@@ -1,4 +1,3 @@
-
 /*
  * Created by v1tr10l7 on 23.05.2024.
  * Copyright (c) 2024-2024, Szymon Zemke <v1tr10l7@proton.me>
@@ -7,7 +6,7 @@
  */
 #pragma once
 
-#include "Utility/BootInfo.hpp"
+#include "Common.hpp"
 
 #include <flanterm.h>
 #include <string_view>
@@ -18,12 +17,12 @@ class Terminal      final
 {
   public:
     Terminal() = default;
-    bool        Initialize(Framebuffer& framebuffer);
+    CTOS_NO_KASAN bool Initialize(Framebuffer& framebuffer);
 
-    void        Clear(u32 color = TERMINAL_COLOR_BLACK);
-    void        PutChar(u64 c);
+    void               Clear(u32 color = TERMINAL_COLOR_BLACK);
+    void               PutChar(u64 c);
 
-    inline void PrintString(std::string_view str)
+    inline void        PrintString(std::string_view str)
     {
         PrintString(str.data(), str.size());
     }

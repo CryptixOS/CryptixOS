@@ -6,31 +6,31 @@
  */
 #pragma once
 
-#include "Utility/Types.hpp"
+#include "Common.hpp"
 
 namespace PhysicalMemoryManager
 {
     inline constexpr const usize PAGE_SIZE = 0x1000;
 
-    bool                         Initialize();
+    CTOS_NO_KASAN bool           Initialize();
     bool                         IsInitialized();
 
-    void*                        AllocatePages(usize count = 1);
-    void*                        CallocatePages(usize count = 1);
-    void                         FreePages(void* ptr, usize count);
+    CTOS_NO_KASAN void*          AllocatePages(usize count = 1);
+    CTOS_NO_KASAN void*          CallocatePages(usize count = 1);
+    CTOS_NO_KASAN void           FreePages(void* ptr, usize count);
 
     template <typename T>
-    T AllocatePages(usize count = 1)
+    CTOS_NO_KASAN T AllocatePages(usize count = 1)
     {
         return reinterpret_cast<T>(AllocatePages(count));
     }
     template <typename T>
-    T CallocatePages(usize count = 1)
+    CTOS_NO_KASAN T CallocatePages(usize count = 1)
     {
         return reinterpret_cast<T>(CallocatePages(count));
     }
     template <typename T>
-    void FreePages(T ptr, usize count)
+    CTOS_NO_KASAN void FreePages(T ptr, usize count)
     {
         FreePages(reinterpret_cast<void*>(ptr), count);
     }

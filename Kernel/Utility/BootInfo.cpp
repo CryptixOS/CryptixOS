@@ -25,7 +25,7 @@ static constexpr const u32 DEFAULT_STACK_SIZE = 65536;
 
 namespace BootInfo
 {
-    extern "C" void Initialize();
+    extern "C" __attribute__((no_sanitize("address"))) void Initialize();
 }
 
 LIMINE_REQUEST limine_bootloader_info_request bootloaderInfoRequest = {
@@ -138,17 +138,18 @@ namespace
     u64              memoryMapEntryCount = 0;
 } // namespace
 
-extern "C" [[noreturn]]
+extern "C" CTOS_NO_KASAN [[noreturn]]
 void kernelStart();
 
 namespace BootInfo
 {
-    extern "C" void Initialize()
+    extern "C" __attribute__((no_sanitize("address"))) void Initialize()
     {
         (void)stackSizeRequest.response;
         (void)entryPointRequest.response;
 
         Logger::EnableOutput(LOG_OUTPUT_E9);
+
         if (LIMINE_BASE_REVISION_SUPPORTED == false)
             Panic("Boot: Limine base revision is not supported");
         if (!framebufferRequest.response

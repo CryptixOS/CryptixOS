@@ -48,18 +48,20 @@ constexpr u64   BACKGROUND_COLOR_WHITE   = 0x6d37345b1b;
 
 constexpr u64   RESET_COLOR              = 0x6d305b1b;
 
+#define CTOS_NO_KASAN __attribute__((no_sanitize("address")))
+
 namespace Logger
 {
-    void EnableOutput(usize output);
-    void DisableOutput(usize output);
+    CTOS_NO_KASAN void EnableOutput(usize output);
+    CTOS_NO_KASAN void DisableOutput(usize output);
 
-    void LogChar(u64 c);
-    void LogString(std::string_view string);
-    void LogString(std::string_view, usize len);
+    CTOS_NO_KASAN void LogChar(u64 c);
+    CTOS_NO_KASAN void LogString(const char* string);
 
-    void Log(LogLevel logLevel, std::string_view string);
-    void Logf(LogLevel logLevel, const char* format, ...);
-    void Logv(LogLevel logLevel, const char* format, va_list& args);
+    CTOS_NO_KASAN void Log(LogLevel logLevel, const char*);
+    CTOS_NO_KASAN void Logf(LogLevel logLevel, const char* format, ...);
+    CTOS_NO_KASAN void Logv(LogLevel logLevel, const char* format,
+                            va_list& args);
 } // namespace Logger
 
 #ifdef CTOS_BUILD_DEBUG
@@ -69,9 +71,10 @@ namespace Logger
     #define LogDebug(...)
 #endif
 
-#define LogMessage(...) Logger::Log(LogLevel::eNone, std::format(__VA_ARGS__))
+#define LogMessage(...)                                                        \
+    Logger::Log(LogLevel::eNone, std::format(__VA_ARGS__).data())
 
-#define ENABLE_LOGGING  true
+#define ENABLE_LOGGING true
 #if ENABLE_LOGGING == true
     #define EarlyLogTrace(...) Logger::Logf(LogLevel::eTrace, __VA_ARGS__)
     #define EarlyLogInfo(...)  Logger::Logf(LogLevel::eInfo, __VA_ARGS__)
@@ -80,13 +83,15 @@ namespace Logger
     #define EarlyLogFatal(...) Logger::Logf(LogLevel::eFatal, __VA_ARGS__)
 
     #define LogTrace(...)                                                      \
-        Logger::Log(LogLevel::eTrace, std::format(__VA_ARGS__))
-    #define LogInfo(...) Logger::Log(LogLevel::eInfo, std::format(__VA_ARGS__))
-    #define LogWarn(...) Logger::Log(LogLevel::eWarn, std::format(__VA_ARGS__))
+        Logger::Log(LogLevel::eTrace, std::format(__VA_ARGS__).data())
+    #define LogInfo(...)                                                       \
+        Logger::Log(LogLevel::eInfo, std::format(__VA_ARGS__).data())
+    #define LogWarn(...)                                                       \
+        Logger::Log(LogLevel::eWarn, std::format(__VA_ARGS__).data())
     #define LogError(...)                                                      \
-        Logger::Log(LogLevel::eError, std::format(__VA_ARGS__))
+        Logger::Log(LogLevel::eError, std::format(__VA_ARGS__).data())
     #define LogFatal(...)                                                      \
-        Logger::Log(LogLevel::eFatal, std::format(__VA_ARGS__))
+        Logger::Log(LogLevel::eFatal, std::format(__VA_ARGS__).data())
 #else
     #define EarlyLogTrace(...)
     #define EarlyLogInfo(...)

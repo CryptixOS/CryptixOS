@@ -15,15 +15,16 @@
 
 namespace E9
 {
-    static void PrintChar(u8 c)
+    CTOS_NO_KASAN static void PrintChar(u8 c)
     {
 #if CTOS_ARCH == CTOS_ARCH_X86_64
         __asm__ volatile("outb %0, %1" : : "a"(c), "d"(u16(0xe9)));
 #endif
     }
-    static void PrintString(std::string_view str)
+
+    CTOS_NO_KASAN static void PrintString(const char* str)
     {
-        for (auto c : str) PrintChar(c);
+        while (*str) PrintChar(*str++);
     }
 }; // namespace E9
 
@@ -36,7 +37,7 @@ namespace Logger
         Terminal   terminal;
 
         template <typename T>
-        T ToNumber(const char* str, usize length)
+        CTOS_NO_KASAN T ToNumber(const char* str, usize length)
         {
             T     integer      = 0;
             bool  isNegative   = str[0] == '-';
@@ -50,13 +51,13 @@ namespace Logger
             return (isNegative) ? -integer : integer;
         }
         template <typename T>
-        T ToNumber(const char* str)
+        CTOS_NO_KASAN T ToNumber(const char* str)
         {
             return ToNumber<T>(str, strlen(str));
         }
 
         template <typename T>
-        char* ToString(T value, char* str, i32 base)
+        CTOS_NO_KASAN char* ToString(T value, char* str, i32 base)
         {
             T    i          = 0;
             bool isNegative = false;
@@ -100,9 +101,10 @@ namespace Logger
         }
 
         template <typename T>
-        void LogNumber(va_list& args, int base, bool justifyLeft = false,
-                       bool plusSign = false, bool spaceIfNoSign = false,
-                       bool zeroPadding = false, usize lengthSpecifier = 0)
+        CTOS_NO_KASAN void
+        LogNumber(va_list& args, int base, bool justifyLeft = false,
+                  bool plusSign = false, bool spaceIfNoSign = false,
+                  bool zeroPadding = false, usize lengthSpecifier = 0)
         {
             char   buf[64];
             T      value   = va_arg(args, T);
@@ -134,7 +136,7 @@ namespace Logger
             }
         }
 
-        void PrintArg(const char*& fmt, va_list& args)
+        CTOS_NO_KASAN void PrintArg(const char*& fmt, va_list& args)
         {
             ++fmt;
             bool leftJustify   = false;
@@ -253,7 +255,7 @@ namespace Logger
             ++fmt;
         }
 
-        void PrintLogLevel(LogLevel logLevel)
+        CTOS_NO_KASAN void PrintLogLevel(LogLevel logLevel)
         {
             if (logLevel != LogLevel::eNone) LogChar('[');
             switch (logLevel)
@@ -297,32 +299,32 @@ namespace Logger
         }
     }; // namespace
 
-    void EnableOutput(usize output)
+    CTOS_NO_KASAN void EnableOutput(usize output)
     {
         enabledOutputs |= output;
 
         if (output == LOG_OUTPUT_TERMINAL)
             terminal.Initialize(*BootInfo::GetFramebuffer());
     }
-    void DisableOutput(usize output) { enabledOutputs &= ~output; }
-
-    void LogChar(u64 c)
+    CTOS_NO_KASAN void DisableOutput(usize output)
     {
-        usize len = 1;
-        if (c == RESET_COLOR) len = 4;
-        else if (c > 255) len = 5;
-        LogString(std::string_view(reinterpret_cast<const char*>(&c), len));
+        enabledOutputs &= ~output;
+    }
+
+    CTOS_NO_KASAN void LogChar(u64 c)
+    {
+        LogString(reinterpret_cast<const char*>(&c));
         if (c == '\n') LogChar('\r');
     }
 
-    void LogString(std::string_view str)
+    CTOS_NO_KASAN void LogString(const char* str)
     {
         if (enabledOutputs & LOG_OUTPUT_E9) E9::PrintString(str);
         if (enabledOutputs & LOG_OUTPUT_SERIAL) Serial::Write(str);
         if (enabledOutputs & LOG_OUTPUT_TERMINAL) terminal.PrintString(str);
     }
 
-    void Log(LogLevel logLevel, std::string_view string)
+    CTOS_NO_KASAN void Log(LogLevel logLevel, const char* string)
     {
         std::unique_lock guard(lock);
 
@@ -331,14 +333,14 @@ namespace Logger
         LogChar('\n');
     }
 
-    void Logf(LogLevel logLevel, const char* fmt, ...)
+    CTOS_NO_KASAN void Logf(LogLevel logLevel, const char* fmt, ...)
     {
         va_list args;
         va_start(args, fmt);
         Logv(logLevel, fmt, args);
         va_end(args);
     }
-    void Logv(LogLevel level, const char* fmt, va_list& args)
+    CTOS_NO_KASAN void Logv(LogLevel level, const char* fmt, va_list& args)
     {
         std::unique_lock guard(lock);
         PrintLogLevel(level);

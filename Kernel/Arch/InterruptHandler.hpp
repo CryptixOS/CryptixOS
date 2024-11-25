@@ -46,11 +46,6 @@ class InterruptHandler
         return true;
     }
 
-    inline void Register()
-    {
-        InterruptManager::RegisterInterruptHandler(*this);
-    }
-
   private:
     std::optional<u8> interruptVector = 0;
     InterruptRoutine  routine         = nullptr;

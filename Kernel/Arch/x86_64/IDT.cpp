@@ -80,8 +80,8 @@ static void raiseException(CPUContext* ctx)
 [[noreturn]]
 static void unhandledInterrupt(CPUContext* context)
 {
-    LogError("\nAn unhandled interrupt 0x{:x} occurred",
-             context->interruptVector);
+    EarlyLogError("\nAn unhandled interrupt %#x occurred",
+                  context->interruptVector);
 
     for (;;) __asm__ volatile("cli; hlt");
 }
@@ -94,6 +94,7 @@ extern "C" void raiseInterrupt(CPUContext* ctx)
     {
         // TODO(v1tr10l7): send eoi
         handler(ctx);
+        return;
     }
 
     unhandledInterrupt(ctx);
@@ -150,6 +151,8 @@ namespace IDT
 
         Panic("IDT: Out of interrupt handlers");
     }
+
+    void SetIST(u8 vector, u32 value) { idtEntries[vector].ist = value; }
 } // namespace IDT
 
 #pragma region exception_names

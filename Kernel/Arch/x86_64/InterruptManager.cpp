@@ -9,6 +9,8 @@
 #include "Arch/x86_64/GDT.hpp"
 #include "Arch/x86_64/IDT.hpp"
 
+#include "Arch/x86_64/Drivers/PIC.hpp"
+
 namespace InterruptManager
 {
     void InstallExceptionHandlers()
@@ -19,4 +21,12 @@ namespace InterruptManager
         IDT::Initialize();
         IDT::Load();
     }
+
+    InterruptHandler* AllocateHandler(u8 hint)
+    {
+        return IDT::AllocateHandler(hint);
+    }
+
+    void Mask(u8 vector) { PIC::MaskIRQ(vector); }
+    void Unmask(u8 vector) { PIC::UnmaskIRQ(vector); }
 }; // namespace InterruptManager

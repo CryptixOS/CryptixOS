@@ -6,12 +6,15 @@
  */
 #include "CPU.hpp"
 
+#include "Scheduler/Process.hpp"
+#include "Scheduler/Thread.hpp"
 #include "Utility/BootInfo.hpp"
 
 namespace CPU
 {
     static std::vector<CPU>                   cpus;
-    static u64                                bspLapicId = 0;
+    static u64                                bspLapicId      = 0;
+    static usize                              onlineCPUsCount = 1;
 
     extern "C" void                           handleSyscall(CPUContext*);
     extern "C" __attribute__((noreturn)) void syscall_entry();
@@ -52,6 +55,24 @@ namespace CPU
         WriteMSR(MSR::LSTAR, reinterpret_cast<uintptr_t>(syscall_entry));
         WriteMSR(MSR::SFMASK, ~Bit(2));
         // TODO(v1tr10l7): Initialize Lapic
+
+        GetCurrent()->tss.ist[0]
+            = ToHigherHalfAddress<uintptr_t>(
+                  PMM::AllocatePages(KERNEL_STACK_SIZE / PMM::PAGE_SIZE))
+            + KERNEL_STACK_SIZE;
+        IDT::SetIST(0x20, 1);
+        IDT::SetIST(14, 2);
+
+        static std::atomic<pid_t> idlePids(-1);
+        Process*                  process = new Process;
+        process->pid                      = idlePids--;
+        process->name                     = "Idle Process";
+        process->pageMap                  = VMM::GetKernelPageMap();
+
+        auto idleThread                   = new ::Thread(
+            process, reinterpret_cast<uintptr_t>(Arch::Halt), false);
+        idleThread->state  = ThreadState::eReady;
+        GetCurrent()->idle = idleThread;
     }
 
     void InitializeBSP()
@@ -111,7 +132,6 @@ namespace CPU
         if (enabled) __asm__ volatile("sti");
         else __asm__ volatile("cli");
     }
-
     void Halt() { __asm__ volatile("hlt"); }
 
     void WriteMSR(u32 msr, u64 value)
@@ -192,22 +212,96 @@ namespace CPU
         if (ReadCR4() & BIT(21)) __asm__ volatile("clac" ::: "cc");
     }
 
-    void SetFSBase(uintptr_t address) { WriteMSR(0xc0000100, address); }
-    void SetGSBase(uintptr_t address) { WriteMSR(0xc0000101, address); }
+    uintptr_t GetFSBase() { return ReadMSR(0xc0000100); }
+    uintptr_t GetGSBase() { return ReadMSR(0xc0000101); }
+    uintptr_t GetKernelGSBase() { return ReadMSR(0xc0000102); }
+
+    void      SetFSBase(uintptr_t address) { WriteMSR(0xc0000100, address); }
+    void      SetGSBase(uintptr_t address) { WriteMSR(0xc0000101, address); }
     void SetKernelGSBase(uintptr_t address) { WriteMSR(0xc0000102, address); }
 
-    uintptr_t         GetFSBase() { return ReadMSR(0xc0000100); }
-    uintptr_t         GetGSBase() { return ReadMSR(0xc0000101); }
-    uintptr_t         GetKernelGSBase() { return ReadMSR(0xc0000102); }
     std::vector<CPU>& GetCPUs() { return cpus; }
-    u64               GetBSPID();
+
+    u64               GetOnlineCPUsCount() { return onlineCPUsCount; }
+    u64               GetBSPID() { return bspLapicId; }
     CPU&              GetBSP() { return cpus[0]; }
-    CPU*              GetCurrent()
+
+    u64               GetCurrentID()
+    {
+        return GetOnlineCPUsCount() > 1 ? GetCurrent()->id : 0;
+    }
+    CPU* GetCurrent()
     {
         usize id;
         __asm__ volatile("mov %%gs:0, %0" : "=r"(id)::"memory");
 
         return &cpus[id];
+    }
+    Thread* GetCurrentThread()
+    {
+        Thread* currentThread;
+        __asm__ volatile("mov %%gs:8, %0" : "=r"(currentThread)::"memory");
+
+        return currentThread;
+    }
+
+    void PrepareThread(Thread* thread, uintptr_t pc)
+    {
+        thread->ctx.rflags = 0x202;
+        thread->ctx.rip    = pc;
+
+        uintptr_t pkstack
+            = PMM::AllocatePages<uintptr_t>(KERNEL_STACK_SIZE / PMM::PAGE_SIZE);
+        thread->kstack
+            = ToHigherHalfAddress<uintptr_t>(pkstack) + KERNEL_STACK_SIZE;
+        GetCurrent()->kernelStack = thread->kstack;
+
+        // uintptr_t ppfstack
+        //     = PMM::AllocatePages<uintptr_t>(KERNEL_STACK_SIZE /
+        //     PMM::PAGE_SIZE);
+        thread->pfstack
+            = ToHigherHalfAddress<uintptr_t>(pkstack) + KERNEL_STACK_SIZE;
+
+        thread->gsBase = reinterpret_cast<uintptr_t>(thread);
+        if (thread->user)
+        {
+            thread->ctx.cs = GDT::USERLAND_CODE_SELECTOR;
+            thread->ctx.ss = GDT::USERLAND_DATA_SELECTOR;
+            thread->ctx.ds = thread->ctx.es = thread->ctx.ss;
+            thread->ctx.rsp                 = thread->stack;
+        }
+        else
+        {
+            thread->ctx.cs  = GDT::KERNEL_CODE_SELECTOR;
+            thread->ctx.ss  = GDT::KERNEL_DATA_SELECTOR;
+            thread->ctx.rsp = thread->stack = thread->kstack;
+        }
+        thread->ctx.rsp = thread->stack = thread->kstack;
+    }
+    void SaveThread(Thread* thread, CPUContext* ctx)
+    {
+        thread->ctx    = *ctx;
+
+        thread->gsBase = GetKernelGSBase();
+        thread->fsBase = GetFSBase();
+    }
+    void LoadThread(Thread* thread, CPUContext* ctx)
+    {
+        thread->runningOn        = GetCurrent()->id;
+
+        GetCurrent()->tss.ist[1] = thread->pfstack;
+        GetCurrent()->tss.rsp[0] = thread->pfstack;
+
+        thread->parent->pageMap->Load();
+        SetGSBase(reinterpret_cast<u64>(thread));
+        SetKernelGSBase(thread->gsBase);
+        SetFSBase(thread->fsBase);
+
+        *ctx = thread->ctx;
+    }
+    void Reschedule(usize ms)
+    {
+        // TODO(v1tr10l7): Reschedule
     }
 
     void EnablePAT()

@@ -25,7 +25,7 @@ inline constexpr u64 BIT(u64 n) { return (1ull << n); }
 #define CTOS_ARCH_AARCH64         1
 #define CTOS_ARCH_RISC_V          2
 
-[[noreturn]]
+CTOS_NO_KASAN [[noreturn]]
 inline void panic(std::string_view msg)
 {
     Arch::DisableInterrupts();
@@ -33,14 +33,14 @@ inline void panic(std::string_view msg)
 
     Logger::Log(LogLevel::eNone, "\n");
     LogFatal("Kernel Panic!");
-    LogError("Error Message: {}\n", msg);
+    LogError("Error Message: {}\n", msg.data());
     Stacktrace::Print(32);
 
     LogFatal("System Halted!\n");
     Arch::Halt();
     CTOS_ASSERT_NOT_REACHED();
 }
-inline void earlyPanic(const char* format, ...)
+CTOS_NO_KASAN inline void earlyPanic(const char* format, ...)
 {
     Arch::DisableInterrupts();
     EarlyLogError("Kernel Panic!");
@@ -58,7 +58,7 @@ inline void earlyPanic(const char* format, ...)
 }
 
 #define EarlyPanic(fmt, ...) earlyPanic("Error Message: " fmt, __VA_ARGS__)
-#define Panic(...)           panic(std::format(__VA_ARGS__))
+#define Panic(...)           panic(std::format(__VA_ARGS__).data())
 
 #define Assert(expr)         AssertMsg(expr, #expr)
 #define AssertMsg(expr, msg)                                                   \

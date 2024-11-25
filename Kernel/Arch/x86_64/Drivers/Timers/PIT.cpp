@@ -17,6 +17,11 @@
 
 #include <atomic>
 
+namespace Scheduler
+{
+    void Schedule(CPUContext* ctx);
+}
+
 namespace PIT
 {
     static constexpr const u64 PIT_FREQUENCY = 1000;
@@ -27,6 +32,10 @@ namespace PIT
     [[maybe_unused]]
     static void TimerTick(struct CPUContext* ctx)
     {
+        LogInfo("TimerTick");
+        Scheduler::Schedule(ctx);
+
+        LogTrace("EOI");
         PIC::SendEOI(timerVector - 0x20);
         tick++;
     }
@@ -40,14 +49,15 @@ namespace PIT
     void Initialize()
     {
         static bool initialized = false;
-        SetFrequency(PIT_FREQUENCY / 10);
+        SetFrequency(PIT_FREQUENCY);
 
         if (initialized) return;
         LogTrace("PIT: Initializing...");
         initialized = true;
 
         handler     = IDT::AllocateHandler(0x20);
-        handler->SetHandler([](::CPUContext* ctx) { TimerTick(ctx); });
+        handler->SetHandler(Scheduler::Schedule);
+        handler->Reserve();
 
         timerVector = handler->GetInterruptVector();
         LogInfo("PIT: Initialized\nTimer vector = {} ", timerVector);
