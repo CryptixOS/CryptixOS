@@ -14,6 +14,7 @@
 #include <exception>
 #include <functional>
 #include <iterator>
+#include <cassert>
 
 namespace std
 {
@@ -98,12 +99,7 @@ namespace std
         }
         constexpr const_reference at(size_type pos) const
         {
-            if (pos >= _size)
-#if __STDC_HOSTED__ == 1
-                throw std::out_of_range();
-#else
-                *((uint8_t*)0)          = 1;
-#endif
+            assert(pos < _size);
             return _data[pos];
         }
         constexpr const_reference front() const { return _data[0]; }
@@ -151,12 +147,7 @@ namespace std
         constexpr size_type copy(pointer dest, size_type count,
                                  size_type pos = 0) const
         {
-            if (pos >= _size)
-#if __STDC_HOSTED__ == 1
-                throw std::out_of_range();
-#else
-                *((volatile uint8_t*)0) = 1;
-#endif
+            assert (pos < _size);
             traits_type::copy(dest, _data + pos, count);
 
             return count;
@@ -164,12 +155,8 @@ namespace std
         constexpr basic_string_view substr(size_type pos   = 0,
                                            size_type count = npos) const
         {
-            if (pos >= _size)
-#if __STDC_HOSTED__ == 1
-                throw std::out_of_range();
-#else
-                *((volatile uint8_t*)0) = 1;
-#endif
+            assert (pos < _size);
+
             if (count == npos) count = _size - pos;
             return basic_string_view<value_type>(_data + pos, count);
         }

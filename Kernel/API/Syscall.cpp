@@ -41,6 +41,8 @@ namespace Syscall
     {
         Initialize();
         RegisterSyscall(0, VFS::SysWrite);
+        RegisterSyscall(1, VFS::SysOpen);
+        RegisterSyscall(2, VFS::SysRead);
     }
     void Handle(Arguments& args)
     {

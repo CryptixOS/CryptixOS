@@ -50,18 +50,21 @@ constexpr u64   RESET_COLOR              = 0x6d305b1b;
 
 #define CTOS_NO_KASAN __attribute__((no_sanitize("address")))
 
+class Terminal;
 namespace Logger
 {
     CTOS_NO_KASAN void EnableOutput(usize output);
     CTOS_NO_KASAN void DisableOutput(usize output);
 
     CTOS_NO_KASAN void LogChar(u64 c);
-    CTOS_NO_KASAN void LogString(const char* string);
+    CTOS_NO_KASAN void LogString(std::string_view string);
 
-    CTOS_NO_KASAN void Log(LogLevel logLevel, const char*);
+    CTOS_NO_KASAN void Log(LogLevel logLevel, std::string_view str);
     CTOS_NO_KASAN void Logf(LogLevel logLevel, const char* format, ...);
     CTOS_NO_KASAN void Logv(LogLevel logLevel, const char* format,
                             va_list& args);
+
+    Terminal&          GetTerminal();
 } // namespace Logger
 
 #ifdef CTOS_BUILD_DEBUG

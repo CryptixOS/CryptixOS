@@ -34,13 +34,14 @@ struct Process
     {
     }
 
-    pid_t                       pid;
-    std::string                 name;
-    PageMap*                    pageMap;
-    std::atomic<tid_t>          nextTid;
+    pid_t                               pid;
+    std::string                         name;
+    PageMap*                            pageMap;
+    std::atomic<tid_t>                  nextTid;
 
-    Process*                    parent;
-    std::vector<struct Thread*> threads;
+    Process*                            parent;
+    std::vector<struct Thread*>         threads;
 
-    uintptr_t                   userStackTop;
+    std::vector<struct FileDescriptor*> fileDescriptors;
+    uintptr_t                           userStackTop;
 };

@@ -8,6 +8,7 @@
 
 #include "Arch/Arch.hpp"
 
+#include "Assertions.hpp"
 #include "Utility/Logger.hpp"
 #include "Utility/Stacktrace.hpp"
 #include "Utility/Types.hpp"
@@ -18,6 +19,7 @@
 inline constexpr u64 BIT(u64 n) { return (1ull << n); }
 
 #define CTOS_UNUSED               [[maybe_unused]]
+#define CtosUnused(var)           ((void)var)
 #define CTOS_ASSERT_NOT_REACHED() __builtin_unreachable()
 #define CTOS_GET_FRAME_ADDRESS(n) __builtin_frame_address(n)
 
@@ -61,13 +63,3 @@ CTOS_NO_KASAN inline void earlyPanic(const char* format, ...)
     Arch::Halt();
     CTOS_ASSERT_NOT_REACHED();
 }
-
-#define EarlyPanic(fmt, ...) earlyPanic("Error Message: " fmt, __VA_ARGS__)
-#define Panic(...)           panic(std::format(__VA_ARGS__).data())
-
-#define Assert(expr)         AssertMsg(expr, #expr)
-#define AssertMsg(expr, msg)                                                   \
-    !(expr) ? Panic("Assertion Failed: {}, In File: {}, At Line: {}", msg,     \
-                    __FILE__, __LINE__)                                        \
-            : (void)0
-#define ToDo() AssertMsg(false, "Function is not implemented!")

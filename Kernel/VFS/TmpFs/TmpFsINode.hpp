@@ -18,7 +18,7 @@ class TmpFsINode final : public INode
         : INode(name, type)
     {
         capacity = 128;
-        data     = new uint8_t[capacity];
+        data     = new u8[capacity];
     }
     TmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
                mode_t mode, INodeType type)
@@ -27,7 +27,7 @@ class TmpFsINode final : public INode
         if (S_ISREG(mode))
         {
             capacity = GetDefaultSize();
-            data     = new uint8_t[capacity];
+            data     = new u8[capacity];
         }
         stats.st_size    = 0;
         stats.st_blocks  = 0;
@@ -48,19 +48,18 @@ class TmpFsINode final : public INode
         if (capacity > 0) delete data;
     }
 
-    inline static constexpr size_t GetDefaultSize() { return 0x1000; }
+    inline static constexpr usize GetDefaultSize() { return 0x1000; }
 
     virtual void InsertChild(INode* node, std::string_view name) override
     {
         std::unique_lock guard(lock);
         children[name] = node;
     }
-    virtual ssize_t Read(void* buffer, off_t offset, size_t bytes) override;
-    virtual ssize_t Write(const void* buffer, off_t offset,
-                          size_t bytes) override;
+    virtual isize Read(void* buffer, off_t offset, usize bytes) override;
+    virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
 
   private:
-    uint8_t*                data     = nullptr;
-    [[maybe_unused]] size_t size     = 0;
-    size_t                  capacity = 0;
+    u8*                    data     = nullptr;
+    [[maybe_unused]] usize size     = 0;
+    usize                  capacity = 0;
 };

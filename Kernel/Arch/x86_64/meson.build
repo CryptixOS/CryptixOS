@@ -32,7 +32,7 @@ c_args += [
 ]
 cxx_args += [
   '-march=x86-64',
-  #'-m64',
+  '-m64',
   '-msoft-float',
   #'-mno-80387',
   '-mno-mmx',
@@ -42,6 +42,7 @@ cxx_args += [
   '-mno-avx',
   '-mcmodel=kernel',
   '-mrdrnd',
+  '-mrdseed',
 ]
 
 ld_args += ['-Wl,-z,noexecstack']

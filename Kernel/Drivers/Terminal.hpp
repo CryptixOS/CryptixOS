@@ -6,10 +6,12 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include "Utility/BootInfo.hpp"
+#include "Utility/Types.hpp"
 
 #include <flanterm.h>
 #include <string_view>
+#include <vector>
 
 constexpr const u32 TERMINAL_COLOR_BLACK = 0x000000;
 
@@ -17,20 +19,31 @@ class Terminal      final
 {
   public:
     Terminal() = default;
-    CTOS_NO_KASAN bool Initialize(Framebuffer& framebuffer);
+    Terminal(Framebuffer& framebuffer, usize id)
+        : id(id)
+    {
+        Initialize(framebuffer);
+    }
 
-    void               Clear(u32 color = TERMINAL_COLOR_BLACK);
-    void               PutChar(u64 c);
+    bool        Initialize(Framebuffer& framebuffer);
 
-    inline void        PrintString(std::string_view str)
+    void        Clear(u32 color = TERMINAL_COLOR_BLACK);
+    void        PutChar(u64 c);
+
+    inline void PrintString(std::string_view str)
     {
         PrintString(str.data(), str.size());
     }
     void PrintString(const char* string, usize length);
     void PrintString(const char* string);
 
+    static std::vector<Terminal*>& EnumerateTerminals();
+
   private:
-    bool              initialized = false;
-    Framebuffer       framebuffer = {};
-    flanterm_context* context     = nullptr;
+    usize                         id          = 0;
+    bool                          initialized = false;
+    Framebuffer                   framebuffer = {};
+    flanterm_context*             context     = nullptr;
+
+    static std::vector<Terminal*> s_Terminals;
 };

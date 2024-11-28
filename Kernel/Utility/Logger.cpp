@@ -22,9 +22,9 @@ namespace E9
 #endif
     }
 
-    CTOS_NO_KASAN static void PrintString(const char* str)
+    CTOS_NO_KASAN static void PrintString(std::string_view str)
     {
-        while (*str) PrintChar(*str++);
+        for (auto c : str) PrintChar(c);
     }
 }; // namespace E9
 
@@ -317,14 +317,14 @@ namespace Logger
         if (c == '\n') LogChar('\r');
     }
 
-    CTOS_NO_KASAN void LogString(const char* str)
+    CTOS_NO_KASAN void LogString(std::string_view str)
     {
         if (enabledOutputs & LOG_OUTPUT_E9) E9::PrintString(str);
         if (enabledOutputs & LOG_OUTPUT_SERIAL) Serial::Write(str);
         if (enabledOutputs & LOG_OUTPUT_TERMINAL) terminal.PrintString(str);
     }
 
-    CTOS_NO_KASAN void Log(LogLevel logLevel, const char* string)
+    CTOS_NO_KASAN void Log(LogLevel logLevel, std::string_view string)
     {
         std::unique_lock guard(lock);
 
@@ -358,4 +358,6 @@ namespace Logger
 
         LogChar('\n');
     }
+
+    Terminal& GetTerminal() { return terminal; }
 } // namespace Logger

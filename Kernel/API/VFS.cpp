@@ -6,6 +6,16 @@
  */
 #include "VFS.hpp"
 
+#include "Arch/CPU.hpp"
+
+#include "Scheduler/Process.hpp"
+#include "Scheduler/Thread.hpp"
+#include "API/UnixTypes.hpp"
+
+#include "VFS/FileDescriptor.hpp"
+#include "VFS/INode.hpp"
+#include "VFS/VFS.hpp"
+
 namespace VFS
 {
     using Syscall::Arguments;
@@ -27,8 +37,42 @@ namespace VFS
         }
 
         std::string_view str(message, length);
-        Logger::Log(LogLevel::eNone, str.data());
+        Logger::Log(LogLevel::eNone, str);
 
         return 0;
+    }
+
+    i32 SysOpen(Arguments& args)
+    {
+        Process*    current = CPU::GetCurrentThread()->parent;
+
+        const char* path    = reinterpret_cast<const char*>(args.args[0]);
+        auto node = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path));
+        Assert(node);
+        auto descriptor = node->Open();
+
+        if (!descriptor) return ENOSYS;
+
+        usize fd = current->fileDescriptors.size();
+        current->fileDescriptors.push_back(descriptor);
+
+        return fd;
+    }
+
+    isize SysRead(Arguments& args)
+    {
+        i32   fd     = args.args[0];
+        void* buffer = reinterpret_cast<void*>(args.args[1]);
+        usize bytes  = args.args[2];
+
+        LogInfo("Reading {} bytes from fd[{}] to address: {:#x}", bytes, fd,
+                u64(buffer));
+
+        Process* current = CPU::GetCurrentThread()->parent;
+        if (fd >= static_cast<i32>(current->fileDescriptors.size()))
+            return EBADF;
+        auto file = current->fileDescriptors[fd];
+
+        return file->node->Read(buffer, 0, bytes);
     }
 }; // namespace VFS

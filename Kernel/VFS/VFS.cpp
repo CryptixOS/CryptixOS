@@ -7,6 +7,7 @@
  */
 #include "VFS.hpp"
 
+#include "VFS/DevTmpFs/DevTmpFs.hpp"
 #include "VFS/INode.hpp"
 #include "VFS/TmpFs/TmpFs.hpp"
 
@@ -23,6 +24,7 @@ namespace VFS
     {
         Filesystem* fs = nullptr;
         if (name == "tmpfs") fs = new TmpFs();
+        else if (name == "devtmpfs") fs = new DevTmpFs();
 
         return fs;
     }
@@ -82,9 +84,22 @@ namespace VFS
                 || currentNode->GetFilesystem()->Populate(currentNode))
             {
                 auto node = currentNode->GetChildren()[segment]->Reduce(
-                    false, !isLast || automount);
+                    false, isLast ? automount : true);
 
-                if (isLast) return {currentNode, node, node->GetName()};
+                auto getReal = [](INode* node) -> INode*
+                {
+                    if (node != rootINode->Reduce(true)
+                        && node->GetFilesystem()->GetMountedOn()
+                        && node
+                               == node->GetFilesystem()
+                                      ->GetMountedOn()
+                                      ->mountGate)
+                        return node->GetFilesystem()->GetMountedOn();
+                    return node;
+                };
+
+                if (isLast)
+                    return {currentNode, getReal(node), node->GetName()};
 
                 currentNode = node;
 
@@ -130,6 +145,13 @@ namespace VFS
         }
 
         rootINode = fs->Mount(nullptr, nullptr, nullptr, "/", nullptr);
+
+        if (rootINode)
+            LogInfo("VFS: Mounted Filesystem '{}' on '/'",
+                    filesystemName.data());
+        else
+            LogError("VFS: Failed to mount filesystem '{}' on '/'",
+                     filesystemName.data());
 
         return rootINode != nullptr;
     }
@@ -196,6 +218,25 @@ namespace VFS
             newNodeParent, newNodeName, mode, type);
         if (newNode) newNodeParent->InsertChild(newNode, newNode->GetName());
         return newNode;
+    }
+
+    INode* MkNod(INode* parent, PathView path, mode_t mode, dev_t dev)
+    {
+        std::unique_lock guard(lock);
+
+        auto [nparent, node, newNodeName] = ResolvePath(parent, path);
+        if (node)
+        {
+            errno = EEXIST;
+            return nullptr;
+        }
+
+        if (!nparent) return nullptr;
+        node = nparent->GetFilesystem()->MkNod(nparent, newNodeName, mode, dev);
+
+        if (node) nparent->InsertChild(node, node->GetName());
+
+        return node;
     }
 
     INode* Symlink(INode* parent, PathView path, std::string_view target)

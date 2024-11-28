@@ -6,8 +6,8 @@
  */
 #pragma once
 
+#include "API/UnixTypes.hpp"
 #include "Utility/Path.hpp"
-#include "Utility/UnixTypes.hpp"
 
 #include <atomic>
 #include <cerrno>
@@ -45,7 +45,13 @@ class Filesystem
 
     virtual INode* Link(INode* parent, std::string_view name, INode* old_node)
         = 0;
-    virtual bool Populate(INode* node) = 0;
+    virtual bool   Populate(INode* node) = 0;
+
+    virtual INode* MkNod(INode* parent, std::string_view path, mode_t mode,
+                         dev_t dev)
+    {
+        return nullptr;
+    }
 
   protected:
     INode*             mountedOn = nullptr;

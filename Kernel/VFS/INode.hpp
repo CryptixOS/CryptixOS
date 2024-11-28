@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include "Utility/UnixTypes.hpp"
+#include "API/UnixTypes.hpp"
 
 #include "VFS/Filesystem.hpp"
 #include "VFS/VFS.hpp"
@@ -23,6 +23,8 @@ enum class INodeType
     eBlockDevice     = 4,
     eDirectory       = 5,
 };
+
+struct FileDescriptor;
 
 class INode
 {
@@ -66,6 +68,7 @@ class INode
 
     bool                      IsEmpty();
 
+    FileDescriptor*           Open();
     virtual void    InsertChild(INode* node, std::string_view name)      = 0;
     virtual ssize_t Read(void* buffer, off_t offset, usize bytes)        = 0;
     virtual ssize_t Write(const void* buffer, off_t offset, usize bytes) = 0;

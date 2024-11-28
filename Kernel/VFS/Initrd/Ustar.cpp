@@ -9,7 +9,7 @@
 #include "Common.hpp"
 
 #include "Utility/Math.hpp"
-#include "Utility/UnixTypes.hpp"
+#include "API/UnixTypes.hpp"
 #include "VFS/INode.hpp"
 
 #include <cstring>

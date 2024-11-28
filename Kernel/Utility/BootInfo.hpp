@@ -31,6 +31,7 @@ namespace BootInfo
     const char*          GetBootloaderVersion();
     u64                  GetHHDMOffset();
     Framebuffer*         GetFramebuffer();
+    Framebuffer**        GetFramebuffers(usize& outCount);
     limine_smp_response* GetSMP_Response();
     MemoryMap            GetMemoryMap(u64& entryCount);
     limine_file*         FindModule(const char* name);

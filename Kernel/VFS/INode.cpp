@@ -6,6 +6,8 @@
  */
 #include "INode.hpp"
 
+#include "VFS/FileDescriptor.hpp"
+
 #include <errno.h>
 
 INode* INode::Reduce(bool symlinks, bool automount)
@@ -38,7 +40,9 @@ bool   INode::IsEmpty()
     return children.empty();
 }
 
-INode* INode::InternalReduce(bool symlinks, bool automount, size_t cnt)
+FileDescriptor* INode::Open() { return new FileDescriptor(this); }
+
+INode*          INode::InternalReduce(bool symlinks, bool automount, size_t cnt)
 {
     if (mountGate && automount)
         return mountGate->InternalReduce(symlinks, automount, 0);

@@ -12,10 +12,10 @@
 
 struct TmpFs : public Filesystem
 {
-    size_t maxInodes   = 0;
-    size_t maxSize     = 0;
+    usize maxInodes   = 0;
+    usize maxSize     = 0;
 
-    size_t currentSize = 0;
+    usize currentSize = 0;
 
     TmpFs();
 

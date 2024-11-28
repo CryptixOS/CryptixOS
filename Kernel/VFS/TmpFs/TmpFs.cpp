@@ -24,8 +24,8 @@ INode* TmpFs::Mount(INode* parent, INode* source, INode* target,
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
                : nullptr;
 
-    maxSize   = PhysicalMemoryManager::GetTotalMemory() / 2;
-    maxInodes = PhysicalMemoryManager::GetTotalMemory() / PMM::PAGE_SIZE / 2;
+    maxSize   = PMM::GetTotalMemory() / 2;
+    maxInodes = PMM::GetTotalMemory() / PMM::PAGE_SIZE / 2;
 
     root      = CreateNode(parent, name, 0644 | S_IFDIR, INodeType::eDirectory);
     if (root) mountedOn = target;

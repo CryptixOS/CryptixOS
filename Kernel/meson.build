@@ -14,6 +14,7 @@ srcs += files(
   'API/VFS.cpp',
 
   'Drivers/Terminal.cpp',
+  'Drivers/TTY.cpp',
 
   'Memory/KernelHeap.cpp',
   'Memory/PMM.cpp',
@@ -32,6 +33,8 @@ srcs += files(
 
   'VFS/INode.cpp',
   'VFS/VFS.cpp',
+  'VFS/DevTmpFs/DevTmpFs.cpp',
+  'VFS/DevTmpFs/DevTmpFsINode.cpp',
   'VFS/Initrd/Initrd.cpp',
   'VFS/Initrd/Ustar.cpp',
   'VFS/TmpFs/TmpFs.cpp',

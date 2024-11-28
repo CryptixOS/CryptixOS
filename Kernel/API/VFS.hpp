@@ -11,4 +11,6 @@
 namespace VFS
 {
     isize SysWrite(Syscall::Arguments& args);
-}
+    i32   SysOpen(Syscall::Arguments& args);
+    isize SysRead(Syscall::Arguments& args);
+} // namespace VFS

@@ -5,3 +5,30 @@
  * SPDX-License-Identifier: GPL-3
  */
 #pragma once
+
+#include "Drivers/Device.hpp"
+#include "VFS/INode.hpp"
+
+class DevTmpFsINode : public INode
+{
+  public:
+    DevTmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
+                  INodeType type, Device* device = nullptr)
+        : INode(parent, name, fs, type)
+    {
+        this->device = device;
+    }
+
+    virtual void InsertChild(INode* node, std::string_view name) override
+    {
+        std::unique_lock guard(lock);
+        children[name] = node;
+    }
+
+    virtual ssize_t Read(void* buffer, off_t offset, size_t bytes) override;
+    virtual ssize_t Write(const void* buffer, off_t offset,
+                          size_t bytes) override;
+
+  private:
+    Device* device = nullptr;
+};

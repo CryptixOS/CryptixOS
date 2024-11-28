@@ -177,6 +177,11 @@ namespace BootInfo
     {
         return framebufferRequest.response->framebuffers[0];
     }
+    Framebuffer** GetFramebuffers(usize& outCount)
+    {
+        outCount = framebufferRequest.response->framebuffer_count;
+        return framebufferRequest.response->framebuffers;
+    }
     limine_smp_response* GetSMP_Response() { return smpRequest.response; }
     MemoryMap            GetMemoryMap(u64& entryCount)
     {

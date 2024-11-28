@@ -7,19 +7,28 @@
  */
 #include "Terminal.hpp"
 
+#include "Memory/PMM.hpp"
 #include "Utility/BootInfo.hpp"
 
 #include <backends/fb.h>
 
+#include <cstdlib>
 #include <cstring>
 
-CTOS_NO_KASAN bool Terminal::Initialize(Framebuffer& framebuffer)
+std::vector<Terminal*> Terminal::s_Terminals = {};
+Terminal*              s_ActiveTerminal      = nullptr;
+
+bool                   Terminal::Initialize(Framebuffer& framebuffer)
 {
     this->framebuffer = framebuffer;
     if (!framebuffer.address) return false;
 
-    context = flanterm_fb_init(
-        nullptr, nullptr, reinterpret_cast<u32*>(framebuffer.address),
+    auto _malloc = PMM::IsInitialized() ? malloc : nullptr;
+    auto _free   = PMM::IsInitialized() ? [](void* addr, usize) { free(addr); }
+                                        : nullptr;
+
+    context      = flanterm_fb_init(
+        _malloc, _free, reinterpret_cast<u32*>(framebuffer.address),
         framebuffer.width, framebuffer.height, framebuffer.pitch,
         framebuffer.red_mask_size, framebuffer.red_mask_shift,
         framebuffer.green_mask_size, framebuffer.green_mask_shift,
@@ -27,6 +36,7 @@ CTOS_NO_KASAN bool Terminal::Initialize(Framebuffer& framebuffer)
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0, 1,
         0, 0, 0);
 
+    if (!s_ActiveTerminal) s_ActiveTerminal = this;
     return (initialized = true);
 }
 
@@ -63,4 +73,27 @@ void Terminal::PrintString(const char* string, usize length)
 void Terminal::PrintString(const char* string)
 {
     while (*string != '\0') { PutChar(*string++); }
+}
+
+std::vector<Terminal*>& Terminal::EnumerateTerminals()
+{
+    static bool initialized = false;
+    if (initialized) return s_Terminals;
+
+    usize         framebufferCount = 0;
+    Framebuffer** framebuffers = BootInfo::GetFramebuffers(framebufferCount);
+
+    for (usize i = 0; i < framebufferCount; i++)
+    {
+        if (s_ActiveTerminal && s_ActiveTerminal->id == i)
+        {
+            s_Terminals.push_back(s_ActiveTerminal);
+            continue;
+        }
+
+        s_Terminals.push_back(new Terminal(*framebuffers[i], i));
+    }
+
+    initialized = true;
+    return s_Terminals;
 }

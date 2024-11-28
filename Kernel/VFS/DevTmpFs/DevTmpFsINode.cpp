@@ -4,3 +4,17 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include "DevTmpFsINode.hpp"
+
+isize DevTmpFsINode::Read(void* buffer, off_t offset, usize bytes)
+{
+    if (!device) return 0;
+
+    return device->Read(buffer, offset, bytes);
+}
+isize DevTmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
+{
+    if (!device) return 0;
+
+    return device->Write(buffer, offset, bytes);
+}

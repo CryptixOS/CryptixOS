@@ -8,8 +8,8 @@
 
 #include "Common.hpp"
 
+#include "API/UnixTypes.hpp"
 #include "Utility/Path.hpp"
-#include "Utility/UnixTypes.hpp"
 
 class INode;
 enum class INodeType;
@@ -29,6 +29,8 @@ namespace VFS
 
     INode* CreateNode(INode* parent, PathView path, mode_t mode,
                       INodeType type);
+
+    INode* MkNod(INode* parent, std::string_view path, mode_t mode, dev_t dev);
     INode* Symlink(INode* parent, PathView path, std::string_view target);
     INode* Link(INode* oldParent, PathView oldPath, INode* newParent,
                 PathView newPath, i32 flags = 0);
