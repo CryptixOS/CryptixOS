@@ -15,7 +15,11 @@
 namespace Arch
 {
     void Pause();
-    bool ExchangeInterruptFlag(bool enabled);
+}
+
+namespace CPU
+{
+    bool SwapInterruptFlag(bool);
 }
 
 namespace std
@@ -29,7 +33,7 @@ namespace std
 
         void   lock()
         {
-            saved_ints = Arch::ExchangeInterruptFlag(false);
+            saved_ints = CPU::SwapInterruptFlag(false);
             auto ticket = _next_ticket.fetch_add(1, std::memory_order_relaxed);
             while (_serving_ticket.load(std::memory_order_acquire) != ticket)
                 Arch::Pause();
@@ -47,7 +51,7 @@ namespace std
 
             auto current = _serving_ticket.load(std::memory_order_relaxed);
             _serving_ticket.store(current + 1, std::memory_order_release);
-            Arch::ExchangeInterruptFlag(saved_ints);
+            CPU::SetInterruptFlag(saved_ints);
             saved_ints = false;
         }
 

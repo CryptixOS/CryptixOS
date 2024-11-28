@@ -22,14 +22,14 @@ namespace Scheduler
 {
     namespace
     {
-        [[maybe_unused]] u8        scheduleVector = 0;
-        std::mutex                 lock;
+        [[maybe_unused]] u8 scheduleVector = 0x20;
+        std::mutex          lock;
 
-        static std::deque<Thread*> queues[2];
-        static auto                active  = &queues[0];
-        static auto                expired = &queues[1];
+        std::deque<Thread*> queues[2];
+        auto                active  = &queues[0];
+        auto                expired = &queues[1];
 
-        Thread*                    GetNextThread(usize cpuID)
+        Thread*             GetNextThread(usize cpuID)
         {
             std::unique_lock guard(lock);
             if (active->empty()) std::swap(active, expired);
@@ -53,19 +53,45 @@ namespace Scheduler
 
     void Initialize()
     {
-        CPU::SetInterruptFlag(true);
+        IDT::SetIST(32, 1);
         InterruptManager::Unmask(0);
         LogInfo("Scheduler: Initialized");
-        for (;;) Arch::Halt();
     }
+
+    void PrepareAP(bool start)
+    {
+        CPU::GetCurrent()->tss.ist[0]
+            = ToHigherHalfAddress<uintptr_t>(PMM::AllocatePages<uintptr_t>(
+                  CPU::KERNEL_STACK_SIZE / PMM::PAGE_SIZE))
+            + CPU::KERNEL_STACK_SIZE;
+        IDT::SetIST(14, 2);
+
+        static std::atomic<pid_t> idlePids(-1);
+
+        Process*                  process = new Process;
+        process->pid                      = idlePids--;
+        process->name                     = "Idle Process for CPU: ";
+        process->name += std::to_string(CPU::GetCurrent()->id);
+        process->pageMap = VMM::GetKernelPageMap();
+
+        auto idleThread  = new ::Thread(
+            process, reinterpret_cast<uintptr_t>(Arch::Halt), false);
+        idleThread->state       = ThreadState::eReady;
+        CPU::GetCurrent()->idle = idleThread;
+
+        if (start) CPU::SetInterruptFlag(true);
+    };
 
     void EnqueueThread(Thread* thread)
     {
         std::unique_lock guard(lock);
         if (thread->enqueued) return;
-        thread->state = ThreadState::eRunning;
+
+        thread->enqueued = true;
+        thread->state    = ThreadState::eRunning;
         expired->push_front(thread);
     }
+
     void EnqueueNotReady(Thread* thread)
     {
         std::unique_lock guard(lock);
@@ -101,10 +127,12 @@ namespace Scheduler
             if (currentThread != CPU::GetCurrent()->idle)
                 EnqueueNotReady(currentThread);
 
-            CPU::SaveThread(newThread, ctx);
+            CPU::SaveThread(currentThread, ctx);
         }
 
+        CPU::Reschedule(1000);
         CPU::LoadThread(newThread, ctx);
+
         if (currentThread && currentThread->state == ThreadState::eKilled
             && currentThread != CPU::GetCurrent()->idle)
             delete currentThread;

@@ -10,6 +10,9 @@ srcs += files(
   'ACPI/ACPI.cpp',
   'ACPI/MADT.cpp',
 
+  'API/Syscall.cpp',
+  'API/VFS.cpp',
+
   'Drivers/Terminal.cpp',
 
   'Memory/KernelHeap.cpp',
@@ -20,6 +23,7 @@ srcs += files(
   'Scheduler/Thread.cpp',
 
   'Utility/BootInfo.cpp',
+  'Utility/ELF.cpp',
   'Utility/ICxxAbi.cpp',
   'Utility/Kasan.cpp',
   'Utility/Logger.cpp',

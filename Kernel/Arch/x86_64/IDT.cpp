@@ -11,7 +11,9 @@
 #include "ACPI/MADT.hpp"
 
 #include "Arch/x86_64/CPUContext.hpp"
+#include "Arch/x86_64/Drivers/PIC.hpp"
 #include "Arch/x86_64/GDT.hpp"
+#include "Drivers/Serial.hpp"
 
 #include "Arch/InterruptHandler.hpp"
 
@@ -92,8 +94,8 @@ extern "C" void raiseInterrupt(CPUContext* ctx)
     if (ctx->interruptVector < 0x20) raiseException(ctx);
     else if (handler.IsUsed())
     {
-        // TODO(v1tr10l7): send eoi
         handler(ctx);
+        PIC::SendEOI(ctx->interruptVector);
         return;
     }
 
@@ -151,8 +153,13 @@ namespace IDT
 
         Panic("IDT: Out of interrupt handlers");
     }
+    InterruptHandler* GetHandler(u8 vector)
+    {
+        return &interruptHandlers[vector];
+    }
 
     void SetIST(u8 vector, u32 value) { idtEntries[vector].ist = value; }
+    void SetDPL(u8 vector, u8 dpl) { idtEntries[vector].dpl = dpl; }
 } // namespace IDT
 
 #pragma region exception_names

@@ -37,4 +37,4 @@ struct CPUContext
     u64 rflags;
     u64 rsp;
     u64 ss;
-};
+} __attribute__((packed));

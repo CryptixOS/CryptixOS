@@ -25,10 +25,15 @@ inline constexpr u64 BIT(u64 n) { return (1ull << n); }
 #define CTOS_ARCH_AARCH64         1
 #define CTOS_ARCH_RISC_V          2
 
+namespace CPU
+{
+    void SetInterruptFlag(bool);
+}
+
 CTOS_NO_KASAN [[noreturn]]
 inline void panic(std::string_view msg)
 {
-    Arch::DisableInterrupts();
+    CPU::SetInterruptFlag(false);
     // TODO(v1tr10l7): Halt all cpus
 
     Logger::Log(LogLevel::eNone, "\n");
@@ -42,7 +47,7 @@ inline void panic(std::string_view msg)
 }
 CTOS_NO_KASAN inline void earlyPanic(const char* format, ...)
 {
-    Arch::DisableInterrupts();
+    CPU::SetInterruptFlag(false);
     EarlyLogError("Kernel Panic!");
 
     va_list args;

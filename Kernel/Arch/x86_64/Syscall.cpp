@@ -6,11 +6,35 @@
  */
 #include "CPU.hpp"
 
+#include "API/Syscall.hpp"
+#include "Scheduler/Thread.hpp"
+
 namespace Syscall
 {
+    constexpr usize SYSCALL_VECTOR = 0x80;
+
+    extern "C" void handleSyscall(CPUContext*);
+    void            Initialize()
+    {
+        auto handler = IDT::GetHandler(SYSCALL_VECTOR);
+        handler->SetHandler(handleSyscall);
+        handler->Reserve();
+
+        IDT::SetDPL(SYSCALL_VECTOR, DPL_RING3);
+    }
     extern "C" void handleSyscall(CPUContext* ctx)
     {
-        LogInfo("Syscall entry");
-        for (;;) CPU::Halt();
+        Arguments args{};
+
+        args.index   = ctx->rax;
+        args.args[0] = ctx->rdi;
+        args.args[1] = ctx->rsi;
+        args.args[2] = ctx->rdx;
+        args.args[3] = ctx->rcx;
+        args.args[4] = ctx->r8;
+        args.args[5] = ctx->r9;
+
+        Handle(args);
+        ctx->rax = args.returnValue;
     }
 } // namespace Syscall

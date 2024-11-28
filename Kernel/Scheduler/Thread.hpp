@@ -21,36 +21,37 @@ using tid_t = i64;
 
 enum class ThreadState
 {
-    eIdle,
     eReady,
-    eRunning,
+    eIdle,
     eKilled,
-    eBlocked,
+    eRunning,
     eDequeued,
+    eBlocked,
 };
 
 struct Process;
 struct Thread
 {
     Thread() = default;
-    Thread(Process* parent, uintptr_t pc, bool user);
+    Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn = -1);
+    Thread(Process* parent, uintptr_t pc, bool user = true);
     ~Thread();
 
-    usize     runningOn;
-    Thread*   self;
-    uintptr_t stack;
+    usize                                    runningOn;
+    Thread*                                  self;
+    uintptr_t                                stack;
 
-#if CTOS_ARCH == CTOS_ARCH_X86_64
-    uintptr_t kstack;
-    uintptr_t pfstack;
-#endif
+    uintptr_t                                kernelStack;
+    uintptr_t                                pageFaultStack;
 
-    tid_t      tid;
-    errno_t    error;
-    Process*   parent;
+    tid_t                                    tid;
+    errno_t                                  error;
+    Process*                                 parent;
 
-    CPUContext ctx;
-    CPUContext savedCtx;
+    CPUContext                               ctx;
+
+    std::vector<std::pair<uintptr_t, usize>> stacks;
+    bool                                     user = false;
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
     uintptr_t gsBase;
@@ -59,7 +60,6 @@ struct Thread
     uintptr_t el0Base;
 #endif
 
-    bool        user     = false;
     bool        enqueued = false;
     ThreadState state    = ThreadState::eIdle;
 };

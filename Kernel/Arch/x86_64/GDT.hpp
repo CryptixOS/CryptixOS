@@ -25,8 +25,10 @@ namespace GDT
 
     constexpr usize KERNEL_CODE_SELECTOR   = 0x08ull;
     constexpr usize KERNEL_DATA_SELECTOR   = 0x10ull;
-    constexpr usize USERLAND_CODE_SELECTOR = 0x18ull | DPL_RING3;
-    constexpr usize USERLAND_DATA_SELECTOR = 0x20ull | DPL_RING3;
+    constexpr usize USERLAND_DATA_SELECTOR = 0x18ull;
+    constexpr usize USERLAND_CODE_SELECTOR = 0x20ull;
+
+    constexpr usize TSS_SELECTOR           = 0x28;
 
     void            Initialize();
     void            Load(u64 id);

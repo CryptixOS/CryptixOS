@@ -18,7 +18,7 @@
 namespace
 {
     __attribute__((
-        used, section(".limine_requests"))) volatile LIMINE_BASE_REVISION(3);
+        used, section(".limine_requests"))) volatile LIMINE_BASE_REVISION(0);
 }
 
 static constexpr const u32 DEFAULT_STACK_SIZE = 65536;

@@ -19,6 +19,8 @@ namespace IDT
     void              Load();
 
     InterruptHandler* AllocateHandler(u8 hint);
+    InterruptHandler* GetHandler(u8 vector);
 
     void              SetIST(u8 vector, u32 value);
+    void              SetDPL(u8 vector, u8 dpl = 3);
 }; // namespace IDT

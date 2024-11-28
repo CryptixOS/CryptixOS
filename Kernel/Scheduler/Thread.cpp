@@ -20,6 +20,20 @@ static u64 AllocateTID()
     return i++;
 }
 
+Thread::Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn)
+    : runningOn(runOn)
+    , self(this)
+    , error(no_error)
+    , parent(parent)
+    , user(false)
+    , enqueued(false)
+    , state(ThreadState::eDequeued)
+
+{
+    tid = AllocateTID();
+    CPU::PrepareThread(this, pc, arg);
+    parent->threads.push_back(this);
+}
 Thread::Thread(Process* parent, uintptr_t pc, bool user)
     : runningOn(CPU::GetCurrent()->id)
     , self(this)
@@ -40,7 +54,7 @@ Thread::Thread(Process* parent, uintptr_t pc, bool user)
                                      PageAttributes::eRW | PageAttributes::eUser
                                          | PageAttributes::eWriteBack));
     parent->userStackTop = vustack - PMM::PAGE_SIZE;
-    // stacks.push_back(std::make_pair(pstack, CPU::USER_STACK_SIZE));
+    stacks.push_back(std::make_pair(pstack, CPU::USER_STACK_SIZE));
 
     [[maybe_unused]] uintptr_t stack1
         = ToHigherHalfAddress<uintptr_t>(pstack) + CPU::USER_STACK_SIZE;
@@ -48,7 +62,7 @@ Thread::Thread(Process* parent, uintptr_t pc, bool user)
 
     this->stack                       = Math::AlignDown(stack1, 16);
 
-    CPU::PrepareThread(this, pc);
+    CPU::PrepareThread(this, pc, 0);
     parent->threads.push_back(this);
 }
 Thread::~Thread() {}

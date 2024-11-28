@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <cassert>
 #include_next <functional>
 
 constexpr inline size_t _hash(const void* ptr, uint64_t len,
@@ -72,13 +73,25 @@ namespace std
 
         function() noexcept = default;
         function(std::nullptr_t) noexcept {}
-        function(const function& other)     = default;
-        function(function&& other) noexcept = default;
+        //function(const function& other)     = default;
+        //function(function&& other) noexcept = default;
+
         template <typename F>
-        function(F&& f)
+        function(F f)
             : _callable(new callableFunc<F>(f))
         {
         }
+        function(function& f)
+        {
+            _callable = f._callable;
+            f._callable = nullptr;
+        }
+        function(function&& f)
+        {
+            _callable = f._callable;
+            f._callable = nullptr;
+        }
+
 
         ~function()
         {
@@ -86,50 +99,60 @@ namespace std
             delete _callable;
         }
 
-        function& operator=(const function& other) = default;
-        function& operator=(function&& other)
-        {
-            other._callable = _callable;
-            _callable       = nullptr;
-        }
-        function& operator=(std::nullptr_t) noexcept { _callable = nullptr; }
-        template <typename F>
-        function& operator=(F&& f)
-        {
-            if (_callable) delete _callable;
-            _callable = new callableFunc<F>(f);
-            return *this;
-        }
+        /*
         template <typename F>
         function& operator=(std::reference_wrapper<F> f) noexcept
         {
             if (_callable) delete _callable;
             _callable = new callableFunc<F>(f);
+
+            return *this;
+        }*/
+
+        template <typename F>
+        function& operator=(F f)
+        {
+            if (_callable) delete _callable;
+            _callable = new callableFunc<F>(f);
+            
+            return *this;
+        }
+        function& operator=(function&& other)
+        {
+            if (_callable) delete _callable;
+            _callable = other._callable;
+            other._callable = nullptr;
+
             return *this;
         }
 
+        /*function& operator=(std::nullptr_t) noexcept { if (_callable) delete _callable; _callable = nullptr; }
+        template <typename F>
+        function& operator=(F&& f)
+        {
+            if (_callable) delete _callable;
+            _callable = new callableFunc<F>(f);
+
+            return *this;
+        }*/
         void swap(function& other) noexcept
         {
             callable* temp  = other._callable;
+
             other._callable = _callable;
             _callable       = temp;
         }
 
-        explicit operator bool() const { return _callable != nullptr; }
+        explicit operator bool() const { return _callable != nullptr ; }
 
         R operator()(Args... args) const
         {
-            if (!_callable) return R();
+            assert(_callable);
             return _callable->invoke(args...);
         }
 
         //        const std::type_info& target_type() const noexcept;
 
-        template <typename T>
-        T* target() noexcept
-        {
-            return reinterpret_cast<T*>(_callable);
-        }
         template <typename T>
         const T* target() const noexcept
         {
@@ -160,6 +183,6 @@ namespace std
             F _function;
         };
 
-        callable* _callable;
+        callable* _callable = nullptr;
     };
 } // namespace std

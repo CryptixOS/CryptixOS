@@ -56,7 +56,7 @@ namespace VirtualMemoryManager
         auto [pageSize, flags] = kernelPageMap->RequiredSize(4_gib);
         for (uintptr_t i = 0; i < 1_gib * 4; i += pageSize)
             Assert(kernelPageMap->Map(ToHigherHalfAddress<uintptr_t>(i), i,
-                                      PageAttributes::eRW | flags
+                                      PageAttributes::eRWXU | flags
                                           | PageAttributes::eWriteBack));
 
         usize entryCount = 0;
@@ -68,7 +68,6 @@ namespace VirtualMemoryManager
             uintptr_t       base  = Math::AlignDown(entry->base, GetPageSize());
             uintptr_t       top
                 = Math::AlignUp(entry->base + entry->length, GetPageSize());
-            if (top < 4_gib) continue;
 
             auto size              = top - base;
             auto [pageSize, flags] = kernelPageMap->RequiredSize(size);
@@ -84,7 +83,7 @@ namespace VirtualMemoryManager
                 if (t < 4_gib) continue;
 
                 Assert(kernelPageMap->Map(ToHigherHalfAddress<uintptr_t>(t), t,
-                                          PageAttributes::eRW | flags
+                                          PageAttributes::eRWXU | flags
                                               | PageAttributes::eWriteBack));
             }
             base += alignedSize;
@@ -95,7 +94,7 @@ namespace VirtualMemoryManager
                 if (t < 4_gib) continue;
 
                 Assert(kernelPageMap->Map(ToHigherHalfAddress<uintptr_t>(t), t,
-                                          PageAttributes::eRW
+                                          PageAttributes::eRWXU
                                               | PageAttributes::eWriteBack));
             }
         }
@@ -105,8 +104,9 @@ namespace VirtualMemoryManager
         {
             uintptr_t phys = BootInfo::GetKernelPhysicalAddress() + i;
             uintptr_t virt = BootInfo::GetKernelVirtualAddress() + i;
-            Assert(kernelPageMap->Map(
-                virt, phys, PageAttributes::eRWX | PageAttributes::eWriteBack));
+            Assert(kernelPageMap->Map(virt, phys,
+                                      PageAttributes::eRWXU
+                                          | PageAttributes::eWriteBack));
         }
 
         {

@@ -15,6 +15,12 @@
 using pid_t = i64;
 using tid_t = i64;
 
+enum class PrivilegeLevel
+{
+    ePrivileged,
+    eUnprivileged,
+};
+
 struct Process
 {
     Process() = default;

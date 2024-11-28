@@ -24,7 +24,7 @@ namespace Scheduler
 
 namespace PIT
 {
-    static constexpr const u64 PIT_FREQUENCY = 1000;
+    static constexpr const u64 PIT_FREQUENCY = 600;
     static std::atomic<u64>    tick          = 0;
     static u8                  timerVector   = 0;
     static InterruptHandler*   handler       = nullptr;
@@ -35,8 +35,6 @@ namespace PIT
         LogInfo("TimerTick");
         Scheduler::Schedule(ctx);
 
-        LogTrace("EOI");
-        PIC::SendEOI(timerVector - 0x20);
         tick++;
     }
 
@@ -82,7 +80,7 @@ namespace PIT
     }
     void SetReloadValue(u16 reloadValue)
     {
-        IO::Out<byte>(0x43, 0x34);
+        IO::Out<byte>(0x43, 0x30 | Mode::SQUARE_WAVE);
         IO::Out<byte>(0x40, static_cast<byte>(reloadValue));
         IO::Out<byte>(0x40, static_cast<byte>(reloadValue >> 8));
     }

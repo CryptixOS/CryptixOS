@@ -31,19 +31,4 @@ namespace Arch
         CTOS_ASSERT_NOT_REACHED();
     }
     void Pause() { __asm__ volatile("pause"); }
-
-    void EnableInterrupts() { __asm__ volatile("sti"); }
-    void DisableInterrupts() { __asm__ volatile("cli"); }
-    bool ExchangeInterruptFlag(bool enabled)
-    {
-        u64 rflags;
-        __asm__ volatile(
-            "pushfq\n\t"
-            "pop %[rflags]"
-            : [rflags] "=r"(rflags));
-
-        if (enabled) EnableInterrupts();
-        else DisableInterrupts();
-        return rflags & Bit(9);
-    }
 }; // namespace Arch

@@ -51,8 +51,6 @@ namespace GDT
         constexpr usize GDT_CODE_SEGMENT    = Bit(3);
         constexpr usize GDT_CODE_READABLE   = Bit(1);
         constexpr usize GDT_DATA_WRITEABLE  = Bit(1);
-
-        constexpr usize TSS_SELECTOR        = 0x28;
     }; // namespace
 
 #define GDTWriteEntry(_entry, _base, _limit, _access, _flags)                  \
@@ -68,11 +66,11 @@ namespace GDT
 #define TSSWriteEntry(_entry, _base)                                           \
     {                                                                          \
         (_entry)->length      = sizeof(TaskStateSegment);                      \
-        (_entry)->baseLow     = (u16)(_base & 0xffff);                         \
-        (_entry)->baseMiddle1 = (u8)((_base >> 16) & 0xff);                    \
+        (_entry)->baseLow     = (u16)(_base);                                  \
+        (_entry)->baseMiddle1 = (u8)(_base >> 16);                             \
         (_entry)->flags1      = ((1 << 3) << 4) | (1 << 3 | 1 << 0);           \
         (_entry)->flags2      = 0;                                             \
-        (_entry)->baseMiddle2 = (u8)((_base >> 24) & 0xff);                    \
+        (_entry)->baseMiddle2 = (u8)(_base >> 24);                             \
         (_entry)->baseHigh    = (u32)(_base >> 32);                            \
         (_entry)->reserved    = 0;                                             \
     }
@@ -83,14 +81,17 @@ namespace GDT
 
         u8 userCodeAccess = GDT_RING3 | GDT_CODE_OR_DATA | GDT_CODE_SEGMENT
                           | GDT_CODE_READABLE;
-        u8 userDataAccess = GDT_DATA_WRITEABLE | GDT_CODE_OR_DATA | GDT_RING3;
+        u8 userDataAccess   = GDT_DATA_WRITEABLE | GDT_CODE_OR_DATA | GDT_RING3;
 
-        GDTWriteEntry(&gdtEntries.kernelCode, 0, 0xffffffff,
-                      GDT_CODE_OR_DATA | GDT_CODE_SEGMENT | GDT_CODE_READABLE,
+        userCodeAccess      = 0xf2;
+        userDataAccess      = 0xfa;
+        u8 kernelCodeAccess = 0x9a;
+        u8 kernelDataAccess = 0x92;
+        GDTWriteEntry(&gdtEntries.kernelCode, 0, 0xffffffff, kernelCodeAccess,
                       0xa);
 
-        GDTWriteEntry(&gdtEntries.kernelData, 0, 0xffffffff,
-                      GDT_CODE_OR_DATA | GDT_DATA_WRITEABLE, 0xa);
+        GDTWriteEntry(&gdtEntries.kernelData, 0, 0xffffffff, kernelDataAccess,
+                      0xa);
         GDTWriteEntry(&gdtEntries.userCode, 0, 0, userCodeAccess, 0xa);
         GDTWriteEntry(&gdtEntries.userData, 0, 0, userDataAccess, 0xa);
         TSSWriteEntry(&gdtEntries.tss, 0ull);
@@ -124,7 +125,7 @@ namespace GDT
             "mov %1, %%ss"
             :
             : "m"(gdtr), "r"(KERNEL_DATA_SELECTOR), "r"(KERNEL_CODE_SELECTOR)
-            : "rbx", "memory", "%rax");
+            : "rbx", "memory", "%rax", "rbx");
 
         __asm__ volatile("ltr %0" ::"r"(static_cast<u16>(TSS_SELECTOR)));
         LogInfo("GDT: Loaded on cpu #{}", id);

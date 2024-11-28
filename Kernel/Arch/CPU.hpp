@@ -6,8 +6,6 @@
  */
 #pragma once
 
-#include "Common.hpp"
-
 #include "Memory/VMM.hpp"
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
@@ -23,14 +21,16 @@ namespace CPU
     constexpr usize KERNEL_STACK_SIZE = 64_kib;
     constexpr usize USER_STACK_SIZE   = 2_mib;
 
+    void            DumpRegisters(CPUContext* ctx);
     bool            GetInterruptFlag();
     void            SetInterruptFlag(bool enabled);
+    bool            SwapInterruptFlag(bool enabled);
 
     struct CPU;
     CPU*    GetCurrent();
     Thread* GetCurrentThread();
 
-    void    PrepareThread(Thread* thread, uintptr_t pc);
+    void    PrepareThread(Thread* thread, uintptr_t pc, uintptr_t arg = 0);
 
     void    SaveThread(Thread* thread, CPUContext* ctx);
     void    LoadThread(Thread* thread, CPUContext* ctx);

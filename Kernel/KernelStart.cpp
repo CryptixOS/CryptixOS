@@ -8,6 +8,9 @@
 #include "Common.hpp"
 
 #include "ACPI/ACPI.hpp"
+#include "API/Syscall.hpp"
+
+#include "Arch/CPU.hpp"
 #include "Arch/InterruptManager.hpp"
 
 #include "Drivers/Serial.hpp"
@@ -19,18 +22,47 @@
 #include "Scheduler/Scheduler.hpp"
 #include "Scheduler/Thread.hpp"
 
+#include "Utility/ELF.hpp"
 #include "Utility/ICxxAbi.hpp"
 #include "Utility/Stacktrace.hpp"
 
 #include "VFS/Initrd/Initrd.hpp"
 #include "VFS/VFS.hpp"
 
+static Process* kernelProcess;
+
+void            userThread2()
+{
+    static const char* str = "Hey";
+    for (;;)
+        __asm__ volatile(
+            "movq $0, %%rax\n"
+            "movq $2, %%rdi\n"
+            "movq %0, %%rsi\n"
+            "movq %1, %%rdx\n"
+            "syscall\n"
+            :
+            : "r"(str), "r"(3ull)
+            : "rax", "rdx", "rsi", "rdi");
+}
+
 void kernelThread()
 {
     Assert(VFS::MountRoot("tmpfs"));
     Initrd::Initialize();
 
-    for (;;) LogInfo("Hello");
+    LogTrace("Loading user process...");
+    Process* userProcess = new Process("TestUserProcess");
+    userProcess->pageMap = VMM::GetKernelPageMap();
+    userProcess->parent  = kernelProcess;
+
+    ELF::Image program;
+    uintptr_t  address = program.Load("/usr/sbin/init");
+    Scheduler::EnqueueThread(new Thread(userProcess, address));
+    Scheduler::EnqueueThread(
+        new Thread(userProcess, reinterpret_cast<uintptr_t>(userThread2)));
+
+    for (;;) Arch::Halt();
 }
 
 extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
@@ -57,12 +89,21 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
     ACPI::Initialize();
     Arch::Initialize();
 
-    static Process* kernelProcess = new Process("Kernel Process");
-    kernelProcess->pageMap        = VMM::GetKernelPageMap();
-    Scheduler::EnqueueThread(new Thread(
-        kernelProcess, reinterpret_cast<uintptr_t>(kernelThread), false));
+    kernelProcess          = new Process("Kernel Process");
+    kernelProcess->pageMap = VMM::GetKernelPageMap();
 
+    auto thread
+        = new Thread(kernelProcess, reinterpret_cast<uintptr_t>(kernelThread),
+                     0, CPU::GetCurrent()->id);
+
+    Scheduler::EnqueueThread(thread);
+
+    Syscall::InstallAll();
     Scheduler::Initialize();
+    LogInfo("Kernel Stack Size: {:#x}, User Stack Size: {:#x}",
+            CPU::KERNEL_STACK_SIZE, CPU::USER_STACK_SIZE);
+
+    Scheduler::PrepareAP(true);
 
     for (;;) Arch::Halt();
 }

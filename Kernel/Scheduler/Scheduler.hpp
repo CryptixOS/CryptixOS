@@ -12,6 +12,7 @@ struct Thread;
 namespace Scheduler
 {
     void Initialize();
+    void PrepareAP(bool start);
 
     void EnqueueThread(Thread* thread);
     void EnqueueNotReady(Thread* thread);

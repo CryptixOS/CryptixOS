@@ -17,6 +17,7 @@
 #include "Memory/PMM.hpp"
 #include "Memory/VMM.hpp"
 
+#include <cerrno>
 #include <vector>
 
 struct Thread;
@@ -38,6 +39,10 @@ namespace CPU
         constexpr usize CSTAR                    = 0xc0000083;
         constexpr usize SFMASK                   = 0xc0000084;
 
+        constexpr usize FS_BASE                  = 0xc0000100;
+        constexpr usize GS_BASE                  = 0xc0000101;
+        constexpr usize KERNEL_GS_BASE           = 0xc0000102;
+
         constexpr usize IA32_EFER_SYSCALL_ENABLE = Bit(0);
     }; // namespace MSR
 
@@ -49,13 +54,14 @@ namespace CPU
         uintptr_t        threadStack;
         uintptr_t        kernelStack;
 
-        usize            lapicID;
+        u64              lapicID;
         bool             isOnline = false;
         TaskStateSegment tss;
 
+        errno_t          error;
         Thread*          idle;
         Thread*          currentThread;
-    };
+    } __attribute__((packed));
 
     void      InitializeBSP();
 
@@ -74,8 +80,8 @@ namespace CPU
 
     std::vector<CPU>& GetCPUs();
     u64               GetOnlineCPUsCount();
-    u64               GetBSPID();
-    CPU&              GetBSP();
+    u64               GetBspIpatd();
+    CPU&              GetBsp();
 
     u64               GetCurrentID();
     void              Reschedule(usize ms);

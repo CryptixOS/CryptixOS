@@ -26,7 +26,7 @@ syscall_entry:
     // rflags
     push r11 
     // cs
-    push 0x23 
+    push 0x23
     // rip
     push rcx 
     // error_code
@@ -35,14 +35,13 @@ syscall_entry:
     push 0 
 
     pushaq
-
+    
     sti
     mov rdi, rsp
     call handleSyscall
     cli
 
     popaq
-
     add rsp, 56
     mov rsp, gs:[16]
 
