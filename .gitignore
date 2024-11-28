@@ -4,6 +4,7 @@ debug.log
 qemu.log
 serial.log
 
+BaseFiles/*
 subprojects/*/
 build-sysroot
 sources
