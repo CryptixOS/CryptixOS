@@ -44,6 +44,9 @@ struct Thread
     uintptr_t                                kernelStack;
     uintptr_t                                pageFaultStack;
 
+    usize                                    fpuStoragePageCount;
+    uintptr_t                                fpuStorage;
+
     tid_t                                    tid;
     errno_t                                  error;
     Process*                                 parent;

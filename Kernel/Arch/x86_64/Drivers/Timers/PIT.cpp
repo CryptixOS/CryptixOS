@@ -24,10 +24,10 @@ namespace Scheduler
 
 namespace PIT
 {
-    static constexpr const u64 PIT_FREQUENCY = 600;
-    static std::atomic<u64>    tick          = 0;
-    static u8                  timerVector   = 0;
-    static InterruptHandler*   handler       = nullptr;
+    constexpr usize          FREQUENCY   = 600;
+    static std::atomic<u64>  tick        = 0;
+    static u8                timerVector = 0;
+    static InterruptHandler* handler     = nullptr;
 
     [[maybe_unused]]
     static void TimerTick(struct CPUContext* ctx)
@@ -47,7 +47,7 @@ namespace PIT
     void Initialize()
     {
         static bool initialized = false;
-        SetFrequency(PIT_FREQUENCY);
+        SetFrequency(FREQUENCY);
 
         if (initialized) return;
         LogTrace("PIT: Initializing...");
@@ -65,24 +65,24 @@ namespace PIT
 
     u64 GetCurrentCount()
     {
-        IO::Out<byte>(0x43, 0x00);
-        auto lo = IO::In<byte>(0x40);
-        auto hi = IO::In<byte>(0x40) << 8;
+        IO::Out<byte>(COMMAND, SELECT_CHANNEL0);
+        auto lo = IO::In<byte>(CHANNEL0_DATA);
+        auto hi = IO::In<byte>(CHANNEL0_DATA) << 8;
         return static_cast<u16>(hi << 8) | lo;
     }
-    u64  GetMilliseconds() { return tick * (1000 / PIT_FREQUENCY); }
+    u64  GetMilliseconds() { return tick * (1000 / FREQUENCY); }
 
     void SetFrequency(usize frequency)
     {
-        u64 reloadValue = PIT_BASE_FREQUENCY / frequency;
-        if (PIT_BASE_FREQUENCY % frequency > frequency / 2) reloadValue++;
+        u64 reloadValue = BASE_FREQUENCY / frequency;
+        if (BASE_FREQUENCY % frequency > frequency / 2) reloadValue++;
         SetReloadValue(reloadValue);
     }
     void SetReloadValue(u16 reloadValue)
     {
-        IO::Out<byte>(0x43, 0x30 | Mode::SQUARE_WAVE);
-        IO::Out<byte>(0x40, static_cast<byte>(reloadValue));
-        IO::Out<byte>(0x40, static_cast<byte>(reloadValue >> 8));
+        IO::Out<byte>(COMMAND, SEND_WORD | Mode::SQUARE_WAVE);
+        IO::Out<byte>(CHANNEL0_DATA, static_cast<byte>(reloadValue));
+        IO::Out<byte>(CHANNEL0_DATA, static_cast<byte>(reloadValue >> 8));
     }
 
 }; // namespace PIT

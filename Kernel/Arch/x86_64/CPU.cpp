@@ -14,12 +14,91 @@
 
 namespace CPU
 {
-    static std::vector<CPU>                   s_CPUs;
-    static CPU*                               s_BSP             = nullptr;
-    static u64                                s_BspLapicId      = 0;
-    static usize                              s_OnlineCPUsCount = 1;
+    namespace
+    {
+        inline void XSave(uintptr_t ctx)
+        {
+            __asm__ volatile("xsave (%0)"
+                             :
+                             : "r"(ctx), "a"(0xffffffff), "d"(0xffffffff)
+                             : "memory");
+        }
+        inline void XRestore(uintptr_t ctx)
+        {
+            __asm__ volatile("xrstor (%0)"
+                             :
+                             : "r"(ctx), "a"(0xffffffff), "d"(0xffffffff)
+                             : "memory");
+        }
+
+        inline void FXSave(uintptr_t ctx)
+        {
+            __asm__ volatile("fxsave (%0)" : : "r"(ctx) : "memory");
+        }
+        inline void FXRestore(uintptr_t ctx)
+        {
+            __asm__ volatile("fxrstor (%0)" : : "r"(ctx) : "memory");
+        }
+
+        std::vector<CPU> s_CPUs;
+        CPU*             s_BSP             = nullptr;
+        u64              s_BspLapicId      = 0;
+        usize            s_OnlineCPUsCount = 1;
+    } // namespace
 
     extern "C" __attribute__((noreturn)) void syscall_entry();
+
+    static void                               InitializeFPU()
+    {
+        if (!EnableSSE()) return;
+        CPU* current = GetCurrent();
+        bool isBSP   = current->lapicID == s_BspLapicId;
+
+        ID   cpuid(CPUID_CHECK_FEATURES, 0);
+        if (cpuid.rcx & CPU_FEAT_ECX_XSAVE)
+        {
+            if (isBSP) LogInfo("FPU: XSave supported");
+
+            WriteCR4(ReadCR4() | CR4::OSXSAVE);
+            u64 xcr0 = 0;
+            if (isBSP) LogInfo("FPU: Saving x87 state using XSave");
+            xcr0 |= XCR0::X87;
+            if (isBSP) LogInfo("FPU: Saving SSE state using XSave");
+            xcr0 |= XCR0::SSE;
+
+            if (cpuid.rcx & CPU_FEAT_ECX_AVX)
+            {
+                if (isBSP) LogInfo("FPU: Saving AVX state using XSave");
+                xcr0 |= XCR0::AVX;
+            }
+
+            if (cpuid(7) && (cpuid.rbx & CPU_FEAT_EBX_AVX512))
+            {
+                if (isBSP) LogInfo("FPU: Saving AVX-512 state using xsave");
+                xcr0 |= XCR0::OPMASK;
+                xcr0 |= XCR0::ZMM_HI256;
+                xcr0 |= XCR0::ZMM_HI16;
+            }
+
+            WriteXCR(0, xcr0);
+            if (!cpuid(0xd)) Panic("CPUID failure");
+
+            current->fpuStorageSize = cpuid.rcx;
+            current->fpuRestore     = XRestore;
+            current->fpuSave        = XSave;
+        }
+        else if (cpuid.rdx & 0x01000000)
+        {
+            WriteCR4(ReadCR4() | CR4::OSFXSR);
+
+            current->fpuStorageSize = 512;
+            current->fpuSave        = FXSave;
+            current->fpuRestore     = FXRestore;
+        }
+        else Panic("SIMD: Unavailable");
+
+        LogInfo("FPU: Initialized on cpu[{}]", current->id);
+    }
 
     static void InitializeCPU(limine_smp_info* cpu)
     {
@@ -38,8 +117,8 @@ namespace CPU
             SetGSBase(cpu->extra_argument);
         }
 
-        // TODO(v1tr10l7): Enable SSE, SMEP, SMAP, UMIP
-        // TODO(v1tr10l7): Initialize the FPU
+        // TODO(v1tr10l7): Enable SMEP, SMAP, UMIP
+        InitializeFPU();
 
         WriteMSR(MSR::IA32_EFER,
                  ReadMSR(MSR::IA32_EFER) | MSR::IA32_EFER_SYSCALL_ENABLE);
@@ -101,7 +180,13 @@ namespace CPU
         LogInfo("BSP: Initialized");
     }
 
-    bool ID(u64 leaf, u64 subleaf, u64& rax, u64& rbx, u64& rcx, u64& rdx)
+    ID::ID(u64 leaf, u64 subleaf)
+    {
+        __asm__ volatile("cpuid"
+                         : "=a"(rax), "=b"(rbx), "=c"(rcx), "=d"(rdx)
+                         : "a"(leaf), "c"(subleaf));
+    }
+    bool ID::operator()(u64 leaf, u64 subleaf)
     {
         u32 cpuidMax;
         __asm__ volatile("cpuid"
@@ -176,6 +261,7 @@ namespace CPU
         u32 d = value >> 32;
         __asm__ volatile("xsetbv" ::"a"(a), "d"(d), "c"(reg) : "memory");
     }
+
     u64 ReadCR0()
     {
         u64 ret;
@@ -272,6 +358,7 @@ namespace CPU
 
     void PrepareThread(Thread* thread, uintptr_t pc, uintptr_t arg)
     {
+        CPU* current       = GetCurrent();
         thread->ctx.rflags = 0x202;
         thread->ctx.rip    = pc;
         thread->ctx.rdi    = arg;
@@ -280,12 +367,17 @@ namespace CPU
             = PMM::AllocatePages<uintptr_t>(KERNEL_STACK_SIZE / PMM::PAGE_SIZE);
         thread->kernelStack
             = ToHigherHalfAddress<uintptr_t>(kernelStack) + KERNEL_STACK_SIZE;
-        GetCurrent()->kernelStack = thread->kernelStack;
+        current->kernelStack = thread->kernelStack;
 
         uintptr_t pfStack
             = PMM::AllocatePages<uintptr_t>(KERNEL_STACK_SIZE / PMM::PAGE_SIZE);
         thread->pageFaultStack
             = ToHigherHalfAddress<uintptr_t>(pfStack) + KERNEL_STACK_SIZE;
+
+        usize fpuPageCount = thread->fpuStoragePageCount
+            = Math::DivRoundUp(current->fpuStorageSize, PMM::PAGE_SIZE);
+        thread->fpuStorage
+            = ToHigherHalfAddress<uintptr_t>(PMM::CallocatePages(fpuPageCount));
 
         thread->gsBase = reinterpret_cast<uintptr_t>(thread);
         if (thread->user)
@@ -295,6 +387,14 @@ namespace CPU
             thread->ctx.ds = thread->ctx.es = thread->ctx.ss;
 
             thread->ctx.rsp                 = thread->stack;
+            current->fpuRestore(thread->fpuStorage);
+
+            u16 defaultFcw = 0b1100111111;
+            __asm__ volatile("fldcw %0" ::"m"(defaultFcw) : "memory");
+            u32 defaultMxCsr = 0b1111110000000;
+            asm volatile("ldmxcsr %0" ::"m"(defaultMxCsr) : "memory");
+
+            current->fpuSave(thread->fpuStorage);
         }
         else
         {
@@ -311,12 +411,15 @@ namespace CPU
 
         thread->gsBase = GetKernelGSBase();
         thread->fsBase = GetFSBase();
+
+        GetCurrent()->fpuSave(thread->fpuStorage);
     }
     void LoadThread(Thread* thread, CPUContext* ctx)
     {
         thread->runningOn        = GetCurrent()->id;
 
         GetCurrent()->tss.ist[1] = thread->pageFaultStack;
+        GetCurrent()->fpuRestore(thread->fpuStorage);
 
         thread->parent->pageMap->Load();
 
@@ -331,6 +434,27 @@ namespace CPU
         // TODO(v1tr10l7): Reschedule
     }
 
+    bool EnableSSE()
+    {
+        ID   cpuid;
+        bool sseAvailable
+            = cpuid(CPUID_CHECK_FEATURES) && (cpuid.rdx & CPU_FEAT_EDX_SSE);
+
+        if (!sseAvailable)
+        {
+            LogError("SSE: Not Supported");
+            return false;
+        }
+
+        u64 cr0 = ReadCR0() & ~CR0::EM;
+        WriteCR0(cr0 | CR0::MP);
+
+        u64 cr4 = ReadCR4();
+        WriteCR4(cr4 | CR4::OSFXSR | CR4::OSXMMEXCPT);
+
+        LogInfo("SSE: Enabled on cpu[{}]", GetCurrent()->id);
+        return true;
+    }
     void EnablePAT()
     {
         // write-combining/write-protect

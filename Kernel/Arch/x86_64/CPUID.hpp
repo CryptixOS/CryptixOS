@@ -8,7 +8,8 @@
 
 #include "Common.hpp"
 
-inline static constexpr const u32 CPUID_FUNCTION_GET_FEATURE = 0x01;
+inline static constexpr const u32 CPUID_CHECK_FEATURES       = 0x01;
+inline static constexpr const u32 CPUID_CHECK_XSAVE_FEATURES = 0x0d;
 
 inline static constexpr const u32 CPU_FEAT_EBX_SMEP          = BIT(7);
 inline static constexpr const u32 CPU_FEAT_EBX_AVX512        = BIT(16);

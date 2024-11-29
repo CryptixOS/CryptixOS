@@ -27,3 +27,46 @@ using i64    = int64_t;
 using symbol = void*[];
 
 inline constexpr u64 Bit(u64 n) { return (1ull << n); }
+
+namespace BootInfo
+{
+    // We have to forward declare it here, to avoid recursive includes
+    uintptr_t GetHHDMOffset();
+}; // namespace BootInfo
+
+struct Pointer
+{
+    Pointer(uintptr_t pointer)
+        : pointer(pointer)
+    {
+    }
+
+    operator uintptr_t() { return pointer; }
+    operator bool() { return pointer != 0; }
+
+    template <typename T>
+    T* As()
+    {
+        return reinterpret_cast<T*>(pointer);
+    }
+
+    inline bool IsHigherHalf() { return pointer >= BootInfo::GetHHDMOffset(); }
+
+    template <typename T>
+    inline T ToHigherHalf()
+    {
+        return IsHigherHalf()
+                 ? reinterpret_cast<T>(pointer)
+                 : reinterpret_cast<T>(pointer + BootInfo::GetHHDMOffset());
+    }
+
+    template <typename T>
+    inline T FromHigherHalf()
+    {
+        return IsHigherHalf()
+                 ? reinterpret_cast<T>(pointer - BootInfo::GetHHDMOffset())
+                 : reinterpret_cast<T>(pointer);
+    }
+
+    uintptr_t pointer = 0;
+};

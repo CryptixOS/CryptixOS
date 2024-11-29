@@ -8,10 +8,21 @@
 
 #include "Utility/Types.hpp"
 
-inline static constexpr u64 PIT_BASE_FREQUENCY = 1193182;
-
 namespace PIT
 {
+    constexpr usize BASE_FREQUENCY  = 1193182ull;
+
+    constexpr usize SEND_WORD       = 0x30;
+
+    constexpr usize CHANNEL0_DATA   = 0x40;
+    constexpr usize CHANNEL1_DATA   = 0x41;
+    constexpr usize CHANNEL2_DATA   = 0x42;
+    constexpr usize COMMAND         = 0x43;
+
+    constexpr usize SELECT_CHANNEL0 = 0x00;
+    constexpr usize SELECT_CHANNEL1 = 0x40;
+    constexpr usize SELECT_CHANNEL2 = 0x80;
+
     namespace Mode
     {
         constexpr usize COUNTDOWN   = 0x00;

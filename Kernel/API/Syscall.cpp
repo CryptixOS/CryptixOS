@@ -6,6 +6,7 @@
  */
 #include "Syscall.hpp"
 
+#include "API/Process.hpp"
 #include "API/VFS.hpp"
 
 #include <array>
@@ -43,6 +44,7 @@ namespace Syscall
         RegisterSyscall(ID::eRead, VFS::SysRead);
         RegisterSyscall(ID::eWrite, VFS::SysWrite);
         RegisterSyscall(ID::eOpen, VFS::SysOpen);
+        // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
     }
     void Handle(Arguments& args)
     {

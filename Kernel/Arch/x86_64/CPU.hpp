@@ -11,6 +11,7 @@
 #include "Arch/CPU.hpp"
 
 #include "Arch/x86_64/CPUContext.hpp"
+#include "Arch/x86_64/CPUID.hpp"
 #include "Arch/x86_64/GDT.hpp"
 #include "Arch/x86_64/IDT.hpp"
 
@@ -23,6 +24,9 @@
 struct Thread;
 namespace CPU
 {
+    using FPUSaveFunc    = void    (*)(uintptr_t ctx);
+    using FPURestoreFunc = void (*)(uintptr_t ctx);
+
     namespace MSR
     {
         constexpr usize IA32_APIC_BASE           = 0x1b;
@@ -46,6 +50,30 @@ namespace CPU
         constexpr usize IA32_EFER_SYSCALL_ENABLE = Bit(0);
     }; // namespace MSR
 
+    namespace XCR0
+    {
+        constexpr usize X87       = Bit(0);
+        constexpr usize SSE       = Bit(1);
+        constexpr usize AVX       = Bit(2);
+        constexpr usize OPMASK    = Bit(5);
+        constexpr usize ZMM_HI256 = Bit(6);
+        constexpr usize ZMM_HI16  = Bit(7);
+    }; // namespace XCR0
+    namespace CR0
+    {
+        // Coprocessor monitoring
+        constexpr usize MP = Bit(1);
+        // Coprocessor emulation
+        constexpr usize EM = Bit(2);
+    }; // namespace CR0
+    namespace CR4
+    {
+        constexpr usize OSFXSR     = Bit(9);
+        constexpr usize OSXMMEXCPT = Bit(10);
+        constexpr usize OSXSAVE    = Bit(18);
+
+    }; // namespace CR4
+
     struct CPU
     {
         usize            id;
@@ -58,6 +86,12 @@ namespace CPU
         bool             isOnline = false;
         TaskStateSegment tss;
 
+        usize            fpuStorageSize = 512;
+        uintptr_t        fpuStorage     = 0;
+
+        FPUSaveFunc      fpuSave        = nullptr;
+        FPURestoreFunc   fpuRestore     = nullptr;
+
         errno_t          error;
         Thread*          idle;
         Thread*          currentThread;
@@ -65,18 +99,33 @@ namespace CPU
 
     void      InitializeBSP();
 
-    bool      ID(u64 leaf, u64 subleaf, u64& rax, u64& rbx, u64& rcx, u64& rdx);
-    void      Halt();
+    struct ID final
+    {
+        ID() = default;
+        ID(u64 leaf, u64 subleaf = 0);
 
-    u64       ReadMSR(u32 msr);
-    void      WriteMSR(u32 msr, u64 value);
+        bool operator()(u64 leaf, u64 subleaf = 0);
 
-    uintptr_t GetFSBase();
-    uintptr_t GetGSBase();
-    uintptr_t GetKernelGSBase();
+        u64  rax, rbx, rcx, rdx;
+    };
 
-    void      SetGSBase(uintptr_t address);
-    void      SetKernelGSBase(uintptr_t address);
+    void              Halt();
+
+    void              WriteXCR(u64 reg, u64 value);
+    u64               ReadCR0();
+    void              WriteCR0(u64 value);
+    u64               ReadCR4();
+    void              WriteCR4(u64 value);
+
+    u64               ReadMSR(u32 msr);
+    void              WriteMSR(u32 msr, u64 value);
+
+    uintptr_t         GetFSBase();
+    uintptr_t         GetGSBase();
+    uintptr_t         GetKernelGSBase();
+
+    void              SetGSBase(uintptr_t address);
+    void              SetKernelGSBase(uintptr_t address);
 
     std::vector<CPU>& GetCPUs();
     u64               GetOnlineCPUsCount();
@@ -86,5 +135,6 @@ namespace CPU
     u64               GetCurrentID();
     void              Reschedule(usize ms);
 
+    bool              EnableSSE();
     void              EnablePAT();
 }; // namespace CPU

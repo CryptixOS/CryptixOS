@@ -9,8 +9,10 @@
 #include "Common.hpp"
 
 #include "Arch/x86_64/CPU.hpp"
+#include "Arch/x86_64/Drivers/PCSpeaker.hpp"
 #include "Arch/x86_64/Drivers/PIC.hpp"
 #include "Arch/x86_64/Drivers/Timers/PIT.hpp"
+#include "Arch/x86_64/IO.hpp"
 
 namespace Arch
 {
@@ -22,6 +24,10 @@ namespace Arch
         PIC::MaskAllIRQs();
 
         PIT::Initialize();
+
+        PCSpeaker::ToneOn(1000);
+        IO::Delay(1000);
+        PCSpeaker::ToneOff();
     }
 
     __attribute__((noreturn)) void Halt()

@@ -14,12 +14,6 @@
 #include "Scheduler/Process.hpp"
 #include "Utility/Math.hpp"
 
-static u64 AllocateTID()
-{
-    static usize i = 10;
-    return i++;
-}
-
 Thread::Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn)
     : runningOn(runOn)
     , self(this)
@@ -30,7 +24,7 @@ Thread::Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn)
     , state(ThreadState::eDequeued)
 
 {
-    tid = AllocateTID();
+    tid = parent->nextTid++;
     CPU::PrepareThread(this, pc, arg);
     parent->threads.push_back(this);
 }
@@ -43,7 +37,7 @@ Thread::Thread(Process* parent, uintptr_t pc, bool user)
     , enqueued(false)
     , state(ThreadState::eDequeued)
 {
-    tid = AllocateTID();
+    tid = parent->nextTid++;
 
     uintptr_t pstack
         = PMM::CallocatePages<uintptr_t>(CPU::USER_STACK_SIZE / PMM::PAGE_SIZE);

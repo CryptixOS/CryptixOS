@@ -15,6 +15,7 @@ srcs += files(
   'interrupts.x86_64.S',
   'syscall.S',
 
+  'Drivers/PCSpeaker.cpp',
   'Drivers/PIC.cpp',
   'Drivers/Serial.cpp',
 

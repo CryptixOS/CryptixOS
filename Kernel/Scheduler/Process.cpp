@@ -17,6 +17,6 @@ Process::Process(std::string_view name, PrivilegeLevel ring)
     : name(name)
     , ring(ring)
 {
-    pid = AllocatePid();
+    nextTid = pid = AllocatePid();
     if (ring == PrivilegeLevel::ePrivileged) pageMap = VMM::GetKernelPageMap();
 }
