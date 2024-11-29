@@ -30,6 +30,7 @@ bool                   Terminal::Initialize(Framebuffer& framebuffer)
     auto _free   = PMM::IsInitialized() ? [](void* addr, usize) { free(addr); }
                                         : nullptr;
 
+    // TODO(v1tr10l7): install callback to flanterm context
     context      = flanterm_fb_init(
         _malloc, _free, reinterpret_cast<u32*>(framebuffer.address),
         framebuffer.width, framebuffer.height, framebuffer.pitch,
@@ -39,11 +40,7 @@ bool                   Terminal::Initialize(Framebuffer& framebuffer)
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0, 1,
         0, 0, 0);
 
-    if (!s_ActiveTerminal)
-    {
-        s_ActiveTerminal     = this;
-        s_ActiveTerminal->id = 0;
-    }
+    if (!s_ActiveTerminal) s_ActiveTerminal = this;
     return (initialized = true);
 }
 
@@ -91,7 +88,6 @@ std::vector<Terminal*>& Terminal::EnumerateTerminals()
             continue;
         }
 
-        break;
         s_Terminals.push_back(new Terminal(*framebuffers[i], i));
     }
 

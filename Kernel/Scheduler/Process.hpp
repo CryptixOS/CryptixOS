@@ -24,6 +24,18 @@ enum class PrivilegeLevel
     eUnprivileged,
 };
 
+struct Credentials
+{
+    uid_t uid;
+    gid_t gid;
+    uid_t euid;
+    gid_t egid;
+    uid_t suid;
+    gid_t sgid;
+    pid_t sid;
+    gid_t pgid;
+};
+
 struct Process
 {
     Process() = default;
@@ -53,6 +65,7 @@ struct Process
     std::string                  name;
     PageMap*                     pageMap;
     std::atomic<tid_t>           nextTid;
+    Credentials                  credentials;
 
     Process*                     parent;
     std::vector<struct Thread*>  threads;

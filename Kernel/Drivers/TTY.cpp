@@ -6,7 +6,13 @@
  */
 #include "TTY.hpp"
 
+#include "Arch/CPU.hpp"
+
 #include "Drivers/Terminal.hpp"
+
+#include "Scheduler/Process.hpp"
+#include "Scheduler/Thread.hpp"
+
 #include "VFS/DevTmpFs/DevTmpFs.hpp"
 #include "VFS/VFS.hpp"
 
@@ -41,10 +47,27 @@ isize TTY::Write(const void* src, off_t offset, usize bytes)
 
 i32 TTY::IoCtl(usize request, uintptr_t argp)
 {
-    CtosUnused(request);
-    CtosUnused(argp);
+    if (!argp) return EINVAL;
 
-    return 0;
+    switch (request)
+    {
+        case TCGETS:
+        {
+            std::memcpy(reinterpret_cast<void*>(argp), &termios,
+                        sizeof(termios));
+            break;
+        }
+        case TCSETS:
+        {
+            std::memcpy(&termios, reinterpret_cast<void*>(argp),
+                        sizeof(termios));
+            break;
+        }
+        case TIOCGPGRP: *reinterpret_cast<i32*>(argp) = pgid; break;
+        case TIOCSPGRP: pgid = *reinterpret_cast<i32*>(argp); break;
+    }
+
+    return no_error;
 }
 
 void TTY::Initialize()
@@ -53,7 +76,7 @@ void TTY::Initialize()
 
     auto& terminals = Terminal::EnumerateTerminals();
 
-    /*usize minor     = 1;
+    usize minor     = 1;
     for (usize i = 0; i < terminals.size(); i++)
     {
         LogTrace("TTY: Creating device /dev/tty{}...", minor);
@@ -69,13 +92,7 @@ void TTY::Initialize()
     }
 
     if (!s_TTYs.empty())
-        VFS::MkNod(VFS::GetRootNode(), "/dev/tty0", 0666, s_TTYs[0]->GetID());*/
+        VFS::MkNod(VFS::GetRootNode(), "/dev/tty0", 0666, s_TTYs[0]->GetID());
 
-    auto  tty       = new TTY(terminals[0], 0);
-    s_TTYs.push_back(tty);
-    DevTmpFs::RegisterDevice(tty);
-
-    std::string path = "/dev/tty0";
-    VFS::MkNod(VFS::GetRootNode(), path, 0666, tty->GetID());
     LogInfo("TTY: Initialized");
 }

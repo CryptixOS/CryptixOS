@@ -24,6 +24,7 @@ class TTY : public Device
     static void   Initialize();
 
   private:
-    Terminal*           terminal = nullptr;
-    CTOS_UNUSED termios termios;
+    Terminal* terminal = nullptr;
+    termios   termios;
+    gid_t     pgid = -1;
 };

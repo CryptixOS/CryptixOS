@@ -18,27 +18,27 @@ extern "C"
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wkeyword-macro"
 #define unsigned signed
-    typedef __SIZE_TYPE__ ssize_t;
+    using ssize_t = __SIZE_TYPE__;
 #undef unsigned
 #pragma clang diagnostic pop
 
-    typedef int64_t      blkcnt_t;
-    typedef int64_t      blksize_t;
-    typedef uint64_t     clock_t;
-    typedef int          clockid_t;
-    typedef uint64_t     dev_t;
-    typedef uint64_t     fsblkcnt_t;
-    typedef uint64_t     fsfilcnt_t;
-    typedef uint32_t     gid_t;
-    typedef int32_t      id_t;
-    typedef uint64_t     ino_t;
-    typedef uint64_t     key_t;
-    typedef unsigned int mode_t;
-    typedef uint64_t     nlink_t;
-    typedef int64_t      off_t;
-    typedef i64          pid_t;
-    typedef uint32_t     uid_t;
-    typedef int64_t      time_t;
+    using blkcnt_t   = int64_t;
+    using blksize_t  = int64_t;
+    using clock_t    = uint64_t;
+    using clockid_t  = int;
+    using dev_t      = uint64_t;
+    using fsblkcnt_t = uint64_t;
+    using fsfilcnt_t = uint64_t;
+    using gid_t      = uint32_t;
+    using id_t       = int32_t;
+    using ino_t      = uint64_t;
+    using key_t      = uint64_t;
+    using mode_t     = unsigned int;
+    using nlink_t    = uint64_t;
+    using off_t      = int64_t;
+    using pid_t      = i64;
+    using uid_t      = uint32_t;
+    using time_t     = int64_t;
 
 #ifdef __cplusplus
 }
