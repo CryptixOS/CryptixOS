@@ -1,4 +1,4 @@
-void __mlibc_entry()
+int main()
 {
     static const char* str = "Hello";
 start:
@@ -14,9 +14,6 @@ start:
             : "rax", "rdx", "rsi");
 
     goto start;
-}
-int main()
-{
-    __mlibc_entry();
+
     return 0;
 }

@@ -26,5 +26,6 @@ class TTY : public Device
   private:
     Terminal* terminal = nullptr;
     termios   termios;
-    gid_t     pgid = -1;
+    pid_t     controlSid = -1;
+    gid_t     pgid       = -1;
 };

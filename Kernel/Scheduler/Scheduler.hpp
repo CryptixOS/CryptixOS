@@ -8,12 +8,17 @@
 
 #include "Common.hpp"
 
+struct Process;
 struct Thread;
 namespace Scheduler
 {
-    void Initialize();
-    void PrepareAP(bool start);
+    void     Initialize();
+    void     PrepareAP(bool start);
 
-    void EnqueueThread(Thread* thread);
-    void EnqueueNotReady(Thread* thread);
+    Process* GetKernelProcess();
+    Thread*  CreateKernelThread(uintptr_t pc, uintptr_t arg,
+                                usize runningOn = -1);
+
+    void     EnqueueThread(Thread* thread);
+    void     EnqueueNotReady(Thread* thread);
 }; // namespace Scheduler

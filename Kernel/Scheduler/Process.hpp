@@ -36,18 +36,23 @@ struct Credentials
     gid_t pgid;
 };
 
+constexpr Credentials ROOT_CREDENTIALS = {
+    .uid  = 0,
+    .gid  = 0,
+    .euid = 0,
+    .egid = 0,
+    .suid = 0,
+    .sgid = 0,
+    .sid  = 0,
+    .pgid = 0,
+};
+
+struct Thread;
+
 struct Process
 {
     Process() = default;
-    Process(std::string_view name)
-        : name(name)
-        , pageMap(nullptr)
-        , nextTid(1)
-        , parent(nullptr)
-        , userStackTop(0x70000000000)
-
-    {
-    }
+    Process(std::string_view name, PrivilegeLevel ring);
 
     void InitializeStreams()
     {
@@ -61,15 +66,16 @@ struct Process
         fileDescriptors.push_back(currentTTY->Open());
     }
 
-    pid_t                        pid;
-    std::string                  name;
-    PageMap*                     pageMap;
-    std::atomic<tid_t>           nextTid;
-    Credentials                  credentials;
+    pid_t                        pid         = -1;
+    std::string                  name        = "?";
+    PageMap*                     pageMap     = nullptr;
+    std::atomic<tid_t>           nextTid     = 1;
+    Credentials                  credentials = {};
+    PrivilegeLevel               ring        = PrivilegeLevel::eUnprivileged;
 
-    Process*                     parent;
-    std::vector<struct Thread*>  threads;
+    Process*                     parent      = nullptr;
+    std::vector<Thread*>         threads;
 
     std::vector<FileDescriptor*> fileDescriptors;
-    uintptr_t                    userStackTop;
+    uintptr_t                    userStackTop = 0x70000000000;
 };

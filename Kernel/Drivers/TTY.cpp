@@ -65,6 +65,12 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         }
         case TIOCGPGRP: *reinterpret_cast<i32*>(argp) = pgid; break;
         case TIOCSPGRP: pgid = *reinterpret_cast<i32*>(argp); break;
+        case TIOCSCTTY:
+            controlSid = CPU::GetCurrentThread()->parent->credentials.sid;
+            break;
+        case TIOCNOTTY: controlSid = -1; break;
+
+        default: return ENOTTY;
     }
 
     return no_error;

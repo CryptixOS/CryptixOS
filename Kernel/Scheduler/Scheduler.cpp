@@ -22,9 +22,10 @@ namespace Scheduler
 {
     namespace
     {
-        [[maybe_unused]] u8 scheduleVector = 0x20;
+        u8                  scheduleVector = 0x20;
         std::mutex          lock;
 
+        Process*            s_KernelProcess = nullptr;
         std::deque<Thread*> queues[2];
         auto                active  = &queues[0];
         auto                expired = &queues[1];
@@ -53,8 +54,11 @@ namespace Scheduler
 
     void Initialize()
     {
-        IDT::SetIST(32, 1);
-        InterruptManager::Unmask(0);
+        IDT::SetIST(scheduleVector, 1);
+
+        s_KernelProcess
+            = new Process("Kernel Process", PrivilegeLevel::ePrivileged);
+        LogInfo("Scheduler: Kernel process created");
         LogInfo("Scheduler: Initialized");
     }
 
@@ -74,13 +78,26 @@ namespace Scheduler
         process->name += std::to_string(CPU::GetCurrent()->id);
         process->pageMap = VMM::GetKernelPageMap();
 
-        auto idleThread  = new ::Thread(
+        auto idleThread  = new Thread(
             process, reinterpret_cast<uintptr_t>(Arch::Halt), false);
         idleThread->state       = ThreadState::eReady;
         CPU::GetCurrent()->idle = idleThread;
 
-        if (start) CPU::SetInterruptFlag(true);
+        if (start)
+        {
+            CPU::SetInterruptFlag(true);
+            InterruptManager::Unmask(0);
+
+            for (;;) Arch::Halt();
+        }
     };
+
+    Process* GetKernelProcess() { return s_KernelProcess; }
+
+    Thread*  CreateKernelThread(uintptr_t pc, uintptr_t arg, usize runningOn)
+    {
+        return new Thread(s_KernelProcess, pc, arg, runningOn);
+    }
 
     void EnqueueThread(Thread* thread)
     {

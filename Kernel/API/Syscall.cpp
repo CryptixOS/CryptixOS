@@ -40,9 +40,9 @@ namespace Syscall
     void InstallAll()
     {
         Initialize();
-        RegisterSyscall(0, VFS::SysWrite);
-        RegisterSyscall(1, VFS::SysOpen);
-        RegisterSyscall(2, VFS::SysRead);
+        RegisterSyscall(ID::eRead, VFS::SysRead);
+        RegisterSyscall(ID::eWrite, VFS::SysWrite);
+        RegisterSyscall(ID::eOpen, VFS::SysOpen);
     }
     void Handle(Arguments& args)
     {

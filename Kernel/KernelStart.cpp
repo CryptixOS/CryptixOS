@@ -96,7 +96,8 @@ void kernelThread()
     }
 
     LogTrace("Loading user process...");
-    Process* userProcess = new Process("TestUserProcess");
+    Process* userProcess
+        = new Process("TestUserProcess", PrivilegeLevel::eUnprivileged);
     userProcess->pageMap = VMM::GetKernelPageMap();
     userProcess->parent  = kernelProcess;
     userProcess->InitializeStreams();
@@ -134,21 +135,17 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
     ACPI::Initialize();
     Arch::Initialize();
 
-    kernelProcess          = new Process("Kernel Process");
-    kernelProcess->pageMap = VMM::GetKernelPageMap();
-
-    auto thread
-        = new Thread(kernelProcess, reinterpret_cast<uintptr_t>(kernelThread),
-                     0, CPU::GetCurrent()->id);
+    Scheduler::Initialize();
+    auto thread = Scheduler::CreateKernelThread(
+        reinterpret_cast<uintptr_t>(kernelThread), 0, CPU::GetCurrent()->id);
 
     Scheduler::EnqueueThread(thread);
 
     Syscall::InstallAll();
-    Scheduler::Initialize();
     LogInfo("Kernel Stack Size: {:#x}, User Stack Size: {:#x}",
             CPU::KERNEL_STACK_SIZE, CPU::USER_STACK_SIZE);
 
     Scheduler::PrepareAP(true);
 
-    for (;;) Arch::Halt();
+    std::unreachable();
 }
