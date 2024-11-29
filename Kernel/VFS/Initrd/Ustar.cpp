@@ -8,8 +8,10 @@
 
 #include "Common.hpp"
 
-#include "Utility/Math.hpp"
 #include "API/UnixTypes.hpp"
+#include "Drivers/Device.hpp"
+#include "Utility/Math.hpp"
+
 #include "VFS/INode.hpp"
 
 #include <cstring>
@@ -75,20 +77,16 @@ namespace Ustar
                                            INodeType::eRegular);
 
                     if (!node)
-                    {
                         LogError(
                             "USTAR: Failed to create regular file!, path: "
                             "'{}'",
                             filename.data());
-                        LogInfo("file created");
-                        break;
-                    }
                     else if (node->Write(
-                                 reinterpret_cast<uint8_t*>(
+                                 reinterpret_cast<u8*>(
                                      reinterpret_cast<uintptr_t>(current)
                                      + 512),
                                  0, size)
-                             != ssize_t(size))
+                             != isize(size))
                         LogError(
                             "USTAR: Could not write to regular file! path: "
                             "'{}'",
@@ -109,13 +107,18 @@ namespace Ustar
                         current->deviceMajor, sizeof(current->deviceMajor));
                     uint32_t deviceMinor = parseOctNumber<uint32_t>(
                         current->deviceMinor, sizeof(current->deviceMinor));
-                    LogError(
-                        "USTAR: Failed to create character device: '{}' "
-                        "({}:{})",
-                        filename.data(), deviceMajor, deviceMinor);
-                    ToDo();
+
+                    VFS::MkNod(VFS::GetRootNode(), filename, mode | S_IFCHR,
+                               makeDevice(deviceMajor, deviceMinor));
+
+                    if (!node)
+                        LogError(
+                            "USTAR: Failed to create character device! path: "
+                            "'{}', id: "
+                            "{{ major: {}, minor: {} }}",
+                            filename, deviceMajor, deviceMinor);
+                    break;
                 }
-                break;
                 case FILE_TYPE_BLOCK_DEVICE: ToDo();
                 case FILE_TYPE_DIRECTORY:
                     node = VFS::CreateNode(nullptr, filename, mode | S_IFDIR,

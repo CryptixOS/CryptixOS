@@ -7,15 +7,18 @@
 #pragma once
 
 #include "Drivers/Device.hpp"
+#include "Utility/NonCopyable.hpp"
 #include "VFS/INode.hpp"
 
-class DevTmpFsINode : public INode
+class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
 {
   public:
     DevTmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
                   INodeType type, Device* device = nullptr)
         : INode(parent, name, fs, type)
     {
+        LogTrace("Creating devtmpfs node: {}, device: {}", name,
+                 device != nullptr);
         this->device = device;
     }
 

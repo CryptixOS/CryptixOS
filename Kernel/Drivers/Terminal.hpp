@@ -10,6 +10,7 @@
 #include "Utility/Types.hpp"
 
 #include <flanterm.h>
+#include <mutex>
 #include <string_view>
 #include <vector>
 
@@ -25,17 +26,12 @@ class Terminal      final
         Initialize(framebuffer);
     }
 
-    bool        Initialize(Framebuffer& framebuffer);
+    bool                           Initialize(Framebuffer& framebuffer);
 
-    void        Clear(u32 color = TERMINAL_COLOR_BLACK);
-    void        PutChar(u64 c);
+    void                           Clear(u32 color = TERMINAL_COLOR_BLACK);
+    void                           PutChar(u64 c);
 
-    inline void PrintString(std::string_view str)
-    {
-        PrintString(str.data(), str.size());
-    }
-    void PrintString(const char* string, usize length);
-    void PrintString(const char* string);
+    void                           PrintString(std::string_view str);
 
     static std::vector<Terminal*>& EnumerateTerminals();
 
@@ -44,6 +40,7 @@ class Terminal      final
     bool                          initialized = false;
     Framebuffer                   framebuffer = {};
     flanterm_context*             context     = nullptr;
+    std::mutex                    lock;
 
     static std::vector<Terminal*> s_Terminals;
 };

@@ -8,9 +8,9 @@
 
 #include "Arch/CPU.hpp"
 
+#include "API/UnixTypes.hpp"
 #include "Scheduler/Process.hpp"
 #include "Scheduler/Thread.hpp"
-#include "API/UnixTypes.hpp"
 
 #include "VFS/FileDescriptor.hpp"
 #include "VFS/INode.hpp"
@@ -30,16 +30,16 @@ namespace VFS
             LogError("Invalid pointer or size");
             return 1;
         }
-        if (fd != 2)
+        Process* current = CPU::GetCurrentThread()->parent;
+        if (fd >= static_cast<i32>(current->fileDescriptors.size()))
         {
-            LogError("Invalid file descriptor");
-            return 1;
+            LogError("Invalid fd");
+            return EBADF;
         }
+        auto             file = current->fileDescriptors[fd];
 
         std::string_view str(message, length);
-        Logger::Log(LogLevel::eNone, str);
-
-        return 0;
+        return file->node->Write(message, 0, length);
     }
 
     i32 SysOpen(Arguments& args)

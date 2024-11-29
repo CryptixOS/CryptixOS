@@ -301,10 +301,10 @@ namespace Logger
 
     CTOS_NO_KASAN void EnableOutput(usize output)
     {
-        enabledOutputs |= output;
-
         if (output == LOG_OUTPUT_TERMINAL)
             terminal.Initialize(*BootInfo::GetFramebuffer());
+
+        enabledOutputs |= output;
     }
     CTOS_NO_KASAN void DisableOutput(usize output)
     {

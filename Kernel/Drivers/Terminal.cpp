@@ -7,6 +7,8 @@
  */
 #include "Terminal.hpp"
 
+#include "Drivers/Serial.hpp"
+
 #include "Memory/PMM.hpp"
 #include "Utility/BootInfo.hpp"
 
@@ -22,6 +24,7 @@ bool                   Terminal::Initialize(Framebuffer& framebuffer)
 {
     this->framebuffer = framebuffer;
     if (!framebuffer.address) return false;
+    if (initialized) return true;
 
     auto _malloc = PMM::IsInitialized() ? malloc : nullptr;
     auto _free   = PMM::IsInitialized() ? [](void* addr, usize) { free(addr); }
@@ -36,7 +39,11 @@ bool                   Terminal::Initialize(Framebuffer& framebuffer)
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0, 1,
         0, 0, 0);
 
-    if (!s_ActiveTerminal) s_ActiveTerminal = this;
+    if (!s_ActiveTerminal)
+    {
+        s_ActiveTerminal     = this;
+        s_ActiveTerminal->id = 0;
+    }
     return (initialized = true);
 }
 
@@ -62,17 +69,10 @@ void Terminal::PutChar(u64 c)
     if (!initialized) return;
     flanterm_write(context, reinterpret_cast<char*>(&c), 1);
 }
-void Terminal::PrintString(const char* string, usize length)
+void Terminal::PrintString(std::string_view str)
 {
-    while (length > 0)
-    {
-        PutChar(*string++);
-        --length;
-    }
-}
-void Terminal::PrintString(const char* string)
-{
-    while (*string != '\0') { PutChar(*string++); }
+    std::unique_lock guard(lock);
+    for (auto c : str) PutChar(c);
 }
 
 std::vector<Terminal*>& Terminal::EnumerateTerminals()
@@ -91,9 +91,11 @@ std::vector<Terminal*>& Terminal::EnumerateTerminals()
             continue;
         }
 
+        break;
         s_Terminals.push_back(new Terminal(*framebuffers[i], i));
     }
 
+    LogInfo("Terminal: Initialized {} terminals", s_Terminals.size());
     initialized = true;
     return s_Terminals;
 }

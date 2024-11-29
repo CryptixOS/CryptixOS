@@ -36,54 +36,18 @@ static Process* kernelProcess;
 
 void            userThread2()
 {
-    static const char* str = "Hey";
-
-    isize              fd  = -1;
-    __asm__ volatile(
-        "movq $1, %%rax\n"
-        "movq %1, %%rdi\n"
-        "syscall\n"
-        "movq %%rax, %0"
-        : "=r"(fd)
-        : "r"("/usr/include/elf.h")
-        : "rax", "rdi");
-
-    static char buffer[1024];
-    usize       bytesRead = 0;
-
-    __asm__ volatile(
-        "movq $2, %%rax\n"
-        "movq %1, %%rdi\n"
-        "movq %2, %%rsi\n"
-        "movq $1024, %%rdx\n"
-        "syscall\n"
-        "movq %%rax, %0"
-        : "=r"(bytesRead)
-        : "r"(fd), "r"(buffer)
-        : "rax", "rdi", "rsi");
-
-    buffer[1023] = 0;
-    for (;;)
-        __asm__ volatile(
-            "movq $0, %%rax\n"
-            "movq $2, %%rdi\n"
-            "movq %0, %%rsi\n"
-            "movq %1, %%rdx\n"
-            "syscall\n"
-            :
-            : "r"(buffer), "r"(1023ull)
-            : "rax", "rdx", "rsi", "rdi");
+    const char* str = "Hey";
 
     for (;;)
         __asm__ volatile(
             "movq $0, %%rax\n"
-            "movq $2, %%rdi\n"
+            "movq $1, %%rdi\n"
             "movq %0, %%rsi\n"
             "movq %1, %%rdx\n"
             "syscall\n"
             :
             : "r"(str), "r"(3ull)
-            : "rax", "rdx", "rsi", "rdi");
+            : "rax", "rdx", "rsi", "rdi", "rcx");
 }
 
 void IterateDirectories(INode* node, int spaceCount = 0)
@@ -109,7 +73,8 @@ void kernelThread()
     Assert(VFS::MountRoot("tmpfs"));
     Initrd::Initialize();
 
-    VFS::CreateNode(VFS::GetRootNode(), "/dev", S_IFDIR, INodeType::eDirectory);
+    VFS::CreateNode(VFS::GetRootNode(), "/dev", 0755 | S_IFDIR,
+                    INodeType::eDirectory);
     Assert(VFS::Mount(VFS::GetRootNode(), "", "/dev", "devtmpfs"));
 
     TTY::Initialize();
@@ -120,26 +85,27 @@ void kernelThread()
 
     char str[100];
     memset(str, 'A', 99);
-    str[99] = 0;
+    str[99]    = 0;
 
+    INode* tty = nullptr;
     for (auto child : devNode->Reduce(true)->GetChildren())
     {
+        tty = child.second;
         LogTrace("/dev/{}", child.second->GetName());
-        child.second->Write(str, 0, 12);
+        tty->Write(str, 0, 12);
     }
-
-    for (;;) Arch::Halt();
 
     LogTrace("Loading user process...");
     Process* userProcess = new Process("TestUserProcess");
     userProcess->pageMap = VMM::GetKernelPageMap();
     userProcess->parent  = kernelProcess;
+    userProcess->InitializeStreams();
 
     ELF::Image                 program;
     [[maybe_unused]] uintptr_t address = program.Load("/usr/sbin/init");
-    // Scheduler::EnqueueThread(new Thread(userProcess, address));
-    Scheduler::EnqueueThread(
-        new Thread(userProcess, reinterpret_cast<uintptr_t>(userThread2)));
+    Scheduler::EnqueueThread(new Thread(userProcess, address));
+    // Scheduler::EnqueueThread(
+    ///   new Thread(userProcess, reinterpret_cast<uintptr_t>(userThread2)));
 
     for (;;) Arch::Halt();
 }

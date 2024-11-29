@@ -53,6 +53,7 @@ INode* DevTmpFs::MkNod(INode* parent, std::string_view name, mode_t mode,
     if (it == devices.end()) return nullptr;
     Device* device = it->second;
 
+    LogTrace("Creating character device");
     return new DevTmpFsINode(parent, name, this, INodeType::eCharacterDevice,
                              device);
 }

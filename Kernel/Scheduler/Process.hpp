@@ -10,6 +10,9 @@
 
 #include "Memory/VMM.hpp"
 
+#include "VFS/INode.hpp"
+#include "VFS/VFS.hpp"
+
 #include <vector>
 
 using pid_t = i64;
@@ -34,14 +37,26 @@ struct Process
     {
     }
 
-    pid_t                               pid;
-    std::string                         name;
-    PageMap*                            pageMap;
-    std::atomic<tid_t>                  nextTid;
+    void InitializeStreams()
+    {
+        fileDescriptors.clear();
+        INode* currentTTY
+            = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), "/dev/tty0"));
 
-    Process*                            parent;
-    std::vector<struct Thread*>         threads;
+        LogTrace("Process: Creating standard streams...");
+        fileDescriptors.push_back(currentTTY->Open());
+        fileDescriptors.push_back(currentTTY->Open());
+        fileDescriptors.push_back(currentTTY->Open());
+    }
 
-    std::vector<struct FileDescriptor*> fileDescriptors;
-    uintptr_t                           userStackTop;
+    pid_t                        pid;
+    std::string                  name;
+    PageMap*                     pageMap;
+    std::atomic<tid_t>           nextTid;
+
+    Process*                     parent;
+    std::vector<struct Thread*>  threads;
+
+    std::vector<FileDescriptor*> fileDescriptors;
+    uintptr_t                    userStackTop;
 };
