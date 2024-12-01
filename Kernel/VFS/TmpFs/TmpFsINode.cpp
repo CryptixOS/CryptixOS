@@ -18,6 +18,7 @@ ssize_t TmpFsINode::Read(void* buffer, off_t offset, size_t bytes)
     if (ssize_t(offset + bytes) >= stats.st_size)
         count = bytes - ((offset + bytes) - stats.st_size);
 
+    Assert(buffer);
     memcpy(buffer, reinterpret_cast<uint8_t*>(data) + offset, count);
     return count;
 }

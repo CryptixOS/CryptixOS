@@ -49,19 +49,12 @@ INode*          INode::InternalReduce(bool symlinks, bool automount, size_t cnt)
 
     if (!target.empty() && symlinks)
     {
-        if (cnt >= SYMLOOP_MAX - 1)
-        {
-            errno = ELOOP;
-            return nullptr;
-        }
+        if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
 
+        LogDebug("Resolving target: {}, parent: {}", target, parent.name());
         auto nextNode
             = std::get<1>(VFS::ResolvePath(parent, target, automount));
-        if (!nextNode)
-        {
-            errno = ENOENT;
-            return nullptr;
-        }
+        if (!nextNode) return_err(nullptr, ENOENT);
 
         return nextNode->InternalReduce(symlinks, automount, ++cnt);
     }

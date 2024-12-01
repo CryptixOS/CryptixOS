@@ -49,15 +49,13 @@ INode* TmpFs::CreateNode(INode* parent, std::string_view name, mode_t mode,
 INode* TmpFs::Symlink(INode* parent, std::string_view name,
                       std::string_view target)
 {
-    if (nextInodeIndex >= maxInodes)
-    {
-        errno = ENOSPC;
-        return nullptr;
-    }
+    if (nextInodeIndex >= maxInodes) return_err(nullptr, ENOSPC);
 
     auto node    = new TmpFsINode(parent, name, this, 0777 | S_IFLNK,
                                   INodeType::eSymlink);
     node->target = target;
+
+    LogInfo("TmpFs: Created symlink '{}' -> '{}'", name, target);
     return node;
 }
 

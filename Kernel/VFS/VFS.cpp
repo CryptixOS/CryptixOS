@@ -67,8 +67,9 @@ namespace VFS
             auto segment     = segments[i];
             bool isLast      = i == (segments.size() - 1);
 
-            bool currentDir  = segment.starts_with(".");
-            bool previousDir = segment.starts_with("..");
+            bool previousDir = segment == ".."; // segment.starts_with("..");
+            bool currentDir
+                = segment == "."; //! previousDir && segment.starts_with(".");
 
             if (currentDir || previousDir)
             {
@@ -84,7 +85,7 @@ namespace VFS
                 || currentNode->GetFilesystem()->Populate(currentNode))
             {
                 auto node = currentNode->GetChildren()[segment]->Reduce(
-                    false, isLast ? automount : true);
+                    true, isLast ? automount : true);
 
                 auto getReal = [](INode* node) -> INode*
                 {
@@ -103,12 +104,11 @@ namespace VFS
 
                 currentNode = node;
 
-                if (currentNode->GetType() == INodeType::eHardLink)
+                if (currentNode->GetType() == INodeType::eSymlink)
                 {
                     currentNode = currentNode->Reduce(true);
                     if (!currentNode) return {nullptr, nullptr, ""};
                 }
-
                 if (currentNode->GetType() != INodeType::eDirectory)
                 {
                     errno = ENOTDIR;
@@ -135,7 +135,7 @@ namespace VFS
         auto fs = CreateFilesystem(filesystemName);
         if (!fs)
         {
-            LogError("Failed to create filesystem!");
+            LogError("VFS: Failed to create filesystem: '{}'", filesystemName);
             return false;
         }
         if (rootINode)
@@ -155,6 +155,7 @@ namespace VFS
 
         return rootINode != nullptr;
     }
+
     // TODO: flags
     bool Mount(INode* parent, PathView source, PathView target,
                std::string_view fsName, int flags, void* data)
@@ -175,10 +176,7 @@ namespace VFS
         if (!node) return false;
 
         if (!isRoot && node->GetType() != INodeType::eDirectory)
-        {
-            errno = ENOTDIR;
-            return false;
-        }
+            return_err(false, ENOTDIR);
 
         auto mountGate = fs->Mount(parent, nullptr, node, basename, data);
         if (!mountGate) return false;
@@ -206,11 +204,7 @@ namespace VFS
         std::unique_lock guard(lock);
 
         auto [newNodeParent, newNode, newNodeName] = ResolvePath(parent, path);
-        if (newNode)
-        {
-            errno = EEXIST;
-            return nullptr;
-        }
+        if (newNode) return_err(nullptr, EEXIST);
 
         if (!newNodeParent) return nullptr;
 
@@ -225,11 +219,7 @@ namespace VFS
         std::unique_lock guard(lock);
 
         auto [nparent, node, newNodeName] = ResolvePath(parent, path);
-        if (node)
-        {
-            errno = EEXIST;
-            return nullptr;
-        }
+        if (node) return_err(nullptr, EEXIST);
 
         if (!nparent) return nullptr;
         node = nparent->GetFilesystem()->MkNod(nparent, newNodeName, mode, dev);
@@ -244,13 +234,8 @@ namespace VFS
         std::unique_lock guard(lock);
 
         auto [newNodeParent, newNode, newNodeName] = ResolvePath(parent, path);
-        if (newNode)
-        {
-            errno = EEXIST;
-            return nullptr;
-        }
-
-        if (!newNodeParent) return nullptr;
+        if (newNode) return_err(nullptr, EEXIST);
+        if (!newNodeParent) return_err(nullptr, ENOENT);
 
         newNode = newNodeParent->GetFilesystem()->Symlink(newNodeParent,
                                                           newNodeName, target);
@@ -261,8 +246,13 @@ namespace VFS
     INode* Link(INode* oldParent, PathView oldPath, INode* newParent,
                 PathView newPath, int flags)
     {
+        ToDo();
         return nullptr;
     }
 
-    bool Unlink(INode* parent, PathView path, int flags) { return false; }
+    bool Unlink(INode* parent, PathView path, int flags)
+    {
+        ToDo();
+        return false;
+    }
 } // namespace VFS

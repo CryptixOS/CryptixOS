@@ -17,21 +17,18 @@ namespace Initrd
 {
     bool Initialize()
     {
+        LogTrace("Initrd: Loading initial ramdisk...");
         auto initrd = BootInfo::FindModule("initrd");
         if (!initrd)
         {
-            LogError("Could not find initrd module!");
+            LogError("Initrd: Could not find initrd module!");
             return false;
         }
 
         uintptr_t address = ToHigherHalfAddress<uintptr_t>(
             reinterpret_cast<uintptr_t>(initrd->address));
 
-        if (Ustar::Validate(address))
-        {
-            LogTrace("Initrd: Trying to load USTAR archive...");
-            Ustar::Load(address);
-        }
+        if (Ustar::Validate(address)) Ustar::Load(address);
         else
         {
             LogError("Initrd: Unknown archive format!");
@@ -43,7 +40,7 @@ namespace Initrd
         PhysicalMemoryManager::FreePages(FromHigherHalfAddress<void*>(address),
                                          pageCount);
 
-        LogInfo("Initrd: Loaded");
+        LogInfo("Initrd: Loaded successfully");
         return true;
     }
 } // namespace Initrd

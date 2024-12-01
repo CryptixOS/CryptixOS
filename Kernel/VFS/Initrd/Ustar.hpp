@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include "cstdint"
+#include "Utility/Types.hpp"
 
 namespace Ustar
 {
@@ -33,18 +33,18 @@ namespace Ustar
 #pragma pack(pop)
 
     inline static constexpr const char* const MAGIC               = "ustar";
-    inline static constexpr const uint8_t     MAGIC_LENGTH        = 6;
+    inline static constexpr const u8          MAGIC_LENGTH        = 6;
 
     // NOTE: Both '0' and '\0' mean the same file type
-    inline static constexpr const uint8_t     FILE_TYPE_NORMAL    = '\0';
-    inline static constexpr const uint8_t     FILE_TYPE_NORMAL_   = '0';
-    inline static constexpr const uint8_t     FILE_TYPE_HARD_LINK = '1';
-    inline static constexpr const uint8_t     FILE_TYPE_SYMLINK   = '2';
-    inline static constexpr const uint8_t     FILE_TYPE_CHARACTER_DEVICE = '3';
-    inline static constexpr const uint8_t     FILE_TYPE_BLOCK_DEVICE     = '4';
-    inline static constexpr const uint8_t     FILE_TYPE_DIRECTORY        = '5';
-    inline static constexpr const uint8_t     FILE_TYPE_FIFO             = '6';
-    inline static constexpr const uint8_t     FILE_TYPE_CONTIGUOUS       = '7';
+    inline static constexpr const u8          FILE_TYPE_NORMAL    = '\0';
+    inline static constexpr const u8          FILE_TYPE_NORMAL_   = '0';
+    inline static constexpr const u8          FILE_TYPE_HARD_LINK = '1';
+    inline static constexpr const u8          FILE_TYPE_SYMLINK   = '2';
+    inline static constexpr const u8          FILE_TYPE_CHARACTER_DEVICE = '3';
+    inline static constexpr const u8          FILE_TYPE_BLOCK_DEVICE     = '4';
+    inline static constexpr const u8          FILE_TYPE_DIRECTORY        = '5';
+    inline static constexpr const u8          FILE_TYPE_FIFO             = '6';
+    inline static constexpr const u8          FILE_TYPE_CONTIGUOUS       = '7';
 
     bool                                      Validate(uintptr_t address);
     void                                      Load(uintptr_t address);

@@ -15,10 +15,9 @@
 #include "VFS/INode.hpp"
 
 #include <cstring>
-#include <string>
 
 template <typename T>
-inline static T parseOctNumber(const char* str, size_t len)
+inline static T parseOctNumber(const char* str, usize len)
     requires std::is_trivial_v<T>
 {
     T value = 0;
@@ -42,9 +41,11 @@ namespace Ustar
 
     void Load(uintptr_t address)
     {
+        LogTrace("USTAR: Loading at '{:#x}'...", address);
+
         auto current = reinterpret_cast<FileHeader*>(address);
         auto getNextFile
-            = [](FileHeader* current, size_t fileSize) -> FileHeader*
+            = [](FileHeader* current, usize fileSize) -> FileHeader*
         {
             uintptr_t nextFile = reinterpret_cast<uintptr_t>(current) + 512
                                + Math::AlignUp(fileSize, 512);
@@ -93,19 +94,25 @@ namespace Ustar
                             filename.data());
                     break;
                 case FILE_TYPE_HARD_LINK:
+                    LogError("USTAR: Loading hard links is not implemented.");
+                    break;
                     LogError("USTAR: Failed to create hardlink: '{}' -> '{}'",
                              filename.data(), linkName.data());
                     break;
                 case FILE_TYPE_SYMLINK:
-
-                    LogError("USTAR: Failed to create Symlink: '{}' -> '{}'",
-                             filename.data(), linkName.data());
+                    LogTrace("FileName: {}, LinkName: {}", filename, linkName);
+                    node = VFS::Symlink(VFS::GetRootNode(), filename.data(),
+                                        linkName.data());
+                    if (!node)
+                        LogError(
+                            "USTAR: Failed to create Symlink: '{}' -> '{}'",
+                            filename.data(), linkName.data());
                     break;
                 case FILE_TYPE_CHARACTER_DEVICE:
                 {
-                    uint32_t deviceMajor = parseOctNumber<uint32_t>(
+                    u32 deviceMajor = parseOctNumber<u32>(
                         current->deviceMajor, sizeof(current->deviceMajor));
-                    uint32_t deviceMinor = parseOctNumber<uint32_t>(
+                    u32 deviceMinor = parseOctNumber<u32>(
                         current->deviceMinor, sizeof(current->deviceMinor));
 
                     VFS::MkNod(VFS::GetRootNode(), filename, mode | S_IFCHR,
@@ -119,7 +126,7 @@ namespace Ustar
                             filename, deviceMajor, deviceMinor);
                     break;
                 }
-                case FILE_TYPE_BLOCK_DEVICE: ToDo();
+                case FILE_TYPE_BLOCK_DEVICE: ToDo(); break;
                 case FILE_TYPE_DIRECTORY:
                     node = VFS::CreateNode(nullptr, filename, mode | S_IFDIR,
                                            INodeType::eDirectory);
