@@ -113,6 +113,7 @@ namespace CPU
 
     void              WriteXCR(u64 reg, u64 value);
     u64               ReadCR0();
+    u64               ReadCR2();
     void              WriteCR0(u64 value);
     u64               ReadCR4();
     void              WriteCR4(u64 value);
@@ -124,6 +125,7 @@ namespace CPU
     uintptr_t         GetGSBase();
     uintptr_t         GetKernelGSBase();
 
+    void              SetFSBase(uintptr_t address);
     void              SetGSBase(uintptr_t address);
     void              SetKernelGSBase(uintptr_t address);
 

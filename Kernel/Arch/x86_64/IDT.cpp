@@ -10,6 +10,7 @@
 
 #include "ACPI/MADT.hpp"
 
+#include "Arch/x86_64/CPU.hpp"
 #include "Arch/x86_64/CPUContext.hpp"
 #include "Arch/x86_64/Drivers/PIC.hpp"
 #include "Arch/x86_64/GDT.hpp"
@@ -24,6 +25,12 @@ constexpr u32                  MAX_IDT_ENTRIES     = 256;
 
 [[maybe_unused]] constexpr u32 GATE_TYPE_INTERRUPT = 0xe;
 [[maybe_unused]] constexpr u32 GATE_TYPE_TRAP      = 0xf;
+
+namespace Exception
+{
+    constexpr u8 BREAKPOINT = 0x03;
+    constexpr u8 PAGE_FAULT = 0x0e;
+}; // namespace Exception
 
 struct IDTEntry
 {
@@ -49,6 +56,7 @@ struct IDTEntry
 [[maybe_unused]] alignas(0x10) static IDTEntry idtEntries[256] = {};
 extern "C" void*        interrupt_handlers[];
 static InterruptHandler interruptHandlers[256];
+static void             (*exceptionHandlers[32])(CPUContext*);
 
 static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
 {
@@ -69,6 +77,7 @@ static void raiseException(CPUContext* ctx)
 {
     // TODO(v1tr10l7): Display valid cpu ids when smp will be implemented
     u64 cpuID = 0;
+
     EarlyPanic(
         "Captured exception[%#x] on cpu %zu: '%s'\n\rError Code: "
         "%#b\n\rrip: "
@@ -77,6 +86,14 @@ static void raiseException(CPUContext* ctx)
         ctx->errorCode, ctx->rip);
 
     Arch::Halt();
+}
+
+// TODO(v1tr10l7): properly handle breakpoints and page faults
+static void breakpoint(CPUContext* ctx) { EarlyPanic("Breakpoint"); }
+static void pageFault(CPUContext* ctx)
+{
+    EarlyLogError("CR2: %#p", CPU::ReadCR2());
+    raiseException(ctx);
 }
 
 [[noreturn]]
@@ -112,8 +129,11 @@ namespace IDT
                           0x80 | GATE_TYPE_INTERRUPT);
 
             interruptHandlers[i].SetInterruptVector(i);
+            if (i < 32) exceptionHandlers[i] = raiseException;
         }
 
+        exceptionHandlers[Exception::BREAKPOINT] = breakpoint;
+        exceptionHandlers[Exception::PAGE_FAULT] = pageFault;
         LogInfo("IDT: Initialized!");
     }
     void Load()
