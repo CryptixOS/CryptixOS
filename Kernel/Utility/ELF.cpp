@@ -13,41 +13,154 @@
 #include "VFS/INode.hpp"
 #include "VFS/VFS.hpp"
 
+#include <magic_enum/magic_enum.hpp>
+
 namespace ELF
 {
-    uintptr_t Image::Load(std::string_view path)
+    bool Image::Load(std::string_view path, uintptr_t loadBase)
     {
         INode* file = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path));
-        Assert(file->Read(&header, 0, sizeof(header)) == sizeof(header));
-        Assert(std::memcmp(&header.magic, MAGIC, 4) == 0);
+        isize  fileSize = file->GetStats().st_size;
+        image           = new u8[fileSize];
 
+        if (file->Read(image, 0, fileSize) != fileSize || !Parse())
+            return false;
+
+        LoadSymbols();
+        for (auto& sym : symbols)
+            LogInfo("Symbol: {}: {}", sym.address, sym.name);
+
+        for (const auto& current : programHeaders)
+        {
+            switch (current.type)
+            {
+                case HeaderType::eLoad:
+                {
+                    usize misalign
+                        = current.virtualAddress & (PMM::PAGE_SIZE - 1);
+                    usize pageCount = Math::DivRoundUp(
+                        current.segmentSizeInMemory + misalign, PMM::PAGE_SIZE);
+
+                    uintptr_t phys = PMM::CallocatePages<uintptr_t>(pageCount);
+                    Assert(phys);
+
+                    usize size = pageCount * PMM::PAGE_SIZE;
+
+                    Assert(VMM::GetKernelPageMap()->MapRange(
+                        current.virtualAddress + loadBase, phys, size,
+                        PageAttributes::eRWXU | PageAttributes::eWriteBack));
+
+                    Read(ToHigherHalfAddress<void*>(phys + misalign),
+                         current.offset, current.segmentSizeInFile);
+                    LogInfo(
+                        "Virtual Address: {:#x}, sizeInFile: {}, sizeInMemory: "
+                        "{}",
+                        current.virtualAddress + loadBase,
+                        current.segmentSizeInFile, current.segmentSizeInMemory);
+                    break;
+                }
+                case HeaderType::eProgramHeader:
+                    auxv.ProgramHeadersAddress
+                        = current.virtualAddress + loadBase;
+                    break;
+                case HeaderType::eInterp:
+                {
+                    char* path = new char[current.segmentSizeInFile + 1];
+                    Read(path, current.offset, current.segmentSizeInFile);
+                    path[current.segmentSizeInFile] = 0;
+
+                    ldPath = std::string_view(path, current.segmentSizeInFile);
+                    LogInfo("Path: {}", path);
+                    break;
+                }
+
+                default: break;
+            }
+        }
+
+        auxv.EntryPoint             = header.entryPoint + loadBase;
+        auxv.ProgramHeaderEntrySize = header.programEntrySize;
+        auxv.ProgramHeaderCount     = header.programEntryCount;
+        LogInfo("EntryPoint: {:#x}", auxv.EntryPoint);
+        return true;
+    }
+
+    bool Image::Parse()
+    {
+        Read(&header, 0);
+
+        LogTrace("ELF: Verifying signature...");
+        if (std::memcmp(&header.magic, MAGIC, 4) != 0)
+        {
+            LogError("ELF: Invalid magic");
+            return false;
+        }
+
+        LogTrace("ELF: Parsing program headers...");
         ProgramHeader current;
         for (usize i = 0; i < header.programEntryCount; i++)
         {
-            Assert(file->Read(&current,
-                              header.programHeaderTableOffset
-                                  + i * header.programEntrySize,
-                              sizeof(current))
-                   == sizeof(current));
-            if (current.type != HeaderType::eLoad) continue;
+            isize headerOffset
+                = header.programHeaderTableOffset + i * header.programEntrySize;
+            Read(&current, headerOffset);
+            LogTrace("ELF: Header[{}] = {}({})", i,
+                     static_cast<usize>(current.type),
+                     magic_enum::enum_name(current.type));
 
-            usize pageCount   = current.segmentSizeInFile / PMM::PAGE_SIZE + 1;
-            uintptr_t program = PMM::CallocatePages<uintptr_t>(pageCount);
-
-            for (usize i = 0; i < pageCount; i++)
-                VMM::GetKernelPageMap()->Map(
-                    current.virtualAddress + i * PMM::PAGE_SIZE,
-                    program + i * PMM::PAGE_SIZE,
-                    PageAttributes::eRWXU | PageAttributes::eWriteBack);
-
-            file->Read(reinterpret_cast<void*>(current.virtualAddress),
-                       current.offset, current.segmentSizeInFile);
-            LogInfo("Virtual Address: {:#x}, sizeInFile: {}, sizeInMemory: {}",
-                    current.virtualAddress, current.segmentSizeInFile,
-                    current.segmentSizeInMemory);
+            programHeaders.push_back(current);
         }
 
-        LogInfo("EntryPoint: {:#x}", header.entryPoint);
-        return header.entryPoint;
+        sections.clear();
+        SectionHeader* _sections = reinterpret_cast<SectionHeader*>(
+            image + header.sectionHeaderTableOffset);
+        for (usize i = 0; i < header.sectionEntryCount; i++)
+
+        {
+            sections.push_back(_sections[i]);
+
+            if (_sections[i].type
+                == std::to_underlying(SectionType::eSymbolTable))
+            {
+                LogInfo("ELF: Found symbol section at: {}", i);
+                symbolSectionIndex = i;
+            }
+            else if (_sections[i].type
+                         == std::to_underlying(SectionType::eStringTable)
+                     && i != header.sectionNamesIndex)
+
+            {
+                LogInfo("ELF: Found string section at: {}", i);
+                stringSectionIndex = i;
+            }
+        }
+
+        // stringSectionIndex = header.sectionNamesIndex;
+        return true;
+    }
+    void Image::LoadSymbols()
+    {
+        LogTrace("ELF: Loading symbols...");
+        Assert(symbolSectionIndex.has_value());
+        Assert(stringSectionIndex.has_value());
+        if (symbolSectionIndex.value() >= sections.size()) return;
+
+        const Sym* symtab = reinterpret_cast<Sym*>(
+            image + sections[symbolSectionIndex.value()].offset);
+        const char* stringTable = reinterpret_cast<const char*>(
+            image + sections[stringSectionIndex.value()].offset);
+
+        usize entryCount = sections[symbolSectionIndex.value()].size
+                         / sections[symbolSectionIndex.value()].entrySize;
+        for (usize i = 0; i < entryCount; i++)
+        {
+            auto name = std::string_view(&stringTable[symtab[i].name]);
+            if (symtab[i].sectionIndex == 0x00 || name.empty()) continue;
+
+            uintptr_t addr = symtab[i].value;
+            Symbol    sym;
+            sym.name    = const_cast<char*>(name.data());
+            sym.address = addr;
+            symbols.push_back(sym);
+        }
     }
 } // namespace ELF
