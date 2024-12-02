@@ -38,7 +38,6 @@ namespace std
 
         constexpr reference at(size_type pos)
         {
-            // We don't have exceptions, so we have to improvise xd
             Assert(pos < _size);
 
             return _data[pos];

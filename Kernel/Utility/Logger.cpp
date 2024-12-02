@@ -330,6 +330,7 @@ namespace Logger
 
         PrintLogLevel(logLevel);
         LogString(string);
+
         LogChar('\n');
     }
 

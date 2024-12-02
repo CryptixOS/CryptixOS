@@ -6,17 +6,17 @@
  */
 #include "IDT.hpp"
 
-#include "Common.hpp"
-
 #include "ACPI/MADT.hpp"
 
 #include "Arch/x86_64/CPU.hpp"
 #include "Arch/x86_64/CPUContext.hpp"
 #include "Arch/x86_64/Drivers/PIC.hpp"
 #include "Arch/x86_64/GDT.hpp"
-#include "Drivers/Serial.hpp"
 
 #include "Arch/InterruptHandler.hpp"
+
+#include "Scheduler/Process.hpp"
+#include "Scheduler/Thread.hpp"
 
 extern const char*             exceptionNames[];
 
@@ -92,7 +92,13 @@ static void raiseException(CPUContext* ctx)
 static void breakpoint(CPUContext* ctx) { EarlyPanic("Breakpoint"); }
 static void pageFault(CPUContext* ctx)
 {
-    EarlyLogError("CR2: %#p", CPU::ReadCR2());
+    EarlyLogFatal(
+        "Captured exception[%#x] on cpu %zu: '%s'\n\rError Code: "
+        "%#b\n\rrip: "
+        "%#p\nCR2: {:#x}",
+        ctx->interruptVector, 0, exceptionNames[ctx->interruptVector],
+        ctx->errorCode, ctx->rip, CPU::ReadCR2());
+
     raiseException(ctx);
 }
 
@@ -108,7 +114,8 @@ extern "C" void raiseInterrupt(CPUContext* ctx)
 {
     auto& handler = interruptHandlers[ctx->interruptVector];
 
-    if (ctx->interruptVector < 0x20) raiseException(ctx);
+    if (ctx->interruptVector < 0x20)
+        exceptionHandlers[ctx->interruptVector](ctx);
     else if (handler.IsUsed())
     {
         handler(ctx);

@@ -8,8 +8,22 @@
 
 #include "Utility/Types.hpp"
 
+#include <compare>
+
 namespace Stacktrace
 {
+    struct Symbol
+    {
+        char*                          name;
+        uintptr_t                      address;
+
+        constexpr std::strong_ordering operator<=>(const Symbol& rhs) const
+        {
+            return address <=> rhs.address;
+        }
+    };
+
     bool Initialize();
-    void Print(usize maxframes = 16);
+    void Print(usize maxFrames = 16);
 }; // namespace Stacktrace
+using Stacktrace::Symbol;

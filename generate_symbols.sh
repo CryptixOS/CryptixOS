@@ -5,10 +5,5 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 echo 'generating ksyms.sym...'
-tmp=$(mktemp)
 NM="${NM:-nm}"
-llvm-nm -n Kernel/Cryptix.elf > "$tmp"
-printf "%08x
-" "$(wc -l "$tmp" | awk '{print $1}')" > ksyms.sym
-cat "$tmp" >> ksyms.sym
-rm -f "$tmp"
+llvm-nm -n Kernel/Cryptix.elf > ksyms.sym

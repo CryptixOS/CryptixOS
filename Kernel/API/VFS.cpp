@@ -48,10 +48,18 @@ namespace VFS
 
         const char* path    = reinterpret_cast<const char*>(args.args[0]);
         auto node = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path));
-        Assert(node);
-        auto descriptor = node->Open();
 
-        if (!descriptor) return ENOSYS;
+        if (!node)
+        {
+            LogError("Failed to open file at '{}'", path);
+            return_err(-1, ENOENT);
+        }
+        auto descriptor = node->Open();
+        if (!descriptor)
+        {
+            LogError("SysOpen: Failed to open fd");
+            return_err(-1, ENOSYS);
+        }
 
         usize fd = current->fileDescriptors.size();
         current->fileDescriptors.push_back(descriptor);
@@ -61,18 +69,54 @@ namespace VFS
 
     isize SysRead(Arguments& args)
     {
-        i32   fd     = args.args[0];
-        void* buffer = reinterpret_cast<void*>(args.args[1]);
-        usize bytes  = args.args[2];
-
-        LogInfo("Reading {} bytes from fd[{}] to address: {:#x}", bytes, fd,
-                u64(buffer));
+        i32      fd      = args.args[0];
+        void*    buffer  = reinterpret_cast<void*>(args.args[1]);
+        usize    bytes   = args.args[2];
 
         Process* current = CPU::GetCurrentThread()->parent;
         if (fd >= static_cast<i32>(current->fileDescriptors.size()))
             return EBADF;
-        auto file = current->fileDescriptors[fd];
+        auto  file      = current->fileDescriptors[fd];
 
-        return file->node->Read(buffer, 0, bytes);
+        isize bytesRead = file->node->Read(buffer, file->offset, bytes);
+        file->offset += bytesRead;
+        return bytesRead;
+    }
+    off_t SysLSeek(Syscall::Arguments& args)
+    {
+        i32      fd      = args.args[0];
+        off_t    offset  = args.args[1];
+        i32      whence  = args.args[2];
+
+        Process* current = CPU::GetCurrentThread()->parent;
+        if (fd >= static_cast<i32>(current->fileDescriptors.size()))
+            return EBADF;
+        auto            file     = current->fileDescriptors[fd];
+
+        constexpr usize SEEK_SET = 0;
+        constexpr usize SEEK_CUR = 1;
+        constexpr usize SEEK_END = 2;
+
+        switch (whence)
+        {
+            case SEEK_SET: file->offset = offset; break;
+            case SEEK_CUR:
+                if (usize(file->offset) + usize(offset) > sizeof(off_t))
+                    return_err(-1, EOVERFLOW);
+                file->offset += offset;
+                break;
+            case SEEK_END:
+            {
+                usize size = file->node->GetStats().st_size;
+                if (usize(file->offset) + size > sizeof(off_t))
+                    return_err(-1, EOVERFLOW);
+                file->offset = file->node->GetStats().st_size + offset;
+                break;
+            }
+
+            default: return_err(-1, EINVAL);
+        };
+
+        return file->offset;
     }
 }; // namespace VFS

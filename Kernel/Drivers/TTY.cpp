@@ -37,9 +37,20 @@ isize TTY::Read(void* dest, off_t offset, usize bytes)
 }
 isize TTY::Write(const void* src, off_t offset, usize bytes)
 {
-    const char*      s = reinterpret_cast<const char*>(src);
+    const char*           s = reinterpret_cast<const char*>(src);
+    static constexpr char MLIBC_LOG_SIGNATURE[] = "[mlibc]: ";
 
-    std::string_view str(s + offset, bytes);
+    std::string_view      str(s + offset, bytes);
+
+    if (str.starts_with(MLIBC_LOG_SIGNATURE))
+    {
+        std::string_view errorMessage(s + offset + sizeof(MLIBC_LOG_SIGNATURE)
+                                      - 1 - 1);
+        LogMessage("[{}mlibc{}]: {} ", AnsiColor::FOREGROUND_MAGENTA,
+                   AnsiColor::FOREGROUND_WHITE, errorMessage);
+
+        return bytes;
+    }
 
     terminal->PrintString(str);
     return bytes;

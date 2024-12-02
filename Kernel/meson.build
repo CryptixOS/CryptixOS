@@ -10,6 +10,7 @@ srcs += files(
   'ACPI/ACPI.cpp',
   'ACPI/MADT.cpp',
 
+  'API/MM.cpp',
   'API/Syscall.cpp',
   'API/VFS.cpp',
 

@@ -10,25 +10,25 @@
 #include "Utility/Math.hpp"
 #include "VFS/TmpFs/TmpFs.hpp"
 
-ssize_t TmpFsINode::Read(void* buffer, off_t offset, size_t bytes)
+isize TmpFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
     std::unique_lock guard(lock);
 
-    size_t           count = bytes;
-    if (ssize_t(offset + bytes) >= stats.st_size)
+    usize            count = bytes;
+    if (off_t(offset + bytes) > stats.st_size)
         count = bytes - ((offset + bytes) - stats.st_size);
 
     Assert(buffer);
-    memcpy(buffer, reinterpret_cast<uint8_t*>(data) + offset, count);
+    std::memcpy(buffer, reinterpret_cast<uint8_t*>(data) + offset, count);
     return count;
 }
-ssize_t TmpFsINode::Write(const void* buffer, off_t offset, size_t bytes)
+isize TmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
 {
     std::unique_lock guard(lock);
 
     if (offset + bytes > capacity)
     {
-        size_t newCapacity = capacity;
+        usize newCapacity = capacity;
         while (offset + bytes >= newCapacity) newCapacity *= 2;
 
         auto tfs = reinterpret_cast<TmpFs*>(filesystem);

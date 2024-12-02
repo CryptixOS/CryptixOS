@@ -110,6 +110,7 @@ deps = [
   dependency('fmt'),
   dependency('string'),
   dependency('demangler'),
+  dependency('magic_enum'),
 ]
 
 inc_deps = []
@@ -261,7 +262,7 @@ ovmf_binaries = subproject('ovmf_binaries')
 ovmf = ovmf_binaries.get_variable(ovmf_id)
 
 run_uefi = custom_target(
-  input: iso,
+  input: [iso],
   output: 'run_uefi',
   command: [qemu, qemu_args, '-cdrom', '@INPUT@', '-bios', ovmf],
   console: true,

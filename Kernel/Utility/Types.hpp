@@ -40,9 +40,24 @@ struct Pointer
         : pointer(pointer)
     {
     }
+    Pointer(void* pointer)
+        : pointer(reinterpret_cast<uintptr_t>(pointer))
+    {
+    }
 
     operator uintptr_t() { return pointer; }
+    operator void*() { return reinterpret_cast<void*>(pointer); }
     operator bool() { return pointer != 0; }
+    Pointer& operator=(uintptr_t addr)
+    {
+        pointer = addr;
+        return *this;
+    }
+    Pointer& operator=(void* addr)
+    {
+        pointer = reinterpret_cast<uintptr_t>(addr);
+        return *this;
+    }
 
     template <typename T>
     T* As()

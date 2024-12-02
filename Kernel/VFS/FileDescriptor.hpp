@@ -15,5 +15,6 @@ struct FileDescriptor
     {
     }
 
-    INode* node = nullptr;
+    INode* node   = nullptr;
+    usize  offset = 0;
 };

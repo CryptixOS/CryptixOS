@@ -59,7 +59,6 @@ class TmpFsINode final : public INode
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
 
   private:
-    u8*                    data     = nullptr;
-    [[maybe_unused]] usize size     = 0;
-    usize                  capacity = 0;
+    u8*   data     = nullptr;
+    usize capacity = 0;
 };

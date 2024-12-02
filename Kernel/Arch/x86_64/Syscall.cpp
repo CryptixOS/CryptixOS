@@ -30,7 +30,7 @@ namespace Syscall
         args.args[0] = ctx->rdi;
         args.args[1] = ctx->rsi;
         args.args[2] = ctx->rdx;
-        args.args[3] = ctx->rcx;
+        args.args[3] = ctx->r10;
         args.args[4] = ctx->r8;
         args.args[5] = ctx->r9;
 

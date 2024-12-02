@@ -80,21 +80,6 @@ void kernelThread()
     TTY::Initialize();
     MemoryDevices::Initialize();
 
-    INode* devNode = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), "/dev"));
-    Assert(devNode);
-
-    char str[100];
-    memset(str, 'A', 99);
-    str[99]    = 0;
-
-    INode* tty = nullptr;
-    for (auto child : devNode->Reduce(true)->GetChildren())
-    {
-        tty = child.second;
-        LogTrace("/dev/{}", child.second->GetName());
-        tty->Write(str, 0, 12);
-    }
-
     LogTrace("Loading user process...");
     Process* userProcess
         = new Process("TestUserProcess", PrivilegeLevel::eUnprivileged);
@@ -102,11 +87,25 @@ void kernelThread()
     userProcess->parent  = kernelProcess;
     userProcess->InitializeStreams();
 
-    ELF::Image                 program;
-    [[maybe_unused]] uintptr_t address = program.Load("/usr/sbin/init");
-    Scheduler::EnqueueThread(new Thread(userProcess, address));
+    const char*       argv[] = {"/usr/sbin/init", nullptr};
+    char*             envp[] = {nullptr};
+
+    static ELF::Image program, ld;
+    Assert(program.Load("/usr/sbin/init"));
+    std::string_view ldPath = program.GetLdPath();
+    if (!ldPath.empty())
+    {
+        LogTrace("Kernel: Loading ld: '{}'", ldPath);
+        Assert(ld.Load(ldPath, 0x40000000));
+    }
+
+    uintptr_t address
+        = ldPath.empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
+    Scheduler::EnqueueThread(new Thread(userProcess, address,
+                                        const_cast<char**>(argv), envp, program,
+                                        CPU::GetCurrent()->id));
     // Scheduler::EnqueueThread(
-    ///   new Thread(userProcess, reinterpret_cast<uintptr_t>(userThread2)));
+    //   new Thread(userProcess, reinterpret_cast<uintptr_t>(userThread2)));
 
     for (;;) Arch::Halt();
 }

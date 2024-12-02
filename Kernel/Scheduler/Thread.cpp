@@ -28,6 +28,115 @@ Thread::Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn)
     CPU::PrepareThread(this, pc, arg);
     parent->threads.push_back(this);
 }
+
+static uintptr_t prepareStack(uintptr_t _stack, uintptr_t sp,
+                              std::vector<std::string_view> argv,
+                              std::vector<std::string_view> envp,
+                              ELF::Image&                   image)
+{
+    auto stack = reinterpret_cast<uintptr_t*>(_stack);
+
+    for (auto env : envp)
+    {
+        stack = reinterpret_cast<uintptr_t*>(reinterpret_cast<char*>(stack)
+                                             - env.length() - 1);
+        std::memcpy(stack, env.data(), env.length());
+    }
+
+    for (auto arg : argv)
+    {
+        stack = reinterpret_cast<uintptr_t*>(reinterpret_cast<char*>(stack)
+                                             - arg.length() - 1);
+        std::memcpy(stack, arg.data(), arg.length());
+    }
+
+    stack = reinterpret_cast<uintptr_t*>(
+        Math::AlignDown(reinterpret_cast<uintptr_t>(stack), 16));
+    if ((argv.size() + envp.size() + 1) & 1) stack--;
+
+    constexpr usize AT_ENTRY = 9;
+    constexpr usize AT_PHDR  = 3;
+    constexpr usize AT_PHENT = 4;
+    constexpr usize AT_PHNUM = 5;
+
+    *(--stack)               = 0;
+    *(--stack)               = 0;
+    stack -= 2;
+    stack[0] = AT_ENTRY, stack[1] = image.GetEntryPoint();
+    stack -= 2;
+    stack[0] = AT_PHDR, stack[1] = image.GetAtPhdr();
+    stack -= 2;
+    stack[0] = AT_PHENT, stack[1] = image.GetPhent();
+    stack -= 2;
+    stack[0] = AT_PHNUM, stack[1] = image.GetPhNum();
+
+    uintptr_t oldSp = sp;
+    *(--stack)      = 0;
+    stack -= envp.size();
+    for (usize i = 0; auto env : envp)
+    {
+        oldSp -= env.length() + 1;
+        stack[i++] = oldSp;
+    }
+
+    *(--stack) = 0;
+    stack -= argv.size();
+    for (usize i = 0; auto arg : argv)
+    {
+        oldSp -= arg.length() + 1;
+        stack[i++] = oldSp;
+    }
+
+    *(--stack) = argv.size();
+    return sp - (_stack - reinterpret_cast<uintptr_t>(stack));
+}
+
+Thread::Thread(Process* parent, uintptr_t pc, char** argv, char** envp,
+               ELF::Image& program, i64 runOn)
+    : runningOn(CPU::GetCurrent()->id)
+    , self(this)
+    , error(no_error)
+    , parent(parent)
+    , user(true)
+    , enqueued(false)
+    , state(ThreadState::eDequeued)
+{
+    tid = parent->nextTid++;
+
+    if (!parent->pageMap) parent->pageMap = VMM::GetKernelPageMap();
+
+    auto mapUserStack = [this]() -> std::pair<uintptr_t, uintptr_t>
+    {
+        uintptr_t pstack  = PMM::CallocatePages<uintptr_t>(CPU::USER_STACK_SIZE
+                                                          / PMM::PAGE_SIZE);
+        uintptr_t vustack = this->parent->userStackTop - CPU::USER_STACK_SIZE;
+
+        Assert(this->parent->pageMap->MapRange(
+            vustack, pstack, CPU::USER_STACK_SIZE,
+            PageAttributes::eRWXU | PageAttributes::eWriteBack));
+
+        this->parent->userStackTop = vustack - PMM::PAGE_SIZE;
+
+        this->stacks.push_back(std::make_pair(pstack, CPU::USER_STACK_SIZE));
+        return {ToHigherHalfAddress<uintptr_t>(pstack) + CPU::USER_STACK_SIZE,
+                vustack + CPU::USER_STACK_SIZE};
+    };
+
+    auto [vstack, vustack] = mapUserStack();
+
+    CtosUnused(argv);
+    CtosUnused(envp);
+    std::vector<std::string_view> argvArr;
+    argvArr.push_back("/usr/sbin/init");
+    std::vector<std::string_view> envpArr;
+    argvArr.push_back("TERM=linux");
+
+    this->stack = prepareStack(vstack, vustack, argvArr, envpArr, program);
+
+    CPU::PrepareThread(this, pc, 0);
+    parent->threads.push_back(this);
+}
+
 Thread::Thread(Process* parent, uintptr_t pc, bool user)
     : runningOn(CPU::GetCurrent()->id)
     , self(this)

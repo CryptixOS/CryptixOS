@@ -113,6 +113,7 @@ namespace
     {
         LogWarn("Ubsan: {} ->\n{}[{}:{}]", message, source.file, source.line,
                 source.column);
+        Stacktrace::Print(4);
     }
 } // namespace
 

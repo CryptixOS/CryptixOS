@@ -17,6 +17,8 @@
 #include <cerrno>
 #include <vector>
 
+#include "Utility/ELF.hpp"
+
 using tid_t = i64;
 
 enum class ThreadState
@@ -34,6 +36,8 @@ struct Thread
 {
     Thread() = default;
     Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn = -1);
+    Thread(Process* parent, uintptr_t pc, char** arg, char** envp,
+           ELF::Image& program, i64 runOn = -1);
     Thread(Process* parent, uintptr_t pc, bool user = true);
     ~Thread();
 

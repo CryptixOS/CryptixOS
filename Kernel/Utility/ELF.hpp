@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include "Utility/Stacktrace.hpp"
 
 #include <vector>
 
@@ -121,7 +121,8 @@ namespace ELF
         }
         inline uintptr_t GetPhNum() const { return auxv.ProgramHeaderCount; }
 
-        inline std::string_view GetLdPath() const { return ldPath; }
+        inline const std::vector<Symbol>& GetSymbols() const { return symbols; }
+        inline std::string_view           GetLdPath() const { return ldPath; }
 
       private:
         u8*                        image = nullptr;

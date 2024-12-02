@@ -20,20 +20,23 @@ namespace Syscall
         u64 returnValue;
     };
 
-    enum class ID
+    enum class ID : u64
     {
-        eRead   = 0,
-        eWrite  = 1,
-        eOpen   = 2,
-        eClose  = 3,
-        eStat   = 4,
-        eFStat  = 5,
-        eLStat  = 6,
-        ePoll   = 7,
-        eLSeek  = 8,
-        eIoCtl  = 16,
-        eExit   = 60,
-        eGetTid = 186,
+        eRead      = 0,
+        eWrite     = 1,
+        eOpen      = 2,
+        eClose     = 3,
+        eStat      = 4,
+        eFStat     = 5,
+        eLStat     = 6,
+        ePoll      = 7,
+        eLSeek     = 8,
+        eMMap      = 9,
+        eIoCtl     = 16,
+        eExit      = 60,
+        eArchPrCtl = 158,
+        eGetTid    = 186,
+        ePanic     = 255,
     };
 
     void RegisterHandler(usize                                index,

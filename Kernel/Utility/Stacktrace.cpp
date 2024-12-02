@@ -15,6 +15,7 @@
 #include "Utility/Math.hpp"
 
 #include <demangler/Demangle.h>
+#include <vector>
 
 namespace Stacktrace
 {
@@ -26,18 +27,11 @@ namespace Stacktrace
             uintptr_t   rip;
         };
 
-        struct Symbol
-        {
-            char*     name;
-            uintptr_t address;
-        };
+        std::vector<Symbol> symbols;
+        uintptr_t           lowestKernelSymbolAddress  = 0xffffffff;
+        uintptr_t           highestKernelSymbolAddress = 0x00000000;
 
-        usize     symbolCount                = 0;
-        Symbol*   symbols                    = nullptr;
-        uintptr_t lowestKernelSymbolAddress  = 0xffffffff;
-        uintptr_t highestKernelSymbolAddress = 0x00000000;
-
-        u64       ParseHexDigit(char digit)
+        u64                 ParseHexDigit(char digit)
         {
             if (digit >= '0' && digit <= '9') return digit - '0';
             Assert(digit >= 'a' && digit <= 'f');
@@ -45,19 +39,19 @@ namespace Stacktrace
             return (digit - 'a') + 0xa;
         }
 
-        Symbol* GetSymbol(uintptr_t address)
+        const Symbol* GetSymbol(uintptr_t address)
         {
             if (address < lowestKernelSymbolAddress
                 || address > highestKernelSymbolAddress)
                 return nullptr;
-            Symbol* ret = nullptr;
+            const Symbol* ret = nullptr;
 
-            for (usize i = 0; i < symbolCount; ++i)
+            for (const auto& symbol : symbols)
             {
-                if (!symbols) break;
-                if (address < symbols[i + 1].address)
+                if ((&symbol + 1) == symbols.end()) break;
+                if (address < (&symbol + 1)->address)
                 {
-                    ret = &symbols[i];
+                    ret = &symbol;
                     break;
                 }
             }
@@ -72,16 +66,10 @@ namespace Stacktrace
         limine_file* file = BootInfo::FindModule("ksyms");
         if (!file || !file->address) return false;
 
-        auto* current     = reinterpret_cast<char*>(file->address);
-        char* startOfName = nullptr;
-        for (usize i = 0; i < 8; ++i)
-            symbolCount = (symbolCount << 4) | ParseHexDigit(*(current++));
-        current++;
+        auto*     current     = reinterpret_cast<char*>(file->address);
+        char*     startOfName = nullptr;
 
-        symbols                      = new Symbol[symbolCount];
-        usize     currentSymbolIndex = 0;
-
-        uintptr_t address            = 0;
+        uintptr_t address     = 0;
         while ((const u8*)current
                < reinterpret_cast<u8*>(file->address) + file->size)
         {
@@ -92,21 +80,22 @@ namespace Stacktrace
             startOfName = current;
             while (*(++current))
                 if (*current == '\n') break;
-            auto& ksym = symbols[currentSymbolIndex];
+
+            Symbol ksym;
             if (address < BootInfo::GetKernelVirtualAddress())
                 address += BootInfo::GetKernelVirtualAddress();
 
             ksym.address = address;
             ksym.name    = startOfName;
+            symbols.push_back(ksym);
 
-            *current     = '\0';
+            *current = '\0';
             if (ksym.address < lowestKernelSymbolAddress)
                 lowestKernelSymbolAddress = ksym.address;
             if (ksym.address > highestKernelSymbolAddress)
                 highestKernelSymbolAddress = ksym.address;
 
             ++current;
-            ++currentSymbolIndex;
         }
 
         PMM::FreePages(FromHigherHalfAddress<uintptr_t>(file->address),
@@ -124,10 +113,10 @@ namespace Stacktrace
         {
             u64 rip = stackFrame->rip;
             if (rip == 0) break;
-            stackFrame         = stackFrame->rbp;
-            Symbol*     symbol = GetSymbol(rip);
+            stackFrame           = stackFrame->rbp;
+            const Symbol* symbol = GetSymbol(rip);
 
-            std::string demangledName
+            std::string   demangledName
                 = symbol ? llvm::demangle(symbol->name) : "??";
             LogMessage("[\u001b[33mStacktrace\u001b[0m]: {}. {} <{:#x}>", i + 1,
                        demangledName, rip);

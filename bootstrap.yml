@@ -261,7 +261,7 @@ packages:
     build:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/sbin']
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/root']
-      - args: ['@OPTION:arch-triple@-gcc', '-z', 'noexecstack', '-fno-pic', '-fno-pie', '-static', '@SOURCE_ROOT@/Userland/Init/init.c', '-o', '@THIS_COLLECT_DIR@/usr/sbin/init']
+      - args: ['@OPTION:arch-triple@-gcc', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/init.c', '-o', '@THIS_COLLECT_DIR@/usr/sbin/init']
 
   - name: linux-headers
     architecture: '@OPTION:arch@'
@@ -334,11 +334,12 @@ packages:
         - '--libdir=lib'
         - '--buildtype=debugoptimized'
         - '--wrap-mode=default'
+        - '-Db_sanitize=undefined'
         - '-Dmlibc_no_headers=true'
         - '-Ddisable_crypt_option=true'
         - '-Ddisable_iconv_option=true'
         - '-Ddisable_intl_option=true'
-        - '-Ddefault_library=static'
+        - '-Ddefault_library=both'
         - '-Dlinux_kernel_headers=@BUILD_ROOT@/packages/linux-headers/usr/include'
         - '@THIS_SOURCE_DIR@'
     build:

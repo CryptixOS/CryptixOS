@@ -27,8 +27,7 @@ namespace ELF
             return false;
 
         LoadSymbols();
-        for (auto& sym : symbols)
-            LogInfo("Symbol: {}: {}", sym.address, sym.name);
+        for (auto& sym : symbols) sym.address += loadBase;
 
         for (const auto& current : programHeaders)
         {
@@ -162,5 +161,7 @@ namespace ELF
             sym.address = addr;
             symbols.push_back(sym);
         }
+
+        std::sort(symbols.begin(), symbols.end(), std::less<Symbol>());
     }
 } // namespace ELF

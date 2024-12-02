@@ -14,9 +14,28 @@
 #include <string_view>
 #include <vector>
 
-constexpr const u32 TERMINAL_COLOR_BLACK = 0x000000;
+namespace AnsiColor
+{
+    constexpr const char* FOREGROUND_BLACK   = "\u001b[30m";
+    constexpr const char* FOREGROUND_RED     = "\u001b[31m";
+    constexpr const char* FOREGROUND_GREEN   = "\u001b[32m";
+    constexpr const char* FOREGROUND_YELLOW  = "\u001b[33m";
+    constexpr const char* FOREGROUND_BLUE    = "\u001b[34m";
+    constexpr const char* FOREGROUND_MAGENTA = "\u001b[35m";
+    constexpr const char* FOREGROUND_CYAN    = "\u001b[36m";
+    constexpr const char* FOREGROUND_WHITE   = "\u001b[37m";
 
-class Terminal      final
+    constexpr const char* BACKGROUND_BLACK   = "\u001b[40m";
+    constexpr const char* BACKGROUND_RED     = "\u001b[41m";
+    constexpr const char* BACKGROUND_GREEN   = "\u001b[42m";
+    constexpr const char* BACKGROUND_YELLOW  = "\u001b[43m";
+    constexpr const char* BACKGROUND_BLUE    = "\u001b[44m";
+    constexpr const char* BACKGROUND_MAGENTA = "\u001b[45m";
+    constexpr const char* BACKGROUND_CYAN    = "\u001b[46m";
+    constexpr const char* BACKGROUND_WHITE   = "\u001b[47m";
+}; // namespace AnsiColor
+
+class Terminal final
 {
   public:
     Terminal() = default;
@@ -28,7 +47,7 @@ class Terminal      final
 
     bool                           Initialize(Framebuffer& framebuffer);
 
-    void                           Clear(u32 color = TERMINAL_COLOR_BLACK);
+    void                           Clear(u32 color = 0xffffff);
     void                           PutChar(u64 c);
 
     void                           PrintString(std::string_view str);
