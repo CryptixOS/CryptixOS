@@ -9,6 +9,7 @@ srcs += files(
 
   'ACPI/ACPI.cpp',
   'ACPI/MADT.cpp',
+  'ACPI/UACPI.cpp',
 
   'API/MM.cpp',
   'API/Process.cpp',

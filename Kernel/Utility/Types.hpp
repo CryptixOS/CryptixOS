@@ -67,12 +67,18 @@ struct Pointer
 
     inline bool IsHigherHalf() { return pointer >= BootInfo::GetHHDMOffset(); }
 
-    template <typename T>
+    template <typename T = Pointer>
     inline T ToHigherHalf()
     {
         return IsHigherHalf()
                  ? reinterpret_cast<T>(pointer)
                  : reinterpret_cast<T>(pointer + BootInfo::GetHHDMOffset());
+    }
+
+    template <>
+    inline Pointer ToHigherHalf<Pointer>()
+    {
+        return pointer + BootInfo::GetHHDMOffset();
     }
 
     template <typename T>

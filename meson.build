@@ -111,6 +111,7 @@ deps = [
   dependency('string'),
   dependency('demangler'),
   dependency('magic_enum'),
+  dependency('uacpi'),
 ]
 
 inc_deps = []
