@@ -17,6 +17,7 @@ srcs += files(
 
   'Drivers/PCSpeaker.cpp',
   'Drivers/PIC.cpp',
+  'Drivers/PS2Keyboard.cpp',
   'Drivers/Serial.cpp',
 
   'Drivers/Timers/PIT.cpp',

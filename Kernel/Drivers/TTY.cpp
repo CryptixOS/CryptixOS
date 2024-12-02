@@ -19,20 +19,46 @@
 namespace
 {
     std::vector<TTY*> s_TTYs;
-}
+    constexpr usize   MAX_CHAR_BUFFER = 64;
+} // namespace
+
+TTY* TTY::s_CurrentTTY = nullptr;
 
 TTY::TTY(Terminal* terminal, usize minor)
     : Device(DriverType::eTTY, static_cast<DeviceType>(minor))
     , terminal(terminal)
 {
+    if (!s_CurrentTTY) s_CurrentTTY = this;
+}
+
+void TTY::PutChar(char c)
+{
+    spinlock.Acquire();
+    if (charBuffer.size() > MAX_CHAR_BUFFER) charBuffer.pop_front();
+    charBuffer.push_back(c);
+    spinlock.Release();
 }
 
 isize TTY::Read(void* dest, off_t offset, usize bytes)
 {
-    CtosUnused(dest);
-    CtosUnused(offset);
-    CtosUnused(bytes);
+    isize nread = 0;
+    u64*  d     = reinterpret_cast<u64*>(dest);
 
+    spinlock.Acquire();
+    while (bytes > 0 && !charBuffer.empty())
+    {
+        LogTrace("TTY: Reading {} bytes to {:#x}", bytes, (uintptr_t)d);
+        (void)offset;
+        *d = charBuffer.front();
+        charBuffer.pop_front();
+
+        d++;
+        --bytes;
+        ++nread;
+    }
+    spinlock.Release();
+
+    (void)nread;
     return 0;
 }
 isize TTY::Write(const void* src, off_t offset, usize bytes)

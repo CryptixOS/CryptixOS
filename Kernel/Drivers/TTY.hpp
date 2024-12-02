@@ -9,10 +9,19 @@
 #include "API/Posix/Termios.hpp"
 #include "Drivers/Device.hpp"
 
+#include "Scheduler/Spinlock.hpp"
+
+#include <deque>
+#include <mutex>
+
 class TTY : public Device
 {
   public:
     TTY(Terminal* terminal, usize minor);
+
+    inline static TTY*       GetCurrent() { return s_CurrentTTY; }
+
+    void                     PutChar(char c);
 
     virtual std::string_view GetName() const noexcept override { return "tty"; }
 
@@ -24,8 +33,14 @@ class TTY : public Device
     static void   Initialize();
 
   private:
-    Terminal* terminal = nullptr;
-    termios   termios;
-    pid_t     controlSid = -1;
-    gid_t     pgid       = -1;
+    static TTY*      s_CurrentTTY;
+
+    std::mutex       lock;
+    Spinlock         spinlock;
+
+    Terminal*        terminal = nullptr;
+    termios          termios;
+    pid_t            controlSid = -1;
+    gid_t            pgid       = -1;
+    std::deque<char> charBuffer;
 };
