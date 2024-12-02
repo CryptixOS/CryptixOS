@@ -6,19 +6,19 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include <Common.hpp>
 
 struct SDTHeader
 {
-    char signature[4];
-    u32  length;
-    u8   revision;
-    u8   checksum;
-    char oemID[6];
-    u64  oemTableID;
-    u32  oemRevision;
-    u32  creatorID;
-    u32  creatorRevision;
+    char Signature[4];
+    u32  Length;
+    u8   Revision;
+    u8   Checksum;
+    char OemID[6];
+    u64  OemTableID;
+    u32  OemRevision;
+    u32  CreatorID;
+    u32  CreatorRevision;
 } __attribute__((packed));
 
 namespace ACPI

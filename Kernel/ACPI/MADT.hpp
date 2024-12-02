@@ -6,60 +6,57 @@
  */
 #pragma once
 
-#include "ACPI/ACPI.hpp"
+#include <ACPI/ACPI.hpp>
 
-#include <cstdint>
 #include <vector>
 
 namespace MADT
 {
-#pragma pack(push, 1)
     struct Header
     {
-        u8 id;
-        u8 length;
-    };
+        u8 ID;
+        u8 Length;
+    } __attribute__((packed));
 
-    struct LAPICEntry
+    struct LapicEntry
     {
-        Header header;
-        u8     processorID;
-        u8     apicID;
-        u32    flags;
-    };
+        Header Header;
+        u8     ProcessorID;
+        u8     ApicID;
+        u32    Flags;
+    } __attribute__((packed));
 
-    struct IOAPICEntry
+    struct IoApicEntry
     {
-        Header header;
-        u8     apicID;
-        u8     reserved;
-        u32    address;
-        u32    gsib;
-    };
+        Header Header;
+        u8     ApicID;
+        u8     Reserved;
+        u32    Address;
+        u32    GsiBase;
+    } __attribute__((packed));
 
-    struct ISOEntry
+    struct IsoEntry
     {
-        Header header;
-        u8     busSource;
-        u8     irqSource;
-        u32    gsi;
-        u16    flags;
-    };
+        Header Header;
+        u8     BusSource;
+        u8     IrqSource;
+        u32    Gsi;
+        u16    Flags;
+    } __attribute__((packed));
 
-    struct LAPIC_NMIEntry
+    struct LapicNmiEntry
     {
-        Header header;
-        u8     processor;
-        u16    flags;
-        u8     lint;
-    };
-#pragma pack(pop)
+        Header Header;
+        u8     Processor;
+        u16    Flags;
+        u8     Lint;
+    } __attribute__((packed));
 
-    void                          Initialize();
-    bool                          LegacyPIC();
+    void                         Initialize();
+    bool                         LegacyPIC();
 
-    std::vector<LAPICEntry*>&     GetLAPICEntries();
-    std::vector<IOAPICEntry*>&    GetIOAPICEntries();
-    std::vector<ISOEntry*>&       GetISOEntries();
-    std::vector<LAPIC_NMIEntry*>& GetLAPIC_NMIEntries();
+    std::vector<LapicEntry*>&    GetLAPICEntries();
+    std::vector<IoApicEntry*>&   GetIOAPICEntries();
+    std::vector<IsoEntry*>&      GetISOEntries();
+    std::vector<LapicNmiEntry*>& GetLAPIC_NMIEntries();
 } // namespace MADT

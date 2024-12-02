@@ -5,7 +5,6 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <ACPI/ACPI.hpp>
-
 #include <Memory/MMIO.hpp>
 
 #include <uacpi/kernel_api.h>

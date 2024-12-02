@@ -4,61 +4,58 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "ACPI.hpp"
+#include <ACPI/ACPI.hpp>
+#include <ACPI/MADT.hpp>
 
-#include "Utility/BootInfo.hpp"
-
-#include "ACPI/MADT.hpp"
-#include "Memory/VMM.hpp"
+#include <Memory/VMM.hpp>
+#include <Utility/BootInfo.hpp>
 
 namespace ACPI
 {
     namespace
     {
-#pragma pack(push, 1)
         struct RSDP
         {
-            char signature[8];
-            u8   checksum;
-            char oemID[6];
-            u8   revision;
-            u32  rsdtAddress;
-            u32  length;
-            u64  xsdtAddress;
-            u8   extendedChecksum;
-            u8   reserved[3];
-        };
+            char Signature[8];
+            u8   Checksum;
+            char OemID[6];
+            u8   Revision;
+            u32  RsdtAddress;
+            u32  Length;
+            u64  XsdtAddress;
+            u8   ExtendedChecksum;
+            u8   Reserved[3];
+        } __attribute__((packed));
         struct RSDT
         {
-            SDTHeader header;
-            u64       sdts[];
-        };
-#pragma pack(pop)
+            SDTHeader Header;
+            u64       Sdts[];
+        } __attribute__((packed));
 
-        bool  xsdt = false;
-        RSDT* rsdt;
+        bool  s_XsdtAvailable = false;
+        RSDT* s_Rsdt          = nullptr;
 
         bool  ValidateChecksum(SDTHeader* header)
         {
 
             u32 checksum = 0;
-            for (u32 i = 0; i < header->length; i++)
-                checksum += reinterpret_cast<char*>(header)[i];
+            for (u32 i = 0; i < header->Length; i++)
+                checksum += reinterpret_cast<u8*>(header)[i];
 
             return checksum;
         }
-        uintptr_t GetTablePointer(u8 index)
+        Pointer GetTablePointer(u8 index)
         {
-            if (xsdt) return rsdt->sdts[index] + BootInfo::GetHHDMOffset();
+            if (s_XsdtAvailable)
+                return Pointer(s_Rsdt->Sdts[index]).ToHigherHalf();
 
-            const u32* ptr = reinterpret_cast<u32*>(rsdt->sdts);
-            return static_cast<uintptr_t>(ptr[index])
-                 + BootInfo::GetHHDMOffset();
+            const u32* ptr = reinterpret_cast<u32*>(s_Rsdt->Sdts);
+            return Pointer(ptr[index]).ToHigherHalf();
         }
         void DetectACPIEntries()
         {
-            const usize entryCount
-                = (rsdt->header.length - sizeof(SDTHeader)) / (xsdt ? 8 : 4);
+            const usize entryCount = (s_Rsdt->Header.Length - sizeof(SDTHeader))
+                                   / (s_XsdtAvailable ? 8 : 4);
             LogInfo("ACPI: Tables count: {}", entryCount);
 
             char acpiSignature[5];
@@ -67,12 +64,11 @@ namespace ACPI
             LogTrace("ACPI: Printing all tables signatures...");
             for (usize i = 0; i < entryCount; i++)
             {
-                SDTHeader* header
-                    = reinterpret_cast<SDTHeader*>(GetTablePointer(i));
-                if (!header || !((char*)header->signature)
-                    || header->signature[0] == 0)
+                SDTHeader* header = GetTablePointer(i).As<SDTHeader>();
+                if (!header || !(reinterpret_cast<char*>(header->Signature))
+                    || header->Signature[0] == 0)
                     continue;
-                memcpy(acpiSignature, header->signature, 4);
+                std::memcpy(acpiSignature, header->Signature, 4);
                 LogTrace("  -{}", acpiSignature);
             }
         }
@@ -81,15 +77,16 @@ namespace ACPI
     void Initialize()
     {
         LogTrace("ACPI: Initializing...");
-        RSDP* rsdp = ToHigherHalfAddress<RSDP*>(BootInfo::GetRSDPAddress());
-        xsdt       = rsdp->revision >= 2 && rsdp->xsdtAddress != 0;
-        u64 rsdtPointer = xsdt ? rsdp->xsdtAddress : rsdp->rsdtAddress;
+        RSDP* rsdp = Pointer(BootInfo::GetRSDPAddress()).ToHigherHalf<RSDP*>();
+        s_XsdtAvailable = rsdp->Revision >= 2 && rsdp->XsdtAddress != 0;
+        u64 rsdtPointer
+            = s_XsdtAvailable ? rsdp->XsdtAddress : rsdp->RsdtAddress;
 
-        rsdt            = ToHigherHalfAddress<RSDT*>(rsdtPointer);
-        Assert(rsdt != nullptr);
+        s_Rsdt = Pointer(rsdtPointer).ToHigherHalf<RSDT*>();
+        Assert(s_Rsdt != nullptr);
 
-        LogInfo("ACPI: Found {} at: {:#x}", xsdt ? "XSDT" : "RSDT",
-                reinterpret_cast<uintptr_t>(rsdt));
+        LogInfo("ACPI: Found {} at: {:#x}", s_XsdtAvailable ? "XSDT" : "RSDT",
+                reinterpret_cast<uintptr_t>(s_Rsdt));
         DetectACPIEntries();
 
         LogTrace("ACPI: Initialized");
@@ -99,17 +96,17 @@ namespace ACPI
     {
         Assert(signature != nullptr);
 
-        const usize entryCount
-            = (rsdt->header.length - sizeof(SDTHeader)) / (xsdt ? 8 : 4);
+        const usize entryCount = (s_Rsdt->Header.Length - sizeof(SDTHeader))
+                               / (s_XsdtAvailable ? 8 : 4);
         for (usize i = 0; i < entryCount; i++)
         {
-            SDTHeader* header
-                = reinterpret_cast<SDTHeader*>(GetTablePointer(i));
+            SDTHeader* header = GetTablePointer(i).As<SDTHeader>();
 
-            if (!header || !((char*)header->signature)) continue;
+            if (!header || !(reinterpret_cast<char*>(header->Signature)))
+                continue;
             if (!ValidateChecksum(header)) continue;
 
-            if (strncmp(header->signature, signature, 4) == 0)
+            if (std::strncmp(header->Signature, signature, 4) == 0)
             {
                 if (index == 0) return header;
                 ++index;

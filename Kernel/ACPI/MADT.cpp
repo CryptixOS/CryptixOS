@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "MADT.hpp"
+#include <ACPI/MADT.hpp>
 
 namespace MADT
 {
@@ -12,83 +12,89 @@ namespace MADT
     {
         struct MADT
         {
-            SDTHeader header;
-            u32       lapicAddress;
-            u32       flags;
-            u8        entries[];
+            SDTHeader Header;
+            u32       LapicAddress;
+            u32       Flags;
+            u8        Entries[];
+        } __attribute__((packed));
+
+        constexpr const char* MADT_SIGNATURE = "APIC";
+
+        enum class EntryType
+        {
+            eProcessorLapic          = 0x00,
+            eIoApic                  = 0x01,
+            eInterruptSourceOverride = 0x02,
+            eNmiSource               = 0x03,
+            eLapicNmi                = 0x04,
+            eLapicAddressOverride    = 0x05,
+
+            eProcessorLocalX2Apic    = 0x09,
         };
 
-        inline constexpr const char* MADT_SIGNATURE                    = "APIC";
-        inline constexpr const u8    ENTRY_TYPE_PROCESSOR_LAPIC        = 0;
-        inline constexpr const u8    ENTRY_TYPE_IO_APIC                = 1;
-        inline constexpr const u8    ENTRY_TYPE_IO_APIC_ISO            = 2;
-        inline constexpr const u8    ENTRY_TYPE_IO_APIC_NMI_SOURCE     = 3;
-        inline constexpr const u8    ENTRY_TYPE_LAPIC_NMI              = 4;
-        inline constexpr const u8    ENTRY_TYPE_LAPIC_ADDRESS_OVERRIDE = 5;
-        inline constexpr const u8    ENTRY_TYPE_PROCESSOR_LOCAL_x2APIC = 6;
+        static MADT*                s_MADT;
 
-        static MADT*                 madt;
-
-        std::vector<LAPICEntry*>     lapicEntries;
-        std::vector<IOAPICEntry*>    ioapicEntries;
-        std::vector<ISOEntry*>       isoEntries;
-        std::vector<LAPIC_NMIEntry*> lapicNMIEntries;
+        std::vector<LapicEntry*>    s_LapicEntries;
+        std::vector<IoApicEntry*>   s_IoApicEntries;
+        std::vector<IsoEntry*>      s_IsoEntries;
+        std::vector<LapicNmiEntry*> s_LapicNmiEntries;
     } // namespace
 
     void Initialize()
     {
-        madt = ACPI::GetTable<MADT>(MADT_SIGNATURE);
-        Assert(madt != nullptr);
+        s_MADT = ACPI::GetTable<MADT>(MADT_SIGNATURE);
+        Assert(s_MADT != nullptr);
 
-        for (usize off = 0; madt->header.length - sizeof(MADT) - off >= 2;)
+        for (usize off = 0; s_MADT->Header.Length - sizeof(MADT) - off >= 2;)
 
         {
-            Header* header = reinterpret_cast<Header*>(madt->entries + off);
+            Header* header = Pointer(s_MADT->Entries + off).As<Header>();
 
-            switch (header->id)
+            switch (static_cast<EntryType>(header->ID))
             {
-                case ENTRY_TYPE_PROCESSOR_LAPIC:
-                    LogTrace("MADT: Found local APIC #{}", lapicEntries.size());
-                    lapicEntries.push_back(
-                        reinterpret_cast<LAPICEntry*>(header));
+                case EntryType::eProcessorLapic:
+                    LogTrace("MADT: Found local APIC #{}",
+                             s_LapicEntries.size());
+                    s_LapicEntries.push_back(
+                        reinterpret_cast<LapicEntry*>(header));
                     break;
-                case ENTRY_TYPE_IO_APIC:
-                    LogTrace("MADT: Found IO APIC #{}", ioapicEntries.size());
-                    ioapicEntries.push_back(
-                        reinterpret_cast<IOAPICEntry*>(header));
+                case EntryType::eIoApic:
+                    LogTrace("MADT: Found IO APIC #{}", s_IoApicEntries.size());
+                    s_IoApicEntries.push_back(
+                        reinterpret_cast<IoApicEntry*>(header));
                     break;
-                case ENTRY_TYPE_IO_APIC_ISO:
-                    LogTrace("MADT: Found ISO #{}", isoEntries.size());
-                    isoEntries.push_back(reinterpret_cast<ISOEntry*>(header));
+                case EntryType::eInterruptSourceOverride:
+                    LogTrace("MADT: Found ISO #{}", s_IsoEntries.size());
+                    s_IsoEntries.push_back(reinterpret_cast<IsoEntry*>(header));
                     break;
-                case ENTRY_TYPE_IO_APIC_NMI_SOURCE: break;
-                case ENTRY_TYPE_LAPIC_NMI:
-                    LogTrace("MADT: Found NMI #{}", lapicNMIEntries.size());
-                    lapicNMIEntries.push_back(
-                        reinterpret_cast<LAPIC_NMIEntry*>(header));
+                case EntryType::eNmiSource: break;
+                case EntryType::eLapicNmi:
+                    LogTrace("MADT: Found NMI #{}", s_LapicNmiEntries.size());
+                    s_LapicNmiEntries.push_back(
+                        reinterpret_cast<LapicNmiEntry*>(header));
                     break;
-                case ENTRY_TYPE_LAPIC_ADDRESS_OVERRIDE: break;
-                case ENTRY_TYPE_PROCESSOR_LOCAL_x2APIC: break;
+                case EntryType::eLapicAddressOverride: break;
+                case EntryType::eProcessorLocalX2Apic: break;
 
                 default:
                     LogWarn("MADT: Encountered unrecognized header(id = {})",
-                            header->id);
+                            header->ID);
                     break;
             }
 
-            off += std::max(header->length, u8(2));
+            off += std::max(header->Length, u8(2));
         }
 
-        LogTrace("MADT: Initialized");
+        LogInfo("MADT: Initialized");
     }
 
-    bool                          LegacyPIC() { return madt->flags & 0x01; }
+    bool                         LegacyPIC() { return s_MADT->Flags & 0x01; }
 
-    std::vector<LAPICEntry*>&     GetLAPICEntries() { return lapicEntries; }
-    std::vector<IOAPICEntry*>&    GetIOAPICEntries() { return ioapicEntries; }
-    std::vector<ISOEntry*>&       GetISOEntries() { return isoEntries; }
-    std::vector<LAPIC_NMIEntry*>& GetLAPIC_NMIEntries()
+    std::vector<LapicEntry*>&    GetLAPICEntries() { return s_LapicEntries; }
+    std::vector<IoApicEntry*>&   GetIOAPICEntries() { return s_IoApicEntries; }
+    std::vector<IsoEntry*>&      GetISOEntries() { return s_IsoEntries; }
+    std::vector<LapicNmiEntry*>& GetLAPIC_NMIEntries()
     {
-        return lapicNMIEntries;
+        return s_LapicNmiEntries;
     }
 } // namespace MADT
