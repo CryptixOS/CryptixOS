@@ -15,6 +15,7 @@ srcs += files(
   'interrupts.x86_64.S',
   'syscall.S',
 
+  'Drivers/IoApic.cpp',
   'Drivers/PCSpeaker.cpp',
   'Drivers/PIC.cpp',
   'Drivers/PS2Keyboard.cpp',
