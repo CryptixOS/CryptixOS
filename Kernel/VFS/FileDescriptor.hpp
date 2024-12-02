@@ -15,6 +15,12 @@ struct FileDescriptor
     {
     }
 
-    INode* node   = nullptr;
-    usize  offset = 0;
+    void       Lock() { lock.lock(); }
+    void       Unlock() { lock.unlock(); }
+
+    void       Close() {}
+
+    INode*     node   = nullptr;
+    usize      offset = 0;
+    std::mutex lock;
 };

@@ -18,6 +18,8 @@ using InterruptRoutine = void (*)(struct CPUContext*);
 class InterruptHandler
 {
   public:
+    bool        eoiFirst = false;
+
     inline bool IsUsed() const { return routine != nullptr; }
     inline bool IsReserved() const { return reserved; }
 

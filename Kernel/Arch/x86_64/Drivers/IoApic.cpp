@@ -110,14 +110,14 @@ void IoApic::Initialize()
             if (entry->irqSource == i)
             {
 
-                SetGSIRedirect(CPU::GetBsp().id, entry->irqSource + 0x20,
+                SetGSIRedirect(CPU::GetBspId(), entry->irqSource + 0x20,
                                entry->gsi, 0, false);
                 IDT::GetHandler(entry->irqSource + 0x20)->Reserve();
                 return;
             }
         }
 
-        SetGSIRedirect(CPU::GetBsp().id, i + 0x20, i, 0, false);
+        SetGSIRedirect(CPU::GetBspId(), i + 0x20, i, 0, false);
         IDT::GetHandler(i + 0x20)->Reserve();
     };
 

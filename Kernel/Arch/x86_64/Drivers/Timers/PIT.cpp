@@ -6,12 +6,8 @@
  */
 #include "PIT.hpp"
 
-#include "Common.hpp"
-
 #include "Arch/InterruptHandler.hpp"
 
-#include "Arch/x86_64/CPU.hpp"
-#include "Arch/x86_64/Drivers/PIC.hpp"
 #include "Arch/x86_64/IDT.hpp"
 #include "Arch/x86_64/IO.hpp"
 
@@ -24,44 +20,62 @@ namespace Scheduler
 
 namespace PIT
 {
-    constexpr usize          FREQUENCY   = 600;
-    static std::atomic<u64>  tick        = 0;
-    static u8                timerVector = 0;
-    static InterruptHandler* handler     = nullptr;
-
-    [[maybe_unused]]
-    static void TimerTick(struct CPUContext* ctx)
+    namespace
     {
-        LogInfo("TimerTick");
-        Scheduler::Schedule(ctx);
+        constexpr usize   FREQUENCY     = 1000;
+        // NOTE(v1tr10l7): When using PIC, we cannot choose irq number of PIT,
+        // and it will have to be IRQ, only IoApic allows to redirect irqs
+        constexpr usize   IRQ_HINT      = 0x20;
+        std::atomic<u64>  s_Tick        = 0;
+        u8                s_TimerVector = 0;
+        InterruptHandler* s_Handler     = nullptr;
+        usize             s_CurrentMode = Mode::ONESHOT;
 
-        tick++;
-    }
+        void              TimerTick(struct CPUContext* ctx)
+        {
+            Scheduler::Schedule(ctx);
 
-    void Sleep(u64 ms)
-    {
-        volatile u64 target = GetMilliseconds() + ms;
-        while (GetMilliseconds() < target) Arch::Pause();
-    }
+            s_Tick++;
+        }
+    } // namespace
 
     void Initialize()
     {
         static bool initialized = false;
-        SetFrequency(FREQUENCY);
-
         if (initialized) return;
+
         LogTrace("PIT: Initializing...");
+        SetFrequency(FREQUENCY);
+        LogInfo("PIT: Frequency set to {}Hz", FREQUENCY);
+
+        s_Handler     = IDT::AllocateHandler(IRQ_HINT);
+        s_TimerVector = s_Handler->GetInterruptVector();
+
+        s_Handler->SetHandler(TimerTick);
+        s_Handler->Reserve();
+
+        LogInfo("PIT: Installed on interrupt gate #{:#x}", s_TimerVector);
+        LogInfo("PIT: Initialized\nTimer vector = {} ", s_TimerVector);
         initialized = true;
-
-        handler     = IDT::AllocateHandler(0x20);
-        handler->SetHandler(Scheduler::Schedule);
-        handler->Reserve();
-
-        timerVector = handler->GetInterruptVector();
-        LogInfo("PIT: Initialized\nTimer vector = {} ", timerVector);
     }
 
-    u8  GetInterruptVector() { return timerVector; }
+    void Start(usize mode, usize ms)
+    {
+        s_CurrentMode     = mode;
+
+        // reloadValue = (ms×frequency) / 3000
+        usize reloadValue = (ms * BASE_FREQUENCY) / 3000;
+        SetReloadValue(reloadValue);
+        IO::Out<byte>(COMMAND, CHANNEL0_DATA | SEND_WORD | mode);
+        InterruptManager::Unmask(s_TimerVector);
+    }
+    void Stop()
+    {
+        InterruptManager::Mask(s_TimerVector);
+        SetReloadValue(0);
+    }
+
+    u8  GetInterruptVector() { return s_TimerVector; }
 
     u64 GetCurrentCount()
     {
@@ -70,7 +84,7 @@ namespace PIT
         auto hi = IO::In<byte>(CHANNEL0_DATA) << 8;
         return static_cast<u16>(hi << 8) | lo;
     }
-    u64  GetMilliseconds() { return tick * (1000 / FREQUENCY); }
+    u64  GetMilliseconds() { return s_Tick * (1000z / FREQUENCY); }
 
     void SetFrequency(usize frequency)
     {
@@ -80,9 +94,15 @@ namespace PIT
     }
     void SetReloadValue(u16 reloadValue)
     {
-        IO::Out<byte>(COMMAND, SEND_WORD | Mode::SQUARE_WAVE);
+        IO::Out<byte>(COMMAND, SEND_WORD | s_CurrentMode);
         IO::Out<byte>(CHANNEL0_DATA, static_cast<byte>(reloadValue));
         IO::Out<byte>(CHANNEL0_DATA, static_cast<byte>(reloadValue >> 8));
+    }
+
+    void Sleep(u64 ms)
+    {
+        volatile u64 target = GetMilliseconds() + ms;
+        while (GetMilliseconds() < target) Arch::Pause();
     }
 
 }; // namespace PIT

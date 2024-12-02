@@ -16,9 +16,11 @@
 #include "VFS/INode.hpp"
 #include "VFS/VFS.hpp"
 
-namespace VFS
+namespace Syscall::VFS
 {
     using Syscall::Arguments;
+    using namespace ::VFS;
+
     isize SysWrite(Arguments& args)
     {
         i32         fd      = args.args[0];
@@ -76,10 +78,12 @@ namespace VFS
         Process* current = CPU::GetCurrentThread()->parent;
         if (fd >= static_cast<i32>(current->fileDescriptors.size()))
             return EBADF;
-        auto  file      = current->fileDescriptors[fd];
+        auto file = current->fileDescriptors[fd];
 
+        file->Lock();
         isize bytesRead = file->node->Read(buffer, file->offset, bytes);
         file->offset += bytesRead;
+        file->Unlock();
         return bytesRead;
     }
     off_t SysLSeek(Syscall::Arguments& args)
@@ -119,4 +123,21 @@ namespace VFS
 
         return file->offset;
     }
-}; // namespace VFS
+
+    int SysIoCtl(Syscall::Arguments& args)
+    {
+        int           fd      = args.args[0];
+        unsigned long request = args.args[1];
+        usize         arg     = args.args[2];
+
+        Process*      current = CPU::GetCurrentThread()->parent;
+        if (fd >= static_cast<i32>(current->fileDescriptors.size()))
+            return EBADF;
+        auto file = current->fileDescriptors[fd];
+        (void)file;
+        (void)arg;
+        (void)request;
+
+        return 0;
+    }
+}; // namespace Syscall::VFS

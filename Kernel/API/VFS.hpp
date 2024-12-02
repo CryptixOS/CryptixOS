@@ -9,11 +9,12 @@
 #include "API/Syscall.hpp"
 #include "API/UnixTypes.hpp"
 
-namespace VFS
+namespace Syscall::VFS
 {
     isize SysWrite(Syscall::Arguments& args);
     i32   SysOpen(Syscall::Arguments& args);
     isize SysRead(Syscall::Arguments& args);
 
     off_t SysLSeek(Syscall::Arguments& args);
-} // namespace VFS
+    int   SysIoCtl(Syscall::Arguments& args);
+} // namespace Syscall::VFS

@@ -1,19 +1,20 @@
-int main()
+#include <stdint.h>
+#include <stdio.h>
+
+#include <sys/mman.h>
+#include <unistd.h>
+
+void prompt(void) { printf("cryptixos@root> "); }
+
+int  main()
 {
-    static const char* str = "Hello";
-start:
+    prompt();
+    char* keyBuffer = mmap(0, 4096, 0x03, MAP_ANONYMOUS, -1, 0);
+
     for (;;)
-        __asm__ volatile(
-            "movq $2, %%rdi\n"
-            "movq $0, %%rax\n"
-            "movq %0, %%rsi\n"
-            "movq %1, %%rdx\n"
-            "syscall\n"
-            :
-            : "r"(str), "r"(5ull)
-            : "rax", "rdx", "rsi");
+    {
+        size_t nread = read(0, keyBuffer, 16);
 
-    goto start;
-
-    return 0;
+        // if (nread) write(0, keyBuffer, nread);
+    }
 }

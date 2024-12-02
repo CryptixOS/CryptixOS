@@ -31,15 +31,18 @@ namespace PIT
         constexpr usize SQUARE_WAVE = 0x06;
     }; // namespace Mode
 
-    void Sleep(u64 ms);
-
     void Initialize();
 
+    void Start(usize mode, usize ms);
+    void Stop();
+
     u8   GetInterruptVector();
+
     u64  GetCurrentCount();
     u64  GetMilliseconds();
 
     void SetFrequency(usize frequency);
     void SetReloadValue(u16 reloadValue);
 
+    void Sleep(u64 ms);
 }; // namespace PIT

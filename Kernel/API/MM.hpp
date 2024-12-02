@@ -12,7 +12,7 @@
 constexpr uintptr_t MAP_FAILED    = -1;
 constexpr usize     MAP_ANONYMOUS = 0x20;
 
-namespace MM
+namespace Syscall::MM
 {
     uintptr_t SysMMap(Syscall::Arguments& args);
-} // namespace MM
+} // namespace Syscall::MM

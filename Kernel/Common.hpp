@@ -20,7 +20,7 @@ inline constexpr u64 BIT(u64 n) { return (1ull << n); }
 
 #define CTOS_UNUSED               [[maybe_unused]]
 #define CtosUnused(var)           ((void)var)
-#define CTOS_ASSERT_NOT_REACHED() __builtin_unreachable()
+#define CtosUnreachable()         __builtin_unreachable()
 #define CTOS_GET_FRAME_ADDRESS(n) __builtin_frame_address(n)
 
 #define CTOS_ARCH_X86_64          0
@@ -45,7 +45,7 @@ inline void panic(std::string_view msg)
 
     LogFatal("System Halted!\n");
     Arch::Halt();
-    CTOS_ASSERT_NOT_REACHED();
+    CtosUnreachable();
 }
 CTOS_NO_KASAN inline void earlyPanic(const char* format, ...)
 {
@@ -61,5 +61,5 @@ CTOS_NO_KASAN inline void earlyPanic(const char* format, ...)
 
     EarlyLogFatal("System Halted!");
     Arch::Halt();
-    CTOS_ASSERT_NOT_REACHED();
+    CtosUnreachable();
 }

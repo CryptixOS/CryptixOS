@@ -128,7 +128,7 @@ namespace GDT
             : "rbx", "memory", "%rax", "rbx");
 
         __asm__ volatile("ltr %0" ::"r"(static_cast<u16>(TSS_SELECTOR)));
-        LogInfo("GDT: Loaded on cpu #{}", id);
+        EarlyLogInfo("GDT: Loaded on cpu #{}", id);
     }
     void LoadTSS(TaskStateSegment* tss)
     {

@@ -12,8 +12,11 @@ struct Process;
 struct Thread;
 namespace Scheduler
 {
-    void     Initialize();
-    void     PrepareAP(bool start);
+    void Initialize();
+    void PrepareAP(bool start = false);
+
+    [[noreturn]]
+    void     Yield();
 
     Process* GetKernelProcess();
     Thread*  CreateKernelThread(uintptr_t pc, uintptr_t arg,

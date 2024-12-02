@@ -12,6 +12,7 @@
 
 #include "Arch/x86_64/CPUContext.hpp"
 #include "Arch/x86_64/CPUID.hpp"
+#include "Arch/x86_64/Drivers/Timers/Lapic.hpp"
 #include "Arch/x86_64/GDT.hpp"
 #include "Arch/x86_64/IDT.hpp"
 
@@ -76,15 +77,16 @@ namespace CPU
 
     struct CPU
     {
-        usize            id;
+        usize            id    = 0;
         void*            empty = nullptr;
 
         uintptr_t        threadStack;
         uintptr_t        kernelStack;
 
-        u64              lapicID;
+        u64              lapicID = 0;
+        Lapic            lapic;
         bool             isOnline = false;
-        TaskStateSegment tss;
+        TaskStateSegment tss{};
 
         usize            fpuStorageSize = 512;
         uintptr_t        fpuStorage     = 0;
@@ -95,9 +97,10 @@ namespace CPU
         errno_t          error;
         Thread*          idle;
         Thread*          currentThread;
-    } __attribute__((packed));
+    };
 
     void      InitializeBSP();
+    void      StartAPs();
 
     struct ID final
     {
@@ -110,6 +113,7 @@ namespace CPU
     };
 
     void              Halt();
+    void              WakeUp(usize id, bool everyone);
 
     void              WriteXCR(u64 reg, u64 value);
     u64               ReadCR0();
@@ -131,7 +135,7 @@ namespace CPU
 
     std::vector<CPU>& GetCPUs();
     u64               GetOnlineCPUsCount();
-    u64               GetBspIpatd();
+    u64               GetBspId();
     CPU&              GetBsp();
 
     u64               GetCurrentID();

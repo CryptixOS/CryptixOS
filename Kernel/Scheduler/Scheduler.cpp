@@ -61,7 +61,6 @@ namespace Scheduler
         LogInfo("Scheduler: Kernel process created");
         LogInfo("Scheduler: Initialized");
     }
-
     void PrepareAP(bool start)
     {
         CPU::GetCurrent()->tss.ist[0]
@@ -92,8 +91,15 @@ namespace Scheduler
         }
     };
 
-    Process* GetKernelProcess() { return s_KernelProcess; }
+    [[noreturn]]
+    void Yield()
+    {
+        CPU::SetInterruptFlag(true);
 
+        for (;;) Arch::Halt();
+    }
+
+    Process* GetKernelProcess() { return s_KernelProcess; }
     Thread*  CreateKernelThread(uintptr_t pc, uintptr_t arg, usize runningOn)
     {
         return new Thread(s_KernelProcess, pc, arg, runningOn);

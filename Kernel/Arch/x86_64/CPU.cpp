@@ -6,9 +6,12 @@
  */
 #include "CPU.hpp"
 
+#include "Arch/x86_64/Drivers/Timers/PIT.hpp"
+
 #include "Scheduler/Process.hpp"
 #include "Scheduler/Scheduler.hpp"
 #include "Scheduler/Thread.hpp"
+
 #include "Utility/BootInfo.hpp"
 #include "Utility/Math.hpp"
 
@@ -429,10 +432,7 @@ namespace CPU
 
         *ctx = thread->ctx;
     }
-    void Reschedule(usize ms)
-    {
-        // TODO(v1tr10l7): Reschedule
-    }
+    void Reschedule(usize ms) { PIT::Start(PIT::Mode::SQUARE_WAVE, 100); }
 
     bool EnableSSE()
     {

@@ -92,13 +92,14 @@ static void raiseException(CPUContext* ctx)
 static void breakpoint(CPUContext* ctx) { EarlyPanic("Breakpoint"); }
 static void pageFault(CPUContext* ctx)
 {
-    EarlyLogFatal(
+    EarlyPanic(
         "Captured exception[%#x] on cpu %zu: '%s'\n\rError Code: "
         "%#b\n\rrip: "
-        "%#p\nCR2: {:#x}",
+        "%#p\nCR2: %#x",
         ctx->interruptVector, 0, exceptionNames[ctx->interruptVector],
         ctx->errorCode, ctx->rip, CPU::ReadCR2());
 
+    for (;;) Arch::Halt();
     raiseException(ctx);
 }
 

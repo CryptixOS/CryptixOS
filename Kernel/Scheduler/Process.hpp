@@ -65,6 +65,7 @@ struct Process
         fileDescriptors.push_back(currentTTY->Open());
         fileDescriptors.push_back(currentTTY->Open());
     }
+    i32                          Exit(i32 code);
 
     pid_t                        pid         = -1;
     std::string                  name        = "?";

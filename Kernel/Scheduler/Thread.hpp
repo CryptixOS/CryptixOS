@@ -29,6 +29,7 @@ enum class ThreadState
     eRunning,
     eDequeued,
     eBlocked,
+    eExited,
 };
 
 struct Process;

@@ -17,7 +17,7 @@
 
 #include "Utility/Math.hpp"
 
-namespace MM
+namespace Syscall::MM
 {
     uintptr_t SysMMap(Syscall::Arguments& args)
     {
@@ -64,4 +64,4 @@ namespace MM
         return_err(MAP_FAILED, EINVAL);
     }
 
-}; // namespace MM
+}; // namespace Syscall::MM

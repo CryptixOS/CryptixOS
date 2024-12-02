@@ -7,6 +7,7 @@
 #include "Syscall.hpp"
 
 #include "API/MM.hpp"
+#include "API/Process.hpp"
 #include "API/VFS.hpp"
 #include "Arch/CPU.hpp"
 
@@ -92,6 +93,8 @@ namespace Syscall
         RegisterSyscall(ID::eOpen, VFS::SysOpen);
         RegisterSyscall(ID::eLSeek, VFS::SysLSeek);
         RegisterSyscall(ID::eMMap, MM::SysMMap);
+        RegisterSyscall(ID::eIoCtl, VFS::SysIoCtl);
+        RegisterSyscall(ID::eExit, Process::SysExit);
         RegisterSyscall(ID::eArchPrCtl, SysArchPrCtl);
         RegisterSyscall(ID::ePanic, sysPanic);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);

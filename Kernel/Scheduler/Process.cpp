@@ -6,6 +6,12 @@
  */
 #include "Process.hpp"
 
+#include "Arch/CPU.hpp"
+
+#include "Scheduler/Scheduler.hpp"
+#include "Scheduler/Thread.hpp"
+#include "VFS/FileDescriptor.hpp"
+
 inline usize AllocatePid()
 {
     static std::atomic<pid_t> pid = 7;
@@ -19,4 +25,15 @@ Process::Process(std::string_view name, PrivilegeLevel ring)
 {
     nextTid = pid = AllocatePid();
     if (ring == PrivilegeLevel::ePrivileged) pageMap = VMM::GetKernelPageMap();
+}
+
+i32 Process::Exit(i32 code)
+{
+    for (FileDescriptor* fd : fileDescriptors) fd->Close();
+    fileDescriptors.clear();
+
+    for (Thread* thread : threads) thread->state = ThreadState::eExited;
+
+    Scheduler::Yield();
+    CtosUnreachable();
 }
