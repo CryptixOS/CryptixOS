@@ -20,6 +20,7 @@ srcs += files(
   'Drivers/PS2Keyboard.cpp',
   'Drivers/Serial.cpp',
 
+  'Drivers/Timers/HPET.cpp',
   'Drivers/Timers/PIT.cpp',
 )
 
