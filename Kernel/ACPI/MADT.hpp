@@ -55,8 +55,8 @@ namespace MADT
     void                         Initialize();
     bool                         LegacyPIC();
 
-    std::vector<LapicEntry*>&    GetLAPICEntries();
-    std::vector<IoApicEntry*>&   GetIOAPICEntries();
-    std::vector<IsoEntry*>&      GetISOEntries();
-    std::vector<LapicNmiEntry*>& GetLAPIC_NMIEntries();
+    std::vector<LapicEntry*>&    GetLapicEntries();
+    std::vector<IoApicEntry*>&   GetIoApicEntries();
+    std::vector<IsoEntry*>&      GetIsoEntries();
+    std::vector<LapicNmiEntry*>& GetLapicNmiEntries();
 } // namespace MADT

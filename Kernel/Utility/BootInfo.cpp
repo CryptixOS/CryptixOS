@@ -197,17 +197,17 @@ namespace BootInfo
         }
         return nullptr;
     }
-    uintptr_t GetRSDPAddress()
+    Pointer GetRSDPAddress()
 
     {
         return reinterpret_cast<uintptr_t>(rsdpRequest.response->address);
     }
-    u64 GetBootTime() { return bootTimeRequest.response->boot_time; }
-    u64 GetKernelPhysicalAddress()
+    u64     GetBootTime() { return bootTimeRequest.response->boot_time; }
+    Pointer GetKernelPhysicalAddress()
     {
         return kernelAddressRequest.response->physical_base;
     }
-    u64 GetKernelVirtualAddress()
+    Pointer GetKernelVirtualAddress()
     {
         return kernelAddressRequest.response->virtual_base;
     }

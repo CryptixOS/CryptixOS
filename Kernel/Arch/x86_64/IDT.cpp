@@ -4,19 +4,18 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "IDT.hpp"
+#include <ACPI/MADT.hpp>
 
-#include "ACPI/MADT.hpp"
+#include <Arch/x86_64/CPU.hpp>
+#include <Arch/x86_64/CPUContext.hpp>
+#include <Arch/x86_64/Drivers/PIC.hpp>
+#include <Arch/x86_64/GDT.hpp>
+#include <Arch/x86_64/IDT.hpp>
 
-#include "Arch/x86_64/CPU.hpp"
-#include "Arch/x86_64/CPUContext.hpp"
-#include "Arch/x86_64/Drivers/PIC.hpp"
-#include "Arch/x86_64/GDT.hpp"
+#include <Arch/InterruptHandler.hpp>
 
-#include "Arch/InterruptHandler.hpp"
-
-#include "Scheduler/Process.hpp"
-#include "Scheduler/Thread.hpp"
+#include <Scheduler/Process.hpp>
+#include <Scheduler/Thread.hpp>
 
 extern const char*             exceptionNames[];
 
@@ -120,7 +119,8 @@ extern "C" void raiseInterrupt(CPUContext* ctx)
     else if (handler.IsUsed())
     {
         handler(ctx);
-        PIC::SendEOI(ctx->interruptVector);
+        CPU::GetCurrent()->Lapic.SendEOI();
+
         return;
     }
 

@@ -24,6 +24,7 @@ struct SDTHeader
 namespace ACPI
 {
     void       Initialize();
+
     SDTHeader* GetTable(const char* signature, usize index = 0);
     template <typename T>
     inline T* GetTable(const char* signature, usize index = 0)

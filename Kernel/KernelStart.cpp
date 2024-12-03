@@ -128,14 +128,13 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
             BootInfo::GetBootTime());
 
     LogInfo("Boot: Kernel Physical Address: {:#x}",
-            BootInfo::GetKernelPhysicalAddress());
+            BootInfo::GetKernelPhysicalAddress().Raw<>());
     LogInfo("Boot: Kernel Virtual Address: {:#x}",
-            BootInfo::GetKernelVirtualAddress());
+            BootInfo::GetKernelVirtualAddress().Raw<>());
     Stacktrace::Initialize();
     ACPI::Initialize();
     Arch::Initialize();
 
-    Scheduler::Initialize();
     auto thread = Scheduler::CreateKernelThread(
         reinterpret_cast<uintptr_t>(kernelThread), 0, CPU::GetCurrent()->ID);
 

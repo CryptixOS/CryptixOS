@@ -90,10 +90,10 @@ namespace MADT
 
     bool                         LegacyPIC() { return s_MADT->Flags & 0x01; }
 
-    std::vector<LapicEntry*>&    GetLAPICEntries() { return s_LapicEntries; }
-    std::vector<IoApicEntry*>&   GetIOAPICEntries() { return s_IoApicEntries; }
-    std::vector<IsoEntry*>&      GetISOEntries() { return s_IsoEntries; }
-    std::vector<LapicNmiEntry*>& GetLAPIC_NMIEntries()
+    std::vector<LapicEntry*>&    GetLapicEntries() { return s_LapicEntries; }
+    std::vector<IoApicEntry*>&   GetIoApicEntries() { return s_IoApicEntries; }
+    std::vector<IsoEntry*>&      GetIsoEntries() { return s_IsoEntries; }
+    std::vector<LapicNmiEntry*>& GetLapicNmiEntries()
     {
         return s_LapicNmiEntries;
     }

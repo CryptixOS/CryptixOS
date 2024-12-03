@@ -9,6 +9,7 @@
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptHandler.hpp>
 #include <Arch/InterruptManager.hpp>
+#include <Arch/x86_64/Drivers/IoApic.hpp>
 
 #include <Memory/PMM.hpp>
 
@@ -83,6 +84,13 @@ namespace Scheduler
         if (start)
         {
             CPU::SetInterruptFlag(true);
+
+            // for (usize i = 0; i < 16; i++)
+            // CPU::GetCurrent()->Lapic.SendEOI();
+            // CPU::GetCurrent()->Lapic.Start(0x20, 20000,
+            // Lapic::Mode::eOneshot); IoApic::SetIRQRedirect(CPU::GetBspId(),
+            // 0x20, 0, true);
+
             InterruptManager::Unmask(0);
 
             for (;;) Arch::Halt();

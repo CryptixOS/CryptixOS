@@ -4,53 +4,30 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "IoApic.hpp"
+#include <ACPI/MADT.hpp>
 
-#include "ACPI/MADT.hpp"
-#include "Arch/x86_64/CPU.hpp"
-#include "Arch/x86_64/Drivers/PIC.hpp"
-#include "Arch/x86_64/IDT.hpp"
+#include <Arch/x86_64/CPU.hpp>
+#include <Arch/x86_64/IDT.hpp>
 
-static std::vector<IoApic> ioapics;
+#include <Arch/x86_64/Drivers/IoApic.hpp>
+#include <Arch/x86_64/Drivers/PIC.hpp>
 
-namespace
+static std::vector<IoApic> s_IoApics{};
+
+IoApic::IoApic(Pointer baseAddress, u32 gsiBase)
+    : m_BaseAddress(baseAddress)
+    , m_GsiBase(gsiBase)
+    , m_RedirectionEntryCount((Read(1) & 0xff0000) >> 16)
 {
-    void Write(MADT::IoApicEntry* ioApic, u32 reg, u32 value)
-    {
-        u64 base = Pointer(ioApic->Address).ToHigherHalf<u64>();
-        *reinterpret_cast<volatile u32*>(base)      = reg;
-        *reinterpret_cast<volatile u32*>(base + 16) = value;
-    }
-    u32 Read(MADT::IoApicEntry* ioApic, u32 reg)
-    {
-        u64 base = Pointer(ioApic->Address).ToHigherHalf<u64>();
-        *reinterpret_cast<volatile u32*>(base) = reg;
-        return *reinterpret_cast<volatile u32*>(base + 16);
-    }
-
-    usize GetGSI_Count(MADT::IoApicEntry* ioApic)
-    {
-        return ((Read(ioApic, 1) >> 16) & 0xff) + 1;
-    }
-
-    MADT::IoApicEntry* IOApicFromGSI(u32 gsi)
-    {
-        for (const auto& entry : MADT::GetIOAPICEntries())
-        {
-            if (gsi >= entry->GsiBase
-                && gsi <= entry->GsiBase + GetGSI_Count(entry))
-                return entry;
-        }
-        Panic("Cannot determine IO APIC from GSI {}", gsi);
-    }
-} // namespace
+    VMM::GetKernelPageMap()->Map(m_BaseAddress, m_BaseAddress,
+                                 PageAttributes::eRW
+                                     | PageAttributes::eWriteBack);
+}
 
 void IoApic::SetIRQRedirect(u32 lapicID, u8 vector, u8 irq, bool status)
 {
-    std::vector<MADT::IsoEntry*> isos = MADT::GetISOEntries();
-    for (usize i = 0; i < isos.size(); i++)
+    for (const auto& iso : MADT::GetIsoEntries())
     {
-        MADT::IsoEntry* iso = isos[i];
         if (iso->IrqSource != irq) continue;
 
         SetGSIRedirect(lapicID, vector, iso->Gsi, iso->Flags, status);
@@ -62,72 +39,64 @@ void IoApic::SetIRQRedirect(u32 lapicID, u8 vector, u8 irq, bool status)
 void IoApic::SetGSIRedirect(u32 lapicID, u8 vector, u8 gsi, u16 flags,
                             bool status)
 {
-    MADT::IoApicEntry* ioApic   = IOApicFromGSI(gsi);
+    IoApic& ioApic   = GetIoApicForGsi(gsi);
 
-    u64                redirect = vector;
-    if ((flags & BIT(1))) redirect |= BIT(13);
-
-    if ((flags & BIT(3))) redirect |= BIT(15);
+    u64     redirect = vector;
+    if (flags & BIT(1)) redirect |= BIT(13);
+    if (flags & BIT(3)) redirect |= BIT(15);
 
     if (!status) redirect |= BIT(16);
-
     redirect |= static_cast<u64>(lapicID) << 56;
 
-    u32 ioRedirectTable = (gsi - ioApic->GsiBase) * 2 + 16;
-    ::Write(ioApic, ioRedirectTable, static_cast<u32>(redirect));
-    ::Write(ioApic, ioRedirectTable + 1, static_cast<u32>(redirect >> 32));
+    u32 ioRedirectTable = (gsi - ioApic.m_GsiBase) * 2 + 16;
+    ioApic.Write(ioRedirectTable, static_cast<u32>(redirect));
+    ioApic.Write(ioRedirectTable + 1, static_cast<u32>(redirect >> 32));
 }
 
 void IoApic::Initialize()
 {
-    PIC::MaskAllIRQs();
-
-    for (const auto& ioapic : MADT::GetIOAPICEntries())
+    if (!s_IoApics.empty())
     {
-        VMM::GetKernelPageMap()->Map(ioapic->Address, ioapic->Address,
-                                     PageAttributes::eRW
-                                         | PageAttributes::eWriteBack);
-        for (usize i = 0; i < GetGSI_Count(ioapic); i++)
-        {
-            auto  entry = [](usize i) -> usize { return 0x10 + (i * 2); };
-
-            usize maskedIrq
-                = ::Read(ioapic, entry(i))
-                | (static_cast<uint64_t>(::Read(ioapic, entry(i) + 0x01))
-                   << 32);
-
-            maskedIrq |= BIT(16);
-            ::Write(ioapic, entry(i), static_cast<uint32_t>(maskedIrq));
-            ::Write(ioapic, entry(i) + 0x01,
-                    static_cast<uint32_t>(maskedIrq >> 32));
-        }
+        LogWarn("IoApic::Initialize: Already initialized");
+        return;
     }
 
     LogTrace("IoApic: Initializing...");
-    auto redirectIsaIrq = [](usize i)
+    PIC::MaskAllIRQs();
+    LogTrace("IoApic: Legacy PIC disabled");
+
+    LogTrace("IoApic: Enumerating controllers...");
+    for (usize i = 0; const auto& entry : MADT::GetIoApicEntries())
     {
-        for (const auto& entry : MADT::GetISOEntries())
-        {
-            if (entry->IrqSource == i)
-            {
+        LogInfo(
+            "IoApic[{}]: Controller found: {{ BaseAddress: {:#x}, ID: {}, "
+            "GsiBase: {}  }}",
+            i++, entry->Address, entry->ApicID, entry->GsiBase);
 
-                SetGSIRedirect(CPU::GetBspId(), entry->IrqSource + 0x20,
-                               entry->Gsi, 0, false);
-                IDT::GetHandler(entry->IrqSource + 0x20)->Reserve();
-                return;
-            }
-        }
+        IoApic ioApic(entry->Address, entry->GsiBase);
+        ioApic.MaskAll();
 
-        SetGSIRedirect(CPU::GetBspId(), i + 0x20, i, 0, false);
-        IDT::GetHandler(i + 0x20)->Reserve();
-    };
-
-    if (MADT::LegacyPIC())
-    {
-        for (usize i = 0; i < 16; i++)
-        {
-            if (i == 2) continue;
-            redirectIsaIrq(i);
-        }
+        s_IoApics.push_back(ioApic);
     }
+
+    if (s_IoApics.empty())
+    {
+        LogError("IoApic: No controllers available");
+        return;
+    }
+
+    LogTrace("IoApic: Controllers found: {}", s_IoApics.size());
+    LogInfo("IoApic: Initialized");
+}
+
+IoApic& IoApic::GetIoApicForGsi(u32 gsi)
+{
+    for (auto& ioapic : s_IoApics)
+    {
+        if (gsi >= ioapic.m_GsiBase
+            && gsi < ioapic.m_GsiBase + ioapic.GetGsiCount())
+            return ioapic;
+    }
+
+    Panic("Cannot determine IO APIC from GSI {}", gsi);
 }

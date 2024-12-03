@@ -15,6 +15,6 @@ namespace InterruptManager
 
     InterruptHandler* AllocateHandler(u8 hint = 0x20);
 
-    void              Mask(u8 vector);
-    void              Unmask(u8 vector);
+    void              Mask(u8 irq);
+    void              Unmask(u8 irq);
 }; // namespace InterruptManager

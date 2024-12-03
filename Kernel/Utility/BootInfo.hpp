@@ -35,10 +35,10 @@ namespace BootInfo
     limine_smp_response* GetSMP_Response();
     MemoryMap            GetMemoryMap(u64& entryCount);
     limine_file*         FindModule(const char* name);
-    uintptr_t            GetRSDPAddress();
+    Pointer              GetRSDPAddress();
     u64                  GetBootTime();
-    u64                  GetKernelPhysicalAddress();
-    u64                  GetKernelVirtualAddress();
+    Pointer              GetKernelPhysicalAddress();
+    Pointer              GetKernelVirtualAddress();
     usize                GetPagingMode();
     limine_file*         GetKernelFile();
 }; // namespace BootInfo

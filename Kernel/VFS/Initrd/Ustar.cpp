@@ -100,7 +100,6 @@ namespace Ustar
                              filename.data(), linkName.data());
                     break;
                 case FILE_TYPE_SYMLINK:
-                    LogTrace("FileName: {}, LinkName: {}", filename, linkName);
                     node = VFS::Symlink(VFS::GetRootNode(), filename.data(),
                                         linkName.data());
                     if (!node)

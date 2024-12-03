@@ -35,6 +35,14 @@ namespace std
         using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
         vector() { reserve(2); }
+        vector( std::initializer_list<T> init,
+            const Allocator& alloc = Allocator() )
+        {
+            reserve(2);
+            for (const auto& value : init)
+                push_back(value);
+        }
+        
 
         constexpr reference at(size_type pos)
         {

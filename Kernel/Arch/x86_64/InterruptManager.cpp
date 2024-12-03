@@ -4,12 +4,15 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Arch/InterruptManager.hpp"
+#include <ACPI/MADT.hpp>
+#include <Arch/InterruptManager.hpp>
 
-#include "Arch/x86_64/GDT.hpp"
-#include "Arch/x86_64/IDT.hpp"
+#include <Arch/x86_64/CPU.hpp>
+#include <Arch/x86_64/GDT.hpp>
+#include <Arch/x86_64/IDT.hpp>
 
-#include "Arch/x86_64/Drivers/PIC.hpp"
+#include <Arch/x86_64/Drivers/IoApic.hpp>
+#include <Arch/x86_64/Drivers/PIC.hpp>
 
 namespace InterruptManager
 {
@@ -27,6 +30,21 @@ namespace InterruptManager
         return IDT::AllocateHandler(hint);
     }
 
-    void Mask(u8 vector) { PIC::MaskIRQ(vector); }
-    void Unmask(u8 vector) { PIC::UnmaskIRQ(vector); }
+#define USE_IOAPIC
+    void Mask(u8 irq)
+    {
+#ifdef USE_IOAPIC
+        IoApic::SetIRQRedirect(CPU::GetCurrentID(), irq + 0x20, irq, false);
+#else
+        PIC::MaskIRQ(irq);
+#endif
+    }
+    void Unmask(u8 irq)
+    {
+#ifdef USE_IOAPIC
+        IoApic::SetIRQRedirect(CPU::GetCurrentID(), irq + 0x20, irq, true);
+#else
+        PIC::UnmaskIRQ(irq);
+#endif
+    }
 }; // namespace InterruptManager

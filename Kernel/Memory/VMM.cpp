@@ -102,8 +102,8 @@ namespace VirtualMemoryManager
         for (usize i = 0; i < BootInfo::GetKernelFile()->size;
              i += GetPageSize())
         {
-            uintptr_t phys = BootInfo::GetKernelPhysicalAddress() + i;
-            uintptr_t virt = BootInfo::GetKernelVirtualAddress() + i;
+            uintptr_t phys = BootInfo::GetKernelPhysicalAddress().Raw<>() + i;
+            uintptr_t virt = BootInfo::GetKernelVirtualAddress().Raw<>() + i;
             Assert(kernelPageMap->Map(virt, phys,
                                       PageAttributes::eRWXU
                                           | PageAttributes::eWriteBack));

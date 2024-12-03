@@ -4,12 +4,12 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "PIT.hpp"
+#include <Arch/x86_64/Drivers/Timers/PIT.hpp>
 
-#include "Arch/InterruptHandler.hpp"
+#include <Arch/InterruptHandler.hpp>
 
-#include "Arch/x86_64/IDT.hpp"
-#include "Arch/x86_64/IO.hpp"
+#include <Arch/x86_64/IDT.hpp>
+#include <Arch/x86_64/IO.hpp>
 
 #include <atomic>
 
@@ -29,13 +29,13 @@ namespace PIT
         std::atomic<u64>  s_Tick        = 0;
         u8                s_TimerVector = 0;
         InterruptHandler* s_Handler     = nullptr;
-        usize             s_CurrentMode = Mode::ONESHOT;
+        usize             s_CurrentMode = Mode::RATE;
 
         void              TimerTick(struct CPUContext* ctx)
         {
             Scheduler::Schedule(ctx);
-
             s_Tick++;
+            // PIC::SendEOI(s_TimerVector - 0x20);
         }
     } // namespace
 
@@ -45,15 +45,15 @@ namespace PIT
         if (initialized) return;
 
         LogTrace("PIT: Initializing...");
-        SetFrequency(FREQUENCY);
+        SetFrequency(FREQUENCY / 10);
         LogInfo("PIT: Frequency set to {}Hz", FREQUENCY);
 
-        s_Handler     = IDT::AllocateHandler(IRQ_HINT);
-        s_TimerVector = s_Handler->GetInterruptVector();
-
+        s_Handler = IDT::AllocateHandler(IRQ_HINT);
         s_Handler->SetHandler(TimerTick);
         s_Handler->Reserve();
+        s_Handler->eoiFirst = true;
 
+        s_TimerVector       = s_Handler->GetInterruptVector();
         LogInfo("PIT: Installed on interrupt gate #{:#x}", s_TimerVector);
         LogInfo("PIT: Initialized\nTimer vector = {} ", s_TimerVector);
         initialized = true;
@@ -67,7 +67,7 @@ namespace PIT
         usize reloadValue = (ms * BASE_FREQUENCY) / 3000;
         SetReloadValue(reloadValue);
         IO::Out<byte>(COMMAND, CHANNEL0_DATA | SEND_WORD | mode);
-        InterruptManager::Unmask(s_TimerVector);
+        // InterruptManager::Unmask(s_TimerVector);
     }
     void Stop()
     {

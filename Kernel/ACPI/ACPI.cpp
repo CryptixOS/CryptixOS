@@ -56,12 +56,12 @@ namespace ACPI
         {
             const usize entryCount = (s_Rsdt->Header.Length - sizeof(SDTHeader))
                                    / (s_XsdtAvailable ? 8 : 4);
-            LogInfo("ACPI: Tables count: {}", entryCount);
+            LogInfo("ACPI: Table count: {}", entryCount);
 
             char acpiSignature[5];
             acpiSignature[4] = '\0';
 
-            LogTrace("ACPI: Printing all tables signatures...");
+            LogTrace("ACPI: Available tables:");
             for (usize i = 0; i < entryCount; i++)
             {
                 SDTHeader* header = GetTablePointer(i).As<SDTHeader>();
@@ -77,19 +77,28 @@ namespace ACPI
     void Initialize()
     {
         LogTrace("ACPI: Initializing...");
-        RSDP* rsdp = Pointer(BootInfo::GetRSDPAddress()).ToHigherHalf<RSDP*>();
+        constexpr const char RSDP_SIGNATURE[] = "RSD PTR";
+        RSDP* rsdp = BootInfo::GetRSDPAddress().ToHigherHalf<RSDP*>();
+        if (std::strncmp(rsdp->Signature, RSDP_SIGNATURE,
+                         std::size(RSDP_SIGNATURE) - 1)
+            != 0)
+        {
+            LogError("ACPI: Invalid RSDP signature!");
+            return;
+        }
+
         s_XsdtAvailable = rsdp->Revision >= 2 && rsdp->XsdtAddress != 0;
-        u64 rsdtPointer
+        Pointer rsdtPointer
             = s_XsdtAvailable ? rsdp->XsdtAddress : rsdp->RsdtAddress;
 
-        s_Rsdt = Pointer(rsdtPointer).ToHigherHalf<RSDT*>();
+        s_Rsdt = rsdtPointer.ToHigherHalf<RSDT*>();
         Assert(s_Rsdt != nullptr);
 
         LogInfo("ACPI: Found {} at: {:#x}", s_XsdtAvailable ? "XSDT" : "RSDT",
                 reinterpret_cast<uintptr_t>(s_Rsdt));
         DetectACPIEntries();
 
-        LogTrace("ACPI: Initialized");
+        LogInfo("ACPI: Initialized");
         MADT::Initialize();
     }
     SDTHeader* GetTable(const char* signature, usize index)

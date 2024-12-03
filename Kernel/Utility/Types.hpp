@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <concepts>
 #include <type_traits>
 
 using usize  = size_t;
@@ -36,58 +37,82 @@ namespace BootInfo
 
 struct Pointer
 {
-    Pointer(uintptr_t pointer)
-        : pointer(pointer)
-    {
-    }
-    Pointer(void* pointer)
-        : pointer(reinterpret_cast<uintptr_t>(pointer))
+    template <std::unsigned_integral T = uintptr_t>
+    Pointer(T m_Pointer)
+        : m_Pointer(m_Pointer)
     {
     }
 
-    operator uintptr_t() { return pointer; }
-    operator void*() { return reinterpret_cast<void*>(pointer); }
-    operator bool() { return pointer != 0; }
+    Pointer(void* m_Pointer)
+        : m_Pointer(reinterpret_cast<uintptr_t>(m_Pointer))
+    {
+    }
+
+    operator uintptr_t() { return m_Pointer; }
+    operator void*() { return reinterpret_cast<void*>(m_Pointer); }
+    operator bool() { return m_Pointer != 0; }
     Pointer& operator=(uintptr_t addr)
     {
-        pointer = addr;
+        m_Pointer = addr;
         return *this;
     }
     Pointer& operator=(void* addr)
     {
-        pointer = reinterpret_cast<uintptr_t>(addr);
+        m_Pointer = reinterpret_cast<uintptr_t>(addr);
         return *this;
     }
 
     template <typename T>
     T* As()
     {
-        return reinterpret_cast<T*>(pointer);
+        return reinterpret_cast<T*>(m_Pointer);
+    }
+    template <typename T = uintptr_t>
+    T Raw()
+    {
+        return static_cast<T>(m_Pointer);
     }
 
-    inline bool IsHigherHalf() { return pointer >= BootInfo::GetHHDMOffset(); }
+    inline bool IsHigherHalf() const
+    {
+        return m_Pointer >= BootInfo::GetHHDMOffset();
+    }
 
-    template <typename T = Pointer>
-    inline T ToHigherHalf()
+    template <typename T = uintptr_t>
+        requires(std::is_pointer_v<T> || std::is_integral_v<T>
+                 || std::is_same_v<T, Pointer>)
+    inline T ToHigherHalf() const
     {
         return IsHigherHalf()
-                 ? reinterpret_cast<T>(pointer)
-                 : reinterpret_cast<T>(pointer + BootInfo::GetHHDMOffset());
+                 ? reinterpret_cast<T>(m_Pointer)
+                 : reinterpret_cast<T>(m_Pointer + BootInfo::GetHHDMOffset());
+    }
+    template <>
+    inline Pointer ToHigherHalf() const
+    {
+        return ToHigherHalf<uintptr_t>();
     }
 
-    template <>
-    inline Pointer ToHigherHalf<Pointer>()
+    inline Pointer ToHigherHalf() const
     {
-        return pointer + BootInfo::GetHHDMOffset();
+        return IsHigherHalf() ? m_Pointer
+                              : m_Pointer + BootInfo::GetHHDMOffset();
     }
 
     template <typename T>
-    inline T FromHigherHalf()
+    inline T FromHigherHalf() const
     {
         return IsHigherHalf()
-                 ? reinterpret_cast<T>(pointer - BootInfo::GetHHDMOffset())
-                 : reinterpret_cast<T>(pointer);
+                 ? reinterpret_cast<T>(m_Pointer - BootInfo::GetHHDMOffset())
+                 : reinterpret_cast<T>(m_Pointer);
     }
 
-    uintptr_t pointer = 0;
+    template <typename T = uintptr_t>
+    inline T Offset(uintptr_t offset) const
+    {
+        return reinterpret_cast<T>(m_Pointer + offset);
+    }
+
+  private:
+    uintptr_t m_Pointer = 0;
 };

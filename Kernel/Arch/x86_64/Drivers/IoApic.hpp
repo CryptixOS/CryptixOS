@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include <Common.hpp>
 
 enum class DeliveryMode
 {
@@ -57,18 +57,18 @@ struct IoApicRedirectionEntry
 {
     union
     {
-        u8                     vector;
-        DeliveryMode           deliveryMode    : 3;
-        DestinationMode        destinationMode : 1;
-        u8                     deliveryStatus  : 1;
-        IoApicRedirectionFlags flags           : 4;
-        u64                    reserved        : 39;
-        u64                    destination     : 8;
+        u8                     Vector;
+        DeliveryMode           DeliveryMode    : 3;
+        DestinationMode        DestinationMode : 1;
+        u8                     DeliveryStatus  : 1;
+        IoApicRedirectionFlags Flags           : 4;
+        u64                    Reserved        : 39;
+        u64                    Destination     : 8;
     };
     union
     {
-        u32 low;
-        u32 high;
+        u32 Low;
+        u32 High;
     };
 };
 
@@ -76,7 +76,9 @@ class IoApic
 {
   public:
     IoApic() = default;
-    IoApic(uintptr_t baseAddress, u32 gsiBase);
+    IoApic(Pointer baseAddress, u32 gsiBase);
+
+    void        MaskAll() {}
 
     static void SetIRQRedirect(u32 lapicID, u8 vector, u8 irq, bool status);
     static void SetGSIRedirect(u32 lapicID, u8 vector, u8 gsi, u16 flags,
@@ -85,12 +87,25 @@ class IoApic
     static void Initialize();
 
   private:
-    uintptr_t      baseAddress           = 0;
-    u32            gsiBase               = 0;
-    usize          redirectionEntryCount = 0;
+    Pointer    m_BaseAddress           = 0;
+    u32        m_GsiBase               = 0;
+    usize      m_RedirectionEntryCount = 0;
 
-    static IoApic* GetIoApicForGsi(u32 gsi);
+    inline u32 Read(u32 reg) const
+    {
+        *m_BaseAddress.ToHigherHalf<volatile u32*>() = reg;
 
-    u32            Read(u32 reg);
-    void           Write(u32 reg, u32 value);
+        return *m_BaseAddress.ToHigherHalf<Pointer>().Offset<volatile u32*>(16);
+    }
+    inline void Write(u32 reg, u32 value) const
+    {
+        *m_BaseAddress.ToHigherHalf<volatile u32*>() = reg;
+
+        *m_BaseAddress.ToHigherHalf<Pointer>().Offset<volatile u32*>(16)
+            = value;
+    }
+
+    inline usize   GetGsiCount() const { return m_RedirectionEntryCount; }
+
+    static IoApic& GetIoApicForGsi(u32 gsi);
 };
