@@ -4,14 +4,14 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <ACPI/ACPI.hpp>
 
-#include "Lapic.hpp"
+#include <Arch/x86_64/CPU.hpp>
+#include <Arch/x86_64/Drivers/Timers/HPET.hpp>
+#include <Arch/x86_64/Drivers/Timers/Lapic.hpp>
+#include <Arch/x86_64/Drivers/Timers/PIT.hpp>
 
-#include "ACPI/ACPI.hpp"
-#include "Arch/x86_64/CPU.hpp"
-#include "Arch/x86_64/Drivers/Timers/HPET.hpp"
-#include "Arch/x86_64/Drivers/Timers/PIT.hpp"
-#include "Memory/VMM.hpp"
+#include <Memory/VMM.hpp>
 
 constexpr u32                  LAPIC_EOI_ACK                      = 0x00;
 CTOS_UNUSED constexpr u32      APIC_BASE_MSR                      = 0x1b;
@@ -52,7 +52,7 @@ bool                           CheckX2Apic()
 void Lapic::Initialize()
 {
     PIT::Initialize();
-    LogTrace("LAPIC: Initializing for cpu #{}...", CPU::GetCurrent()->lapicID);
+    LogTrace("LAPIC: Initializing for cpu #{}...", CPU::GetCurrent()->LapicID);
     x2apic = CheckX2Apic();
     LogInfo("LAPIC: X2APIC available: {}", x2apic);
 

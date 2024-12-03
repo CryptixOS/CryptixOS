@@ -4,25 +4,25 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Scheduler.hpp"
+#include <Scheduler/Scheduler.hpp>
 
-#include "Arch/CPU.hpp"
-#include "Arch/InterruptHandler.hpp"
-#include "Arch/InterruptManager.hpp"
+#include <Arch/CPU.hpp>
+#include <Arch/InterruptHandler.hpp>
+#include <Arch/InterruptManager.hpp>
 
-#include "Memory/PMM.hpp"
+#include <Memory/PMM.hpp>
 
-#include "Scheduler/Process.hpp"
-#include "Scheduler/Thread.hpp"
+#include <Scheduler/Process.hpp>
+#include <Scheduler/Thread.hpp>
 
 #include <deque>
 #include <mutex>
 
+u8 g_ScheduleVector = 0x20;
 namespace Scheduler
 {
     namespace
     {
-        u8                  scheduleVector = 0x20;
         std::mutex          lock;
 
         Process*            s_KernelProcess = nullptr;
@@ -54,8 +54,6 @@ namespace Scheduler
 
     void Initialize()
     {
-        IDT::SetIST(scheduleVector, 1);
-
         s_KernelProcess
             = new Process("Kernel Process", PrivilegeLevel::ePrivileged);
         LogInfo("Scheduler: Kernel process created");
@@ -63,7 +61,7 @@ namespace Scheduler
     }
     void PrepareAP(bool start)
     {
-        CPU::GetCurrent()->tss.ist[0]
+        CPU::GetCurrent()->TSS.ist[0]
             = ToHigherHalfAddress<uintptr_t>(PMM::AllocatePages<uintptr_t>(
                   CPU::KERNEL_STACK_SIZE / PMM::PAGE_SIZE))
             + CPU::KERNEL_STACK_SIZE;
@@ -74,13 +72,13 @@ namespace Scheduler
         Process*                  process = new Process;
         process->pid                      = idlePids--;
         process->name                     = "Idle Process for CPU: ";
-        process->name += std::to_string(CPU::GetCurrent()->id);
+        process->name += std::to_string(CPU::GetCurrent()->ID);
         process->pageMap = VMM::GetKernelPageMap();
 
         auto idleThread  = new Thread(
             process, reinterpret_cast<uintptr_t>(Arch::Halt), false);
         idleThread->state       = ThreadState::eReady;
-        CPU::GetCurrent()->idle = idleThread;
+        CPU::GetCurrent()->Idle = idleThread;
 
         if (start)
         {
@@ -128,7 +126,7 @@ namespace Scheduler
 
     void Schedule(CPUContext* ctx)
     {
-        auto newThread = GetNextThread(CPU::GetCurrent()->id);
+        auto newThread = GetNextThread(CPU::GetCurrent()->ID);
         while (newThread && newThread->state != ThreadState::eReady)
         {
             if (newThread->state == ThreadState::eKilled)
@@ -138,16 +136,16 @@ namespace Scheduler
             }
 
             EnqueueNotReady(newThread);
-            newThread = GetNextThread(CPU::GetCurrent()->id);
+            newThread = GetNextThread(CPU::GetCurrent()->ID);
         }
 
-        if (!newThread) newThread = CPU::GetCurrent()->idle;
+        if (!newThread) newThread = CPU::GetCurrent()->Idle;
         else newThread->state = ThreadState::eRunning;
 
         auto currentThread = CPU::GetCurrentThread();
         if (currentThread && currentThread->state != ThreadState::eKilled)
         {
-            if (currentThread != CPU::GetCurrent()->idle)
+            if (currentThread != CPU::GetCurrent()->Idle)
                 EnqueueNotReady(currentThread);
 
             CPU::SaveThread(currentThread, ctx);
@@ -157,7 +155,7 @@ namespace Scheduler
         CPU::LoadThread(newThread, ctx);
 
         if (currentThread && currentThread->state == ThreadState::eKilled
-            && currentThread != CPU::GetCurrent()->idle)
+            && currentThread != CPU::GetCurrent()->Idle)
             delete currentThread;
     }
 }; // namespace Scheduler

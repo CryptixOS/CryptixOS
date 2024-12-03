@@ -1,36 +1,37 @@
 /*
  * Created by v1tr10l7 on 16.11.2024.
+ *
  * Copyright (c) 2024-2024, Szymon Zemke <v1tr10l7@proton.me>
  *
  * SPDX-License-Identifier: GPL-3
  */
 
-#include "Common.hpp"
+#include <Common.hpp>
 
-#include "ACPI/ACPI.hpp"
-#include "API/Syscall.hpp"
+#include <ACPI/ACPI.hpp>
+#include <API/Syscall.hpp>
 
-#include "Arch/CPU.hpp"
-#include "Arch/InterruptManager.hpp"
+#include <Arch/CPU.hpp>
+#include <Arch/InterruptManager.hpp>
 
-#include "Drivers/MemoryDevices.hpp"
-#include "Drivers/Serial.hpp"
-#include "Drivers/TTY.hpp"
+#include <Drivers/MemoryDevices.hpp>
+#include <Drivers/Serial.hpp>
+#include <Drivers/TTY.hpp>
 
-#include "Memory/PMM.hpp"
-#include "Memory/VMM.hpp"
+#include <Memory/PMM.hpp>
+#include <Memory/VMM.hpp>
 
-#include "Scheduler/Process.hpp"
-#include "Scheduler/Scheduler.hpp"
-#include "Scheduler/Thread.hpp"
+#include <Scheduler/Process.hpp>
+#include <Scheduler/Scheduler.hpp>
+#include <Scheduler/Thread.hpp>
 
-#include "Utility/ELF.hpp"
-#include "Utility/ICxxAbi.hpp"
-#include "Utility/Stacktrace.hpp"
+#include <Utility/ELF.hpp>
+#include <Utility/ICxxAbi.hpp>
+#include <Utility/Stacktrace.hpp>
 
-#include "VFS/INode.hpp"
-#include "VFS/Initrd/Initrd.hpp"
-#include "VFS/VFS.hpp"
+#include <VFS/INode.hpp>
+#include <VFS/Initrd/Initrd.hpp>
+#include <VFS/VFS.hpp>
 
 static Process* kernelProcess;
 
@@ -103,7 +104,7 @@ void kernelThread()
         = ldPath.empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
     Scheduler::EnqueueThread(new Thread(userProcess, address,
                                         const_cast<char**>(argv), envp, program,
-                                        CPU::GetCurrent()->id));
+                                        CPU::GetCurrent()->ID));
     // Scheduler::EnqueueThread(
     //   new Thread(userProcess, reinterpret_cast<uintptr_t>(userThread2)));
 
@@ -136,7 +137,7 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
 
     Scheduler::Initialize();
     auto thread = Scheduler::CreateKernelThread(
-        reinterpret_cast<uintptr_t>(kernelThread), 0, CPU::GetCurrent()->id);
+        reinterpret_cast<uintptr_t>(kernelThread), 0, CPU::GetCurrent()->ID);
 
     Scheduler::EnqueueThread(thread);
 

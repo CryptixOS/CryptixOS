@@ -6,20 +6,20 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include <Common.hpp>
 
-#include "Arch/CPU.hpp"
+#include <Arch/CPU.hpp>
 
-#include "Arch/x86_64/CPUContext.hpp"
-#include "Arch/x86_64/CPUID.hpp"
-#include "Arch/x86_64/Drivers/Timers/Lapic.hpp"
-#include "Arch/x86_64/GDT.hpp"
-#include "Arch/x86_64/IDT.hpp"
+#include <Arch/x86_64/CPUContext.hpp>
+#include <Arch/x86_64/CPUID.hpp>
+#include <Arch/x86_64/Drivers/Timers/Lapic.hpp>
+#include <Arch/x86_64/GDT.hpp>
+#include <Arch/x86_64/IDT.hpp>
 
-#include "Memory/PMM.hpp"
-#include "Memory/VMM.hpp"
+#include <Memory/PMM.hpp>
+#include <Memory/VMM.hpp>
 
-#include <cerrno>
+#include <errno.h>
 #include <vector>
 
 struct Thread;
@@ -77,26 +77,26 @@ namespace CPU
 
     struct CPU
     {
-        usize            id    = 0;
-        void*            empty = nullptr;
+        usize            ID    = 0;
+        void*            Empty = nullptr;
 
-        uintptr_t        threadStack;
-        uintptr_t        kernelStack;
+        uintptr_t        ThreadStack;
+        uintptr_t        KernelStack;
 
-        u64              lapicID = 0;
-        Lapic            lapic;
-        bool             isOnline = false;
-        TaskStateSegment tss{};
+        u64              LapicID = 0;
+        Lapic            Lapic;
+        bool             IsOnline = false;
+        TaskStateSegment TSS{};
 
-        usize            fpuStorageSize = 512;
-        uintptr_t        fpuStorage     = 0;
+        usize            FpuStorageSize = 512;
+        uintptr_t        FpuStorage     = 0;
 
-        FPUSaveFunc      fpuSave        = nullptr;
-        FPURestoreFunc   fpuRestore     = nullptr;
+        FPUSaveFunc      FpuSave        = nullptr;
+        FPURestoreFunc   FpuRestore     = nullptr;
 
-        errno_t          error;
-        Thread*          idle;
-        Thread*          currentThread;
+        errno_t          Error;
+        Thread*          Idle;
+        Thread*          CurrentThread;
     };
 
     void      InitializeBSP();

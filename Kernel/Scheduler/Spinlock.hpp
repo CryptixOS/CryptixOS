@@ -4,11 +4,12 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
 #pragma once
 
-#include "Common.hpp"
+#include <Common.hpp>
 
-#include "Arch/Arch.hpp"
+#include <Arch/Arch.hpp>
 
 class Spinlock
 {

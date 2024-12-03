@@ -6,18 +6,18 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include <Common.hpp>
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
-    #include "Arch/x86_64/CPUContext.hpp"
+    #include <Arch/x86_64/CPUContext.hpp>
 #elif CTOS_ARCH == CTOS_ARCH_AARCH64
-    #include "Arch/aarch64/CPUContext.hpp"
+    #include <Arch/aarch64/CPUContext.hpp>
 #endif
 
 #include <cerrno>
 #include <vector>
 
-#include "Utility/ELF.hpp"
+#include <Utility/ELF.hpp>
 
 using tid_t = i64;
 

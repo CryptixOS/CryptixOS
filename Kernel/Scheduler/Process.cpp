@@ -4,13 +4,13 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Process.hpp"
+#include <Scheduler/Process.hpp>
 
-#include "Arch/CPU.hpp"
+#include <Arch/CPU.hpp>
 
-#include "Scheduler/Scheduler.hpp"
-#include "Scheduler/Thread.hpp"
-#include "VFS/FileDescriptor.hpp"
+#include <Scheduler/Scheduler.hpp>
+#include <Scheduler/Thread.hpp>
+#include <VFS/FileDescriptor.hpp>
 
 inline usize AllocatePid()
 {

@@ -4,16 +4,17 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "CPU.hpp"
+#include <Arch/x86_64/CPU.hpp>
+#include <Arch/x86_64/Drivers/Timers/PIT.hpp>
 
-#include "Arch/x86_64/Drivers/Timers/PIT.hpp"
+#include <Scheduler/Process.hpp>
+#include <Scheduler/Scheduler.hpp>
+#include <Scheduler/Thread.hpp>
 
-#include "Scheduler/Process.hpp"
-#include "Scheduler/Scheduler.hpp"
-#include "Scheduler/Thread.hpp"
+#include <Utility/BootInfo.hpp>
+#include <Utility/Math.hpp>
 
-#include "Utility/BootInfo.hpp"
-#include "Utility/Math.hpp"
+extern u8 g_ScheduleVector;
 
 namespace CPU
 {
@@ -55,7 +56,7 @@ namespace CPU
     {
         if (!EnableSSE()) return;
         CPU* current = GetCurrent();
-        bool isBSP   = current->lapicID == s_BspLapicId;
+        bool isBSP   = current->LapicID == s_BspLapicId;
 
         ID   cpuid(CPUID_CHECK_FEATURES, 0);
         if (cpuid.rcx & CPU_FEAT_ECX_XSAVE)
@@ -86,34 +87,35 @@ namespace CPU
             WriteXCR(0, xcr0);
             if (!cpuid(0xd)) Panic("CPUID failure");
 
-            current->fpuStorageSize = cpuid.rcx;
-            current->fpuRestore     = XRestore;
-            current->fpuSave        = XSave;
+            current->FpuStorageSize = cpuid.rcx;
+            current->FpuRestore     = XRestore;
+            current->FpuSave        = XSave;
         }
         else if (cpuid.rdx & 0x01000000)
         {
             WriteCR4(ReadCR4() | CR4::OSFXSR);
 
-            current->fpuStorageSize = 512;
-            current->fpuSave        = FXSave;
-            current->fpuRestore     = FXRestore;
+            current->FpuStorageSize = 512;
+            current->FpuSave        = FXSave;
+            current->FpuRestore     = FXRestore;
         }
         else Panic("SIMD: Unavailable");
 
-        LogInfo("FPU: Initialized on cpu[{}]", current->id);
+        LogInfo("FPU: Initialized on cpu[{}]", current->ID);
     }
 
     static void InitializeCPU(limine_smp_info* cpu)
     {
         CPU* current = reinterpret_cast<CPU*>(cpu->extra_argument);
 
-        if (current->lapicID != s_BspLapicId)
+        if (current->LapicID != s_BspLapicId)
         {
             EnablePAT();
             VMM::GetKernelPageMap()->Load();
 
-            GDT::Load(current->id);
-            GDT::LoadTSS((&current->tss));
+            GDT::Initialize();
+            GDT::Load(current->ID);
+            GDT::LoadTSS((&current->TSS));
             IDT::Load();
 
             SetKernelGSBase(cpu->extra_argument);
@@ -123,6 +125,7 @@ namespace CPU
         // TODO(v1tr10l7): Enable SMEP, SMAP, UMIP
         InitializeFPU();
 
+        // Setup syscalls
         WriteMSR(MSR::IA32_EFER,
                  ReadMSR(MSR::IA32_EFER) | MSR::IA32_EFER_SYSCALL_ENABLE);
 
@@ -138,8 +141,7 @@ namespace CPU
         WriteMSR(MSR::LSTAR, reinterpret_cast<uintptr_t>(syscall_entry));
         WriteMSR(MSR::SFMASK, ~u32(2));
 
-        // TODO(v1tr10l7): Initialize Lapic
-        Scheduler::PrepareAP(false);
+        current->Lapic.Initialize();
     }
 
     void InitializeBSP()
@@ -157,30 +159,65 @@ namespace CPU
             // Find the bsp
             if (smpInfo->lapic_id != s_BspLapicId) continue;
 
-            smpInfo->extra_argument = reinterpret_cast<u64>(&s_CPUs[i]);
-
-            s_CPUs[i].lapicID       = smpInfo->lapic_id;
-            s_CPUs[i].id            = i;
+            smpInfo->extra_argument = Pointer(&s_CPUs[i]);
+            s_CPUs[i].LapicID       = smpInfo->lapic_id;
+            s_CPUs[i].ID            = i;
 
             CPU* current = reinterpret_cast<CPU*>(smpInfo->extra_argument);
             s_BSP        = current;
 
             GDT::Initialize();
-            GDT::Load(current->lapicID);
-            GDT::LoadTSS(&current->tss);
+            GDT::Load(current->LapicID);
+            GDT::LoadTSS(&current->TSS);
 
             IDT::Initialize();
             IDT::Load();
 
             SetKernelGSBase(smpInfo->extra_argument);
             SetGSBase(smpInfo->extra_argument);
-            IDT::SetIST(32, 1);
 
+            current->Lapic.Initialize();
             InitializeCPU(smpInfo);
-            current->isOnline = true;
+            current->IsOnline = true;
         }
 
+        Scheduler::Initialize();
+        IDT::SetIST(g_ScheduleVector, 1);
         LogInfo("BSP: Initialized");
+    }
+    void StartAPs()
+    {
+        LogTrace("SMP: Launching APs");
+
+        auto apEntryPoint = [](limine_smp_info* cpu)
+        {
+            CPU* current = reinterpret_cast<CPU*>(cpu->extra_argument);
+            static std::mutex lock;
+            {
+                std::unique_lock guard(lock);
+                InitializeCPU(cpu);
+
+                current->IsOnline = true;
+                LogInfo("SMP: CPU {} is up", current->ID);
+            }
+
+            Halt();
+            // Scheduler::PrepareAP();
+        };
+
+        auto smpResponse = BootInfo::GetSMP_Response();
+        for (usize i = 0; i < smpResponse->cpu_count; i++)
+        {
+            auto cpu = smpResponse->cpus[i];
+            if (cpu->lapic_id == s_BspLapicId) continue;
+
+            cpu->extra_argument = reinterpret_cast<uintptr_t>(&s_CPUs[i]);
+            s_CPUs[i].LapicID   = cpu->lapic_id;
+            s_CPUs[i].ID        = i;
+
+            cpu->goto_address   = apEntryPoint;
+            while (!s_CPUs[i].IsOnline) Arch::Pause();
+        }
     }
 
     ID::ID(u64 leaf, u64 subleaf)
@@ -342,7 +379,7 @@ namespace CPU
 
     u64               GetCurrentID()
     {
-        return GetOnlineCPUsCount() > 1 ? GetCurrent()->id : s_BspLapicId;
+        return GetOnlineCPUsCount() > 1 ? GetCurrent()->ID : s_BspLapicId;
     }
     CPU* GetCurrent()
     {
@@ -370,7 +407,7 @@ namespace CPU
             = PMM::AllocatePages<uintptr_t>(KERNEL_STACK_SIZE / PMM::PAGE_SIZE);
         thread->kernelStack
             = ToHigherHalfAddress<uintptr_t>(kernelStack) + KERNEL_STACK_SIZE;
-        current->kernelStack = thread->kernelStack;
+        current->KernelStack = thread->kernelStack;
 
         uintptr_t pfStack
             = PMM::AllocatePages<uintptr_t>(KERNEL_STACK_SIZE / PMM::PAGE_SIZE);
@@ -378,7 +415,7 @@ namespace CPU
             = ToHigherHalfAddress<uintptr_t>(pfStack) + KERNEL_STACK_SIZE;
 
         usize fpuPageCount = thread->fpuStoragePageCount
-            = Math::DivRoundUp(current->fpuStorageSize, PMM::PAGE_SIZE);
+            = Math::DivRoundUp(current->FpuStorageSize, PMM::PAGE_SIZE);
         thread->fpuStorage
             = ToHigherHalfAddress<uintptr_t>(PMM::CallocatePages(fpuPageCount));
 
@@ -390,14 +427,14 @@ namespace CPU
             thread->ctx.ds = thread->ctx.es = thread->ctx.ss;
 
             thread->ctx.rsp                 = thread->stack;
-            current->fpuRestore(thread->fpuStorage);
+            current->FpuRestore(thread->fpuStorage);
 
             u16 defaultFcw = 0b1100111111;
             __asm__ volatile("fldcw %0" ::"m"(defaultFcw) : "memory");
             u32 defaultMxCsr = 0b1111110000000;
             asm volatile("ldmxcsr %0" ::"m"(defaultMxCsr) : "memory");
 
-            current->fpuSave(thread->fpuStorage);
+            current->FpuSave(thread->fpuStorage);
         }
         else
         {
@@ -415,14 +452,14 @@ namespace CPU
         thread->gsBase = GetKernelGSBase();
         thread->fsBase = GetFSBase();
 
-        GetCurrent()->fpuSave(thread->fpuStorage);
+        GetCurrent()->FpuSave(thread->fpuStorage);
     }
     void LoadThread(Thread* thread, CPUContext* ctx)
     {
-        thread->runningOn        = GetCurrent()->id;
+        thread->runningOn        = GetCurrent()->ID;
 
-        GetCurrent()->tss.ist[1] = thread->pageFaultStack;
-        GetCurrent()->fpuRestore(thread->fpuStorage);
+        GetCurrent()->TSS.ist[1] = thread->pageFaultStack;
+        GetCurrent()->FpuRestore(thread->fpuStorage);
 
         thread->parent->pageMap->Load();
 
@@ -452,7 +489,7 @@ namespace CPU
         u64 cr4 = ReadCR4();
         WriteCR4(cr4 | CR4::OSFXSR | CR4::OSXMMEXCPT);
 
-        LogInfo("SSE: Enabled on cpu[{}]", GetCurrent()->id);
+        LogInfo("SSE: Enabled on cpu[{}]", GetCurrent()->ID);
         return true;
     }
     void EnablePAT()

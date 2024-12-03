@@ -22,11 +22,10 @@ namespace Arch
     {
         HPET::Initialize();
         CPU::InitializeBSP();
+        CPU::StartAPs();
 
         PIC::Remap(0x20, 0x28);
         PIC::MaskAllIRQs();
-
-        PIT::Initialize();
 
         PCSpeaker::ToneOn(1000);
         IO::Delay(1000);

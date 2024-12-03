@@ -5,14 +5,14 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Thread.hpp"
+#include <Scheduler/Thread.hpp>
 
-#include "Arch/CPU.hpp"
+#include <Arch/CPU.hpp>
 
-#include "Memory/PMM.hpp"
+#include <Memory/PMM.hpp>
 
-#include "Scheduler/Process.hpp"
-#include "Utility/Math.hpp"
+#include <Scheduler/Process.hpp>
+#include <Utility/Math.hpp>
 
 Thread::Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn)
     : runningOn(runOn)
@@ -93,7 +93,7 @@ static uintptr_t prepareStack(uintptr_t _stack, uintptr_t sp,
 
 Thread::Thread(Process* parent, uintptr_t pc, char** argv, char** envp,
                ELF::Image& program, i64 runOn)
-    : runningOn(CPU::GetCurrent()->id)
+    : runningOn(CPU::GetCurrent()->ID)
     , self(this)
     , error(no_error)
     , parent(parent)
@@ -138,7 +138,7 @@ Thread::Thread(Process* parent, uintptr_t pc, char** argv, char** envp,
 }
 
 Thread::Thread(Process* parent, uintptr_t pc, bool user)
-    : runningOn(CPU::GetCurrent()->id)
+    : runningOn(CPU::GetCurrent()->ID)
     , self(this)
     , error(no_error)
     , parent(parent)
