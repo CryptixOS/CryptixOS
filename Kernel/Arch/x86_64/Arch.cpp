@@ -27,9 +27,11 @@ namespace Arch
 
         CPU::InitializeBSP();
 
+        // TODO(v1tr10l7): Disabled temporarily, because first we need to enable
+        // PAT with appriopriate flags, so it doesn't take so long to draw to
+        // the framebuffer
         // CPU::StartAPs();
 
-        return;
         PCSpeaker::ToneOn(1000);
         IO::Delay(1000);
         PCSpeaker::ToneOff();

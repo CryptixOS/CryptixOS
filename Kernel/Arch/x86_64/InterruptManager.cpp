@@ -24,27 +24,29 @@ namespace InterruptManager
         IDT::Initialize();
         IDT::Load();
     }
-
     InterruptHandler* AllocateHandler(u8 hint)
     {
         return IDT::AllocateHandler(hint);
     }
 
-#define USE_IOAPIC
     void Mask(u8 irq)
     {
-#ifdef USE_IOAPIC
-        IoApic::SetIRQRedirect(CPU::GetCurrentID(), irq + 0x20, irq, false);
-#else
-        PIC::MaskIRQ(irq);
-#endif
+        if (IoApic::IsAnyEnabled())
+            IoApic::SetIrqRedirect(CPU::GetCurrent()->LapicID, irq + 0x20, irq,
+                                   false);
+        else PIC::MaskIRQ(irq);
     }
     void Unmask(u8 irq)
     {
-#ifdef USE_IOAPIC
-        IoApic::SetIRQRedirect(CPU::GetCurrentID(), irq + 0x20, irq, true);
-#else
-        PIC::UnmaskIRQ(irq);
-#endif
+        if (IoApic::IsAnyEnabled())
+            IoApic::SetIrqRedirect(CPU::GetCurrent()->LapicID, irq + 0x20, irq,
+                                   true);
+        else PIC::UnmaskIRQ(irq);
+    }
+
+    void SendEOI(u8 vector)
+    {
+        if (IoApic::IsAnyEnabled()) CPU::GetCurrent()->Lapic.SendEOI();
+        else PIC::SendEOI(vector);
     }
 }; // namespace InterruptManager

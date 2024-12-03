@@ -85,12 +85,8 @@ namespace Scheduler
         {
             CPU::SetInterruptFlag(true);
 
-            // for (usize i = 0; i < 16; i++)
-            // CPU::GetCurrent()->Lapic.SendEOI();
             // CPU::GetCurrent()->Lapic.Start(0x20, 20000,
-            // Lapic::Mode::eOneshot); IoApic::SetIRQRedirect(CPU::GetBspId(),
-            // 0x20, 0, true);
-
+            // Lapic::Mode::eOneshot);
             InterruptManager::Unmask(0);
 
             for (;;) Arch::Halt();

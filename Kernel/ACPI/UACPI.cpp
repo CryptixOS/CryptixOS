@@ -4,8 +4,11 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include "Arch/CPU.hpp"
 #include <ACPI/ACPI.hpp>
+
 #include <Memory/MMIO.hpp>
+#include <Scheduler/Spinlock.hpp>
 
 #include <uacpi/kernel_api.h>
 
@@ -168,27 +171,15 @@ namespace uACPI
             ToDo();
         }
 
-        void* uacpi_kernel_alloc(uacpi_size size)
-        {
-            CtosUnused(size);
-
-            ToDo();
-            return nullptr;
-        }
+        void* uacpi_kernel_alloc(uacpi_size size) { return new u8[size]; }
         void* uacpi_kernel_calloc(uacpi_size count, uacpi_size size)
         {
-            CtosUnused(count);
-            CtosUnused(size);
-
-            ToDo();
-            return nullptr;
+            return new u8[count * size];
         }
 
-        void uacpi_kernel_free(void* mem)
+        void uacpi_kernel_free(void* memory)
         {
-            CtosUnused(mem);
-
-            ToDo();
+            delete[] reinterpret_cast<u8*>(memory);
         }
 
         void uacpi_kernel_log(uacpi_log_level, const uacpi_char*) { ToDo(); }
@@ -275,20 +266,28 @@ namespace uACPI
 
         uacpi_handle uacpi_kernel_create_spinlock(void)
         {
-            ToDo();
+            Spinlock* spinlock = new Spinlock;
 
-            return {};
+            return reinterpret_cast<uacpi_handle>(spinlock);
         }
-        void            uacpi_kernel_free_spinlock(uacpi_handle) { ToDo(); }
+        void uacpi_kernel_free_spinlock(uacpi_handle spinlock)
+        {
+            delete reinterpret_cast<Spinlock*>(spinlock);
+        }
 
-        uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle)
+        uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle handle)
         {
-            ToDo();
-            return {};
+            uacpi_cpu_flags interruptState = CPU::GetInterruptFlag();
+
+            reinterpret_cast<Spinlock*>(handle)->Acquire();
+            return interruptState;
         }
-        void uacpi_kernel_unlock_spinlock(uacpi_handle, uacpi_cpu_flags)
+        void uacpi_kernel_unlock_spinlock(uacpi_handle    spinlock,
+                                          uacpi_cpu_flags interruptState)
         {
-            ToDo();
+            reinterpret_cast<Spinlock*>(spinlock)->Release();
+
+            CPU::SetInterruptFlag(interruptState);
         }
 
         uacpi_status uacpi_kernel_schedule_work(uacpi_work_type,

@@ -110,7 +110,7 @@ namespace CPU
 
         if (current->LapicID != s_BspLapicId)
         {
-            EnablePAT();
+            // EnablePAT();
             VMM::GetKernelPageMap()->Load();
 
             GDT::Initialize();

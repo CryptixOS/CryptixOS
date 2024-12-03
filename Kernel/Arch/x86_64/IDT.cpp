@@ -119,7 +119,7 @@ extern "C" void raiseInterrupt(CPUContext* ctx)
     else if (handler.IsUsed())
     {
         handler(ctx);
-        CPU::GetCurrent()->Lapic.SendEOI();
+        InterruptManager::SendEOI(ctx->interruptVector);
 
         return;
     }

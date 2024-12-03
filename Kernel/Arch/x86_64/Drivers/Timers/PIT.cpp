@@ -35,7 +35,6 @@ namespace PIT
         {
             Scheduler::Schedule(ctx);
             s_Tick++;
-            // PIC::SendEOI(s_TimerVector - 0x20);
         }
     } // namespace
 

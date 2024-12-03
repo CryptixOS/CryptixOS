@@ -15,28 +15,62 @@
 static std::vector<IoApic> s_IoApics{};
 
 IoApic::IoApic(Pointer baseAddress, u32 gsiBase)
-    : m_BaseAddress(baseAddress)
+    : m_BaseAddressPhys(baseAddress)
     , m_GsiBase(gsiBase)
-    , m_RedirectionEntryCount((Read(1) & 0xff0000) >> 16)
 {
-    VMM::GetKernelPageMap()->Map(m_BaseAddress, m_BaseAddress,
+    m_BaseAddressVirt = m_BaseAddressPhys.ToHigherHalf<>();
+    VMM::GetKernelPageMap()->Map(m_BaseAddressPhys, m_BaseAddressVirt,
                                  PageAttributes::eRW
                                      | PageAttributes::eWriteBack);
+
+    m_RegisterSelect = m_BaseAddressVirt.As<volatile u32>();
+    m_RegisterWindow = m_BaseAddressVirt.Offset<volatile u32*>(0x10);
+
+    m_RedirectionEntryCount
+        = ((Read(IoApicRegister::eVersion) & 0xff0000) >> 16);
 }
 
-void IoApic::SetIRQRedirect(u32 lapicID, u8 vector, u8 irq, bool status)
+void IoApic::MaskGsi(u32 gsi) const
+{
+    IoApicRegister redirectionTableLow
+        = (gsi - m_GsiBase) * 2 + IoApicRegister::eRedirectionTableLow;
+    IoApicRegister redirectionTableHigh
+        = (gsi - m_GsiBase) * 2 + IoApicRegister::eRedirectionTableHigh;
+
+    u64 entry = (static_cast<u64>(Read(redirectionTableHigh)) << 32)
+              | Read(redirectionTableLow);
+
+    entry |= std::to_underlying(IoApicRedirectionFlags::eMasked);
+    Write(redirectionTableLow, entry);
+    Write(redirectionTableHigh, entry >> 32);
+}
+
+void IoApic::SetRedirectionEntry(u32 gsi, u64 entry)
+{
+    IoApicRegister redirectionTableLow
+        = (gsi - m_GsiBase) * 2 + IoApicRegister::eRedirectionTableLow;
+    IoApicRegister redirectionTableHigh
+        = (gsi - m_GsiBase) * 2 + IoApicRegister::eRedirectionTableHigh;
+
+    Write(redirectionTableLow, entry);
+    Write(redirectionTableHigh, entry >> 32);
+}
+
+std::vector<IoApic>& IoApic::GetIoApics() { return s_IoApics; }
+
+void IoApic::SetIrqRedirect(u32 lapicID, u8 vector, u8 irq, bool status)
 {
     for (const auto& iso : MADT::GetIsoEntries())
     {
         if (iso->IrqSource != irq) continue;
 
-        SetGSIRedirect(lapicID, vector, iso->Gsi, iso->Flags, status);
+        SetGsiRedirect(lapicID, vector, iso->Gsi, iso->Flags, status);
         return;
     }
 
-    SetGSIRedirect(lapicID, vector, irq, 0, status);
+    SetGsiRedirect(lapicID, vector, irq, 0, status);
 }
-void IoApic::SetGSIRedirect(u32 lapicID, u8 vector, u8 gsi, u16 flags,
+void IoApic::SetGsiRedirect(u32 lapicID, u8 vector, u8 gsi, u16 flags,
                             bool status)
 {
     IoApic& ioApic   = GetIoApicForGsi(gsi);
@@ -45,12 +79,9 @@ void IoApic::SetGSIRedirect(u32 lapicID, u8 vector, u8 gsi, u16 flags,
     if (flags & BIT(1)) redirect |= BIT(13);
     if (flags & BIT(3)) redirect |= BIT(15);
 
-    if (!status) redirect |= BIT(16);
+    if (!status) redirect |= IoApicRedirectionFlags::eMasked;
     redirect |= static_cast<u64>(lapicID) << 56;
-
-    u32 ioRedirectTable = (gsi - ioApic.m_GsiBase) * 2 + 16;
-    ioApic.Write(ioRedirectTable, static_cast<u32>(redirect));
-    ioApic.Write(ioRedirectTable + 1, static_cast<u32>(redirect >> 32));
+    ioApic.SetRedirectionEntry(gsi, redirect);
 }
 
 void IoApic::Initialize()
@@ -58,6 +89,11 @@ void IoApic::Initialize()
     if (!s_IoApics.empty())
     {
         LogWarn("IoApic::Initialize: Already initialized");
+        return;
+    }
+    if (MADT::GetIoApicEntries().empty())
+    {
+        LogError("IoApic: Not Available!");
         return;
     }
 
@@ -68,13 +104,18 @@ void IoApic::Initialize()
     LogTrace("IoApic: Enumerating controllers...");
     for (usize i = 0; const auto& entry : MADT::GetIoApicEntries())
     {
+        IoApic ioApic(entry->Address, entry->GsiBase);
+        u8     version       = ioApic.Read(IoApicRegister::eVersion);
+        u8     arbitrationID = ioApic.Read(IoApicRegister::eArbitrationID);
+
         LogInfo(
             "IoApic[{}]: Controller found: {{ BaseAddress: {:#x}, ID: {}, "
-            "GsiBase: {}  }}",
-            i++, entry->Address, entry->ApicID, entry->GsiBase);
+            "GsiBase: {}, Version: {}, ArbitrationID: {} }}",
+            i++, entry->Address, entry->ApicID, entry->GsiBase, version,
+            arbitrationID);
 
-        IoApic ioApic(entry->Address, entry->GsiBase);
-        ioApic.MaskAll();
+        ioApic.MaskAllEntries();
+        ioApic.Enable();
 
         s_IoApics.push_back(ioApic);
     }

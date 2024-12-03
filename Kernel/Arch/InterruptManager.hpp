@@ -12,9 +12,10 @@ class InterruptHandler;
 namespace InterruptManager
 {
     void              InstallExceptionHandlers();
-
     InterruptHandler* AllocateHandler(u8 hint = 0x20);
 
     void              Mask(u8 irq);
     void              Unmask(u8 irq);
+
+    void              SendEOI(u8 vector);
 }; // namespace InterruptManager
