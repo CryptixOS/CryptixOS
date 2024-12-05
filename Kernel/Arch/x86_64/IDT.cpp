@@ -17,13 +17,13 @@
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 
-extern const char*             exceptionNames[];
+extern const char* exceptionNames[];
 
-constexpr u32                  MAX_IDT_ENTRIES     = 256;
-// constexpr u32      IDT_ENTRY_PRESENT   = BIT(7);
+constexpr u32      MAX_IDT_ENTRIES     = 256;
+constexpr u32      IDT_ENTRY_PRESENT   = BIT(7);
 
-[[maybe_unused]] constexpr u32 GATE_TYPE_INTERRUPT = 0xe;
-[[maybe_unused]] constexpr u32 GATE_TYPE_TRAP      = 0xf;
+constexpr u32      GATE_TYPE_INTERRUPT = 0xe;
+constexpr u32      GATE_TYPE_TRAP      = 0xf;
 
 namespace Exception
 {
@@ -91,10 +91,11 @@ static void raiseException(CPUContext* ctx)
 static void breakpoint(CPUContext* ctx) { EarlyPanic("Breakpoint"); }
 static void pageFault(CPUContext* ctx)
 {
+    CPU::DumpRegisters(ctx);
     EarlyPanic(
-        "Captured exception[%#x] on cpu %zu: '%s'\n\rError Code: "
-        "%#b\n\rrip: "
-        "%#p\nCR2: %#x",
+        "Captured exception[%#zx] on cpu %zu: '%s'\n\rError Code: "
+        "%#zb\n\rrip: "
+        "%#p\nCR2: %#zx",
         ctx->interruptVector, 0, exceptionNames[ctx->interruptVector],
         ctx->errorCode, ctx->rip, CPU::ReadCR2());
 
@@ -118,8 +119,9 @@ extern "C" void raiseInterrupt(CPUContext* ctx)
         exceptionHandlers[ctx->interruptVector](ctx);
     else if (handler.IsUsed())
     {
+        if (handler.eoiFirst) InterruptManager::SendEOI(ctx->interruptVector);
         handler(ctx);
-        InterruptManager::SendEOI(ctx->interruptVector);
+        if (!handler.eoiFirst) InterruptManager::SendEOI(ctx->interruptVector);
 
         return;
     }
@@ -133,8 +135,11 @@ namespace IDT
     {
         for (u32 i = 0; i < 256; i++)
         {
-            idtWriteEntry(i, reinterpret_cast<uintptr_t>(interrupt_handlers[i]),
-                          0x80 | GATE_TYPE_INTERRUPT);
+
+            idtWriteEntry(
+                i, reinterpret_cast<uintptr_t>(interrupt_handlers[i]),
+                IDT_ENTRY_PRESENT
+                    | (i < 0x20 ? GATE_TYPE_TRAP : GATE_TYPE_INTERRUPT));
 
             interruptHandlers[i].SetInterruptVector(i);
             if (i < 32) exceptionHandlers[i] = raiseException;
@@ -142,6 +147,8 @@ namespace IDT
 
         exceptionHandlers[Exception::BREAKPOINT] = breakpoint;
         exceptionHandlers[Exception::PAGE_FAULT] = pageFault;
+
+        SetDPL(Exception::BREAKPOINT, 3);
         LogInfo("IDT: Initialized!");
     }
     void Load()
