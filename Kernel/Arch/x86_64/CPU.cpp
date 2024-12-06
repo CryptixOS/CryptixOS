@@ -115,6 +115,11 @@ namespace CPU
 
             GDT::Initialize();
             GDT::Load(current->ID);
+
+            current->TSS.rsp[0] = Pointer(PMM::CallocatePages(KERNEL_STACK_SIZE
+                                                              / PMM::PAGE_SIZE))
+                                      .ToHigherHalf<Pointer>()
+                                      .Offset<uintptr_t>(KERNEL_STACK_SIZE);
             GDT::LoadTSS((&current->TSS));
             IDT::Load();
 
@@ -168,6 +173,11 @@ namespace CPU
 
             GDT::Initialize();
             GDT::Load(current->LapicID);
+
+            current->TSS.rsp[0] = Pointer(PMM::CallocatePages(KERNEL_STACK_SIZE
+                                                              / PMM::PAGE_SIZE))
+                                      .ToHigherHalf<Pointer>()
+                                      .Offset<uintptr_t>(KERNEL_STACK_SIZE);
             GDT::LoadTSS(&current->TSS);
 
             IDT::Initialize();
