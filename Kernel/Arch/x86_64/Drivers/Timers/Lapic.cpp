@@ -4,12 +4,12 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <ACPI/ACPI.hpp>
-
 #include <Arch/x86_64/CPU.hpp>
 #include <Arch/x86_64/Drivers/Timers/HPET.hpp>
 #include <Arch/x86_64/Drivers/Timers/Lapic.hpp>
 #include <Arch/x86_64/Drivers/Timers/PIT.hpp>
+
+#include <Firmware/ACPI/ACPI.hpp>
 
 #include <Memory/VMM.hpp>
 

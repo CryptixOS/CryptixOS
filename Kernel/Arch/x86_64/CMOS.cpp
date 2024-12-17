@@ -5,26 +5,27 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/x86_64/CMOS.hpp>
-
 #include <Arch/x86_64/IO.hpp>
+
+#include <utility>
 
 namespace CMOS
 {
-    constexpr u8 CMOS      = 0x70;
-    constexpr u8 CMOS_DATA = 0x71;
+    constexpr u8 REGISTER_SELECT = 0x70;
+    constexpr u8 DATA            = 0x71;
 
-    void         Write(byte reg, byte value)
+    void         Write(Register reg, byte value)
     {
-        IO::Out<byte>(CMOS, reg);
+        IO::Out<byte>(REGISTER_SELECT, std::to_underlying(reg));
         IO::Wait();
 
-        IO::Out<byte>(CMOS_DATA, value);
+        IO::Out<byte>(DATA, value);
     }
-    byte Read(byte reg)
+    byte Read(Register reg)
     {
-        IO::Out<byte>(CMOS, reg);
+        IO::Out<byte>(REGISTER_SELECT, std::to_underlying(reg));
         IO::Wait();
 
-        return IO::In<byte>(CMOS_DATA);
+        return IO::In<byte>(DATA);
     }
 } // namespace CMOS

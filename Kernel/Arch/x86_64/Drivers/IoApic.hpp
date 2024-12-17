@@ -31,7 +31,7 @@ enum class IoApicRedirectionFlags
 {
     eActiveLow      = BIT(0),
     eLevelTriggered = BIT(1),
-    eMasked         = BIT(2),
+    eMasked         = BIT(16),
 };
 
 inline u64& operator|=(u64& lhs, const IoApicRedirectionFlags rhs)
@@ -62,19 +62,34 @@ inline IoApicRedirectionFlags& operator|=(IoApicRedirectionFlags&       left,
     return left = left | right;
 }
 
-struct IoApicRedirectionEntry final
+enum class PinPolarity
 {
-    union
+    eActiveHigh = 0,
+    eActiveLow  = 1,
+};
+enum class InterruptTriggerMode
+{
+    eEdge  = 0,
+    eLevel = 1,
+};
+
+union IoApicRedirectionEntry
+{
+    struct
     {
         u8                     Vector;
         DeliveryMode           DeliveryMode    : 3;
         DestinationMode        DestinationMode : 1;
         u8                     DeliveryStatus  : 1;
+        PinPolarity            PinPolarity     : 1;
+        u8                     RemoteIRR       : 1;
+        InterruptTriggerMode   TriggerMode     : 1;
+        bool                   Masked          : 1;
         IoApicRedirectionFlags Flags           : 4;
         u64                    Reserved        : 39;
         u64                    Destination     : 8;
     };
-    union
+    struct
     {
         u32 Low;
         u32 High;
@@ -98,7 +113,7 @@ inline IoApicRegister operator+(u32 lhs, const IoApicRegister& rhs)
     return static_cast<IoApicRegister>(lhs);
 }
 
-class IoApic
+class IoApic final
 {
   public:
     IoApic() = default;
@@ -129,7 +144,8 @@ class IoApic
 
     void SetRedirectionEntry(u32 gsi, IoApicRedirectionEntry& entry)
     {
-        SetRedirectionEntry(gsi, *reinterpret_cast<u64*>(&entry));
+        SetRedirectionEntry(gsi,
+                            (static_cast<u64>(entry.High) << 32) | entry.Low);
     }
     void                        SetRedirectionEntry(u32 gsi, u64 entry);
 

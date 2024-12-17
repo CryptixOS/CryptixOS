@@ -4,7 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <ACPI/MADT.hpp>
 #include <Arch/InterruptManager.hpp>
 
 #include <Arch/x86_64/CPU.hpp>
@@ -13,6 +12,8 @@
 
 #include <Arch/x86_64/Drivers/IoApic.hpp>
 #include <Arch/x86_64/Drivers/PIC.hpp>
+
+#include <Firmware/ACPI/MADT.hpp>
 
 namespace InterruptManager
 {

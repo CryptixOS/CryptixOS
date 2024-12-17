@@ -6,7 +6,7 @@
  */
 #include "HPET.hpp"
 
-#include "ACPI/ACPI.hpp"
+#include "Firmware/ACPI/ACPI.hpp"
 
 #include "Memory/VMM.hpp"
 

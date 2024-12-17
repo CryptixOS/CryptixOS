@@ -14,7 +14,6 @@
 
 .altmacro
 .macro interrupt_handler int_number
-.align 16
 interrupt_handler_\int_number:
 .if \int_number != 8 && \int_number != 10 && \int_number != 11 && \int_number != 12 && \int_number != 13 && \int_number != 14 && \int_number != 17 && \int_number != 21 && \int_number != 29 && \int_number != 30
     push 0

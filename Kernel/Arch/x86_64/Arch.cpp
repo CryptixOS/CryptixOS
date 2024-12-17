@@ -9,12 +9,13 @@
 #include <Common.hpp>
 
 #include <Arch/x86_64/CPU.hpp>
+#include <Arch/x86_64/Drivers/I8042Controller.hpp>
 #include <Arch/x86_64/Drivers/IoApic.hpp>
 #include <Arch/x86_64/Drivers/PCSpeaker.hpp>
 #include <Arch/x86_64/Drivers/PIC.hpp>
-#include <Arch/x86_64/Drivers/PS2Keyboard.hpp>
 #include <Arch/x86_64/Drivers/Timers/HPET.hpp>
 #include <Arch/x86_64/Drivers/Timers/PIT.hpp>
+#include <Arch/x86_64/Drivers/Timers/RTC.hpp>
 #include <Arch/x86_64/IO.hpp>
 
 namespace Arch
@@ -28,7 +29,7 @@ namespace Arch
         CPU::InitializeBSP();
 
         // TODO(v1tr10l7): Disabled temporarily, because first we need to enable
-        // PAT with appriopriate flags, so it doesn't take so long to draw to
+        // PAT with appropriate flags, so it doesn't take so long to draw to
         // the framebuffer
         // CPU::StartAPs();
 
@@ -36,13 +37,18 @@ namespace Arch
         IO::Delay(1000);
         PCSpeaker::ToneOff();
 
-        PS2Keyboard::Initialize();
+        I8042Controller::Initialize();
+
+        LogInfo("Date: {:02}/{:02}/{:04} {:02}:{:02}:{:02}", RTC::GetDay(),
+                RTC::GetMonth(), RTC::GetCentury() * 100 + RTC::GetYear(),
+                RTC::GetHour(), RTC::GetMinute(), RTC::GetSecond());
     }
 
     __attribute__((noreturn)) void Halt()
     {
         for (;;) __asm__ volatile("hlt");
 
+        Panic("Shouldn't Reach");
         CtosUnreachable();
     }
     void Pause() { __asm__ volatile("pause"); }

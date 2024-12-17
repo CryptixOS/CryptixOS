@@ -104,13 +104,19 @@ namespace Arch::VMM
         bool largePages = pteFlags & PTE_LPAGE;
         u64  patbit     = (largePages ? PTE_PATLG : PTE_PAT4K);
 
+        if (attribs & PageAttributes::eUncacheableStrong) pteFlags |= PTE_PCD;
         if (attribs & PageAttributes::eWriteCombining)
         {
             pteFlags |= PTE_PCD | PTE_PWT;
             pteFlags &= ~patbit;
         }
+        else if (attribs & PageAttributes::eWriteThrough) pteFlags |= patbit;
+        else if (attribs & PageAttributes::eWriteProtected)
+            pteFlags |= patbit | PTE_PWT;
         else if (attribs & PageAttributes::eWriteBack)
             pteFlags |= patbit | PTE_PCD;
+        else if (attribs & PageAttributes::eUncacheable)
+            pteFlags |= patbit | PTE_PCD | PTE_PWT;
 
         return pteFlags | PTE_USER_SUPER;
     }

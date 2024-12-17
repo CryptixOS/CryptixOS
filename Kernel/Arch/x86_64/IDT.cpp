@@ -4,7 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <ACPI/MADT.hpp>
 
 #include <Arch/x86_64/CPU.hpp>
 #include <Arch/x86_64/CPUContext.hpp>
@@ -13,6 +12,8 @@
 #include <Arch/x86_64/IDT.hpp>
 
 #include <Arch/InterruptHandler.hpp>
+
+#include <Firmware/ACPI/MADT.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
@@ -71,11 +72,10 @@ static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
     entry->isrHigh    = (handler & 0xffffffff00000000) >> 32;
 }
 
-[[noreturn]] [[maybe_unused]]
+[[noreturn]]
 static void raiseException(CPUContext* ctx)
 {
-    // TODO(v1tr10l7): Display valid cpu ids when smp will be implemented
-    u64 cpuID = 0;
+    u64 cpuID = CPU::GetCurrentID();
 
     EarlyPanic(
         "Captured exception[%#x] on cpu %zu: '%s'\n\rError Code: "

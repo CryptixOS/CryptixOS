@@ -7,6 +7,7 @@
 srcs += files(
   'Arch.cpp',
   'CPU.cpp',
+  'CMOS.cpp',
   'GDT.cpp',
   'IDT.cpp',
   'InterruptManager.cpp',
@@ -15,6 +16,7 @@ srcs += files(
   'interrupts.x86_64.S',
   'syscall.S',
 
+  'Drivers/I8042Controller.cpp',
   'Drivers/IoApic.cpp',
   'Drivers/PCSpeaker.cpp',
   'Drivers/PIC.cpp',
@@ -24,6 +26,7 @@ srcs += files(
   'Drivers/Timers/HPET.cpp',
   'Drivers/Timers/Lapic.cpp',
   'Drivers/Timers/PIT.cpp',
+  'Drivers/Timers/RTC.cpp',
 )
 
 c_args += [

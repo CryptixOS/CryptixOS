@@ -4,13 +4,14 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <ACPI/MADT.hpp>
 
 #include <Arch/x86_64/CPU.hpp>
 #include <Arch/x86_64/IDT.hpp>
 
 #include <Arch/x86_64/Drivers/IoApic.hpp>
 #include <Arch/x86_64/Drivers/PIC.hpp>
+
+#include <Firmware/ACPI/MADT.hpp>
 
 static std::vector<IoApic> s_IoApics{};
 
@@ -40,7 +41,7 @@ void IoApic::MaskGsi(u32 gsi) const
     u64 entry = (static_cast<u64>(Read(redirectionTableHigh)) << 32)
               | Read(redirectionTableLow);
 
-    entry |= std::to_underlying(IoApicRedirectionFlags::eMasked);
+    entry |= Bit(16);
     Write(redirectionTableLow, entry);
     Write(redirectionTableHigh, entry >> 32);
 }
@@ -73,15 +74,18 @@ void IoApic::SetIrqRedirect(u32 lapicID, u8 vector, u8 irq, bool status)
 void IoApic::SetGsiRedirect(u32 lapicID, u8 vector, u8 gsi, u16 flags,
                             bool status)
 {
-    IoApic& ioApic   = GetIoApicForGsi(gsi);
+    IoApic&                ioApic = GetIoApicForGsi(gsi);
+    IoApicRedirectionEntry entry{};
+    entry.Vector = vector;
+    entry.PinPolarity
+        = flags & Bit(1) ? PinPolarity::eActiveLow : PinPolarity::eActiveHigh;
+    entry.TriggerMode = flags & Bit(3) ? InterruptTriggerMode::eLevel
+                                       : InterruptTriggerMode::eEdge;
 
-    u64     redirect = vector;
-    if (flags & BIT(1)) redirect |= BIT(13);
-    if (flags & BIT(3)) redirect |= BIT(15);
+    if (!status) entry.Masked = true;
+    entry.Destination = lapicID;
 
-    if (!status) redirect |= IoApicRedirectionFlags::eMasked;
-    redirect |= static_cast<u64>(lapicID) << 56;
-    ioApic.SetRedirectionEntry(gsi, redirect);
+    ioApic.SetRedirectionEntry(gsi, entry);
 }
 
 void IoApic::Initialize()
