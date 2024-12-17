@@ -9,3 +9,4 @@ subprojects/*/
 build-sysroot/
 sysroot/
 sources
+*.objdump

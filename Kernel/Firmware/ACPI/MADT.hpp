@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <ACPI/ACPI.hpp>
+#include <Firmware/ACPI/ACPI.hpp>
 
 #include <vector>
 

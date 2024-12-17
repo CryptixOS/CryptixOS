@@ -18,7 +18,7 @@
 namespace
 {
     __attribute__((
-        used, section(".limine_requests"))) volatile LIMINE_BASE_REVISION(0);
+        used, section(".limine_requests"))) volatile LIMINE_BASE_REVISION(3);
 }
 
 static constexpr const u32 DEFAULT_STACK_SIZE = 65536;
@@ -202,6 +202,12 @@ namespace BootInfo
     {
         return reinterpret_cast<uintptr_t>(rsdpRequest.response->address);
     }
+    std::pair<Pointer, Pointer> GetSmBiosEntries()
+    {
+        return std::make_pair(smbiosRequest.response->entry_32,
+                              smbiosRequest.response->entry_64);
+    }
+
     u64     GetBootTime() { return bootTimeRequest.response->boot_time; }
     Pointer GetKernelPhysicalAddress()
     {

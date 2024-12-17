@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -19,10 +20,16 @@ int main()
 
     for (;;)
     {
-        ssize_t nread;
-        // nread = read(0, keyBuffer, 16);
-        nread = getline(&keyBuffer, &nread, stdin);
+        char    keybuf[16];
 
-        if (nread > 0) write(0, keyBuffer, nread);
+        ssize_t nread = read(0, keybuf, sizeof(keybuf));
+        if (nread < 0 && errno == EINTR) return 2;
+
+        for (ssize_t i = 0; i < nread; ++i)
+        {
+            putchar(keybuf[i]);
+            fflush(stdout);
+        }
+        // if (nread > 0) write(0, keyBuffer, nread);
     }
 }

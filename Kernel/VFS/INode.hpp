@@ -72,6 +72,7 @@ class INode
     virtual void  InsertChild(INode* node, std::string_view name)      = 0;
     virtual isize Read(void* buffer, off_t offset, usize bytes)        = 0;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) = 0;
+    virtual i32   IoCtl(usize request, usize arg) { return_err(-1, ENOTTY); }
 
   protected:
     INode*                                       parent;

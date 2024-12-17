@@ -27,6 +27,13 @@ inline constexpr u64 BIT(u64 n) { return (1ull << n); }
 #define CTOS_ARCH_AARCH64         1
 #define CTOS_ARCH_RISC_V          2
 
+#define CTOS_DEBUG_SYSCALLS       0
+#if CTOS_DEBUG_SYSCALLS == 1
+    #define DebugSyscall(...) LogDebug(__VA_ARGS__)
+#else
+    #define DebugSyscall(...)
+#endif
+
 namespace CPU
 {
     void SetInterruptFlag(bool);

@@ -6,8 +6,8 @@
  */
 #pragma once
 
-#include "Utility/BootInfo.hpp"
-#include "Utility/Types.hpp"
+#include <Utility/BootInfo.hpp>
+#include <Utility/Types.hpp>
 
 #include <flanterm.h>
 #include <mutex>
@@ -39,13 +39,16 @@ class Terminal final
 {
   public:
     Terminal() = default;
-    Terminal(Framebuffer& framebuffer, usize id)
-        : id(id)
+    Terminal(Framebuffer& m_Framebuffer, usize id)
+        : m_ID(id)
     {
-        Initialize(framebuffer);
+        Initialize(m_Framebuffer);
     }
 
-    bool                           Initialize(Framebuffer& framebuffer);
+    bool                      Initialize(Framebuffer& m_Framebuffer);
+
+    inline const Framebuffer& GetFramebuffer() const { return m_Framebuffer; }
+    inline const flanterm_context* GetContext() const { return m_Context; }
 
     void                           Clear(u32 color = 0xffffff);
     void                           PutChar(u64 c);
@@ -55,11 +58,11 @@ class Terminal final
     static std::vector<Terminal*>& EnumerateTerminals();
 
   private:
-    usize                         id          = 0;
-    bool                          initialized = false;
-    Framebuffer                   framebuffer = {};
-    flanterm_context*             context     = nullptr;
-    std::mutex                    lock;
+    usize                         m_ID          = 0;
+    bool                          m_Initialized = false;
+    Framebuffer                   m_Framebuffer = {};
+    flanterm_context*             m_Context     = nullptr;
+    std::mutex                    m_Lock;
 
     static std::vector<Terminal*> s_Terminals;
 };

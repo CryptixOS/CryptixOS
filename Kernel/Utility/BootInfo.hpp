@@ -4,6 +4,8 @@
 
 #include <limine.h>
 
+#include <utility>
+
 static constexpr const u32 FRAMEBUFFER_MEMORY_MODEL_RGB
     = LIMINE_FRAMEBUFFER_RGB;
 
@@ -27,18 +29,19 @@ using Framebuffer    = limine_framebuffer;
 
 namespace BootInfo
 {
-    const char*          GetBootloaderName();
-    const char*          GetBootloaderVersion();
-    u64                  GetHHDMOffset();
-    Framebuffer*         GetFramebuffer();
-    Framebuffer**        GetFramebuffers(usize& outCount);
-    limine_smp_response* GetSMP_Response();
-    MemoryMap            GetMemoryMap(u64& entryCount);
-    limine_file*         FindModule(const char* name);
-    Pointer              GetRSDPAddress();
-    u64                  GetBootTime();
-    Pointer              GetKernelPhysicalAddress();
-    Pointer              GetKernelVirtualAddress();
-    usize                GetPagingMode();
-    limine_file*         GetKernelFile();
+    const char*                 GetBootloaderName();
+    const char*                 GetBootloaderVersion();
+    u64                         GetHHDMOffset();
+    Framebuffer*                GetFramebuffer();
+    Framebuffer**               GetFramebuffers(usize& outCount);
+    limine_smp_response*        GetSMP_Response();
+    MemoryMap                   GetMemoryMap(u64& entryCount);
+    limine_file*                FindModule(const char* name);
+    Pointer                     GetRSDPAddress();
+    std::pair<Pointer, Pointer> GetSmBiosEntries();
+    u64                         GetBootTime();
+    Pointer                     GetKernelPhysicalAddress();
+    Pointer                     GetKernelVirtualAddress();
+    usize                       GetPagingMode();
+    limine_file*                GetKernelFile();
 }; // namespace BootInfo

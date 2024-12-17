@@ -5,10 +5,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-
 #include <Common.hpp>
 
-#include <ACPI/ACPI.hpp>
 #include <API/Syscall.hpp>
 
 #include <Arch/CPU.hpp>
@@ -17,6 +15,9 @@
 #include <Drivers/MemoryDevices.hpp>
 #include <Drivers/Serial.hpp>
 #include <Drivers/TTY.hpp>
+
+#include <Firmware/ACPI/ACPI.hpp>
+#include <Firmware/SMBIOS/SMBIOS.hpp>
 
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
@@ -92,14 +93,16 @@ void kernelThread()
     char*             envp[] = {nullptr};
 
     static ELF::Image program, ld;
-    Assert(program.Load("/usr/sbin/init"));
+    PageMap*          pageMap = new PageMap();
+    Assert(program.Load("/usr/sbin/init", pageMap));
     std::string_view ldPath = program.GetLdPath();
     if (!ldPath.empty())
     {
         LogTrace("Kernel: Loading ld: '{}'", ldPath);
-        Assert(ld.Load(ldPath, 0x40000000));
+        Assert(ld.Load(ldPath, pageMap, 0x40000000));
     }
 
+    userProcess->pageMap = pageMap;
     uintptr_t address
         = ldPath.empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
     Scheduler::EnqueueThread(new Thread(userProcess, address,
@@ -134,6 +137,8 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
     Stacktrace::Initialize();
     ACPI::Initialize();
     Arch::Initialize();
+
+    SMBIOS::Initialize();
 
     auto thread = Scheduler::CreateKernelThread(
         reinterpret_cast<uintptr_t>(kernelThread), 0, CPU::GetCurrent()->ID);

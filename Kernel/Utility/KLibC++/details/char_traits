@@ -20,7 +20,7 @@ namespace std
       public:
         using char_type            = CharT;
         using int_type             = int32_t;
-        using comparision_category = std::strong_ordering;
+        using comparison_category = std::strong_ordering;
 
         static constexpr void assign(char_type& r, const char_type& a) noexcept
         {

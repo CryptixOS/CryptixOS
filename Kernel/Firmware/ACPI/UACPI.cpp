@@ -4,8 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Arch/CPU.hpp"
-#include <ACPI/ACPI.hpp>
+#include <Arch/CPU.hpp>
+#include <Firmware/ACPI/ACPI.hpp>
 
 #include <Memory/MMIO.hpp>
 #include <Scheduler/Spinlock.hpp>

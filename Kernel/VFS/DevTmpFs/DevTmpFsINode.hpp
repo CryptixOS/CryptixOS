@@ -31,6 +31,7 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
     virtual ssize_t Read(void* buffer, off_t offset, size_t bytes) override;
     virtual ssize_t Write(const void* buffer, off_t offset,
                           size_t bytes) override;
+    virtual i32     IoCtl(usize request, usize arg) override;
 
   private:
     Device* device = nullptr;

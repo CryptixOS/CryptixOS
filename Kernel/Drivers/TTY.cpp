@@ -42,24 +42,23 @@ void TTY::PutChar(char c)
 isize TTY::Read(void* dest, off_t offset, usize bytes)
 {
     isize nread = 0;
-    u64*  d     = reinterpret_cast<u64*>(dest);
+    Assert(dest);
+    u8* d = reinterpret_cast<u8*>(dest);
 
     spinlock.Acquire();
-    while (bytes > 0 && !charBuffer.empty())
+    while (bytes > 0 && charBuffer.size() > 0)
     {
-        LogTrace("TTY: Reading {} bytes to {:#x}", bytes, (uintptr_t)d);
         (void)offset;
-        *d = charBuffer.front();
+        *d++ = charBuffer.front();
         charBuffer.pop_front();
 
-        d++;
         --bytes;
         ++nread;
     }
     spinlock.Release();
 
-    (void)nread;
-    return 0;
+    (void)MAX_CHAR_BUFFER;
+    return nread;
 }
 isize TTY::Write(const void* src, off_t offset, usize bytes)
 {
@@ -98,6 +97,17 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         {
             std::memcpy(&termios, reinterpret_cast<void*>(argp),
                         sizeof(termios));
+            break;
+        }
+        case TIOCGWINSZ:
+        {
+            if (!terminal->GetContext()) return_err(-1, ENOTTY);
+
+            winsize* windowSize   = reinterpret_cast<winsize*>(argp);
+            windowSize->ws_row    = terminal->GetContext()->rows;
+            windowSize->ws_col    = terminal->GetContext()->cols;
+            windowSize->ws_xpixel = terminal->GetContext()->saved_cursor_x;
+            windowSize->ws_ypixel = terminal->GetContext()->saved_cursor_y;
             break;
         }
         case TIOCGPGRP: *reinterpret_cast<i32*>(argp) = pgid; break;

@@ -160,7 +160,7 @@ tools:
         pkgs_required:
          - mlibc-headers
         compile:
-          # GCC complains if the include directory is non-existant.
+          # GCC complains if the include directory is non-existent.
           - args: ['mkdir', '-p', '@SYSROOT_DIR@/usr/include']
           - args: ['make', '-j@PARALLELISM@', 'inhibit_libc=true', 'all-gcc']
         install:
@@ -206,7 +206,7 @@ tools:
         pkgs_required:
         - mlibc-headers
         compile:
-          # GCC complains if the include directory is non-existant.
+          # GCC complains if the include directory is non-existent.
           - args: ['mkdir', '-p', '@SYSROOT_DIR@/usr/include']
           - args: ['make', '-j@PARALLELISM@', 'all-gcc']
         install:
@@ -261,7 +261,7 @@ packages:
     build:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/sbin']
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/root']
-      - args: ['@OPTION:arch-triple@-gcc', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/init.c', '-o', '@THIS_COLLECT_DIR@/usr/sbin/init']
+      - args: ['@OPTION:arch-triple@-gcc', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/sh.c', '-o', '@THIS_COLLECT_DIR@/usr/sbin/init']
 
   - name: linux-headers
     architecture: '@OPTION:arch@'

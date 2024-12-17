@@ -21,14 +21,15 @@ namespace Syscall::MM
 {
     uintptr_t SysMMap(Syscall::Arguments& args)
     {
-        uintptr_t addr   = args.args[0];
-        usize     len    = args.args[1];
-        usize     prot   = args.args[2];
-        usize     flags  = args.args[3];
-        i32       fd     = args.args[4];
-        off_t     offset = args.args[5];
+        uintptr_t addr    = args.args[0];
+        usize     len     = args.args[1];
+        usize     prot    = args.args[2];
+        usize     flags   = args.args[3];
+        i32       fd      = args.args[4];
+        off_t     offset  = args.args[5];
 
-        LogInfo(
+        Process*  process = CPU::GetCurrentThread()->parent;
+        DebugSyscall(
             "MMAP: hint: {:#x}, size: {}, prot: {}, flags: {}, fd: {}, offset: "
             "{}",
             addr, len, prot, flags, fd, offset);
@@ -48,11 +49,11 @@ namespace Syscall::MM
 
             if (virt == 0) virt = VMM::AllocateSpace(len, 0, true);
             uintptr_t phys = PMM::CallocatePages<uintptr_t>(pageCount);
-            VMM::GetKernelPageMap()->MapRange(virt, phys, len,
-                                              PageAttributes::eRWXU
-                                                  | PageAttributes::eWriteBack);
+            process->pageMap->MapRange(virt, phys, len,
+                                       PageAttributes::eRWXU
+                                           | PageAttributes::eWriteBack);
 
-            LogInfo("MMAP: virt: {:#x}", virt);
+            DebugSyscall("MMAP: virt: {:#x}", virt);
             return virt;
         }
 

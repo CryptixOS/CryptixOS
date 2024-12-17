@@ -51,7 +51,6 @@ INode*          INode::InternalReduce(bool symlinks, bool automount, size_t cnt)
     {
         if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
 
-        LogDebug("Resolving target: {}, parent: {}", target, parent.name());
         auto nextNode
             = std::get<1>(VFS::ResolvePath(parent, target, automount));
         if (!nextNode) return_err(nullptr, ENOENT);

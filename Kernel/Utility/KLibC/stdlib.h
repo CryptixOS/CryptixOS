@@ -93,9 +93,9 @@ extern "C"
     int   abs(int j);
     long int      labs(long int j);
     long long int llabs(long long int j);
-    div_t         div(int numer, int denom);
-    ldiv_t        ldiv(long int numer, long int denom);
-    lldiv_t       lldiv(long long int numer, long long int denom);
+    div_t         div(int numerator, int denom);
+    ldiv_t        ldiv(long int numerator, long int denom);
+    lldiv_t       lldiv(long long int numerator, long long int denom);
 
     //--------------------------------------------------------------------------
     // Multibyte/wide character conversion functions

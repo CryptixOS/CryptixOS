@@ -17,7 +17,8 @@
 
 namespace ELF
 {
-    bool Image::Load(std::string_view path, uintptr_t loadBase)
+    bool Image::Load(std::string_view path, PageMap* pageMap,
+                     uintptr_t loadBase)
     {
         INode* file = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path));
         isize  fileSize = file->GetStats().st_size;
@@ -45,7 +46,7 @@ namespace ELF
 
                     usize size = pageCount * PMM::PAGE_SIZE;
 
-                    Assert(VMM::GetKernelPageMap()->MapRange(
+                    Assert(pageMap->MapRange(
                         current.virtualAddress + loadBase, phys, size,
                         PageAttributes::eRWXU | PageAttributes::eWriteBack));
 

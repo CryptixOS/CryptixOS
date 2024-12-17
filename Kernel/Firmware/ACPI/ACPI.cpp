@@ -4,8 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <ACPI/ACPI.hpp>
-#include <ACPI/MADT.hpp>
+#include <Firmware/ACPI/ACPI.hpp>
+#include <Firmware/ACPI/MADT.hpp>
 
 #include <Memory/VMM.hpp>
 #include <Utility/BootInfo.hpp>

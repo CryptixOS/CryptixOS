@@ -303,6 +303,7 @@ PageMap::PageMap()
         return;
     }
 
+    // Map Kernel
     for (usize i = 256; i < 512; i++)
         topLevel->entries[i] = VMM::GetKernelPageMap()->topLevel->entries[i];
 }

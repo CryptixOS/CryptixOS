@@ -112,6 +112,11 @@ struct Pointer
     {
         return reinterpret_cast<T>(m_Pointer + offset);
     }
+    template <>
+    inline Pointer Offset(uintptr_t offset) const
+    {
+        return m_Pointer + offset;
+    }
 
   private:
     uintptr_t m_Pointer = 0;

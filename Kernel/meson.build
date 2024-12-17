@@ -7,10 +7,6 @@
 srcs += files(
   'KernelStart.cpp',
 
-  'ACPI/ACPI.cpp',
-  'ACPI/MADT.cpp',
-  'ACPI/UACPI.cpp',
-
   'API/MM.cpp',
   'API/Process.cpp',
   'API/Syscall.cpp',
@@ -18,6 +14,12 @@ srcs += files(
 
   'Drivers/Terminal.cpp',
   'Drivers/TTY.cpp',
+  
+  'Firmware/ACPI/ACPI.cpp',
+  'Firmware/ACPI/MADT.cpp',
+  'Firmware/ACPI/UACPI.cpp',
+
+  'Firmware/SMBIOS/SMBIOS.cpp',
 
   'Memory/KernelHeap.cpp',
   'Memory/PMM.cpp',

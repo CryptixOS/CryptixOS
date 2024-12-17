@@ -25,6 +25,14 @@ struct termios
     speed_t  obaud;
 };
 
+struct winsize
+{
+    u16 ws_row;
+    u16 ws_col;
+    u16 ws_xpixel;
+    u16 ws_ypixel;
+};
+
 constexpr usize TCGETS       = 0x5401;
 constexpr usize TCSETS       = 0x5402;
 constexpr usize TCSETSW      = 0x5403;

@@ -67,6 +67,7 @@ namespace Logger
     Terminal&          GetTerminal();
 } // namespace Logger
 
+#define CTOS_BUILD_DEBUG
 #ifdef CTOS_BUILD_DEBUG
     #define LogDebug(...)                                                      \
         Logger::Log(LogLevel::eDebug, std::format(__VA_ARGS__))

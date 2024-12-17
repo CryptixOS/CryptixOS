@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <ACPI/MADT.hpp>
+#include <Firmware/ACPI/MADT.hpp>
 
 namespace MADT
 {

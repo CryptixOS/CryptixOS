@@ -442,11 +442,11 @@ namespace std
     //        return lhs.compare(rhs) == 0;
     //    }
     //    template <typename CharT, typename Traits>
-    //    constexpr typename Traits::comparision_category
+    //    constexpr typename Traits::comparison_category
     //    operator<=>(basic_string_view<CharT, Traits> lhs,
     //                basic_string_view<CharT, Traits> rhs) noexcept
     //    {
-    //        return static_cast<typename Traits::comparision_category>(
+    //        return static_cast<typename Traits::comparison_category>(
     //            lhs.compare(rhs) <=> 0);
     //    }
     // TODO: << operator

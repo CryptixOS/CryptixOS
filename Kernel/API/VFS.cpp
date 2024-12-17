@@ -132,12 +132,10 @@ namespace Syscall::VFS
 
         Process*      current = CPU::GetCurrentThread()->parent;
         if (fd >= static_cast<i32>(current->fileDescriptors.size()))
-            return EBADF;
+            return_err(-1, EBADF);
         auto file = current->fileDescriptors[fd];
-        (void)file;
-        (void)arg;
-        (void)request;
+        if (!file) return_err(-1, EBADF);
 
-        return 0;
+        return file->node->IoCtl(request, arg);
     }
 }; // namespace Syscall::VFS

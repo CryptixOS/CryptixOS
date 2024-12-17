@@ -37,6 +37,7 @@ warnings = [
   '-Wno-builtin-macro-redefined',
   '-Wno-macro-redefined',
   '-Wno-nan-infinity-disabled',
+  '-Wno-deprecated-builtins',
 ]
 
 add_global_arguments(
@@ -137,6 +138,7 @@ qemu_args = [
   '-boot', 'order=d,menu=on,splash-time=100',
   '-audiodev', 'id=audio,driver=alsa',
   '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
+  '-smbios', 'type=1',
 ]
 qemu = 'qemu-system-' + arch
 

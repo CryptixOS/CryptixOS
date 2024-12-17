@@ -25,20 +25,24 @@ inline constexpr usize operator""_gib(unsigned long long count)
 
 enum class PageAttributes : isize
 {
-    eRead           = Bit(0),
-    eWrite          = Bit(1),
-    eExecutable     = Bit(2),
-    eUser           = Bit(3),
-    eGlobal         = Bit(4),
-    eLPage          = Bit(5),
-    eLLPage         = Bit(6),
+    eRead              = Bit(0),
+    eWrite             = Bit(1),
+    eExecutable        = Bit(2),
+    eUser              = Bit(3),
+    eGlobal            = Bit(4),
+    eLPage             = Bit(5),
+    eLLPage            = Bit(6),
 
-    eRW             = eRead | eWrite,
-    eRWX            = eRW | eExecutable,
-    eRWXU           = eRWX | eUser,
+    eRW                = eRead | eWrite,
+    eRWX               = eRW | eExecutable,
+    eRWXU              = eRWX | eUser,
 
-    eWriteCombining = Bit(7),
-    eWriteBack      = Bit(8),
+    eUncacheableStrong = Bit(8),
+    eWriteCombining    = Bit(7) | Bit(7),
+    eWriteThrough      = Bit(9),
+    eWriteProtected    = Bit(9) | Bit(7),
+    eWriteBack         = Bit(9) | Bit(8),
+    eUncacheable       = Bit(7) | Bit(8) | Bit(9),
 };
 inline bool operator!(const PageAttributes& value)
 {

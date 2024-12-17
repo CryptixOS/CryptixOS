@@ -6,7 +6,8 @@
  */
 #pragma once
 
-#include "Utility/Stacktrace.hpp"
+#include <Memory/VMM.hpp>
+#include <Utility/Stacktrace.hpp>
 
 #include <vector>
 
@@ -65,7 +66,7 @@ namespace ELF
         eProgBits    = 1,
         eSymbolTable = 2,
         eStringTable = 3,
-        eRela        = 4,
+        eRelA        = 4,
         eNoBits      = 8,
         eRel         = 9,
     };
@@ -108,7 +109,8 @@ namespace ELF
     class Image
     {
       public:
-        bool             Load(std::string_view path, uintptr_t loadBase = 0);
+        bool             Load(std::string_view path, PageMap* pageMap,
+                              uintptr_t loadBase = 0);
 
         inline uintptr_t GetEntryPoint() const { return auxv.EntryPoint; }
         inline uintptr_t GetAtPhdr() const
