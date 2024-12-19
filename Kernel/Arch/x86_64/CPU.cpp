@@ -110,7 +110,7 @@ namespace CPU
 
         if (current->LapicID != s_BspLapicId)
         {
-            // EnablePAT();
+            EnablePAT();
             VMM::GetKernelPageMap()->Load();
 
             GDT::Initialize();
@@ -128,6 +128,7 @@ namespace CPU
         }
 
         // TODO(v1tr10l7): Enable SMEP, SMAP, UMIP
+        EnablePAT();
         InitializeFPU();
 
         // Setup syscalls
@@ -504,10 +505,16 @@ namespace CPU
     }
     void EnablePAT()
     {
+
         // write-combining/write-protect
         u64 pat = ReadMSR(MSR::IA32_PAT);
         pat &= 0xffffffffull;
         pat |= 0x0105ull << 32ull;
+
+        pat = (PAT::eUncacheable << 56) | (PAT::eWriteBack << 48)
+            | (PAT::eWriteProtected << 40) | (PAT::eWriteThrough << 32)
+            | (PAT::eWriteCombining << 24) | (PAT::eUncacheableStrong << 16);
+
         WriteMSR(MSR::IA32_PAT, pat);
     }
 }; // namespace CPU

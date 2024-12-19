@@ -28,6 +28,19 @@ namespace CPU
     using FPUSaveFunc    = void    (*)(uintptr_t ctx);
     using FPURestoreFunc = void (*)(uintptr_t ctx);
 
+    namespace PAT
+    {
+        enum Entries : u64
+        {
+            eUncacheableStrong = 0x00,
+            eWriteCombining    = 0x01,
+            eWriteThrough      = 0x04,
+            eWriteProtected    = 0x05,
+            eWriteBack         = 0x06,
+            eUncacheable       = 0x07,
+        };
+    };
+
     namespace MSR
     {
         constexpr usize IA32_APIC_BASE           = 0x1b;

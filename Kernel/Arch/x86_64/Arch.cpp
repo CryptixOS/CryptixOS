@@ -27,11 +27,7 @@ namespace Arch
         HPET::Initialize();
 
         CPU::InitializeBSP();
-
-        // TODO(v1tr10l7): Disabled temporarily, because first we need to enable
-        // PAT with appropriate flags, so it doesn't take so long to draw to
-        // the framebuffer
-        // CPU::StartAPs();
+        CPU::StartAPs();
 
         PCSpeaker::ToneOn(1000);
         IO::Delay(1000);
