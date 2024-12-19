@@ -36,7 +36,7 @@ Process::Process(std::string_view name, pid_t pid)
 
 i32 Process::Exec(const char* path, char** argv, char** envp)
 {
-    for (auto fd : m_FileDescriptors) delete fd;
+    for (auto fd : m_FileDescriptors) delete fd.second;
     m_FileDescriptors.clear();
     InitializeStreams();
 
@@ -98,12 +98,12 @@ Process* Process::Fork()
     }
 
     newProcess->m_NextTid.store(m_NextTid);
-    for (usize i = 0; i < m_FileDescriptors.size(); i++)
+    for (const auto& descriptor : m_FileDescriptors)
     {
-        FileDescriptor* currentFd = m_FileDescriptors[i];
+        FileDescriptor* currentFd = descriptor.second;
         FileDescriptor* newFd     = currentFd->node->Open();
 
-        newProcess->m_FileDescriptors.push_back(newFd);
+        newProcess->m_FileDescriptors[descriptor.first] = newFd;
     }
 
     m_Children.push_back(newProcess);
@@ -121,7 +121,7 @@ Process* Process::Fork()
 
 i32 Process::Exit(i32 code)
 {
-    for (FileDescriptor* fd : m_FileDescriptors) fd->Close();
+    for (auto& fd : m_FileDescriptors) fd.second->Close();
     m_FileDescriptors.clear();
 
     for (Thread* thread : m_Threads) thread->state = ThreadState::eExited;

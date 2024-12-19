@@ -132,7 +132,7 @@ Thread::Thread(Process* parent, uintptr_t pc, char** argv, char** envp,
     std::vector<std::string_view> argvArr;
     argvArr.push_back("/usr/sbin/init");
     std::vector<std::string_view> envpArr;
-    argvArr.push_back("TERM=linux");
+    envpArr.push_back("TERM=linux");
 
     this->stack = prepareStack(vstack, vustack, argvArr, envpArr, program);
 

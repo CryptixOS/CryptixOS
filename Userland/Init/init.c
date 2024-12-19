@@ -25,7 +25,11 @@ int main(int argc, char** argv, char** envp)
     {
         write(0, child, 5);
         // execve("/usr/sbin/sh", argv, envp);
-        execve("/usr/bin/bash", argv, envp);
+        const char* path   = "/usr/bin/bash";
+        const char* args[] = {path, 0};
+        const char* env[]  = {0};
+
+        execve("/usr/bin/bash", (char* const*)args, (char* const*)env);
     }
     else if (pid == -1) { write(0, fork_fail, 11); }
     else write(0, fork_success, 12);

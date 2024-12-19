@@ -13,6 +13,44 @@
 
 namespace Syscall::Process
 {
+    uid_t SysGetUid(Syscall::Arguments&)
+    {
+        class Process* current = CPU::GetCurrentThread()->parent;
+        Assert(current);
+
+        return current->GetCredentials().uid;
+    }
+    gid_t SysGetGid(Syscall::Arguments&)
+    {
+        class Process* current = CPU::GetCurrentThread()->parent;
+        Assert(current);
+
+        return current->GetCredentials().gid;
+    }
+
+    uid_t SysGet_eUid(Syscall::Arguments&)
+    {
+        class Process* current = CPU::GetCurrentThread()->parent;
+        Assert(current);
+
+        return current->GetCredentials().euid;
+    }
+    gid_t SysGet_eGid(Syscall::Arguments&)
+    {
+        class Process* current = CPU::GetCurrentThread()->parent;
+        Assert(current);
+
+        return current->GetCredentials().egid;
+    }
+
+    pid_t SysGet_pPid(Syscall::Arguments&)
+    {
+        class Process* current = CPU::GetCurrentThread()->parent;
+        Assert(current);
+
+        return current->GetParentPid();
+    }
+
     pid_t SysFork(Syscall::Arguments&)
     {
         class Process* process    = CPU::GetCurrentThread()->parent;
