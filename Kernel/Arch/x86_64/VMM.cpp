@@ -178,10 +178,10 @@ PageTableEntry* PageMap::Virt2Pte(PageTable* topLevel, uintptr_t virt,
 
 uintptr_t PageMap::Virt2Phys(uintptr_t virt, PageAttributes flags)
 {
-    std::unique_lock guard(lock);
+    ScopedLock      guard(s_Lock);
 
-    auto             pageSize = GetPageSize(flags);
-    PageTableEntry*  pmlEntry = Virt2Pte(topLevel, virt, false, pageSize);
+    auto            pageSize = GetPageSize(flags);
+    PageTableEntry* pmlEntry = Virt2Pte(topLevel, virt, false, pageSize);
     if (!pmlEntry || !pmlEntry->GetFlag(PTE_PRESENT)) return -1;
 
     return pmlEntry->GetAddress() + (virt % pageSize);
@@ -247,10 +247,10 @@ bool PageMap::InternalUnmap(uintptr_t virt, PageAttributes flags)
 
 bool PageMap::SetFlags(uintptr_t virt, PageAttributes flags)
 {
-    std::unique_lock guard(lock);
+    ScopedLock      guard(s_Lock);
 
-    auto             pageSize = GetPageSize(flags);
-    PageTableEntry*  pmlEntry = Virt2Pte(topLevel, virt, true, pageSize);
+    auto            pageSize = GetPageSize(flags);
+    PageTableEntry* pmlEntry = Virt2Pte(topLevel, virt, true, pageSize);
     if (!pmlEntry)
     {
         LogError("VMM: Could not get page map entry for address {:#x}", virt);

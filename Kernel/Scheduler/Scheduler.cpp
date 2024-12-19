@@ -14,6 +14,7 @@
 #include <Memory/PMM.hpp>
 
 #include <Scheduler/Process.hpp>
+#include <Scheduler/Spinlock.hpp>
 #include <Scheduler/Thread.hpp>
 
 #include <deque>
@@ -24,23 +25,29 @@ namespace Scheduler
 {
     namespace
     {
-        std::mutex          lock;
+        Spinlock            s_Lock{};
 
         Process*            s_KernelProcess = nullptr;
+        std::deque<Thread*> s_ExecutionQueue;
         std::deque<Thread*> queues[2];
         auto                active  = &queues[0];
         auto                expired = &queues[1];
 
         Thread*             GetNextThread(usize cpuID)
         {
-            std::unique_lock guard(lock);
+            ScopedLock guard(s_Lock);
+            if (s_ExecutionQueue.empty()) return nullptr;
+            Thread* t = s_ExecutionQueue.front();
+            s_ExecutionQueue.pop_front();
+            return t;
+
             if (active->empty()) std::swap(active, expired);
             if (active->empty()) return nullptr;
 
             for (auto it = active->rbegin(); it != active->rend(); it++)
             {
                 Thread* thread = *it;
-                if (thread->runningOn < 0 || thread->runningOn == cpuID)
+                if (thread->runningOn < 0 || thread->runningOn == cpuID || true)
                 {
                     active->erase(std::next(it).base());
                     thread->enqueued = false;
@@ -109,23 +116,25 @@ namespace Scheduler
 
     void EnqueueThread(Thread* thread)
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(s_Lock);
         if (thread->enqueued) return;
 
         thread->enqueued = true;
-        thread->state    = ThreadState::eRunning;
-        expired->push_front(thread);
+        thread->state    = ThreadState::eReady;
+        // expired->push_front(thread);
+        s_ExecutionQueue.push_back(thread);
     }
 
     void EnqueueNotReady(Thread* thread)
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(s_Lock);
 
         thread->enqueued = true;
         if (thread->state == ThreadState::eRunning)
             thread->state = ThreadState::eReady;
 
-        expired->push_front(thread);
+        // expired->push_front(thread);
+        s_ExecutionQueue.push_back(thread);
     }
 
     void Schedule(CPUContext* ctx)

@@ -6,13 +6,13 @@
  */
 #include "GDT.hpp"
 
-#include <mutex>
+#include <Scheduler/Spinlock.hpp>
 
 namespace GDT
 {
     namespace
     {
-        std::mutex lock;
+        Spinlock s_Lock;
         struct SegmentDescriptor
         {
             u16 limitLow;
@@ -132,7 +132,7 @@ namespace GDT
     }
     void LoadTSS(TaskStateSegment* tss)
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(s_Lock);
         Assert(tss);
 
         TSSWriteEntry(&gdtEntries.tss, reinterpret_cast<uintptr_t>(tss));

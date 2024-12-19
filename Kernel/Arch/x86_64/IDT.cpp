@@ -93,11 +93,15 @@ static void pageFault(CPUContext* ctx)
 {
     CPU::DumpRegisters(ctx);
     EarlyPanic(
-        "Captured exception[%#zx] on cpu %zu: '%s'\n\rError Code: "
-        "%#zb\n\rrip: "
+        "Captured exception[%#zx] on cpu %zu: '%s'\n\rP: %d, W: %d, U: %d, R: "
+        "%d, I: %d: "
+        "\nerrorCode: %#zb\n\rrip: "
         "%#p\nCR2: %#zx",
         ctx->interruptVector, 0, exceptionNames[ctx->interruptVector],
-        ctx->errorCode, ctx->rip, CPU::ReadCR2());
+        (ctx->errorCode & Bit(0)) != 0, (ctx->errorCode & Bit(1)) != 0,
+        (ctx->errorCode & Bit(2)) != 0, (ctx->errorCode & Bit(3)) != 0,
+        (ctx->errorCode & Bit(4)) != 0, ctx->errorCode, ctx->rip,
+        CPU::ReadCR2());
 
     for (;;) Arch::Halt();
     raiseException(ctx);

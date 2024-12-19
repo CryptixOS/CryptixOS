@@ -9,8 +9,9 @@
 #include <Utility/BootInfo.hpp>
 #include <Utility/Types.hpp>
 
+#include <Scheduler/Spinlock.hpp>
+
 #include <flanterm.h>
-#include <mutex>
 #include <string_view>
 #include <vector>
 
@@ -62,7 +63,7 @@ class Terminal final
     bool                          m_Initialized = false;
     Framebuffer                   m_Framebuffer = {};
     flanterm_context*             m_Context     = nullptr;
-    std::mutex                    m_Lock;
+    Spinlock                      m_Lock;
 
     static std::vector<Terminal*> s_Terminals;
 };

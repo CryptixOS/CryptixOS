@@ -111,9 +111,12 @@ Thread::Thread(Process* parent, uintptr_t pc, char** argv, char** envp,
                                                           / PMM::PAGE_SIZE);
         uintptr_t vustack = this->parent->userStackTop - CPU::USER_STACK_SIZE;
 
+        LogDebug("StackPhys: {:#x}, StackVirt: {:#x}, HhStack: {:#x}", pstack,
+                 vustack, Pointer(pstack).ToHigherHalf<u64>());
         Assert(this->parent->pageMap->MapRange(
             vustack, pstack, CPU::USER_STACK_SIZE,
             PageAttributes::eRWXU | PageAttributes::eWriteBack));
+        this->stackVirt            = vustack;
 
         this->parent->userStackTop = vustack - PMM::PAGE_SIZE;
 
@@ -169,3 +172,56 @@ Thread::Thread(Process* parent, uintptr_t pc, bool user)
     parent->threads.push_back(this);
 }
 Thread::~Thread() {}
+
+Thread* Thread::Fork(Process* process)
+{
+    Thread* newThread    = new Thread();
+    newThread->runningOn = -1;
+    newThread->self      = newThread;
+    newThread->stack     = stack;
+
+    Pointer kstack       = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
+                                                    / PMM::PAGE_SIZE);
+    newThread->kernelStack = kstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
+        CPU::KERNEL_STACK_SIZE);
+
+    Pointer pfstack = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
+                                                     / PMM::PAGE_SIZE);
+    newThread->pageFaultStack
+        = pfstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
+            CPU::KERNEL_STACK_SIZE);
+
+    for (const auto& [stackPhys, size] : stacks)
+    {
+        uintptr_t newStack = PMM::CallocatePages<uintptr_t>(
+            Math::AlignUp(size, PMM::PAGE_SIZE) / PMM::PAGE_SIZE);
+
+        std::memcpy(Pointer(newStack).ToHigherHalf<void*>(),
+                    Pointer(stackPhys).ToHigherHalf<void*>(), size);
+
+        process->pageMap->MapRange(stackVirt, newStack, size,
+                                   PageAttributes::eRWXU
+                                       | PageAttributes::eWriteBack);
+        newThread->stacks.push_back({newStack, size});
+    }
+
+    newThread->fpuStoragePageCount = fpuStoragePageCount;
+    newThread->fpuStorage
+        = Pointer(PMM::CallocatePages<uintptr_t>(fpuStoragePageCount))
+              .ToHigherHalf<uintptr_t>();
+    std::memcpy((void*)newThread->fpuStorage, (void*)fpuStorage,
+                fpuStoragePageCount * PMM::PAGE_SIZE);
+
+    newThread->parent  = process;
+    newThread->ctx     = SavedContext;
+    newThread->ctx.rax = 0;
+    newThread->ctx.rdx = 0;
+
+    newThread->user    = user;
+    newThread->gsBase  = gsBase;
+    newThread->fsBase  = fsBase;
+
+    newThread->state   = ThreadState::eDequeued;
+
+    return newThread;
+}

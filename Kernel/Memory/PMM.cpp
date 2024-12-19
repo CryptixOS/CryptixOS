@@ -14,24 +14,24 @@
 
 #include "Memory/KernelHeap.hpp"
 
-#include <mutex>
+#include <Scheduler/Spinlock.hpp>
 
 namespace PhysicalMemoryManager
 {
     namespace
     {
-        bool       s_Initialized = false;
-        Bitmap     bitmap{};
+        bool      s_Initialized = false;
+        Bitmap    bitmap{};
 
-        uintptr_t  memoryTop        = 0;
-        uintptr_t  usableMemoryTop  = 0;
+        uintptr_t memoryTop        = 0;
+        uintptr_t usableMemoryTop  = 0;
 
-        usize      usableMemorySize = 0;
-        usize      totalMemory      = 0;
-        usize      usedMemory       = 0;
-        std::mutex lock;
+        usize     usableMemorySize = 0;
+        usize     totalMemory      = 0;
+        usize     usedMemory       = 0;
+        Spinlock  s_Lock;
 
-        void*      FindFreeRegion(usize& start, usize count, usize limit)
+        void*     FindFreeRegion(usize& start, usize count, usize limit)
         {
             usize contiguousPages = 0;
             while (start < limit)
@@ -160,7 +160,7 @@ namespace PhysicalMemoryManager
 
     void* AllocatePages(usize count)
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(s_Lock);
         if (count == 0) return nullptr;
         static usize lastIndex = 0;
 
@@ -171,7 +171,7 @@ namespace PhysicalMemoryManager
         {
             lastIndex = 0;
             ret       = FindFreeRegion(lastIndex, count, i);
-            if (!ret) Panic("Out of memory!");
+            if (!ret) EarlyPanic("Out of memory!");
         }
 
         usedMemory += count * PAGE_SIZE;
@@ -192,7 +192,7 @@ namespace PhysicalMemoryManager
 
     void FreePages(void* ptr, usize count)
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(s_Lock);
         if (count == 0 || !ptr) return;
         uintptr_t page = reinterpret_cast<uintptr_t>(ptr) / PAGE_SIZE;
 

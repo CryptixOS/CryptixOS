@@ -66,7 +66,7 @@ void Terminal::PutChar(u64 c)
 }
 void Terminal::PrintString(std::string_view str)
 {
-    std::unique_lock guard(m_Lock);
+    ScopedLock guard(m_Lock);
     for (auto c : str) PutChar(c);
 }
 

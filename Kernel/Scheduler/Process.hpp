@@ -6,12 +6,13 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include <Common.hpp>
 
-#include "Memory/VMM.hpp"
+#include <Memory/Region.hpp>
+#include <Memory/VMM.hpp>
 
-#include "VFS/INode.hpp"
-#include "VFS/VFS.hpp"
+#include <VFS/INode.hpp>
+#include <VFS/VFS.hpp>
 
 #include <vector>
 
@@ -54,7 +55,9 @@ struct Process
     Process() = default;
     Process(std::string_view name, PrivilegeLevel ring);
 
-    void InitializeStreams()
+    Process* Fork();
+
+    void     InitializeStreams()
     {
         fileDescriptors.clear();
         INode* currentTTY
@@ -75,8 +78,10 @@ struct Process
     PrivilegeLevel               ring        = PrivilegeLevel::eUnprivileged;
 
     Process*                     parent      = nullptr;
+    std::vector<Process*>        m_Children;
     std::vector<Thread*>         threads;
 
     std::vector<FileDescriptor*> fileDescriptors;
+    std::vector<VMM::Region>     m_AddressSpace{};
     uintptr_t                    userStackTop = 0x70000000000;
 };

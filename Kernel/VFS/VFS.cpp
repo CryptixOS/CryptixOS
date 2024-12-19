@@ -7,6 +7,8 @@
  */
 #include "VFS.hpp"
 
+#include <Scheduler/Spinlock.hpp>
+
 #include "VFS/DevTmpFs/DevTmpFs.hpp"
 #include "VFS/INode.hpp"
 #include "VFS/TmpFs/TmpFs.hpp"
@@ -16,7 +18,7 @@
 namespace VFS
 {
     static INode*      rootINode = nullptr;
-    static std::mutex  lock;
+    static Spinlock    s_Lock;
 
     INode*             GetRootNode() { return rootINode; }
 
@@ -160,9 +162,9 @@ namespace VFS
     bool Mount(INode* parent, PathView source, PathView target,
                std::string_view fsName, int flags, void* data)
     {
-        std::unique_lock guard(lock);
+        ScopedLock  guard(s_Lock);
 
-        Filesystem*      fs = CreateFilesystem(fsName);
+        Filesystem* fs = CreateFilesystem(fsName);
         if (fs == nullptr)
         {
             errno = ENODEV;
@@ -201,7 +203,7 @@ namespace VFS
 
     INode* CreateNode(INode* parent, PathView path, mode_t mode, INodeType type)
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(s_Lock);
 
         auto [newNodeParent, newNode, newNodeName] = ResolvePath(parent, path);
         if (newNode) return_err(nullptr, EEXIST);
@@ -216,7 +218,7 @@ namespace VFS
 
     INode* MkNod(INode* parent, PathView path, mode_t mode, dev_t dev)
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(s_Lock);
 
         auto [nparent, node, newNodeName] = ResolvePath(parent, path);
         if (node) return_err(nullptr, EEXIST);
@@ -231,7 +233,7 @@ namespace VFS
 
     INode* Symlink(INode* parent, PathView path, std::string_view target)
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(s_Lock);
 
         auto [newNodeParent, newNode, newNodeName] = ResolvePath(parent, path);
         if (newNode) return_err(nullptr, EEXIST);

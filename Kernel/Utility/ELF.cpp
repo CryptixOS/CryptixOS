@@ -7,7 +7,6 @@
 #include "ELF.hpp"
 
 #include "Memory/PMM.hpp"
-#include "Memory/VMM.hpp"
 #include "Utility/Math.hpp"
 
 #include "VFS/INode.hpp"
@@ -18,7 +17,7 @@
 namespace ELF
 {
     bool Image::Load(std::string_view path, PageMap* pageMap,
-                     uintptr_t loadBase)
+                     std::vector<VMM::Region>& addressSpace, uintptr_t loadBase)
     {
         INode* file = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path));
         isize  fileSize = file->GetStats().st_size;
@@ -49,6 +48,9 @@ namespace ELF
                     Assert(pageMap->MapRange(
                         current.virtualAddress + loadBase, phys, size,
                         PageAttributes::eRWXU | PageAttributes::eWriteBack));
+                    addressSpace.push_back({phys,
+                                            current.virtualAddress + loadBase,
+                                            pageCount * PMM::PAGE_SIZE});
 
                     Read(ToHigherHalfAddress<void*>(phys + misalign),
                          current.offset, current.segmentSizeInFile);
@@ -70,7 +72,6 @@ namespace ELF
                     path[current.segmentSizeInFile] = 0;
 
                     ldPath = std::string_view(path, current.segmentSizeInFile);
-                    LogInfo("Path: {}", path);
                     break;
                 }
 

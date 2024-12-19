@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <compare>
 #include <concepts>
 #include <type_traits>
 
@@ -63,7 +64,7 @@ struct Pointer
     }
 
     template <typename T>
-    T* As()
+    inline T* As() const
     {
         return reinterpret_cast<T*>(m_Pointer);
     }
@@ -117,6 +118,8 @@ struct Pointer
     {
         return m_Pointer + offset;
     }
+
+    inline auto operator<=>(const Pointer& other) const = default;
 
   private:
     uintptr_t m_Pointer = 0;

@@ -4,11 +4,11 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Drivers/Serial.hpp"
+#include <Arch/x86_64/IO.hpp>
 
-#include "Arch/x86_64/IO.hpp"
+#include <Drivers/Serial.hpp>
+#include <Scheduler/Spinlock.hpp>
 
-#include <mutex>
 #include <utility>
 
 namespace Serial
@@ -54,14 +54,14 @@ namespace Serial
             return true;
         }
 
-        std::mutex lock;
+        Spinlock s_Lock;
     } // namespace
     bool Initialize() { return InitializePort(Port::eCom1); }
 
     byte Read()
     {
-        std::unique_lock guard(lock);
-        word             port = static_cast<word>(Port::eCom1);
+        ScopedLock guard(s_Lock);
+        word       port = static_cast<word>(Port::eCom1);
         while ((IO::In<byte>(port + 5) & 1) == 0)
             ;
 
@@ -69,8 +69,8 @@ namespace Serial
     }
     void Write(byte data)
     {
-        std::unique_lock guard(lock);
-        word             port = static_cast<word>(Port::eCom1);
+        ScopedLock guard(s_Lock);
+        word       port = static_cast<word>(Port::eCom1);
         while ((IO::In<byte>(port + 5) & 0x20) == 0)
             ;
 

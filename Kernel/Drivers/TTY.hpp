@@ -12,7 +12,6 @@
 #include "Scheduler/Spinlock.hpp"
 
 #include <deque>
-#include <mutex>
 
 class TTY : public Device
 {
@@ -35,7 +34,6 @@ class TTY : public Device
   private:
     static TTY*      s_CurrentTTY;
 
-    std::mutex       lock;
     Spinlock         spinlock;
 
     Terminal*        terminal = nullptr;

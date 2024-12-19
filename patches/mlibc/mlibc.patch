@@ -1,0 +1,448 @@
+From b5dc7888c9a13eccf101a8de0fc65b4bdcbb9303 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Wed, 18 Dec 2024 23:35:34 +0100
+Subject: [PATCH] port to cryptix
+
+---
+ sysdeps/cryptix/{generic => entry}/entry.cpp |  10 ++
+ sysdeps/cryptix/entry/thread.cpp             |  45 +++++++++
+ sysdeps/cryptix/generic/sysdeps.cpp          |  41 --------
+ sysdeps/cryptix/include/cryptix/syscall.h    |  29 +++++-
+ sysdeps/cryptix/meson.build                  |  11 +-
+ sysdeps/cryptix/sysdeps/file_io.cpp          |  66 ++++++++++++
+ sysdeps/cryptix/sysdeps/internal.cpp         | 100 +++++++++++++++++++
+ sysdeps/cryptix/sysdeps/process.cpp          |   9 ++
+ sysdeps/cryptix/x86_64/thread_entry.S        |  24 +++++
+ 9 files changed, 291 insertions(+), 44 deletions(-)
+ rename sysdeps/cryptix/{generic => entry}/entry.cpp (87%)
+ create mode 100644 sysdeps/cryptix/entry/thread.cpp
+ delete mode 100644 sysdeps/cryptix/generic/sysdeps.cpp
+ create mode 100644 sysdeps/cryptix/sysdeps/file_io.cpp
+ create mode 100644 sysdeps/cryptix/sysdeps/internal.cpp
+ create mode 100644 sysdeps/cryptix/sysdeps/process.cpp
+ create mode 100644 sysdeps/cryptix/x86_64/thread_entry.S
+
+diff --git a/sysdeps/cryptix/generic/entry.cpp b/sysdeps/cryptix/entry/entry.cpp
+similarity index 87%
+rename from sysdeps/cryptix/generic/entry.cpp
+rename to sysdeps/cryptix/entry/entry.cpp
+index d159b404..216181fb 100644
+--- a/sysdeps/cryptix/generic/entry.cpp
++++ b/sysdeps/cryptix/entry/entry.cpp
+@@ -1,6 +1,10 @@
+ #include <cryptix/syscall.h>
+ #include <mlibc/elf/startup.h>
++
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
+ #include <stdint.h>
++#include <stdio.h>
+ #include <stdlib.h>
+ 
+ // defined by the POSIX library
+@@ -18,6 +22,11 @@ struct LibraryGuard
+ };
+ 
+ static LibraryGuard guard;
++namespace mlibc
++{
++
++    int sys_anon_allocate(size_t size, void** pointer);
++}
+ 
+ LibraryGuard::LibraryGuard()
+ {
+@@ -34,6 +43,7 @@ extern "C" void __mlibc_entry(uintptr_t* entry_stack,
+                                              char* env[]))
+ {
+     __dlapi_enter(entry_stack);
++
+     auto result
+         = main_fn(__mlibc_stack_data.argc, __mlibc_stack_data.argv, environ);
+     exit(result);
+diff --git a/sysdeps/cryptix/entry/thread.cpp b/sysdeps/cryptix/entry/thread.cpp
+new file mode 100644
+index 00000000..8a01eb9a
+--- /dev/null
++++ b/sysdeps/cryptix/entry/thread.cpp
+@@ -0,0 +1,45 @@
++#include <bits/ensure.h>
++#include <errno.h>
++#include <mlibc/all-sysdeps.hpp>
++#include <mlibc/thread.hpp>
++#include <stddef.h>
++#include <stdint.h>
++#include <sys/mman.h>
++
++namespace mlibc
++{
++
++    static constexpr size_t default_stacksize = 0x200000; // 2 mib
++
++    int sys_prepare_stack(void** stack, void* entry, void* user_arg, void* tcb,
++                          size_t* stack_size, size_t* guard_size,
++                          void** stack_base)
++    {
++        (void)tcb;
++        if (!*stack_size) *stack_size = default_stacksize;
++
++        uintptr_t map;
++        if (*stack)
++        {
++            map         = reinterpret_cast<uintptr_t>(*stack);
++            *guard_size = 0;
++        }
++        else
++        {
++            map = reinterpret_cast<uintptr_t>(
++                mmap(nullptr, *stack_size + *guard_size, PROT_NONE,
++                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
++            if (reinterpret_cast<void*>(map) == MAP_FAILED) return EAGAIN;
++            int ret = mprotect(reinterpret_cast<void*>(map + *guard_size),
++                               *stack_size, PROT_READ | PROT_WRITE);
++            if (ret) return EAGAIN;
++        }
++
++        *stack_base = reinterpret_cast<void*>(map);
++        auto sp = reinterpret_cast<uintptr_t*>(map + *guard_size + *stack_size);
++        *--sp   = reinterpret_cast<uintptr_t>(user_arg);
++        *--sp   = reinterpret_cast<uintptr_t>(entry);
++        *stack  = reinterpret_cast<void*>(sp);
++        return 0;
++    }
++} // namespace mlibc
+diff --git a/sysdeps/cryptix/generic/sysdeps.cpp b/sysdeps/cryptix/generic/sysdeps.cpp
+deleted file mode 100644
+index f2e1f275..00000000
+--- a/sysdeps/cryptix/generic/sysdeps.cpp
++++ /dev/null
+@@ -1,41 +0,0 @@
+-#include <cstddef>
+-
+-#define STUB(signature)                                                        \
+-    signature { __asm__ volatile("int $0xf0; hlt;"); }
+-#define STUB_RET(signature)                                                    \
+-    signature                                                                  \
+-    {                                                                          \
+-        __asm__ volatile("int $0xf0; hlt;");                                   \
+-        return 0;                                                              \
+-    }
+-
+-#include "cryptix/syscall.h"
+-
+-#include <mlibc/debug.hpp>
+-#include <mlibc/posix-sysdeps.hpp>
+-
+-namespace mlibc
+-{
+-    void sys_libc_log(const char* message)
+-    {
+-        auto len = strlen(message);
+-        Syscall(SYS_WRITE, 2, message, len);
+-    }
+-
+-    void sys_libc_panic() { __asm__ volatile("int $0xf0; hlt"); }
+-    int  sys_tcb_set() { return 0; }
+-    int  sys_anon_free(void* pointer, size_t size) { return 0; }
+-    int  sys_close(int) { return 0; }
+-    int  sys_anon_allocate(unsigned long, void**) { return 0; }
+-    STUB_RET(int sys_open(const char*, int, mode_t, int*));
+-    STUB_RET(int sys_seek(int, long, int, long*));
+-    STUB_RET(int sys_vm_map(void*, unsigned long, int, int, int, long, void**));
+-    STUB_RET(int sys_read(int, void*, unsigned long, long*));
+-    STUB_RET(int sys_futex_wake(int*));
+-    STUB_RET(int sys_futex_wait(int*, int, timespec const*));
+-    STUB_RET(int sys_tcb_set(void*));
+-    STUB_RET(int sys_clock_get(int, long*, long*));
+-    STUB_RET(int sys_vm_unmap(void*, unsigned long));
+-    STUB_RET(int sys_write(int, void const*, unsigned long, long*));
+-    STUB(void sys_exit(int));
+-} // namespace mlibc
+diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
+index 6184058e..eeb1356b 100644
+--- a/sysdeps/cryptix/include/cryptix/syscall.h
++++ b/sysdeps/cryptix/include/cryptix/syscall.h
+@@ -3,10 +3,37 @@
+ 
+ #define SyscallInvoker "syscall"
+ 
++#define STUB(signature)                                                        \
++    signature { sys_libc_log(#signature "is a stub!"); }
++#define STUB_RET(signature)                                                    \
++    signature                                                                  \
++    {                                                                          \
++        sys_libc_log(#signature " is a stub!");                                \
++        return 0;                                                              \
++    }
++
++#define STUB(signature)                                                        \
++    signature { sys_libc_log(#signature "is a stub!"); }
++#define STUB_RET(signature)                                                    \
++    signature                                                                  \
++    {                                                                          \
++        sys_libc_log(#signature " is a stub!");                                \
++        return 0;                                                              \
++    }
++
+ namespace mlibc
+ {
+ #pragma region
+-    inline constexpr size_t SYS_WRITE = 0;
++    inline constexpr size_t SYS_READ       = 0;
++    inline constexpr size_t SYS_WRITE      = 1;
++    inline constexpr size_t SYS_OPEN       = 2;
++    inline constexpr size_t SYS_LSEEK      = 8;
++    inline constexpr size_t SYS_MMAP       = 9;
++    inline constexpr size_t SYS_IOCTL      = 16;
++    inline constexpr size_t SYS_FORK       = 57;
++    inline constexpr size_t SYS_EXIT       = 60;
++    inline constexpr size_t SYS_ARCH_PRCTL = 158;
++    inline constexpr size_t SYS_PANIC      = 0xff;
+ 
+ #pragma endregion
+ 
+diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
+index 7027a530..41f3b173 100644
+--- a/sysdeps/cryptix/meson.build
++++ b/sysdeps/cryptix/meson.build
+@@ -1,5 +1,12 @@
+-rtld_dso_sources += files('generic/sysdeps.cpp')
+-libc_sources += files('generic/entry.cpp', 'generic/sysdeps.cpp')
++rtld_dso_sources += files('sysdeps/internal.cpp', 'sysdeps/file_io.cpp')
++libc_sources += files(
++  'entry/entry.cpp',
++
++  'sysdeps/file_io.cpp',
++  'sysdeps/internal.cpp',
++  'sysdeps/process.cpp',
++)
++
+ 
+ if not no_headers
+   install_headers(
+diff --git a/sysdeps/cryptix/sysdeps/file_io.cpp b/sysdeps/cryptix/sysdeps/file_io.cpp
+new file mode 100644
+index 00000000..00f3d1a0
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/file_io.cpp
+@@ -0,0 +1,66 @@
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++
++#include "cryptix/syscall.h"
++
++#include <errno.h>
++
++// TODO(v1tr10l7): Temporary solution
++#undef errno
++#define errno -1
++
++namespace mlibc
++{
++    int sys_read(int fd, void* buffer, size_t count, ssize_t* bytesRead)
++    {
++        ssize_t ret = Syscall(SYS_READ, fd, buffer, count);
++        if (ret == -1) return -1;
++
++        *bytesRead = ret;
++        return 0;
++    }
++    int sys_write(int fd, void const* buffer, unsigned long bytes,
++                  long* bytesWritten)
++    {
++        *bytesWritten = Syscall(SYS_WRITE, fd, buffer, bytes);
++        return 0;
++    }
++    int sys_open(const char* path, int flags, mode_t mode, int* fd)
++    {
++        int f = Syscall(SYS_OPEN, path, flags, mode);
++        if (f < 0)
++        {
++            sys_libc_log("Failed to open");
++            sys_libc_panic();
++        };
++
++        *fd = f;
++        return 0;
++    }
++    int sys_seek(int fd, off_t offset, int whence, off_t* newOffset)
++    {
++        off_t off = Syscall(SYS_LSEEK, fd, offset, whence);
++
++        if (off == -1) return -1;
++        *newOffset = off;
++        return 0;
++    }
++    int sys_ioctl(int fd, unsigned long request, void* arg, int* result)
++    {
++        int ret = Syscall(SYS_IOCTL, fd, request, arg);
++
++        if (ret == -1) return errno;
++
++        *result = ret;
++        return 0;
++    }
++
++    int sys_isatty(int fd)
++    {
++        winsize ws;
++        int     ret;
++        if (!sys_ioctl(fd, TIOCGWINSZ, &ws, &ret)) return 0;
++
++        return ENOTTY;
++    }
++}; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/internal.cpp b/sysdeps/cryptix/sysdeps/internal.cpp
+new file mode 100644
+index 00000000..067434fc
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/internal.cpp
+@@ -0,0 +1,100 @@
++#include <cstddef>
++
++#include "cryptix/syscall.h"
++
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++
++#include <sys/mman.h>
++
++namespace mlibc
++{
++
++    void sys_libc_log(const char* message)
++    {
++        static constexpr char MLIBC_SIG[] = "[mlibc]: ";
++
++        size_t                len         = strlen(message);
++        char*                 messageEOL
++            = reinterpret_cast<char*>(alloca(len + sizeof(MLIBC_SIG)));
++
++        memcpy(messageEOL, MLIBC_SIG, sizeof(MLIBC_SIG) - 1);
++        memcpy(messageEOL + sizeof(MLIBC_SIG) - 1, message, len);
++        len += sizeof(MLIBC_SIG) - 1;
++
++        Syscall(SYS_WRITE, 1, messageEOL, len);
++    }
++    [[noreturn]]
++    void sys_libc_panic()
++    {
++        Syscall(SYS_PANIC, "mlibc crashed");
++    }
++
++    //////
++    STUB_RET(int sys_openat(int dirfd, const char* path, int flags, mode_t mode,
++                            int* fd));
++    STUB_RET(int sys_fcntl(int fd, int request, va_list args, int* result));
++
++    STUB_RET(int sys_dup2(int fd, int flags, int newfd));
++    int sys_fork(pid_t* child)
++    {
++        pid_t ret = Syscall(SYS_FORK);
++        if (ret == -1) return -1;
++
++        *child = ret;
++        return 0;
++    }
++
++    STUB_RET(int sys_execve(const char* path, char* const argv[],
++                            char* const envp[]));
++    STUB_RET(pid_t sys_getpid());
++    STUB_RET(int sys_waitpid(pid_t pid, int* status, int flags,
++                             struct rusage* ru, pid_t* ret_pid));
++    STUB_RET(int sys_getcwd(char* buffer, size_t size));
++    STUB_RET(int sys_chdir(const char* path));
++    STUB_RET(int sys_clone(void* tcb, pid_t* pid_out, void* stack));
++
++    STUB_RET(int sys_kill(pid_t, int));
++
++    //////
++    int sys_tcb_set(void* pointer)
++    {
++        return Syscall(SYS_ARCH_PRCTL, 0x1002, pointer);
++    }
++
++    STUB_RET([[gnu::weak]] int sys_futex_tid());
++    STUB_RET(int sys_futex_wait(int* pointer, int expected,
++                                const struct timespec* time));
++    STUB_RET(int sys_futex_wake(int* pointer));
++
++    int sys_anon_allocate(size_t size, void** pointer)
++    {
++        return sys_vm_map(nullptr, size, PROT_READ | PROT_WRITE, 0x20, -1, 0,
++                          pointer);
++    }
++    STUB_RET(int sys_anon_free(void* pointer, size_t size));
++
++    STUB_RET(int sys_close(int fd));
++
++    STUB_RET([[gnu::weak]] int sys_stat(fsfd_target fsfdt, int fd,
++                                        const char* path, int flags,
++                                        struct stat* statbuf));
++
++    int sys_vm_map(void* hint, size_t size, int prot, int flags, int fd,
++                   off_t offset, void** window)
++    {
++        void* ret = reinterpret_cast<void*>(
++            Syscall(SYS_MMAP, hint, size, prot, flags, fd, offset));
++
++        if (ret == MAP_FAILED) return -1;
++
++        *window = (void*)ret;
++        return 0;
++    }
++    STUB_RET(int sys_vm_unmap(void* pointer, size_t size));
++    STUB_RET([[gnu::weak]] int sys_vm_protect(void* pointer, size_t size,
++                                              int prot));
++
++    STUB_RET(int sys_clock_get(int, long*, long*));
++    void sys_exit(int code) { Syscall(SYS_EXIT, code); }
++} // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/process.cpp b/sysdeps/cryptix/sysdeps/process.cpp
+new file mode 100644
+index 00000000..1c1f28e9
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/process.cpp
+@@ -0,0 +1,9 @@
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++
++#include "cryptix/syscall.h"
++
++namespace mlibc
++{
++    STUB_RET(uid_t sys_getuid());
++}; // namespace mlibc
+diff --git a/sysdeps/cryptix/x86_64/thread_entry.S b/sysdeps/cryptix/x86_64/thread_entry.S
+new file mode 100644
+index 00000000..cea1b172
+--- /dev/null
++++ b/sysdeps/cryptix/x86_64/thread_entry.S
+@@ -0,0 +1,24 @@
++
++.section .text
++.global __mlibc_spawn_thread
++.type __mlibc_spawn_thread, "function"
++__mlibc_spawn_thread:
++	xor %eax, %eax
++	/* The rest of the args are already in the right registers,
++	* only need to fixup rcx to r10
++	*/
++	mov %rcx, %r10
++	mov $56, %al
++	syscall
++	test %eax, %eax
++	jnz 1f
++	xor %ebp, %ebp
++	pop %rdi
++	pop %rsi
++	call __mlibc_enter_thread
++	hlt
++1:
++	ret
++.section .note.GNU-stack,"",%progbits
++
++
+-- 
+2.47.1
+

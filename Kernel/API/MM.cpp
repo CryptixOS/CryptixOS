@@ -4,18 +4,18 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "MM.hpp"
+#include <API/MM.hpp>
+#include <API/UnixTypes.hpp>
 
-#include "API/UnixTypes.hpp"
-#include "Arch/CPU.hpp"
+#include <Arch/CPU.hpp>
 
-#include "Memory/PMM.hpp"
-#include "Memory/VMM.hpp"
+#include <Memory/PMM.hpp>
+#include <Memory/VMM.hpp>
 
-#include "Scheduler/Process.hpp"
-#include "Scheduler/Thread.hpp"
+#include <Scheduler/Process.hpp>
+#include <Scheduler/Thread.hpp>
 
-#include "Utility/Math.hpp"
+#include <Utility/Math.hpp>
 
 namespace Syscall::MM
 {
@@ -53,6 +53,9 @@ namespace Syscall::MM
                                        PageAttributes::eRWXU
                                            | PageAttributes::eWriteBack);
 
+            process->m_AddressSpace.push_back({phys, virt, len});
+            if (0x4129659d >= virt && 0x4129659d <= virt + len)
+                LogFatal("Memory in range: {:#x}", virt);
             DebugSyscall("MMAP: virt: {:#x}", virt);
             return virt;
         }

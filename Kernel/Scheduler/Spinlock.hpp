@@ -44,3 +44,17 @@ class Spinlock
     i32   lock         = 0;
     void* lastAcquirer = nullptr;
 };
+
+class ScopedLock final
+{
+  public:
+    ScopedLock(Spinlock& lock)
+        : m_Lock(lock)
+    {
+        lock.Acquire();
+    }
+    ~ScopedLock() { m_Lock.Release(); }
+
+  private:
+    Spinlock& m_Lock;
+};

@@ -10,9 +10,9 @@
 
 #include "Memory/PMM.hpp"
 #include "Memory/VMM.hpp"
-#include "Utility/Math.hpp"
 
-#include <mutex>
+#include <Scheduler/Spinlock.hpp>
+#include <Utility/Math.hpp>
 
 class SlabAllocatorBase
 {
@@ -52,7 +52,7 @@ class SlabAllocator : public SlabAllocatorBase
 
     void* Allocate() override
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(m_Lock);
         if (!firstFree) Initialize();
 
         auto oldFree = reinterpret_cast<usize*>(firstFree);
@@ -63,7 +63,7 @@ class SlabAllocator : public SlabAllocatorBase
     }
     void Free(void* memory) override
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(m_Lock);
         if (!memory) return;
 
         auto newHead = static_cast<usize*>(memory);
@@ -85,7 +85,7 @@ class SlabAllocator : public SlabAllocatorBase
     }
 
   private:
-    uintptr_t  firstFree      = 0;
-    usize      allocationSize = Bytes;
-    std::mutex lock;
+    uintptr_t firstFree      = 0;
+    usize     allocationSize = Bytes;
+    Spinlock  m_Lock;
 };

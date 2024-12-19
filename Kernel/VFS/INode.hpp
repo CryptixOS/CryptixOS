@@ -8,6 +8,8 @@
 
 #include "API/UnixTypes.hpp"
 
+#include <Scheduler/Spinlock.hpp>
+
 #include "VFS/Filesystem.hpp"
 #include "VFS/VFS.hpp"
 
@@ -77,7 +79,7 @@ class INode
   protected:
     INode*                                       parent;
     std::string                                  name;
-    std::mutex                                   lock;
+    Spinlock                                     m_Lock;
     Filesystem*                                  filesystem;
     stat                                         stats;
     std::unordered_map<std::string_view, INode*> children;

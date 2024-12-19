@@ -24,7 +24,7 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
 
     virtual void InsertChild(INode* node, std::string_view name) override
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(m_Lock);
         children[name] = node;
     }
 

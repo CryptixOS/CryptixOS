@@ -17,6 +17,7 @@ int main()
 {
     prompt();
     char* keyBuffer = mmap(0, 4096, 0x03, MAP_ANONYMOUS, -1, 0);
+    fork();
 
     for (;;)
     {

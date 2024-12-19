@@ -26,13 +26,16 @@ namespace Syscall
     {
         Arguments args{};
 
-        args.index   = ctx->rax;
-        args.args[0] = ctx->rdi;
-        args.args[1] = ctx->rsi;
-        args.args[2] = ctx->rdx;
-        args.args[3] = ctx->r10;
-        args.args[4] = ctx->r8;
-        args.args[5] = ctx->r9;
+        args.index            = ctx->rax;
+        args.args[0]          = ctx->rdi;
+        args.args[1]          = ctx->rsi;
+        args.args[2]          = ctx->rdx;
+        args.args[3]          = ctx->r10;
+        args.args[4]          = ctx->r8;
+        args.args[5]          = ctx->r9;
+
+        Thread* current       = CPU::GetCurrentThread();
+        current->SavedContext = *ctx;
 
         Handle(args);
         ctx->rax = args.returnValue;

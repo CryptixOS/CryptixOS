@@ -202,9 +202,9 @@ namespace CPU
         auto apEntryPoint = [](limine_smp_info* cpu)
         {
             CPU* current = reinterpret_cast<CPU*>(cpu->extra_argument);
-            static std::mutex lock;
+            static Spinlock s_Lock;
             {
-                std::unique_lock guard(lock);
+                ScopedLock guard(s_Lock);
                 InitializeCPU(cpu);
 
                 current->IsOnline = true;

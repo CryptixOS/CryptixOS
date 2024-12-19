@@ -4,15 +4,15 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Syscall.hpp"
+#include <API/Syscall.hpp>
 
-#include "API/MM.hpp"
-#include "API/Process.hpp"
-#include "API/VFS.hpp"
-#include "Arch/CPU.hpp"
+#include <API/MM.hpp>
+#include <API/Process.hpp>
+#include <API/VFS.hpp>
+#include <Arch/CPU.hpp>
 
-#include "Scheduler/Process.hpp"
-#include "Scheduler/Thread.hpp"
+#include <Scheduler/Process.hpp>
+#include <Scheduler/Thread.hpp>
 
 #include <array>
 #include <cerrno>
@@ -95,6 +95,7 @@ namespace Syscall
         RegisterSyscall(ID::eMMap, MM::SysMMap);
         RegisterSyscall(ID::eIoCtl, VFS::SysIoCtl);
         RegisterSyscall(ID::eExit, Process::SysExit);
+        RegisterSyscall(ID::eFork, Process::SysFork);
         RegisterSyscall(ID::eArchPrCtl, SysArchPrCtl);
         RegisterSyscall(ID::ePanic, sysPanic);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);

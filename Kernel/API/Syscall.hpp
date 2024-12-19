@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include <Common.hpp>
 
 #include <utility>
 
@@ -33,6 +33,7 @@ namespace Syscall
         eLSeek     = 8,
         eMMap      = 9,
         eIoCtl     = 16,
+        eFork      = 57,
         eExit      = 60,
         eArchPrCtl = 158,
         eGetTid    = 186,

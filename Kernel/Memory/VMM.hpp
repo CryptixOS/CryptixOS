@@ -6,9 +6,8 @@
  */
 #pragma once
 
-#include "Utility/BootInfo.hpp"
-
-#include <mutex>
+#include <Scheduler/Spinlock.hpp>
+#include <Utility/BootInfo.hpp>
 
 inline constexpr usize operator""_kib(unsigned long long count)
 {
@@ -251,14 +250,14 @@ class PageMap
                         PageAttributes flags
                         = PageAttributes::eRW | PageAttributes::eWriteBack)
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(s_Lock);
         return InternalMap(virt, phys, flags);
     }
 
     bool Unmap(uintptr_t      virt,
                PageAttributes flags = static_cast<PageAttributes>(0))
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(s_Lock);
         return InternalUnmap(virt, flags);
     }
 
@@ -328,7 +327,7 @@ class PageMap
 
   private:
     PageTable* topLevel = 0;
-    std::mutex lock;
+    Spinlock   s_Lock;
 
     usize      pageSize = 0;
 };

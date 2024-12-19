@@ -52,7 +52,7 @@ class TmpFsINode final : public INode
 
     virtual void InsertChild(INode* node, std::string_view name) override
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(m_Lock);
         children[name] = node;
     }
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;

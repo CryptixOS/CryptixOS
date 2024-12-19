@@ -4,14 +4,14 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Logger.hpp"
 
-#include "Drivers/Serial.hpp"
-#include "Drivers/Terminal.hpp"
+#include <Drivers/Serial.hpp>
+#include <Drivers/Terminal.hpp>
 
-#include "Utility/Math.hpp"
+#include <Utility/Logger.hpp>
+#include <Utility/Math.hpp>
 
-#include <mutex>
+#include <Scheduler/Spinlock.hpp>
 
 namespace E9
 {
@@ -32,9 +32,9 @@ namespace Logger
 {
     namespace
     {
-        usize      enabledOutputs = 0;
-        std::mutex lock;
-        Terminal   terminal;
+        usize    s_EnabledOutputs = 0;
+        Spinlock s_Lock;
+        Terminal s_Terminal;
 
         template <typename T>
         CTOS_NO_KASAN T ToNumber(const char* str, usize length)
@@ -302,13 +302,13 @@ namespace Logger
     CTOS_NO_KASAN void EnableOutput(usize output)
     {
         if (output == LOG_OUTPUT_TERMINAL)
-            terminal.Initialize(*BootInfo::GetFramebuffer());
+            s_Terminal.Initialize(*BootInfo::GetFramebuffer());
 
-        enabledOutputs |= output;
+        s_EnabledOutputs |= output;
     }
     CTOS_NO_KASAN void DisableOutput(usize output)
     {
-        enabledOutputs &= ~output;
+        s_EnabledOutputs &= ~output;
     }
 
     CTOS_NO_KASAN void LogChar(u64 c)
@@ -319,14 +319,14 @@ namespace Logger
 
     CTOS_NO_KASAN void LogString(std::string_view str)
     {
-        if (enabledOutputs & LOG_OUTPUT_E9) E9::PrintString(str);
-        if (enabledOutputs & LOG_OUTPUT_SERIAL) Serial::Write(str);
-        if (enabledOutputs & LOG_OUTPUT_TERMINAL) terminal.PrintString(str);
+        if (s_EnabledOutputs & LOG_OUTPUT_E9) E9::PrintString(str);
+        if (s_EnabledOutputs & LOG_OUTPUT_SERIAL) Serial::Write(str);
+        if (s_EnabledOutputs & LOG_OUTPUT_TERMINAL) s_Terminal.PrintString(str);
     }
 
     CTOS_NO_KASAN void Log(LogLevel logLevel, std::string_view string)
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(s_Lock);
 
         PrintLogLevel(logLevel);
         LogString(string);
@@ -343,7 +343,7 @@ namespace Logger
     }
     CTOS_NO_KASAN void Logv(LogLevel level, const char* fmt, va_list& args)
     {
-        std::unique_lock guard(lock);
+        ScopedLock guard(s_Lock);
         PrintLogLevel(level);
         while (*fmt)
         {
@@ -360,5 +360,5 @@ namespace Logger
         LogChar('\n');
     }
 
-    Terminal& GetTerminal() { return terminal; }
+    Terminal& GetTerminal() { return s_Terminal; }
 } // namespace Logger

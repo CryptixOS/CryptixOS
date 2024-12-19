@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
 #include <Utility/Stacktrace.hpp>
 
@@ -110,7 +111,8 @@ namespace ELF
     {
       public:
         bool             Load(std::string_view path, PageMap* pageMap,
-                              uintptr_t loadBase = 0);
+                              std::vector<VMM::Region>& addressSpace,
+                              uintptr_t                 loadBase = 0);
 
         inline uintptr_t GetEntryPoint() const { return auxv.EntryPoint; }
         inline uintptr_t GetAtPhdr() const

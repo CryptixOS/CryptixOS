@@ -34,40 +34,9 @@
 #include <VFS/Initrd/Initrd.hpp>
 #include <VFS/VFS.hpp>
 
-static Process* kernelProcess;
-
-void            userThread2()
+void testThread()
 {
-    const char* str = "Hey";
-
-    for (;;)
-        __asm__ volatile(
-            "movq $0, %%rax\n"
-            "movq $1, %%rdi\n"
-            "movq %0, %%rsi\n"
-            "movq %1, %%rdx\n"
-            "syscall\n"
-            :
-            : "r"(str), "r"(3ull)
-            : "rax", "rdx", "rsi", "rdi", "rcx");
-}
-
-void IterateDirectories(INode* node, int spaceCount = 0)
-{
-    char* spaces = new char[spaceCount + 1];
-    memset(spaces, ' ', spaceCount);
-    spaces[spaceCount] = 0;
-    for (auto child : node->GetChildren())
-    {
-        LogInfo("{}-{}", spaces, child.second->GetName().data());
-        if (child.second->mountGate)
-        {
-            IterateDirectories(child.second->mountGate, spaceCount + 4);
-            continue;
-        }
-        if (child.second->GetType() == INodeType::eDirectory)
-            IterateDirectories(child.second, spaceCount + 4);
-    }
+    for (;;) LogInfo("works");
 }
 
 void kernelThread()
@@ -86,7 +55,6 @@ void kernelThread()
     Process* userProcess
         = new Process("TestUserProcess", PrivilegeLevel::eUnprivileged);
     userProcess->pageMap = VMM::GetKernelPageMap();
-    userProcess->parent  = kernelProcess;
     userProcess->InitializeStreams();
 
     const char*       argv[] = {"/usr/sbin/init", nullptr};
@@ -94,12 +62,14 @@ void kernelThread()
 
     static ELF::Image program, ld;
     PageMap*          pageMap = new PageMap();
-    Assert(program.Load("/usr/sbin/init", pageMap));
+    Assert(
+        program.Load("/usr/sbin/init", pageMap, userProcess->m_AddressSpace));
     std::string_view ldPath = program.GetLdPath();
     if (!ldPath.empty())
     {
         LogTrace("Kernel: Loading ld: '{}'", ldPath);
-        Assert(ld.Load(ldPath, pageMap, 0x40000000));
+        Assert(
+            ld.Load(ldPath, pageMap, userProcess->m_AddressSpace, 0x40000000));
     }
 
     userProcess->pageMap = pageMap;
@@ -108,8 +78,6 @@ void kernelThread()
     Scheduler::EnqueueThread(new Thread(userProcess, address,
                                         const_cast<char**>(argv), envp, program,
                                         CPU::GetCurrent()->ID));
-    // Scheduler::EnqueueThread(
-    //   new Thread(userProcess, reinterpret_cast<uintptr_t>(userThread2)));
 
     for (;;) Arch::Halt();
 }

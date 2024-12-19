@@ -4,18 +4,27 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Process.hpp"
+#include <API/Process.hpp>
 
-#include "Arch/InterruptGuard.hpp"
+#include <Arch/InterruptGuard.hpp>
 
-#include "Scheduler/Process.hpp"
-#include "Scheduler/Thread.hpp"
+#include <Scheduler/Process.hpp>
+#include <Scheduler/Thread.hpp>
 
 namespace Syscall::Process
 {
+    pid_t SysFork(Syscall::Arguments&)
+    {
+        struct Process* process    = CPU::GetCurrentThread()->parent;
+
+        struct Process* newProcess = process->Fork();
+        Assert(newProcess);
+
+        LogInfo("New Process Pid: {}", newProcess->pid);
+        return newProcess->pid;
+    }
     int SysExit(Syscall::Arguments& args)
     {
-        InterruptGuard(false);
         i32   code    = args.args[0];
 
         auto* process = CPU::GetCurrentThread()->parent;

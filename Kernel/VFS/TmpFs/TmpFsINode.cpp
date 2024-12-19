@@ -12,9 +12,9 @@
 
 isize TmpFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
-    std::unique_lock guard(lock);
+    ScopedLock guard(m_Lock);
 
-    usize            count = bytes;
+    usize      count = bytes;
     if (off_t(offset + bytes) > stats.st_size)
         count = bytes - ((offset + bytes) - stats.st_size);
 
@@ -24,7 +24,7 @@ isize TmpFsINode::Read(void* buffer, off_t offset, usize bytes)
 }
 isize TmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
 {
-    std::unique_lock guard(lock);
+    ScopedLock guard(m_Lock);
 
     if (offset + bytes > capacity)
     {
