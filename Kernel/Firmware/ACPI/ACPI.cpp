@@ -8,7 +8,7 @@
 #include <Firmware/ACPI/MADT.hpp>
 
 #include <Memory/VMM.hpp>
-#include <Utility/BootInfo.hpp>
+#include <Boot/BootInfo.hpp>
 
 namespace ACPI
 {

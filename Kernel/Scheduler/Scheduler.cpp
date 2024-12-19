@@ -18,7 +18,6 @@
 #include <Scheduler/Thread.hpp>
 
 #include <deque>
-#include <mutex>
 
 u8 g_ScheduleVector = 0x20;
 namespace Scheduler
@@ -29,33 +28,15 @@ namespace Scheduler
 
         Process*            s_KernelProcess = nullptr;
         std::deque<Thread*> s_ExecutionQueue;
-        std::deque<Thread*> queues[2];
-        auto                active  = &queues[0];
-        auto                expired = &queues[1];
 
         Thread*             GetNextThread(usize cpuID)
         {
             ScopedLock guard(s_Lock);
             if (s_ExecutionQueue.empty()) return nullptr;
+
             Thread* t = s_ExecutionQueue.front();
             s_ExecutionQueue.pop_front();
             return t;
-
-            if (active->empty()) std::swap(active, expired);
-            if (active->empty()) return nullptr;
-
-            for (auto it = active->rbegin(); it != active->rend(); it++)
-            {
-                Thread* thread = *it;
-                if (thread->runningOn < 0 || thread->runningOn == cpuID || true)
-                {
-                    active->erase(std::next(it).base());
-                    thread->enqueued = false;
-
-                    return thread;
-                }
-            }
-            return nullptr;
         }
     } // namespace
     void Schedule(CPUContext* ctx);
@@ -69,12 +50,6 @@ namespace Scheduler
     }
     void PrepareAP(bool start)
     {
-        CPU::GetCurrent()->TSS.ist[0]
-            = ToHigherHalfAddress<uintptr_t>(PMM::AllocatePages<uintptr_t>(
-                  CPU::KERNEL_STACK_SIZE / PMM::PAGE_SIZE))
-            + CPU::KERNEL_STACK_SIZE;
-        IDT::SetIST(14, 2);
-
         static std::atomic<pid_t> idlePids(-1);
 
         std::string               name = "Idle Process for CPU: ";
@@ -121,7 +96,6 @@ namespace Scheduler
 
         thread->enqueued = true;
         thread->state    = ThreadState::eReady;
-        // expired->push_front(thread);
         s_ExecutionQueue.push_back(thread);
     }
 
@@ -133,7 +107,6 @@ namespace Scheduler
         if (thread->state == ThreadState::eRunning)
             thread->state = ThreadState::eReady;
 
-        // expired->push_front(thread);
         s_ExecutionQueue.push_back(thread);
     }
 

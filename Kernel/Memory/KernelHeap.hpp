@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include "Utility/Types.hpp"
+#include <Utility/Types.hpp>
 
 namespace KernelHeap
 {

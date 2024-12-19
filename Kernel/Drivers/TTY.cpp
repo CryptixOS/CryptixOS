@@ -145,7 +145,10 @@ void TTY::Initialize()
     }
 
     if (!s_TTYs.empty())
+    {
         VFS::MkNod(VFS::GetRootNode(), "/dev/tty0", 0666, s_TTYs[0]->GetID());
+        VFS::MkNod(VFS::GetRootNode(), "/dev/tty", 0666, s_TTYs[0]->GetID());
+    }
 
     LogInfo("TTY: Initialized");
 }

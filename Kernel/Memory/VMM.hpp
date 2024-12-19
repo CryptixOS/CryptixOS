@@ -7,7 +7,7 @@
 #pragma once
 
 #include <Scheduler/Spinlock.hpp>
-#include <Utility/BootInfo.hpp>
+#include <Boot/BootInfo.hpp>
 
 inline constexpr usize operator""_kib(unsigned long long count)
 {

@@ -8,7 +8,7 @@
 
 #include "Memory/PMM.hpp"
 
-#include "Utility/BootInfo.hpp"
+#include "Boot/BootInfo.hpp"
 #include "Utility/Math.hpp"
 
 extern "C" symbol text_start_addr;

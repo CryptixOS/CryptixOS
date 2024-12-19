@@ -6,13 +6,12 @@
  */
 #pragma once
 
-#include "Utility/Types.hpp"
-
-#include "Memory/PMM.hpp"
-#include "Memory/VMM.hpp"
+#include <Memory/PMM.hpp>
+#include <Memory/VMM.hpp>
 
 #include <Scheduler/Spinlock.hpp>
 #include <Utility/Math.hpp>
+#include <Utility/Types.hpp>
 
 class SlabAllocatorBase
 {
@@ -24,7 +23,7 @@ class SlabAllocatorBase
 
 struct SlabHeader
 {
-    SlabAllocatorBase* slab;
+    SlabAllocatorBase* Slab;
 };
 
 template <usize Bytes>
@@ -34,17 +33,17 @@ class SlabAllocator : public SlabAllocatorBase
     SlabAllocator() = default;
     void Initialize()
     {
-        firstFree = ToHigherHalfAddress<uintptr_t>(
+        m_FirstFree = ToHigherHalfAddress<uintptr_t>(
             PhysicalMemoryManager::CallocatePages(1));
         auto available
-            = 0x1000 - Math::AlignUp(sizeof(SlabHeader), allocationSize);
-        auto slabPointer  = reinterpret_cast<SlabHeader*>(firstFree);
-        slabPointer->slab = this;
-        firstFree += Math::AlignUp(sizeof(SlabHeader), allocationSize);
+            = 0x1000 - Math::AlignUp(sizeof(SlabHeader), m_AllocationSize);
+        auto slabPointer  = reinterpret_cast<SlabHeader*>(m_FirstFree);
+        slabPointer->Slab = this;
+        m_FirstFree += Math::AlignUp(sizeof(SlabHeader), m_AllocationSize);
 
-        auto array = reinterpret_cast<usize*>(firstFree);
-        auto max   = available / allocationSize - 1;
-        auto fact  = allocationSize / 8;
+        auto array = reinterpret_cast<usize*>(m_FirstFree);
+        auto max   = available / m_AllocationSize - 1;
+        auto fact  = m_AllocationSize / 8;
         for (usize i = 0; i < max; i++)
             array[i * fact] = reinterpret_cast<usize>(&array[(i + 1) * fact]);
         array[max * fact] = 0;
@@ -53,11 +52,11 @@ class SlabAllocator : public SlabAllocatorBase
     void* Allocate() override
     {
         ScopedLock guard(m_Lock);
-        if (!firstFree) Initialize();
+        if (!m_FirstFree) Initialize();
 
-        auto oldFree = reinterpret_cast<usize*>(firstFree);
-        firstFree    = oldFree[0];
-        std::memset(oldFree, 0, allocationSize);
+        auto oldFree = reinterpret_cast<usize*>(m_FirstFree);
+        m_FirstFree  = oldFree[0];
+        std::memset(oldFree, 0, m_AllocationSize);
 
         return oldFree;
     }
@@ -67,11 +66,11 @@ class SlabAllocator : public SlabAllocatorBase
         if (!memory) return;
 
         auto newHead = static_cast<usize*>(memory);
-        newHead[0]   = firstFree;
-        firstFree    = reinterpret_cast<uintptr_t>(newHead);
+        newHead[0]   = m_FirstFree;
+        m_FirstFree  = reinterpret_cast<uintptr_t>(newHead);
     }
 
-    virtual usize GetAllocationSize() override { return allocationSize; }
+    virtual usize GetAllocationSize() override { return m_AllocationSize; }
 
     template <typename T>
     T Allocate()
@@ -85,7 +84,7 @@ class SlabAllocator : public SlabAllocatorBase
     }
 
   private:
-    uintptr_t firstFree      = 0;
-    usize     allocationSize = Bytes;
+    uintptr_t m_FirstFree      = 0;
+    usize     m_AllocationSize = Bytes;
     Spinlock  m_Lock;
 };

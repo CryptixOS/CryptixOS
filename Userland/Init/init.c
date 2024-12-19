@@ -24,7 +24,8 @@ int main(int argc, char** argv, char** envp)
     if (pid == 0)
     {
         write(0, child, 5);
-        execve("/usr/sbin/sh", argv, envp);
+        // execve("/usr/sbin/sh", argv, envp);
+        execve("/usr/bin/bash", argv, envp);
     }
     else if (pid == -1) { write(0, fork_fail, 11); }
     else write(0, fork_success, 12);

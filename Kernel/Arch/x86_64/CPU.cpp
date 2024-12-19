@@ -11,7 +11,7 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-#include <Utility/BootInfo.hpp>
+#include <Boot/BootInfo.hpp>
 #include <Utility/Math.hpp>
 
 extern u8 g_ScheduleVector;
@@ -104,7 +104,7 @@ namespace CPU
         LogInfo("FPU: Initialized on cpu[{}]", current->ID);
     }
 
-    static void InitializeCPU(limine_smp_info* cpu)
+    static void InitializeCPU(limine_mp_info* cpu)
     {
         CPU* current = reinterpret_cast<CPU*>(cpu->extra_argument);
 
@@ -148,12 +148,18 @@ namespace CPU
         WriteMSR(MSR::SFMASK, ~u32(2));
 
         current->Lapic.Initialize();
+
+        GetCurrent()->TSS.ist[0]
+            = ToHigherHalfAddress<uintptr_t>(PMM::AllocatePages<uintptr_t>(
+                  KERNEL_STACK_SIZE / PMM::PAGE_SIZE))
+            + KERNEL_STACK_SIZE;
+        IDT::SetIST(14, 2);
     }
 
     void InitializeBSP()
     {
-        limine_smp_response* smp      = BootInfo::GetSMP_Response();
-        usize                cpuCount = smp->cpu_count;
+        limine_mp_response* smp      = BootInfo::GetSMP_Response();
+        usize               cpuCount = smp->cpu_count;
 
         s_CPUs.resize(cpuCount);
         s_BspLapicId = smp->bsp_lapic_id;
@@ -161,7 +167,7 @@ namespace CPU
         LogTrace("BSP: Initializing...");
         for (usize i = 0; i < cpuCount; i++)
         {
-            limine_smp_info* smpInfo = smp->cpus[i];
+            limine_mp_info* smpInfo = smp->cpus[i];
             // Find the bsp
             if (smpInfo->lapic_id != s_BspLapicId) continue;
 
@@ -200,7 +206,7 @@ namespace CPU
     {
         LogTrace("SMP: Launching APs");
 
-        auto apEntryPoint = [](limine_smp_info* cpu)
+        auto apEntryPoint = [](limine_mp_info* cpu)
         {
             CPU* current = reinterpret_cast<CPU*>(cpu->extra_argument);
             static Spinlock s_Lock;

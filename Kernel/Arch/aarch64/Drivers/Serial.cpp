@@ -6,7 +6,7 @@
  */
 #include "Drivers/Serial.hpp"
 
-#include "Utility/BootInfo.hpp"
+#include "Boot/BootInfo.hpp"
 
 namespace Serial
 {

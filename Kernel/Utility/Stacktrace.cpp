@@ -11,7 +11,7 @@
 #include "Memory/PMM.hpp"
 #include "Memory/VMM.hpp"
 
-#include "Utility/BootInfo.hpp"
+#include "Boot/BootInfo.hpp"
 #include "Utility/Math.hpp"
 
 #include <demangler/Demangle.h>

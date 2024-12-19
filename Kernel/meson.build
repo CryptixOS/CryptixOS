@@ -12,6 +12,8 @@ srcs += files(
   'API/Syscall.cpp',
   'API/VFS.cpp',
 
+  'Boot/BootInfo.cpp',
+
   'Drivers/Terminal.cpp',
   'Drivers/TTY.cpp',
   
@@ -29,7 +31,6 @@ srcs += files(
   'Scheduler/Scheduler.cpp',
   'Scheduler/Thread.cpp',
 
-  'Utility/BootInfo.cpp',
   'Utility/ELF.cpp',
   'Utility/ICxxAbi.cpp',
   'Utility/Kasan.cpp',

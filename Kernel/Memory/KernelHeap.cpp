@@ -4,23 +4,23 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "KernelHeap.hpp"
+#include <Memory/KernelHeap.hpp>
 
-#include "Memory/PMM.hpp"
-#include "Memory/SlabAllocator.hpp"
+#include <Memory/PMM.hpp>
+#include <Memory/SlabAllocator.hpp>
 
 namespace KernelHeap
 {
     namespace
     {
-        SlabAllocator<8>    allocator8    = {};
-        SlabAllocator<16>   allocator16   = {};
-        SlabAllocator<32>   allocator32   = {};
-        SlabAllocator<64>   allocator64   = {};
-        SlabAllocator<128>  allocator128  = {};
-        SlabAllocator<256>  allocator256  = {};
-        SlabAllocator<512>  allocator512  = {};
-        SlabAllocator<1024> allocator1024 = {};
+        SlabAllocator<8>    s_Allocator8    = {};
+        SlabAllocator<16>   s_Allocator16   = {};
+        SlabAllocator<32>   s_Allocator32   = {};
+        SlabAllocator<64>   s_Allocator64   = {};
+        SlabAllocator<128>  s_Allocator128  = {};
+        SlabAllocator<256>  s_Allocator256  = {};
+        SlabAllocator<512>  s_Allocator512  = {};
+        SlabAllocator<1024> s_Allocator1024 = {};
 
         struct BigAllocMeta
         {
@@ -30,14 +30,14 @@ namespace KernelHeap
 
         void* InternalAllocate(usize size)
         {
-            if (size <= 8) return allocator8.Allocate<void*>();
-            else if (size <= 16) return allocator16.Allocate<void*>();
-            else if (size <= 32) return allocator32.Allocate<void*>();
-            else if (size <= 64) return allocator64.Allocate<void*>();
-            else if (size <= 128) return allocator128.Allocate<void*>();
-            else if (size <= 256) return allocator256.Allocate<void*>();
-            else if (size <= 512) return allocator512.Allocate<void*>();
-            else if (size <= 1024) return allocator1024.Allocate<void*>();
+            if (size <= 8) return s_Allocator8.Allocate<void*>();
+            else if (size <= 16) return s_Allocator16.Allocate<void*>();
+            else if (size <= 32) return s_Allocator32.Allocate<void*>();
+            else if (size <= 64) return s_Allocator64.Allocate<void*>();
+            else if (size <= 128) return s_Allocator128.Allocate<void*>();
+            else if (size <= 256) return s_Allocator256.Allocate<void*>();
+            else if (size <= 512) return s_Allocator512.Allocate<void*>();
+            else if (size <= 1024) return s_Allocator1024.Allocate<void*>();
 
             usize pages = Math::AlignUp(size, 4096) / 4096;
             auto  ptr
@@ -66,7 +66,7 @@ namespace KernelHeap
             }
             reinterpret_cast<SlabHeader*>(reinterpret_cast<uintptr_t>(ptr)
                                           & ~0xfff)
-                ->slab->Free(ptr);
+                ->Slab->Free(ptr);
         }
     } // namespace
       //
@@ -74,14 +74,14 @@ namespace KernelHeap
     {
         EarlyLogTrace("KernelHeap: Initializing...");
 
-        allocator8.Initialize();
-        allocator16.Initialize();
-        allocator32.Initialize();
-        allocator64.Initialize();
-        allocator128.Initialize();
-        allocator256.Initialize();
-        allocator512.Initialize();
-        allocator1024.Initialize();
+        s_Allocator8.Initialize();
+        s_Allocator16.Initialize();
+        s_Allocator32.Initialize();
+        s_Allocator64.Initialize();
+        s_Allocator128.Initialize();
+        s_Allocator256.Initialize();
+        s_Allocator512.Initialize();
+        s_Allocator1024.Initialize();
 
         LogInfo("KernelHeap: Initialized");
     }
@@ -129,7 +129,7 @@ namespace KernelHeap
 
         SlabAllocatorBase* slab = reinterpret_cast<SlabHeader*>(
                                       reinterpret_cast<uintptr_t>(ptr) & ~0xFFF)
-                                      ->slab;
+                                      ->Slab;
         usize oldSize = slab->GetAllocationSize();
 
         if (size == 0)

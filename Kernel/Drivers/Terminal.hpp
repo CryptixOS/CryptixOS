@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Utility/BootInfo.hpp>
+#include <Boot/BootInfo.hpp>
 #include <Utility/Types.hpp>
 
 #include <Scheduler/Spinlock.hpp>

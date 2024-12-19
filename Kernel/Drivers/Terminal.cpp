@@ -9,7 +9,7 @@
 #include <Drivers/Terminal.hpp>
 
 #include <Memory/PMM.hpp>
-#include <Utility/BootInfo.hpp>
+#include <Boot/BootInfo.hpp>
 
 #include <backends/fb.h>
 

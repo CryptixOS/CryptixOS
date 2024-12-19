@@ -34,10 +34,7 @@
 #include <VFS/Initrd/Initrd.hpp>
 #include <VFS/VFS.hpp>
 
-void testThread()
-{
-    for (;;) LogInfo("works");
-}
+#include <magic_enum/magic_enum.hpp>
 
 void kernelThread()
 {
@@ -84,8 +81,7 @@ void kernelThread()
 
 extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
 {
-    Logger::EnableOutput(LOG_OUTPUT_TERMINAL);
-    InterruptManager::InstallExceptionHandlers();
+    InterruptManager::InstallExceptions();
 
     Assert(PMM::Initialize());
     icxxabi::Initialize();
@@ -94,14 +90,17 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
     Serial::Initialize();
     Logger::EnableOutput(LOG_OUTPUT_SERIAL);
 
-    LogInfo("Boot: Kernel loaded with {}-{} -> boot time: {}s",
-            BootInfo::GetBootloaderName(), BootInfo::GetBootloaderVersion(),
-            BootInfo::GetBootTime());
+    LogInfo(
+        "Boot: Kernel loaded with {}-{} -> firmware type: {}, boot time: {}s",
+        BootInfo::GetBootloaderName(), BootInfo::GetBootloaderVersion(),
+        magic_enum::enum_name(BootInfo::GetFirmwareType()),
+        BootInfo::GetBootTime());
 
     LogInfo("Boot: Kernel Physical Address: {:#x}",
             BootInfo::GetKernelPhysicalAddress().Raw<>());
     LogInfo("Boot: Kernel Virtual Address: {:#x}",
             BootInfo::GetKernelVirtualAddress().Raw<>());
+
     Stacktrace::Initialize();
     ACPI::Initialize();
     Arch::Initialize();
@@ -114,9 +113,6 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
     Scheduler::EnqueueThread(thread);
 
     Syscall::InstallAll();
-    LogInfo("Kernel Stack Size: {:#x}, User Stack Size: {:#x}",
-            CPU::KERNEL_STACK_SIZE, CPU::USER_STACK_SIZE);
-
     Scheduler::PrepareAP(true);
 
     std::unreachable();

@@ -17,7 +17,7 @@
 
 namespace InterruptManager
 {
-    void InstallExceptionHandlers()
+    void InstallExceptions()
     {
         GDT::Initialize();
         GDT::Load(0);

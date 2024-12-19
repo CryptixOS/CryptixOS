@@ -13,7 +13,7 @@ srcs += files(
   'InterruptManager.cpp',
   'Syscall.cpp',
   'VMM.cpp',
-  'interrupts.x86_64.S',
+  'idt.S',
   'syscall.S',
 
   'Drivers/I8042Controller.cpp',

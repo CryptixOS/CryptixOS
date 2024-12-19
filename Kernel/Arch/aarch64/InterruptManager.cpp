@@ -26,7 +26,7 @@ extern "C" void raiseIrq()
 namespace InterruptManager
 {
     extern "C" char* exception_handlers;
-    void             InstallExceptionHandlers()
+    void             InstallExceptions()
     {
         __asm__ volatile("msr VBAR_EL1, %0" ::"r"(&exception_handlers));
         __asm__ volatile(
