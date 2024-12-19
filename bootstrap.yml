@@ -262,6 +262,7 @@ packages:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/sbin']
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/root']
       - args: ['@OPTION:arch-triple@-gcc', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/init.c', '-o', '@THIS_COLLECT_DIR@/usr/sbin/init']
+      - args: ['@OPTION:arch-triple@-gcc', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/sh.c', '-o', '@THIS_COLLECT_DIR@/usr/sbin/sh']
 
   - name: linux-headers
     architecture: '@OPTION:arch@'

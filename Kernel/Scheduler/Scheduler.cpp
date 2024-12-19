@@ -77,11 +77,11 @@ namespace Scheduler
 
         static std::atomic<pid_t> idlePids(-1);
 
-        Process*                  process = new Process;
-        process->pid                      = idlePids--;
-        process->name                     = "Idle Process for CPU: ";
-        process->name += std::to_string(CPU::GetCurrent()->ID);
-        process->pageMap = VMM::GetKernelPageMap();
+        std::string               name = "Idle Process for CPU: ";
+        name += std::to_string(CPU::GetCurrentID());
+
+        Process* process = new Process(name, idlePids--);
+        process->PageMap = VMM::GetKernelPageMap();
 
         auto idleThread  = new Thread(
             process, reinterpret_cast<uintptr_t>(Arch::Halt), false);
@@ -164,7 +164,7 @@ namespace Scheduler
             CPU::SaveThread(currentThread, ctx);
         }
 
-        CPU::Reschedule(1000);
+        CPU::Reschedule(newThread->parent->m_Quantum);
         CPU::LoadThread(newThread, ctx);
 
         if (currentThread && currentThread->state == ThreadState::eKilled

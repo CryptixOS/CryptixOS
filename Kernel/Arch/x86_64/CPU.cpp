@@ -471,7 +471,7 @@ namespace CPU
         GetCurrent()->TSS.ist[1] = thread->pageFaultStack;
         GetCurrent()->FpuRestore(thread->fpuStorage);
 
-        thread->parent->pageMap->Load();
+        thread->parent->PageMap->Load();
 
         SetGSBase(reinterpret_cast<u64>(thread));
         SetKernelGSBase(thread->gsBase);

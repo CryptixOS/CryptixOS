@@ -12,7 +12,7 @@ void prompt(void)
     write(0, prompt_str, strlen(prompt_str));
 }
 
-int main()
+int main(int argc, char** argv, char** envp)
 {
     prompt();
     char*       keyBuffer    = mmap(0, 4096, 0x03, MAP_ANONYMOUS, -1, 0);
@@ -21,7 +21,11 @@ int main()
     const char* fork_fail    = "fork-failed";
     const char* fork_success = "fork-success";
 
-    if (pid == 0) { write(0, child, 5); }
+    if (pid == 0)
+    {
+        write(0, child, 5);
+        execve("/usr/sbin/sh", argv, envp);
+    }
     else if (pid == -1) { write(0, fork_fail, 11); }
     else write(0, fork_success, 12);
 
@@ -29,7 +33,5 @@ int main()
     {
         ssize_t nread;
         nread = getline(&keyBuffer, &nread, stdin);
-
-        if (nread > 0) write(0, keyBuffer, nread);
     }
 }

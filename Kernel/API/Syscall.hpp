@@ -34,6 +34,7 @@ namespace Syscall
         eMMap      = 9,
         eIoCtl     = 16,
         eFork      = 57,
+        eExecve    = 59,
         eExit      = 60,
         eArchPrCtl = 158,
         eGetTid    = 186,

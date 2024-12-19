@@ -22,23 +22,64 @@ inline usize AllocatePid()
 }
 
 Process::Process(std::string_view name, PrivilegeLevel ring)
-    : name(name)
-    , ring(ring)
+    : m_Name(name)
+    , m_Ring(ring)
 {
-    nextTid = pid = AllocatePid();
-    if (ring == PrivilegeLevel::ePrivileged) pageMap = VMM::GetKernelPageMap();
+    m_NextTid = m_Pid = AllocatePid();
+    if (ring == PrivilegeLevel::ePrivileged) PageMap = VMM::GetKernelPageMap();
+}
+Process::Process(std::string_view name, pid_t pid)
+    : m_Pid(pid)
+    , m_Name(name)
+{
 }
 
+i32 Process::Exec(const char* path, char** argv, char** envp)
+{
+    for (auto fd : m_FileDescriptors) delete fd;
+    m_FileDescriptors.clear();
+    InitializeStreams();
+
+    m_Name = path;
+    Arch::VMM::DestroyPageMap(PageMap);
+    delete PageMap;
+    PageMap = new class PageMap();
+
+    static ELF::Image program, ld;
+    Assert(program.Load(path, PageMap, m_AddressSpace));
+    std::string_view ldPath = program.GetLdPath();
+    if (!ldPath.empty())
+    {
+        LogTrace("Kernel: Loading ld: '{}'", ldPath);
+        Assert(ld.Load(ldPath, PageMap, m_AddressSpace, 0x40000000));
+    }
+    Thread* currentThread = CPU::GetCurrentThread();
+    currentThread->state  = ThreadState::eKilled;
+
+    for (auto& thread : m_Threads)
+    {
+        if (thread == currentThread) continue;
+        delete thread;
+    }
+
+    uintptr_t address
+        = ldPath.empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
+    Scheduler::EnqueueThread(
+        new Thread(this, address, argv, envp, program, CPU::GetCurrent()->ID));
+
+    Scheduler::Yield();
+    return 0;
+}
 Process* Process::Fork()
 {
     Thread* currentThread = CPU::GetCurrentThread();
     Assert(currentThread && currentThread->parent == this);
 
-    Process* newProcess = new Process(name, ring);
-    newProcess->parent  = this;
+    Process* newProcess    = new Process(m_Name, m_Ring);
+    newProcess->m_Parent   = this;
 
-    PageMap* pageMap    = new PageMap();
-    newProcess->pageMap = pageMap;
+    class PageMap* pageMap = new class PageMap();
+    newProcess->PageMap    = pageMap;
 
     for (auto& range : m_AddressSpace)
     {
@@ -56,23 +97,23 @@ Process* Process::Fork()
                           PageAttributes::eRWXU | PageAttributes::eWriteBack);
     }
 
-    newProcess->nextTid.store(nextTid);
-    for (usize i = 0; i < fileDescriptors.size(); i++)
+    newProcess->m_NextTid.store(m_NextTid);
+    for (usize i = 0; i < m_FileDescriptors.size(); i++)
     {
-        FileDescriptor* currentFd = fileDescriptors[i];
+        FileDescriptor* currentFd = m_FileDescriptors[i];
         FileDescriptor* newFd     = currentFd->node->Open();
 
-        newProcess->fileDescriptors.push_back(newFd);
+        newProcess->m_FileDescriptors.push_back(newFd);
     }
 
     m_Children.push_back(newProcess);
-    newProcess->parent       = this;
+    newProcess->m_Parent       = this;
 
-    Thread* thread           = currentThread->Fork(newProcess);
-    thread->enqueued         = false;
-    newProcess->userStackTop = userStackTop;
+    Thread* thread             = currentThread->Fork(newProcess);
+    thread->enqueued           = false;
+    newProcess->m_UserStackTop = m_UserStackTop;
 
-    newProcess->threads.push_back(thread);
+    newProcess->m_Threads.push_back(thread);
     Scheduler::EnqueueThread(thread);
 
     return newProcess;
@@ -80,10 +121,10 @@ Process* Process::Fork()
 
 i32 Process::Exit(i32 code)
 {
-    for (FileDescriptor* fd : fileDescriptors) fd->Close();
-    fileDescriptors.clear();
+    for (FileDescriptor* fd : m_FileDescriptors) fd->Close();
+    m_FileDescriptors.clear();
 
-    for (Thread* thread : threads) thread->state = ThreadState::eExited;
+    for (Thread* thread : m_Threads) thread->state = ThreadState::eExited;
 
     Scheduler::Yield();
     CtosUnreachable();

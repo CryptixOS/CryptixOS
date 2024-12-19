@@ -54,7 +54,7 @@ void kernelThread()
     LogTrace("Loading user process...");
     Process* userProcess
         = new Process("TestUserProcess", PrivilegeLevel::eUnprivileged);
-    userProcess->pageMap = VMM::GetKernelPageMap();
+    userProcess->PageMap = VMM::GetKernelPageMap();
     userProcess->InitializeStreams();
 
     const char*       argv[] = {"/usr/sbin/init", nullptr};
@@ -72,7 +72,7 @@ void kernelThread()
             ld.Load(ldPath, pageMap, userProcess->m_AddressSpace, 0x40000000));
     }
 
-    userProcess->pageMap = pageMap;
+    userProcess->PageMap = pageMap;
     uintptr_t address
         = ldPath.empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
     Scheduler::EnqueueThread(new Thread(userProcess, address,

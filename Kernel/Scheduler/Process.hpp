@@ -50,38 +50,61 @@ constexpr Credentials ROOT_CREDENTIALS = {
 
 struct Thread;
 
-struct Process
+class Process
 {
+  public:
     Process() = default;
     Process(std::string_view name, PrivilegeLevel ring);
+    Process(std::string_view name, pid_t pid);
 
-    Process* Fork();
-
-    void     InitializeStreams()
+    void InitializeStreams()
     {
-        fileDescriptors.clear();
+        m_FileDescriptors.clear();
         INode* currentTTY
             = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), "/dev/tty0"));
 
         LogTrace("Process: Creating standard streams...");
-        fileDescriptors.push_back(currentTTY->Open());
-        fileDescriptors.push_back(currentTTY->Open());
-        fileDescriptors.push_back(currentTTY->Open());
+        m_FileDescriptors.push_back(currentTTY->Open());
+        m_FileDescriptors.push_back(currentTTY->Open());
+        m_FileDescriptors.push_back(currentTTY->Open());
     }
-    i32                          Exit(i32 code);
 
-    pid_t                        pid         = -1;
-    std::string                  name        = "?";
-    PageMap*                     pageMap     = nullptr;
-    std::atomic<tid_t>           nextTid     = 1;
-    Credentials                  credentials = {};
-    PrivilegeLevel               ring        = PrivilegeLevel::eUnprivileged;
+    inline pid_t              GetPid() const { return m_Pid; }
+    inline const Credentials& GetCredentials() const { return m_Credentials; }
+    inline i32                CreateDescriptor(INode* node)
+    {
+        auto  descriptor = node->Open();
 
-    Process*                     parent      = nullptr;
+        usize fd         = m_FileDescriptors.size();
+        m_FileDescriptors.push_back(descriptor);
+
+        return fd;
+    }
+    inline FileDescriptor* GetFileHandle(i32 fd) const
+    {
+        if (fd >= static_cast<i32>(m_FileDescriptors.size())) return nullptr;
+
+        return m_FileDescriptors[fd];
+    }
+
+    Process* Fork();
+    i32      Exec(const char* path, char** argv, char** envp);
+    i32      Exit(i32 code);
+
+    friend struct Thread;
+    pid_t                        m_Pid         = -1;
+    std::string                  m_Name        = "?";
+    PageMap*                     PageMap       = nullptr;
+    std::atomic<tid_t>           m_NextTid     = 1;
+    Credentials                  m_Credentials = {};
+    PrivilegeLevel               m_Ring        = PrivilegeLevel::eUnprivileged;
+
+    Process*                     m_Parent      = nullptr;
     std::vector<Process*>        m_Children;
-    std::vector<Thread*>         threads;
+    std::vector<Thread*>         m_Threads;
 
-    std::vector<FileDescriptor*> fileDescriptors;
+    std::vector<FileDescriptor*> m_FileDescriptors;
     std::vector<VMM::Region>     m_AddressSpace{};
-    uintptr_t                    userStackTop = 0x70000000000;
+    uintptr_t                    m_UserStackTop = 0x70000000000;
+    usize                        m_Quantum      = 1000;
 };

@@ -49,7 +49,7 @@ namespace Syscall::MM
 
             if (virt == 0) virt = VMM::AllocateSpace(len, 0, true);
             uintptr_t phys = PMM::CallocatePages<uintptr_t>(pageCount);
-            process->pageMap->MapRange(virt, phys, len,
+            process->PageMap->MapRange(virt, phys, len,
                                        PageAttributes::eRWXU
                                            | PageAttributes::eWriteBack);
 

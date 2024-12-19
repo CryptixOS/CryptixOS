@@ -8,7 +8,7 @@
 
 #include <Common.hpp>
 
-struct Process;
+class Process;
 struct Thread;
 namespace Scheduler
 {

@@ -24,9 +24,9 @@ Thread::Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn)
     , state(ThreadState::eDequeued)
 
 {
-    tid = parent->nextTid++;
+    tid = parent->m_NextTid++;
     CPU::PrepareThread(this, pc, arg);
-    parent->threads.push_back(this);
+    parent->m_Threads.push_back(this);
 }
 
 static uintptr_t prepareStack(uintptr_t _stack, uintptr_t sp,
@@ -101,24 +101,24 @@ Thread::Thread(Process* parent, uintptr_t pc, char** argv, char** envp,
     , enqueued(false)
     , state(ThreadState::eDequeued)
 {
-    tid = parent->nextTid++;
+    tid = parent->m_NextTid++;
 
-    if (!parent->pageMap) parent->pageMap = VMM::GetKernelPageMap();
+    if (!parent->PageMap) parent->PageMap = VMM::GetKernelPageMap();
 
     auto mapUserStack = [this]() -> std::pair<uintptr_t, uintptr_t>
     {
         uintptr_t pstack  = PMM::CallocatePages<uintptr_t>(CPU::USER_STACK_SIZE
                                                           / PMM::PAGE_SIZE);
-        uintptr_t vustack = this->parent->userStackTop - CPU::USER_STACK_SIZE;
+        uintptr_t vustack = this->parent->m_UserStackTop - CPU::USER_STACK_SIZE;
 
         LogDebug("StackPhys: {:#x}, StackVirt: {:#x}, HhStack: {:#x}", pstack,
                  vustack, Pointer(pstack).ToHigherHalf<u64>());
-        Assert(this->parent->pageMap->MapRange(
+        Assert(this->parent->PageMap->MapRange(
             vustack, pstack, CPU::USER_STACK_SIZE,
             PageAttributes::eRWXU | PageAttributes::eWriteBack));
-        this->stackVirt            = vustack;
+        this->stackVirt              = vustack;
 
-        this->parent->userStackTop = vustack - PMM::PAGE_SIZE;
+        this->parent->m_UserStackTop = vustack - PMM::PAGE_SIZE;
 
         this->stacks.push_back(std::make_pair(pstack, CPU::USER_STACK_SIZE));
         return {ToHigherHalfAddress<uintptr_t>(pstack) + CPU::USER_STACK_SIZE,
@@ -137,7 +137,7 @@ Thread::Thread(Process* parent, uintptr_t pc, char** argv, char** envp,
     this->stack = prepareStack(vstack, vustack, argvArr, envpArr, program);
 
     CPU::PrepareThread(this, pc, 0);
-    parent->threads.push_back(this);
+    parent->m_Threads.push_back(this);
 }
 
 Thread::Thread(Process* parent, uintptr_t pc, bool user)
@@ -149,17 +149,17 @@ Thread::Thread(Process* parent, uintptr_t pc, bool user)
     , enqueued(false)
     , state(ThreadState::eDequeued)
 {
-    tid = parent->nextTid++;
+    tid = parent->m_NextTid++;
 
     uintptr_t pstack
         = PMM::CallocatePages<uintptr_t>(CPU::USER_STACK_SIZE / PMM::PAGE_SIZE);
-    uintptr_t vustack = parent->userStackTop - CPU::USER_STACK_SIZE;
+    uintptr_t vustack = parent->m_UserStackTop - CPU::USER_STACK_SIZE;
 
-    if (!parent->pageMap) parent->pageMap = VMM::GetKernelPageMap();
-    Assert(parent->pageMap->MapRange(vustack, pstack, CPU::USER_STACK_SIZE,
+    if (!parent->PageMap) parent->PageMap = VMM::GetKernelPageMap();
+    Assert(parent->PageMap->MapRange(vustack, pstack, CPU::USER_STACK_SIZE,
                                      PageAttributes::eRW | PageAttributes::eUser
                                          | PageAttributes::eWriteBack));
-    parent->userStackTop = vustack - PMM::PAGE_SIZE;
+    parent->m_UserStackTop = vustack - PMM::PAGE_SIZE;
     stacks.push_back(std::make_pair(pstack, CPU::USER_STACK_SIZE));
 
     [[maybe_unused]] uintptr_t stack1
@@ -169,7 +169,7 @@ Thread::Thread(Process* parent, uintptr_t pc, bool user)
     this->stack                       = Math::AlignDown(stack1, 16);
 
     CPU::PrepareThread(this, pc, 0);
-    parent->threads.push_back(this);
+    parent->m_Threads.push_back(this);
 }
 Thread::~Thread() {}
 
@@ -199,7 +199,7 @@ Thread* Thread::Fork(Process* process)
         std::memcpy(Pointer(newStack).ToHigherHalf<void*>(),
                     Pointer(stackPhys).ToHigherHalf<void*>(), size);
 
-        process->pageMap->MapRange(stackVirt, newStack, size,
+        process->PageMap->MapRange(stackVirt, newStack, size,
                                    PageAttributes::eRWXU
                                        | PageAttributes::eWriteBack);
         newThread->stacks.push_back({newStack, size});

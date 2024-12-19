@@ -15,13 +15,21 @@ namespace Syscall::Process
 {
     pid_t SysFork(Syscall::Arguments&)
     {
-        struct Process* process    = CPU::GetCurrentThread()->parent;
+        class Process* process    = CPU::GetCurrentThread()->parent;
 
-        struct Process* newProcess = process->Fork();
+        class Process* newProcess = process->Fork();
         Assert(newProcess);
 
-        LogInfo("New Process Pid: {}", newProcess->pid);
-        return newProcess->pid;
+        LogInfo("New Process Pid: {}", newProcess->GetPid());
+        return newProcess->GetPid();
+    }
+    int SysExecve(Syscall::Arguments& args)
+    {
+        char*  path = reinterpret_cast<char*>(args.args[0]);
+        char** argv = reinterpret_cast<char**>(args.args[1]);
+        char** envp = reinterpret_cast<char**>(args.args[2]);
+
+        return CPU::GetCurrentThread()->parent->Exec(path, argv, envp);
     }
     int SysExit(Syscall::Arguments& args)
     {

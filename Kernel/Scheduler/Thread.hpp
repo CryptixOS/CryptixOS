@@ -32,7 +32,7 @@ enum class ThreadState
     eExited,
 };
 
-struct Process;
+class Process;
 struct Thread
 {
     Thread() = default;

@@ -12,5 +12,6 @@
 namespace Syscall::Process
 {
     pid_t SysFork(Syscall::Arguments& args);
+    int   SysExecve(Syscall::Arguments& args);
     int   SysExit(Syscall::Arguments& args);
 }; // namespace Syscall::Process

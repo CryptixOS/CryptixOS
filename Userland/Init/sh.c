@@ -16,21 +16,33 @@ void prompt(void)
 int main()
 {
     prompt();
-    char* keyBuffer = mmap(0, 4096, 0x03, MAP_ANONYMOUS, -1, 0);
-    fork();
+
+    char linebuf[128];
+    int  linedx = 0;
+    linebuf[0]  = '\0';
 
     for (;;)
     {
         char    keybuf[16];
 
         ssize_t nread = read(0, keybuf, sizeof(keybuf));
-        if (nread < 0 && errno == EINTR) return 2;
+        // if (nread < 0 && errno == EINTR) return 2;
 
         for (ssize_t i = 0; i < nread; ++i)
         {
-            putchar(keybuf[i]);
+            write(0, keybuf + i, 1);
             fflush(stdout);
+            if (keybuf[i] != '\n')
+            {
+                linebuf[linedx++] = keybuf[i];
+                linebuf[linedx]   = '\0';
+            }
+            else
+            {
+                linebuf[0] = '\0';
+                linedx     = 0;
+                prompt();
+            }
         }
-        // if (nread > 0) write(0, keyBuffer, nread);
     }
 }

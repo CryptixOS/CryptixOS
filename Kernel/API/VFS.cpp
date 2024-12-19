@@ -33,12 +33,8 @@ namespace Syscall::VFS
             return 1;
         }
         Process* current = CPU::GetCurrentThread()->parent;
-        if (fd >= static_cast<i32>(current->fileDescriptors.size()))
-        {
-            LogError("Invalid fd");
-            return EBADF;
-        }
-        auto             file = current->fileDescriptors[fd];
+        auto     file    = current->GetFileHandle(fd);
+        if (!file) return_err(-1, EBADF);
 
         std::string_view str(message, length);
         return file->node->Write(message, 0, length);
@@ -63,10 +59,7 @@ namespace Syscall::VFS
             return_err(-1, ENOSYS);
         }
 
-        usize fd = current->fileDescriptors.size();
-        current->fileDescriptors.push_back(descriptor);
-
-        return fd;
+        return current->CreateDescriptor(node);
     }
 
     isize SysRead(Arguments& args)
@@ -76,9 +69,7 @@ namespace Syscall::VFS
         usize    bytes   = args.args[2];
 
         Process* current = CPU::GetCurrentThread()->parent;
-        if (fd >= static_cast<i32>(current->fileDescriptors.size()))
-            return EBADF;
-        auto file = current->fileDescriptors[fd];
+        auto     file    = current->GetFileHandle(fd);
 
         file->Lock();
         isize bytesRead = file->node->Read(buffer, file->offset, bytes);
@@ -88,14 +79,12 @@ namespace Syscall::VFS
     }
     off_t SysLSeek(Syscall::Arguments& args)
     {
-        i32      fd      = args.args[0];
-        off_t    offset  = args.args[1];
-        i32      whence  = args.args[2];
+        i32             fd       = args.args[0];
+        off_t           offset   = args.args[1];
+        i32             whence   = args.args[2];
 
-        Process* current = CPU::GetCurrentThread()->parent;
-        if (fd >= static_cast<i32>(current->fileDescriptors.size()))
-            return EBADF;
-        auto            file     = current->fileDescriptors[fd];
+        Process*        current  = CPU::GetCurrentThread()->parent;
+        auto            file     = current->GetFileHandle(fd);
 
         constexpr usize SEEK_SET = 0;
         constexpr usize SEEK_CUR = 1;
@@ -131,9 +120,7 @@ namespace Syscall::VFS
         usize         arg     = args.args[2];
 
         Process*      current = CPU::GetCurrentThread()->parent;
-        if (fd >= static_cast<i32>(current->fileDescriptors.size()))
-            return_err(-1, EBADF);
-        auto file = current->fileDescriptors[fd];
+        auto          file    = current->GetFileHandle(fd);
         if (!file) return_err(-1, EBADF);
 
         return file->node->IoCtl(request, arg);
