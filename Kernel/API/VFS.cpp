@@ -100,9 +100,20 @@ namespace Syscall::VFS
         return SysFStatAt(args);
     }
 
-    off_t SysLSeek(Syscall::Arguments& args) { return -1; }
+    off_t SysLSeek(Syscall::Arguments& args)
+    {
+        i32      fd      = static_cast<i32>(args.Args[0]);
+        off_t    offset  = static_cast<off_t>(args.Args[1]);
+        i32      whence  = static_cast<i32>(args.Args[2]);
 
-    int   SysIoCtl(Syscall::Arguments& args)
+        Process* current = CPU::GetCurrentThread()->parent;
+        auto     file    = current->GetFileHandle(fd);
+        if (!file) return_err(-1, ENOENT);
+
+        return file->Seek(whence, offset);
+    }
+
+    int SysIoCtl(Syscall::Arguments& args)
     {
         int           fd      = args.Args[0];
         unsigned long request = args.Args[1];
