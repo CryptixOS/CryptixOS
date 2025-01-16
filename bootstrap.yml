@@ -67,6 +67,7 @@ tools:
       - args: ['make', '-j@PARALLELISM@']
     install:
       - args: ['make', 'install']
+
   - name: host-automake-v1.11
     architecture: noarch
     source:
@@ -276,7 +277,7 @@ packages:
     architecture: '@OPTION:arch@'
     source:
       subdir: 'sources'
-      url: 'https://ftp.gnu.org/gnu/bash/bash-5.2.15.tar.gz'
+      url: 'https://mirrors.dotsrc.org/gnu/bash/bash-5.2.15.tar.gz'
       format: 'tar.gz'
       extract_path: 'bash-5.2.15'
       version: '5.2.15'
@@ -314,11 +315,9 @@ packages:
     architecture: '@OPTION:arch@'
     source:
       subdir: 'sources'
-      url: 'https://ftp.gnu.org/gnu/coreutils/coreutils-9.5.tar.xz'
-      format: tar.xz
-      checksum: 'blake2b:6fd3a77697c9e85f31415c6ad66559faf18acc7d346677a89d4a999c2027886551e78842a7283e7b3b44fe8ef2fde04ba2f88df32a7844d5f69d45bcb7a04b6f'
-      extract_path: 'coreutils-9.5'
-      version: '9.5'
+      git: 'https://git.savannah.gnu.org/git/coreutils.git'
+      tag: 'v9.1'
+      version: '9.1'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.15
@@ -331,12 +330,14 @@ packages:
       - system-gcc
     pkgs_required:
       - mlibc
-    revision: 1
     configure:
       # Huge hack: coreutils does not compile the build-machine binary make-prime-list
       # using the build-machine compiler. Hence, build and invoke the binary manually here.
       - args:
         - '@THIS_SOURCE_DIR@/configure'
+        environ: 
+          ac_cv_sys_largefile_opts: 'none needed'
+          ac_cv_sys_year2038_opts: 'none needed'
       - args: ['make', 'src/make-prime-list']
       - args: |
           ./src/make-prime-list 5000 > @THIS_SOURCE_DIR@/src/primes.h
@@ -348,8 +349,6 @@ packages:
         - '--prefix=/usr'
         - '--disable-nls'
         - 'CFLAGS=-DSLOW_BUT_NO_HACKS -Wno-error'
-        environ:
-          gl_cv_have_proc_uptime: 'yes'
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install']
@@ -360,7 +359,7 @@ packages:
   - name: dash
     architecture: '@OPTION:arch@'
     source:
-      subdir: 'ports'
+      subdir: 'sources'
       git: 'https://git.kernel.org/pub/scm/utils/dash/dash.git'
       tag: 'v0.5.12'
       version: '0.5.12'
@@ -534,6 +533,5 @@ packages:
       - mlibc
       - init
       - bash
-      - coreutils
     configure: []
     build: []
