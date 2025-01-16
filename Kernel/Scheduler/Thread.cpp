@@ -91,8 +91,10 @@ static uintptr_t prepareStack(uintptr_t _stack, uintptr_t sp,
     return sp - (_stack - reinterpret_cast<uintptr_t>(stack));
 }
 
-Thread::Thread(Process* parent, uintptr_t pc, char** argv, char** envp,
-               ELF::Image& program, i64 runOn)
+Thread::Thread(Process* parent, uintptr_t pc,
+               std::vector<std::string_view>& argv,
+               std::vector<std::string_view>& envp, ELF::Image& program,
+               i64 runOn)
     : runningOn(CPU::GetCurrent()->ID)
     , self(this)
     , error(no_error)
@@ -127,14 +129,10 @@ Thread::Thread(Process* parent, uintptr_t pc, char** argv, char** envp,
 
     auto [vstack, vustack] = mapUserStack();
 
-    CtosUnused(argv);
-    CtosUnused(envp);
-    std::vector<std::string_view> argvArr;
-    argvArr.push_back("/usr/sbin/init");
-    std::vector<std::string_view> envpArr;
-    envpArr.push_back("TERM=linux");
+    // argv.push_back("/usr/sbin/init");
+    // envp.push_back("TERM=linux");
 
-    this->stack = prepareStack(vstack, vustack, argvArr, envpArr, program);
+    this->stack            = prepareStack(vstack, vustack, argv, envp, program);
 
     CPU::PrepareThread(this, pc, 0);
     parent->m_Threads.push_back(this);

@@ -137,7 +137,8 @@ namespace Scheduler
             CPU::SaveThread(currentThread, ctx);
         }
 
-        CPU::Reschedule(newThread->parent->m_Quantum);
+        // CPU::Reschedule(newThread->parent->m_Quantum);
+        CPU::Reschedule(2000);
         CPU::LoadThread(newThread, ctx);
 
         if (currentThread && currentThread->state == ThreadState::eKilled

@@ -36,8 +36,9 @@ struct Thread
 {
     Thread() = default;
     Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn = -1);
-    Thread(Process* parent, uintptr_t pc, char** arg, char** envp,
-           ELF::Image& program, i64 runOn = -1);
+    Thread(Process* parent, uintptr_t pc, std::vector<std::string_view>& arg,
+           std::vector<std::string_view>& envp, ELF::Image& program,
+           i64 runOn = -1);
     Thread(Process* parent, uintptr_t pc, bool user = true);
     ~Thread();
 

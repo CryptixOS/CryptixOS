@@ -72,7 +72,7 @@ class Process
     {
         if (m_Parent) return m_Parent->m_Pid;
 
-        // TODO(v1tr10l7): what should we return, if there is no parent??
+        // TODO(v1tr10l7): What should we return, if there is no parent??
         return 0;
     }
     inline const Credentials& GetCredentials() const { return m_Credentials; }
@@ -83,7 +83,6 @@ class Process
 
         return m_FdTable.Insert(descriptor);
     }
-
     i32         CloseFd(i32 fd);
     inline bool IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
     inline FileDescriptor* GetFileHandle(i32 fd) { return m_FdTable.GetFd(fd); }
@@ -97,7 +96,6 @@ class Process
     i32                    Exit(i32 code);
 
     friend struct Thread;
-
     pid_t                    m_Pid         = -1;
     std::string              m_Name        = "?";
     PageMap*                 PageMap       = nullptr;

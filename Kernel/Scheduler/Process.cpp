@@ -81,8 +81,15 @@ i32 Process::Exec(const char* path, char** argv, char** envp)
 
     uintptr_t address
         = ldPath.empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
-    Scheduler::EnqueueThread(
-        new Thread(this, address, argv, envp, program, CPU::GetCurrent()->ID));
+
+    std::vector<std::string_view> argvArr;
+    for (char** arg = argv; *arg; arg++) argvArr.push_back(*arg);
+
+    std::vector<std::string_view> envpArr;
+    for (char** env = envp; *env; env++) envpArr.push_back(*env);
+
+    Scheduler::EnqueueThread(new Thread(this, address, argvArr, envpArr,
+                                        program, CPU::GetCurrent()->ID));
 
     Scheduler::Yield();
     return 0;
@@ -141,7 +148,6 @@ Process* Process::Fork()
 i32 Process::Exit(i32 code)
 {
     m_FdTable.Clear();
-
     for (Thread* thread : m_Threads) thread->state = ThreadState::eExited;
 
     Scheduler::Yield();
