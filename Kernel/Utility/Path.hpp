@@ -11,7 +11,10 @@
 
 namespace Path
 {
-    inline bool IsAbsolute(std::string_view path) { return path[0] == '/'; }
+    inline bool IsAbsolute(std::string_view path)
+    {
+        return !path.empty() && path[0] == '/';
+    }
 
     inline std::vector<std::string> SplitPath(std::string path)
     {
