@@ -531,5 +531,6 @@ packages:
       - base-files
       - mlibc
       - init
+      - bash
     configure: []
     build: []
