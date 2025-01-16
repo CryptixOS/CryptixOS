@@ -33,24 +33,6 @@ INode::INode(INode* parent, std::string_view name, Filesystem* fs)
     m_Stats.st_uid = process->m_Credentials.euid;
     m_Stats.st_gid = process->m_Credentials.egid;
 }
-INode* INode::Reduce(bool symlinks, bool automount, usize cnt)
-{
-    if (mountGate && automount)
-        return mountGate->Reduce(symlinks, automount, 0);
-
-    if (!target.empty() && symlinks)
-    {
-        if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
-
-        auto nextNode
-            = std::get<1>(VFS::ResolvePath(m_Parent, target, automount));
-        if (!nextNode) return_err(nullptr, ENOENT);
-
-        return nextNode->Reduce(symlinks, automount, ++cnt);
-    }
-
-    return this;
-}
 
 std::string INode::GetPath()
 {
@@ -90,4 +72,23 @@ void INode::UpdateATime()
 FileDescriptor* INode::Open(i32 flags, mode_t mode)
 {
     return new FileDescriptor(this, flags, mode);
+}
+
+INode* INode::Reduce(bool symlinks, bool automount, usize cnt)
+{
+    if (mountGate && automount)
+        return mountGate->Reduce(symlinks, automount, 0);
+
+    if (!target.empty() && symlinks)
+    {
+        if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
+
+        auto nextNode
+            = std::get<1>(VFS::ResolvePath(m_Parent, target, automount));
+        if (!nextNode) return_err(nullptr, ENOENT);
+
+        return nextNode->Reduce(symlinks, automount, ++cnt);
+    }
+
+    return this;
 }

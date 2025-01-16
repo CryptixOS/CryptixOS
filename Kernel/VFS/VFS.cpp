@@ -62,6 +62,7 @@ namespace VFS
         auto     acc            = flags & O_ACCMODE;
 
         INode*   node
+
             = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
         bool didExist = true;
 
@@ -185,6 +186,7 @@ namespace VFS
             LogError("VFS: Failed to create filesystem: '{}'", filesystemName);
             return false;
         }
+
         if (s_RootNode)
         {
             LogError("VFS: Root already mounted!");
@@ -210,7 +212,7 @@ namespace VFS
         ScopedLock  guard(s_Lock);
 
         Filesystem* fs = CreateFilesystem(fsName, flags);
-        if (!fs)
+        if (fs == nullptr)
         {
             errno = ENODEV;
             return false;

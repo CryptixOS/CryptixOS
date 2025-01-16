@@ -68,7 +68,8 @@ class INode
     INode*                                       m_Parent;
     std::string                                  m_Name;
     Spinlock                                     m_Lock;
+
     Filesystem*                                  m_Filesystem;
-    stat                                         m_Stats;
     std::unordered_map<std::string_view, INode*> m_Children;
+    stat                                         m_Stats;
 };

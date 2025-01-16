@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <VFS/INode.hpp>
+#include "VFS/INode.hpp"
 
 #include <API/Posix/fcntl.h>
 
@@ -17,7 +17,6 @@ enum class FileAccessMode
     eWrite = Bit(1),
     eExec  = Bit(2),
 };
-
 inline bool operator&(const FileAccessMode lhs, FileAccessMode rhs)
 {
     return static_cast<u64>(lhs) & static_cast<u64>(rhs);

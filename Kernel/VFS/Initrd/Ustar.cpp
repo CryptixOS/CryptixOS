@@ -4,15 +4,13 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Ustar.hpp"
 
-#include "Common.hpp"
+#include <API/UnixTypes.hpp>
+#include <Drivers/Device.hpp>
+#include <Utility/Math.hpp>
 
-#include "API/UnixTypes.hpp"
-#include "Drivers/Device.hpp"
-#include "Utility/Math.hpp"
-
-#include "VFS/INode.hpp"
+#include <VFS/INode.hpp>
+#include <VFS/Initrd/Ustar.hpp>
 
 #include <cstring>
 
