@@ -92,6 +92,9 @@ namespace Syscall
         RegisterSyscall(ID::eWrite, VFS::SysWrite);
         RegisterSyscall(ID::eOpen, VFS::SysOpen);
         RegisterSyscall(ID::eClose, VFS::SysClose);
+        RegisterSyscall(ID::eStat, VFS::SysStat);
+        RegisterSyscall(ID::eFStat, VFS::SysFStat);
+        RegisterSyscall(ID::eLStat, VFS::SysLStat);
         RegisterSyscall(ID::eLSeek, VFS::SysLSeek);
         RegisterSyscall(ID::eMMap, MM::SysMMap);
         RegisterSyscall(ID::eIoCtl, VFS::SysIoCtl);
@@ -106,6 +109,7 @@ namespace Syscall
         RegisterSyscall(ID::eArchPrCtl, SysArchPrCtl);
         RegisterSyscall(ID::ePanic, sysPanic);
         RegisterSyscall(ID::eOpenAt, VFS::SysOpenAt);
+        RegisterSyscall(ID::eFStatAt, VFS::SysFStatAt);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
     }
     void Handle(Arguments& args)

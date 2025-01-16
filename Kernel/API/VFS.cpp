@@ -73,6 +73,32 @@ namespace Syscall::VFS
         i32      fd      = static_cast<i32>(args.Args[0]);
         return current->CloseFd(fd);
     }
+    i32 SysStat(Arguments& args)
+    {
+        args.Args[3] = args.Args[1];
+        args.Args[2] = 0;
+        args.Args[1] = args.Args[0];
+        args.Args[0] = AT_FDCWD;
+
+        return SysFStatAt(args);
+    }
+    i32 SysFStat(Arguments& args)
+    {
+        args.Args[3] = args.Args[1];
+        args.Args[2] = AT_EMPTY_PATH;
+        args.Args[1] = 0;
+
+        return SysFStatAt(args);
+    }
+    i32 SysLStat(Arguments& args)
+    {
+        args.Args[3] = args.Args[1];
+        args.Args[2] = AT_SYMLINK_NOFOLLOW;
+        args.Args[1] = args.Args[0];
+        args.Args[0] = AT_FDCWD;
+
+        return SysFStatAt(args);
+    }
 
     off_t SysLSeek(Syscall::Arguments& args) { return -1; }
 
@@ -99,5 +125,46 @@ namespace Syscall::VFS
         mode_t   mode    = static_cast<mode_t>(args.Args[3]);
 
         return current->OpenAt(dirFd, path, flags, mode);
+    }
+    i32 SysFStatAt(Arguments& args)
+    {
+        Process*        current   = CPU::GetCurrentThread()->parent;
+
+        i32             fd        = static_cast<i32>(args.Args[0]);
+        const char*     path      = reinterpret_cast<const char*>(args.Args[1]);
+        CTOS_UNUSED i32 flags     = static_cast<i32>(args.Args[2]);
+        stat*           outBuffer = reinterpret_cast<stat*>(args.Args[3]);
+
+        if (flags & ~(AT_EMPTY_PATH | AT_NO_AUTOMOUNT | AT_SYMLINK_NOFOLLOW))
+            return_err(-1, EINVAL);
+
+        FileDescriptor* fileHandle     = current->GetFileHandle(fd);
+        bool            followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
+
+        if (!outBuffer) return_err(-1, EFAULT);
+
+        if (!path || *path == 0)
+        {
+            if (!(flags & AT_EMPTY_PATH)) return_err(-1, ENOENT);
+
+            if (fd == AT_FDCWD) *outBuffer = current->GetCWD()->GetStats();
+            else if (!fileHandle) return_err(-1, EBADF);
+            else *outBuffer = fileHandle->GetNode()->GetStats();
+
+            return 0;
+        }
+
+        INode* parent = Path::IsAbsolute(path) ? VFS::GetRootNode() : nullptr;
+        if (fd == AT_FDCWD) parent = current->GetCWD();
+        else if (fileHandle) parent = fileHandle->GetNode();
+
+        if (!parent) return_err(-1, EBADF);
+        INode* node
+            = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
+
+        if (!node) return -1;
+        *outBuffer = node->GetStats();
+
+        return 0;
     }
 }; // namespace Syscall::VFS

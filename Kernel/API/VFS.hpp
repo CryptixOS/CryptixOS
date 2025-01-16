@@ -16,8 +16,13 @@ namespace Syscall::VFS
     i32   SysOpen(Syscall::Arguments& args);
     i32   SysClose(Syscall::Arguments& args);
 
+    i32   SysStat(Syscall::Arguments& args);
+    i32   SysFStat(Syscall::Arguments& args);
+    i32   SysLStat(Syscall::Arguments& args);
+
     off_t SysLSeek(Syscall::Arguments& args);
     i32   SysIoCtl(Syscall::Arguments& args);
 
     i32   SysOpenAt(Syscall::Arguments& args);
+    i32   SysFStatAt(Syscall::Arguments& args);
 } // namespace Syscall::VFS
