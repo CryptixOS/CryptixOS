@@ -56,7 +56,7 @@ namespace VirtualMemoryManager
         auto [pageSize, flags] = kernelPageMap->RequiredSize(4_gib);
         for (uintptr_t i = 0; i < 1_gib * 4; i += pageSize)
             Assert(kernelPageMap->Map(ToHigherHalfAddress<uintptr_t>(i), i,
-                                      PageAttributes::eRWXU | flags
+                                      PageAttributes::eRW | flags
                                           | PageAttributes::eWriteBack));
 
         usize entryCount = 0;
@@ -83,7 +83,7 @@ namespace VirtualMemoryManager
                 if (t < 4_gib) continue;
 
                 Assert(kernelPageMap->Map(ToHigherHalfAddress<uintptr_t>(t), t,
-                                          PageAttributes::eRWXU | flags
+                                          PageAttributes::eRW | flags
                                               | PageAttributes::eWriteBack));
             }
             base += alignedSize;
@@ -94,7 +94,7 @@ namespace VirtualMemoryManager
                 if (t < 4_gib) continue;
 
                 Assert(kernelPageMap->Map(ToHigherHalfAddress<uintptr_t>(t), t,
-                                          PageAttributes::eRWXU
+                                          PageAttributes::eRW
                                               | PageAttributes::eWriteBack));
             }
         }
@@ -104,9 +104,8 @@ namespace VirtualMemoryManager
         {
             uintptr_t phys = BootInfo::GetKernelPhysicalAddress().Raw<>() + i;
             uintptr_t virt = BootInfo::GetKernelVirtualAddress().Raw<>() + i;
-            Assert(kernelPageMap->Map(virt, phys,
-                                      PageAttributes::eRWXU
-                                          | PageAttributes::eWriteBack));
+            Assert(kernelPageMap->Map(
+                virt, phys, PageAttributes::eRWX | PageAttributes::eWriteBack));
         }
 
         {
