@@ -294,7 +294,6 @@ packages:
       - system-gcc
     pkgs_required:
       - mlibc
-      - readline
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
@@ -302,7 +301,6 @@ packages:
         - '--prefix=/usr'
         - '--without-bash-malloc'
         - '--disable-nls'
-        - '--without-readline'
         - '--disable-readline'
         environ:
           ac_cv_func_wcswidth: 'no'
@@ -395,7 +393,6 @@ packages:
     pkgs_required:
       - base-files
       - mlibc
-      - readline
     configure: []
     build:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/sbin']
