@@ -6,15 +6,17 @@
  */
 #pragma once
 
-#include "API/Syscall.hpp"
-#include "API/UnixTypes.hpp"
+#include <API/Syscall.hpp>
+#include <API/UnixTypes.hpp>
 
 namespace Syscall::VFS
 {
+    isize SysRead(Syscall::Arguments& args);
     isize SysWrite(Syscall::Arguments& args);
     i32   SysOpen(Syscall::Arguments& args);
-    isize SysRead(Syscall::Arguments& args);
 
     off_t SysLSeek(Syscall::Arguments& args);
-    int   SysIoCtl(Syscall::Arguments& args);
+    i32   SysIoCtl(Syscall::Arguments& args);
+
+    i32   SysOpenAt(Syscall::Arguments& args);
 } // namespace Syscall::VFS

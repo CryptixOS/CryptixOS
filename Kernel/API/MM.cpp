@@ -21,12 +21,12 @@ namespace Syscall::MM
 {
     uintptr_t SysMMap(Syscall::Arguments& args)
     {
-        uintptr_t addr    = args.args[0];
-        usize     len     = args.args[1];
-        usize     prot    = args.args[2];
-        usize     flags   = args.args[3];
-        i32       fd      = args.args[4];
-        off_t     offset  = args.args[5];
+        uintptr_t addr    = args.Args[0];
+        usize     len     = args.Args[1];
+        usize     prot    = args.Args[2];
+        usize     flags   = args.Args[3];
+        i32       fd      = args.Args[4];
+        off_t     offset  = args.Args[5];
 
         Process*  process = CPU::GetCurrentThread()->parent;
         DebugSyscall(

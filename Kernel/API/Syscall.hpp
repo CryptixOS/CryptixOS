@@ -8,16 +8,17 @@
 
 #include <Common.hpp>
 
-#include <utility>
+#include <magic_enum/magic_enum.hpp>
+#include <magic_enum/magic_enum_format.hpp>
 
 namespace Syscall
 {
     struct Arguments
     {
-        u64 index;
-        u64 args[6];
+        u64 Index;
+        u64 Args[6];
 
-        u64 returnValue;
+        u64 ReturnValue;
     };
 
     enum class ID : u64
@@ -33,9 +34,14 @@ namespace Syscall
         eLSeek     = 8,
         eMMap      = 9,
         eIoCtl     = 16,
+        eAccess    = 21,
+        eGetPid    = 39,
         eFork      = 57,
         eExecve    = 59,
         eExit      = 60,
+        eUname     = 63,
+        eFcntl     = 72,
+        eGetCwd    = 79,
         eGetUid    = 102,
         eGetGid    = 104,
         eGet_eUid  = 107,
@@ -44,6 +50,8 @@ namespace Syscall
         eArchPrCtl = 158,
         eGetTid    = 186,
         ePanic     = 255,
+        eOpenAt    = 257,
+        eFStatAt   = 262,
     };
 
     void RegisterHandler(usize                                index,

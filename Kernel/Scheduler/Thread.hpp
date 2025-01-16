@@ -8,18 +8,17 @@
 
 #include <Common.hpp>
 
+#include <API/UnixTypes.hpp>
 #if CTOS_ARCH == CTOS_ARCH_X86_64
     #include <Arch/x86_64/CPUContext.hpp>
 #elif CTOS_ARCH == CTOS_ARCH_AARCH64
     #include <Arch/aarch64/CPUContext.hpp>
 #endif
 
-#include <cerrno>
-#include <vector>
-
 #include <Utility/ELF.hpp>
 
-using tid_t = i64;
+#include <errno.h>
+#include <vector>
 
 enum class ThreadState
 {

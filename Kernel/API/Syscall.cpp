@@ -51,8 +51,8 @@ namespace Syscall
     static uintptr_t SysArchPrCtl(Arguments& args)
     {
         auto      thread = CPU::GetCurrentThread();
-        i32       op     = args.args[0];
-        uintptr_t addr   = args.args[1];
+        i32       op     = args.Args[0];
+        uintptr_t addr   = args.Args[1];
 
         switch (op)
         {
@@ -82,7 +82,7 @@ namespace Syscall
         auto sysPanic = [](Arguments& args) -> uintptr_t
         {
             const char* errorMessage
-                = reinterpret_cast<const char*>(args.args[0]);
+                = reinterpret_cast<const char*>(args.Args[0]);
 
             Panic("SYS_PANIC: {}", errorMessage);
         };
@@ -104,18 +104,36 @@ namespace Syscall
         RegisterSyscall(ID::eExecve, Process::SysExecve);
         RegisterSyscall(ID::eArchPrCtl, SysArchPrCtl);
         RegisterSyscall(ID::ePanic, sysPanic);
+        RegisterSyscall(ID::eOpenAt, VFS::SysOpenAt);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
     }
     void Handle(Arguments& args)
     {
-        if (args.index >= 512 || !syscalls[args.index])
+#define LOG_SYSCALLS false
+#if LOG_SYSCALLS == true
+        static isize previousSyscall = -1;
+
+        if (static_cast<isize>(args.Index) != previousSyscall)
+            LogTrace("Syscall[{}]: '{}'", args.Index,
+                     magic_enum::enum_name(static_cast<ID>(args.Index)));
+        previousSyscall = args.Index;
+#endif
+
+        if (args.Index >= 512 || !syscalls[args.Index])
         {
-            args.returnValue = -1;
+            args.ReturnValue = -1;
             errno            = ENOSYS;
-            LogError("Undefined syscall: {}", args.index);
+            LogError("Undefined syscall: {}", args.Index);
             return;
         }
 
-        args.returnValue = syscalls[args.index](args);
+        errno    = no_error;
+        auto ret = syscalls[args.Index](args);
+        Assert(ret >= 0);
+
+        auto err = magic_enum::enum_cast<errno_t>(errno);
+        if (err.has_value() && static_cast<intptr_t>(ret) < 0)
+            args.ReturnValue = -intptr_t(err.value());
+        else args.ReturnValue = ret;
     }
 } // namespace Syscall

@@ -40,9 +40,12 @@ bool   INode::IsEmpty()
     return children.empty();
 }
 
-FileDescriptor* INode::Open() { return new FileDescriptor(this); }
+FileDescriptor* INode::Open(i32 flags, mode_t mode)
+{
+    return new FileDescriptor(this);
+}
 
-INode*          INode::InternalReduce(bool symlinks, bool automount, size_t cnt)
+INode* INode::InternalReduce(bool symlinks, bool automount, size_t cnt)
 {
     if (mountGate && automount)
         return mountGate->InternalReduce(symlinks, automount, 0);

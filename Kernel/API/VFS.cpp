@@ -4,28 +4,47 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "VFS.hpp"
 
-#include "Arch/CPU.hpp"
+#include <API/Posix/fcntl.h>
+#include <API/UnixTypes.hpp>
+#include <API/VFS.hpp>
 
-#include "API/UnixTypes.hpp"
-#include "Scheduler/Process.hpp"
-#include "Scheduler/Thread.hpp"
+#include <Arch/CPU.hpp>
 
-#include "VFS/FileDescriptor.hpp"
-#include "VFS/INode.hpp"
-#include "VFS/VFS.hpp"
+#include <Scheduler/Process.hpp>
+#include <Scheduler/Thread.hpp>
+
+#include <Utility/Path.hpp>
+
+#include <VFS/FileDescriptor.hpp>
+#include <VFS/INode.hpp>
+#include <VFS/VFS.hpp>
 
 namespace Syscall::VFS
 {
     using Syscall::Arguments;
     using namespace ::VFS;
 
+    isize SysRead(Arguments& args)
+    {
+        i32      fd      = args.Args[0];
+        void*    buffer  = reinterpret_cast<void*>(args.Args[1]);
+        usize    bytes   = args.Args[2];
+
+        Process* current = CPU::GetCurrentThread()->parent;
+        auto     file    = current->GetFileHandle(fd);
+
+        file->Lock();
+        isize bytesRead = file->node->Read(buffer, file->offset, bytes);
+        file->offset += bytesRead;
+        file->Unlock();
+        return bytesRead;
+    }
     isize SysWrite(Arguments& args)
     {
-        i32         fd      = args.args[0];
-        const char* message = reinterpret_cast<const char*>(args.args[1]);
-        usize       length  = args.args[2];
+        i32         fd      = args.Args[0];
+        const char* message = reinterpret_cast<const char*>(args.Args[1]);
+        usize       length  = args.Args[2];
 
         if (!message || length <= 0)
         {
@@ -42,46 +61,19 @@ namespace Syscall::VFS
 
     i32 SysOpen(Arguments& args)
     {
-        Process*    current = CPU::GetCurrentThread()->parent;
-
-        const char* path    = reinterpret_cast<const char*>(args.args[0]);
-        auto node = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path));
-
-        if (!node)
-        {
-            LogError("Failed to open file at '{}'", path);
-            return_err(-1, ENOENT);
-        }
-        auto descriptor = node->Open();
-        if (!descriptor)
-        {
-            LogError("SysOpen: Failed to open fd");
-            return_err(-1, ENOSYS);
-        }
-
-        return current->CreateDescriptor(node);
-    }
-
-    isize SysRead(Arguments& args)
-    {
-        i32      fd      = args.args[0];
-        void*    buffer  = reinterpret_cast<void*>(args.args[1]);
-        usize    bytes   = args.args[2];
-
         Process* current = CPU::GetCurrentThread()->parent;
-        auto     file    = current->GetFileHandle(fd);
+        PathView path    = reinterpret_cast<const char*>(args.Args[0]);
+        i32      flags   = static_cast<i32>(args.Args[1]);
+        mode_t   mode    = static_cast<mode_t>(args.Args[2]);
 
-        file->Lock();
-        isize bytesRead = file->node->Read(buffer, file->offset, bytes);
-        file->offset += bytesRead;
-        file->Unlock();
-        return bytesRead;
+        return current->OpenAt(AT_FDCWD, path, flags, mode);
     }
+
     off_t SysLSeek(Syscall::Arguments& args)
     {
-        i32             fd       = args.args[0];
-        off_t           offset   = args.args[1];
-        i32             whence   = args.args[2];
+        i32             fd       = args.Args[0];
+        off_t           offset   = args.Args[1];
+        i32             whence   = args.Args[2];
 
         Process*        current  = CPU::GetCurrentThread()->parent;
         auto            file     = current->GetFileHandle(fd);
@@ -115,14 +107,26 @@ namespace Syscall::VFS
 
     int SysIoCtl(Syscall::Arguments& args)
     {
-        int           fd      = args.args[0];
-        unsigned long request = args.args[1];
-        usize         arg     = args.args[2];
+        int           fd      = args.Args[0];
+        unsigned long request = args.Args[1];
+        usize         arg     = args.Args[2];
 
         Process*      current = CPU::GetCurrentThread()->parent;
         auto          file    = current->GetFileHandle(fd);
         if (!file) return_err(-1, EBADF);
 
         return file->node->IoCtl(request, arg);
+    }
+
+    i32 SysOpenAt(Syscall::Arguments& args)
+    {
+        Process* current = CPU::GetCurrentThread()->parent;
+
+        i32      dirFd   = static_cast<i32>(args.Args[0]);
+        PathView path    = reinterpret_cast<const char*>(args.Args[1]);
+        i32      flags   = static_cast<i32>(args.Args[2]);
+        mode_t   mode    = static_cast<mode_t>(args.Args[3]);
+
+        return current->OpenAt(dirFd, path, flags, mode);
     }
 }; // namespace Syscall::VFS

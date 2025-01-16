@@ -63,15 +63,15 @@ namespace Syscall::Process
     }
     int SysExecve(Syscall::Arguments& args)
     {
-        char*  path = reinterpret_cast<char*>(args.args[0]);
-        char** argv = reinterpret_cast<char**>(args.args[1]);
-        char** envp = reinterpret_cast<char**>(args.args[2]);
+        char*  path = reinterpret_cast<char*>(args.Args[0]);
+        char** argv = reinterpret_cast<char**>(args.Args[1]);
+        char** envp = reinterpret_cast<char**>(args.Args[2]);
 
         return CPU::GetCurrentThread()->parent->Exec(path, argv, envp);
     }
     int SysExit(Syscall::Arguments& args)
     {
-        i32   code    = args.args[0];
+        i32   code    = args.Args[0];
 
         auto* process = CPU::GetCurrentThread()->parent;
         return process->Exit(code);

@@ -70,7 +70,7 @@ class INode
 
     bool                      IsEmpty();
 
-    FileDescriptor*           Open();
+    FileDescriptor*           Open(i32 flags, mode_t mode);
     virtual void  InsertChild(INode* node, std::string_view name)      = 0;
     virtual isize Read(void* buffer, off_t offset, usize bytes)        = 0;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) = 0;

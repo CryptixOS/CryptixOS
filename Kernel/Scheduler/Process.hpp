@@ -11,14 +11,11 @@
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
 
+#include <VFS/FileDescriptorTable.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
 
-#include <unordered_map>
 #include <vector>
-
-using pid_t = i64;
-using tid_t = i64;
 
 enum class PrivilegeLevel
 {
@@ -60,14 +57,14 @@ class Process
 
     void InitializeStreams()
     {
-        m_FileDescriptors.clear();
+        m_FdTable.Clear();
         INode* currentTTY
-            = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), "/dev/tty0"));
+            = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), "/dev/tty"));
 
         LogTrace("Process: Creating standard streams...");
-        m_FileDescriptors[0] = currentTTY->Open();
-        m_FileDescriptors[1] = currentTTY->Open();
-        m_FileDescriptors[2] = currentTTY->Open();
+        m_FdTable.Insert(currentTTY->Open(0, 0));
+        m_FdTable.Insert(currentTTY->Open(0, 0));
+        m_FdTable.Insert(currentTTY->Open(0, 0));
     }
 
     inline pid_t GetPid() const { return m_Pid; }
@@ -75,45 +72,45 @@ class Process
     {
         if (m_Parent) return m_Parent->m_Pid;
 
-        // TODO(v1tr10l7): ??
-        return m_Pid;
+        // TODO(v1tr10l7): what should we return, if there is no parent??
+        return 0;
     }
     inline const Credentials& GetCredentials() const { return m_Credentials; }
-    inline i32                CreateDescriptor(INode* node)
+    i32        OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode);
+    inline i32 CreateFileDescriptor(INode* node, i32 flags, mode_t mode)
     {
-        auto  descriptor      = node->Open();
+        auto descriptor = node->Open(flags, mode);
 
-        usize fd              = m_FileDescriptors.size();
-        m_FileDescriptors[fd] = descriptor;
-
-        return fd;
-    }
-    inline FileDescriptor* GetFileHandle(i32 fd)
-    {
-        if (m_FileDescriptors.find(fd) == m_FileDescriptors.end())
-            return nullptr;
-
-        return m_FileDescriptors[fd];
+        return m_FdTable.Insert(descriptor);
     }
 
-    Process* Fork();
-    i32      Exec(const char* path, char** argv, char** envp);
-    i32      Exit(i32 code);
+    i32         CloseFd(i32 fd);
+    inline bool IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
+    inline FileDescriptor* GetFileHandle(i32 fd) { return m_FdTable.GetFd(fd); }
+
+    Process*               Fork();
+    i32                    Exec(const char* path, char** argv, char** envp);
+    i32                    Exit(i32 code);
 
     friend struct Thread;
-    pid_t                 m_Pid         = -1;
-    std::string           m_Name        = "?";
-    PageMap*              PageMap       = nullptr;
-    std::atomic<tid_t>    m_NextTid     = 1;
-    Credentials           m_Credentials = {};
-    PrivilegeLevel        m_Ring        = PrivilegeLevel::eUnprivileged;
 
-    Process*              m_Parent      = nullptr;
-    std::vector<Process*> m_Children;
-    std::vector<Thread*>  m_Threads;
+    pid_t                    m_Pid         = -1;
+    std::string              m_Name        = "?";
+    PageMap*                 PageMap       = nullptr;
+    std::atomic<tid_t>       m_NextTid     = 1;
+    Credentials              m_Credentials = {};
+    PrivilegeLevel           m_Ring        = PrivilegeLevel::eUnprivileged;
 
-    std::unordered_map<i32, FileDescriptor*> m_FileDescriptors;
-    std::vector<VMM::Region>                 m_AddressSpace{};
-    uintptr_t                                m_UserStackTop = 0x70000000000;
-    usize                                    m_Quantum      = 1000;
+    INode*                   m_RootNode    = VFS::GetRootNode();
+    INode*                   m_CWD         = VFS::GetRootNode();
+    mode_t                   m_UMask       = 0;
+
+    Process*                 m_Parent      = nullptr;
+    std::vector<Process*>    m_Children;
+    std::vector<Thread*>     m_Threads;
+
+    FileDescriptorTable      m_FdTable;
+    std::vector<VMM::Region> m_AddressSpace{};
+    uintptr_t                m_UserStackTop = 0x70000000000;
+    usize                    m_Quantum      = 1000;
 };

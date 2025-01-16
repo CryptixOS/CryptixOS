@@ -34,10 +34,27 @@ Process::Process(std::string_view name, pid_t pid)
 {
 }
 
+i32 Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
+{
+    return -1;
+    /*INode* parent = m_CWD;
+    if (Path::IsAbsolute(path)) parent = VFS::GetRootNode();
+    else if (dirFd != AT_FDCWD)
+    {
+        auto* descriptor = GetFileHandle(dirFd);
+        if (!descriptor) return_err(-1, EBADF);
+        parent = descriptor->GetNode();
+    }*/
+
+    // auto descriptor = VFS::Open(parent, path, flags, mode);
+    // if (!descriptor) return -1;
+
+    // return m_FdTable.Insert(descriptor);
+}
+
 i32 Process::Exec(const char* path, char** argv, char** envp)
 {
-    for (auto fd : m_FileDescriptors) delete fd.second;
-    m_FileDescriptors.clear();
+    m_FdTable.Clear();
     InitializeStreams();
 
     m_Name = path;
@@ -95,15 +112,17 @@ Process* Process::Fork()
         pageMap->MapRange(range.GetVirtualBase(), physicalSpace,
                           range.GetSize(),
                           PageAttributes::eRWXU | PageAttributes::eWriteBack);
+
+        // TODO(v1tr10l7): Free regions;
     }
 
     newProcess->m_NextTid.store(m_NextTid);
-    for (const auto& descriptor : m_FileDescriptors)
+    for (const auto& descriptor : m_FdTable)
     {
-        FileDescriptor* currentFd = descriptor.second;
-        FileDescriptor* newFd     = currentFd->node->Open();
+        FileDescriptor* currentFd               = descriptor.second;
+        FileDescriptor* newFd                   = currentFd->node->Open(0, 0);
 
-        newProcess->m_FileDescriptors[descriptor.first] = newFd;
+        newProcess->m_FdTable[descriptor.first] = newFd;
     }
 
     m_Children.push_back(newProcess);
@@ -121,8 +140,7 @@ Process* Process::Fork()
 
 i32 Process::Exit(i32 code)
 {
-    for (auto& fd : m_FileDescriptors) fd.second->Close();
-    m_FileDescriptors.clear();
+    m_FdTable.Clear();
 
     for (Thread* thread : m_Threads) thread->state = ThreadState::eExited;
 
