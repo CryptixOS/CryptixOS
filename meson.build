@@ -105,6 +105,7 @@ deps = [
     'compiler_rt_builtins',
     default_options: 'custom_includes=' + meson.project_source_root() / 'Kernel/Utility/KLibC',
   ),
+  dependency('smart_ptr'),
   dependency('veque'),
   dependency('fmt'),
   dependency('string'),
