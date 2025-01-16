@@ -137,6 +137,29 @@ namespace Syscall::VFS
         return 0;
     }
 
+    i32 SysFcntl(Syscall::Arguments& args)
+    {
+        i32       fd      = static_cast<i32>(args.Args[0]);
+        i32       op      = static_cast<i32>(args.Args[1]);
+        uintptr_t arg     = reinterpret_cast<uintptr_t>(args.Args[2]);
+
+        Process*  current = CPU::GetCurrentThread()->parent;
+        auto      file    = current->GetFileHandle(fd);
+        if (!file) return_err(-1, EBADF);
+
+        switch (op)
+        {
+            case F_DUPFD:
+                return current->CreateFileDescriptor(file->GetNode(), 0, 0);
+                break;
+
+            default: LogError("Syscall::VFS::SysFcntl: Unknown opcode"); break;
+        }
+        (void)fd;
+        (void)arg;
+
+        return 0;
+    }
     i32 SysOpenAt(Syscall::Arguments& args)
     {
         Process* current = CPU::GetCurrentThread()->parent;
