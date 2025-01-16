@@ -160,6 +160,21 @@ namespace Syscall::VFS
 
         return 0;
     }
+    i32 SysGetCwd(Syscall::Arguments& args)
+    {
+        class Process* current = CPU::GetCurrentThread()->parent;
+
+        char*          buffer  = reinterpret_cast<char*>(args.Args[0]);
+        usize          size    = args.Args[1];
+
+        auto           cwd     = current->GetCWD()->GetPath();
+        usize          count   = cwd.size();
+        if (size < count) count = size;
+        strncpy(buffer, cwd.data(), count);
+
+        return 0;
+    }
+
     i32 SysOpenAt(Syscall::Arguments& args)
     {
         Process* current = CPU::GetCurrentThread()->parent;

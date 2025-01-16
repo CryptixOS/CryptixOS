@@ -43,6 +43,13 @@ namespace Syscall::Process
         return current->GetCredentials().egid;
     }
 
+    pid_t SysGetPid(Syscall::Arguments& args)
+    {
+        class Process* current = CPU::GetCurrentThread()->parent;
+        Assert(current);
+
+        return current->m_Pid;
+    }
     pid_t SysGet_pPid(Syscall::Arguments&)
     {
         class Process* current = CPU::GetCurrentThread()->parent;
@@ -53,27 +60,32 @@ namespace Syscall::Process
 
     pid_t SysFork(Syscall::Arguments&)
     {
-        class Process* process    = CPU::GetCurrentThread()->parent;
+        class Process* process = CPU::GetCurrentThread()->parent;
 
+        CPU::SetInterruptFlag(false);
         class Process* newProcess = process->Fork();
         Assert(newProcess);
 
         LogInfo("New Process Pid: {}", newProcess->GetPid());
         return newProcess->GetPid();
     }
-    int SysExecve(Syscall::Arguments& args)
+    i32 SysExecve(Syscall::Arguments& args)
     {
         char*  path = reinterpret_cast<char*>(args.Args[0]);
         char** argv = reinterpret_cast<char**>(args.Args[1]);
         char** envp = reinterpret_cast<char**>(args.Args[2]);
 
+        CPU::SetInterruptFlag(false);
+
         return CPU::GetCurrentThread()->parent->Exec(path, argv, envp);
     }
-    int SysExit(Syscall::Arguments& args)
+    i32 SysExit(Syscall::Arguments& args)
     {
         i32   code    = args.Args[0];
 
         auto* process = CPU::GetCurrentThread()->parent;
+
+        LogTrace("SysExit: exiting process: '{}'...", process->m_Name);
         return process->Exit(code);
     }
 }; // namespace Syscall::Process

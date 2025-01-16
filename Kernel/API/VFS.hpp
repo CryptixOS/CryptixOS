@@ -25,6 +25,7 @@ namespace Syscall::VFS
     i32   SysAccess(Syscall::Arguments& args);
 
     i32   SysFcntl(Syscall::Arguments& args);
+    i32   SysGetCwd(Syscall::Arguments& args);
     i32   SysOpenAt(Syscall::Arguments& args);
     i32   SysFStatAt(Syscall::Arguments& args);
 } // namespace Syscall::VFS

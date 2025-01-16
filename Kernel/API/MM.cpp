@@ -19,7 +19,7 @@
 
 namespace Syscall::MM
 {
-    uintptr_t SysMMap(Syscall::Arguments& args)
+    intptr_t SysMMap(Syscall::Arguments& args)
     {
         uintptr_t addr    = args.Args[0];
         usize     len     = args.Args[1];
@@ -54,8 +54,6 @@ namespace Syscall::MM
                                            | PageAttributes::eWriteBack);
 
             process->m_AddressSpace.push_back({phys, virt, len});
-            if (0x4129659d >= virt && 0x4129659d <= virt + len)
-                LogFatal("Memory in range: {:#x}", virt);
             DebugSyscall("MMAP: virt: {:#x}", virt);
             return virt;
         }

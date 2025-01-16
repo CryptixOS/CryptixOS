@@ -6,13 +6,12 @@
  */
 #pragma once
 
-#include "API/Syscall.hpp"
-#include "Common.hpp"
+#include <API/Syscall.hpp>
 
 constexpr uintptr_t MAP_FAILED    = -1;
 constexpr usize     MAP_ANONYMOUS = 0x20;
 
 namespace Syscall::MM
 {
-    uintptr_t SysMMap(Syscall::Arguments& args);
+    intptr_t SysMMap(Syscall::Arguments& args);
 } // namespace Syscall::MM

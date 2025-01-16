@@ -16,9 +16,10 @@ namespace Syscall::Process
     uid_t SysGet_eUid(Syscall::Arguments&);
     gid_t SysGet_eGid(Syscall::Arguments&);
 
+    pid_t SysGetPid(Syscall::Arguments& args);
     pid_t SysGet_pPid(Syscall::Arguments&);
 
     pid_t SysFork(Syscall::Arguments& args);
-    int   SysExecve(Syscall::Arguments& args);
-    int   SysExit(Syscall::Arguments& args);
+    i32   SysExecve(Syscall::Arguments& args);
+    i32   SysExit(Syscall::Arguments& args);
 }; // namespace Syscall::Process
