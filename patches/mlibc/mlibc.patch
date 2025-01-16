@@ -1,7 +1,7 @@
-From 255623d509644f3cc9cc26c19023264298461b90 Mon Sep 17 00:00:00 2001
+From 431606f4c44fc29c0758b25e12596997911be388 Mon Sep 17 00:00:00 2001
 From: V1tr10l7 <vitriol1744@gmail.com>
-Date: Thu, 16 Jan 2025 17:23:20 +0100
-Subject: [PATCH] add support for cryptixos target
+Date: Fri, 17 Jan 2025 00:57:02 +0100
+Subject: [PATCH] implement support for cryptix target
 
 ---
  meson.build                                   |   5 +
@@ -60,8 +60,10 @@ Subject: [PATCH] add support for cryptixos target
  sysdeps/cryptix/include/mntent.h              |  50 +++++
  sysdeps/cryptix/include/sys/mount.h           |  54 ++++++
  sysdeps/cryptix/include/sys/reboot.h          |  20 ++
+ sysdeps/cryptix/include/sys/statfs.h          |   1 +
  sysdeps/cryptix/include/sys/sysmacros.h       |  24 +++
- sysdeps/cryptix/meson.build                   | 107 +++++++++++
+ sysdeps/cryptix/include/sys/vfs.h             |   1 +
+ sysdeps/cryptix/meson.build                   | 109 +++++++++++
  sysdeps/cryptix/sysdeps/file_io.cpp           | 181 ++++++++++++++++++
  sysdeps/cryptix/sysdeps/internal.cpp          |  97 ++++++++++
  sysdeps/cryptix/sysdeps/process.cpp           |  27 +++
@@ -70,7 +72,7 @@ Subject: [PATCH] add support for cryptixos target
  sysdeps/cryptix/x86_64/crti.S                 |  10 +
  sysdeps/cryptix/x86_64/crtn.S                 |   8 +
  sysdeps/cryptix/x86_64/thread_entry.S         |  24 +++
- 66 files changed, 1082 insertions(+)
+ 68 files changed, 1086 insertions(+)
  create mode 100644 mlibc.patch
  create mode 100644 sysdeps/cryptix/entry/entry.cpp
  create mode 100644 sysdeps/cryptix/entry/thread.cpp
@@ -126,7 +128,9 @@ Subject: [PATCH] add support for cryptixos target
  create mode 100644 sysdeps/cryptix/include/mntent.h
  create mode 100644 sysdeps/cryptix/include/sys/mount.h
  create mode 100644 sysdeps/cryptix/include/sys/reboot.h
+ create mode 120000 sysdeps/cryptix/include/sys/statfs.h
  create mode 100644 sysdeps/cryptix/include/sys/sysmacros.h
+ create mode 120000 sysdeps/cryptix/include/sys/vfs.h
  create mode 100644 sysdeps/cryptix/meson.build
  create mode 100644 sysdeps/cryptix/sysdeps/file_io.cpp
  create mode 100644 sysdeps/cryptix/sysdeps/internal.cpp
@@ -1111,6 +1115,14 @@ index 00000000..6c4e4959
 +#endif
 +
 +#endif // MLIBC_SYS_REBOOT_H
+diff --git a/sysdeps/cryptix/include/sys/statfs.h b/sysdeps/cryptix/include/sys/statfs.h
+new file mode 120000
+index 00000000..785b00a4
+--- /dev/null
++++ b/sysdeps/cryptix/include/sys/statfs.h
+@@ -0,0 +1 @@
++../../../../options/linux/include/sys/statfs.h
+\ No newline at end of file
 diff --git a/sysdeps/cryptix/include/sys/sysmacros.h b/sysdeps/cryptix/include/sys/sysmacros.h
 new file mode 100644
 index 00000000..1d81ef56
@@ -1141,12 +1153,20 @@ index 00000000..1d81ef56
 +#endif
 +
 +#endif // _SYS_SYSMACROS_H
+diff --git a/sysdeps/cryptix/include/sys/vfs.h b/sysdeps/cryptix/include/sys/vfs.h
+new file mode 120000
+index 00000000..aca87dd7
+--- /dev/null
++++ b/sysdeps/cryptix/include/sys/vfs.h
+@@ -0,0 +1 @@
++../../../../options/linux/include/sys/vfs.h
+\ No newline at end of file
 diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
 new file mode 100644
-index 00000000..5571df72
+index 00000000..64af1453
 --- /dev/null
 +++ b/sysdeps/cryptix/meson.build
-@@ -0,0 +1,107 @@
+@@ -0,0 +1,109 @@
 +rtld_dso_sources += files('sysdeps/internal.cpp', 'sysdeps/file_io.cpp')
 +libc_sources += files(
 +  'entry/entry.cpp',
@@ -1217,6 +1237,8 @@ index 00000000..5571df72
 +    'include/sys/reboot.h',
 +	'include/sys/mount.h',
 +	'include/sys/sysmacros.h',
++    'include/sys/statfs.h',
++    'include/sys/vfs.h',
 +    subdir: 'sys')
 +
 +  install_headers(
