@@ -65,6 +65,7 @@ namespace Logger
                             va_list& args);
 
     Terminal&          GetTerminal();
+    void               Unlock();
 } // namespace Logger
 
 #define CTOS_BUILD_DEBUG

@@ -8,6 +8,7 @@
 
 #include <API/MM.hpp>
 #include <API/Process.hpp>
+#include <API/System.hpp>
 #include <API/VFS.hpp>
 #include <Arch/CPU.hpp>
 
@@ -103,6 +104,7 @@ namespace Syscall
         RegisterSyscall(ID::eExit, Process::SysExit);
         RegisterSyscall(ID::eGetUid, Process::SysGetUid);
         RegisterSyscall(ID::eGetGid, Process::SysGetGid);
+        RegisterSyscall(ID::eUname, System::SysUname);
         RegisterSyscall(ID::eFcntl, VFS::SysFcntl);
         RegisterSyscall(ID::eGetCwd, VFS::SysGetCwd);
         RegisterSyscall(ID::eGet_eUid, Process::SysGet_eUid);

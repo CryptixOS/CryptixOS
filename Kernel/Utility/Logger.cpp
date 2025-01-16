@@ -326,7 +326,7 @@ namespace Logger
 
     CTOS_NO_KASAN void Log(LogLevel logLevel, std::string_view string)
     {
-        ScopedLock guard(s_Lock);
+        ScopedLock guard(s_Lock, true);
 
         PrintLogLevel(logLevel);
         LogString(string);
@@ -343,7 +343,7 @@ namespace Logger
     }
     CTOS_NO_KASAN void Logv(LogLevel level, const char* fmt, va_list& args)
     {
-        ScopedLock guard(s_Lock);
+        ScopedLock guard(s_Lock, true);
         PrintLogLevel(level);
         while (*fmt)
         {
@@ -361,4 +361,5 @@ namespace Logger
     }
 
     Terminal& GetTerminal() { return s_Terminal; }
+    void      Unlock() { s_Lock.Release(); }
 } // namespace Logger

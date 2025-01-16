@@ -6,10 +6,12 @@
 #*/
 srcs += files(
   'KernelStart.cpp',
+  'Panic.cpp',
 
   'API/MM.cpp',
   'API/Process.cpp',
   'API/Syscall.cpp',
+  'API/System.cpp',
   'API/VFS.cpp',
 
   'Boot/BootInfo.cpp',

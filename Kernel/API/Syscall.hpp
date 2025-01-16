@@ -15,10 +15,10 @@ namespace Syscall
 {
     struct Arguments
     {
-        u64 Index;
-        u64 Args[6];
+        u64       Index;
+        u64       Args[6];
 
-        u64 ReturnValue;
+        uintptr_t ReturnValue;
     };
 
     enum class ID : u64

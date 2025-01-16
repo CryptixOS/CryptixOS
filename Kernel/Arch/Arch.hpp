@@ -10,6 +10,12 @@
 
 #include <string_view>
 
+#if CTOS_ARCH == CTOS_ARCH_X86_64
+    #define CTOS_ARCH_STRING "x86-64"
+#elif CTOS_ARCH == CTOS_ARCH_AARCH64
+    #define CTOS_ARCH_STRING "aarch64"
+#endif
+
 namespace Arch
 {
     void                           Initialize();

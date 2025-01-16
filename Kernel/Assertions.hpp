@@ -18,14 +18,14 @@ namespace PMM = PhysicalMemoryManager;
 
 #define Assert(expr) AssertMsg(expr, #expr)
 #define AssertMsg(expr, msg)                                                   \
-    !(expr) ? Panic("Assertion Failed: {}, In File: {}, At Line: {}", msg,     \
-                    __FILE__, __LINE__)                                        \
-            : (void)0
+    !(expr)                                                                    \
+        ? Panic("{}[{}]: Assertion Failed =>\n{}", __FILE__, __LINE__, msg)    \
+        : (void)0
 
 #define AssertFmt(expr, fmt, ...)                                              \
-    !(expr) ? Panic("Assertion Failed: {}, In File: {}, At Line: {}",          \
-                    std::format(fmt, __VA_ARGS__), __FILE__, __LINE__)         \
+    !(expr) ? Panic("{}[{}]: Assertion Failed =>\n{}", __FILE__, __LINE__,     \
+                    std::format(fmt, __VA_ARGS__))                             \
             : (void)0
-#define ToDo()            AssertMsg(false, "Function is not implemented!")
+#define ToDo()            AssertFmt(false, "{} is not implemented!", __PRETTY_FUNCTION__)
 
 #define AssertPMM_Ready() Assert(PMM::IsInitialized())

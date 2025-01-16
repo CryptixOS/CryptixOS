@@ -4,7 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-
 #include <API/Posix/fcntl.h>
 #include <API/UnixTypes.hpp>
 #include <API/VFS.hpp>
@@ -100,7 +99,7 @@ namespace Syscall::VFS
         return SysFStatAt(args);
     }
 
-    off_t SysLSeek(Syscall::Arguments& args)
+    off_t SysLSeek(Arguments& args)
     {
         i32      fd      = static_cast<i32>(args.Args[0]);
         off_t    offset  = static_cast<off_t>(args.Args[1]);
@@ -113,11 +112,11 @@ namespace Syscall::VFS
         return file->Seek(whence, offset);
     }
 
-    i32 SysIoCtl(Syscall::Arguments& args)
+    int SysIoCtl(Syscall::Arguments& args)
     {
-        i32      fd      = args.Args[0];
-        u64      request = args.Args[1];
-        usize    arg     = args.Args[2];
+        i32      fd      = static_cast<i32>(args.Args[0]);
+        usize    request = static_cast<usize>(args.Args[1]);
+        usize    arg     = static_cast<usize>(args.Args[2]);
 
         Process* current = CPU::GetCurrentThread()->parent;
         auto     file    = current->GetFileHandle(fd);
@@ -125,7 +124,7 @@ namespace Syscall::VFS
 
         return file->GetNode()->IoCtl(request, arg);
     }
-    i32 SysAccess(Syscall::Arguments& args)
+    int SysAccess(Syscall::Arguments& args)
     {
         const char* path = reinterpret_cast<const char*>(args.Args[0]);
         i32         mode = static_cast<i32>(args.Args[1]);
