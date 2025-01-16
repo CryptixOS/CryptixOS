@@ -4,10 +4,11 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "TmpFs.hpp"
 
-#include "Memory/PMM.hpp"
-#include "VFS/TmpFs/TmpFsINode.hpp"
+#include <Memory/PMM.hpp>
+
+#include <VFS/TmpFs/TmpFs.hpp>
+#include <VFS/TmpFs/TmpFsINode.hpp>
 
 TmpFs::TmpFs(u32 flags)
     : Filesystem("TmpFs", flags)
@@ -20,20 +21,20 @@ TmpFs::TmpFs(u32 flags)
 INode* TmpFs::Mount(INode* parent, INode* source, INode* target,
                     std::string_view name, void* data)
 {
-    mountData
+    m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
                : nullptr;
 
     maxSize   = PMM::GetTotalMemory() / 2;
     maxInodes = PMM::GetTotalMemory() / PMM::PAGE_SIZE / 2;
 
-    root      = CreateNode(parent, name, 0644 | S_IFDIR);
-    if (root) mountedOn = target;
-    return root;
+    m_Root    = CreateNode(parent, name, 0644 | S_IFDIR);
+    if (m_Root) m_MountedOn = target;
+    return m_Root;
 }
 INode* TmpFs::CreateNode(INode* parent, std::string_view name, mode_t mode)
 {
-    if (nextInodeIndex >= maxInodes
+    if (m_NextInodeIndex >= maxInodes
         || (S_ISREG(mode)
             && currentSize + TmpFsINode::GetDefaultSize() > maxSize))
     {
@@ -48,7 +49,7 @@ INode* TmpFs::CreateNode(INode* parent, std::string_view name, mode_t mode)
 INode* TmpFs::Symlink(INode* parent, std::string_view name,
                       std::string_view target)
 {
-    if (nextInodeIndex >= maxInodes) return_err(nullptr, ENOSPC);
+    if (m_NextInodeIndex >= maxInodes) return_err(nullptr, ENOSPC);
 
     auto node    = new TmpFsINode(parent, name, this, 0777 | S_IFLNK);
     node->target = target;

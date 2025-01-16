@@ -6,9 +6,9 @@
  */
 #pragma once
 
-#include "VFS/INode.hpp"
-#include "VFS/TmpFs/TmpFsINode.hpp"
-#include "VFS/VFS.hpp"
+#include <VFS/INode.hpp>
+#include <VFS/TmpFs/TmpFsINode.hpp>
+#include <VFS/VFS.hpp>
 
 struct TmpFs : public Filesystem
 {

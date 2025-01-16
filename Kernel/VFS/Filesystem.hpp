@@ -6,31 +6,25 @@
  */
 #pragma once
 
-#include "API/UnixTypes.hpp"
-#include "Utility/Path.hpp"
+#include <API/UnixTypes.hpp>
+#include <Scheduler/Spinlock.hpp>
 
 #include <atomic>
-#include <cerrno>
-#include <cstdlib>
-#include <mutex>
-#include <optional>
-#include <string>
 
 class INode;
 class Filesystem
 {
   public:
-    Filesystem(const std::string& name, u32 flags)
-        : mountedOn(nullptr)
-        , mountData(nullptr)
-        , name(name)
+    Filesystem(std::string_view name, u32 flags)
+        : m_Name(name)
+        , m_Flags(flags)
     {
     }
 
-    inline INode*  GetMountedOn() { return mountedOn; }
-    inline INode*  GetRootNode() { return root; }
-    inline ino_t   GetNextINodeIndex() { return nextInodeIndex++; }
-    inline dev_t   GetDeviceID() const { return deviceID; }
+    inline INode*  GetMountedOn() { return m_MountedOn; }
+    inline INode*  GetRootNode() { return m_Root; }
+    inline ino_t   GetNextINodeIndex() { return m_NextInodeIndex++; }
+    inline dev_t   GetDeviceID() const { return m_DeviceID; }
 
     virtual INode* Mount(INode* parent, INode* source, INode* target,
                          std::string_view name, void* data = nullptr)
@@ -52,13 +46,14 @@ class Filesystem
     }
 
   protected:
-    INode*             mountedOn = nullptr;
-    void*              mountData = nullptr;
-    INode*             root      = nullptr;
+    Spinlock           m_Lock;
 
-    std::mutex         lock;
+    std::string        m_Name;
+    u32                m_Flags          = 0;
+    INode*             m_Root           = nullptr;
+    INode*             m_MountedOn      = nullptr;
+    void*              m_MountData      = nullptr;
 
-    std::string        name;
-    std::atomic<ino_t> nextInodeIndex = 0;
-    dev_t              deviceID       = 0;
+    std::atomic<ino_t> m_NextInodeIndex = 0;
+    dev_t              m_DeviceID       = 0;
 };

@@ -4,11 +4,10 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "DevTmpFs.hpp"
+#include <VFS/DevTmpFs/DevTmpFs.hpp>
+#include <VFS/DevTmpFs/DevTmpFsINode.hpp>
 
-#include "VFS/DevTmpFs/DevTmpFsINode.hpp"
-
-std::unordered_map<dev_t, Device*> DevTmpFs::devices{};
+std::unordered_map<dev_t, Device*> DevTmpFs::s_Devices{};
 
 DevTmpFs::DevTmpFs(u32 flags)
     : Filesystem("DevTmpFs", flags)
@@ -18,47 +17,49 @@ DevTmpFs::DevTmpFs(u32 flags)
 INode* DevTmpFs::Mount(INode* parent, INode* source, INode* target,
                        std::string_view name, void* data)
 {
-    mountData
+    m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
                : nullptr;
 
-    if (root) delete root;
-    root      = CreateNode(parent, name, 0644 | S_IFDIR);
-    mountedOn = root;
+    if (m_Root) delete m_Root;
+    m_Root      = CreateNode(parent, name, 0755 | S_IFDIR);
+    m_MountedOn = target;
 
-    LogTrace("DevTmpFs: Created root node");
-    return root;
+    return m_Root;
 }
 
 INode* DevTmpFs::CreateNode(INode* parent, std::string_view name, mode_t mode)
 {
-    return new DevTmpFsINode(parent, name, this);
+    return new DevTmpFsINode(parent, name, this, mode);
 }
 
 INode* DevTmpFs::Symlink(INode* parent, std::string_view name,
                          std::string_view target)
 {
+    ToDo();
+
     return nullptr;
 }
 INode* DevTmpFs::Link(INode* parent, std::string_view name, INode* oldNode)
 {
+    ToDo();
+
     return nullptr;
 }
 
 INode* DevTmpFs::MkNod(INode* parent, std::string_view name, mode_t mode,
                        dev_t dev)
 {
-    auto it = devices.find(dev);
-    if (it == devices.end()) return nullptr;
+    auto it = s_Devices.find(dev);
+    if (it == s_Devices.end()) return_err(nullptr, EEXIST);
     Device* device = it->second;
 
-    LogTrace("Creating character device");
-    return new DevTmpFsINode(parent, name, this, device);
+    return new DevTmpFsINode(parent, name, this, mode, device);
 }
 
 void DevTmpFs::RegisterDevice(Device* device)
 {
     Assert(device);
 
-    devices[device->GetID()] = device;
+    s_Devices[device->GetID()] = device;
 }

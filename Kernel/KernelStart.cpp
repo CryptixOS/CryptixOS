@@ -53,8 +53,10 @@ void kernelThread()
     userProcess->PageMap = VMM::GetKernelPageMap();
     userProcess->InitializeStreams();
 
-    const char*       argv[] = {"/usr/sbin/init", nullptr};
-    char*             envp[] = {nullptr};
+    std::vector<std::string_view> argv;
+    argv.push_back("/usr/sbin/init");
+    std::vector<std::string_view> envp;
+    envp.push_back("TERM=linux");
 
     static ELF::Image program, ld;
     PageMap*          pageMap = new PageMap();
@@ -71,9 +73,8 @@ void kernelThread()
     userProcess->PageMap = pageMap;
     uintptr_t address
         = ldPath.empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
-    Scheduler::EnqueueThread(new Thread(userProcess, address,
-                                        const_cast<char**>(argv), envp, program,
-                                        CPU::GetCurrent()->ID));
+    Scheduler::EnqueueThread(new Thread(userProcess, address, argv, envp,
+                                        program, CPU::GetCurrent()->ID));
 
     for (;;) Arch::Halt();
 }

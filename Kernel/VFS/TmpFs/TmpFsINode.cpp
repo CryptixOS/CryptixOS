@@ -4,18 +4,43 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "TmpFsINode.hpp"
+#include <Memory/KernelHeap.hpp>
 
-#include "Memory/KernelHeap.hpp"
-#include "Utility/Math.hpp"
-#include "VFS/TmpFs/TmpFs.hpp"
+#include <Utility/Math.hpp>
 
+#include <VFS/TmpFs/TmpFs.hpp>
+#include <VFS/TmpFs/TmpFsINode.hpp>
+
+TmpFsINode::TmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
+                       mode_t mode)
+    : INode(parent, name, fs)
+{
+    m_Stats.st_size    = 0;
+    m_Stats.st_blocks  = 0;
+    m_Stats.st_blksize = 512;
+    m_Stats.st_dev     = fs->GetDeviceID();
+    m_Stats.st_ino     = fs->GetNextINodeIndex();
+    m_Stats.st_mode    = mode;
+    m_Stats.st_nlink   = 1;
+
+    // TODO(v1tr10l7): Set to realtime
+    m_Stats.st_atim    = {};
+    m_Stats.st_ctim    = {};
+    m_Stats.st_mtim    = {};
+
+    if (S_ISREG(mode))
+    {
+        capacity = GetDefaultSize();
+        data     = new u8[capacity];
+    }
+}
 isize TmpFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
     ScopedLock guard(m_Lock);
 
-    usize      count = bytes;
-    if (off_t(offset + bytes) > m_Stats.st_size)
+    if (!buffer) return_err(-1, EFAULT);
+    usize count = bytes;
+    if (static_cast<off_t>(offset + bytes) >= m_Stats.st_size)
         count = bytes - ((offset + bytes) - m_Stats.st_size);
 
     Assert(buffer);

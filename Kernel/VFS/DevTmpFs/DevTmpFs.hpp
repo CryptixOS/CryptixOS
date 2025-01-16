@@ -6,8 +6,8 @@
  */
 #pragma once
 
-#include "Drivers/Device.hpp"
-#include "VFS/Filesystem.hpp"
+#include <Drivers/Device.hpp>
+#include <VFS/Filesystem.hpp>
 
 #include <unordered_map>
 
@@ -34,5 +34,5 @@ class DevTmpFs : public Filesystem
     static void    RegisterDevice(Device* device);
 
   private:
-    static std::unordered_map<dev_t, Device*> devices;
+    static std::unordered_map<dev_t, Device*> s_Devices;
 };

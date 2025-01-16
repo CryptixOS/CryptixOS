@@ -6,20 +6,18 @@
  */
 #pragma once
 
-#include "Drivers/Device.hpp"
-#include "Utility/NonCopyable.hpp"
-#include "VFS/INode.hpp"
+#include <Drivers/Device.hpp>
+#include <Utility/NonCopyable.hpp>
+#include <VFS/INode.hpp>
 
 class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
 {
   public:
     DevTmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
-                  Device* device = nullptr)
-        : INode(parent, name, fs)
+                  mode_t mode, Device* device = nullptr);
+    virtual ~DevTmpFsINode()
     {
-        LogTrace("Creating devtmpfs node: {}, device: {}", name,
-                 device != nullptr);
-        this->device = device;
+        if (m_Capacity > 0) delete m_Data;
     }
 
     virtual void InsertChild(INode* node, std::string_view name) override
@@ -34,5 +32,7 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
     virtual i32     IoCtl(usize request, usize arg) override;
 
   private:
-    Device* device = nullptr;
+    Device* m_Device   = nullptr;
+    u8*     m_Data     = nullptr;
+    usize   m_Capacity = 0;
 };

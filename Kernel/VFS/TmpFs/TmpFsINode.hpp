@@ -6,10 +6,8 @@
  */
 #pragma once
 
-#include "Utility/Logger.hpp"
-#include "VFS/INode.hpp"
-
-#include <unordered_map>
+#include <Utility/Logger.hpp>
+#include <VFS/INode.hpp>
 
 class TmpFsINode final : public INode
 {
@@ -21,27 +19,7 @@ class TmpFsINode final : public INode
         data     = new u8[capacity];
     }
     TmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
-               mode_t mode)
-        : INode(parent, name, fs)
-    {
-        if (S_ISREG(mode))
-        {
-            capacity = GetDefaultSize();
-            data     = new u8[capacity];
-        }
-        m_Stats.st_size    = 0;
-        m_Stats.st_blocks  = 0;
-        m_Stats.st_blksize = 512;
-        m_Stats.st_dev     = fs->GetDeviceID();
-        m_Stats.st_ino     = fs->GetNextINodeIndex();
-        m_Stats.st_mode    = mode;
-        m_Stats.st_nlink   = 1;
-
-        // TODO(V1tri0l1744): Set st_atim, st_mtim, st_ctim
-        m_Stats.st_atim    = {0, 0};
-        m_Stats.st_mtim    = {0, 0};
-        m_Stats.st_ctim    = {0, 0};
-    }
+               mode_t mode);
 
     ~TmpFsINode()
     {
