@@ -314,9 +314,11 @@ packages:
     architecture: '@OPTION:arch@'
     source:
       subdir: 'sources'
-      git: 'https://git.savannah.gnu.org/git/coreutils.git'
-      tag: 'v9.1'
-      version: '9.1'
+      url: 'https://ftp.gnu.org/gnu/coreutils/coreutils-9.5.tar.xz'
+      format: tar.xz
+      checksum: 'blake2b:6fd3a77697c9e85f31415c6ad66559faf18acc7d346677a89d4a999c2027886551e78842a7283e7b3b44fe8ef2fde04ba2f88df32a7844d5f69d45bcb7a04b6f'
+      extract_path: 'coreutils-9.5'
+      version: '9.5'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.15
@@ -329,14 +331,12 @@ packages:
       - system-gcc
     pkgs_required:
       - mlibc
+    revision: 1
     configure:
       # Huge hack: coreutils does not compile the build-machine binary make-prime-list
       # using the build-machine compiler. Hence, build and invoke the binary manually here.
       - args:
         - '@THIS_SOURCE_DIR@/configure'
-        environ: 
-          ac_cv_sys_largefile_opts: 'none needed'
-          ac_cv_sys_year2038_opts: 'none needed'
       - args: ['make', 'src/make-prime-list']
       - args: |
           ./src/make-prime-list 5000 > @THIS_SOURCE_DIR@/src/primes.h
@@ -348,6 +348,8 @@ packages:
         - '--prefix=/usr'
         - '--disable-nls'
         - 'CFLAGS=-DSLOW_BUT_NO_HACKS -Wno-error'
+        environ:
+          gl_cv_have_proc_uptime: 'yes'
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install']
@@ -532,5 +534,6 @@ packages:
       - mlibc
       - init
       - bash
+      - coreutils
     configure: []
     build: []
