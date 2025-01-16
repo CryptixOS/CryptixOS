@@ -84,8 +84,10 @@ namespace CPU
     {
         constexpr usize OSFXSR     = Bit(9);
         constexpr usize OSXMMEXCPT = Bit(10);
+        constexpr usize UMIP       = Bit(11);
         constexpr usize OSXSAVE    = Bit(18);
-
+        constexpr usize SMEP       = Bit(20);
+        constexpr usize SMAP       = Bit(21);
     }; // namespace CR4
 
     struct CPU
@@ -156,4 +158,7 @@ namespace CPU
 
     bool              EnableSSE();
     void              EnablePAT();
+    void              EnableSMEP();
+    void              EnableSMAP();
+    void              EnableUMIP();
 }; // namespace CPU

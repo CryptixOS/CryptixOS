@@ -129,6 +129,8 @@ namespace CPU
 
         // TODO(v1tr10l7): Enable SMEP, SMAP, UMIP
         EnablePAT();
+        // EnableSMEP();
+        // EnableSMAP();
         InitializeFPU();
 
         // Setup syscalls
@@ -522,5 +524,24 @@ namespace CPU
             | (PAT::eWriteCombining << 24) | (PAT::eUncacheableStrong << 16);
 
         WriteMSR(MSR::IA32_PAT, pat);
+    }
+    void EnableSMEP()
+    {
+        ID id(7, 0);
+        if (id.rbx & CPU_FEAT_EBX_SMEP) WriteCR4(ReadCR4() | CR4::SMEP);
+    }
+    void EnableSMAP()
+    {
+        ID id(7, 0);
+        if (id.rbx & CPU_FEAT_EBX_SMAP)
+        {
+            WriteCR4(ReadCR4() | CR4::SMAP);
+            Clac();
+        }
+    }
+    void EnableUMIP()
+    {
+        ID id(7, 0);
+        if (id.rcx & CPU_FEAT_ECX_UMIP) WriteCR4(ReadCR4() | CR4::UMIP);
     }
 }; // namespace CPU

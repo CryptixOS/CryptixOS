@@ -4,10 +4,10 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "CPU.hpp"
+#include <API/Syscall.hpp>
+#include <Arch/x86_64/CPU.hpp>
 
-#include "API/Syscall.hpp"
-#include "Scheduler/Thread.hpp"
+#include <Scheduler/Thread.hpp>
 
 namespace Syscall
 {
