@@ -113,17 +113,28 @@ namespace Syscall::VFS
         return file->Seek(whence, offset);
     }
 
-    int SysIoCtl(Syscall::Arguments& args)
+    i32 SysIoCtl(Syscall::Arguments& args)
     {
-        int           fd      = args.Args[0];
-        unsigned long request = args.Args[1];
-        usize         arg     = args.Args[2];
+        i32      fd      = args.Args[0];
+        u64      request = args.Args[1];
+        usize    arg     = args.Args[2];
 
-        Process*      current = CPU::GetCurrentThread()->parent;
-        auto          file    = current->GetFileHandle(fd);
+        Process* current = CPU::GetCurrentThread()->parent;
+        auto     file    = current->GetFileHandle(fd);
         if (!file) return_err(-1, EBADF);
 
         return file->GetNode()->IoCtl(request, arg);
+    }
+    i32 SysAccess(Syscall::Arguments& args)
+    {
+        const char* path = reinterpret_cast<const char*>(args.Args[0]);
+        i32         mode = static_cast<i32>(args.Args[1]);
+        (void)mode;
+
+        INode* node = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path));
+        if (!node) return -1;
+
+        return 0;
     }
 
     i32 SysOpenAt(Syscall::Arguments& args)

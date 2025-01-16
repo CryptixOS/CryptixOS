@@ -22,6 +22,7 @@ namespace Syscall::VFS
 
     off_t SysLSeek(Syscall::Arguments& args);
     i32   SysIoCtl(Syscall::Arguments& args);
+    i32   SysAccess(Syscall::Arguments& args);
 
     i32   SysOpenAt(Syscall::Arguments& args);
     i32   SysFStatAt(Syscall::Arguments& args);

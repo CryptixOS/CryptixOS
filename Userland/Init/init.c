@@ -1,42 +1,41 @@
-#include <stdint.h>
+#include <mntent.h>
 #include <stdio.h>
-#include <string.h>
-
-#include <sys/mman.h>
+#include <stdlib.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
-void prompt(void)
+int main()
 {
-    const char* prompt_str = ("cryptixos@root> ");
+    setenv("TERM", "linux", 1);
+    setenv("USER", "root", 1);
+    setenv("HOME", "/root", 1);
 
-    write(0, prompt_str, strlen(prompt_str));
-}
-
-int main(int argc, char** argv, char** envp)
-{
-    prompt();
-    char*       keyBuffer    = mmap(0, 4096, 0x03, MAP_ANONYMOUS, -1, 0);
-    int         pid          = fork();
-    const char* child        = "child";
-    const char* fork_fail    = "fork-failed";
-    const char* fork_success = "fork-success";
-
-    if (pid == 0)
+    const char* path = "/usr/bin/bash";
+    if (access(path, X_OK) == -1)
     {
-        write(0, child, 5);
-        // execve("/usr/sbin/sh", argv, envp);
-        const char* path   = "/usr/bin/bash";
-        const char* args[] = {path, 0};
-        const char* env[]  = {0};
-
-        execve("/usr/bin/bash", (char* const*)args, (char* const*)env);
+        perror("init: failed to access shell");
+        return EXIT_FAILURE;
     }
-    else if (pid == -1) { write(0, fork_fail, 11); }
-    else write(0, fork_success, 12);
 
-    for (;;)
+    while (1)
     {
-        ssize_t nread;
-        nread = getline(&keyBuffer, &nread, stdin);
+        int pid = fork();
+        if (pid == -1)
+        {
+            perror("init: fork failed");
+            return EXIT_FAILURE;
+        }
+        else if (pid == 0)
+        {
+            char* argv[] = {path, NULL};
+            chdir(getenv("HOME"));
+            execvp(path, argv);
+            return EXIT_FAILURE;
+        }
+
+        waitpid(pid, NULL, 0);
+        break;
     }
+
+    return EXIT_SUCCESS;
 }
