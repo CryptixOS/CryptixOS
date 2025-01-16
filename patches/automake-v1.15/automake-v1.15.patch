@@ -1,0 +1,12 @@
+diff --color -Naur automake-1.15.1/lib/config.sub automake-v1.15/lib/config.sub
+--- automake-1.15.1/lib/config.sub	2017-06-18 04:37:14.000000000 +0200
++++ automake-v1.15/lib/config.sub	2025-01-16 17:39:28.735950203 +0100
+@@ -1417,7 +1417,7 @@
+ 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
+ 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
+ 	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* \
+-	      | -onefs* | -tirtos* | -phoenix* | -fuchsia* | -redox*)
++	      | -onefs* | -tirtos* | -phoenix* | -fuchsia* | -redox* | -cryptix*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	-qnx*)

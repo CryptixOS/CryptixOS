@@ -4,35 +4,133 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "TTY.hpp"
+#include <Arch/CPU.hpp>
 
-#include "Arch/CPU.hpp"
+#include <Drivers/TTY.hpp>
+#include <Drivers/Terminal.hpp>
 
-#include "Drivers/Terminal.hpp"
+#include <Scheduler/Process.hpp>
+#include <Scheduler/Scheduler.hpp>
+#include <Scheduler/Thread.hpp>
 
-#include "Scheduler/Process.hpp"
-#include "Scheduler/Thread.hpp"
-
-#include "VFS/DevTmpFs/DevTmpFs.hpp"
-#include "VFS/VFS.hpp"
+#include <VFS/DevTmpFs/DevTmpFs.hpp>
+#include <VFS/VFS.hpp>
 
 namespace
 {
     std::vector<TTY*> s_TTYs;
     constexpr usize   MAX_CHAR_BUFFER = 64;
 } // namespace
+#define CTRL(c)  (c & 0x1F)
+#define CINTR    CTRL('c')
+#define CQUIT    034
+#define CERASE   010
+#define CKILL    CTRL('u')
+#define CEOF     CTRL('d')
+#define CTIME    0
+#define CMIN     1
+#define CSWTC    0
+#define CSTART   CTRL('q')
+#define CSTOP    CTRL('s')
+#define CSUSP    CTRL('z')
+#define CEOL     0
+#define CREPRINT CTRL('r')
+#define CDISCARD CTRL('o')
+#define CWERASE  CTRL('w')
+#define CLNEXT   CTRL('v')
+#define CEOL2    CEOL
 
-TTY* TTY::s_CurrentTTY = nullptr;
+#define CEOT     CEOF
+#define CBRK     CEOL
+#define CRPRNT   CREPRINT
+#define CFLUSH   CDISCARD
+
+TTY*        TTY::s_CurrentTTY = nullptr;
+static cc_t ttydefchars[NCCS];
 
 TTY::TTY(Terminal* terminal, usize minor)
     : Device(DriverType::eTTY, static_cast<DeviceType>(minor))
     , terminal(terminal)
 {
     if (!s_CurrentTTY) s_CurrentTTY = this;
+
+    ttydefchars[VINTR]    = CINTR;
+    ttydefchars[VQUIT]    = CQUIT;
+    ttydefchars[VERASE]   = CERASE;
+    ttydefchars[VKILL]    = CKILL;
+    ttydefchars[VEOF]     = CEOF;
+    ttydefchars[VTIME]    = CTIME;
+    ttydefchars[VMIN]     = CMIN;
+    ttydefchars[VSWTC]    = CSWTC;
+    ttydefchars[VSTART]   = CSTART;
+    ttydefchars[VSTOP]    = CSTOP;
+    ttydefchars[VSUSP]    = CSUSP;
+    ttydefchars[VEOL]     = CEOL;
+    ttydefchars[VREPRINT] = CREPRINT;
+    ttydefchars[VDISCARD] = CDISCARD;
+    ttydefchars[VWERASE]  = CWERASE;
+    ttydefchars[VLNEXT]   = CLNEXT;
+    ttydefchars[VEOL2]    = CEOL2;
+
+    std::memset(&m_Termios, 0, sizeof(m_Termios));
+    m_Termios.c_iflag  = ICRNL;
+    m_Termios.c_oflag  = OPOST | ONLCR;
+    m_Termios.c_lflag  = ISIG | ICANON | ECHO | ECHOE | ECHOK | ECHONL;
+    m_Termios.c_cflag  = CS8;
+    m_Termios.c_ispeed = B9600;
+    m_Termios.c_ospeed = B9600;
+    std::memcpy(m_Termios.c_cc, ttydefchars, NCCS);
 }
 
 void TTY::PutChar(char c)
 {
+    Logger::LogChar(c);
+    //  if (m_Termios.c_iflag & ISTRIP) c &= 0x7F;
+
+    static std::deque<char> line;
+
+    spinlock.Acquire();
+    if (c == 0xa)
+    {
+        line.push_back(c);
+        m_LineQueue.push_back(line);
+        line.clear();
+    }
+    else line.push_back(c);
+    spinlock.Release();
+
+    return;
+
+    // TODO(v1tr10l7): Check whether we should generate signals
+    if (SignalsEnabled())
+        ;
+
+    if (c == '\r' && (m_Termios.c_iflag & ICRNL)) c = '\n';
+    else if (c == '\n' && (m_Termios.c_iflag & INLCR)) c = '\r';
+
+    if (m_IsNextVerbatim)
+    {
+        m_IsNextVerbatim = false;
+        m_CanonQueue.push_back(c);
+        if (m_Termios.c_lflag & ECHO)
+        {
+            if (IsControlCharacter(c))
+            {
+                Output('^');
+                Output(('@' + c) % 128);
+            }
+            else Output(c);
+        }
+
+        return;
+    }
+
+    if (IsCanonicalMode())
+    {
+        // if (c == m_Termios.c_cc[VLNEXT] && m_Termios.c_lflag & IEXTEN)
+        //   ;
+    }
+
     spinlock.Acquire();
     if (charBuffer.size() > MAX_CHAR_BUFFER) charBuffer.pop_front();
     charBuffer.push_back(c);
@@ -45,17 +143,43 @@ isize TTY::Read(void* dest, off_t offset, usize bytes)
     Assert(dest);
     u8* d = reinterpret_cast<u8*>(dest);
 
+    m_Termios.c_lflag |= ICANON;
+    // LogInfo("BeforeYield");
+    while (m_LineQueue.empty()) Arch::Pause(); // Scheduler::Yield();
+    // LogInfo("AfterYield");
+
     spinlock.Acquire();
+
+    auto& line = m_LineQueue.front();
+    while (bytes > 0 && !line.empty())
+    {
+        char c = line.front();
+        line.pop_front();
+
+        *d++ = c;
+        --bytes;
+        ++nread;
+    }
+    m_LineQueue.pop_front();
+
+    // LogInfo("Line: {}", line.data());
+    spinlock.Release();
+
+    /*
     while (bytes > 0 && charBuffer.size() > 0)
     {
+        break;
         (void)offset;
-        *d++ = charBuffer.front();
+
+        char c = charBuffer.front();
+
+        *d++   = c;
         charBuffer.pop_front();
 
         --bytes;
         ++nread;
     }
-    spinlock.Release();
+    */
 
     (void)MAX_CHAR_BUFFER;
     return nread;
@@ -77,7 +201,7 @@ isize TTY::Write(const void* src, off_t offset, usize bytes)
         return bytes;
     }
 
-    terminal->PrintString(str);
+    Logger::LogString(str);
     return bytes;
 }
 
@@ -89,13 +213,13 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
     {
         case TCGETS:
         {
-            std::memcpy(reinterpret_cast<void*>(argp), &termios,
+            std::memcpy(reinterpret_cast<void*>(argp), &m_Termios,
                         sizeof(termios));
             break;
         }
         case TCSETS:
         {
-            std::memcpy(&termios, reinterpret_cast<void*>(argp),
+            std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
                         sizeof(termios));
             break;
         }
@@ -117,7 +241,9 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
             break;
         case TIOCNOTTY: controlSid = -1; break;
 
-        default: return ENOTTY;
+        default:
+            LogInfo("Request: {:#x}, argp: {}", request, argp);
+            return EINVAL;
     }
 
     return no_error;
@@ -148,6 +274,8 @@ void TTY::Initialize()
     {
         VFS::MkNod(VFS::GetRootNode(), "/dev/tty0", 0666, s_TTYs[0]->GetID());
         VFS::MkNod(VFS::GetRootNode(), "/dev/tty", 0666, s_TTYs[0]->GetID());
+        VFS::MkNod(VFS::GetRootNode(), "/dev/console", 0666,
+                   s_TTYs[0]->GetID());
     }
 
     LogInfo("TTY: Initialized");
