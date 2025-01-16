@@ -38,6 +38,7 @@ srcs += files(
   'Utility/Stacktrace.cpp',
   'Utility/Ubsan.cpp',
 
+  'VFS/FileDescriptor.cpp',
   'VFS/INode.cpp',
   'VFS/VFS.cpp',
   'VFS/DevTmpFs/DevTmpFs.cpp',

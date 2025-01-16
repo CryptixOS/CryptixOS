@@ -91,6 +91,7 @@ namespace Syscall
         RegisterSyscall(ID::eRead, VFS::SysRead);
         RegisterSyscall(ID::eWrite, VFS::SysWrite);
         RegisterSyscall(ID::eOpen, VFS::SysOpen);
+        RegisterSyscall(ID::eClose, VFS::SysClose);
         RegisterSyscall(ID::eLSeek, VFS::SysLSeek);
         RegisterSyscall(ID::eMMap, MM::SysMMap);
         RegisterSyscall(ID::eIoCtl, VFS::SysIoCtl);

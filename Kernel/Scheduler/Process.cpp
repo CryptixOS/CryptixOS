@@ -50,6 +50,7 @@ i32 Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 
     return m_FdTable.Insert(descriptor);
 }
+i32 Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
 
 i32 Process::Exec(const char* path, char** argv, char** envp)
 {
