@@ -97,7 +97,6 @@ phmap_opts.add_cmake_defines(
 limine = subproject('limine', default_options: 'arch=' + arch)
 deps = [
   cmake.subproject('parallel_hashmap', options: phmap_opts).dependency('phmap'),
-  cmake.subproject('frozen').dependency('frozen'),
 
   dependency('limine'),
   dependency('flanterm'),
@@ -106,7 +105,6 @@ deps = [
     'compiler_rt_builtins',
     default_options: 'custom_includes=' + meson.project_source_root() / 'Kernel/Utility/KLibC',
   ),
-  dependency('smart_ptr'),
   dependency('veque'),
   dependency('fmt'),
   dependency('string'),
