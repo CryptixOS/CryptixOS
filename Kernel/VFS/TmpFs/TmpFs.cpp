@@ -9,8 +9,8 @@
 #include "Memory/PMM.hpp"
 #include "VFS/TmpFs/TmpFsINode.hpp"
 
-TmpFs::TmpFs()
-    : Filesystem("TmpFs")
+TmpFs::TmpFs(u32 flags)
+    : Filesystem("TmpFs", flags)
     , maxInodes(0)
     , maxSize(0)
     , currentSize(0)
@@ -27,12 +27,11 @@ INode* TmpFs::Mount(INode* parent, INode* source, INode* target,
     maxSize   = PMM::GetTotalMemory() / 2;
     maxInodes = PMM::GetTotalMemory() / PMM::PAGE_SIZE / 2;
 
-    root      = CreateNode(parent, name, 0644 | S_IFDIR, INodeType::eDirectory);
+    root      = CreateNode(parent, name, 0644 | S_IFDIR);
     if (root) mountedOn = target;
     return root;
 }
-INode* TmpFs::CreateNode(INode* parent, std::string_view name, mode_t mode,
-                         INodeType type)
+INode* TmpFs::CreateNode(INode* parent, std::string_view name, mode_t mode)
 {
     if (nextInodeIndex >= maxInodes
         || (S_ISREG(mode)
@@ -43,7 +42,7 @@ INode* TmpFs::CreateNode(INode* parent, std::string_view name, mode_t mode,
         return nullptr;
     }
 
-    return new TmpFsINode(parent, name, this, mode, type);
+    return new TmpFsINode(parent, name, this, mode);
 }
 
 INode* TmpFs::Symlink(INode* parent, std::string_view name,
@@ -51,8 +50,7 @@ INode* TmpFs::Symlink(INode* parent, std::string_view name,
 {
     if (nextInodeIndex >= maxInodes) return_err(nullptr, ENOSPC);
 
-    auto node    = new TmpFsINode(parent, name, this, 0777 | S_IFLNK,
-                                  INodeType::eSymlink);
+    auto node    = new TmpFsINode(parent, name, this, 0777 | S_IFLNK);
     node->target = target;
 
     LogInfo("TmpFs: Created symlink '{}' -> '{}'", name, target);
@@ -61,13 +59,12 @@ INode* TmpFs::Symlink(INode* parent, std::string_view name,
 
 INode* TmpFs::Link(INode* parent, std::string_view name, INode* oldNode)
 {
-    if (oldNode->GetType() == INodeType::eDirectory)
+    if (oldNode->IsDirectory())
     {
         errno = EISDIR;
         return nullptr;
     }
 
     return new TmpFsINode(parent, name, this,
-                          (oldNode->GetStats().st_mode & ~S_IFMT),
-                          oldNode->GetType());
+                          (oldNode->GetStats().st_mode & ~S_IFMT));
 }

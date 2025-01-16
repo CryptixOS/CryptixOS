@@ -14,8 +14,8 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
 {
   public:
     DevTmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
-                  INodeType type, Device* device = nullptr)
-        : INode(parent, name, fs, type)
+                  Device* device = nullptr)
+        : INode(parent, name, fs)
     {
         LogTrace("Creating devtmpfs node: {}, device: {}", name,
                  device != nullptr);
@@ -25,7 +25,7 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
     virtual void InsertChild(INode* node, std::string_view name) override
     {
         ScopedLock guard(m_Lock);
-        children[name] = node;
+        m_Children[name] = node;
     }
 
     virtual ssize_t Read(void* buffer, off_t offset, size_t bytes) override;

@@ -74,8 +74,7 @@ namespace Ustar
             {
                 case FILE_TYPE_NORMAL:
                 case FILE_TYPE_NORMAL_:
-                    node = VFS::CreateNode(nullptr, filename, mode | S_IFREG,
-                                           INodeType::eRegular);
+                    node = VFS::CreateNode(nullptr, filename, mode | S_IFREG);
 
                     if (!node)
                         LogError(
@@ -127,8 +126,7 @@ namespace Ustar
                 }
                 case FILE_TYPE_BLOCK_DEVICE: ToDo(); break;
                 case FILE_TYPE_DIRECTORY:
-                    node = VFS::CreateNode(nullptr, filename, mode | S_IFDIR,
-                                           INodeType::eDirectory);
+                    node = VFS::CreateNode(nullptr, filename, mode | S_IFDIR);
                     if (!node)
                         LogError(
                             "USTAR: Failed to create a directory! path: '{}'",

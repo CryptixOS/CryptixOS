@@ -15,8 +15,8 @@ isize TmpFsINode::Read(void* buffer, off_t offset, usize bytes)
     ScopedLock guard(m_Lock);
 
     usize      count = bytes;
-    if (off_t(offset + bytes) > stats.st_size)
-        count = bytes - ((offset + bytes) - stats.st_size);
+    if (off_t(offset + bytes) > m_Stats.st_size)
+        count = bytes - ((offset + bytes) - m_Stats.st_size);
 
     Assert(buffer);
     std::memcpy(buffer, reinterpret_cast<uint8_t*>(data) + offset, count);
@@ -31,7 +31,7 @@ isize TmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
         usize newCapacity = capacity;
         while (offset + bytes >= newCapacity) newCapacity *= 2;
 
-        auto tfs = reinterpret_cast<TmpFs*>(filesystem);
+        auto tfs = reinterpret_cast<TmpFs*>(m_Filesystem);
         if (tfs->currentSize + (newCapacity - capacity) > tfs->maxSize)
         {
             errno = ENOSPC;
@@ -46,10 +46,11 @@ isize TmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
 
     memcpy(data + offset, buffer, bytes);
 
-    if (off_t(offset + bytes) >= stats.st_size)
+    if (off_t(offset + bytes) >= m_Stats.st_size)
     {
-        stats.st_size   = off_t(offset + bytes);
-        stats.st_blocks = Math::DivRoundUp(stats.st_size, stats.st_blksize);
+        m_Stats.st_size = off_t(offset + bytes);
+        m_Stats.st_blocks
+            = Math::DivRoundUp(m_Stats.st_size, m_Stats.st_blksize);
     }
 
     return bytes;

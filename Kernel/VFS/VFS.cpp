@@ -5,28 +5,41 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "VFS.hpp"
+#include <Arch/CPU.hpp>
 
+#include <Scheduler/Process.hpp>
 #include <Scheduler/Spinlock.hpp>
+#include <Scheduler/Thread.hpp>
 
-#include "VFS/DevTmpFs/DevTmpFs.hpp"
-#include "VFS/INode.hpp"
-#include "VFS/TmpFs/TmpFs.hpp"
+#include <VFS/DevTmpFs/DevTmpFs.hpp>
+#include <VFS/INode.hpp>
+#include <VFS/TmpFs/TmpFs.hpp>
+#include <VFS/VFS.hpp>
 
 #include <cerrno>
 
 namespace VFS
 {
-    static INode*      rootINode = nullptr;
-    static Spinlock    s_Lock;
+    static INode*   s_RootNode = nullptr;
+    static Spinlock s_Lock;
 
-    INode*             GetRootNode() { return rootINode; }
+    INode*          GetRootNode()
+    {
+        Thread* thread = CPU::GetCurrentThread();
+        if (!thread) return s_RootNode;
 
-    static Filesystem* CreateFilesystem(std::string_view name)
+        Process* process = thread->parent;
+        Assert(process);
+
+        INode* rootNode = process->GetRootNode();
+        return rootNode ? rootNode : s_RootNode;
+    }
+
+    static Filesystem* CreateFilesystem(std::string_view name, u32 flags)
     {
         Filesystem* fs = nullptr;
-        if (name == "tmpfs") fs = new TmpFs();
-        else if (name == "devtmpfs") fs = new DevTmpFs();
+        if (name == "tmpfs") fs = new TmpFs(flags);
+        else if (name == "devtmpfs") fs = new DevTmpFs(flags);
 
         return fs;
     }
@@ -35,11 +48,49 @@ namespace VFS
     {
         if (!node) return;
 
-        if (node->GetType() == INodeType::eDirectory)
+        if (node->IsDirectory())
             for (auto [name, child] : node->GetChildren())
                 RecursiveDelete(child);
 
         delete node;
+    }
+
+    FileDescriptor* Open(INode* parent, PathView path, i32 flags, mode_t mode)
+    {
+        Process* current        = CPU::GetCurrentThread()->parent;
+        bool     followSymlinks = !(flags & O_NOFOLLOW);
+        auto     acc            = flags & O_ACCMODE;
+
+        INode*   node
+            = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
+        bool didExist = true;
+
+        if (!node)
+        {
+            didExist = false;
+            if (errno != ENOENT || !(flags & O_CREAT)) return nullptr;
+
+            if (!parent->ValidatePermissions(current->GetCredentials(), 5))
+                return_err(nullptr, EACCES);
+            node = VFS::CreateNode(parent, path,
+                                   (mode & ~current->GetUMask()) | S_IFREG);
+
+            if (!node) return nullptr;
+        }
+
+        if (flags & O_EXCL && didExist) return_err(nullptr, EEXIST);
+        node = node->Reduce(followSymlinks, false);
+        if (!node) return nullptr;
+
+        if (node->IsSymlink()) return_err(nullptr, ELOOP);
+        if ((flags & O_DIRECTORY && !node->IsDirectory())
+            || (node->IsDirectory() && (acc & O_WRONLY || acc & O_RDWR)))
+            return_err(nullptr, EISDIR);
+
+        // TODO(v1tr10l7): check acc modes and truncate
+        if (flags & O_TRUNC && node->IsRegular() && didExist)
+            ;
+        return node->Open(flags, mode);
     }
 
     std::tuple<INode*, INode*, std::string>
@@ -64,14 +115,13 @@ namespace VFS
 
         auto segments = Path::SplitPath(path.data());
 
-        for (size_t i = 0; i < segments.size(); i++)
+        for (usize i = 0; i < segments.size(); i++)
         {
             auto segment     = segments[i];
             bool isLast      = i == (segments.size() - 1);
 
-            bool previousDir = segment == ".."; // segment.starts_with("..");
-            bool currentDir
-                = segment == "."; //! previousDir && segment.starts_with(".");
+            bool previousDir = segment == "..";
+            bool currentDir  = segment == ".";
 
             if (currentDir || previousDir)
             {
@@ -91,12 +141,7 @@ namespace VFS
 
                 auto getReal = [](INode* node) -> INode*
                 {
-                    if (node != rootINode->Reduce(true)
-                        && node->GetFilesystem()->GetMountedOn()
-                        && node
-                               == node->GetFilesystem()
-                                      ->GetMountedOn()
-                                      ->mountGate)
+                    if (node->IsFilesystemRoot())
                         return node->GetFilesystem()->GetMountedOn();
                     return node;
                 };
@@ -106,12 +151,12 @@ namespace VFS
 
                 currentNode = node;
 
-                if (currentNode->GetType() == INodeType::eSymlink)
+                if (currentNode->IsSymlink())
                 {
                     currentNode = currentNode->Reduce(true);
                     if (!currentNode) return {nullptr, nullptr, ""};
                 }
-                if (currentNode->GetType() != INodeType::eDirectory)
+                if (!currentNode->IsDirectory())
                 {
                     errno = ENOTDIR;
                     return {nullptr, nullptr, ""};
@@ -134,38 +179,38 @@ namespace VFS
 
     bool MountRoot(std::string_view filesystemName)
     {
-        auto fs = CreateFilesystem(filesystemName);
+        auto fs = CreateFilesystem(filesystemName, 0);
         if (!fs)
         {
             LogError("VFS: Failed to create filesystem: '{}'", filesystemName);
             return false;
         }
-        if (rootINode)
+        if (s_RootNode)
         {
             LogError("VFS: Root already mounted!");
             return false;
         }
 
-        rootINode = fs->Mount(nullptr, nullptr, nullptr, "/", nullptr);
+        s_RootNode = fs->Mount(nullptr, nullptr, nullptr, "/", nullptr);
 
-        if (rootINode)
+        if (s_RootNode)
             LogInfo("VFS: Mounted Filesystem '{}' on '/'",
                     filesystemName.data());
         else
             LogError("VFS: Failed to mount filesystem '{}' on '/'",
                      filesystemName.data());
 
-        return rootINode != nullptr;
+        return s_RootNode != nullptr;
     }
 
     // TODO: flags
     bool Mount(INode* parent, PathView source, PathView target,
-               std::string_view fsName, int flags, void* data)
+               std::string_view fsName, i32 flags, void* data)
     {
         ScopedLock  guard(s_Lock);
 
-        Filesystem* fs = CreateFilesystem(fsName);
-        if (fs == nullptr)
+        Filesystem* fs = CreateFilesystem(fsName, flags);
+        if (!fs)
         {
             errno = ENODEV;
             return false;
@@ -177,8 +222,7 @@ namespace VFS
 
         if (!node) return false;
 
-        if (!isRoot && node->GetType() != INodeType::eDirectory)
-            return_err(false, ENOTDIR);
+        if (!isRoot && !node->IsDirectory()) return_err(false, ENOTDIR);
 
         auto mountGate = fs->Mount(parent, nullptr, node, basename, data);
         if (!mountGate) return false;
@@ -194,14 +238,14 @@ namespace VFS
         return true;
     }
 
-    bool Unmount(INode* parent, PathView path, int flags)
+    bool Unmount(INode* parent, PathView path, i32 flags)
     {
         // TODO: Unmount
         ToDo();
         return false;
     }
 
-    INode* CreateNode(INode* parent, PathView path, mode_t mode, INodeType type)
+    INode* CreateNode(INode* parent, PathView path, mode_t mode)
     {
         ScopedLock guard(s_Lock);
 
@@ -210,8 +254,8 @@ namespace VFS
 
         if (!newNodeParent) return nullptr;
 
-        newNode = newNodeParent->GetFilesystem()->CreateNode(
-            newNodeParent, newNodeName, mode, type);
+        newNode = newNodeParent->GetFilesystem()->CreateNode(newNodeParent,
+                                                             newNodeName, mode);
         if (newNode) newNodeParent->InsertChild(newNode, newNode->GetName());
         return newNode;
     }
@@ -246,13 +290,13 @@ namespace VFS
     }
 
     INode* Link(INode* oldParent, PathView oldPath, INode* newParent,
-                PathView newPath, int flags)
+                PathView newPath, i32 flags)
     {
         ToDo();
         return nullptr;
     }
 
-    bool Unlink(INode* parent, PathView path, int flags)
+    bool Unlink(INode* parent, PathView path, i32 flags)
     {
         ToDo();
         return false;

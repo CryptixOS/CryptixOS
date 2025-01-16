@@ -10,8 +10,8 @@
 
 std::unordered_map<dev_t, Device*> DevTmpFs::devices{};
 
-DevTmpFs::DevTmpFs()
-    : Filesystem("DevTmpFs")
+DevTmpFs::DevTmpFs(u32 flags)
+    : Filesystem("DevTmpFs", flags)
 {
 }
 
@@ -23,17 +23,16 @@ INode* DevTmpFs::Mount(INode* parent, INode* source, INode* target,
                : nullptr;
 
     if (root) delete root;
-    root      = CreateNode(parent, name, 0644 | S_IFDIR, INodeType::eDirectory);
+    root      = CreateNode(parent, name, 0644 | S_IFDIR);
     mountedOn = root;
 
     LogTrace("DevTmpFs: Created root node");
     return root;
 }
 
-INode* DevTmpFs::CreateNode(INode* parent, std::string_view name, mode_t mode,
-                            INodeType type)
+INode* DevTmpFs::CreateNode(INode* parent, std::string_view name, mode_t mode)
 {
-    return new DevTmpFsINode(parent, name, this, type);
+    return new DevTmpFsINode(parent, name, this);
 }
 
 INode* DevTmpFs::Symlink(INode* parent, std::string_view name,
@@ -54,8 +53,7 @@ INode* DevTmpFs::MkNod(INode* parent, std::string_view name, mode_t mode,
     Device* device = it->second;
 
     LogTrace("Creating character device");
-    return new DevTmpFsINode(parent, name, this, INodeType::eCharacterDevice,
-                             device);
+    return new DevTmpFsINode(parent, name, this, device);
 }
 
 void DevTmpFs::RegisterDevice(Device* device)

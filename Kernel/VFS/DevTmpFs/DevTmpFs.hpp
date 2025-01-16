@@ -14,13 +14,13 @@
 class DevTmpFs : public Filesystem
 {
   public:
-    DevTmpFs();
+    DevTmpFs(u32 flags);
 
     virtual INode* Mount(INode* parent, INode* source, INode* target,
                          std::string_view name, void* data = nullptr) override;
 
-    virtual INode* CreateNode(INode* parent, std::string_view name, mode_t mode,
-                              INodeType type) override;
+    virtual INode* CreateNode(INode* parent, std::string_view name,
+                              mode_t mode) override;
 
     virtual INode* Symlink(INode* parent, std::string_view name,
                            std::string_view target) override;

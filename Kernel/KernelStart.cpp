@@ -41,8 +41,7 @@ void kernelThread()
     Assert(VFS::MountRoot("tmpfs"));
     Initrd::Initialize();
 
-    VFS::CreateNode(VFS::GetRootNode(), "/dev", 0755 | S_IFDIR,
-                    INodeType::eDirectory);
+    VFS::CreateNode(VFS::GetRootNode(), "/dev", 0755 | S_IFDIR);
     Assert(VFS::Mount(VFS::GetRootNode(), "", "/dev", "devtmpfs"));
 
     TTY::Initialize();

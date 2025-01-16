@@ -17,11 +17,10 @@
 #include <string>
 
 class INode;
-enum class INodeType;
 class Filesystem
 {
   public:
-    Filesystem(const std::string& name)
+    Filesystem(const std::string& name, u32 flags)
         : mountedOn(nullptr)
         , mountData(nullptr)
         , name(name)
@@ -36,14 +35,13 @@ class Filesystem
     virtual INode* Mount(INode* parent, INode* source, INode* target,
                          std::string_view name, void* data = nullptr)
         = 0;
-    virtual INode* CreateNode(INode* parent, std::string_view name, mode_t mode,
-                              INodeType type)
+    virtual INode* CreateNode(INode* parent, std::string_view name, mode_t mode)
         = 0;
     virtual INode* Symlink(INode* parent, std::string_view name,
                            std::string_view target)
         = 0;
 
-    virtual INode* Link(INode* parent, std::string_view name, INode* old_node)
+    virtual INode* Link(INode* parent, std::string_view name, INode* oldNode)
         = 0;
     virtual bool   Populate(INode* node) = 0;
 

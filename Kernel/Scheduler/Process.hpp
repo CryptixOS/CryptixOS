@@ -88,6 +88,10 @@ class Process
     inline bool IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
     inline FileDescriptor* GetFileHandle(i32 fd) { return m_FdTable.GetFd(fd); }
 
+    inline INode*          GetRootNode() const { return m_RootNode; }
+    inline INode*          GetCWD() const { return m_CWD; }
+    inline mode_t          GetUMask() const { return m_UMask; }
+
     Process*               Fork();
     i32                    Exec(const char* path, char** argv, char** envp);
     i32                    Exit(i32 code);

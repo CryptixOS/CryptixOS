@@ -6,18 +6,20 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include <Common.hpp>
 
-#include "API/UnixTypes.hpp"
-#include "Utility/Path.hpp"
+#include <API/UnixTypes.hpp>
+#include <Utility/Path.hpp>
 
 class INode;
-enum class INodeType;
 
+struct FileDescriptor;
 namespace VFS
 {
-    INode* GetRootNode();
-    void   RecursiveDelete(INode* node);
+    INode*          GetRootNode();
+    void            RecursiveDelete(INode* node);
+
+    FileDescriptor* Open(INode* parent, PathView path, i32 flags, mode_t mode);
 
     std::tuple<INode*, INode*, std::string>
     ResolvePath(INode* parent, std::string_view path, bool automount = true);
@@ -27,8 +29,7 @@ namespace VFS
                  std::string_view fsName, i32 flags = 0, void* data = nullptr);
     bool   Unmount(INode* parent, PathView path, i32 flags = 0);
 
-    INode* CreateNode(INode* parent, PathView path, mode_t mode,
-                      INodeType type);
+    INode* CreateNode(INode* parent, PathView path, mode_t mode);
 
     INode* MkNod(INode* parent, std::string_view path, mode_t mode, dev_t dev);
     INode* Symlink(INode* parent, PathView path, std::string_view target);

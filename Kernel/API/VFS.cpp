@@ -25,21 +25,7 @@ namespace Syscall::VFS
     using Syscall::Arguments;
     using namespace ::VFS;
 
-    isize SysRead(Arguments& args)
-    {
-        i32      fd      = args.Args[0];
-        void*    buffer  = reinterpret_cast<void*>(args.Args[1]);
-        usize    bytes   = args.Args[2];
-
-        Process* current = CPU::GetCurrentThread()->parent;
-        auto     file    = current->GetFileHandle(fd);
-
-        file->Lock();
-        isize bytesRead = file->node->Read(buffer, file->offset, bytes);
-        file->offset += bytesRead;
-        file->Unlock();
-        return bytesRead;
-    }
+    isize SysRead(Arguments& args) { return -1; }
     isize SysWrite(Arguments& args)
     {
         i32         fd      = args.Args[0];
@@ -56,7 +42,7 @@ namespace Syscall::VFS
         if (!file) return_err(-1, EBADF);
 
         std::string_view str(message, length);
-        return file->node->Write(message, 0, length);
+        return file->GetNode()->Write(message, 0, length);
     }
 
     i32 SysOpen(Arguments& args)
@@ -69,43 +55,9 @@ namespace Syscall::VFS
         return current->OpenAt(AT_FDCWD, path, flags, mode);
     }
 
-    off_t SysLSeek(Syscall::Arguments& args)
-    {
-        i32             fd       = args.Args[0];
-        off_t           offset   = args.Args[1];
-        i32             whence   = args.Args[2];
+    off_t SysLSeek(Syscall::Arguments& args) { return -1; }
 
-        Process*        current  = CPU::GetCurrentThread()->parent;
-        auto            file     = current->GetFileHandle(fd);
-
-        constexpr usize SEEK_SET = 0;
-        constexpr usize SEEK_CUR = 1;
-        constexpr usize SEEK_END = 2;
-
-        switch (whence)
-        {
-            case SEEK_SET: file->offset = offset; break;
-            case SEEK_CUR:
-                if (usize(file->offset) + usize(offset) > sizeof(off_t))
-                    return_err(-1, EOVERFLOW);
-                file->offset += offset;
-                break;
-            case SEEK_END:
-            {
-                usize size = file->node->GetStats().st_size;
-                if (usize(file->offset) + size > sizeof(off_t))
-                    return_err(-1, EOVERFLOW);
-                file->offset = file->node->GetStats().st_size + offset;
-                break;
-            }
-
-            default: return_err(-1, EINVAL);
-        };
-
-        return file->offset;
-    }
-
-    int SysIoCtl(Syscall::Arguments& args)
+    int   SysIoCtl(Syscall::Arguments& args)
     {
         int           fd      = args.Args[0];
         unsigned long request = args.Args[1];
@@ -115,7 +67,7 @@ namespace Syscall::VFS
         auto          file    = current->GetFileHandle(fd);
         if (!file) return_err(-1, EBADF);
 
-        return file->node->IoCtl(request, arg);
+        return file->GetNode()->IoCtl(request, arg);
     }
 
     i32 SysOpenAt(Syscall::Arguments& args)

@@ -4,15 +4,52 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "INode.hpp"
+#include <Arch/CPU.hpp>
 
-#include "VFS/FileDescriptor.hpp"
+#include <Scheduler/Process.hpp>
+#include <Scheduler/Thread.hpp>
 
-#include <errno.h>
+#include <VFS/FileDescriptor.hpp>
+#include <VFS/INode.hpp>
 
-INode* INode::Reduce(bool symlinks, bool automount)
+INode::INode(INode* parent, std::string_view name, Filesystem* fs)
+    : m_Parent(parent)
+    , m_Name(name)
+    , m_Filesystem(fs)
 {
-    return InternalReduce(symlinks, automount, 0);
+    Thread*  thread  = CPU::GetCurrentThread();
+    Process* process = thread ? thread->parent : nullptr;
+
+    if (parent && parent->m_Stats.st_mode & S_ISUID)
+    {
+        m_Stats.st_uid = parent->m_Stats.st_uid;
+        m_Stats.st_gid = parent->m_Stats.st_gid;
+
+        return;
+    }
+
+    if (!process) return;
+
+    m_Stats.st_uid = process->m_Credentials.euid;
+    m_Stats.st_gid = process->m_Credentials.egid;
+}
+INode* INode::Reduce(bool symlinks, bool automount, usize cnt)
+{
+    if (mountGate && automount)
+        return mountGate->Reduce(symlinks, automount, 0);
+
+    if (!target.empty() && symlinks)
+    {
+        if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
+
+        auto nextNode
+            = std::get<1>(VFS::ResolvePath(m_Parent, target, automount));
+        if (!nextNode) return_err(nullptr, ENOENT);
+
+        return nextNode->Reduce(symlinks, automount, ++cnt);
+    }
+
+    return this;
 }
 
 std::string INode::GetPath()
@@ -24,42 +61,33 @@ std::string INode::GetPath()
 
     while (current && current != root)
     {
-        ret.insert(0, "/" + current->name);
-        current = current->parent;
+        ret.insert(0, "/" + current->m_Name);
+        current = current->m_Parent;
     }
 
     if (ret.empty()) ret += "/";
     return ret;
 }
 
-mode_t INode::GetMode() const { return stats.st_mode & ~S_IFMT; }
+mode_t INode::GetMode() const { return m_Stats.st_mode & ~S_IFMT; }
 
 bool   INode::IsEmpty()
 {
-    filesystem->Populate(this);
-    return children.empty();
+    m_Filesystem->Populate(this);
+    return m_Children.empty();
+}
+
+bool INode::ValidatePermissions(const Credentials& creds, u32 acc)
+{
+    return true;
+}
+void INode::UpdateATime()
+{
+    // TODO(v1tr10l7): check if we should update atime
+    //  TODO(v1tr10l7): update atime
 }
 
 FileDescriptor* INode::Open(i32 flags, mode_t mode)
 {
-    return new FileDescriptor(this);
-}
-
-INode* INode::InternalReduce(bool symlinks, bool automount, size_t cnt)
-{
-    if (mountGate && automount)
-        return mountGate->InternalReduce(symlinks, automount, 0);
-
-    if (!target.empty() && symlinks)
-    {
-        if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
-
-        auto nextNode
-            = std::get<1>(VFS::ResolvePath(parent, target, automount));
-        if (!nextNode) return_err(nullptr, ENOENT);
-
-        return nextNode->InternalReduce(symlinks, automount, ++cnt);
-    }
-
-    return this;
+    return new FileDescriptor(this, flags, mode);
 }

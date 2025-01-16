@@ -14,33 +14,33 @@
 class TmpFsINode final : public INode
 {
   public:
-    TmpFsINode(std::string_view name, INodeType type)
-        : INode(name, type)
+    TmpFsINode(std::string_view name)
+        : INode(name)
     {
         capacity = 128;
         data     = new u8[capacity];
     }
     TmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
-               mode_t mode, INodeType type)
-        : INode(parent, name, fs, type)
+               mode_t mode)
+        : INode(parent, name, fs)
     {
         if (S_ISREG(mode))
         {
             capacity = GetDefaultSize();
             data     = new u8[capacity];
         }
-        stats.st_size    = 0;
-        stats.st_blocks  = 0;
-        stats.st_blksize = 512;
-        stats.st_dev     = fs->GetDeviceID();
-        stats.st_ino     = fs->GetNextINodeIndex();
-        stats.st_mode    = mode;
-        stats.st_nlink   = 1;
+        m_Stats.st_size    = 0;
+        m_Stats.st_blocks  = 0;
+        m_Stats.st_blksize = 512;
+        m_Stats.st_dev     = fs->GetDeviceID();
+        m_Stats.st_ino     = fs->GetNextINodeIndex();
+        m_Stats.st_mode    = mode;
+        m_Stats.st_nlink   = 1;
 
         // TODO(V1tri0l1744): Set st_atim, st_mtim, st_ctim
-        stats.st_atim    = {0, 0};
-        stats.st_mtim    = {0, 0};
-        stats.st_ctim    = {0, 0};
+        m_Stats.st_atim    = {0, 0};
+        m_Stats.st_mtim    = {0, 0};
+        m_Stats.st_ctim    = {0, 0};
     }
 
     ~TmpFsINode()
@@ -53,7 +53,7 @@ class TmpFsINode final : public INode
     virtual void InsertChild(INode* node, std::string_view name) override
     {
         ScopedLock guard(m_Lock);
-        children[name] = node;
+        m_Children[name] = node;
     }
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;

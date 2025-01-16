@@ -6,85 +6,69 @@
  */
 #pragma once
 
-#include "API/UnixTypes.hpp"
+#include <API/UnixTypes.hpp>
 
 #include <Scheduler/Spinlock.hpp>
 
-#include "VFS/Filesystem.hpp"
-#include "VFS/VFS.hpp"
+#include <VFS/Filesystem.hpp>
+#include <VFS/VFS.hpp>
 
-#include <functional>
+#include <errno.h>
 #include <unordered_map>
-
-enum class INodeType
-{
-    eRegular         = 0,
-    eHardLink        = 1,
-    eSymlink         = 2,
-    eCharacterDevice = 3,
-    eBlockDevice     = 4,
-    eDirectory       = 5,
-};
 
 struct FileDescriptor;
 
+struct Credentials;
 class INode
 {
   public:
     std::string target;
     INode*      mountGate;
 
-    INode(INode* parent, std::string_view name, Filesystem* fs)
-        : parent(parent)
-        , name(name)
-        , filesystem(fs)
+    INode(std::string_view name)
+        : m_Name(name)
     {
     }
-    INode(std::string_view name, INodeType type)
-        : name(name)
-        , type(type)
-    {
-    }
-    INode(INode* parent, std::string_view name, Filesystem* fs, INodeType type)
-        : parent(parent)
-        , name(name)
-        , filesystem(fs)
-        , type(type)
-    {
-    }
+    INode(INode* parent, std::string_view name, Filesystem* fs);
     virtual ~INode() {}
 
-    INode*             Reduce(bool symlinks, bool automount = true);
-    std::string        GetPath();
+    INode*      Reduce(bool symlinks, bool automount = true, usize cnt = 0);
+    std::string GetPath();
 
-    inline Filesystem* GetFilesystem() { return filesystem; }
-    inline const stat& GetStats() const { return stats; }
+    inline Filesystem* GetFilesystem() { return m_Filesystem; }
+    inline const stat& GetStats() const { return m_Stats; }
     inline std::unordered_map<std::string_view, INode*>& GetChildren()
     {
-        return children;
+        return m_Children;
     }
-    inline const std::string& GetName() { return name; }
-    inline INode*             GetParent() { return parent; }
+    inline const std::string& GetName() { return m_Name; }
+    inline INode*             GetParent() { return m_Parent; }
     mode_t                    GetMode() const;
-    INodeType                 GetType() const { return type; }
 
-    bool                      IsEmpty();
+    inline bool               IsFilesystemRoot() const
+    {
+        return m_Filesystem->GetMountedOn()
+            && this == m_Filesystem->GetMountedOn()->mountGate;
+    }
+    bool            IsEmpty();
+    inline bool     IsDirectory() const { return S_ISDIR(m_Stats.st_mode); }
+    inline bool     IsRegular() const { return S_ISREG(m_Stats.st_mode); }
+    inline bool     IsSymlink() const { return S_ISLNK(m_Stats.st_mode); }
 
-    FileDescriptor*           Open(i32 flags, mode_t mode);
-    virtual void  InsertChild(INode* node, std::string_view name)      = 0;
-    virtual isize Read(void* buffer, off_t offset, usize bytes)        = 0;
-    virtual isize Write(const void* buffer, off_t offset, usize bytes) = 0;
-    virtual i32   IoCtl(usize request, usize arg) { return_err(-1, ENOTTY); }
+    bool            ValidatePermissions(const Credentials& creds, u32 acc);
+    void            UpdateATime();
+
+    FileDescriptor* Open(i32 flags, mode_t mode);
+    virtual void    InsertChild(INode* node, std::string_view name)      = 0;
+    virtual isize   Read(void* buffer, off_t offset, usize bytes)        = 0;
+    virtual isize   Write(const void* buffer, off_t offset, usize bytes) = 0;
+    virtual i32     IoCtl(usize request, usize arg) { return_err(-1, ENOTTY); }
 
   protected:
-    INode*                                       parent;
-    std::string                                  name;
+    INode*                                       m_Parent;
+    std::string                                  m_Name;
     Spinlock                                     m_Lock;
-    Filesystem*                                  filesystem;
-    stat                                         stats;
-    std::unordered_map<std::string_view, INode*> children;
-
-    INodeType                                    type;
-
-    INode* InternalReduce(bool symlinks, bool automount, usize cnt);
+    Filesystem*                                  m_Filesystem;
+    stat                                         m_Stats;
+    std::unordered_map<std::string_view, INode*> m_Children;
 };
