@@ -11,13 +11,23 @@
 
 #include <Arch/Arch.hpp>
 
+namespace CPU
+{
+    bool SwapInterruptFlag(bool);
+}
+
 class Spinlock
 {
   public:
-    bool TestAndAcquire() { return __sync_bool_compare_and_swap(&lock, 0, 1); }
-
-    void Acquire()
+    bool TestAndAcquire()
     {
+        return __sync_bool_compare_and_swap(&m_Lock, 0, 1);
+    }
+
+    void Acquire(bool disableInterrupts = false)
+    {
+        if (disableInterrupts)
+            m_SavedInterruptState = CPU::SwapInterruptFlag(false);
         volatile usize deadLockCounter = 0;
         for (;;)
         {
@@ -28,33 +38,39 @@ class Spinlock
             Arch::Pause();
         }
 
-        lastAcquirer = __builtin_return_address(0);
+        m_LastAcquirer = __builtin_return_address(0);
         return;
 
     deadlock:
         Panic("DEADLOCK");
     }
-    void Release()
+    void Release(bool restoreInterrupts = false)
     {
-        lastAcquirer = nullptr;
-        __sync_bool_compare_and_swap(&lock, 1, 0);
+        m_LastAcquirer = nullptr;
+        __sync_bool_compare_and_swap(&m_Lock, 1, 0);
+
+        if (restoreInterrupts) CPU::SetInterruptFlag(m_SavedInterruptState);
+        m_SavedInterruptState = false;
     }
 
   private:
-    i32   lock         = 0;
-    void* lastAcquirer = nullptr;
+    i32   m_Lock                = 0;
+    void* m_LastAcquirer        = nullptr;
+    bool  m_SavedInterruptState = false;
 };
 
 class ScopedLock final
 {
   public:
-    ScopedLock(Spinlock& lock)
+    ScopedLock(Spinlock& lock, bool disableInterrupts = false)
         : m_Lock(lock)
+        , m_RestoreInterrupts(disableInterrupts)
     {
-        lock.Acquire();
+        lock.Acquire(disableInterrupts);
     }
-    ~ScopedLock() { m_Lock.Release(); }
+    ~ScopedLock() { m_Lock.Release(m_RestoreInterrupts); }
 
   private:
     Spinlock& m_Lock;
+    bool      m_RestoreInterrupts = false;
 };
