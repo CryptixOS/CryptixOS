@@ -93,12 +93,22 @@ namespace uACPI
             return UACPI_STATUS_UNIMPLEMENTED;
         }
 
-        uacpi_status uacpi_kernel_pci_read(uacpi_pci_address* address,
-                                           uacpi_size         offset,
+        uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
+                                                  uacpi_handle*     outHandle)
+        {
+            CtosUnused(address);
+            CtosUnused(outHandle);
+
+            return UACPI_STATUS_UNIMPLEMENTED;
+        }
+        void         uacpi_kernel_pci_device_close(uacpi_handle) {}
+
+        uacpi_status uacpi_kernel_pci_read(uacpi_handle device,
+                                           uacpi_size   offset,
                                            uacpi_u8 byteWidth, uacpi_u64* value)
         {
 
-            CtosUnused(address);
+            CtosUnused(device);
             CtosUnused(offset);
             CtosUnused(byteWidth);
             CtosUnused(value);
@@ -106,11 +116,11 @@ namespace uACPI
             ToDo();
             return UACPI_STATUS_UNIMPLEMENTED;
         }
-        uacpi_status uacpi_kernel_pci_write(uacpi_pci_address* address,
-                                            uacpi_size         offset,
+        uacpi_status uacpi_kernel_pci_write(uacpi_handle device,
+                                            uacpi_size   offset,
                                             uacpi_u8 byteWidth, uacpi_u64 value)
         {
-            CtosUnused(address);
+            CtosUnused(device);
             CtosUnused(offset);
             CtosUnused(byteWidth);
             CtosUnused(value);
