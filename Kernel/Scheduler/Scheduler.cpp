@@ -24,12 +24,15 @@ namespace Scheduler
 {
     namespace
     {
-        Spinlock            s_Lock{};
+        Spinlock                            s_Lock{};
 
-        Process*            s_KernelProcess = nullptr;
-        std::deque<Thread*> s_ExecutionQueue;
+        Process*                            s_KernelProcess = nullptr;
+        Spinlock                            s_ProcessListLock;
+        std::unordered_map<pid_t, Process*> s_Processes;
 
-        Thread*             GetNextThread(usize cpuID)
+        std::deque<Thread*>                 s_ExecutionQueue;
+
+        Thread*                             GetNextThread(usize cpuID)
         {
             ScopedLock guard(s_Lock);
             if (s_ExecutionQueue.empty()) return nullptr;
@@ -84,7 +87,17 @@ namespace Scheduler
     }
 
     Process* GetKernelProcess() { return s_KernelProcess; }
-    Thread*  CreateKernelThread(uintptr_t pc, uintptr_t arg, usize runningOn)
+    std::unordered_map<pid_t, Process*>& GetProcessList()
+    {
+        return s_Processes;
+    }
+    bool ProcessExist(pid_t pid)
+    {
+        ScopedLock guard(s_ProcessListLock);
+        return s_Processes.find(pid) != s_Processes.end();
+    }
+
+    Thread* CreateKernelThread(uintptr_t pc, uintptr_t arg, usize runningOn)
     {
         return new Thread(s_KernelProcess, pc, arg, runningOn);
     }
@@ -92,6 +105,7 @@ namespace Scheduler
     void EnqueueThread(Thread* thread)
     {
         ScopedLock guard(s_Lock);
+
         if (thread->enqueued) return;
 
         thread->enqueued = true;

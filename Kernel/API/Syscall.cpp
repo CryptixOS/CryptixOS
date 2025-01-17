@@ -102,11 +102,14 @@ namespace Syscall
         RegisterSyscall(ID::eAccess, VFS::SysAccess);
         RegisterSyscall(ID::eGetPid, Process::SysGetPid);
         RegisterSyscall(ID::eExit, Process::SysExit);
+        RegisterSyscall(ID::eWait4, Process::SysWait4);
         RegisterSyscall(ID::eGetUid, Process::SysGetUid);
         RegisterSyscall(ID::eGetGid, Process::SysGetGid);
         RegisterSyscall(ID::eUname, System::SysUname);
         RegisterSyscall(ID::eFcntl, VFS::SysFcntl);
         RegisterSyscall(ID::eGetCwd, VFS::SysGetCwd);
+        RegisterSyscall(ID::eChDir, VFS::SysChDir);
+        RegisterSyscall(ID::eFChDir, VFS::SysFChDir);
         RegisterSyscall(ID::eGet_eUid, Process::SysGet_eUid);
         RegisterSyscall(ID::eGet_eGid, Process::SysGet_eGid);
         RegisterSyscall(ID::eGet_pPid, Process::SysGet_pPid);
@@ -114,6 +117,7 @@ namespace Syscall
         RegisterSyscall(ID::eExecve, Process::SysExecve);
         RegisterSyscall(ID::eArchPrCtl, SysArchPrCtl);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
+        RegisterSyscall(ID::eGetDents64, VFS::SysGetDents64);
         RegisterSyscall(ID::ePanic, sysPanic);
         RegisterSyscall(ID::eOpenAt, VFS::SysOpenAt);
         RegisterSyscall(ID::eFStatAt, VFS::SysFStatAt);

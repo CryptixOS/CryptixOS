@@ -7,6 +7,7 @@
 #include <VFS/FileDescriptor.hpp>
 
 #include <API/Posix/unistd.h>
+#include <Utility/Math.hpp>
 
 isize FileDescriptor::Read(void* const outBuffer, usize count)
 {
@@ -42,4 +43,52 @@ isize FileDescriptor::Seek(i32 whence, off_t offset)
     };
 
     return m_Offset;
+}
+
+bool FileDescriptor::GenerateDirEntries()
+{
+    ScopedLock guard(m_Lock);
+    if (!m_Node || !m_Node->IsDirectory()) return_err(false, ENOTDIR);
+
+    auto node = m_Node->Reduce(true, true);
+
+    m_DirEntries.clear();
+    for (const auto [name, child] : node->GetChildren())
+    {
+        auto  current   = child->Reduce(false);
+        auto  reclen    = Math::AlignUp(DIRENT_LENGTH + name.length() + 1, 8);
+
+        auto* entry     = reinterpret_cast<dirent*>(malloc(reclen));
+        entry->d_ino    = current->GetStats().st_ino;
+        entry->d_off    = reclen;
+        entry->d_reclen = reclen;
+        entry->d_type   = IF2DT(current->GetStats().st_mode);
+
+        name.copy(entry->d_name, name.length());
+        reinterpret_cast<char*>(entry->d_name)[name.length()] = 0;
+
+        m_DirEntries.push_back(entry);
+    }
+
+    return true;
+    for (std::string_view name : {".", ".."})
+    {
+        auto current = node;
+        if (name != "." && node->GetName() != "/") current = node->GetParent();
+
+        auto  reclen    = DIRENT_LENGTH + name.length() + 1;
+
+        auto* entry     = reinterpret_cast<dirent*>(malloc(reclen));
+        entry->d_ino    = current->GetStats().st_ino;
+        entry->d_off    = reclen;
+        entry->d_reclen = reclen;
+        entry->d_type   = IF2DT(current->GetStats().st_mode);
+
+        name.copy(entry->d_name, name.length());
+        entry->d_name[name.length()] = 0;
+
+        m_DirEntries.push_back(entry);
+    }
+
+    return true;
 }

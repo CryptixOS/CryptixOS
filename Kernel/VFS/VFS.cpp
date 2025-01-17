@@ -25,14 +25,16 @@ namespace VFS
 
     INode*          GetRootNode()
     {
-        Thread* thread = CPU::GetCurrentThread();
+        /*Thread* thread = CPU::GetCurrentThread();
         if (!thread) return s_RootNode;
 
         Process* process = thread->parent;
         Assert(process);
 
         INode* rootNode = process->GetRootNode();
-        return rootNode ? rootNode : s_RootNode;
+        return rootNode ? rootNode : s_RootNode;*/
+
+        return s_RootNode;
     }
 
     static Filesystem* CreateFilesystem(std::string_view name, u32 flags)
@@ -84,8 +86,9 @@ namespace VFS
         if (!node) return nullptr;
 
         if (node->IsSymlink()) return_err(nullptr, ELOOP);
-        if ((flags & O_DIRECTORY && !node->IsDirectory())
-            || (node->IsDirectory() && (acc & O_WRONLY || acc & O_RDWR)))
+        if ((flags & O_DIRECTORY && !node->IsDirectory()))
+            return_err(nullptr, ENOTDIR);
+        if ((node->IsDirectory() && (acc & O_WRONLY || acc & O_RDWR)))
             return_err(nullptr, EISDIR);
 
         // TODO(v1tr10l7): check acc modes and truncate
@@ -99,7 +102,8 @@ namespace VFS
     {
         if (!parent || Path::IsAbsolute(path)) parent = GetRootNode();
 
-        auto currentNode = parent->Reduce(false);
+        auto currentNode
+            = parent == s_RootNode ? s_RootNode : parent->Reduce(false);
 
         if (path == "/" || path.empty()) return {currentNode, currentNode, "/"};
 

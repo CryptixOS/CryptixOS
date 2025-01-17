@@ -4,61 +4,26 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Posix/sys/wait.h>
 #include <API/Process.hpp>
 
 #include <Arch/InterruptGuard.hpp>
 
 #include <Scheduler/Process.hpp>
+#include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
 namespace Syscall::Process
 {
-    uid_t SysGetUid(Syscall::Arguments&)
-    {
-        class Process* current = CPU::GetCurrentThread()->parent;
-        Assert(current);
-
-        return current->GetCredentials().uid;
-    }
-    gid_t SysGetGid(Syscall::Arguments&)
-    {
-        class Process* current = CPU::GetCurrentThread()->parent;
-        Assert(current);
-
-        return current->GetCredentials().gid;
-    }
-
-    uid_t SysGet_eUid(Syscall::Arguments&)
-    {
-        class Process* current = CPU::GetCurrentThread()->parent;
-        Assert(current);
-
-        return current->GetCredentials().euid;
-    }
-    gid_t SysGet_eGid(Syscall::Arguments&)
-    {
-        class Process* current = CPU::GetCurrentThread()->parent;
-        Assert(current);
-
-        return current->GetCredentials().egid;
-    }
-
-    pid_t SysGetPid(Syscall::Arguments& args)
+    pid_t SysGetPid(Arguments& args)
     {
         class Process* current = CPU::GetCurrentThread()->parent;
         Assert(current);
 
         return current->m_Pid;
     }
-    pid_t SysGet_pPid(Syscall::Arguments&)
-    {
-        class Process* current = CPU::GetCurrentThread()->parent;
-        Assert(current);
 
-        return current->GetParentPid();
-    }
-
-    pid_t SysFork(Syscall::Arguments&)
+    pid_t SysFork(Arguments&)
     {
         class Process* process = CPU::GetCurrentThread()->parent;
 
@@ -69,7 +34,7 @@ namespace Syscall::Process
         LogInfo("New Process Pid: {}", newProcess->GetPid());
         return newProcess->GetPid();
     }
-    i32 SysExecve(Syscall::Arguments& args)
+    i32 SysExecve(Arguments& args)
     {
         char*  path = reinterpret_cast<char*>(args.Args[0]);
         char** argv = reinterpret_cast<char**>(args.Args[1]);
@@ -79,7 +44,7 @@ namespace Syscall::Process
 
         return CPU::GetCurrentThread()->parent->Exec(path, argv, envp);
     }
-    i32 SysExit(Syscall::Arguments& args)
+    i32 SysExit(Arguments& args)
     {
         i32   code    = args.Args[0];
 
@@ -88,4 +53,60 @@ namespace Syscall::Process
         LogTrace("SysExit: exiting process: '{}'...", process->m_Name);
         return process->Exit(code);
     }
+    i32 SysWait4(Arguments& args)
+    {
+        pid_t          pid     = static_cast<pid_t>(args.Args[0]);
+        i32*           wstatus = reinterpret_cast<i32*>(args.Args[1]);
+        i32            flags   = static_cast<i32>(args.Args[2]);
+        rusage*        rusage  = reinterpret_cast<struct rusage*>(args.Args[3]);
+
+        Thread*        thread  = CPU::GetCurrentThread();
+        class Process* process = thread->parent;
+        return 0;
+
+        (void)pid;
+        (void)wstatus;
+        (void)flags;
+        (void)rusage;
+        (void)process;
+    }
+
+    uid_t SysGetUid(Arguments&)
+    {
+        class Process* current = CPU::GetCurrentThread()->parent;
+        Assert(current);
+
+        return current->GetCredentials().uid;
+    }
+    gid_t SysGetGid(Arguments&)
+    {
+        class Process* current = CPU::GetCurrentThread()->parent;
+        Assert(current);
+
+        return current->GetCredentials().gid;
+    }
+
+    uid_t SysGet_eUid(Arguments&)
+    {
+        class Process* current = CPU::GetCurrentThread()->parent;
+        Assert(current);
+
+        return current->GetCredentials().euid;
+    }
+    gid_t SysGet_eGid(Arguments&)
+    {
+        class Process* current = CPU::GetCurrentThread()->parent;
+        Assert(current);
+
+        return current->GetCredentials().egid;
+    }
+
+    pid_t SysGet_pPid(Arguments&)
+    {
+        class Process* current = CPU::GetCurrentThread()->parent;
+        Assert(current);
+
+        return current->GetParentPid();
+    }
+
 }; // namespace Syscall::Process

@@ -6,9 +6,12 @@
  */
 #pragma once
 
-#include "VFS/INode.hpp"
-
+#include <API/Posix/dirent.h>
 #include <API/Posix/fcntl.h>
+
+#include <VFS/INode.hpp>
+
+#include <deque>
 
 enum class FileAccessMode
 {
@@ -24,6 +27,8 @@ inline bool operator&(const FileAccessMode lhs, FileAccessMode rhs)
 
 struct FileDescriptor
 {
+    bool DirentsInvalid = false;
+
     FileDescriptor(INode* node, i32 flags, mode_t mode)
         : m_Node(node)
     {
@@ -67,8 +72,14 @@ struct FileDescriptor
 
     inline bool CanRead() const { return m_AccessMode & FileAccessMode::eRead; }
 
-    Spinlock    m_Lock;
-    INode*      m_Node          = nullptr;
-    usize       m_Offset        = 0;
-    FileAccessMode m_AccessMode = FileAccessMode::eRead;
+    inline std::deque<dirent*>& GetDirEntries() { return m_DirEntries; }
+    bool                        GenerateDirEntries();
+
+  private:
+    Spinlock            m_Lock;
+    INode*              m_Node       = nullptr;
+    usize               m_Offset     = 0;
+
+    FileAccessMode      m_AccessMode = FileAccessMode::eRead;
+    std::deque<dirent*> m_DirEntries;
 };

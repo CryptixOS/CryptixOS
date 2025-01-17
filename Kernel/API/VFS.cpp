@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Posix/dirent.h>
 #include <API/Posix/fcntl.h>
 #include <API/UnixTypes.hpp>
 #include <API/VFS.hpp>
@@ -173,7 +174,85 @@ namespace Syscall::VFS
 
         return 0;
     }
+    i32 SysChDir(Syscall::Arguments& args)
+    {
+        const char* path    = reinterpret_cast<const char*>(args.Args[0]);
+        Process*    current = CPU::GetCurrentThread()->parent;
 
+        INode* node = std::get<1>(VFS::ResolvePath(current->GetCWD(), path));
+        if (!node) return_err(-1, ENOENT);
+        if (!node->IsDirectory()) return_err(-1, ENOTDIR);
+
+        current->m_CWD = node;
+        return 0;
+    }
+    i32 SysFChDir(Syscall::Arguments& args)
+    {
+        i32             fd             = static_cast<i32>(args.Args[0]);
+        Process*        current        = CPU::GetCurrentThread()->parent;
+
+        FileDescriptor* fileDescriptor = current->GetFileHandle(fd);
+        if (!fileDescriptor) return_err(-1, EBADF);
+
+        INode* node = fileDescriptor->GetNode();
+        if (!node) return_err(-1, ENOENT);
+
+        if (!node->IsDirectory()) return_err(-1, ENOTDIR);
+        current->m_CWD = node;
+
+        return 0;
+    }
+
+    [[clang::no_sanitize("alignment")]]
+    i32 SysGetDents64(Syscall::Arguments& args)
+    {
+        LogTrace("Reading entries");
+        u32           fd        = static_cast<u32>(args.Args[0]);
+        dirent* const outBuffer = reinterpret_cast<dirent* const>(args.Args[1]);
+        u32           count     = static_cast<u32>(args.Args[2]);
+
+        if (!outBuffer) return_err(-1, EFAULT);
+
+        Process*        current        = CPU::GetCurrentThread()->parent;
+        FileDescriptor* fileDescriptor = current->GetFileHandle(fd);
+        if (!fileDescriptor) return_err(-1, EBADF);
+        INode* node = fileDescriptor->GetNode();
+        if (!node->IsDirectory()) return_err(-1, ENOTDIR);
+
+        if (fileDescriptor->GetDirEntries().empty())
+            fileDescriptor->GenerateDirEntries();
+
+        if (fileDescriptor->GetDirEntries().empty()) return 0;
+
+        usize length = 0;
+        for (const auto& entry : fileDescriptor->GetDirEntries())
+            length += entry->d_reclen;
+
+        length = std::min(static_cast<usize>(count), length);
+
+        if (fileDescriptor->GetDirEntries().front()->d_reclen > count)
+            return_err(-1, EINVAL);
+
+        bool end                       = fileDescriptor->DirentsInvalid;
+        fileDescriptor->DirentsInvalid = false;
+
+        usize i                        = 0;
+        usize bytes                    = 0;
+        while (i < length)
+        {
+            auto entry = fileDescriptor->GetDirEntries().pop_front_element();
+            std::memcpy(reinterpret_cast<char*>(outBuffer) + i, entry,
+                        entry->d_reclen);
+            bytes = i;
+            i += entry->d_reclen;
+            free(entry);
+        }
+
+        if (fileDescriptor->GetDirEntries().empty())
+            fileDescriptor->DirentsInvalid = true;
+
+        return end ? 0 : bytes;
+    }
     i32 SysOpenAt(Syscall::Arguments& args)
     {
         Process* current = CPU::GetCurrentThread()->parent;

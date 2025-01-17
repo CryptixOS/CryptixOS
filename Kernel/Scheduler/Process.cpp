@@ -27,11 +27,16 @@ Process::Process(std::string_view name, PrivilegeLevel ring)
 {
     m_NextTid = m_Pid = AllocatePid();
     if (ring == PrivilegeLevel::ePrivileged) PageMap = VMM::GetKernelPageMap();
+
+    Scheduler::GetProcessList()[m_Pid] = this;
+    m_CWD                              = VFS::GetRootNode();
 }
 Process::Process(std::string_view name, pid_t pid)
     : m_Pid(pid)
     , m_Name(name)
 {
+    Scheduler::GetProcessList()[m_Pid] = this;
+    m_CWD                              = VFS::GetRootNode();
 }
 
 i32 Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
@@ -104,6 +109,8 @@ Process* Process::Fork()
 
     class PageMap* pageMap = new class PageMap();
     newProcess->PageMap    = pageMap;
+    newProcess->m_CWD
+        = m_CWD ? m_CWD->Reduce(false) : VFS::GetRootNode()->Reduce(false);
 
     for (auto& range : m_AddressSpace)
     {
@@ -149,6 +156,8 @@ i32 Process::Exit(i32 code)
 {
     m_FdTable.Clear();
     for (Thread* thread : m_Threads) thread->state = ThreadState::eExited;
+
+    Scheduler::GetProcessList().erase(m_Pid);
 
     Scheduler::Yield();
     CtosUnreachable();

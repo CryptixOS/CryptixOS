@@ -358,6 +358,12 @@ packages:
 
   - name: dash
     architecture: '@OPTION:arch@'
+    metadata:
+      summary: Debian Almquist SHell
+      description: This package provides the Debian Almquist SHell, the default shell on debian.
+      spdx: 'BSD'
+      website: 'http://gondor.apana.org.au/~herbert/dash/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
     source:
       subdir: 'sources'
       git: 'https://git.kernel.org/pub/scm/utils/dash/dash.git'
@@ -381,8 +387,9 @@ packages:
         - '--enable-fnmatch'
     build:
       - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
-        quiet: true
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
 
   - name: init
     architecture: '@OPTION:arch@'

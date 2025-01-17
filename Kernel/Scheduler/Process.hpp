@@ -91,9 +91,11 @@ class Process
     inline INode*          GetCWD() const { return m_CWD; }
     inline mode_t          GetUMask() const { return m_UMask; }
 
-    Process*               Fork();
-    i32                    Exec(const char* path, char** argv, char** envp);
-    i32                    Exit(i32 code);
+    inline const std::vector<Process*>& GetZombies() const { return m_Zombies; }
+
+    Process*                            Fork();
+    i32 Exec(const char* path, char** argv, char** envp);
+    i32 Exit(i32 code);
 
     friend struct Thread;
     pid_t                    m_Pid         = -1;
@@ -109,6 +111,7 @@ class Process
 
     Process*                 m_Parent      = nullptr;
     std::vector<Process*>    m_Children;
+    std::vector<Process*>    m_Zombies;
     std::vector<Thread*>     m_Threads;
 
     FileDescriptorTable      m_FdTable;

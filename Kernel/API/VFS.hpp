@@ -26,6 +26,11 @@ namespace Syscall::VFS
 
     i32   SysFcntl(Syscall::Arguments& args);
     i32   SysGetCwd(Syscall::Arguments& args);
-    i32   SysOpenAt(Syscall::Arguments& args);
-    i32   SysFStatAt(Syscall::Arguments& args);
+    i32   SysChDir(Syscall::Arguments& args);
+    i32   SysFChDir(Syscall::Arguments& args);
+
+    [[clang::no_sanitize("alignment")]]
+    i32 SysGetDents64(Syscall::Arguments& args);
+    i32 SysOpenAt(Syscall::Arguments& args);
+    i32 SysFStatAt(Syscall::Arguments& args);
 } // namespace Syscall::VFS
