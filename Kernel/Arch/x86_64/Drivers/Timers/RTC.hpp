@@ -6,6 +6,8 @@
  */
 #pragma once
 
+#include <API/Posix/sys/time.h>
+
 #include <Utility/Types.hpp>
 
 namespace RTC
@@ -20,6 +22,7 @@ namespace RTC
     u8           GetMinute();
     u8           GetSecond();
 
+    time_t       CurrentTime();
     u8           GetTime();
 
     void         Sleep(u64 seconds);
