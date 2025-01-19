@@ -50,6 +50,7 @@ namespace Syscall::Process
 
         auto* process = CPU::GetCurrentThread()->parent;
 
+        CPU::SetInterruptFlag(false);
         LogTrace("SysExit: exiting process: '{}'...", process->m_Name);
         return process->Exit(code);
     }
@@ -62,13 +63,8 @@ namespace Syscall::Process
 
         Thread*        thread  = CPU::GetCurrentThread();
         class Process* process = thread->parent;
-        return 0;
 
-        (void)pid;
-        (void)wstatus;
-        (void)flags;
-        (void)rusage;
-        (void)process;
+        return process->WaitPid(pid, wstatus, flags, rusage);
     }
 
     std::expected<uid_t, std::errno_t> SysGetUid(Arguments&)
@@ -100,6 +96,17 @@ namespace Syscall::Process
 
         return current->GetCredentials().egid;
     }
+    std::expected<gid_t, std::errno_t> SysSet_pGid(Syscall::Arguments& args)
+    {
+        const pid_t pid  = static_cast<pid_t>(args.Args[0]);
+        const pid_t pgid = static_cast<pid_t>(args.Args[1]);
+
+        CtosUnused(pid);
+        CtosUnused(pgid);
+
+        // TODO(v1tr10l7): Set the process group id
+        return 0;
+    }
 
     std::expected<pid_t, std::errno_t> SysGet_pPid(Arguments&)
     {
@@ -107,6 +114,12 @@ namespace Syscall::Process
         Assert(current);
 
         return current->GetParentPid();
+    }
+    std::expected<gid_t, std::errno_t> SysGet_pGid(Syscall::Arguments& args)
+    {
+        // TODO(v1tr10l7): SysGet_pGid;
+
+        return 0;
     }
 
 }; // namespace Syscall::Process

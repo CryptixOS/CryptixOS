@@ -45,6 +45,17 @@ Process* Process::GetCurrent()
     return currentThread->parent;
 }
 
+void Process::InitializeStreams()
+{
+    m_FdTable.Clear();
+    INode* currentTTY
+        = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), "/dev/tty"));
+
+    LogTrace("Process: Creating standard streams...");
+    m_FdTable.Insert(currentTTY->Open(0, 0));
+    m_FdTable.Insert(currentTTY->Open(0, 0));
+    m_FdTable.Insert(currentTTY->Open(0, 0));
+}
 bool Process::ValidateAddress(Pointer address, i32 accessMode)
 {
     // TODO(v1tr10l7): Validate access mode
@@ -114,6 +125,23 @@ i32 Process::Exec(const char* path, char** argv, char** envp)
     Scheduler::Yield();
     return 0;
 }
+std::expected<pid_t, std::errno_t> Process::WaitPid(pid_t pid, i32* wstatus,
+                                                    i32 flags, rusage* rusage)
+{
+    std::vector<Process*> procs;
+
+    if (m_Children.empty()) return std::errno_t(ECHILD);
+    for (auto& child : m_Children) procs.push_back(child);
+
+    for (;;)
+        for (const auto& child : procs)
+        {
+            if (!child->GetStatus()) continue;
+            if (wstatus) *wstatus = child->GetStatus().value();
+            return child->GetPid();
+        }
+}
+
 Process* Process::Fork()
 {
     Thread* currentThread = CPU::GetCurrentThread();
@@ -173,6 +201,8 @@ i32 Process::Exit(i32 code)
     for (Thread* thread : m_Threads) thread->state = ThreadState::eExited;
 
     Scheduler::GetProcessList().erase(m_Pid);
+
+    m_Status = code;
 
     Scheduler::Yield();
     CtosUnreachable();

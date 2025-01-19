@@ -22,5 +22,7 @@ namespace Syscall::Process
     std::expected<gid_t, std::errno_t> SysGetGid(Syscall::Arguments& args);
     std::expected<uid_t, std::errno_t> SysGet_eUid(Syscall::Arguments& args);
     std::expected<gid_t, std::errno_t> SysGet_eGid(Syscall::Arguments& args);
+    std::expected<gid_t, std::errno_t> SysSet_pGid(Syscall::Arguments& args);
     std::expected<pid_t, std::errno_t> SysGet_pPid(Syscall::Arguments& args);
+    std::expected<gid_t, std::errno_t> SysGet_pGid(Syscall::Arguments& args);
 }; // namespace Syscall::Process

@@ -15,6 +15,8 @@
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
 
+#include <cerrno>
+#include <expected>
 #include <vector>
 
 enum class PrivilegeLevel
@@ -57,31 +59,35 @@ class Process
 
     static Process* GetCurrent();
 
+    void            InitializeStreams();
     bool            ValidateAddress(const Pointer address, i32 accessMode);
 
-    void            InitializeStreams()
-    {
-        m_FdTable.Clear();
-        INode* currentTTY
-            = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), "/dev/tty"));
-
-        LogTrace("Process: Creating standard streams...");
-        m_FdTable.Insert(currentTTY->Open(0, 0));
-        m_FdTable.Insert(currentTTY->Open(0, 0));
-        m_FdTable.Insert(currentTTY->Open(0, 0));
-    }
-
-    inline pid_t GetPid() const { return m_Pid; }
-    inline pid_t GetParentPid() const
+    inline pid_t    GetParentPid() const
     {
         if (m_Parent) return m_Parent->m_Pid;
 
         // TODO(v1tr10l7): What should we return, if there is no parent??
         return 0;
     }
+    inline Process*           GetParent() const { return m_Parent; }
+    inline pid_t              GetPid() const { return m_Pid; }
+    inline std::string_view   GetName() const { return m_Name; }
     inline const Credentials& GetCredentials() const { return m_Credentials; }
-    i32        OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode);
-    inline i32 CreateFileDescriptor(INode* node, i32 flags, mode_t mode)
+    inline std::optional<i32> GetStatus() const { return m_Status; }
+
+    inline const std::vector<Process*>& GetChildren() const
+    {
+        return m_Children;
+    }
+    inline const std::vector<Process*>& GetZombies() const { return m_Zombies; }
+    inline const std::vector<Thread*>&  GetThreads() const { return m_Threads; }
+
+    inline INode* GetRootNode() const { return m_RootNode; }
+    inline INode* GetCWD() const { return m_CWD; }
+    inline mode_t GetUMask() const { return m_UMask; }
+
+    i32           OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode);
+    inline i32    CreateFileDescriptor(INode* node, i32 flags, mode_t mode)
     {
         auto descriptor = node->Open(flags, mode);
 
@@ -91,32 +97,30 @@ class Process
     inline bool IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
     inline FileDescriptor* GetFileHandle(i32 fd) { return m_FdTable.GetFd(fd); }
 
-    inline INode*          GetRootNode() const { return m_RootNode; }
-    inline INode*          GetCWD() const { return m_CWD; }
-    inline mode_t          GetUMask() const { return m_UMask; }
+    std::expected<pid_t, std::errno_t>
+             WaitPid(pid_t pid, i32* wstatus, i32 flags, struct rusage* rusage);
 
-    inline const std::vector<Process*>& GetZombies() const { return m_Zombies; }
-
-    Process*                            Fork();
-    i32 Exec(const char* path, char** argv, char** envp);
-    i32 Exit(i32 code);
+    Process* Fork();
+    i32      Exec(const char* path, char** argv, char** envp);
+    i32      Exit(i32 code);
 
     friend struct Thread;
+    Process*                 m_Parent      = nullptr;
     pid_t                    m_Pid         = -1;
     std::string              m_Name        = "?";
     PageMap*                 PageMap       = nullptr;
-    std::atomic<tid_t>       m_NextTid     = 1;
     Credentials              m_Credentials = {};
     PrivilegeLevel           m_Ring        = PrivilegeLevel::eUnprivileged;
+    std::optional<i32>       m_Status;
 
-    INode*                   m_RootNode    = VFS::GetRootNode();
-    INode*                   m_CWD         = VFS::GetRootNode();
-    mode_t                   m_UMask       = 0;
-
-    Process*                 m_Parent      = nullptr;
+    std::atomic<tid_t>       m_NextTid = m_Pid;
     std::vector<Process*>    m_Children;
     std::vector<Process*>    m_Zombies;
     std::vector<Thread*>     m_Threads;
+
+    INode*                   m_RootNode = VFS::GetRootNode();
+    INode*                   m_CWD      = VFS::GetRootNode();
+    mode_t                   m_UMask    = 0;
 
     FileDescriptorTable      m_FdTable;
     std::vector<VMM::Region> m_AddressSpace{};

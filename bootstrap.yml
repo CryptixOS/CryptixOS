@@ -319,8 +319,8 @@ packages:
       tag: 'v9.1'
       version: '9.1'
       tools_required:
-        - host-autoconf-v2.69
         - host-automake-v1.15
+        - host-autoconf-v2.69
       regenerate:
         - args: ['./bootstrap']
         - args: ['cp',
@@ -328,6 +328,7 @@ packages:
             '@THIS_SOURCE_DIR@/build-aux/']
     tools_required:
       - system-gcc
+      - host-automake-v1.15
     pkgs_required:
       - mlibc
     configure:

@@ -117,7 +117,9 @@ namespace Syscall
         RegisterSyscall(ID::eGetTimeOfDay, Time::SysGetTimeOfDay);
         RegisterSyscall(ID::eGet_eUid, Process::SysGet_eUid);
         RegisterSyscall(ID::eGet_eGid, Process::SysGet_eGid);
+        RegisterSyscall(ID::eSet_pGid, Process::SysSet_pGid);
         RegisterSyscall(ID::eGet_pPid, Process::SysGet_pPid);
+        RegisterSyscall(ID::eGet_pGid, Process::SysGet_pGid);
         RegisterSyscall(ID::eFork, Process::SysFork);
         RegisterSyscall(ID::eExecve, Process::SysExecve);
         RegisterSyscall(ID::eArchPrCtl, SysArchPrCtl);
