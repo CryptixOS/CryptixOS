@@ -16,3 +16,8 @@ struct timeval
     time_t      tv_sec;  /* Seconds.  */
     suseconds_t tv_usec; /* Microseconds.  */
 };
+struct timezone
+{
+    i32 tz_minuteswest;
+    i32 tz_dsttime;
+};

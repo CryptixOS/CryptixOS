@@ -12,6 +12,7 @@ srcs += files(
   'API/Process.cpp',
   'API/Syscall.cpp',
   'API/System.cpp',
+  'API/Time.cpp',
   'API/VFS.cpp',
 
   'Boot/BootInfo.cpp',

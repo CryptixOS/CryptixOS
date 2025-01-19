@@ -11,26 +11,26 @@
 
 namespace Syscall::VFS
 {
-    isize SysRead(Syscall::Arguments& args);
-    isize SysWrite(Syscall::Arguments& args);
-    i32   SysOpen(Syscall::Arguments& args);
-    i32   SysClose(Syscall::Arguments& args);
+    std::expected<isize, std::errno_t> SysRead(Syscall::Arguments& args);
+    std::expected<isize, std::errno_t> SysWrite(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysOpen(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysClose(Syscall::Arguments& args);
 
-    i32   SysStat(Syscall::Arguments& args);
-    i32   SysFStat(Syscall::Arguments& args);
-    i32   SysLStat(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysStat(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysFStat(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysLStat(Syscall::Arguments& args);
 
-    off_t SysLSeek(Syscall::Arguments& args);
-    i32   SysIoCtl(Syscall::Arguments& args);
-    i32   SysAccess(Syscall::Arguments& args);
+    std::expected<off_t, std::errno_t> SysLSeek(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysIoCtl(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysAccess(Syscall::Arguments& args);
 
-    i32   SysFcntl(Syscall::Arguments& args);
-    i32   SysGetCwd(Syscall::Arguments& args);
-    i32   SysChDir(Syscall::Arguments& args);
-    i32   SysFChDir(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysFcntl(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysGetCwd(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysChDir(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysFChDir(Syscall::Arguments& args);
 
     [[clang::no_sanitize("alignment")]]
-    i32 SysGetDents64(Syscall::Arguments& args);
-    i32 SysOpenAt(Syscall::Arguments& args);
-    i32 SysFStatAt(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t> SysGetDents64(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t> SysOpenAt(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t> SysFStatAt(Syscall::Arguments& args);
 } // namespace Syscall::VFS

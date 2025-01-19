@@ -25,7 +25,7 @@ namespace Syscall::VFS
     using Syscall::Arguments;
     using namespace ::VFS;
 
-    isize SysRead(Arguments& args)
+    std::expected<isize, std::errno_t> SysRead(Arguments& args)
     {
         i32   fd     = static_cast<i32>(args.Args[0]);
         void* buffer = reinterpret_cast<void*>(args.Args[1]);
@@ -41,7 +41,7 @@ namespace Syscall::VFS
 
         return file->Read(buffer, bytes);
     }
-    isize SysWrite(Arguments& args)
+    std::expected<isize, std::errno_t> SysWrite(Arguments& args)
     {
         i32         fd      = static_cast<i32>(args.Args[0]);
         const char* message = reinterpret_cast<const char*>(args.Args[1]);
@@ -57,7 +57,7 @@ namespace Syscall::VFS
         return file->GetNode()->Write(message, 0, length);
     }
 
-    i32 SysOpen(Arguments& args)
+    std::expected<i32, std::errno_t> SysOpen(Arguments& args)
     {
         Process* current = CPU::GetCurrentThread()->parent;
         PathView path    = reinterpret_cast<const char*>(args.Args[0]);
@@ -66,14 +66,14 @@ namespace Syscall::VFS
 
         return current->OpenAt(AT_FDCWD, path, flags, mode);
     }
-    i32 SysClose(Arguments& args)
+    std::expected<i32, std::errno_t> SysClose(Arguments& args)
     {
         Process* current = CPU::GetCurrentThread()->parent;
 
         i32      fd      = static_cast<i32>(args.Args[0]);
         return current->CloseFd(fd);
     }
-    i32 SysStat(Arguments& args)
+    std::expected<i32, std::errno_t> SysStat(Arguments& args)
     {
         args.Args[3] = args.Args[1];
         args.Args[2] = 0;
@@ -82,7 +82,7 @@ namespace Syscall::VFS
 
         return SysFStatAt(args);
     }
-    i32 SysFStat(Arguments& args)
+    std::expected<i32, std::errno_t> SysFStat(Arguments& args)
     {
         args.Args[3] = args.Args[1];
         args.Args[2] = AT_EMPTY_PATH;
@@ -90,7 +90,7 @@ namespace Syscall::VFS
 
         return SysFStatAt(args);
     }
-    i32 SysLStat(Arguments& args)
+    std::expected<i32, std::errno_t> SysLStat(Arguments& args)
     {
         args.Args[3] = args.Args[1];
         args.Args[2] = AT_SYMLINK_NOFOLLOW;
@@ -100,7 +100,7 @@ namespace Syscall::VFS
         return SysFStatAt(args);
     }
 
-    off_t SysLSeek(Arguments& args)
+    std::expected<off_t, std::errno_t> SysLSeek(Arguments& args)
     {
         i32      fd      = static_cast<i32>(args.Args[0]);
         off_t    offset  = static_cast<off_t>(args.Args[1]);
@@ -113,7 +113,7 @@ namespace Syscall::VFS
         return file->Seek(whence, offset);
     }
 
-    int SysIoCtl(Syscall::Arguments& args)
+    std::expected<i32, std::errno_t> SysIoCtl(Syscall::Arguments& args)
     {
         i32      fd      = static_cast<i32>(args.Args[0]);
         usize    request = static_cast<usize>(args.Args[1]);
@@ -125,7 +125,7 @@ namespace Syscall::VFS
 
         return file->GetNode()->IoCtl(request, arg);
     }
-    int SysAccess(Syscall::Arguments& args)
+    std::expected<i32, std::errno_t> SysAccess(Syscall::Arguments& args)
     {
         const char* path = reinterpret_cast<const char*>(args.Args[0]);
         i32         mode = static_cast<i32>(args.Args[1]);
@@ -137,7 +137,7 @@ namespace Syscall::VFS
         return 0;
     }
 
-    i32 SysFcntl(Syscall::Arguments& args)
+    std::expected<i32, std::errno_t> SysFcntl(Syscall::Arguments& args)
     {
         i32       fd      = static_cast<i32>(args.Args[0]);
         i32       op      = static_cast<i32>(args.Args[1]);
@@ -160,7 +160,7 @@ namespace Syscall::VFS
 
         return 0;
     }
-    i32 SysGetCwd(Syscall::Arguments& args)
+    std::expected<i32, std::errno_t> SysGetCwd(Syscall::Arguments& args)
     {
         class Process* current = CPU::GetCurrentThread()->parent;
 
@@ -174,7 +174,7 @@ namespace Syscall::VFS
 
         return 0;
     }
-    i32 SysChDir(Syscall::Arguments& args)
+    std::expected<i32, std::errno_t> SysChDir(Syscall::Arguments& args)
     {
         const char* path    = reinterpret_cast<const char*>(args.Args[0]);
         Process*    current = CPU::GetCurrentThread()->parent;
@@ -186,7 +186,7 @@ namespace Syscall::VFS
         current->m_CWD = node;
         return 0;
     }
-    i32 SysFChDir(Syscall::Arguments& args)
+    std::expected<i32, std::errno_t> SysFChDir(Syscall::Arguments& args)
     {
         i32             fd             = static_cast<i32>(args.Args[0]);
         Process*        current        = CPU::GetCurrentThread()->parent;
@@ -204,7 +204,7 @@ namespace Syscall::VFS
     }
 
     [[clang::no_sanitize("alignment")]]
-    i32 SysGetDents64(Syscall::Arguments& args)
+    std::expected<i32, std::errno_t> SysGetDents64(Syscall::Arguments& args)
     {
         LogTrace("Reading entries");
         u32           fd        = static_cast<u32>(args.Args[0]);
@@ -253,7 +253,7 @@ namespace Syscall::VFS
 
         return end ? 0 : bytes;
     }
-    i32 SysOpenAt(Syscall::Arguments& args)
+    std::expected<i32, std::errno_t> SysOpenAt(Syscall::Arguments& args)
     {
         Process* current = CPU::GetCurrentThread()->parent;
 
@@ -264,7 +264,7 @@ namespace Syscall::VFS
 
         return current->OpenAt(dirFd, path, flags, mode);
     }
-    i32 SysFStatAt(Arguments& args)
+    std::expected<i32, std::errno_t> SysFStatAt(Arguments& args)
     {
         Process*        current   = CPU::GetCurrentThread()->parent;
 

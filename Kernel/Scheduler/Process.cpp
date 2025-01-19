@@ -39,6 +39,21 @@ Process::Process(std::string_view name, pid_t pid)
     m_CWD                              = VFS::GetRootNode();
 }
 
+Process* Process::GetCurrent()
+{
+    Thread* currentThread = CPU::GetCurrentThread();
+    return currentThread->parent;
+}
+
+bool Process::ValidateAddress(Pointer address, i32 accessMode)
+{
+    // TODO(v1tr10l7): Validate access mode
+    for (const auto& region : m_AddressSpace)
+        if (region.Contains(address)) return true;
+
+    return false;
+}
+
 i32 Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
     INode* parent = m_CWD;

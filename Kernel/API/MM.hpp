@@ -13,5 +13,5 @@ constexpr usize     MAP_ANONYMOUS = 0x20;
 
 namespace Syscall::MM
 {
-    intptr_t SysMMap(Syscall::Arguments& args);
+    std::expected<intptr_t, std::errno_t> SysMMap(Syscall::Arguments& args);
 } // namespace Syscall::MM

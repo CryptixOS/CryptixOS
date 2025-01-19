@@ -7,3 +7,8 @@
 #pragma once
 
 #include <errno.h>
+
+namespace std
+{
+    using ::errno_t;
+};

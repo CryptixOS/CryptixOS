@@ -11,16 +11,16 @@
 
 namespace Syscall::Process
 {
-    pid_t SysGetPid(Syscall::Arguments& args);
+    std::expected<pid_t, std::errno_t> SysGetPid(Syscall::Arguments& args);
 
-    pid_t SysFork(Syscall::Arguments& args);
-    i32   SysExecve(Syscall::Arguments& args);
-    i32   SysExit(Syscall::Arguments& args);
-    i32   SysWait4(Syscall::Arguments& args);
+    std::expected<pid_t, std::errno_t> SysFork(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysExecve(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysExit(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysWait4(Syscall::Arguments& args);
 
-    uid_t SysGetUid(Syscall::Arguments& args);
-    gid_t SysGetGid(Syscall::Arguments& args);
-    uid_t SysGet_eUid(Syscall::Arguments& args);
-    gid_t SysGet_eGid(Syscall::Arguments& args);
-    pid_t SysGet_pPid(Syscall::Arguments& args);
+    std::expected<uid_t, std::errno_t> SysGetUid(Syscall::Arguments& args);
+    std::expected<gid_t, std::errno_t> SysGetGid(Syscall::Arguments& args);
+    std::expected<uid_t, std::errno_t> SysGet_eUid(Syscall::Arguments& args);
+    std::expected<gid_t, std::errno_t> SysGet_eGid(Syscall::Arguments& args);
+    std::expected<pid_t, std::errno_t> SysGet_pPid(Syscall::Arguments& args);
 }; // namespace Syscall::Process

@@ -53,9 +53,13 @@ class Process
   public:
     Process() = default;
     Process(std::string_view name, PrivilegeLevel ring);
-    Process(std::string_view name, pid_t pid);
+    Process(std::string_view name, pid_t pivalidate_write_typedd);
 
-    void InitializeStreams()
+    static Process* GetCurrent();
+
+    bool            ValidateAddress(const Pointer address, i32 accessMode);
+
+    void            InitializeStreams()
     {
         m_FdTable.Clear();
         INode* currentTTY

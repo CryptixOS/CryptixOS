@@ -22,6 +22,11 @@ namespace VirtualMemoryManager
         {
         }
 
+        inline bool Contains(const Pointer address) const
+        {
+            return m_VirtualSpace.Contains(address);
+        }
+
         inline const AddressRange& GetVirtualRange() const
         {
             return m_VirtualSpace;
