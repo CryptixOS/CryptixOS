@@ -1,0 +1,278 @@
+From 00c040a0618ac6614f9334589e0cefc61a6a55db Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Mon, 20 Jan 2025 01:55:48 +0100
+Subject: [PATCH] [feat]: implement more syscalls for cryptix
+
+---
+ sysdeps/cryptix/include/cryptix/syscall.h     |  8 +++
+ sysdeps/cryptix/meson.build                   |  4 +-
+ sysdeps/cryptix/sysdeps/internal.cpp          | 20 -------
+ sysdeps/cryptix/sysdeps/process.cpp           | 44 +++++++++++---
+ .../cryptix/sysdeps/{file_io.cpp => vfs.cpp}  | 59 ++++++++++++++++++-
+ 5 files changed, 105 insertions(+), 30 deletions(-)
+ rename sysdeps/cryptix/sysdeps/{file_io.cpp => vfs.cpp} (76%)
+
+diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
+index e1ddbeed..e705c573 100644
+--- a/sysdeps/cryptix/include/cryptix/syscall.h
++++ b/sysdeps/cryptix/include/cryptix/syscall.h
+@@ -33,19 +33,27 @@ namespace mlibc
+     constexpr size_t SYS_MMAP       = 9;
+     constexpr size_t SYS_IOCTL      = 16;
+     constexpr size_t SYS_ACCESS     = 21;
++    constexpr size_t SYS_DUP        = 32;
++    constexpr size_t SYS_DUP2       = 33;
+     constexpr size_t SYS_GETPID     = 39;
+     constexpr size_t SYS_FORK       = 57;
+     constexpr size_t SYS_EXECVE     = 59;
+     constexpr size_t SYS_EXIT       = 60;
++    constexpr size_t SYS_WAIT4      = 61;
+     constexpr size_t SYS_UNAME      = 63;
+     constexpr size_t SYS_FCNTL      = 72;
+     constexpr size_t SYS_GETCWD     = 79;
++    constexpr size_t SYS_CHDIR      = 80;
++    constexpr size_t SYS_FCHDIR     = 81;
+     constexpr size_t SYS_GETUID     = 102;
+     constexpr size_t SYS_GETGID     = 104;
+     constexpr size_t SYS_GETEUID    = 107;
+     constexpr size_t SYS_GETEGID    = 108;
++    constexpr size_t SYS_SETPGID    = 109;
+     constexpr size_t SYS_GETPPID    = 110;
++    constexpr size_t SYS_GETPGID    = 121;
+     constexpr size_t SYS_ARCH_PRCTL = 158;
++    constexpr size_t SYS_GETDENTS64 = 217;
+     constexpr size_t SYS_PANIC      = 255;
+     constexpr size_t SYS_OPENAT     = 257;
+     constexpr size_t SYS_FSTATAT    = 262;
+diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
+index 64af1453..ebbc66fd 100644
+--- a/sysdeps/cryptix/meson.build
++++ b/sysdeps/cryptix/meson.build
+@@ -1,11 +1,11 @@
+-rtld_dso_sources += files('sysdeps/internal.cpp', 'sysdeps/file_io.cpp')
++rtld_dso_sources += files('sysdeps/internal.cpp', 'sysdeps/vfs.cpp')
+ libc_sources += files(
+   'entry/entry.cpp',
+ 
+   'generic/mntent.cpp',
+   'generic/mount.cpp',
+ 
+-  'sysdeps/file_io.cpp',
++  'sysdeps/vfs.cpp',
+   'sysdeps/internal.cpp',
+   'sysdeps/process.cpp',
+ )
+diff --git a/sysdeps/cryptix/sysdeps/internal.cpp b/sysdeps/cryptix/sysdeps/internal.cpp
+index 63cd551b..f4ba86cb 100644
+--- a/sysdeps/cryptix/sysdeps/internal.cpp
++++ b/sysdeps/cryptix/sysdeps/internal.cpp
+@@ -33,26 +33,7 @@ namespace mlibc
+         Syscall(SYS_PANIC, "mlibc crashed");
+     }
+ 
+-    //////
+-    STUB_RET(int sys_dup2(int fd, int flags, int newfd));
+-    int sys_fork(pid_t* child)
+-    {
+-        auto ret = Syscall(SYS_FORK);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *child = ret;
+-        return 0;
+-    }
+-
+-    int sys_execve(const char* path, char* const argv[], char* const envp[])
+-    {
+-        return Syscall(SYS_EXECVE, path, argv, envp);
+-    }
+-    STUB_RET(int sys_waitpid(pid_t pid, int* status, int flags,
+-                             struct rusage* ru, pid_t* ret_pid));
+-    STUB_RET(int sys_chdir(const char* path));
+     STUB_RET(int sys_clone(void* tcb, pid_t* pid_out, void* stack));
+-
+     STUB_RET(int sys_kill(pid_t, int));
+ 
+     //////
+@@ -93,5 +74,4 @@ namespace mlibc
+                                               int prot));
+ 
+     STUB_RET(int sys_clock_get(int, long*, long*));
+-    void sys_exit(int code) { Syscall(SYS_EXIT, code); }
+ } // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/process.cpp b/sysdeps/cryptix/sysdeps/process.cpp
+index f8592dcc..ca25aff9 100644
+--- a/sysdeps/cryptix/sysdeps/process.cpp
++++ b/sysdeps/cryptix/sysdeps/process.cpp
+@@ -5,23 +5,53 @@
+ 
+ namespace mlibc
+ {
++
++    STUB_RET(int sys_sigaction(int signum,
++                               const struct sigaction* __restrict act,
++                               struct sigaction* __restrict oldact));
++
++    pid_t sys_getpid() { return Syscall(SYS_GETPID); }
++    void  sys_exit(int code) { Syscall(SYS_EXIT, code); }
++    int   sys_waitpid(pid_t pid, int* status, int flags, struct rusage* ru,
++                      pid_t* ret_pid)
++    {
++        auto ret = Syscall(SYS_WAIT4, pid, status, flags, ru);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *ret_pid = ret;
++        return 0;
++    }
++
+     uid_t sys_getuid() { return Syscall(SYS_GETUID); }
+     gid_t sys_getgid() { return Syscall(SYS_GETGID); }
+     uid_t sys_geteuid() { return Syscall(SYS_GETEUID); }
+-
+     gid_t sys_getegid() { return Syscall(SYS_GETEGID); }
++    int   sys_setpgid(pid_t pid, pid_t pgid)
++    {
++        auto ret = Syscall(SYS_SETPGID, pid, pgid);
++        if (auto e = syscall_error(ret); e) return e;
+ 
+-    pid_t sys_getpid() { return Syscall(SYS_GETPID); }
++        return 0;
++    }
+     pid_t sys_getppid() { return Syscall(SYS_GETPPID); }
+-    STUB_RET(int sys_setpgid(pid_t pid, pid_t pgid));
+     pid_t sys_getpgid(pid_t pid, pid_t* out)
+     {
+-        // TODO(v1tr10l7): sys_getpgid
++        auto ret = Syscall(SYS_GETPGID, pid);
++        if (auto e = syscall_error(ret); e) return e;
+ 
++        *out = ret;
+         return 0;
+     }
++    int sys_fork(pid_t* child)
++    {
++        auto ret = Syscall(SYS_FORK);
++        if (auto e = syscall_error(ret); e) return e;
+ 
+-    STUB_RET(int sys_sigaction(int signum,
+-                               const struct sigaction* __restrict act,
+-                               struct sigaction* __restrict oldact));
++        *child = ret;
++        return 0;
++    }
++    int sys_execve(const char* path, char* const argv[], char* const envp[])
++    {
++        return Syscall(SYS_EXECVE, path, argv, envp);
++    }
+ }; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/file_io.cpp b/sysdeps/cryptix/sysdeps/vfs.cpp
+similarity index 76%
+rename from sysdeps/cryptix/sysdeps/file_io.cpp
+rename to sysdeps/cryptix/sysdeps/vfs.cpp
+index 945d4a83..2760d666 100644
+--- a/sysdeps/cryptix/sysdeps/file_io.cpp
++++ b/sysdeps/cryptix/sysdeps/vfs.cpp
+@@ -15,8 +15,9 @@
+ #include <fcntl.h>
+ #include <stdlib.h>
+ #include <sys/ioctl.h>
++#include <unistd.h>
+ 
+-#include "cryptix/syscall.h"
++#include <cryptix/syscall.h>
+ 
+ #include <errno.h>
+ 
+@@ -26,6 +27,18 @@
+ 
+ namespace mlibc
+ {
++    int sys_sysconf(int num, long* ret)
++    {
++        switch (num)
++        {
++            case _SC_OPEN_MAX: *ret = INT32_MAX; break;
++            case _SC_CHILD_MAX: *ret = INT32_MAX; break;
++            default: return EINVAL;
++        }
++
++        return 0;
++    }
++
+     int sys_read(int fd, void* buffer, size_t count, ssize_t* bytesRead)
+     {
+         auto ret = Syscall(SYS_READ, fd, buffer, count);
+@@ -56,6 +69,10 @@ namespace mlibc
+     {
+         return sys_openat(AT_FDCWD, path, flags, mode, fd);
+     }
++    int sys_open_dir(const char* path, int* fd)
++    {
++        return sys_openat(AT_FDCWD, path, O_DIRECTORY, 0, fd);
++    }
+     int sys_close(int fd)
+     {
+         auto ret = Syscall(SYS_CLOSE, fd);
+@@ -64,6 +81,15 @@ namespace mlibc
+         return 0;
+     }
+ 
++    int sys_read_entries(int handle, void* buffer, size_t maxSize,
++                         size_t* bytesRead)
++    {
++        auto ret = Syscall(SYS_GETDENTS64, handle, buffer, maxSize);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *bytesRead = ret;
++        return 0;
++    }
+     int sys_stat(fsfd_target fsfdt, int fd, const char* path, int flags,
+                  struct stat* statbuf)
+     {
+@@ -113,6 +139,23 @@ namespace mlibc
+ 
+         return 0;
+     }
++    int sys_dup(int fd, int flags, int* newfd)
++    {
++        // TODO(v1tr10l7): implement flags;
++        (void)flags;
++        auto ret = Syscall(SYS_DUP, fd);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *newfd = ret;
++        return 0;
++    }
++    int sys_dup2(int fd, int flags, int newfd)
++    {
++        auto ret = Syscall(SYS_DUP2, fd, newfd);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
+ 
+     int sys_getcwd(char* buffer, size_t size)
+     {
+@@ -121,6 +164,20 @@ namespace mlibc
+ 
+         return 0;
+     }
++    int sys_chdir(const char* path)
++    {
++        auto ret = Syscall(SYS_CHDIR, path);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_fchdir(int fd)
++    {
++        auto ret = Syscall(SYS_FCHDIR, fd);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
+ 
+     int sys_uname(struct utsname* out)
+     {
+-- 
+2.47.1
+

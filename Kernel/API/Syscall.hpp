@@ -38,6 +38,8 @@ namespace Syscall
         eMMap         = 9,
         eIoCtl        = 16,
         eAccess       = 21,
+        eDup          = 32,
+        eDup2         = 33,
         eGetPid       = 39,
         eFork         = 57,
         eExecve       = 59,
@@ -63,6 +65,7 @@ namespace Syscall
         ePanic        = 255,
         eOpenAt       = 257,
         eFStatAt      = 262,
+        eDup3         = 292,
     };
 
     void RegisterHandler(

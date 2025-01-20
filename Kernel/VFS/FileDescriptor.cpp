@@ -33,13 +33,16 @@ FileDescriptor::~FileDescriptor()
     if (m_Description->RefCount == 0) delete m_Description;
 }
 
-isize FileDescriptor::Read(void* const outBuffer, usize count)
+std::expected<isize, std::errno_t> FileDescriptor::Read(void* const outBuffer,
+                                                        usize       count)
 {
     ScopedLock guard(m_Description->Lock);
 
-    if (!CanRead()) return_err(-1, EBADF);
-    if (!GetNode()) return_err(-1, ENOENT);
-    if (GetNode()->IsDirectory()) return_err(-1, EISDIR);
+    if (!CanRead()) return std::errno_t(EBADF);
+    if (!GetNode()) return std::errno_t(ENOENT);
+    if (GetNode()->IsDirectory()) return std::errno_t(EISDIR);
+
+    // if (GetNode()->IsSocket())
 
     isize bytesRead
         = m_Description->Node->Read(outBuffer, m_Description->Offset, count);
@@ -47,7 +50,8 @@ isize FileDescriptor::Read(void* const outBuffer, usize count)
 
     return bytesRead;
 }
-isize FileDescriptor::Write(const char* data, isize bytes)
+std::expected<isize, std::errno_t> FileDescriptor::Write(const void* data,
+                                                         isize       bytes)
 {
     ScopedLock guard(m_Description->Lock);
 

@@ -4,10 +4,9 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Scheduler/Process.hpp>
-
 #include <Arch/CPU.hpp>
 
+#include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
@@ -16,9 +15,13 @@
 
 inline usize AllocatePid()
 {
-    static std::atomic<pid_t> pid = 7;
-
-    return pid++;
+    static Spinlock pidLock;
+    ScopedLock      guard(pidLock);
+    for (pid_t i = 0; i < std::numeric_limits<pid_t>::max(); i++)
+    {
+        if (!Scheduler::GetProcessList().contains(i)) return i;
+    }
+    return -1;
 }
 
 Process::Process(std::string_view name, PrivilegeLevel ring)
@@ -68,25 +71,34 @@ bool Process::ValidateAddress(Pointer address, i32 accessMode)
     return false;
 }
 
-i32 Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
+std::expected<i32, std::errno_t> Process::OpenAt(i32 dirFd, PathView path,
+                                                 i32 flags, mode_t mode)
 {
     INode* parent = m_CWD;
     if (Path::IsAbsolute(path)) parent = VFS::GetRootNode();
     else if (dirFd != AT_FDCWD)
     {
         auto* descriptor = GetFileHandle(dirFd);
-        if (!descriptor) return_err(-1, EBADF);
+        if (!descriptor) return std::errno_t(EBADF);
         parent = descriptor->GetNode();
     }
 
     auto descriptor = VFS::Open(parent, path, flags, mode);
-    if (!descriptor) return -1;
+    if (!descriptor) return descriptor.error();
 
-    return m_FdTable.Insert(descriptor);
+    return m_FdTable.Insert(descriptor.value());
 }
-i32 Process::DupFd(i32 oldFdNum, i32 newFdNum, i32 flags)
+std::expected<i32, std::errno_t> Process::DupFd(i32 oldFdNum, i32 newFdNum,
+                                                i32 flags)
 {
-    return_err(-1, ENOSYS);
+    FileDescriptor* oldFd = GetFileHandle(oldFdNum);
+    if (!oldFd) return std::errno_t(EBADF);
+
+    FileDescriptor* newFd = GetFileHandle(newFdNum);
+    if (newFd) CloseFd(newFdNum);
+
+    newFd = new FileDescriptor(oldFd, flags);
+    return m_FdTable.Insert(newFd, newFdNum);
 }
 i32 Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
 

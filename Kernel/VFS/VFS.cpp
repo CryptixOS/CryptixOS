@@ -57,7 +57,8 @@ namespace VFS
         delete node;
     }
 
-    FileDescriptor* Open(INode* parent, PathView path, i32 flags, mode_t mode)
+    std::expected<FileDescriptor*, std::errno_t>
+    Open(INode* parent, PathView path, i32 flags, mode_t mode)
     {
         Process* current        = CPU::GetCurrentThread()->parent;
         bool     followSymlinks = !(flags & O_NOFOLLOW);
@@ -77,7 +78,7 @@ namespace VFS
                 accMode |= FileAccessMode::eRead | FileAccessMode::eWrite;
                 break;
 
-            default: return_err(nullptr, EINVAL);
+            default: return std::unexpected(EINVAL);
         }
 
         if (!node)
@@ -86,22 +87,22 @@ namespace VFS
             if (errno != ENOENT || !(flags & O_CREAT)) return nullptr;
 
             if (!parent->ValidatePermissions(current->GetCredentials(), 5))
-                return_err(nullptr, EACCES);
+                return std::unexpected(EACCES);
             node = VFS::CreateNode(parent, path,
                                    (mode & ~current->GetUMask()) | S_IFREG);
 
-            if (!node) return nullptr;
+            if (!node) return std::unexpected(ENOENT);
         }
 
-        if (flags & O_EXCL && didExist) return_err(nullptr, EEXIST);
+        if (flags & O_EXCL && didExist) return std::unexpected(EEXIST);
         node = node->Reduce(followSymlinks, false);
-        if (!node) return nullptr;
+        if (!node) return std::unexpected(ENOENT);
 
-        if (node->IsSymlink()) return_err(nullptr, ELOOP);
+        if (node->IsSymlink()) return std::unexpected(ELOOP);
         if ((flags & O_DIRECTORY && !node->IsDirectory()))
-            return_err(nullptr, ENOTDIR);
+            return std::unexpected(ENOTDIR);
         if ((node->IsDirectory() && (acc & O_WRONLY || acc & O_RDWR)))
-            return_err(nullptr, EISDIR);
+            return std::unexpected(EISDIR);
 
         // TODO(v1tr10l7): check acc modes and truncate
         if (flags & O_TRUNC && node->IsRegular() && didExist)

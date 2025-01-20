@@ -11,7 +11,9 @@
 
 #include <VFS/INode.hpp>
 
+#include <cerrno>
 #include <deque>
+#include <expected>
 
 enum class FileAccessMode
 {
@@ -80,11 +82,11 @@ struct FileDescriptor
         m_Description->Flags = flags;
     }
 
-    isize       Read(void* const outBuffer, usize count);
-    isize       Write(const char* data, isize bytes);
-    isize       Seek(i32 whence, off_t offset);
+    std::expected<isize, std::errno_t> Read(void* const outBuffer, usize count);
+    std::expected<isize, std::errno_t> Write(const void* data, isize bytes);
+    isize                              Seek(i32 whence, off_t offset);
 
-    void        Lock() { m_Description->Lock.Acquire(); }
+    void                               Lock() { m_Description->Lock.Acquire(); }
     void        Unlock() { m_Description->Lock.Release(); }
 
     inline bool IsPipe() const

@@ -104,6 +104,8 @@ namespace Syscall
         RegisterSyscall(ID::eMMap, MM::SysMMap);
         RegisterSyscall(ID::eIoCtl, VFS::SysIoCtl);
         RegisterSyscall(ID::eAccess, VFS::SysAccess);
+        RegisterSyscall(ID::eDup, VFS::SysDup);
+        RegisterSyscall(ID::eDup2, VFS::SysDup2);
         RegisterSyscall(ID::eGetPid, Process::SysGetPid);
         RegisterSyscall(ID::eExit, Process::SysExit);
         RegisterSyscall(ID::eWait4, Process::SysWait4);
@@ -129,6 +131,7 @@ namespace Syscall
         RegisterSyscall(ID::ePanic, sysPanic);
         RegisterSyscall(ID::eOpenAt, VFS::SysOpenAt);
         RegisterSyscall(ID::eFStatAt, VFS::SysFStatAt);
+        RegisterSyscall(ID::eDup3, VFS::SysDup3);
     }
     void Handle(Arguments& args)
     {

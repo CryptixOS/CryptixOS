@@ -6,6 +6,7 @@
  */
 #include <API/Posix/dirent.h>
 #include <API/Posix/fcntl.h>
+#include <API/Posix/sys/mman.h>
 #include <API/UnixTypes.hpp>
 #include <API/VFS.hpp>
 
@@ -27,44 +28,49 @@ namespace Syscall::VFS
 
     std::expected<isize, std::errno_t> SysRead(Arguments& args)
     {
-        i32   fd     = static_cast<i32>(args.Args[0]);
-        void* buffer = reinterpret_cast<void*>(args.Args[1]);
-        usize bytes  = static_cast<usize>(args.Args[2]);
-
-        if (!buffer) return_err(-1, EFAULT);
+        i32      fdNum   = static_cast<i32>(args.Args[0]);
+        void*    buffer  = reinterpret_cast<void*>(args.Args[1]);
+        usize    bytes   = static_cast<usize>(args.Args[2]);
 
         Process* current = CPU::GetCurrentThread()->parent;
-        auto     file    = current->GetFileHandle(fd);
-        if (!file || !file->CanRead()) return_err(-1, EBADF);
+        if (!buffer
+            || !current->ValidateAddress(buffer, PROT_READ | PROT_WRITE))
+            return std::errno_t(EFAULT);
 
-        if (file->GetNode()->IsDirectory()) return_err(-1, EISDIR);
+        FileDescriptor* fd = current->GetFileHandle(fdNum);
+        if (!fd) return std::errno_t(EBADF);
 
-        return file->Read(buffer, bytes);
+        return fd->Read(buffer, bytes);
     }
     std::expected<isize, std::errno_t> SysWrite(Arguments& args)
     {
-        i32         fd      = static_cast<i32>(args.Args[0]);
-        const char* message = reinterpret_cast<const char*>(args.Args[1]);
-        usize       length  = static_cast<usize>(args.Args[2]);
+        i32      fdNum   = static_cast<i32>(args.Args[0]);
+        void*    data    = reinterpret_cast<void*>(args.Args[1]);
+        usize    bytes   = static_cast<usize>(args.Args[2]);
 
-        Process*    current = CPU::GetCurrentThread()->parent;
-        if (!message) return_err(-1, EFAULT);
+        Process* current = CPU::GetCurrentThread()->parent;
+        if (!data || current->ValidateAddress(data, PROT_READ | PROT_WRITE))
+            return std::errno_t(EFAULT);
 
-        auto file = current->GetFileHandle(fd);
-        if (!file) return_err(-1, EBADF);
+        FileDescriptor* fd = current->GetFileHandle(fdNum);
+        if (!fd) return std::errno_t(EBADF);
 
-        std::string_view str(message, length);
-        return file->GetNode()->Write(message, 0, length);
+        return fd->Write(data, bytes);
     }
 
     std::expected<i32, std::errno_t> SysOpen(Arguments& args)
     {
-        Process* current = CPU::GetCurrentThread()->parent;
-        PathView path    = reinterpret_cast<const char*>(args.Args[0]);
-        i32      flags   = static_cast<i32>(args.Args[1]);
-        mode_t   mode    = static_cast<mode_t>(args.Args[2]);
+        Process*  current = CPU::GetCurrentThread()->parent;
 
-        return current->OpenAt(AT_FDCWD, path, flags, mode);
+        uintptr_t path    = args.Args[0];
+        i32       flags   = static_cast<i32>(args.Args[1]);
+        mode_t    mode    = static_cast<mode_t>(args.Args[2]);
+
+        if (!path || !current->ValidateAddress(path, PROT_READ))
+            return std::errno_t(EFAULT);
+
+        return current->OpenAt(AT_FDCWD, reinterpret_cast<const char*>(path),
+                               flags, mode);
     }
     std::expected<i32, std::errno_t> SysClose(Arguments& args)
     {
@@ -137,6 +143,36 @@ namespace Syscall::VFS
         return 0;
     }
 
+    std::expected<i32, std::errno_t> SysDup(Arguments& args)
+    {
+        i32 oldFd = static_cast<i32>(args.Args[0]);
+
+        LogTrace("Syscall::VFS::SysDup: {{ oldFd: {} }}", oldFd);
+        Process* current = CPU::GetCurrentThread()->parent;
+
+        auto     ret     = current->DupFd(oldFd, -1);
+        if (!ret) return ret.error();
+        auto desc = current->GetFileHandle(ret.value());
+        if (!desc) Panic("Failed to duplicate fd");
+
+        return ret;
+    }
+    std::expected<i32, std::errno_t> SysDup2(Syscall::Arguments& args)
+    {
+        i32 oldFd = static_cast<i32>(args.Args[0]);
+        i32 newFd = static_cast<i32>(args.Args[1]);
+
+        LogTrace("Syscall::VFS::SysDup2: {{ oldFd: {}, newFd: {} }}", oldFd,
+                 newFd);
+        Process* current = CPU::GetCurrentThread()->parent;
+
+        auto     ret     = current->DupFd(oldFd, newFd);
+        if (!ret) return ret.error();
+        auto desc = current->GetFileHandle(newFd);
+        if (!desc) Panic("Failed to duplicate fd, newFd: {}", ret.value());
+
+        return ret.value();
+    }
     std::expected<i32, std::errno_t> SysFcntl(Arguments& args)
     {
         i32             fdNum   = static_cast<i32>(args.Args[0]);

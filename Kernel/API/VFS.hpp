@@ -22,7 +22,10 @@ namespace Syscall::VFS
 
     std::expected<off_t, std::errno_t> SysLSeek(Syscall::Arguments& args);
     std::expected<i32, std::errno_t>   SysIoCtl(Syscall::Arguments& args);
+
     std::expected<i32, std::errno_t>   SysAccess(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysDup(Syscall::Arguments& args);
+    std::expected<i32, std::errno_t>   SysDup2(Syscall::Arguments& args);
 
     std::expected<i32, std::errno_t>   SysFcntl(Syscall::Arguments& args);
     std::expected<i32, std::errno_t>   SysGetCwd(Syscall::Arguments& args);
@@ -33,4 +36,6 @@ namespace Syscall::VFS
     std::expected<i32, std::errno_t> SysGetDents64(Syscall::Arguments& args);
     std::expected<i32, std::errno_t> SysOpenAt(Syscall::Arguments& args);
     std::expected<i32, std::errno_t> SysFStatAt(Syscall::Arguments& args);
+
+    std::expected<i32, std::errno_t> SysDup3(Syscall::Arguments& args);
 } // namespace Syscall::VFS

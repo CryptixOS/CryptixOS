@@ -11,15 +11,19 @@
 #include <API/UnixTypes.hpp>
 #include <Utility/Path.hpp>
 
+#include <cerrno>
+#include <expected>
+
 class INode;
 
 struct FileDescriptor;
 namespace VFS
 {
-    INode*          GetRootNode();
-    void            RecursiveDelete(INode* node);
+    INode* GetRootNode();
+    void   RecursiveDelete(INode* node);
 
-    FileDescriptor* Open(INode* parent, PathView path, i32 flags, mode_t mode);
+    std::expected<FileDescriptor*, std::errno_t>
+    Open(INode* parent, PathView path, i32 flags, mode_t mode);
 
     std::tuple<INode*, INode*, std::string>
     ResolvePath(INode* parent, std::string_view path, bool automount = true);
