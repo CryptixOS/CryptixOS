@@ -16,8 +16,9 @@ struct timeval
     time_t      tv_sec;  /* Seconds.  */
     suseconds_t tv_usec; /* Microseconds.  */
 };
+
 struct timezone
 {
-    i32 tz_minuteswest;
-    i32 tz_dsttime;
+    i32 tz_minuteswest; /* minutes west of Greenwich */
+    i32 tz_dsttime;     /* type of DST correction */
 };
