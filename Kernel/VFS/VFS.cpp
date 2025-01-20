@@ -63,10 +63,8 @@ namespace VFS
         Process* current        = CPU::GetCurrentThread()->parent;
         bool     followSymlinks = !(flags & O_NOFOLLOW);
         auto     acc            = flags & O_ACCMODE;
+        mode &= ~(S_IRWXU | S_IRWXG | S_IRWXO | S_ISVTX | S_ISUID | S_ISGID);
 
-        INode*   node
-
-            = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
         bool           didExist = true;
 
         FileAccessMode accMode  = FileAccessMode::eNone;
@@ -81,6 +79,11 @@ namespace VFS
             default: return std::unexpected(EINVAL);
         }
 
+        if (flags & O_TMPFILE && !(accMode & FileAccessMode::eWrite))
+            return std::unexpected(EINVAL);
+
+        INode* node
+            = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
         if (!node)
         {
             didExist = false;

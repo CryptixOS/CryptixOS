@@ -71,8 +71,7 @@ bool Process::ValidateAddress(Pointer address, i32 accessMode)
     return false;
 }
 
-std::expected<i32, std::errno_t> Process::OpenAt(i32 dirFd, PathView path,
-                                                 i32 flags, mode_t mode)
+ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
     INode* parent = m_CWD;
     if (Path::IsAbsolute(path)) parent = VFS::GetRootNode();
@@ -88,8 +87,7 @@ std::expected<i32, std::errno_t> Process::OpenAt(i32 dirFd, PathView path,
 
     return m_FdTable.Insert(descriptor.value());
 }
-std::expected<i32, std::errno_t> Process::DupFd(i32 oldFdNum, i32 newFdNum,
-                                                i32 flags)
+ErrorOr<i32> Process::DupFd(i32 oldFdNum, i32 newFdNum, i32 flags)
 {
     FileDescriptor* oldFd = GetFileHandle(oldFdNum);
     if (!oldFd) return std::errno_t(EBADF);
@@ -144,8 +142,8 @@ i32 Process::Exec(const char* path, char** argv, char** envp)
     Scheduler::Yield();
     return 0;
 }
-std::expected<pid_t, std::errno_t> Process::WaitPid(pid_t pid, i32* wstatus,
-                                                    i32 flags, rusage* rusage)
+ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
+                                rusage* rusage)
 {
     std::vector<Process*> procs;
 

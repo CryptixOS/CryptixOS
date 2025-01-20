@@ -15,7 +15,7 @@
 
 namespace Syscall::Process
 {
-    std::expected<pid_t, std::errno_t> SysGetPid(Arguments& args)
+    ErrorOr<pid_t> SysGetPid(Arguments& args)
     {
         class Process* current = CPU::GetCurrentThread()->parent;
         Assert(current);
@@ -23,7 +23,7 @@ namespace Syscall::Process
         return current->m_Pid;
     }
 
-    std::expected<pid_t, std::errno_t> SysFork(Arguments&)
+    ErrorOr<pid_t> SysFork(Arguments&)
     {
         class Process* process = CPU::GetCurrentThread()->parent;
 
@@ -34,7 +34,7 @@ namespace Syscall::Process
         LogInfo("New Process Pid: {}", newProcess->GetPid());
         return newProcess->GetPid();
     }
-    std::expected<i32, std::errno_t> SysExecve(Arguments& args)
+    ErrorOr<i32> SysExecve(Arguments& args)
     {
         char*  path = reinterpret_cast<char*>(args.Args[0]);
         char** argv = reinterpret_cast<char**>(args.Args[1]);
@@ -44,7 +44,7 @@ namespace Syscall::Process
 
         return CPU::GetCurrentThread()->parent->Exec(path, argv, envp);
     }
-    std::expected<i32, std::errno_t> SysExit(Arguments& args)
+    ErrorOr<i32> SysExit(Arguments& args)
     {
         i32   code    = args.Args[0];
 
@@ -54,7 +54,7 @@ namespace Syscall::Process
         LogTrace("SysExit: exiting process: '{}'...", process->m_Name);
         return process->Exit(code);
     }
-    std::expected<i32, std::errno_t> SysWait4(Arguments& args)
+    ErrorOr<i32> SysWait4(Arguments& args)
     {
         pid_t          pid     = static_cast<pid_t>(args.Args[0]);
         i32*           wstatus = reinterpret_cast<i32*>(args.Args[1]);
@@ -67,14 +67,14 @@ namespace Syscall::Process
         return process->WaitPid(pid, wstatus, flags, rusage);
     }
 
-    std::expected<uid_t, std::errno_t> SysGetUid(Arguments&)
+    ErrorOr<uid_t> SysGetUid(Arguments&)
     {
         class Process* current = CPU::GetCurrentThread()->parent;
         Assert(current);
 
         return current->GetCredentials().uid;
     }
-    std::expected<gid_t, std::errno_t> SysGetGid(Arguments&)
+    ErrorOr<gid_t> SysGetGid(Arguments&)
     {
         class Process* current = CPU::GetCurrentThread()->parent;
         Assert(current);
@@ -82,21 +82,21 @@ namespace Syscall::Process
         return current->GetCredentials().gid;
     }
 
-    std::expected<uid_t, std::errno_t> SysGet_eUid(Arguments&)
+    ErrorOr<uid_t> SysGet_eUid(Arguments&)
     {
         class Process* current = CPU::GetCurrentThread()->parent;
         Assert(current);
 
         return current->GetCredentials().euid;
     }
-    std::expected<gid_t, std::errno_t> SysGet_eGid(Arguments&)
+    ErrorOr<gid_t> SysGet_eGid(Arguments&)
     {
         class Process* current = CPU::GetCurrentThread()->parent;
         Assert(current);
 
         return current->GetCredentials().egid;
     }
-    std::expected<gid_t, std::errno_t> SysSet_pGid(Syscall::Arguments& args)
+    ErrorOr<gid_t> SysSet_pGid(Syscall::Arguments& args)
     {
         const pid_t pid  = static_cast<pid_t>(args.Args[0]);
         const pid_t pgid = static_cast<pid_t>(args.Args[1]);
@@ -108,14 +108,14 @@ namespace Syscall::Process
         return 0;
     }
 
-    std::expected<pid_t, std::errno_t> SysGet_pPid(Arguments&)
+    ErrorOr<pid_t> SysGet_pPid(Arguments&)
     {
         class Process* current = CPU::GetCurrentThread()->parent;
         Assert(current);
 
         return current->GetParentPid();
     }
-    std::expected<gid_t, std::errno_t> SysGet_pGid(Syscall::Arguments& args)
+    ErrorOr<gid_t> SysGet_pGid(Syscall::Arguments& args)
     {
         // TODO(v1tr10l7): SysGet_pGid;
 

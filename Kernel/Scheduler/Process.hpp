@@ -82,24 +82,22 @@ class Process
     inline const std::vector<Process*>& GetZombies() const { return m_Zombies; }
     inline const std::vector<Thread*>&  GetThreads() const { return m_Threads; }
 
-    inline INode*                    GetRootNode() const { return m_RootNode; }
-    inline INode*                    GetCWD() const { return m_CWD; }
-    inline mode_t                    GetUMask() const { return m_UMask; }
+    inline INode* GetRootNode() const { return m_RootNode; }
+    inline INode* GetCWD() const { return m_CWD; }
+    inline mode_t GetUMask() const { return m_UMask; }
 
-    std::expected<i32, std::errno_t> OpenAt(i32 dirFdNum, PathView path,
-                                            i32 flags, mode_t mode);
-    std::expected<i32, std::errno_t> DupFd(i32 oldFdNum, i32 newFdNum = -1,
-                                           i32 flags = 0);
-    i32                              CloseFd(i32 fd);
-    inline bool IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
+    ErrorOr<i32>  OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
+    ErrorOr<i32>  DupFd(i32 oldFdNum, i32 newFdNum = -1, i32 flags = 0);
+    i32           CloseFd(i32 fd);
+    inline bool   IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
     inline FileDescriptor* GetFileHandle(i32 fd) { return m_FdTable.GetFd(fd); }
 
-    std::expected<pid_t, std::errno_t>
-             WaitPid(pid_t pid, i32* wstatus, i32 flags, struct rusage* rusage);
+    ErrorOr<pid_t>         WaitPid(pid_t pid, i32* wstatus, i32 flags,
+                                   struct rusage* rusage);
 
-    Process* Fork();
-    i32      Exec(const char* path, char** argv, char** envp);
-    i32      Exit(i32 code);
+    Process*               Fork();
+    i32                    Exec(const char* path, char** argv, char** envp);
+    i32                    Exit(i32 code);
 
     friend struct Thread;
     Process*                 m_Parent      = nullptr;

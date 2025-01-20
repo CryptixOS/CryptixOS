@@ -19,7 +19,7 @@
 
 namespace Syscall::MM
 {
-    std::expected<intptr_t, std::errno_t> SysMMap(Syscall::Arguments& args)
+    ErrorOr<intptr_t> SysMMap(Syscall::Arguments& args)
     {
         uintptr_t addr    = args.Args[0];
         usize     len     = args.Args[1];

@@ -14,7 +14,7 @@
 
 namespace Syscall::Time
 {
-    std::expected<i32, std::errno_t> SysGetTimeOfDay(Arguments& args)
+    ErrorOr<i32> SysGetTimeOfDay(Arguments& args)
     {
         timeval*  tv      = reinterpret_cast<timeval*>(args.Args[0]);
         timezone* tz      = reinterpret_cast<timezone*>(args.Args[1]);
@@ -42,7 +42,7 @@ namespace Syscall::Time
 
         return std::errno_t(ENOSYS);
     }
-    std::expected<i32, std::errno_t> SysSetTimeOfDay(Arguments& args)
+    ErrorOr<i32> SysSetTimeOfDay(Arguments& args)
     {
         timeval*  tv      = reinterpret_cast<timeval*>(args.Args[0]);
         timezone* tz      = reinterpret_cast<timezone*>(args.Args[1]);

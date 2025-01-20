@@ -33,8 +33,7 @@ FileDescriptor::~FileDescriptor()
     if (m_Description->RefCount == 0) delete m_Description;
 }
 
-std::expected<isize, std::errno_t> FileDescriptor::Read(void* const outBuffer,
-                                                        usize       count)
+ErrorOr<isize> FileDescriptor::Read(void* const outBuffer, usize count)
 {
     ScopedLock guard(m_Description->Lock);
 
@@ -50,15 +49,14 @@ std::expected<isize, std::errno_t> FileDescriptor::Read(void* const outBuffer,
 
     return bytesRead;
 }
-std::expected<isize, std::errno_t> FileDescriptor::Write(const void* data,
-                                                         isize       bytes)
+ErrorOr<isize> FileDescriptor::Write(const void* data, isize bytes)
 {
     ScopedLock guard(m_Description->Lock);
 
-    if (!CanWrite()) return_err(-1, EBADF);
+    if (!CanWrite()) return std::errno_t(EBADF);
 
     INode* node = GetNode();
-    if (!node) return_err(-1, ENOENT);
+    if (!node) return std::errno_t(ENOENT);
     isize offset       = m_Description->Offset;
 
     isize bytesWritten = node->Write(data, offset, bytes);
@@ -69,21 +67,23 @@ std::expected<isize, std::errno_t> FileDescriptor::Write(const void* data,
 
 isize FileDescriptor::Seek(i32 whence, off_t offset)
 {
-    INode* node = m_Description->Node;
-    if (IsPipe() || node->IsSocket() || node->IsFifo()) return_err(-1, ESPIPE);
+    ScopedLock guard(m_Description->Lock);
+    INode*     node = m_Description->Node;
+    if (IsPipe() || node->IsSocket() || node->IsFifo())
+        return std::errno_t(ESPIPE);
 
     switch (whence)
     {
         case SEEK_SET:
-            if (offset < 0) return_err(-1, EINVAL);
+            if (offset < 0) return std::errno_t(EINVAL);
             m_Description->Offset = offset;
             break;
         case SEEK_CUR:
         {
             isize newOffset = m_Description->Offset + offset;
             if (newOffset >= std::numeric_limits<off_t>::max())
-                return_err(-1, EOVERFLOW);
-            if (newOffset < 0) return_err(-1, EINVAL);
+                return std::errno_t(EOVERFLOW);
+            if (newOffset < 0) return std::errno_t(EINVAL);
             m_Description->Offset += offset;
             break;
         }
@@ -92,13 +92,13 @@ isize FileDescriptor::Seek(i32 whence, off_t offset)
             usize size = m_Description->Node->GetStats().st_size;
             if (static_cast<usize>(m_Description->Offset) + size
                 > std::numeric_limits<off_t>::max())
-                return_err(-1, EOVERFLOW);
+                return std::errno_t(EOVERFLOW);
             m_Description->Offset
                 = m_Description->Node->GetStats().st_size + offset;
             break;
         }
 
-        default: return_err(-1, EINVAL);
+        default: return std::errno_t(EINVAL);
     };
 
     return m_Description->Offset;
@@ -108,7 +108,7 @@ bool FileDescriptor::GenerateDirEntries()
 {
     ScopedLock guard(m_Description->Lock);
     if (!m_Description->Node || !m_Description->Node->IsDirectory())
-        return_err(false, ENOTDIR);
+        return std::errno_t(ENOTDIR);
 
     auto node = m_Description->Node->Reduce(true, true);
 

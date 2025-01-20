@@ -56,24 +56,45 @@ constexpr isize AT_EMPTY_PATH       = 0x1000;
 constexpr isize AT_RECURSIVE        = 0x8000;
 constexpr isize AT_EACCESS          = 0x200;
 
-#define S_ISUID  04000 /* Set user ID on execution.  */
-#define S_ISGID  02000 /* Set group ID on execution.  */
-#define S_ISVTX  01000 /* Save swapped text after use (sticky).  */
-#define S_IREAD  0400  /* Read by owner.  */
-#define S_IWRITE 0200  /* Write by owner.  */
-#define S_IEXEC  0100  /* Execute by owner.  */
+// set-user-id
+constexpr usize S_ISUID             = 04000; /* Set user ID on execution.  */
+// set-group-id
+constexpr usize S_ISGID             = 02000; /* Set group ID on execution.  */
+// set-sticky
+constexpr usize S_ISVTX  = 01000; /* Save swapped text after use (sticky).  */
+// owner
+// read
+constexpr usize S_IREAD  = 0400;
+// write
+constexpr usize S_IWRITE = 0200;
+// exec
+constexpr usize S_IEXEC  = 0100;
 
-#define S_IRWXU  00700
-#define S_IRUSR  00400
-#define S_IWUSR  00200
-#define S_IXUSR  00100
+// rwx
+constexpr usize S_IRWXU  = 00700;
+// read
+constexpr usize S_IRUSR  = S_IREAD;
+// write
+constexpr usize S_IWUSR  = S_IWRITE;
+// exec
+constexpr usize S_IXUSR  = S_IEXEC;
 
-#define S_IRWXG  00070
-#define S_IRGRP  00040
-#define S_IWGRP  00020
-#define S_IXGRP  00010
+// group
+// rwx
+constexpr usize S_IRWXG  = 00070;
+// read
+constexpr usize S_IRGRP  = 00040;
+// write
+constexpr usize S_IWGRP  = 00020;
+// exec
+constexpr usize S_IXGRP  = 00010;
 
-#define S_IRWXO  00007
-#define S_IROTH  00004
-#define S_IWOTH  00002
-#define S_IXOTH  00001
+// others
+// rwx
+constexpr usize S_IRWXO  = 00007;
+// read
+constexpr usize S_IROTH  = 00004;
+// write
+constexpr usize S_IWOTH  = 00002;
+// exec
+constexpr usize S_IXOTH  = 00001;

@@ -10,5 +10,5 @@
 
 namespace Syscall::System
 {
-    std::expected<isize, std::errno_t> SysUname(Syscall::Arguments& args);
+    ErrorOr<isize> SysUname(Syscall::Arguments& args);
 }

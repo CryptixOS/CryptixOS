@@ -13,6 +13,6 @@
 
 namespace Syscall::Time
 {
-    std::expected<i32, std::errno_t> SysGetTimeOfDay(Syscall::Arguments& args);
-    std::expected<i32, std::errno_t> SysSetTimeOfDay(Syscall::Arguments& args);
+    ErrorOr<i32> SysGetTimeOfDay(Syscall::Arguments& args);
+    ErrorOr<i32> SysSetTimeOfDay(Syscall::Arguments& args);
 } // namespace Syscall::Time

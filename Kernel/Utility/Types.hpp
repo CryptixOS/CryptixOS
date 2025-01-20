@@ -6,27 +6,31 @@
  */
 #pragma once
 
-#include <stddef.h>
-#include <stdint.h>
-
+#include <cerrno>
 #include <compare>
 #include <concepts>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
 #include <type_traits>
 
-using usize  = size_t;
+using usize  = std::size_t;
 using isize  = std::make_signed_t<usize>;
 
-using u8     = uint8_t;
-using u16    = uint16_t;
-using u32    = uint32_t;
-using u64    = uint64_t;
+using u8     = std::uint8_t;
+using u16    = std::uint16_t;
+using u32    = std::uint32_t;
+using u64    = std::uint64_t;
 
-using i8     = int8_t;
-using i16    = int16_t;
-using i32    = int32_t;
-using i64    = int64_t;
+using i8     = std::int8_t;
+using i16    = std::int16_t;
+using i32    = std::int32_t;
+using i64    = std::int64_t;
 
 using symbol = void*[];
+
+template <typename R>
+using ErrorOr = std::expected<R, std::errno_t>;
 
 inline constexpr u64 Bit(u64 n) { return (1ull << n); }
 
@@ -38,28 +42,28 @@ namespace BootInfo
 
 struct Pointer
 {
-    template <std::unsigned_integral T = uintptr_t>
+    template <std::unsigned_integral T = std::uintptr_t>
     Pointer(T m_Pointer)
         : m_Pointer(m_Pointer)
     {
     }
 
     Pointer(void* m_Pointer)
-        : m_Pointer(reinterpret_cast<uintptr_t>(m_Pointer))
+        : m_Pointer(reinterpret_cast<std::uintptr_t>(m_Pointer))
     {
     }
 
-    operator uintptr_t() { return m_Pointer; }
+    operator std::uintptr_t() { return m_Pointer; }
     operator void*() { return reinterpret_cast<void*>(m_Pointer); }
     operator bool() { return m_Pointer != 0; }
-    Pointer& operator=(uintptr_t addr)
+    Pointer& operator=(std::uintptr_t addr)
     {
         m_Pointer = addr;
         return *this;
     }
     Pointer& operator=(void* addr)
     {
-        m_Pointer = reinterpret_cast<uintptr_t>(addr);
+        m_Pointer = reinterpret_cast<std::uintptr_t>(addr);
         return *this;
     }
 
@@ -68,7 +72,7 @@ struct Pointer
     {
         return reinterpret_cast<T*>(m_Pointer);
     }
-    template <typename T = uintptr_t>
+    template <typename T = std::uintptr_t>
     T Raw()
     {
         return static_cast<T>(m_Pointer);
@@ -79,7 +83,7 @@ struct Pointer
         return m_Pointer >= BootInfo::GetHHDMOffset();
     }
 
-    template <typename T = uintptr_t>
+    template <typename T = std::uintptr_t>
         requires(std::is_pointer_v<T> || std::is_integral_v<T>
                  || std::is_same_v<T, Pointer>)
     inline T ToHigherHalf() const
@@ -91,7 +95,7 @@ struct Pointer
     template <>
     inline Pointer ToHigherHalf() const
     {
-        return ToHigherHalf<uintptr_t>();
+        return ToHigherHalf<std::uintptr_t>();
     }
 
     inline Pointer ToHigherHalf() const
@@ -108,13 +112,13 @@ struct Pointer
                  : reinterpret_cast<T>(m_Pointer);
     }
 
-    template <typename T = uintptr_t>
-    inline T Offset(uintptr_t offset) const
+    template <typename T = std::uintptr_t>
+    inline T Offset(std::uintptr_t offset) const
     {
         return reinterpret_cast<T>(m_Pointer + offset);
     }
     template <>
-    inline Pointer Offset(uintptr_t offset) const
+    inline Pointer Offset(std::uintptr_t offset) const
     {
         return m_Pointer + offset;
     }
@@ -122,5 +126,5 @@ struct Pointer
     inline auto operator<=>(const Pointer& other) const = default;
 
   private:
-    uintptr_t m_Pointer = 0;
+    std::uintptr_t m_Pointer = 0;
 };

@@ -8,6 +8,7 @@ int main()
     setenv("TERM", "linux", 1);
     setenv("USER", "root", 1);
     setenv("HOME", "/root", 1);
+    setenv("PATH", "/usr/local/bin:/usr/bin", 1);
 
     const char* path = "/usr/bin/bash";
     if (access(path, X_OK) == -1)
@@ -16,8 +17,10 @@ int main()
         return EXIT_FAILURE;
     }
 
-    while (1)
+    for (;;)
     {
+        printf("Welcome to CryptixOS!");
+
         int pid = fork();
         if (pid == -1)
         {
@@ -32,7 +35,8 @@ int main()
             return EXIT_FAILURE;
         }
 
-        waitpid(pid, NULL, 0);
+        int status;
+        waitpid(pid, &status, 0);
         break;
     }
 

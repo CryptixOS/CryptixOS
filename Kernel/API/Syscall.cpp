@@ -25,12 +25,10 @@ namespace Syscall
 
     struct Syscall
     {
-        std::string name;
-        std::function<std::expected<uintptr_t, std::errno_t>(Arguments&)>
-            handler;
+        std::string                                   name;
+        std::function<ErrorOr<uintptr_t>(Arguments&)> handler;
 
-        inline std::expected<uintptr_t, std::errno_t>
-        operator()(Arguments& args)
+        inline ErrorOr<uintptr_t> operator()(Arguments& args)
         {
             if (handler.operator bool()) return handler(args);
 
@@ -40,11 +38,10 @@ namespace Syscall
     };
     static std::array<Syscall, 512> syscalls;
 
-    void                            RegisterHandler(
-                                   usize index,
-                                   std::function<std::expected<uintptr_t, std::errno_t>(Arguments& args)>
-                                               handler,
-                                   std::string name)
+    void
+    RegisterHandler(usize                                              index,
+                    std::function<ErrorOr<uintptr_t>(Arguments& args)> handler,
+                    std::string                                        name)
     {
         syscalls[index] = {name, handler};
     }

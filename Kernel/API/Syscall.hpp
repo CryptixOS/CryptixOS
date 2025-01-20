@@ -68,11 +68,9 @@ namespace Syscall
         eDup3         = 292,
     };
 
-    void RegisterHandler(
-        usize index,
-        std::function<std::expected<uintptr_t, std::errno_t>(Arguments&)>
-                    handler,
-        std::string name);
+    void RegisterHandler(usize                                         index,
+                         std::function<ErrorOr<uintptr_t>(Arguments&)> handler,
+                         std::string                                   name);
 #define RegisterSyscall(index, handler)                                        \
     ::Syscall::RegisterHandler(std::to_underlying(index), handler, #handler)
 

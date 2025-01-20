@@ -82,14 +82,14 @@ struct FileDescriptor
         m_Description->Flags = flags;
     }
 
-    std::expected<isize, std::errno_t> Read(void* const outBuffer, usize count);
-    std::expected<isize, std::errno_t> Write(const void* data, isize bytes);
-    isize                              Seek(i32 whence, off_t offset);
+    ErrorOr<isize> Read(void* const outBuffer, usize count);
+    ErrorOr<isize> Write(const void* data, isize bytes);
+    isize          Seek(i32 whence, off_t offset);
 
-    void                               Lock() { m_Description->Lock.Acquire(); }
-    void        Unlock() { m_Description->Lock.Release(); }
+    void           Lock() { m_Description->Lock.Acquire(); }
+    void           Unlock() { m_Description->Lock.Release(); }
 
-    inline bool IsPipe() const
+    inline bool    IsPipe() const
     {
         // FIXME(v1tr10l7): implement this once pipes are supported
 

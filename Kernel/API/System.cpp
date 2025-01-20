@@ -10,7 +10,7 @@
 
 namespace Syscall::System
 {
-    std::expected<isize, std::errno_t> SysUname(Syscall::Arguments& args)
+    ErrorOr<isize> SysUname(Syscall::Arguments& args)
     {
         utsname* out = reinterpret_cast<utsname*>(args.Args[0]);
         strncpy(out->sysname, "Cryptix", sizeof(out->sysname));
