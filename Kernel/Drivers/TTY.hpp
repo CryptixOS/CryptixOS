@@ -6,12 +6,13 @@
  */
 #pragma once
 
-#include <API/Posix/Termios.hpp>
+#include <API/Posix/termios.h>
 #include <Drivers/Device.hpp>
 
 #include <Scheduler/Spinlock.hpp>
 
 #include <deque>
+#include <vector>
 
 class TTY : public Device
 {
@@ -32,29 +33,45 @@ class TTY : public Device
     static void   Initialize();
 
   private:
-    static TTY*                  s_CurrentTTY;
+    static std::vector<TTY*> s_TTYs;
+    static TTY*              s_CurrentTTY;
 
-    Spinlock                     spinlock;
+    Spinlock                 m_Lock;
 
-    Terminal*                    terminal = nullptr;
-    termios                      m_Termios;
-    bool                         m_IsNextVerbatim = false;
+    Terminal*                m_Terminal = nullptr;
+    termios                  m_Termios;
 
-    pid_t                        controlSid       = -1;
-    gid_t                        pgid             = 100;
-    std::deque<char>             charBuffer;
-    std::deque<std::deque<char>> m_LineQueue{};
-    std::deque<char>             m_CanonQueue;
+    pid_t                    m_ControlSid = -1;
+    gid_t                    m_Pgid       = 100;
+    std::deque<char>         m_InputBuffer;
+    std::deque<std::string>  m_LineQueue;
 
     inline bool IsCanonicalMode() const { return m_Termios.c_lflag & ICANON; }
     inline bool SignalsEnabled() const { return m_Termios.c_lflag & ISIG; }
 
-    inline bool IsControlCharacter(char c) const
+    inline void AddLine()
     {
-        return c < ' ' || c == 0x7f;
+        ScopedLock guard(m_Lock);
+        m_LineQueue.emplace_back(m_InputBuffer.begin(), m_InputBuffer.end());
+        m_InputBuffer.clear();
+    }
+    inline void KillLine()
+    {
+        while (!m_LineQueue.empty()) EraseChar();
     }
 
-    inline void Output(char c) const
+    inline void EnqueueChar(u64 c)
+    {
+        ScopedLock guard(m_Lock);
+        m_InputBuffer.push_back(c);
+    }
+    void           Echo(u64 c);
+    void           EraseChar();
+    void           EraseWord();
+
+    constexpr bool IsControl(char c) const { return c < ' ' || c == 0x7f; }
+
+    inline void    Output(char c) const
     {
         if (c == '\n' && m_Termios.c_oflag & ONLCR)
         {

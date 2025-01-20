@@ -55,7 +55,7 @@ class Process
   public:
     Process() = default;
     Process(std::string_view name, PrivilegeLevel ring);
-    Process(std::string_view name, pid_t pivalidate_write_typedd);
+    Process(std::string_view name, pid_t pid);
 
     static Process* GetCurrent();
 
@@ -86,15 +86,10 @@ class Process
     inline INode* GetCWD() const { return m_CWD; }
     inline mode_t GetUMask() const { return m_UMask; }
 
-    i32           OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode);
-    inline i32    CreateFileDescriptor(INode* node, i32 flags, mode_t mode)
-    {
-        auto descriptor = node->Open(flags, mode);
-
-        return m_FdTable.Insert(descriptor);
-    }
-    i32         CloseFd(i32 fd);
-    inline bool IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
+    i32           OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
+    i32           DupFd(i32 oldFdNum, i32 newFdNum = -1, i32 flags = 0);
+    i32           CloseFd(i32 fd);
+    inline bool   IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
     inline FileDescriptor* GetFileHandle(i32 fd) { return m_FdTable.GetFd(fd); }
 
     std::expected<pid_t, std::errno_t>

@@ -12,20 +12,31 @@
 
 class FileDescriptorTable
 {
+    using TableType = std::unordered_map<i32, FileDescriptor*>;
+
   public:
-    i32 Insert(FileDescriptor* descriptor)
-    {
-        i32 fd      = m_NextIndex++;
-        m_Table[fd] = descriptor;
+    FileDescriptorTable() = default;
 
-        return fd;
+    i32 Insert(FileDescriptor* descriptor, i32 desired = -1)
+    {
+        ScopedLock guard(m_Lock);
+        i32        fdNum = m_NextIndex;
+        if (desired >= 0 && m_Table.find(desired) == m_Table.end())
+            fdNum = desired;
+        m_Table[fdNum] = descriptor;
+
+        ++m_NextIndex;
+        return fdNum;
     }
-    i32 Erase(i32 fd)
+    i32 Erase(i32 fdNum)
     {
-        delete m_Table[fd];
-        m_Table.erase(fd);
+        ScopedLock      guard(m_Lock);
+        FileDescriptor* fd = GetFd(fdNum);
+        if (!fd) return_err(-1, EBADF);
 
-        // TODO(v1tr10l7): error handling
+        delete fd;
+        m_Table.erase(fdNum);
+
         return 0;
     }
     void Clear()
@@ -47,13 +58,13 @@ class FileDescriptorTable
         return m_Table.at(fd);
     }
 
-    using TableType = std::unordered_map<i32, FileDescriptor*>;
     TableType::iterator     begin() { return m_Table.begin(); }
     TableType::iterator     end() { return m_Table.end(); }
 
     inline FileDescriptor*& operator[](usize i) { return m_Table[i]; }
 
   private:
+    Spinlock         m_Lock;
     TableType        m_Table;
     std::atomic<i32> m_NextIndex = 0;
 };

@@ -50,19 +50,22 @@ class INode
         return m_Filesystem->GetMountedOn()
             && this == m_Filesystem->GetMountedOn()->mountGate;
     }
-    bool            IsEmpty();
-    inline bool     IsDirectory() const { return S_ISDIR(m_Stats.st_mode); }
-    inline bool     IsRegular() const { return S_ISREG(m_Stats.st_mode); }
-    inline bool     IsSymlink() const { return S_ISLNK(m_Stats.st_mode); }
+    bool          IsEmpty();
 
-    bool            ValidatePermissions(const Credentials& creds, u32 acc);
-    void            UpdateATime();
+    inline bool   IsCharDevice() const { return S_ISCHR(m_Stats.st_mode); }
+    inline bool   IsFifo() const { return S_ISFIFO(m_Stats.st_mode); }
+    inline bool   IsDirectory() const { return S_ISDIR(m_Stats.st_mode); }
+    inline bool   IsRegular() const { return S_ISREG(m_Stats.st_mode); }
+    inline bool   IsSymlink() const { return S_ISLNK(m_Stats.st_mode); }
+    inline bool   IsSocket() const { return S_ISSOCK(m_Stats.st_mode); }
 
-    FileDescriptor* Open(i32 flags, mode_t mode);
-    virtual void    InsertChild(INode* node, std::string_view name)      = 0;
-    virtual isize   Read(void* buffer, off_t offset, usize bytes)        = 0;
-    virtual isize   Write(const void* buffer, off_t offset, usize bytes) = 0;
-    virtual i32     IoCtl(usize request, usize arg) { return_err(-1, ENOTTY); }
+    bool          ValidatePermissions(const Credentials& creds, u32 acc);
+    void          UpdateATime();
+
+    virtual void  InsertChild(INode* node, std::string_view name)      = 0;
+    virtual isize Read(void* buffer, off_t offset, usize bytes)        = 0;
+    virtual isize Write(const void* buffer, off_t offset, usize bytes) = 0;
+    virtual i32   IoCtl(usize request, usize arg) { return_err(-1, ENOTTY); }
 
   protected:
     INode*                                       m_Parent;

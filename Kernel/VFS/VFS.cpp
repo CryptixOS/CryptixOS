@@ -66,7 +66,19 @@ namespace VFS
         INode*   node
 
             = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
-        bool didExist = true;
+        bool           didExist = true;
+
+        FileAccessMode accMode  = FileAccessMode::eNone;
+        switch (acc)
+        {
+            case O_RDONLY: accMode |= FileAccessMode::eRead; break;
+            case O_WRONLY: accMode |= FileAccessMode::eWrite; break;
+            case O_RDWR:
+                accMode |= FileAccessMode::eRead | FileAccessMode::eWrite;
+                break;
+
+            default: return_err(nullptr, EINVAL);
+        }
 
         if (!node)
         {
@@ -94,7 +106,7 @@ namespace VFS
         // TODO(v1tr10l7): check acc modes and truncate
         if (flags & O_TRUNC && node->IsRegular() && didExist)
             ;
-        return node->Open(flags, mode);
+        return new FileDescriptor(node, flags, accMode);
     }
 
     std::tuple<INode*, INode*, std::string>

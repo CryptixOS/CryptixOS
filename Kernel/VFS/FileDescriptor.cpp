@@ -9,50 +9,106 @@
 #include <API/Posix/unistd.h>
 #include <Utility/Math.hpp>
 
+FileDescriptor::FileDescriptor(INode* node, i32 flags, FileAccessMode accMode)
+{
+    m_Description = new FileDescription;
+    m_Description->IncRefCount();
+    m_Description->Node  = node;
+
+    m_Description->Flags = flags
+                         & ~(O_CREAT | O_DIRECTORY | O_EXCL | O_NOCTTY
+                             | O_NOFOLLOW | O_TRUNC | O_CLOEXEC);
+    m_Description->AccessMode = accMode;
+    m_Flags                   = flags & O_CLOEXEC;
+}
+FileDescriptor::FileDescriptor(FileDescriptor* fd, i32 flags)
+    : m_Description(fd->m_Description)
+    , m_Flags(flags)
+{
+    m_Description->IncRefCount();
+}
+FileDescriptor::~FileDescriptor()
+{
+    --m_Description->RefCount;
+    if (m_Description->RefCount == 0) delete m_Description;
+}
+
 isize FileDescriptor::Read(void* const outBuffer, usize count)
 {
-    ScopedLock guard(m_Lock);
+    ScopedLock guard(m_Description->Lock);
 
-    isize      bytesRead = m_Node->Read(outBuffer, m_Offset, count);
-    m_Offset += bytesRead;
+    if (!CanRead()) return_err(-1, EBADF);
+    if (!GetNode()) return_err(-1, ENOENT);
+    if (GetNode()->IsDirectory()) return_err(-1, EISDIR);
 
-    m_Node->UpdateATime();
+    isize bytesRead
+        = m_Description->Node->Read(outBuffer, m_Description->Offset, count);
+    m_Description->Offset += bytesRead;
 
     return bytesRead;
 }
+isize FileDescriptor::Write(const char* data, isize bytes)
+{
+    ScopedLock guard(m_Description->Lock);
+
+    if (!CanWrite()) return_err(-1, EBADF);
+
+    INode* node = GetNode();
+    if (!node) return_err(-1, ENOENT);
+    isize offset       = m_Description->Offset;
+
+    isize bytesWritten = node->Write(data, offset, bytes);
+    m_Description->Offset += bytesWritten;
+
+    return bytesWritten;
+}
+
 isize FileDescriptor::Seek(i32 whence, off_t offset)
 {
+    INode* node = m_Description->Node;
+    if (IsPipe() || node->IsSocket() || node->IsFifo()) return_err(-1, ESPIPE);
+
     switch (whence)
     {
-        case SEEK_SET: m_Offset = offset; break;
-        case SEEK_CUR:
-            if (usize(m_Offset) + usize(offset) > sizeof(off_t))
-                return_err(-1, EOVERFLOW);
-            m_Offset += offset;
+        case SEEK_SET:
+            if (offset < 0) return_err(-1, EINVAL);
+            m_Description->Offset = offset;
             break;
+        case SEEK_CUR:
+        {
+            isize newOffset = m_Description->Offset + offset;
+            if (newOffset >= std::numeric_limits<off_t>::max())
+                return_err(-1, EOVERFLOW);
+            if (newOffset < 0) return_err(-1, EINVAL);
+            m_Description->Offset += offset;
+            break;
+        }
         case SEEK_END:
         {
-            usize size = m_Node->GetStats().st_size;
-            if (usize(m_Offset) + size > sizeof(off_t))
+            usize size = m_Description->Node->GetStats().st_size;
+            if (static_cast<usize>(m_Description->Offset) + size
+                > std::numeric_limits<off_t>::max())
                 return_err(-1, EOVERFLOW);
-            m_Offset = m_Node->GetStats().st_size + offset;
+            m_Description->Offset
+                = m_Description->Node->GetStats().st_size + offset;
             break;
         }
 
         default: return_err(-1, EINVAL);
     };
 
-    return m_Offset;
+    return m_Description->Offset;
 }
 
 bool FileDescriptor::GenerateDirEntries()
 {
-    ScopedLock guard(m_Lock);
-    if (!m_Node || !m_Node->IsDirectory()) return_err(false, ENOTDIR);
+    ScopedLock guard(m_Description->Lock);
+    if (!m_Description->Node || !m_Description->Node->IsDirectory())
+        return_err(false, ENOTDIR);
 
-    auto node = m_Node->Reduce(true, true);
+    auto node = m_Description->Node->Reduce(true, true);
 
-    m_DirEntries.clear();
+    m_Description->DirEntries.clear();
     for (const auto [name, child] : node->GetChildren())
     {
         auto  current   = child->Reduce(false);
@@ -67,7 +123,7 @@ bool FileDescriptor::GenerateDirEntries()
         name.copy(entry->d_name, name.length());
         reinterpret_cast<char*>(entry->d_name)[name.length()] = 0;
 
-        m_DirEntries.push_back(entry);
+        m_Description->DirEntries.push_back(entry);
     }
 
     return true;
@@ -87,7 +143,7 @@ bool FileDescriptor::GenerateDirEntries()
         name.copy(entry->d_name, name.length());
         entry->d_name[name.length()] = 0;
 
-        m_DirEntries.push_back(entry);
+        m_Description->DirEntries.push_back(entry);
     }
 
     return true;

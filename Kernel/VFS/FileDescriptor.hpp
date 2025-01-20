@@ -20,66 +20,97 @@ enum class FileAccessMode
     eWrite = Bit(1),
     eExec  = Bit(2),
 };
+
+inline FileAccessMode& operator|=(FileAccessMode& lhs, const FileAccessMode rhs)
+{
+    usize ret = static_cast<usize>(lhs) | static_cast<usize>(rhs);
+
+    lhs       = static_cast<FileAccessMode>(ret);
+    return lhs;
+}
+
+inline FileAccessMode operator|(const FileAccessMode lhs, FileAccessMode rhs)
+{
+    usize ret = static_cast<u64>(lhs) | static_cast<u64>(rhs);
+
+    return static_cast<FileAccessMode>(ret);
+}
 inline bool operator&(const FileAccessMode lhs, FileAccessMode rhs)
 {
     return static_cast<u64>(lhs) & static_cast<u64>(rhs);
 }
 
+struct FileDescription
+{
+    Spinlock            Lock;
+    std::atomic<usize>  RefCount = 0;
+
+    INode*              Node;
+    usize               Offset     = 0;
+
+    i32                 Flags      = 0;
+    FileAccessMode      AccessMode = FileAccessMode::eRead;
+    std::deque<dirent*> DirEntries;
+
+    inline void         IncRefCount() { ++RefCount; }
+};
+
 struct FileDescriptor
 {
     bool DirentsInvalid = false;
 
-    FileDescriptor(INode* node, i32 flags, mode_t mode)
-        : m_Node(node)
+    FileDescriptor(INode* node, i32 flags, FileAccessMode accMode);
+    FileDescriptor(FileDescriptor* fd, i32 flags = 0);
+    ~FileDescriptor();
+
+    inline INode* GetNode() const { return m_Description->Node; }
+    inline usize  GetOffset() const { return m_Description->Offset; }
+
+    inline i32    GetFlags() const { return m_Flags; }
+    inline void   SetFlags(i32 flags)
     {
-        if ((flags & O_ACCMODE) == 0) flags |= O_RDONLY;
-
-        mode &= (S_IRWXU | S_IRWXG | S_IRWXO | S_ISVTX | S_ISUID | S_ISGID);
-
-        auto   follow  = !(flags & O_NOFOLLOW);
-
-        auto   acc     = flags & O_ACCMODE;
-
-        size_t accmode = 0;
-        switch (acc)
-        {
-            case O_RDONLY: // accmode = stat_t::read; break;
-            case O_WRONLY: // accmode = stat_t::write; break;
-            case O_RDWR:   // accmode = stat_t::read | stat_t::write; break;
-            default:
-        }
-
-        return_err(, EINVAL);
-
-        (void)follow;
-        (void)accmode;
-        (void)mode;
-
-        // if (flags & o_tmpfile && !(accmode & stat_t::write))
-        //     return_err(-1, EINVAL);
+        ScopedLock guard(m_Lock);
+        m_Flags = flags;
     }
 
-    inline INode* GetNode() const { return m_Node; }
-    inline usize  GetOffset() const { return m_Offset; }
+    inline i32  GetDescriptionFlags() const { return m_Description->Flags; }
+    inline void SetDescriptionFlags(i32 flags)
+    {
+        ScopedLock guard(m_Description->Lock);
+        m_Description->Flags = flags;
+    }
 
-    isize         Read(void* const outBuffer, usize count);
-    isize         Seek(i32 whence, off_t offset);
+    isize       Read(void* const outBuffer, usize count);
+    isize       Write(const char* data, isize bytes);
+    isize       Seek(i32 whence, off_t offset);
 
-    void          Lock() { m_Lock.Acquire(); }
-    void          Unlock() { m_Lock.Release(); }
+    void        Lock() { m_Description->Lock.Acquire(); }
+    void        Unlock() { m_Description->Lock.Release(); }
 
-    void          Close() {}
+    inline bool IsPipe() const
+    {
+        // FIXME(v1tr10l7): implement this once pipes are supported
 
-    inline bool CanRead() const { return m_AccessMode & FileAccessMode::eRead; }
+        return false;
+    }
+    inline bool CanRead() const
+    {
+        return m_Description->AccessMode & FileAccessMode::eRead;
+    }
+    inline bool CanWrite() const
+    {
+        return m_Description->AccessMode & FileAccessMode::eWrite;
+    }
+    inline bool CloseOnExec() const { return m_Flags & O_CLOEXEC; }
 
-    inline std::deque<dirent*>& GetDirEntries() { return m_DirEntries; }
-    bool                        GenerateDirEntries();
+    inline std::deque<dirent*>& GetDirEntries()
+    {
+        return m_Description->DirEntries;
+    }
+    bool GenerateDirEntries();
 
   private:
-    Spinlock            m_Lock;
-    INode*              m_Node       = nullptr;
-    usize               m_Offset     = 0;
-
-    FileAccessMode      m_AccessMode = FileAccessMode::eRead;
-    std::deque<dirent*> m_DirEntries;
+    Spinlock         m_Lock;
+    FileDescription* m_Description = nullptr;
+    i32              m_Flags       = 0;
 };

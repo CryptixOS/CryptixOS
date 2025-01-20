@@ -69,11 +69,6 @@ void INode::UpdateATime()
     //  TODO(v1tr10l7): update atime
 }
 
-FileDescriptor* INode::Open(i32 flags, mode_t mode)
-{
-    return new FileDescriptor(this, flags, mode);
-}
-
 INode* INode::Reduce(bool symlinks, bool automount, usize cnt)
 {
     if (mountGate && automount)

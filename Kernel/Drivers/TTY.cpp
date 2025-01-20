@@ -16,172 +16,96 @@
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/VFS.hpp>
 
-namespace
-{
-    std::vector<TTY*> s_TTYs;
-    constexpr usize   MAX_CHAR_BUFFER = 64;
-} // namespace
-#define CTRL(c)  (c & 0x1F)
-#define CINTR    CTRL('c')
-#define CQUIT    034
-#define CERASE   010
-#define CKILL    CTRL('u')
-#define CEOF     CTRL('d')
-#define CTIME    0
-#define CMIN     1
-#define CSWTC    0
-#define CSTART   CTRL('q')
-#define CSTOP    CTRL('s')
-#define CSUSP    CTRL('z')
-#define CEOL     0
-#define CREPRINT CTRL('r')
-#define CDISCARD CTRL('o')
-#define CWERASE  CTRL('w')
-#define CLNEXT   CTRL('v')
-#define CEOL2    CEOL
+#include <API/Posix/sys/ttydefaults.h>
 
-#define CEOT     CEOF
-#define CBRK     CEOL
-#define CRPRNT   CREPRINT
-#define CFLUSH   CDISCARD
-
-TTY*        TTY::s_CurrentTTY = nullptr;
-static cc_t ttydefchars[NCCS];
+std::vector<TTY*> TTY::s_TTYs{};
+TTY*              TTY::s_CurrentTTY = nullptr;
 
 TTY::TTY(Terminal* terminal, usize minor)
     : Device(DriverType::eTTY, static_cast<DeviceType>(minor))
-    , terminal(terminal)
+    , m_Terminal(terminal)
 {
     if (!s_CurrentTTY) s_CurrentTTY = this;
 
-    ttydefchars[VINTR]    = CINTR;
-    ttydefchars[VQUIT]    = CQUIT;
-    ttydefchars[VERASE]   = CERASE;
-    ttydefchars[VKILL]    = CKILL;
-    ttydefchars[VEOF]     = CEOF;
-    ttydefchars[VTIME]    = CTIME;
-    ttydefchars[VMIN]     = CMIN;
-    ttydefchars[VSWTC]    = CSWTC;
-    ttydefchars[VSTART]   = CSTART;
-    ttydefchars[VSTOP]    = CSTOP;
-    ttydefchars[VSUSP]    = CSUSP;
-    ttydefchars[VEOL]     = CEOL;
-    ttydefchars[VREPRINT] = CREPRINT;
-    ttydefchars[VDISCARD] = CDISCARD;
-    ttydefchars[VWERASE]  = CWERASE;
-    ttydefchars[VLNEXT]   = CLNEXT;
-    ttydefchars[VEOL2]    = CEOL2;
-
     std::memset(&m_Termios, 0, sizeof(m_Termios));
-    m_Termios.c_iflag  = ICRNL;
-    m_Termios.c_oflag  = OPOST | ONLCR;
-    m_Termios.c_lflag  = ISIG | ICANON | ECHO | ECHOE | ECHOK | ECHONL;
-    m_Termios.c_cflag  = CS8;
-    m_Termios.c_ispeed = B9600;
-    m_Termios.c_ospeed = B9600;
-    std::memcpy(m_Termios.c_cc, ttydefchars, NCCS);
+    m_Termios.c_iflag        = TTYDEF_IFLAG;
+    m_Termios.c_oflag        = TTYDEF_OFLAG;
+    m_Termios.c_lflag        = TTYDEF_LFLAG;
+    m_Termios.c_cflag        = TTYDEF_CFLAG;
+    m_Termios.c_ispeed       = TTYDEF_SPEED;
+    m_Termios.c_ospeed       = TTYDEF_SPEED;
+
+    m_Termios.c_cc[VINTR]    = CINTR;
+    m_Termios.c_cc[VQUIT]    = CQUIT;
+    m_Termios.c_cc[VERASE]   = CERASE;
+    m_Termios.c_cc[VKILL]    = CKILL;
+    m_Termios.c_cc[VEOF]     = CEOF;
+    m_Termios.c_cc[VTIME]    = CTIME;
+    m_Termios.c_cc[VMIN]     = CMIN;
+    m_Termios.c_cc[VSWTC]    = CSWTC;
+    m_Termios.c_cc[VSTART]   = CSTART;
+    m_Termios.c_cc[VSTOP]    = CSTOP;
+    m_Termios.c_cc[VSUSP]    = CSUSP;
+    m_Termios.c_cc[VEOL]     = CEOL;
+    m_Termios.c_cc[VREPRINT] = CREPRINT;
+    m_Termios.c_cc[VDISCARD] = CDISCARD;
+    m_Termios.c_cc[VWERASE]  = CWERASE;
+    m_Termios.c_cc[VLNEXT]   = CLNEXT;
+    m_Termios.c_cc[VEOL2]    = CEOL2;
 }
 
 void TTY::PutChar(char c)
 {
-    Logger::LogChar(c);
-    //  if (m_Termios.c_iflag & ISTRIP) c &= 0x7F;
+    if (m_Termios.c_iflag & ISTRIP) c &= 0x7F;
 
-    static std::deque<char> line;
-
-    spinlock.Acquire();
-    if (c == 0xa)
+    if (c == '\r')
     {
-        line.push_back(c);
-        m_LineQueue.push_back(line);
-        line.clear();
-    }
-    else line.push_back(c);
-    spinlock.Release();
-
-    return;
-
-    // TODO(v1tr10l7): Check whether we should generate signals
-    if (SignalsEnabled())
-        ;
-
-    if (c == '\r' && (m_Termios.c_iflag & ICRNL)) c = '\n';
-    else if (c == '\n' && (m_Termios.c_iflag & INLCR)) c = '\r';
-
-    if (m_IsNextVerbatim)
-    {
-        m_IsNextVerbatim = false;
-        m_CanonQueue.push_back(c);
-        if (m_Termios.c_lflag & ECHO)
-        {
-            if (IsControlCharacter(c))
-            {
-                Output('^');
-                Output(('@' + c) % 128);
-            }
-            else Output(c);
-        }
-
-        return;
+        if (m_Termios.c_iflag & IGNCR) return;
+        if (m_Termios.c_iflag & ICRNL) c = '\n';
     }
 
     if (IsCanonicalMode())
     {
-        // if (c == m_Termios.c_cc[VLNEXT] && m_Termios.c_lflag & IEXTEN)
-        //   ;
+        if (c == m_Termios.c_cc[VEOF]) return AddLine();
+        if (c == m_Termios.c_cc[VKILL] && m_Termios.c_lflag & ECHOK)
+            return KillLine();
+
+        if (c == m_Termios.c_cc[VERASE] && m_Termios.c_lflag & ECHOE)
+            return EraseChar();
+        if (c == m_Termios.c_cc[VWERASE] && m_Termios.c_lflag & ECHOE)
+            return EraseWord();
+        if (c == '\n')
+        {
+            if (m_Termios.c_lflag & ECHO || m_Termios.c_lflag & ECHONL) Echo(c);
+
+            EnqueueChar(c);
+            return AddLine();
+        }
+        if (c == m_Termios.c_cc[VEOL]) AddLine();
     }
 
-    spinlock.Acquire();
-    if (charBuffer.size() > MAX_CHAR_BUFFER) charBuffer.pop_front();
-    charBuffer.push_back(c);
-    spinlock.Release();
+    EnqueueChar(c);
+    if (m_Termios.c_lflag & ECHO) Echo(c);
 }
 
-isize TTY::Read(void* dest, off_t offset, usize bytes)
+isize TTY::Read(void* buffer, off_t offset, usize bytes)
 {
-    isize nread = 0;
-    Assert(dest);
-    u8* d = reinterpret_cast<u8*>(dest);
-
-    m_Termios.c_lflag |= ICANON;
-    // LogInfo("BeforeYield");
-    while (m_LineQueue.empty()) Arch::Pause(); // Scheduler::Yield();
-    // LogInfo("AfterYield");
-
-    spinlock.Acquire();
-
-    auto& line = m_LineQueue.front();
-    while (bytes > 0 && !line.empty())
+    if (IsCanonicalMode())
     {
-        char c = line.front();
-        line.pop_front();
+        while (m_LineQueue.empty()) Arch::Pause();
+        ScopedLock         guard(m_Lock);
 
-        *d++ = c;
-        --bytes;
-        ++nread;
+        const std::string& line  = m_LineQueue.pop_front_element();
+        const usize        count = std::min(bytes, line.size());
+        return line.copy(reinterpret_cast<char*>(buffer), count);
     }
-    m_LineQueue.pop_front();
 
-    // LogInfo("Line: {}", line.data());
-    spinlock.Release();
+    ScopedLock guard(m_Lock);
 
-    /*
-    while (bytes > 0 && charBuffer.size() > 0)
-    {
-        break;
-        (void)offset;
-
-        char c = charBuffer.front();
-
-        *d++   = c;
-        charBuffer.pop_front();
-
-        --bytes;
-        ++nread;
-    }
-    */
-
-    (void)MAX_CHAR_BUFFER;
+    isize      nread = 0;
+    char*      dest  = reinterpret_cast<char*>(buffer);
+    for (; bytes > 0 && !m_InputBuffer.empty(); nread++, dest++)
+        *dest = m_InputBuffer.pop_front_element();
     return nread;
 }
 isize TTY::Write(const void* src, off_t offset, usize bytes)
@@ -189,12 +113,11 @@ isize TTY::Write(const void* src, off_t offset, usize bytes)
     const char*           s = reinterpret_cast<const char*>(src);
     static constexpr char MLIBC_LOG_SIGNATURE[] = "[mlibc]: ";
 
-    std::string_view      str(s + offset, bytes);
+    std::string_view      str(s, bytes);
 
     if (str.starts_with(MLIBC_LOG_SIGNATURE))
     {
-        std::string_view errorMessage(s + offset + sizeof(MLIBC_LOG_SIGNATURE)
-                                      - 1 - 1);
+        std::string_view errorMessage(s + sizeof(MLIBC_LOG_SIGNATURE) - 1 - 1);
         LogMessage("[{}mlibc{}]: {} ", AnsiColor::FOREGROUND_MAGENTA,
                    AnsiColor::FOREGROUND_WHITE, errorMessage);
 
@@ -207,7 +130,7 @@ isize TTY::Write(const void* src, off_t offset, usize bytes)
 
 i32 TTY::IoCtl(usize request, uintptr_t argp)
 {
-    if (!argp) return EINVAL;
+    if (!argp) return_err(-1, EFAULT);
 
     switch (request)
     {
@@ -225,21 +148,22 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         }
         case TIOCGWINSZ:
         {
-            if (!terminal->GetContext()) return_err(-1, ENOTTY);
+            if (!m_Terminal->GetContext()) return_err(-1, ENOTTY);
 
             winsize* windowSize   = reinterpret_cast<winsize*>(argp);
-            windowSize->ws_row    = terminal->GetContext()->rows;
-            windowSize->ws_col    = terminal->GetContext()->cols;
-            windowSize->ws_xpixel = terminal->GetContext()->saved_cursor_x;
-            windowSize->ws_ypixel = terminal->GetContext()->saved_cursor_y;
+            windowSize->ws_row    = m_Terminal->GetContext()->rows;
+            windowSize->ws_col    = m_Terminal->GetContext()->cols;
+            windowSize->ws_xpixel = m_Terminal->GetContext()->saved_cursor_x;
+            windowSize->ws_ypixel = m_Terminal->GetContext()->saved_cursor_y;
             break;
         }
-        case TIOCGPGRP: *reinterpret_cast<i32*>(argp) = pgid; break;
-        case TIOCSPGRP: pgid = *reinterpret_cast<i32*>(argp); break;
+        case TIOCGPGRP: *reinterpret_cast<i32*>(argp) = m_Pgid; break;
+        case TIOCSPGRP: m_Pgid = *reinterpret_cast<i32*>(argp); break;
         case TIOCSCTTY:
-            controlSid = CPU::GetCurrentThread()->parent->GetCredentials().sid;
+            m_ControlSid
+                = CPU::GetCurrentThread()->parent->GetCredentials().sid;
             break;
-        case TIOCNOTTY: controlSid = -1; break;
+        case TIOCNOTTY: m_ControlSid = -1; break;
 
         default:
             LogInfo("Request: {:#x}, argp: {}", request, argp);
@@ -279,4 +203,34 @@ void TTY::Initialize()
     }
 
     LogInfo("TTY: Initialized");
+}
+
+void TTY::Echo(u64 c)
+{
+    if (c == '\n' && m_Termios.c_oflag & ONLCR) Logger::LogChar('\r');
+    if (c == '\r' && m_Termios.c_oflag & ONLRET) return;
+
+    Logger::LogChar(c);
+}
+void TTY::EraseChar()
+{
+    ScopedLock guard(m_Lock);
+
+    if (m_InputBuffer.empty()) return;
+    usize count = 1;
+    if (IsControl(m_InputBuffer.pop_back_element())) count = 2;
+    if (m_Termios.c_lflag & ECHO && m_Termios.c_lflag & ECHOK)
+    {
+        while (count--)
+        {
+            Echo('\b');
+            Echo(' ');
+            Echo('\b');
+        }
+    }
+}
+void TTY::EraseWord()
+{
+    while (!m_InputBuffer.empty() && m_InputBuffer.back() != ' ') EraseChar();
+    while (!m_InputBuffer.empty() && m_InputBuffer.back() == ' ') EraseChar();
 }

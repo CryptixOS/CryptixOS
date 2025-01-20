@@ -113,7 +113,7 @@ namespace Syscall::VFS
         return file->Seek(whence, offset);
     }
 
-    std::expected<i32, std::errno_t> SysIoCtl(Syscall::Arguments& args)
+    std::expected<i32, std::errno_t> SysIoCtl(Arguments& args)
     {
         i32      fd      = static_cast<i32>(args.Args[0]);
         usize    request = static_cast<usize>(args.Args[1]);
@@ -125,7 +125,7 @@ namespace Syscall::VFS
 
         return file->GetNode()->IoCtl(request, arg);
     }
-    std::expected<i32, std::errno_t> SysAccess(Syscall::Arguments& args)
+    std::expected<i32, std::errno_t> SysAccess(Arguments& args)
     {
         const char* path = reinterpret_cast<const char*>(args.Args[0]);
         i32         mode = static_cast<i32>(args.Args[1]);
@@ -137,30 +137,39 @@ namespace Syscall::VFS
         return 0;
     }
 
-    std::expected<i32, std::errno_t> SysFcntl(Syscall::Arguments& args)
+    std::expected<i32, std::errno_t> SysFcntl(Arguments& args)
     {
-        i32       fd      = static_cast<i32>(args.Args[0]);
-        i32       op      = static_cast<i32>(args.Args[1]);
-        uintptr_t arg     = reinterpret_cast<uintptr_t>(args.Args[2]);
+        i32             fdNum   = static_cast<i32>(args.Args[0]);
+        i32             op      = static_cast<i32>(args.Args[1]);
+        uintptr_t       arg     = reinterpret_cast<uintptr_t>(args.Args[2]);
 
-        Process*  current = CPU::GetCurrentThread()->parent;
-        auto      file    = current->GetFileHandle(fd);
-        if (!file) return_err(-1, EBADF);
+        Process*        current = CPU::GetCurrentThread()->parent;
+        FileDescriptor* fd      = current->GetFileHandle(fdNum);
+        if (!fd) return_err(-1, EBADF);
 
         switch (op)
         {
-            case F_DUPFD:
-                return current->CreateFileDescriptor(file->GetNode(), 0, 0);
+            case F_DUPFD: return current->DupFd(fdNum, arg);
+            case F_DUPFD_CLOEXEC: return current->DupFd(fdNum, arg, O_CLOEXEC);
+            case F_GETFD: return fd->GetFlags();
+            case F_SETFD:
+                if (!fd) return_err(-1, EBADF);
+                fd->SetFlags(arg);
+                break;
+            case F_GETFL: return fd->GetDescriptionFlags();
+            case F_SETFL:
+                if (arg & O_ACCMODE) return_err(-1, EINVAL);
+                fd->SetDescriptionFlags(arg);
                 break;
 
-            default: LogError("Syscall::VFS::SysFcntl: Unknown opcode"); break;
+            default:
+                LogError("Syscall::VFS::SysFcntl: Unknown opcode");
+                return_err(-1, EINVAL);
         }
-        (void)fd;
-        (void)arg;
 
         return 0;
     }
-    std::expected<i32, std::errno_t> SysGetCwd(Syscall::Arguments& args)
+    std::expected<i32, std::errno_t> SysGetCwd(Arguments& args)
     {
         class Process* current = CPU::GetCurrentThread()->parent;
 
@@ -174,7 +183,7 @@ namespace Syscall::VFS
 
         return 0;
     }
-    std::expected<i32, std::errno_t> SysChDir(Syscall::Arguments& args)
+    std::expected<i32, std::errno_t> SysChDir(Arguments& args)
     {
         const char* path    = reinterpret_cast<const char*>(args.Args[0]);
         Process*    current = CPU::GetCurrentThread()->parent;
@@ -186,7 +195,7 @@ namespace Syscall::VFS
         current->m_CWD = node;
         return 0;
     }
-    std::expected<i32, std::errno_t> SysFChDir(Syscall::Arguments& args)
+    std::expected<i32, std::errno_t> SysFChDir(Arguments& args)
     {
         i32             fd             = static_cast<i32>(args.Args[0]);
         Process*        current        = CPU::GetCurrentThread()->parent;
@@ -204,9 +213,8 @@ namespace Syscall::VFS
     }
 
     [[clang::no_sanitize("alignment")]]
-    std::expected<i32, std::errno_t> SysGetDents64(Syscall::Arguments& args)
+    std::expected<i32, std::errno_t> SysGetDents64(Arguments& args)
     {
-        LogTrace("Reading entries");
         u32           fd        = static_cast<u32>(args.Args[0]);
         dirent* const outBuffer = reinterpret_cast<dirent* const>(args.Args[1]);
         u32           count     = static_cast<u32>(args.Args[2]);
@@ -253,7 +261,8 @@ namespace Syscall::VFS
 
         return end ? 0 : bytes;
     }
-    std::expected<i32, std::errno_t> SysOpenAt(Syscall::Arguments& args)
+
+    std::expected<i32, std::errno_t> SysOpenAt(Arguments& args)
     {
         Process* current = CPU::GetCurrentThread()->parent;
 

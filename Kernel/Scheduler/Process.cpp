@@ -52,9 +52,12 @@ void Process::InitializeStreams()
         = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), "/dev/tty"));
 
     LogTrace("Process: Creating standard streams...");
-    m_FdTable.Insert(currentTTY->Open(0, 0));
-    m_FdTable.Insert(currentTTY->Open(0, 0));
-    m_FdTable.Insert(currentTTY->Open(0, 0));
+    m_FdTable.Insert(new FileDescriptor(currentTTY, 0, FileAccessMode::eRead),
+                     0);
+    m_FdTable.Insert(new FileDescriptor(currentTTY, 0, FileAccessMode::eWrite),
+                     1);
+    m_FdTable.Insert(new FileDescriptor(currentTTY, 0, FileAccessMode::eWrite),
+                     2);
 }
 bool Process::ValidateAddress(Pointer address, i32 accessMode)
 {
@@ -80,6 +83,10 @@ i32 Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
     if (!descriptor) return -1;
 
     return m_FdTable.Insert(descriptor);
+}
+i32 Process::DupFd(i32 oldFdNum, i32 newFdNum, i32 flags)
+{
+    return_err(-1, ENOSYS);
 }
 i32 Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
 
@@ -174,12 +181,10 @@ Process* Process::Fork()
     }
 
     newProcess->m_NextTid.store(m_NextTid);
-    for (const auto& descriptor : m_FdTable)
+    for (const auto& file : m_FdTable)
     {
-        FileDescriptor* currentFd = descriptor.second;
-        FileDescriptor* newFd     = currentFd->GetNode()->Open(0, 0);
-
-        newProcess->m_FdTable[descriptor.first] = newFd;
+        FileDescriptor* fd = new FileDescriptor(file.second);
+        newProcess->m_FdTable.Insert(fd, file.first);
     }
 
     m_Children.push_back(newProcess);
