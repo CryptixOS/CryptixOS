@@ -12,9 +12,9 @@
 
 TmpFs::TmpFs(u32 flags)
     : Filesystem("TmpFs", flags)
-    , maxInodes(0)
-    , maxSize(0)
-    , currentSize(0)
+    , m_MaxInodeCount(0)
+    , m_MaxSize(0)
+    , m_Size(0)
 {
 }
 
@@ -25,18 +25,17 @@ INode* TmpFs::Mount(INode* parent, INode* source, INode* target,
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
                : nullptr;
 
-    maxSize   = PMM::GetTotalMemory() / 2;
-    maxInodes = PMM::GetTotalMemory() / PMM::PAGE_SIZE / 2;
+    m_MaxSize       = PMM::GetTotalMemory() / 2;
+    m_MaxInodeCount = PMM::GetTotalMemory() / PMM::PAGE_SIZE / 2;
 
-    m_Root    = CreateNode(parent, name, 0644 | S_IFDIR);
+    m_Root          = CreateNode(parent, name, 0644 | S_IFDIR);
     if (m_Root) m_MountedOn = target;
     return m_Root;
 }
 INode* TmpFs::CreateNode(INode* parent, std::string_view name, mode_t mode)
 {
-    if (m_NextInodeIndex >= maxInodes
-        || (S_ISREG(mode)
-            && currentSize + TmpFsINode::GetDefaultSize() > maxSize))
+    if (m_NextInodeIndex >= m_MaxInodeCount
+        || (S_ISREG(mode) && m_Size + TmpFsINode::GetDefaultSize() > m_MaxSize))
     {
         errno = ENOSPC;
 
@@ -49,7 +48,7 @@ INode* TmpFs::CreateNode(INode* parent, std::string_view name, mode_t mode)
 INode* TmpFs::Symlink(INode* parent, std::string_view name,
                       std::string_view target)
 {
-    if (m_NextInodeIndex >= maxInodes) return_err(nullptr, ENOSPC);
+    if (m_NextInodeIndex >= m_MaxInodeCount) return_err(nullptr, ENOSPC);
 
     auto node    = new TmpFsINode(parent, name, this, 0777 | S_IFLNK);
     node->target = target;

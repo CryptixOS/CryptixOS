@@ -14,14 +14,22 @@
 
 #include <magic_enum/magic_enum.hpp>
 
+#if 0
+    #define ElfDebugLog(...) LogDebug(__VA_ARGS__)
+#else
+    #define ElfDebugLog(...)
+#endif
+
 namespace ELF
 {
     bool Image::Load(std::string_view path, PageMap* pageMap,
                      std::vector<VMM::Region>& addressSpace, uintptr_t loadBase)
     {
         INode* file = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path));
-        isize  fileSize = file->GetStats().st_size;
-        image           = new u8[fileSize];
+        if (!file) return_err(false, ENOENT);
+
+        isize fileSize = file->GetStats().st_size;
+        image          = new u8[fileSize];
 
         if (file->Read(image, 0, fileSize) != fileSize || !Parse())
             return false;
@@ -48,13 +56,12 @@ namespace ELF
                     Assert(pageMap->MapRange(
                         current.virtualAddress + loadBase, phys, size,
                         PageAttributes::eRWXU | PageAttributes::eWriteBack));
-                    addressSpace.push_back({phys,
-                                            current.virtualAddress + loadBase,
-                                            pageCount * PMM::PAGE_SIZE});
+                    addressSpace.push_back(
+                        {phys, current.virtualAddress + loadBase, size});
 
                     Read(ToHigherHalfAddress<void*>(phys + misalign),
                          current.offset, current.segmentSizeInFile);
-                    LogInfo(
+                    ElfDebugLog(
                         "Virtual Address: {:#x}, sizeInFile: {}, sizeInMemory: "
                         "{}",
                         current.virtualAddress + loadBase,
@@ -82,7 +89,7 @@ namespace ELF
         auxv.EntryPoint             = header.entryPoint + loadBase;
         auxv.ProgramHeaderEntrySize = header.programEntrySize;
         auxv.ProgramHeaderCount     = header.programEntryCount;
-        LogInfo("EntryPoint: {:#x}", auxv.EntryPoint);
+        ElfDebugLog("EntryPoint: {:#x}", auxv.EntryPoint);
         return true;
     }
 
@@ -90,23 +97,23 @@ namespace ELF
     {
         Read(&header, 0);
 
-        LogTrace("ELF: Verifying signature...");
+        ElfDebugLog("ELF: Verifying signature...");
         if (std::memcmp(&header.magic, MAGIC, 4) != 0)
         {
             LogError("ELF: Invalid magic");
             return false;
         }
 
-        LogTrace("ELF: Parsing program headers...");
+        ElfDebugLog("ELF: Parsing program headers...");
         ProgramHeader current;
         for (usize i = 0; i < header.programEntryCount; i++)
         {
             isize headerOffset
                 = header.programHeaderTableOffset + i * header.programEntrySize;
             Read(&current, headerOffset);
-            LogTrace("ELF: Header[{}] = {}({})", i,
-                     static_cast<usize>(current.type),
-                     magic_enum::enum_name(current.type));
+            ElfDebugLog("ELF: Header[{}] = {}({})", i,
+                        static_cast<usize>(current.type),
+                        magic_enum::enum_name(current.type));
 
             programHeaders.push_back(current);
         }
@@ -122,7 +129,7 @@ namespace ELF
             if (_sections[i].type
                 == std::to_underlying(SectionType::eSymbolTable))
             {
-                LogInfo("ELF: Found symbol section at: {}", i);
+                ElfDebugLog("ELF: Found symbol section at: {}", i);
                 symbolSectionIndex = i;
             }
             else if (_sections[i].type
@@ -130,7 +137,7 @@ namespace ELF
                      && i != header.sectionNamesIndex)
 
             {
-                LogInfo("ELF: Found string section at: {}", i);
+                ElfDebugLog("ELF: Found string section at: {}", i);
                 stringSectionIndex = i;
             }
         }
@@ -140,7 +147,7 @@ namespace ELF
     }
     void Image::LoadSymbols()
     {
-        LogTrace("ELF: Loading symbols...");
+        ElfDebugLog("ELF: Loading symbols...");
         Assert(symbolSectionIndex.has_value());
         Assert(stringSectionIndex.has_value());
         if (symbolSectionIndex.value() >= sections.size()) return;

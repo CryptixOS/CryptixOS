@@ -13,7 +13,7 @@
 #include <Memory/KernelHeap.hpp>
 #include <Memory/PMM.hpp>
 
-#include <Scheduler/Spinlock.hpp>
+#include <Utility/Spinlock.hpp>
 
 namespace PhysicalMemoryManager
 {

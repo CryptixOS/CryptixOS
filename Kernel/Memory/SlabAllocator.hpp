@@ -9,7 +9,7 @@
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
-#include <Scheduler/Spinlock.hpp>
+#include <Utility/Spinlock.hpp>
 #include <Utility/Math.hpp>
 #include <Utility/Types.hpp>
 

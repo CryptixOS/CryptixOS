@@ -10,14 +10,13 @@
 #include <VFS/TmpFs/TmpFsINode.hpp>
 #include <VFS/VFS.hpp>
 
-struct TmpFs : public Filesystem
+class TmpFs : public Filesystem
 {
-    usize maxInodes   = 0;
-    usize maxSize     = 0;
-
-    usize currentSize = 0;
-
+  public:
     TmpFs(u32 flags);
+
+    inline usize   GetSize() const { return m_Size; }
+    inline usize   GetMaxSize() const { return m_MaxSize; }
 
     virtual INode* Mount(INode* parent, INode* source, INode* target,
                          std::string_view name, void* data = nullptr) override;
@@ -28,4 +27,10 @@ struct TmpFs : public Filesystem
     virtual INode* Link(INode* parent, std::string_view name,
                         INode* oldNode) override;
     virtual bool   Populate(INode* node) override { return false; }
+
+  private:
+    usize m_MaxInodeCount = 0;
+    usize m_MaxSize       = 0;
+
+    usize m_Size          = 0;
 };

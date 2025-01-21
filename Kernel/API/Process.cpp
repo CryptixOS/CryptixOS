@@ -31,7 +31,6 @@ namespace Syscall::Process
         class Process* newProcess = process->Fork();
         Assert(newProcess);
 
-        LogInfo("New Process Pid: {}", newProcess->GetPid());
         return newProcess->GetPid();
     }
     ErrorOr<i32> SysExecve(Arguments& args)

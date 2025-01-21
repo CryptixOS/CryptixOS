@@ -15,15 +15,15 @@ class TmpFsINode final : public INode
     TmpFsINode(std::string_view name)
         : INode(name)
     {
-        capacity = 128;
-        data     = new u8[capacity];
+        m_Capacity = 128;
+        m_Data     = new u8[m_Capacity];
     }
     TmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
                mode_t mode);
 
     ~TmpFsINode()
     {
-        if (capacity > 0) delete data;
+        if (m_Capacity > 0) delete m_Data;
     }
 
     inline static constexpr usize GetDefaultSize() { return 0x1000; }
@@ -35,8 +35,9 @@ class TmpFsINode final : public INode
     }
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
+    virtual isize Truncate(usize size) override;
 
   private:
-    u8*   data     = nullptr;
-    usize capacity = 0;
+    u8*   m_Data     = nullptr;
+    usize m_Capacity = 0;
 };

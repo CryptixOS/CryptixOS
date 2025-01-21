@@ -29,7 +29,7 @@ int main()
         }
         else if (pid == 0)
         {
-            char* argv[] = {path, NULL};
+            char* const argv[] = {(char*)path, NULL};
             chdir(getenv("HOME"));
             execvp(path, argv);
             return EXIT_FAILURE;
@@ -37,7 +37,6 @@ int main()
 
         int status;
         waitpid(pid, &status, 0);
-        break;
     }
 
     return EXIT_SUCCESS;

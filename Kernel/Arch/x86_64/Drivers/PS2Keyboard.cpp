@@ -14,7 +14,19 @@
 
 #include <Drivers/TTY.hpp>
 
-static char s_Map[0x80]
+static char s_Map[0x100]
+    = {0,   0,   '1',  '2', '3',  '4', '5', '6',  '7', '8', '9', '0',
+       '-', '=', 0177, 0,   'q',  'w', 'e', 'r',  't', 'y', 'u', 'i',
+       'o', 'p', '[',  ']', 0,    0,   'a', 's',  'd', 'f', 'g', 'h',
+       'j', 'k', 'l',  ';', '\'', '`', 0,   '\\', 'z', 'x', 'c', 'v',
+       'b', 'n', 'm',  ',', '.',  '/', 0,   0,    0,   ' '};
+
+static char s_ShiftMap[0x100] = {
+    0,   0,   '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', 0,
+    0,   'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', 0,   0,
+    'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', 0,   '|', 'Z',
+    'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 0,   0,   0,   ' '};
+/*static char s_Map[0x80]
     = {0,   '\033', '1',  '2', '3',  '4', '5', '6',  '7', '8', '9', '0',
        '-', '=',    0177, 0,   'q',  'w', 'e', 'r',  't', 'y', 'u', 'i',
        'o', 'p',    '[',  ']', '\n', 0,   'a', 's',  'd', 'f', 'g', 'h',
@@ -27,7 +39,7 @@ static char s_ShiftMap[0x80]
        'O', 'P',    '{',  '}', '\n', 0,   'A', 'S', 'D', 'F', 'G', 'H',
        'J', 'K',    'L',  ':', '"',  '~', 0,   '|', 'Z', 'X', 'C', 'V',
        'B', 'N',    'M',  '<', '>',  '?', 0,   0,   0,   ' '};
-
+*/
 enum KeyModifier
 {
     eModAlt     = 0x01,
@@ -95,13 +107,15 @@ void PS2Keyboard::HandleInterrupt(CPUContext* ctx)
             case 0x2a:
                 if (pressed) s_Modifiers |= eModShift;
                 else s_Modifiers &= ~eModShift;
+            case 0x1c: current->PutChar('\n'); break;
             case I8042Response::eAcknowledge: break;
             default:
 
-                if (ch & 0x80 || !current | !pressed) break;
+                if (ch & 0x80 || !current || !pressed || ch == 0x5b) break;
 
-                if (!s_Modifiers) current->PutChar(s_Map[ch]);
                 if (s_Modifiers & eModShift) current->PutChar(s_ShiftMap[ch]);
+                else if (!s_Modifiers || s_Modifiers & eModControl)
+                    current->PutChar(s_Map[ch]);
                 break;
         }
     }

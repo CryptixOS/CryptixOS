@@ -11,7 +11,7 @@
 #include <Utility/Logger.hpp>
 #include <Utility/Math.hpp>
 
-#include <Scheduler/Spinlock.hpp>
+#include <Utility/Spinlock.hpp>
 
 namespace E9
 {

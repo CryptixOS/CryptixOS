@@ -8,7 +8,7 @@
 #include <Arch/CPU.hpp>
 
 #include <Scheduler/Process.hpp>
-#include <Scheduler/Spinlock.hpp>
+#include <Utility/Spinlock.hpp>
 #include <Scheduler/Thread.hpp>
 
 #include <VFS/DevTmpFs/DevTmpFs.hpp>

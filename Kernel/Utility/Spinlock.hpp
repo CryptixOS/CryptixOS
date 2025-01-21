@@ -19,12 +19,13 @@ namespace CPU
 class Spinlock
 {
   public:
-    bool TestAndAcquire()
+    inline bool Test() { return !m_Lock.load(); }
+    inline bool TestAndAcquire()
     {
-        return __sync_bool_compare_and_swap(&m_Lock, 0, 1);
+        return !m_Lock.exchange(true, std::memory_order_acquire);
     }
 
-    void Acquire(bool disableInterrupts = false)
+    inline void Acquire(bool disableInterrupts = false)
     {
         if (disableInterrupts)
             m_SavedInterruptState = CPU::SwapInterruptFlag(false);
@@ -32,10 +33,14 @@ class Spinlock
         for (;;)
         {
             if (TestAndAcquire()) break;
-            deadLockCounter += 1;
-            if (deadLockCounter >= 100000000) goto deadlock;
 
-            Arch::Pause();
+            while (m_Lock.load(std::memory_order_relaxed))
+            {
+                deadLockCounter += 1;
+                if (deadLockCounter >= 100000000) goto deadlock;
+
+                Arch::Pause();
+            }
         }
 
         m_LastAcquirer = __builtin_return_address(0);
@@ -44,19 +49,19 @@ class Spinlock
     deadlock:
         Panic("DEADLOCK");
     }
-    void Release(bool restoreInterrupts = false)
+    inline void Release(bool restoreInterrupts = false)
     {
         m_LastAcquirer = nullptr;
-        __sync_bool_compare_and_swap(&m_Lock, 1, 0);
+        m_Lock.store(false, std::memory_order_release);
 
         if (restoreInterrupts) CPU::SetInterruptFlag(m_SavedInterruptState);
         m_SavedInterruptState = false;
     }
 
   private:
-    i32   m_Lock                = 0;
-    void* m_LastAcquirer        = nullptr;
-    bool  m_SavedInterruptState = false;
+    std::atomic_bool m_Lock                = false;
+    void*            m_LastAcquirer        = nullptr;
+    bool             m_SavedInterruptState = false;
 };
 
 class ScopedLock final

@@ -7,7 +7,7 @@
 #include <Arch/x86_64/IO.hpp>
 
 #include <Drivers/Serial.hpp>
-#include <Scheduler/Spinlock.hpp>
+#include <Utility/Spinlock.hpp>
 
 #include <utility>
 

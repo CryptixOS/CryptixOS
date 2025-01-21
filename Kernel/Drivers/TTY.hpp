@@ -9,8 +9,9 @@
 #include <API/Posix/termios.h>
 #include <Drivers/Device.hpp>
 
-#include <Scheduler/Spinlock.hpp>
+#include <Utility/Spinlock.hpp>
 
+#include <cctype>
 #include <deque>
 #include <vector>
 
@@ -60,11 +61,7 @@ class TTY : public Device
         while (!m_LineQueue.empty()) EraseChar();
     }
 
-    inline void EnqueueChar(u64 c)
-    {
-        ScopedLock guard(m_Lock);
-        m_InputBuffer.push_back(c);
-    }
+    void           EnqueueChar(u64 c);
     void           Echo(u64 c);
     void           EraseChar();
     void           EraseWord();

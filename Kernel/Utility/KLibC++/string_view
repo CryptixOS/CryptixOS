@@ -147,7 +147,11 @@ namespace std
         constexpr size_type copy(pointer dest, size_type count,
                                  size_type pos = 0) const
         {
-            assert (pos < _size);
+            assert (pos <= _size);
+
+            count = min(count, _size - pos);
+            if (count == 0) return 0;
+            
             traits_type::copy(dest, _data + pos, count);
 
             return count;

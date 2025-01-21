@@ -14,7 +14,7 @@
 #include <Memory/PMM.hpp>
 
 #include <Scheduler/Process.hpp>
-#include <Scheduler/Spinlock.hpp>
+#include <Utility/Spinlock.hpp>
 #include <Scheduler/Thread.hpp>
 
 #include <deque>

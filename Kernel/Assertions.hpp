@@ -29,3 +29,8 @@ namespace PMM = PhysicalMemoryManager;
 #define ToDo()            AssertFmt(false, "{} is not implemented!", __PRETTY_FUNCTION__)
 
 #define AssertPMM_Ready() Assert(PMM::IsInitialized())
+
+#define DebugWarnIf(cond, msg)                                                 \
+    {                                                                          \
+        if ((cond)) LogWarn(msg);                                              \
+    }

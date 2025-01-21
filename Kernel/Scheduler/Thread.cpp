@@ -113,11 +113,11 @@ Thread::Thread(Process* parent, uintptr_t pc,
                                                           / PMM::PAGE_SIZE);
         uintptr_t vustack = this->parent->m_UserStackTop - CPU::USER_STACK_SIZE;
 
-        LogDebug("StackPhys: {:#x}, StackVirt: {:#x}, HhStack: {:#x}", pstack,
-                 vustack, Pointer(pstack).ToHigherHalf<u64>());
         Assert(this->parent->PageMap->MapRange(
             vustack, pstack, CPU::USER_STACK_SIZE,
             PageAttributes::eRWXU | PageAttributes::eWriteBack));
+        this->parent->m_AddressSpace.push_back(
+            {pstack, vustack, CPU::USER_STACK_SIZE});
         this->stackVirt              = vustack;
 
         this->parent->m_UserStackTop = vustack - PMM::PAGE_SIZE;

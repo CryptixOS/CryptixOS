@@ -254,14 +254,14 @@ tools:
           - args: ['make', '-j@PARALLELISM@', 'all-target-libgcc']
         install:
           - args: ['make', 'install-target-libgcc']
-            #- name: libstdc++
-            #tools_required:
-            #- tool: system-gcc
-            #stage_dependencies: [libgcc]
-            #compile:
-            #- args: ['make', '-j@PARALLELISM@', 'all-target-libstdc++-v3']
-            #install:
-            #- args: ['make', 'install-target-libstdc++-v3']
+      - name: libstdc++
+        tools_required:
+          - tool: system-gcc
+            stage_dependencies: [libgcc]
+        compile:
+          - args: ['make', '-j@PARALLELISM@', 'all-target-libstdc++-v3']
+        install:
+            - args: ['make', 'install-target-libstdc++-v3']
 
 packages:
   - name: base-files
@@ -406,7 +406,7 @@ packages:
     build:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/sbin']
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/root']
-      - args: ['@OPTION:arch-triple@-gcc', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/init.c', '-o', '@THIS_COLLECT_DIR@/usr/sbin/init']
+      - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/init.cpp', '-o', '@THIS_COLLECT_DIR@/usr/sbin/init']
       #- args: ['@OPTION:arch-triple@-gcc', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/sh.c', '-o', '@THIS_COLLECT_DIR@/usr/sbin/sh']
 
   - name: linux-headers

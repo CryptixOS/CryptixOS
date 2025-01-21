@@ -28,31 +28,31 @@ namespace Syscall::VFS
 
     ErrorOr<isize> SysRead(Arguments& args)
     {
-        i32             fdNum   = static_cast<i32>(args.Args[0]);
-        void*           buffer  = reinterpret_cast<void*>(args.Args[1]);
-        usize           bytes   = static_cast<usize>(args.Args[2]);
+        i32      fdNum   = static_cast<i32>(args.Args[0]);
+        void*    buffer  = reinterpret_cast<void*>(args.Args[1]);
+        usize    bytes   = static_cast<usize>(args.Args[2]);
 
-        Process*        current = CPU::GetCurrentThread()->parent;
-        // if (!buffer
-        //     || !current->ValidateAddress(buffer, PROT_READ | PROT_WRITE))
-        //     return std::errno_t(EFAULT);
+        Process* current = CPU::GetCurrentThread()->parent;
+        if (!buffer
+            || !current->ValidateAddress(buffer, PROT_READ | PROT_WRITE))
+            return std::errno_t(EFAULT);
 
-        FileDescriptor* fd      = current->GetFileHandle(fdNum);
+        FileDescriptor* fd = current->GetFileHandle(fdNum);
         if (!fd) return std::errno_t(EBADF);
 
         return fd->Read(buffer, bytes);
     }
     ErrorOr<isize> SysWrite(Arguments& args)
     {
-        i32             fdNum   = static_cast<i32>(args.Args[0]);
-        void*           data    = reinterpret_cast<void*>(args.Args[1]);
-        usize           bytes   = static_cast<usize>(args.Args[2]);
+        i32      fdNum   = static_cast<i32>(args.Args[0]);
+        void*    data    = reinterpret_cast<void*>(args.Args[1]);
+        usize    bytes   = static_cast<usize>(args.Args[2]);
 
-        Process*        current = CPU::GetCurrentThread()->parent;
-        // if (!data || current->ValidateAddress(data, PROT_READ | PROT_WRITE))
-        //     return std::errno_t(EFAULT);
+        Process* current = CPU::GetCurrentThread()->parent;
+        if (!data || !current->ValidateAddress(data, PROT_READ | PROT_WRITE))
+            return std::errno_t(EFAULT);
 
-        FileDescriptor* fd      = current->GetFileHandle(fdNum);
+        FileDescriptor* fd = current->GetFileHandle(fdNum);
         if (!fd) return std::errno_t(EBADF);
 
         return fd->Write(data, bytes);
@@ -76,8 +76,8 @@ namespace Syscall::VFS
     {
         Process* current = CPU::GetCurrentThread()->parent;
 
-        i32      fd      = static_cast<i32>(args.Args[0]);
-        return current->CloseFd(fd);
+        i32      fdNum   = static_cast<i32>(args.Args[0]);
+        return current->CloseFd(fdNum);
     }
     ErrorOr<i32> SysStat(Arguments& args)
     {
@@ -108,28 +108,28 @@ namespace Syscall::VFS
 
     ErrorOr<off_t> SysLSeek(Arguments& args)
     {
-        i32      fd      = static_cast<i32>(args.Args[0]);
+        i32      fdNum   = static_cast<i32>(args.Args[0]);
         off_t    offset  = static_cast<off_t>(args.Args[1]);
         i32      whence  = static_cast<i32>(args.Args[2]);
 
         Process* current = CPU::GetCurrentThread()->parent;
-        auto     file    = current->GetFileHandle(fd);
-        if (!file) return_err(-1, ENOENT);
+        auto     fd      = current->GetFileHandle(fdNum);
+        if (!fd) return std::errno_t(ENOENT);
 
-        return file->Seek(whence, offset);
+        return fd->Seek(whence, offset);
     }
 
     ErrorOr<i32> SysIoCtl(Arguments& args)
     {
-        i32      fd      = static_cast<i32>(args.Args[0]);
+        i32      fdNum   = static_cast<i32>(args.Args[0]);
         usize    request = static_cast<usize>(args.Args[1]);
         usize    arg     = static_cast<usize>(args.Args[2]);
 
         Process* current = CPU::GetCurrentThread()->parent;
-        auto     file    = current->GetFileHandle(fd);
-        if (!file) return_err(-1, EBADF);
+        auto     fd      = current->GetFileHandle(fdNum);
+        if (!fd) return std::errno_t(EBADF);
 
-        return file->GetNode()->IoCtl(request, arg);
+        return fd->GetNode()->IoCtl(request, arg);
     }
     ErrorOr<i32> SysAccess(Arguments& args)
     {
@@ -145,33 +145,20 @@ namespace Syscall::VFS
 
     ErrorOr<i32> SysDup(Arguments& args)
     {
-        i32 oldFd = static_cast<i32>(args.Args[0]);
+        i32      oldFd   = static_cast<i32>(args.Args[0]);
 
-        LogTrace("Syscall::VFS::SysDup: {{ oldFd: {} }}", oldFd);
         Process* current = CPU::GetCurrentThread()->parent;
 
-        auto     ret     = current->DupFd(oldFd, -1);
-        if (!ret) return ret.error();
-        auto desc = current->GetFileHandle(ret.value());
-        if (!desc) Panic("Failed to duplicate fd");
-
-        return ret;
+        return current->DupFd(oldFd, -1);
     }
     ErrorOr<i32> SysDup2(Syscall::Arguments& args)
     {
-        i32 oldFd = static_cast<i32>(args.Args[0]);
-        i32 newFd = static_cast<i32>(args.Args[1]);
+        i32      oldFd   = static_cast<i32>(args.Args[0]);
+        i32      newFd   = static_cast<i32>(args.Args[1]);
 
-        LogTrace("Syscall::VFS::SysDup2: {{ oldFd: {}, newFd: {} }}", oldFd,
-                 newFd);
         Process* current = CPU::GetCurrentThread()->parent;
 
-        auto     ret     = current->DupFd(oldFd, newFd);
-        if (!ret) return ret.error();
-        auto desc = current->GetFileHandle(newFd);
-        if (!desc) Panic("Failed to duplicate fd, newFd: {}", ret.value());
-
-        return ret.value();
+        return current->DupFd(oldFd, newFd);
     }
     ErrorOr<i32> SysFcntl(Arguments& args)
     {
@@ -181,7 +168,7 @@ namespace Syscall::VFS
 
         Process*        current = CPU::GetCurrentThread()->parent;
         FileDescriptor* fd      = current->GetFileHandle(fdNum);
-        if (!fd) return_err(-1, EBADF);
+        if (!fd) return std::errno_t(EBADF);
 
         switch (op)
         {
@@ -189,18 +176,18 @@ namespace Syscall::VFS
             case F_DUPFD_CLOEXEC: return current->DupFd(fdNum, arg, O_CLOEXEC);
             case F_GETFD: return fd->GetFlags();
             case F_SETFD:
-                if (!fd) return_err(-1, EBADF);
+                if (!fd) return std::errno_t(EBADF);
                 fd->SetFlags(arg);
                 break;
             case F_GETFL: return fd->GetDescriptionFlags();
             case F_SETFL:
-                if (arg & O_ACCMODE) return_err(-1, EINVAL);
+                if (arg & O_ACCMODE) return std::errno_t(EINVAL);
                 fd->SetDescriptionFlags(arg);
                 break;
 
             default:
                 LogError("Syscall::VFS::SysFcntl: Unknown opcode");
-                return_err(-1, EINVAL);
+                return std::errno_t(EINVAL);
         }
 
         return 0;
@@ -225,24 +212,24 @@ namespace Syscall::VFS
         Process*    current = CPU::GetCurrentThread()->parent;
 
         INode* node = std::get<1>(VFS::ResolvePath(current->GetCWD(), path));
-        if (!node) return_err(-1, ENOENT);
-        if (!node->IsDirectory()) return_err(-1, ENOTDIR);
+        if (!node) return std::errno_t(ENOENT);
+        if (!node->IsDirectory()) return std::errno_t(ENOTDIR);
 
         current->m_CWD = node;
         return 0;
     }
     ErrorOr<i32> SysFChDir(Arguments& args)
     {
-        i32             fd             = static_cast<i32>(args.Args[0]);
-        Process*        current        = CPU::GetCurrentThread()->parent;
+        i32             fdNum   = static_cast<i32>(args.Args[0]);
+        Process*        current = CPU::GetCurrentThread()->parent;
 
-        FileDescriptor* fileDescriptor = current->GetFileHandle(fd);
-        if (!fileDescriptor) return_err(-1, EBADF);
+        FileDescriptor* fd      = current->GetFileHandle(fdNum);
+        if (!fd) return std::errno_t(EBADF);
 
-        INode* node = fileDescriptor->GetNode();
-        if (!node) return_err(-1, ENOENT);
+        INode* node = fd->GetNode();
+        if (!node) return std::errno_t(ENOENT);
 
-        if (!node->IsDirectory()) return_err(-1, ENOTDIR);
+        if (!node->IsDirectory()) return std::errno_t(ENOTDIR);
         current->m_CWD = node;
 
         return 0;
@@ -251,51 +238,19 @@ namespace Syscall::VFS
     [[clang::no_sanitize("alignment")]]
     ErrorOr<i32> SysGetDents64(Arguments& args)
     {
-        u32           fd        = static_cast<u32>(args.Args[0]);
+        u32           fdNum     = static_cast<u32>(args.Args[0]);
         dirent* const outBuffer = reinterpret_cast<dirent* const>(args.Args[1]);
         u32           count     = static_cast<u32>(args.Args[2]);
 
-        if (!outBuffer) return_err(-1, EFAULT);
+        Process*      current   = Process::GetCurrent();
+        if (!outBuffer
+            || !current->ValidateAddress(outBuffer, PROT_READ | PROT_WRITE))
+            return std::errno_t(EFAULT);
 
-        Process*        current        = CPU::GetCurrentThread()->parent;
-        FileDescriptor* fileDescriptor = current->GetFileHandle(fd);
-        if (!fileDescriptor) return_err(-1, EBADF);
-        INode* node = fileDescriptor->GetNode();
-        if (!node->IsDirectory()) return_err(-1, ENOTDIR);
+        FileDescriptor* fd = current->GetFileHandle(fdNum);
+        if (!fd) return std::errno_t(EBADF);
 
-        if (fileDescriptor->GetDirEntries().empty())
-            fileDescriptor->GenerateDirEntries();
-
-        if (fileDescriptor->GetDirEntries().empty()) return 0;
-
-        usize length = 0;
-        for (const auto& entry : fileDescriptor->GetDirEntries())
-            length += entry->d_reclen;
-
-        length = std::min(static_cast<usize>(count), length);
-
-        if (fileDescriptor->GetDirEntries().front()->d_reclen > count)
-            return_err(-1, EINVAL);
-
-        bool end                       = fileDescriptor->DirentsInvalid;
-        fileDescriptor->DirentsInvalid = false;
-
-        usize i                        = 0;
-        usize bytes                    = 0;
-        while (i < length)
-        {
-            auto entry = fileDescriptor->GetDirEntries().pop_front_element();
-            std::memcpy(reinterpret_cast<char*>(outBuffer) + i, entry,
-                        entry->d_reclen);
-            bytes = i;
-            i += entry->d_reclen;
-            free(entry);
-        }
-
-        if (fileDescriptor->GetDirEntries().empty())
-            fileDescriptor->DirentsInvalid = true;
-
-        return end ? 0 : bytes;
+        return fd->GetDirEntries(outBuffer, count);
     }
 
     ErrorOr<i32> SysOpenAt(Arguments& args)
@@ -313,35 +268,35 @@ namespace Syscall::VFS
     {
         Process*        current   = CPU::GetCurrentThread()->parent;
 
-        i32             fd        = static_cast<i32>(args.Args[0]);
+        i32             fdNum     = static_cast<i32>(args.Args[0]);
         const char*     path      = reinterpret_cast<const char*>(args.Args[1]);
         CTOS_UNUSED i32 flags     = static_cast<i32>(args.Args[2]);
         stat*           outBuffer = reinterpret_cast<stat*>(args.Args[3]);
 
         if (flags & ~(AT_EMPTY_PATH | AT_NO_AUTOMOUNT | AT_SYMLINK_NOFOLLOW))
-            return_err(-1, EINVAL);
+            return std::errno_t(EINVAL);
 
-        FileDescriptor* fileHandle     = current->GetFileHandle(fd);
+        FileDescriptor* fileHandle     = current->GetFileHandle(fdNum);
         bool            followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
 
-        if (!outBuffer) return_err(-1, EFAULT);
+        if (!outBuffer) return std::errno_t(EFAULT);
 
         if (!path || *path == 0)
         {
-            if (!(flags & AT_EMPTY_PATH)) return_err(-1, ENOENT);
+            if (!(flags & AT_EMPTY_PATH)) return std::errno_t(ENOENT);
 
-            if (fd == AT_FDCWD) *outBuffer = current->GetCWD()->GetStats();
-            else if (!fileHandle) return_err(-1, EBADF);
+            if (fdNum == AT_FDCWD) *outBuffer = current->GetCWD()->GetStats();
+            else if (!fileHandle) return std::errno_t(EBADF);
             else *outBuffer = fileHandle->GetNode()->GetStats();
 
             return 0;
         }
 
         INode* parent = Path::IsAbsolute(path) ? VFS::GetRootNode() : nullptr;
-        if (fd == AT_FDCWD) parent = current->GetCWD();
+        if (fdNum == AT_FDCWD) parent = current->GetCWD();
         else if (fileHandle) parent = fileHandle->GetNode();
 
-        if (!parent) return_err(-1, EBADF);
+        if (!parent) return std::errno_t(EBADF);
         INode* node
             = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
 
@@ -357,8 +312,8 @@ namespace Syscall::VFS
         i32 newFdNum = static_cast<i32>(args.Args[1]);
         i32 flags    = static_cast<i32>(args.Args[2]);
 
-        if (oldFdNum == newFdNum) return_err(-1, EINVAL);
-        if ((flags & ~O_CLOEXEC) != 0) return_err(-1, EINVAL);
+        if (oldFdNum == newFdNum) return std::errno_t(EINVAL);
+        if ((flags & ~O_CLOEXEC) != 0) return std::errno_t(EINVAL);
 
         Process* current = CPU::GetCurrentThread()->parent;
         return current->DupFd(oldFdNum, newFdNum, flags);

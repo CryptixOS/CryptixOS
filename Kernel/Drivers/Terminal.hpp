@@ -9,7 +9,7 @@
 #include <Boot/BootInfo.hpp>
 #include <Utility/Types.hpp>
 
-#include <Scheduler/Spinlock.hpp>
+#include <Utility/Spinlock.hpp>
 
 #include <flanterm.h>
 #include <string_view>

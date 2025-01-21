@@ -6,7 +6,7 @@
  */
 #include "GDT.hpp"
 
-#include <Scheduler/Spinlock.hpp>
+#include <Utility/Spinlock.hpp>
 
 namespace GDT
 {

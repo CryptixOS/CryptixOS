@@ -54,7 +54,6 @@ void Process::InitializeStreams()
     INode* currentTTY
         = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), "/dev/tty"));
 
-    LogTrace("Process: Creating standard streams...");
     m_FdTable.Insert(new FileDescriptor(currentTTY, 0, FileAccessMode::eRead),
                      0);
     m_FdTable.Insert(new FileDescriptor(currentTTY, 0, FileAccessMode::eWrite),
@@ -111,13 +110,11 @@ i32 Process::Exec(const char* path, char** argv, char** envp)
     PageMap = new class PageMap();
 
     static ELF::Image program, ld;
-    Assert(program.Load(path, PageMap, m_AddressSpace));
+    AssertFmt(program.Load(path, PageMap, m_AddressSpace),
+              "Failed to load the program at '{}'", path);
     std::string_view ldPath = program.GetLdPath();
     if (!ldPath.empty())
-    {
-        LogTrace("Kernel: Loading ld: '{}'", ldPath);
         Assert(ld.Load(ldPath, PageMap, m_AddressSpace, 0x40000000));
-    }
     Thread* currentThread = CPU::GetCurrentThread();
     currentThread->state  = ThreadState::eKilled;
 
@@ -186,6 +183,8 @@ Process* Process::Fork()
         pageMap->MapRange(range.GetVirtualBase(), physicalSpace,
                           range.GetSize(),
                           PageAttributes::eRWXU | PageAttributes::eWriteBack);
+        newProcess->m_AddressSpace.push_back(
+            {physicalSpace, range.GetVirtualBase(), range.GetSize()});
 
         // TODO(v1tr10l7): Free regions;
     }

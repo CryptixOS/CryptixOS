@@ -42,19 +42,47 @@ inline bool operator&(const FileAccessMode lhs, FileAccessMode rhs)
     return static_cast<u64>(lhs) & static_cast<u64>(rhs);
 }
 
+struct DirectoryEntries
+{
+    using ListType = std::deque<dirent*>;
+    ListType    Entries;
+    usize       Size = 0;
+
+    dirent*     Front() const { return Entries.front(); }
+    inline bool IsEmpty() const { return Entries.empty(); }
+
+    inline void Clear() { Entries.clear(); }
+    void        Push(INode* node, std::string_view = "");
+
+    usize       CopyAndPop(u8* out)
+    {
+        if (Entries.empty()) return 0;
+
+        auto  entry     = Entries.pop_front_element();
+        usize entrySize = entry->d_reclen;
+
+        std::memcpy(out, entry, entry->d_reclen);
+        delete entry;
+
+        return entrySize;
+    }
+
+    auto begin() { return Entries.begin(); }
+    auto end() { return Entries.end(); }
+};
 struct FileDescription
 {
-    Spinlock            Lock;
-    std::atomic<usize>  RefCount = 0;
+    Spinlock           Lock;
+    std::atomic<usize> RefCount = 0;
 
-    INode*              Node;
-    usize               Offset     = 0;
+    INode*             Node;
+    usize              Offset     = 0;
 
-    i32                 Flags      = 0;
-    FileAccessMode      AccessMode = FileAccessMode::eRead;
-    std::deque<dirent*> DirEntries;
+    i32                Flags      = 0;
+    FileAccessMode     AccessMode = FileAccessMode::eRead;
+    DirectoryEntries   DirEntries;
 
-    inline void         IncRefCount() { ++RefCount; }
+    inline void        IncRefCount() { ++RefCount; }
 };
 
 struct FileDescriptor
@@ -105,14 +133,17 @@ struct FileDescriptor
     }
     inline bool CloseOnExec() const { return m_Flags & O_CLOEXEC; }
 
-    inline std::deque<dirent*>& GetDirEntries()
+    [[clang::no_sanitize("alignment")]]
+    ErrorOr<i32> GetDirEntries(dirent* const out, usize maxSize);
+
+  private:
+    Spinlock                 m_Lock;
+    FileDescription*         m_Description = nullptr;
+    i32                      m_Flags       = 0;
+
+    inline DirectoryEntries& GetDirEntries()
     {
         return m_Description->DirEntries;
     }
     bool GenerateDirEntries();
-
-  private:
-    Spinlock         m_Lock;
-    FileDescription* m_Description = nullptr;
-    i32              m_Flags       = 0;
 };

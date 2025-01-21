@@ -8,7 +8,7 @@
 #include <Firmware/ACPI/ACPI.hpp>
 
 #include <Memory/MMIO.hpp>
-#include <Scheduler/Spinlock.hpp>
+#include <Utility/Spinlock.hpp>
 
 #include <uacpi/kernel_api.h>
 

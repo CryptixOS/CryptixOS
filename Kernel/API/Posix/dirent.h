@@ -19,4 +19,16 @@ struct dirent
 
 constexpr usize MAXNAMELEN    = 1024;
 constexpr usize DIRENT_LENGTH = sizeof(dirent) - MAXNAMELEN;
+
 constexpr usize IF2DT(mode_t mode) { return (mode & S_IFMT) >> 12; }
+constexpr usize DT2IF(usize dirtype) { return dirtype << 12; }
+
+constexpr usize DT_UNKNOWN = 0;
+constexpr usize DT_FIFO    = 1;
+constexpr usize DT_CHR     = 2;
+constexpr usize DT_DIR     = 4;
+constexpr usize DT_BLK     = 6;
+constexpr usize DT_REG     = 8;
+constexpr usize DT_LNK     = 10;
+constexpr usize DT_SOCK    = 12;
+constexpr usize DT_WHT     = 14;
