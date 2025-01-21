@@ -38,6 +38,7 @@ srcs += files(
   'Utility/ICxxAbi.cpp',
   'Utility/Kasan.cpp',
   'Utility/Logger.cpp',
+  'Utility/Path.cpp',
   'Utility/Stacktrace.cpp',
   'Utility/Ubsan.cpp',
 

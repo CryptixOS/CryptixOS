@@ -305,14 +305,7 @@ namespace VFS
         if (fdNum == AT_FDCWD) parent = process->GetCWD();
         else if (fd) parent = fd->GetNode();
 
-        usize pathLen = 0;
-        while (path[pathLen])
-        {
-            if (pathLen >= Limits::MAX_PATH_LENGTH)
-                return std::unexpected(ENAMETOOLONG);
-            ++pathLen;
-        }
-
+        if (!Path::ValidateLength(path)) return std::unexpected(ENAMETOOLONG);
         if (!parent) return std::unexpected(EBADF);
         INode* node
             = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
