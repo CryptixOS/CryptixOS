@@ -46,7 +46,8 @@ struct DirectoryEntries
 {
     using ListType = std::deque<dirent*>;
     ListType    Entries;
-    usize       Size = 0;
+    usize       Size             = 0;
+    bool        ShouldRegenerate = false;
 
     dirent*     Front() const { return Entries.front(); }
     inline bool IsEmpty() const { return Entries.empty(); }
@@ -87,8 +88,6 @@ struct FileDescription
 
 struct FileDescriptor
 {
-    bool DirentsInvalid = false;
-
     FileDescriptor(INode* node, i32 flags, FileAccessMode accMode);
     FileDescriptor(FileDescriptor* fd, i32 flags = 0);
     ~FileDescriptor();
@@ -110,14 +109,15 @@ struct FileDescriptor
         m_Description->Flags = flags;
     }
 
-    ErrorOr<isize> Read(void* const outBuffer, usize count);
-    ErrorOr<isize> Write(const void* data, isize bytes);
-    isize          Seek(i32 whence, off_t offset);
+    ErrorOr<isize>       Read(void* const outBuffer, usize count);
+    ErrorOr<isize>       Write(const void* data, isize bytes);
+    ErrorOr<const stat*> Stat() const;
+    isize                Seek(i32 whence, off_t offset);
 
-    void           Lock() { m_Description->Lock.Acquire(); }
-    void           Unlock() { m_Description->Lock.Release(); }
+    void                 Lock() { m_Description->Lock.Acquire(); }
+    void                 Unlock() { m_Description->Lock.Release(); }
 
-    inline bool    IsPipe() const
+    inline bool          IsPipe() const
     {
         // FIXME(v1tr10l7): implement this once pipes are supported
 

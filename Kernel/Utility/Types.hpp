@@ -14,23 +14,25 @@
 #include <expected>
 #include <type_traits>
 
-using usize  = std::size_t;
-using isize  = std::make_signed_t<usize>;
+using usize     = std::size_t;
+using isize     = std::make_signed_t<usize>;
 
-using u8     = std::uint8_t;
-using u16    = std::uint16_t;
-using u32    = std::uint32_t;
-using u64    = std::uint64_t;
+using u8        = std::uint8_t;
+using u16       = std::uint16_t;
+using u32       = std::uint32_t;
+using u64       = std::uint64_t;
 
-using i8     = std::int8_t;
-using i16    = std::int16_t;
-using i32    = std::int32_t;
-using i64    = std::int64_t;
+using i8        = std::int8_t;
+using i16       = std::int16_t;
+using i32       = std::int32_t;
+using i64       = std::int64_t;
 
-using symbol = void*[];
+using symbol    = void*[];
+using Error     = std::errno_t;
+using ErrorType = std::errno_t;
 
 template <typename R>
-using ErrorOr = std::expected<R, std::errno_t>;
+using ErrorOr = std::expected<R, ErrorType>;
 
 inline constexpr u64 Bit(u64 n) { return (1ull << n); }
 
@@ -43,7 +45,7 @@ namespace BootInfo
 struct Pointer
 {
     template <std::unsigned_integral T = std::uintptr_t>
-    Pointer(T m_Pointer)
+    Pointer(const T m_Pointer)
         : m_Pointer(m_Pointer)
     {
     }

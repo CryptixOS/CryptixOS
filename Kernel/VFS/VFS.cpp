@@ -5,11 +5,12 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Limits.hpp>
 #include <Arch/CPU.hpp>
 
 #include <Scheduler/Process.hpp>
-#include <Utility/Spinlock.hpp>
 #include <Scheduler/Thread.hpp>
+#include <Utility/Spinlock.hpp>
 
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/INode.hpp>
@@ -280,6 +281,44 @@ namespace VFS
                                                              newNodeName, mode);
         if (newNode) newNodeParent->InsertChild(newNode, newNode->GetName());
         return newNode;
+    }
+    ErrorOr<const stat*> Stat(i32 fdNum, std::string_view path, i32 flags)
+    {
+        if (flags & ~(AT_EMPTY_PATH | AT_NO_AUTOMOUNT | AT_SYMLINK_NOFOLLOW))
+            return std::unexpected(Error(EINVAL));
+
+        Process*        process        = Process::GetCurrent();
+        FileDescriptor* fd             = process->GetFileHandle(fdNum);
+        bool            followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
+
+        if (!path.data() || !path[0])
+        {
+            if (!(flags & AT_EMPTY_PATH)) return std::unexpected(ENOENT);
+
+            if (fdNum == AT_FDCWD) return &process->GetCWD()->GetStats();
+            else if (!fd) return std::unexpected(EBADF);
+
+            return &fd->GetNode()->GetStats();
+        }
+
+        INode* parent = Path::IsAbsolute(path) ? VFS::GetRootNode() : nullptr;
+        if (fdNum == AT_FDCWD) parent = process->GetCWD();
+        else if (fd) parent = fd->GetNode();
+
+        usize pathLen = 0;
+        while (path[pathLen])
+        {
+            if (pathLen >= Limits::MAX_PATH_LENGTH)
+                return std::unexpected(ENAMETOOLONG);
+            ++pathLen;
+        }
+
+        if (!parent) return std::unexpected(EBADF);
+        INode* node
+            = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
+
+        if (!node) return std::unexpected(errno);
+        return &node->GetStats();
     }
 
     INode* MkNod(INode* parent, PathView path, mode_t mode, dev_t dev)

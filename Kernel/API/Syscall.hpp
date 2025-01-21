@@ -8,9 +8,6 @@
 
 #include <Common.hpp>
 
-#include <cerrno>
-#include <expected>
-
 #include <magic_enum/magic_enum.hpp>
 #include <magic_enum/magic_enum_format.hpp>
 
@@ -22,6 +19,12 @@ namespace Syscall
         u64       Args[6];
 
         uintptr_t ReturnValue;
+
+        template <typename T>
+        inline T Get(usize index) const
+        {
+            return T(Args[index]);
+        }
     };
 
     enum class ID : u64

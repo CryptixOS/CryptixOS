@@ -81,29 +81,52 @@ namespace Syscall::VFS
     }
     ErrorOr<i32> SysStat(Arguments& args)
     {
-        args.Args[3] = args.Args[1];
-        args.Args[2] = 0;
-        args.Args[1] = args.Args[0];
-        args.Args[0] = AT_FDCWD;
+        PathView path    = args.Get<const char*>(0);
+        stat*    out     = args.Get<stat*>(1);
 
-        return SysFStatAt(args);
+        Process* process = Process::GetCurrent();
+        if (!process->ValidateAddress(reinterpret_cast<uintptr_t>(path.data()),
+                                      PROT_READ)
+            || !process->ValidateAddress(out, PROT_READ | PROT_WRITE))
+            return Error(EFAULT);
+
+        auto stats = VFS::Stat(AT_FDCWD, path, 0);
+        if (!stats) return stats.error();
+        *out = *stats.value();
+
+        return 0;
     }
     ErrorOr<i32> SysFStat(Arguments& args)
     {
-        args.Args[3] = args.Args[1];
-        args.Args[2] = AT_EMPTY_PATH;
-        args.Args[1] = 0;
+        i32      fd      = args.Get<i32>(0);
+        stat*    out     = args.Get<stat*>(1);
 
-        return SysFStatAt(args);
+        Process* process = Process::GetCurrent();
+        if (!process->ValidateAddress(out, PROT_READ | PROT_WRITE))
+            return Error(EFAULT);
+
+        auto stats = VFS::Stat(fd, "", AT_EMPTY_PATH);
+        if (!stats) return stats.error();
+        *out = *stats.value();
+
+        return 0;
     }
     ErrorOr<i32> SysLStat(Arguments& args)
     {
-        args.Args[3] = args.Args[1];
-        args.Args[2] = AT_SYMLINK_NOFOLLOW;
-        args.Args[1] = args.Args[0];
-        args.Args[0] = AT_FDCWD;
+        PathView path    = args.Get<const char*>(0);
+        stat*    out     = args.Get<stat*>(1);
 
-        return SysFStatAt(args);
+        Process* process = Process::GetCurrent();
+        if (!process->ValidateAddress(reinterpret_cast<uintptr_t>(path.data()),
+                                      PROT_READ)
+            || !process->ValidateAddress(out, PROT_READ | PROT_WRITE))
+            return Error(EFAULT);
+
+        auto stats = VFS::Stat(AT_FDCWD, path, AT_SYMLINK_NOFOLLOW);
+        if (!stats) return stats.error();
+        *out = *stats.value();
+
+        return 0;
     }
 
     ErrorOr<off_t> SysLSeek(Arguments& args)
@@ -194,15 +217,14 @@ namespace Syscall::VFS
     }
     ErrorOr<i32> SysGetCwd(Arguments& args)
     {
-        class Process* current = CPU::GetCurrentThread()->parent;
+        class Process*   current = CPU::GetCurrentThread()->parent;
 
-        char*          buffer  = reinterpret_cast<char*>(args.Args[0]);
-        usize          size    = args.Args[1];
+        char*            buffer  = reinterpret_cast<char*>(args.Args[0]);
+        usize            size    = args.Args[1];
 
-        auto           cwd     = current->GetCWD()->GetPath();
-        usize          count   = cwd.size();
-        if (size < count) count = size;
-        strncpy(buffer, cwd.data(), count);
+        std::string_view cwdPath = current->GetCWD()->GetPath();
+        usize            len     = std::min(size, cwdPath.length());
+        cwdPath.copy(buffer, len);
 
         return 0;
     }
@@ -266,42 +288,21 @@ namespace Syscall::VFS
     }
     ErrorOr<i32> SysFStatAt(Arguments& args)
     {
-        Process*        current   = CPU::GetCurrentThread()->parent;
+        i32         fdNum   = args.Get<i32>(0);
+        const char* path    = args.Get<const char*>(1);
+        i32         flags   = args.Get<i32>(2);
+        stat*       out     = args.Get<stat*>(3);
 
-        i32             fdNum     = static_cast<i32>(args.Args[0]);
-        const char*     path      = reinterpret_cast<const char*>(args.Args[1]);
-        CTOS_UNUSED i32 flags     = static_cast<i32>(args.Args[2]);
-        stat*           outBuffer = reinterpret_cast<stat*>(args.Args[3]);
+        Process*    process = CPU::GetCurrentThread()->parent;
+        if (!process->ValidateAddress(reinterpret_cast<uintptr_t>(path),
+                                      PROT_READ)
+            || !process->ValidateAddress(out, PROT_READ | PROT_WRITE))
+            return Error(EFAULT);
 
-        if (flags & ~(AT_EMPTY_PATH | AT_NO_AUTOMOUNT | AT_SYMLINK_NOFOLLOW))
-            return std::errno_t(EINVAL);
-
-        FileDescriptor* fileHandle     = current->GetFileHandle(fdNum);
-        bool            followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
-
-        if (!outBuffer) return std::errno_t(EFAULT);
-
-        if (!path || *path == 0)
-        {
-            if (!(flags & AT_EMPTY_PATH)) return std::errno_t(ENOENT);
-
-            if (fdNum == AT_FDCWD) *outBuffer = current->GetCWD()->GetStats();
-            else if (!fileHandle) return std::errno_t(EBADF);
-            else *outBuffer = fileHandle->GetNode()->GetStats();
-
-            return 0;
-        }
-
-        INode* parent = Path::IsAbsolute(path) ? VFS::GetRootNode() : nullptr;
-        if (fdNum == AT_FDCWD) parent = current->GetCWD();
-        else if (fileHandle) parent = fileHandle->GetNode();
-
-        if (!parent) return std::errno_t(EBADF);
-        INode* node
-            = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
-
-        if (!node) return -1;
-        *outBuffer = node->GetStats();
+        if (!out) return std::errno_t(EFAULT);
+        auto stats = VFS::Stat(fdNum, path, flags);
+        if (!stats) return stats.error();
+        *out = *stats.value();
 
         return 0;
     }

@@ -59,9 +59,9 @@ ErrorOr<isize> FileDescriptor::Read(void* const outBuffer, usize count)
 {
     ScopedLock guard(m_Description->Lock);
 
-    if (!CanRead()) return std::errno_t(EBADF);
-    if (!GetNode()) return std::errno_t(ENOENT);
-    if (GetNode()->IsDirectory()) return std::errno_t(EISDIR);
+    if (!CanRead()) return Error(EBADF);
+    if (!GetNode()) return Error(ENOENT);
+    if (GetNode()->IsDirectory()) return Error(EISDIR);
 
     // if (GetNode()->IsSocket())
 
@@ -75,10 +75,10 @@ ErrorOr<isize> FileDescriptor::Write(const void* data, isize bytes)
 {
     ScopedLock guard(m_Description->Lock);
 
-    if (!CanWrite()) return std::errno_t(EBADF);
+    if (!CanWrite()) return Error(EBADF);
 
     INode* node = GetNode();
-    if (!node) return std::errno_t(ENOENT);
+    if (!node) return Error(ENOENT);
     isize offset       = m_Description->Offset;
 
     isize bytesWritten = node->Write(data, offset, bytes);
@@ -86,26 +86,32 @@ ErrorOr<isize> FileDescriptor::Write(const void* data, isize bytes)
 
     return bytesWritten;
 }
+ErrorOr<const stat*> FileDescriptor::Stat() const
+{
+    INode* node = GetNode();
+    if (!node) return std::unexpected(Error(ENOENT));
+
+    return &node->GetStats();
+}
 
 isize FileDescriptor::Seek(i32 whence, off_t offset)
 {
     ScopedLock guard(m_Description->Lock);
     INode*     node = m_Description->Node;
-    if (IsPipe() || node->IsSocket() || node->IsFifo())
-        return std::errno_t(ESPIPE);
+    if (IsPipe() || node->IsSocket() || node->IsFifo()) return Error(ESPIPE);
 
     switch (whence)
     {
         case SEEK_SET:
-            if (offset < 0) return std::errno_t(EINVAL);
+            if (offset < 0) return Error(EINVAL);
             m_Description->Offset = offset;
             break;
         case SEEK_CUR:
         {
             isize newOffset = m_Description->Offset + offset;
             if (newOffset >= std::numeric_limits<off_t>::max())
-                return std::errno_t(EOVERFLOW);
-            if (newOffset < 0) return std::errno_t(EINVAL);
+                return Error(EOVERFLOW);
+            if (newOffset < 0) return Error(EINVAL);
             m_Description->Offset += offset;
             break;
         }
@@ -114,13 +120,13 @@ isize FileDescriptor::Seek(i32 whence, off_t offset)
             usize size = m_Description->Node->GetStats().st_size;
             if (static_cast<usize>(m_Description->Offset) + size
                 > std::numeric_limits<off_t>::max())
-                return std::errno_t(EOVERFLOW);
+                return Error(EOVERFLOW);
             m_Description->Offset
                 = m_Description->Node->GetStats().st_size + offset;
             break;
         }
 
-        default: return std::errno_t(EINVAL);
+        default: return Error(EINVAL);
     };
 
     return m_Description->Offset;
@@ -132,8 +138,8 @@ ErrorOr<i32> FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
     ScopedLock guard(m_Description->Lock);
 
     INode*     node = GetNode();
-    if (!node) return std::errno_t(ENOENT);
-    if (!node->IsDirectory()) return std::errno_t(ENOTDIR);
+    if (!node) return Error(ENOENT);
+    if (!node->IsDirectory()) return Error(ENOTDIR);
 
     DirectoryEntries& dirEntries = GetDirEntries();
     if (dirEntries.IsEmpty()) GenerateDirEntries();
@@ -143,10 +149,13 @@ ErrorOr<i32> FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
     for (const auto& entry : dirEntries) length += entry->d_reclen;
     length = std::min(maxSize, length);
 
-    if (dirEntries.Front()->d_reclen > maxSize) return std::errno_t(EINVAL);
+    if (dirEntries.Front()->d_reclen > maxSize) return Error(EINVAL);
 
-    usize bytes  = 0;
-    usize offset = 0;
+    bool end                    = dirEntries.ShouldRegenerate;
+    dirEntries.ShouldRegenerate = false;
+
+    usize bytes                 = 0;
+    usize offset                = 0;
 
     while (offset < length)
     {
@@ -154,9 +163,9 @@ ErrorOr<i32> FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
         offset += dirEntries.CopyAndPop(reinterpret_cast<u8*>(out) + offset);
     }
 
-    if (dirEntries.IsEmpty()) bytes = true;
+    if (dirEntries.IsEmpty()) dirEntries.ShouldRegenerate = true;
 
-    return bytes;
+    return end ? 0 : bytes;
 }
 bool FileDescriptor::GenerateDirEntries()
 {
@@ -164,7 +173,7 @@ bool FileDescriptor::GenerateDirEntries()
                 "FileDescriptor::GenerateDirEntries called without "
                 "m_Description->Lock being acquired!");
     INode* node = GetNode();
-    if (!node || !node->IsDirectory()) return std::errno_t(ENOTDIR);
+    if (!node || !node->IsDirectory()) return Error(ENOTDIR);
 
     DirectoryEntries& dirEntries = GetDirEntries();
     dirEntries.Clear();

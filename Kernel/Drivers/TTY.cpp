@@ -209,7 +209,6 @@ void TTY::EnqueueChar(u64 c)
 {
     ScopedLock guard(m_Lock);
 
-    if (!std::isgraph(c)) return;
     m_InputBuffer.push_back(c);
 }
 void TTY::Echo(u64 c)
