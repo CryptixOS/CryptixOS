@@ -96,6 +96,12 @@ bool Process::ValidateAddress(Pointer address, i32 accessMode)
     return false;
 }
 
+pid_t Process::SetSid()
+{
+    m_Credentials.sid = m_Credentials.pgid = m_Pid;
+    return m_Pid;
+}
+
 ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
     INode* parent = m_CWD;

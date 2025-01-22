@@ -65,8 +65,10 @@ class Process
     inline const Credentials& GetCredentials() const { return m_Credentials; }
     inline std::optional<i32> GetStatus() const { return m_Status; }
 
-    inline pid_t              GetPGid() const { return m_Credentials.pgid; }
     inline pid_t              GetSid() const { return m_Credentials.sid; }
+    inline pid_t              GetPGid() const { return m_Credentials.pgid; }
+
+    pid_t                     SetSid();
     inline void               SetPGid(pid_t pgid) { m_Credentials.pgid = pgid; }
 
     inline const std::vector<Process*>& GetChildren() const
@@ -75,6 +77,15 @@ class Process
     }
     inline const std::vector<Process*>& GetZombies() const { return m_Zombies; }
     inline const std::vector<Thread*>&  GetThreads() const { return m_Threads; }
+
+    inline bool IsGroupLeader() const { return m_Pid == m_Credentials.pgid; }
+    inline bool IsChild(Process* process) const
+    {
+        for (const auto& child : m_Children)
+            if (process == child) return true;
+
+        return false;
+    }
 
     inline INode* GetRootNode() const { return m_RootNode; }
     inline INode* GetCWD() const { return m_CWD; }

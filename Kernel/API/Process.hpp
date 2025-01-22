@@ -22,7 +22,9 @@ namespace Syscall::Process
     ErrorOr<gid_t> SysGetGid(Syscall::Arguments& args);
     ErrorOr<uid_t> SysGet_eUid(Syscall::Arguments& args);
     ErrorOr<gid_t> SysGet_eGid(Syscall::Arguments& args);
-    ErrorOr<gid_t> SysSet_pGid(Syscall::Arguments& args);
+    ErrorOr<pid_t> SysSet_pGid(Syscall::Arguments& args);
     ErrorOr<pid_t> SysGet_pPid(Syscall::Arguments& args);
-    ErrorOr<gid_t> SysGet_pGid(Syscall::Arguments& args);
+    ErrorOr<pid_t> SysSetSid(Syscall::Arguments& args);
+    ErrorOr<pid_t> SysGet_pGid(Syscall::Arguments& args);
+    ErrorOr<pid_t> SysGetSid(Syscall::Arguments& args);
 }; // namespace Syscall::Process

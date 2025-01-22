@@ -97,13 +97,16 @@ namespace Syscall::Process
     }
     ErrorOr<gid_t> SysSet_pGid(Syscall::Arguments& args)
     {
-        const pid_t    pid  = static_cast<pid_t>(args.Args[0]);
-        const pid_t    pgid = static_cast<pid_t>(args.Args[1]);
+        const pid_t    pid     = static_cast<pid_t>(args.Args[0]);
+        const pid_t    pgid    = static_cast<pid_t>(args.Args[1]);
 
+        class Process* current = ::Process::GetCurrent();
         class Process* process
             = pid ? Scheduler::GetProcess(pid) : ::Process::GetCurrent();
 
         if (!process) return Error(ESRCH);
+        if ((process != current && !current->IsChild(process)))
+            return Error(EPERM);
 
         if (pgid != 0)
         {
@@ -128,17 +131,41 @@ namespace Syscall::Process
 
         return current->GetParentPid();
     }
-    ErrorOr<gid_t> SysGet_pGid(Syscall::Arguments& args)
+    ErrorOr<pid_t> SysSetSid(Arguments&)
     {
-        pid_t          pid = args.Get<pid_t>(0);
+        class Process* current = ::Process::GetCurrent();
+        if (current->IsGroupLeader()) return Error(EPERM);
+
+        return current->SetSid();
+    }
+    ErrorOr<pid_t> SysGet_pGid(Arguments& args)
+    {
+        pid_t          pid            = args.Get<pid_t>(0);
 
         // FIXME(v1tr10l7): validate whether pid is a child of the calling
         // process
-        class Process* process
-            = pid ? Scheduler::GetProcess(pid) : ::Process::GetCurrent();
-        if (!process) return Error(EPERM);
+        class Process* currentProcess = ::Process::GetCurrent();
+
+        if (pid == 0) return currentProcess->GetPGid();
+        class Process* process = Scheduler::GetProcess(pid);
+        if (!process
+            || (process != currentProcess && !currentProcess->IsChild(process)))
+            return Error(EPERM);
 
         return process->GetPGid();
+    }
+    ErrorOr<pid_t> SysGetSid(Arguments& args)
+    {
+        pid_t          pid     = args.Get<pid_t>(0);
+
+        class Process* current = ::Process::GetCurrent();
+        if (pid == 0) return current->GetSid();
+
+        class Process* process = Scheduler::GetProcess(pid);
+        if (!process) return Error(ESRCH);
+
+        if (current->GetSid() != process->GetSid()) return Error(EPERM);
+        return process->GetSid();
     }
 
 }; // namespace Syscall::Process
