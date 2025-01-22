@@ -47,5 +47,7 @@ namespace Arch
         Panic("Shouldn't Reach");
         CtosUnreachable();
     }
-    void Pause() { __asm__ volatile("pause"); }
+    void  Pause() { __asm__ volatile("pause"); }
+
+    usize GetEpoch() { return RTC::CurrentTime(); }
 }; // namespace Arch

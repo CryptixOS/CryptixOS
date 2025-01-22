@@ -33,6 +33,8 @@ srcs += files(
   'Scheduler/Process.cpp',
   'Scheduler/Scheduler.cpp',
   'Scheduler/Thread.cpp',
+    
+  'Time/Time.cpp',
 
   'Utility/ELF.cpp',
   'Utility/ICxxAbi.cpp',
@@ -43,6 +45,7 @@ srcs += files(
   'Utility/Ubsan.cpp',
 
   'VFS/FileDescriptor.cpp',
+  'VFS/FileDescriptorTable.cpp',
   'VFS/INode.cpp',
   'VFS/VFS.cpp',
   'VFS/DevTmpFs/DevTmpFs.cpp',

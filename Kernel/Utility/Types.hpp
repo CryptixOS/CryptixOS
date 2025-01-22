@@ -50,7 +50,7 @@ struct Pointer
     {
     }
 
-    Pointer(void* m_Pointer)
+    Pointer(const void* m_Pointer)
         : m_Pointer(reinterpret_cast<std::uintptr_t>(m_Pointer))
     {
     }

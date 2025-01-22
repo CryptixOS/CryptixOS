@@ -11,7 +11,6 @@
 
 #include <Utility/Spinlock.hpp>
 
-#include <cctype>
 #include <deque>
 #include <vector>
 
@@ -46,6 +45,8 @@ class TTY : public Device
     gid_t                    m_Pgid       = 100;
     std::deque<char>         m_InputBuffer;
     std::deque<std::string>  m_LineQueue;
+
+    void                     SendSignal(i32 signal);
 
     inline bool IsCanonicalMode() const { return m_Termios.c_lflag & ICANON; }
     inline bool SignalsEnabled() const { return m_Termios.c_lflag & ISIG; }

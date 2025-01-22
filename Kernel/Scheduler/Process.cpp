@@ -15,52 +15,78 @@
 
 inline usize AllocatePid()
 {
-    static Spinlock pidLock;
-    ScopedLock      guard(pidLock);
-    for (pid_t i = 0; i < std::numeric_limits<pid_t>::max(); i++)
-    {
-        if (!Scheduler::GetProcessList().contains(i)) return i;
-    }
+    static Spinlock lock;
+    ScopedLock      guard(lock);
+    for (pid_t i = 1; i < std::numeric_limits<pid_t>::max(); i++)
+        if (!Scheduler::ValidatePid(i)) return i;
     return -1;
 }
 
-Process::Process(std::string_view name, PrivilegeLevel ring)
-    : m_Name(name)
-    , m_Ring(ring)
-{
-    m_NextTid = m_Pid = AllocatePid();
-    if (ring == PrivilegeLevel::ePrivileged) PageMap = VMM::GetKernelPageMap();
+Credentials Credentials::s_Root = {
+    .uid  = 0,
+    .gid  = 0,
+    .euid = 0,
+    .egid = 0,
+    .suid = 0,
+    .sgid = 0,
+    .sid  = 0,
+    .pgid = 0,
+};
 
-    Scheduler::GetProcessList()[m_Pid] = this;
-    m_CWD                              = VFS::GetRootNode();
-}
-Process::Process(std::string_view name, pid_t pid)
-    : m_Pid(pid)
+Process::Process(Process* parent, std::string_view name,
+                 const Credentials& creds)
+    : m_Parent(parent)
+    , m_Pid(AllocatePid())
     , m_Name(name)
+    , m_Credentials(creds)
+    , m_Ring(PrivilegeLevel::eUnprivileged)
+    , m_NextTid(m_Pid)
+
 {
-    Scheduler::GetProcessList()[m_Pid] = this;
-    m_CWD                              = VFS::GetRootNode();
+    m_CWD = VFS::GetRootNode();
+    m_FdTable.OpenStdioStreams();
 }
 
 Process* Process::GetCurrent()
 {
     Thread* currentThread = CPU::GetCurrentThread();
-    return currentThread->parent;
-}
 
-void Process::InitializeStreams()
+    return currentThread ? currentThread->parent : nullptr;
+}
+Process* Process::CreateKernelProcess()
 {
-    m_FdTable.Clear();
-    INode* currentTTY
-        = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), "/dev/tty"));
+    Process* kernelProcess = Scheduler::GetKernelProcess();
+    if (kernelProcess) goto ret;
 
-    m_FdTable.Insert(new FileDescriptor(currentTTY, 0, FileAccessMode::eRead),
-                     0);
-    m_FdTable.Insert(new FileDescriptor(currentTTY, 0, FileAccessMode::eWrite),
-                     1);
-    m_FdTable.Insert(new FileDescriptor(currentTTY, 0, FileAccessMode::eWrite),
-                     2);
+    kernelProcess                = new Process;
+    kernelProcess->m_Pid         = 0;
+    kernelProcess->m_Name        = "TheOverlord";
+    kernelProcess->PageMap       = VMM::GetKernelPageMap();
+    kernelProcess->m_Credentials = Credentials::s_Root;
+    kernelProcess->m_Ring        = PrivilegeLevel::ePrivileged;
+    kernelProcess->m_NextTid     = 0;
+    kernelProcess->m_UMask       = 0;
+
+    // FIXME(v1tr10l7): What about m_AddressSpace?
+
+ret:
+    return kernelProcess;
 }
+Process* Process::CreateIdleProcess()
+{
+    static std::atomic<pid_t> idlePids(-1);
+
+    std::string               name = "Idle Process for CPU: ";
+    name += std::to_string(CPU::GetCurrentID());
+
+    Process* idle = new Process;
+    idle->m_Pid   = idlePids--;
+    idle->m_Name  = name;
+    idle->PageMap = VMM::GetKernelPageMap();
+
+    return idle;
+}
+
 bool Process::ValidateAddress(Pointer address, i32 accessMode)
 {
     // TODO(v1tr10l7): Validate access mode
@@ -102,7 +128,7 @@ i32 Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
 i32 Process::Exec(const char* path, char** argv, char** envp)
 {
     m_FdTable.Clear();
-    InitializeStreams();
+    m_FdTable.OpenStdioStreams();
 
     m_Name = path;
     Arch::VMM::DestroyPageMap(PageMap);
@@ -110,8 +136,8 @@ i32 Process::Exec(const char* path, char** argv, char** envp)
     PageMap = new class PageMap();
 
     static ELF::Image program, ld;
-    AssertFmt(program.Load(path, PageMap, m_AddressSpace),
-              "Failed to load the program at '{}'", path);
+    if (!program.Load(path, PageMap, m_AddressSpace)) return Error(ENOEXEC);
+
     std::string_view ldPath = program.GetLdPath();
     if (!ldPath.empty())
         Assert(ld.Load(ldPath, PageMap, m_AddressSpace, 0x40000000));
@@ -161,11 +187,10 @@ Process* Process::Fork()
     Thread* currentThread = CPU::GetCurrentThread();
     Assert(currentThread && currentThread->parent == this);
 
-    Process* newProcess    = new Process(m_Name, m_Ring);
-    newProcess->m_Parent   = this;
+    Process*       newProcess = new Process(this, m_Name, m_Credentials);
 
-    class PageMap* pageMap = new class PageMap();
-    newProcess->PageMap    = pageMap;
+    class PageMap* pageMap    = new class PageMap();
+    newProcess->PageMap       = pageMap;
     newProcess->m_CWD
         = m_CWD ? m_CWD->Reduce(false) : VFS::GetRootNode()->Reduce(false);
 
@@ -214,7 +239,7 @@ i32 Process::Exit(i32 code)
     m_FdTable.Clear();
     for (Thread* thread : m_Threads) thread->state = ThreadState::eExited;
 
-    Scheduler::GetProcessList().erase(m_Pid);
+    Scheduler::RemoveProcess(m_Pid);
 
     m_Status = code;
 

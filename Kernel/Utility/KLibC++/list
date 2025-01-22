@@ -1,0 +1,160 @@
+/*
+ * Created by v1tr10l7 on 22.01.2025.
+ * Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
+ *
+ * SPDX-License-Identifier: GPL-3
+ */
+#pragma once
+
+#include <memory>
+#include <limits>
+
+namespace std
+{
+    template <typename T, typename Allocator = std::allocator<T>>
+    class list
+    {
+        struct node
+        {
+            node* _prev;
+            node* _next;
+            T _value;
+        };
+      public:
+            using value_type                = T;
+            using allocator_type            = Allocator;
+            using size_type                 = std::size_t;
+            using difference_type           = std::ptrdiff_t;
+            using reference                 = value_type&;
+            using const_reference           = const value_type&;
+            using pointer                   = std::allocator_traits<Allocator>::pointer;
+            using const_pointer             = std::allocator_traits<Allocator>::const_pointer;
+            using iterator                  = node*;
+            using const_iterator            = node* const;
+            using reverse_iterator          = std::reverse_iterator<iterator>;
+            using const_reverse_iterator    = std::reverse_iterator<const_iterator>;
+
+            list() : list(Allocator()) { }
+            explicit list(const Allocator& alloc)
+                : _allocator(alloc) { }
+            explicit list(size_type count, const Allocator& alloc = Allocator())
+                : _allocator(alloc) 
+            {
+                resize(count);
+            }
+            list(size_type count, const T& value, const Allocator& alloc = Allocator())
+                : _allocator(alloc)
+            {
+                resize(count, value);
+            }
+            template<typename InputIt>
+            list(InputIt first, InputIt last, const Allocator& alloc = Allocator()) 
+                : _allocator(alloc)
+            {
+                while (first < last)
+                    push_back(*first++);
+            }
+            list(const list& other)
+                : _allocator(other._allocator), _data(nullptr), _last(other._last), _size(other._size)
+            {
+                for (const auto& val : other)
+                    push_back(val);
+            }
+            list(list&& other)
+                : _allocator(other._allocator), _data(other._data), _last(other._last), _size(other._size)
+            {
+                other._data = nullptr;
+                other._last = nullptr;
+                other._size = 0;
+            }
+            list(std::initializer_list<T> init, const Allocator& alloc = Allocator())
+                : _allocator(alloc)
+            {
+                for (const auto& val : init)
+                    push_back(val);
+            }
+            ~list()
+            {
+                node* current = _data;
+                while (current)
+                {
+                    node* next = current->_next;
+                    delete current;
+                    current = next;
+                }
+                
+                _data = nullptr;
+                _size = 0;
+            }
+
+            list& operator=(const list& other)
+            {
+                clear();
+                for (const auto& val : other)
+                    push_back(val);
+
+                return *this;
+            }
+            list& operator=(list&& other)
+            {
+                clear();
+                _data = other._data;
+                _last = other._last;
+                _size = other._size;
+                
+                other._data = nullptr;
+                other._last = nullptr;
+                other._size = 0;
+
+                return *this;
+            }
+            list& operator=(std::initializer_list<value_type> ilist)  
+            {
+                clear();
+                for (const auto& val : ilist)
+                    push_back(val);
+
+                return *this;
+            }
+
+        
+            reference front() { return _data->_value; }
+            const_reference front() const { return _data->_value; }
+            
+            reference back() { return _last->_value; }
+            const_reference back() const { return _last->_value; }
+
+            bool empty() const { return _size == 0; }
+            size_type size() const noexcept { return _size; }
+            size_type max_size() const noexcept { return std::numeric_limits<difference_type>::max(); }
+            
+
+            void clear()
+            {
+                node* current = _data;
+                while (current && _size > 0)
+                {
+                    node* next = current->_next;
+                    delete current;
+                    current = next;
+
+                    --_size;
+                }
+
+                _data = nullptr;
+                _last = nullptr;
+            }
+            void push_back(const T& value);
+
+            void resize(size_type count);
+            void resize(size_type count, const value_type& value);
+        
+
+      private:
+            Allocator _allocator{};
+            node* _data = nullptr;
+            node* _last = nullptr;
+            size_type _size = 0;
+            
+    };
+};

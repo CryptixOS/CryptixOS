@@ -217,15 +217,21 @@ namespace Syscall::VFS
     }
     ErrorOr<i32> SysGetCwd(Arguments& args)
     {
-        class Process*   current = CPU::GetCurrentThread()->parent;
+        char*    buffer  = args.Get<char*>(0);
+        usize    size    = args.Get<usize>(1);
 
-        char*            buffer  = reinterpret_cast<char*>(args.Args[0]);
-        usize            size    = args.Args[1];
+        Process* process = CPU::GetCurrentThread()->parent;
 
-        std::string_view cwdPath = current->GetCWD()->GetPath();
-        usize            len     = std::min(size, cwdPath.length());
-        cwdPath.copy(buffer, len);
+        if (!buffer || size == 0) return Error(EINVAL);
+        if (!process->ValidateAddress(buffer, PROT_READ)) return Error(EFAULT);
 
+        INode* cwd = process->GetCWD();
+        if (!cwd) return Error(ENOENT);
+
+        std::string_view cwdPath = cwd->GetPath();
+        if (size < cwdPath.length()) return Error(ERANGE);
+
+        cwdPath.copy(buffer, cwdPath.length());
         return 0;
     }
     ErrorOr<i32> SysChDir(Arguments& args)
@@ -253,6 +259,34 @@ namespace Syscall::VFS
 
         if (!node->IsDirectory()) return std::errno_t(ENOTDIR);
         current->m_CWD = node;
+
+        return 0;
+    }
+    ErrorOr<i32> SysMkDir(Syscall::Arguments& args)
+    {
+        PathView path    = args.Get<const char*>(0);
+        mode_t   mode    = args.Get<mode_t>(1);
+
+        // TODO(v1tr10l7): validate whether user has appriopriate permissions
+        Process* current = Process::GetCurrent();
+
+        if (!current->ValidateAddress(reinterpret_cast<uintptr_t>(path.data()),
+                                      PROT_READ))
+            return Error(EFAULT);
+        if (!Path::ValidateLength(path)) return Error(ENAMETOOLONG);
+
+        INode* parent        = Path::IsAbsolute(path) ? current->GetRootNode()
+                                                      : current->GetCWD();
+        auto [_, node, name] = VFS::ResolvePath(parent, path);
+
+        mode &= ~current->GetUMask() & 0777;
+        if (!parent) return Error(ENOENT);
+        if (!parent->IsDirectory()) return Error(ENOTDIR);
+
+        if (node) return Error(EEXIST);
+
+        node = VFS::CreateNode(parent, path, mode | S_IFDIR);
+        if (!node) return Error(errno);
 
         return 0;
     }
@@ -285,6 +319,46 @@ namespace Syscall::VFS
         mode_t   mode    = static_cast<mode_t>(args.Args[3]);
 
         return current->OpenAt(dirFd, path, flags, mode);
+    }
+    ErrorOr<i32> SysMkDirAt(Syscall::Arguments& args)
+    {
+        i32      dirFd   = args.Get<i32>(0);
+        PathView path    = args.Get<const char*>(1);
+        mode_t   mode    = args.Get<mode_t>(2);
+
+        Process* process = CPU::GetCurrentThread()->parent;
+        if (!process->ValidateAddress(reinterpret_cast<uintptr_t>(path.data()),
+                                      PROT_READ))
+            return Error(EFAULT);
+        if (!Path::ValidateLength(path)) return Error(ENAMETOOLONG);
+
+        INode*          parent = nullptr;
+        FileDescriptor* fd     = process->GetFileHandle(dirFd);
+
+        if (!Path::IsAbsolute(path))
+        {
+            if (dirFd != AT_FDCWD && !fd) return Error(EBADF);
+
+            INode* node = fd->GetNode();
+            if (!node) return Error(ENOENT);
+            parent = node->GetParent();
+        }
+
+        if (!parent) return Error(ENOENT);
+        if (!parent->IsDirectory()) return Error(ENOTDIR);
+        (void)mode;
+
+        mode &= ~process->GetUMask() & 0777;
+        if (!parent) return Error(ENOENT);
+        if (!parent->IsDirectory()) return Error(ENOTDIR);
+
+        INode* node = std::get<1>(VFS::ResolvePath(parent, path));
+        if (node) return Error(EEXIST);
+
+        node = VFS::CreateNode(parent, path, mode | S_IFDIR);
+        if (!node) return Error(errno);
+
+        return 0;
     }
     ErrorOr<i32> SysFStatAt(Arguments& args)
     {

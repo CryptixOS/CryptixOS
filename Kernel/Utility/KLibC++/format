@@ -9,7 +9,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-field-initializers"
 #pragma clang diagnostic ignored "-Wunused-parameter"
-#include "fmt/core.h"
+#include <fmt/core.h>
 #pragma clang diagnostic pop
 
 namespace std

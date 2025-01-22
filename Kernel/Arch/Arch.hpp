@@ -22,4 +22,6 @@ namespace Arch
 
     __attribute__((noreturn)) void Halt();
     void                           Pause();
+
+    usize                          GetEpoch();
 }; // namespace Arch

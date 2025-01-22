@@ -48,10 +48,10 @@ void kernelThread()
     MemoryDevices::Initialize();
 
     LogTrace("Loading user process...");
-    Process* userProcess
-        = new Process("TestUserProcess", PrivilegeLevel::eUnprivileged);
+    Process* kernelProcess = Scheduler::GetKernelProcess();
+    Process* userProcess   = Scheduler::CreateProcess(
+        kernelProcess, "/usr/sbin/init", Credentials::s_Root);
     userProcess->PageMap = VMM::GetKernelPageMap();
-    userProcess->InitializeStreams();
 
     std::vector<std::string_view> argv;
     argv.push_back("/usr/sbin/init");

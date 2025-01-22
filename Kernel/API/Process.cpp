@@ -97,13 +97,27 @@ namespace Syscall::Process
     }
     ErrorOr<gid_t> SysSet_pGid(Syscall::Arguments& args)
     {
-        const pid_t pid  = static_cast<pid_t>(args.Args[0]);
-        const pid_t pgid = static_cast<pid_t>(args.Args[1]);
+        const pid_t    pid  = static_cast<pid_t>(args.Args[0]);
+        const pid_t    pgid = static_cast<pid_t>(args.Args[1]);
 
-        CtosUnused(pid);
-        CtosUnused(pgid);
+        class Process* process
+            = pid ? Scheduler::GetProcess(pid) : ::Process::GetCurrent();
 
-        // TODO(v1tr10l7): Set the process group id
+        if (!process) return Error(ESRCH);
+
+        if (pgid != 0)
+        {
+            if (pgid < 0) return Error(EINVAL);
+
+            class Process* groupLeader = Scheduler::GetProcess(pgid);
+            if (!groupLeader || process->GetSid() != groupLeader->GetSid())
+                return Error(EPERM);
+
+            process->SetPGid(pgid);
+            return 0;
+        }
+
+        process->SetPGid(process->GetPid());
         return 0;
     }
 
@@ -116,9 +130,15 @@ namespace Syscall::Process
     }
     ErrorOr<gid_t> SysGet_pGid(Syscall::Arguments& args)
     {
-        // TODO(v1tr10l7): SysGet_pGid;
+        pid_t          pid = args.Get<pid_t>(0);
 
-        return 0;
+        // FIXME(v1tr10l7): validate whether pid is a child of the calling
+        // process
+        class Process* process
+            = pid ? Scheduler::GetProcess(pid) : ::Process::GetCurrent();
+        if (!process) return Error(EPERM);
+
+        return process->GetPGid();
     }
 
 }; // namespace Syscall::Process

@@ -4,6 +4,9 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Posix/signal.h>
+#include <API/Posix/sys/ttydefaults.h>
+
 #include <Arch/CPU.hpp>
 
 #include <Drivers/TTY.hpp>
@@ -16,7 +19,7 @@
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/VFS.hpp>
 
-#include <API/Posix/sys/ttydefaults.h>
+#include <cctype>
 
 std::vector<TTY*> TTY::s_TTYs{};
 TTY*              TTY::s_CurrentTTY = nullptr;
@@ -57,6 +60,14 @@ TTY::TTY(Terminal* terminal, usize minor)
 void TTY::PutChar(char c)
 {
     if (m_Termios.c_iflag & ISTRIP) c &= 0x7F;
+
+    if ((m_Termios.c_lflag & ISIG) == ISIG)
+    {
+        if (c == m_Termios.c_cc[VINFO]) return SendSignal(SIGINFO);
+        if (c == m_Termios.c_cc[VINTR]) return SendSignal(SIGINT);
+        if (c == m_Termios.c_cc[VQUIT]) return SendSignal(SIGQUIT);
+        if (c == m_Termios.c_cc[VSUSP]) return SendSignal(SIGTSTP);
+    }
 
     if (c == '\r')
     {
@@ -203,6 +214,11 @@ void TTY::Initialize()
     }
 
     LogInfo("TTY: Initialized");
+}
+
+void TTY::SendSignal(i32 signal)
+{
+    if (m_Pgid < 0) return;
 }
 
 void TTY::EnqueueChar(u64 c)

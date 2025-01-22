@@ -10,7 +10,7 @@
 #include <system_error>
 
 #define _HandleError(error_code, error_message) Panic(error_message);
-#include "Common.hpp"
+#include <Common.hpp>
 
 namespace Arch
 {

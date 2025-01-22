@@ -43,6 +43,7 @@ constexpr usize VDISCARD   = 13;
 constexpr usize VWERASE    = 14;
 constexpr usize VLNEXT     = 15;
 constexpr usize VEOL2      = 16;
+constexpr usize VINFO      = 17;
 
 // c_iflag
 // ignore break condition

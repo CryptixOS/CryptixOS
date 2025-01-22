@@ -53,7 +53,6 @@ INode* TmpFs::Symlink(INode* parent, std::string_view name,
     auto node    = new TmpFsINode(parent, name, this, 0777 | S_IFLNK);
     node->target = target;
 
-    LogInfo("TmpFs: Created symlink '{}' -> '{}'", name, target);
     return node;
 }
 

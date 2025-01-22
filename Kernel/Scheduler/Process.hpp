@@ -15,7 +15,6 @@
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
 
-#include <cerrno>
 #include <expected>
 #include <vector>
 
@@ -27,25 +26,16 @@ enum class PrivilegeLevel
 
 struct Credentials
 {
-    uid_t uid;
-    gid_t gid;
-    uid_t euid;
-    gid_t egid;
-    uid_t suid;
-    gid_t sgid;
-    pid_t sid;
-    gid_t pgid;
-};
+    uid_t              uid;
+    gid_t              gid;
+    uid_t              euid;
+    gid_t              egid;
+    uid_t              suid;
+    gid_t              sgid;
+    pid_t              sid;
+    gid_t              pgid;
 
-constexpr Credentials ROOT_CREDENTIALS = {
-    .uid  = 0,
-    .gid  = 0,
-    .euid = 0,
-    .egid = 0,
-    .suid = 0,
-    .sgid = 0,
-    .sid  = 0,
-    .pgid = 0,
+    static Credentials s_Root;
 };
 
 struct Thread;
@@ -54,12 +44,12 @@ class Process
 {
   public:
     Process() = default;
-    Process(std::string_view name, PrivilegeLevel ring);
-    Process(std::string_view name, pid_t pid);
+    Process(Process* parent, std::string_view name, const Credentials& creds);
 
     static Process* GetCurrent();
+    static Process* CreateKernelProcess();
+    static Process* CreateIdleProcess();
 
-    void            InitializeStreams();
     bool            ValidateAddress(const Pointer address, i32 accessMode);
 
     inline pid_t    GetParentPid() const
@@ -74,6 +64,10 @@ class Process
     inline std::string_view   GetName() const { return m_Name; }
     inline const Credentials& GetCredentials() const { return m_Credentials; }
     inline std::optional<i32> GetStatus() const { return m_Status; }
+
+    inline pid_t              GetPGid() const { return m_Credentials.pgid; }
+    inline pid_t              GetSid() const { return m_Credentials.sid; }
+    inline void               SetPGid(pid_t pgid) { m_Credentials.pgid = pgid; }
 
     inline const std::vector<Process*>& GetChildren() const
     {

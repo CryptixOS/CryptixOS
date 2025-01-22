@@ -6,6 +6,7 @@
  */
 #include <Memory/KernelHeap.hpp>
 
+#include <Scheduler/Process.hpp>
 #include <Utility/Math.hpp>
 
 #include <VFS/TmpFs/TmpFs.hpp>
@@ -15,18 +16,29 @@ TmpFsINode::TmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
                        mode_t mode)
     : INode(parent, name, fs)
 {
-    m_Stats.st_size    = 0;
-    m_Stats.st_blocks  = 0;
-    m_Stats.st_blksize = 512;
+    Process* process   = Process::GetCurrent();
+
     m_Stats.st_dev     = fs->GetDeviceID();
     m_Stats.st_ino     = fs->GetNextINodeIndex();
-    m_Stats.st_mode    = mode;
     m_Stats.st_nlink   = 1;
+    m_Stats.st_mode    = mode;
+    m_Stats.st_uid     = process ? process->GetCredentials().euid : 0;
+    m_Stats.st_gid     = process ? process->GetCredentials().egid : 0;
+    m_Stats.st_rdev    = 0;
+    m_Stats.st_size    = 0;
+    m_Stats.st_blksize = 512;
+    m_Stats.st_blocks  = 0;
 
     // TODO(v1tr10l7): Set to realtime
     m_Stats.st_atim    = {};
-    m_Stats.st_ctim    = {};
     m_Stats.st_mtim    = {};
+    m_Stats.st_ctim    = {};
+
+    if (parent && parent->GetStats().st_mode & S_ISGID)
+    {
+        m_Stats.st_gid = parent->GetStats().st_gid;
+        m_Stats.st_mode |= S_ISGID;
+    }
 
     if (S_ISREG(mode))
     {

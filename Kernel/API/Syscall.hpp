@@ -53,6 +53,7 @@ namespace Syscall
         eGetCwd       = 79,
         eChDir        = 80,
         eFChDir       = 81,
+        eMkDir        = 83,
         eGetTimeOfDay = 96,
         eGetUid       = 102,
         eGetGid       = 104,
@@ -67,6 +68,7 @@ namespace Syscall
         eGetDents64   = 217,
         ePanic        = 255,
         eOpenAt       = 257,
+        eMkDirAt      = 258,
         eFStatAt      = 262,
         eDup3         = 292,
     };

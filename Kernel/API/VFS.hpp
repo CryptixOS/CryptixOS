@@ -31,10 +31,12 @@ namespace Syscall::VFS
     ErrorOr<i32>   SysGetCwd(Syscall::Arguments& args);
     ErrorOr<i32>   SysChDir(Syscall::Arguments& args);
     ErrorOr<i32>   SysFChDir(Syscall::Arguments& args);
+    ErrorOr<i32>   SysMkDir(Syscall::Arguments& args);
 
     [[clang::no_sanitize("alignment")]]
     ErrorOr<i32> SysGetDents64(Syscall::Arguments& args);
     ErrorOr<i32> SysOpenAt(Syscall::Arguments& args);
+    ErrorOr<i32> SysMkDirAt(Syscall::Arguments& args);
     ErrorOr<i32> SysFStatAt(Syscall::Arguments& args);
 
     ErrorOr<i32> SysDup3(Syscall::Arguments& args);

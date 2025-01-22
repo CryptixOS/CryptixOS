@@ -62,11 +62,9 @@ namespace PIT
     {
         s_CurrentMode     = mode;
 
-        // reloadValue = (ms×frequency) / 3000
         usize reloadValue = (ms * BASE_FREQUENCY) / 3000;
         SetReloadValue(reloadValue);
         IO::Out<byte>(COMMAND, CHANNEL0_DATA | SEND_WORD | mode);
-        // InterruptManager::Unmask(s_TimerVector);
     }
     void Stop()
     {

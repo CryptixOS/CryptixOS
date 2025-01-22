@@ -14,8 +14,8 @@
 #include <Memory/PMM.hpp>
 
 #include <Scheduler/Process.hpp>
-#include <Utility/Spinlock.hpp>
 #include <Scheduler/Thread.hpp>
+#include <Utility/Spinlock.hpp>
 
 #include <deque>
 
@@ -32,7 +32,61 @@ namespace Scheduler
 
         std::deque<Thread*>                 s_ExecutionQueue;
 
-        Thread*                             GetNextThread(usize cpuID)
+        struct ThreadQueue
+        {
+            Thread* Front()
+            {
+                ScopedLock guard(Lock);
+                return Queue.front();
+            }
+            Thread* Back()
+            {
+                ScopedLock guard(Lock);
+                return Queue.back();
+            }
+
+            void PushBack(Thread* t)
+            {
+                ScopedLock guard(Lock);
+                Queue.push_back(t);
+            }
+            void PushFront(Thread* t)
+            {
+                ScopedLock guard(Lock);
+                Queue.push_front(t);
+            }
+
+            void PopBack()
+            {
+                ScopedLock guard(Lock);
+                Queue.pop_back();
+            }
+            void PopFront()
+            {
+                ScopedLock guard(Lock);
+                Queue.pop_front();
+            }
+
+            Thread* PopFrontElement()
+            {
+                ScopedLock guard(Lock);
+                return Queue.pop_front_element();
+            }
+            Thread* PopBackElement()
+            {
+                ScopedLock guard(Lock);
+                return Queue.pop_back_element();
+            }
+
+            Spinlock            Lock;
+            std::deque<Thread*> Queue;
+        };
+
+        // ThreadQueue s_WaitQueue;
+        // ThreadQueue s_ReadyQueue;
+        // ThreadQueue s_BlockedQueue;
+
+        Thread* GetNextThread(usize cpuID)
         {
             ScopedLock guard(s_Lock);
             if (s_ExecutionQueue.empty()) return nullptr;
@@ -46,22 +100,15 @@ namespace Scheduler
 
     void Initialize()
     {
-        s_KernelProcess
-            = new Process("Kernel Process", PrivilegeLevel::ePrivileged);
+        s_KernelProcess = Process::CreateKernelProcess();
         LogInfo("Scheduler: Kernel process created");
         LogInfo("Scheduler: Initialized");
     }
     void PrepareAP(bool start)
     {
-        static std::atomic<pid_t> idlePids(-1);
+        Process* process    = Process::CreateIdleProcess();
 
-        std::string               name = "Idle Process for CPU: ";
-        name += std::to_string(CPU::GetCurrentID());
-
-        Process* process = new Process(name, idlePids--);
-        process->PageMap = VMM::GetKernelPageMap();
-
-        auto idleThread  = new Thread(
+        auto     idleThread = new Thread(
             process, reinterpret_cast<uintptr_t>(Arch::Halt), false);
         idleThread->state       = ThreadState::eReady;
         CPU::GetCurrent()->Idle = idleThread;
@@ -87,14 +134,32 @@ namespace Scheduler
     }
 
     Process* GetKernelProcess() { return s_KernelProcess; }
-    std::unordered_map<pid_t, Process*>& GetProcessList()
+
+    Process* CreateProcess(Process* parent, std::string_view name,
+                           const Credentials& creds)
     {
-        return s_Processes;
+        auto       proc = new Process(parent, name, creds);
+
+        ScopedLock guard(s_ProcessListLock);
+        s_Processes[proc->GetPid()] = proc;
+
+        return proc;
     }
-    bool ProcessExist(pid_t pid)
+    void RemoveProcess(pid_t pid)
     {
         ScopedLock guard(s_ProcessListLock);
-        return s_Processes.find(pid) != s_Processes.end();
+        s_Processes.erase(pid);
+    }
+
+    bool ValidatePid(pid_t pid)
+    {
+        ScopedLock guard(s_ProcessListLock);
+        return s_Processes.contains(pid);
+    }
+    Process* GetProcess(pid_t pid)
+    {
+        ScopedLock guard(s_ProcessListLock);
+        return s_Processes[pid];
     }
 
     Thread* CreateKernelThread(uintptr_t pc, uintptr_t arg, usize runningOn)
@@ -151,8 +216,7 @@ namespace Scheduler
             CPU::SaveThread(currentThread, ctx);
         }
 
-        // CPU::Reschedule(newThread->parent->m_Quantum);
-        CPU::Reschedule(2000);
+        CPU::Reschedule(newThread->parent->m_Quantum);
         CPU::LoadThread(newThread, ctx);
 
         if (currentThread && currentThread->state == ThreadState::eKilled

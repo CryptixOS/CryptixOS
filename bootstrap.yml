@@ -15,6 +15,7 @@ imports:
   - file: host-recipes/core-tools.yml
   - file: recipes/core-apps.yml
   - file: recipes/core-libs.yml
+  - file: recipes/misc-apps.yml
   - file: source-recipes/core.yml
 
 packages:

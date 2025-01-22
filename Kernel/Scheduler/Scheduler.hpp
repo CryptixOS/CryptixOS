@@ -7,8 +7,7 @@
 #pragma once
 
 #include <API/UnixTypes.hpp>
-
-#include <unordered_map>
+#include <Scheduler/Process.hpp>
 
 class Process;
 struct Thread;
@@ -18,15 +17,20 @@ namespace Scheduler
     void PrepareAP(bool start = false);
 
     [[noreturn]]
-    void                                 Yield();
+    void     Yield();
 
-    Process*                             GetKernelProcess();
-    std::unordered_map<pid_t, Process*>& GetProcessList();
-    bool                                 ProcessExist(pid_t pid);
+    Process* GetKernelProcess();
 
-    Thread* CreateKernelThread(uintptr_t pc, uintptr_t arg,
-                               usize runningOn = -1);
+    Process* CreateProcess(Process* parent, std::string_view name,
+                           const Credentials& creds);
+    void     RemoveProcess(pid_t pid);
 
-    void    EnqueueThread(Thread* thread);
-    void    EnqueueNotReady(Thread* thread);
+    bool     ValidatePid(pid_t pid);
+    Process* GetProcess(pid_t pid);
+
+    Thread*  CreateKernelThread(uintptr_t pc, uintptr_t arg,
+                                usize runningOn = -1);
+
+    void     EnqueueThread(Thread* thread);
+    void     EnqueueNotReady(Thread* thread);
 }; // namespace Scheduler

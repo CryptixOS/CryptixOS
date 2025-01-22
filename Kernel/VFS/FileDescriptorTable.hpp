@@ -17,35 +17,11 @@ class FileDescriptorTable
   public:
     FileDescriptorTable() = default;
 
-    i32 Insert(FileDescriptor* descriptor, i32 desired = -1)
-    {
-        ScopedLock guard(m_Lock);
-        i32        fdNum = m_NextIndex;
-        if (desired >= 0 && m_Table.find(desired) == m_Table.end())
-            fdNum = desired;
-        m_Table[fdNum] = descriptor;
+    i32         Insert(FileDescriptor* descriptor, i32 desired = -1);
+    i32         Erase(i32 fdNum);
 
-        ++m_NextIndex;
-        return fdNum;
-    }
-    i32 Erase(i32 fdNum)
-    {
-        ScopedLock      guard(m_Lock);
-        FileDescriptor* fd = GetFd(fdNum);
-        if (!fd) return_err(-1, EBADF);
-
-        delete fd;
-        m_Table.erase(fdNum);
-
-        return 0;
-    }
-    void Clear()
-    {
-        for (const auto& fd : m_Table) delete fd.second;
-
-        m_Table.clear();
-        m_NextIndex = 0;
-    }
+    void        OpenStdioStreams();
+    void        Clear();
 
     inline bool IsValid(i32 fd) const
     {
@@ -66,5 +42,5 @@ class FileDescriptorTable
   private:
     Spinlock         m_Lock;
     TableType        m_Table;
-    std::atomic<i32> m_NextIndex = 0;
+    std::atomic<i32> m_NextIndex = 3;
 };

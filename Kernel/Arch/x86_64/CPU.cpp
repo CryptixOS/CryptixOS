@@ -488,7 +488,7 @@ namespace CPU
 
         *ctx = thread->ctx;
     }
-    void Reschedule(usize ms) { PIT::Start(PIT::Mode::SQUARE_WAVE, 100); }
+    void Reschedule(usize ms) { PIT::Start(PIT::Mode::ONESHOT, 100); }
 
     bool EnableSSE()
     {

@@ -34,6 +34,7 @@ namespace VFS
     bool                 Unmount(INode* parent, PathView path, i32 flags = 0);
 
     INode*               CreateNode(INode* parent, PathView path, mode_t mode);
+    ErrorOr<i32>         MkDir(INode* parent, mode_t mode);
     ErrorOr<const stat*> Stat(i32 dirFd, std::string_view path, i32 flags);
 
     INode* MkNod(INode* parent, std::string_view path, mode_t mode, dev_t dev);
