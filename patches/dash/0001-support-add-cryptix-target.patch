@@ -1,19 +1,12 @@
-From 9536dca1c70c8199a28a9591672fe129b4e11954 Mon Sep 17 00:00:00 2001
+From 70d485267226b4fe9ea2d18eb9d5c0c55dc94d01 Mon Sep 17 00:00:00 2001
 From: V1tr10l7 <vitriol1744@gmail.com>
-Date: Sun, 19 Jan 2025 20:32:09 +0100
-Subject: [PATCH] [dash]: port to cryptixos
+Date: Wed, 22 Jan 2025 08:54:48 +0100
+Subject: [PATCH] [support]: add cryptix target
 
 ---
- checkedout.xbstrap | 0
- configure.ac       | 4 ----
- fetched.xbstrap    | 0
- 3 files changed, 4 deletions(-)
- create mode 100644 checkedout.xbstrap
- create mode 100644 fetched.xbstrap
+ configure.ac | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/checkedout.xbstrap b/checkedout.xbstrap
-new file mode 100644
-index 0000000..e69de29
 diff --git a/configure.ac b/configure.ac
 index 52aa429..3cf8c0a 100644
 --- a/configure.ac
@@ -29,9 +22,6 @@ index 52aa429..3cf8c0a 100644
  ])
  
  dnl Check if struct stat has st_mtim.
-diff --git a/fetched.xbstrap b/fetched.xbstrap
-new file mode 100644
-index 0000000..e69de29
 -- 
 2.47.1
 

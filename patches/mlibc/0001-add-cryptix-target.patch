@@ -1,14 +1,13 @@
-From 431606f4c44fc29c0758b25e12596997911be388 Mon Sep 17 00:00:00 2001
+From c8a566986053d02ee37faa7fcf88b7880b50cde6 Mon Sep 17 00:00:00 2001
 From: V1tr10l7 <vitriol1744@gmail.com>
-Date: Fri, 17 Jan 2025 00:57:02 +0100
-Subject: [PATCH] implement support for cryptix target
+Date: Wed, 22 Jan 2025 07:06:09 +0100
+Subject: [PATCH] add cryptix target
 
 ---
  meson.build                                   |   5 +
- mlibc.patch                                   |   1 +
- sysdeps/cryptix/entry/entry.cpp               |  50 +++++
- sysdeps/cryptix/entry/thread.cpp              |  45 +++++
- sysdeps/cryptix/generic/mntent.cpp            | 117 +++++++++++
+ sysdeps/cryptix/entry/entry.cpp               |  50 ++++
+ sysdeps/cryptix/entry/thread.cpp              |  45 ++++
+ sysdeps/cryptix/generic/mntent.cpp            | 117 +++++++++
  sysdeps/cryptix/generic/mount.cpp             |  18 ++
  sysdeps/cryptix/include/abi-bits/access.h     |   1 +
  sysdeps/cryptix/include/abi-bits/auxv.h       |   1 +
@@ -56,24 +55,23 @@ Subject: [PATCH] implement support for cryptix target
  sysdeps/cryptix/include/abi-bits/vt.h         |   1 +
  sysdeps/cryptix/include/abi-bits/wait.h       |   1 +
  sysdeps/cryptix/include/abi-bits/xattr.h      |   1 +
- sysdeps/cryptix/include/cryptix/syscall.h     | 180 +++++++++++++++++
- sysdeps/cryptix/include/mntent.h              |  50 +++++
- sysdeps/cryptix/include/sys/mount.h           |  54 ++++++
+ sysdeps/cryptix/include/cryptix/syscall.h     | 190 ++++++++++++++
+ sysdeps/cryptix/include/mntent.h              |  50 ++++
+ sysdeps/cryptix/include/sys/mount.h           |  54 ++++
  sysdeps/cryptix/include/sys/reboot.h          |  20 ++
  sysdeps/cryptix/include/sys/statfs.h          |   1 +
- sysdeps/cryptix/include/sys/sysmacros.h       |  24 +++
+ sysdeps/cryptix/include/sys/sysmacros.h       |  24 ++
  sysdeps/cryptix/include/sys/vfs.h             |   1 +
- sysdeps/cryptix/meson.build                   | 109 +++++++++++
- sysdeps/cryptix/sysdeps/file_io.cpp           | 181 ++++++++++++++++++
- sysdeps/cryptix/sysdeps/internal.cpp          |  97 ++++++++++
- sysdeps/cryptix/sysdeps/process.cpp           |  27 +++
- sysdeps/cryptix/sysdeps/signal.cpp            |   9 +
+ sysdeps/cryptix/meson.build                   | 110 ++++++++
+ sysdeps/cryptix/sysdeps/internal.cpp          |  84 ++++++
+ sysdeps/cryptix/sysdeps/process.cpp           |  63 +++++
+ sysdeps/cryptix/sysdeps/signal.cpp            |  24 ++
+ sysdeps/cryptix/sysdeps/vfs.cpp               | 247 ++++++++++++++++++
  sysdeps/cryptix/x86_64/crt0.S                 |   7 +
  sysdeps/cryptix/x86_64/crti.S                 |  10 +
  sysdeps/cryptix/x86_64/crtn.S                 |   8 +
- sysdeps/cryptix/x86_64/thread_entry.S         |  24 +++
- 68 files changed, 1086 insertions(+)
- create mode 100644 mlibc.patch
+ sysdeps/cryptix/x86_64/thread_entry.S         |  24 ++
+ 67 files changed, 1200 insertions(+)
  create mode 100644 sysdeps/cryptix/entry/entry.cpp
  create mode 100644 sysdeps/cryptix/entry/thread.cpp
  create mode 100644 sysdeps/cryptix/generic/mntent.cpp
@@ -132,10 +130,10 @@ Subject: [PATCH] implement support for cryptix target
  create mode 100644 sysdeps/cryptix/include/sys/sysmacros.h
  create mode 120000 sysdeps/cryptix/include/sys/vfs.h
  create mode 100644 sysdeps/cryptix/meson.build
- create mode 100644 sysdeps/cryptix/sysdeps/file_io.cpp
  create mode 100644 sysdeps/cryptix/sysdeps/internal.cpp
  create mode 100644 sysdeps/cryptix/sysdeps/process.cpp
  create mode 100644 sysdeps/cryptix/sysdeps/signal.cpp
+ create mode 100644 sysdeps/cryptix/sysdeps/vfs.cpp
  create mode 100644 sysdeps/cryptix/x86_64/crt0.S
  create mode 100644 sysdeps/cryptix/x86_64/crti.S
  create mode 100644 sysdeps/cryptix/x86_64/crtn.S
@@ -157,13 +155,6 @@ index 471604e0..61823778 100644
  elif host_machine.system() == 'lemon'
  	rtld_include_dirs += include_directories('sysdeps/lemon/include')
  	libc_include_dirs += include_directories('sysdeps/lemon/include')
-diff --git a/mlibc.patch b/mlibc.patch
-new file mode 100644
-index 00000000..700b4f49
---- /dev/null
-+++ b/mlibc.patch
-@@ -0,0 +1 @@
-+0001-port-to-cryptix.patch
 diff --git a/sysdeps/cryptix/entry/entry.cpp b/sysdeps/cryptix/entry/entry.cpp
 new file mode 100644
 index 00000000..216181fb
@@ -789,10 +780,10 @@ index 00000000..66412d70
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
 new file mode 100644
-index 00000000..e1ddbeed
+index 00000000..0dfe0b6c
 --- /dev/null
 +++ b/sysdeps/cryptix/include/cryptix/syscall.h
-@@ -0,0 +1,180 @@
+@@ -0,0 +1,190 @@
 +#include <cstddef>
 +#include <cstdint>
 +
@@ -828,19 +819,29 @@ index 00000000..e1ddbeed
 +    constexpr size_t SYS_MMAP       = 9;
 +    constexpr size_t SYS_IOCTL      = 16;
 +    constexpr size_t SYS_ACCESS     = 21;
++    constexpr size_t SYS_DUP        = 32;
++    constexpr size_t SYS_DUP2       = 33;
 +    constexpr size_t SYS_GETPID     = 39;
 +    constexpr size_t SYS_FORK       = 57;
 +    constexpr size_t SYS_EXECVE     = 59;
 +    constexpr size_t SYS_EXIT       = 60;
++    constexpr size_t SYS_WAIT4      = 61;
 +    constexpr size_t SYS_UNAME      = 63;
 +    constexpr size_t SYS_FCNTL      = 72;
 +    constexpr size_t SYS_GETCWD     = 79;
++    constexpr size_t SYS_CHDIR      = 80;
++    constexpr size_t SYS_FCHDIR     = 81;
++    constexpr size_t SYS_MKDIR      = 83;
++    constexpr size_t SYS_CREAT      = 85;
 +    constexpr size_t SYS_GETUID     = 102;
 +    constexpr size_t SYS_GETGID     = 104;
 +    constexpr size_t SYS_GETEUID    = 107;
 +    constexpr size_t SYS_GETEGID    = 108;
++    constexpr size_t SYS_SETPGID    = 109;
 +    constexpr size_t SYS_GETPPID    = 110;
++    constexpr size_t SYS_GETPGID    = 121;
 +    constexpr size_t SYS_ARCH_PRCTL = 158;
++    constexpr size_t SYS_GETDENTS64 = 217;
 +    constexpr size_t SYS_PANIC      = 255;
 +    constexpr size_t SYS_OPENAT     = 257;
 +    constexpr size_t SYS_FSTATAT    = 262;
@@ -1163,19 +1164,20 @@ index 00000000..aca87dd7
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
 new file mode 100644
-index 00000000..64af1453
+index 00000000..954b0bdb
 --- /dev/null
 +++ b/sysdeps/cryptix/meson.build
-@@ -0,0 +1,109 @@
-+rtld_dso_sources += files('sysdeps/internal.cpp', 'sysdeps/file_io.cpp')
+@@ -0,0 +1,110 @@
++rtld_dso_sources += files('sysdeps/internal.cpp', 'sysdeps/vfs.cpp')
 +libc_sources += files(
 +  'entry/entry.cpp',
 +
 +  'generic/mntent.cpp',
 +  'generic/mount.cpp',
 +
-+  'sysdeps/file_io.cpp',
++  'sysdeps/vfs.cpp',
 +  'sysdeps/internal.cpp',
++  'sysdeps/signal.cpp',
 +  'sysdeps/process.cpp',
 +)
 +
@@ -1276,12 +1278,201 @@ index 00000000..64af1453
 +    install_dir: get_option('libdir'),
 +  )
 +endif
-diff --git a/sysdeps/cryptix/sysdeps/file_io.cpp b/sysdeps/cryptix/sysdeps/file_io.cpp
+diff --git a/sysdeps/cryptix/sysdeps/internal.cpp b/sysdeps/cryptix/sysdeps/internal.cpp
 new file mode 100644
-index 00000000..945d4a83
+index 00000000..1fd6a350
 --- /dev/null
-+++ b/sysdeps/cryptix/sysdeps/file_io.cpp
-@@ -0,0 +1,181 @@
++++ b/sysdeps/cryptix/sysdeps/internal.cpp
+@@ -0,0 +1,84 @@
++#include <cstddef>
++#include <stdio.h>
++#include <stdlib.h>
++
++#include <cryptix/syscall.h>
++
++#include <execinfo.h>
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++
++#include <sys/mman.h>
++
++namespace mlibc
++{
++
++    void sys_libc_log(const char* message)
++    {
++        static constexpr char MLIBC_SIG[] = "[mlibc]: ";
++
++        size_t                len         = strlen(message);
++        char*                 messageEOL
++            = reinterpret_cast<char*>(alloca(len + sizeof(MLIBC_SIG)));
++
++        memcpy(messageEOL, MLIBC_SIG, sizeof(MLIBC_SIG) - 1);
++        memcpy(messageEOL + sizeof(MLIBC_SIG) - 1, message, len);
++        len += sizeof(MLIBC_SIG) - 1;
++
++        Syscall(SYS_WRITE, 1, messageEOL, len);
++    }
++    [[noreturn]]
++    void sys_libc_panic()
++    {
++        Syscall(SYS_PANIC, "mlibc crashed");
++
++        __builtin_unreachable();
++    }
++
++    STUB_RET(int sys_clone([[maybe_unused]] void*  tcb,
++                           [[maybe_unused]] pid_t* pid_out,
++                           [[maybe_unused]] void*  stack));
++    STUB_RET(int sys_kill([[maybe_unused]] pid_t, [[maybe_unused]] int));
++
++    //////
++    int sys_tcb_set(void* pointer)
++    {
++        auto ret = Syscall(SYS_ARCH_PRCTL, 0x1002, pointer);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return ret;
++    }
++
++    STUB_RET(int sys_futex_wait(int* pointer, int expected,
++                                const struct timespec* time));
++    STUB_RET(int sys_futex_wake([[maybe_unused]] int* pointer));
++
++    int sys_anon_allocate(size_t size, void** pointer)
++    {
++        auto ret = sys_vm_map(nullptr, size, PROT_READ | PROT_WRITE, 0x20, -1,
++                              0, pointer);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    STUB_RET(int sys_anon_free([[maybe_unused]] void*  pointer,
++                               [[maybe_unused]] size_t size));
++
++    int sys_vm_map(void* hint, size_t size, int prot, int flags, int fd,
++                   off_t offset, void** window)
++    {
++        auto ret = Syscall(SYS_MMAP, hint, size, prot, flags, fd, offset);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *window = reinterpret_cast<void*>(ret);
++        return 0;
++    }
++    STUB_RET(int sys_vm_unmap([[maybe_unused]] void*  pointer,
++                              [[maybe_unused]] size_t size));
++    STUB_RET([[gnu::weak]] int sys_vm_protect([[maybe_unused]] void*  pointer,
++                                              [[maybe_unused]] size_t size,
++                                              [[maybe_unused]] int    prot));
++
++    STUB_RET(int sys_clock_get([[maybe_unused]] int, [[maybe_unused]] long*,
++                               [[maybe_unused]] long*));
++} // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/process.cpp b/sysdeps/cryptix/sysdeps/process.cpp
+new file mode 100644
+index 00000000..eb679bd3
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/process.cpp
+@@ -0,0 +1,63 @@
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++
++#include <cryptix/syscall.h>
++
++namespace mlibc
++{
++    pid_t sys_getpid() { return Syscall(SYS_GETPID); }
++    void  sys_exit(int code)
++    {
++        Syscall(SYS_EXIT, code);
++
++        __builtin_unreachable();
++    }
++    int sys_waitpid(pid_t pid, int* status, int flags, struct rusage* ru,
++                    pid_t* ret_pid)
++    {
++        auto ret = Syscall(SYS_WAIT4, pid, status, flags, ru);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *ret_pid = ret;
++        return 0;
++    }
++
++    uid_t sys_getuid() { return Syscall(SYS_GETUID); }
++    gid_t sys_getgid() { return Syscall(SYS_GETGID); }
++    uid_t sys_geteuid() { return Syscall(SYS_GETEUID); }
++    gid_t sys_getegid() { return Syscall(SYS_GETEGID); }
++    int   sys_setpgid(pid_t pid, pid_t pgid)
++    {
++        auto ret = Syscall(SYS_SETPGID, pid, pgid);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    pid_t sys_getppid() { return Syscall(SYS_GETPPID); }
++    pid_t sys_getpgid(pid_t pid, pid_t* out)
++    {
++        auto ret = Syscall(SYS_GETPGID, pid);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *out = ret;
++        return 0;
++    }
++    int sys_fork(pid_t* child)
++    {
++        auto ret = Syscall(SYS_FORK);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *child = ret;
++        return 0;
++    }
++    int sys_execve(const char* path, char* const argv[], char* const envp[])
++    {
++        return Syscall(SYS_EXECVE, path, argv, envp);
++    }
++
++    int sys_futex_tid()
++    {
++        // TODO(v1tr10l7): implement sys_futex_tid
++        return 0;
++    }
++}; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/signal.cpp b/sysdeps/cryptix/sysdeps/signal.cpp
+new file mode 100644
+index 00000000..f272ba62
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/signal.cpp
+@@ -0,0 +1,24 @@
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++
++#include <cryptix/syscall.h>
++
++namespace mlibc
++{
++    int sys_sigaction([[maybe_unused]] int signum,
++                      [[maybe_unused]] const struct sigaction* __restrict act,
++                      [[maybe_unused]] struct sigaction* __restrict oldact)
++    {
++        // TODO(v1tr10l7): implement sys_sigaction;
++        return 0;
++    }
++
++    int sys_sigprocmask([[maybe_unused]] int             how,
++                        [[maybe_unused]] const sigset_t* set,
++                        [[maybe_unused]] sigset_t*       retrieve)
++    {
++
++        // TODO(v1tr10l7): implement sys_sigprocmask;
++        return 0;
++    }
++}; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/vfs.cpp b/sysdeps/cryptix/sysdeps/vfs.cpp
+new file mode 100644
+index 00000000..7af44e87
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/vfs.cpp
+@@ -0,0 +1,247 @@
 +#include <bits/ensure.h>
 +#include <dirent.h>
 +#include <errno.h>
@@ -1299,8 +1490,9 @@ index 00000000..945d4a83
 +#include <fcntl.h>
 +#include <stdlib.h>
 +#include <sys/ioctl.h>
++#include <unistd.h>
 +
-+#include "cryptix/syscall.h"
++#include <cryptix/syscall.h>
 +
 +#include <errno.h>
 +
@@ -1310,6 +1502,18 @@ index 00000000..945d4a83
 +
 +namespace mlibc
 +{
++    int sys_sysconf(int num, long* ret)
++    {
++        switch (num)
++        {
++            case _SC_OPEN_MAX: *ret = INT32_MAX; break;
++            case _SC_CHILD_MAX: *ret = INT32_MAX; break;
++            default: return EINVAL;
++        }
++
++        return 0;
++    }
++
 +    int sys_read(int fd, void* buffer, size_t count, ssize_t* bytesRead)
 +    {
 +        auto ret = Syscall(SYS_READ, fd, buffer, count);
@@ -1340,6 +1544,10 @@ index 00000000..945d4a83
 +    {
 +        return sys_openat(AT_FDCWD, path, flags, mode, fd);
 +    }
++    int sys_open_dir(const char* path, int* fd)
++    {
++        return sys_openat(AT_FDCWD, path, O_DIRECTORY, 0, fd);
++    }
 +    int sys_close(int fd)
 +    {
 +        auto ret = Syscall(SYS_CLOSE, fd);
@@ -1348,6 +1556,15 @@ index 00000000..945d4a83
 +        return 0;
 +    }
 +
++    int sys_read_entries(int handle, void* buffer, size_t maxSize,
++                         size_t* bytesRead)
++    {
++        auto ret = Syscall(SYS_GETDENTS64, handle, buffer, maxSize);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *bytesRead = ret;
++        return 0;
++    }
 +    int sys_stat(fsfd_target fsfdt, int fd, const char* path, int flags,
 +                 struct stat* statbuf)
 +    {
@@ -1397,10 +1614,50 @@ index 00000000..945d4a83
 +
 +        return 0;
 +    }
++    int sys_dup(int fd, int flags, int* newfd)
++    {
++        // TODO(v1tr10l7): implement flags;
++        (void)flags;
++        auto ret = Syscall(SYS_DUP, fd);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *newfd = ret;
++        return 0;
++    }
++    int sys_dup2(int fd, int flags, int newfd)
++    {
++        // TODO(v1tr10l7): implement flags;
++        (void)flags;
++        auto ret = Syscall(SYS_DUP2, fd, newfd);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
 +
 +    int sys_getcwd(char* buffer, size_t size)
 +    {
 +        auto ret = Syscall(SYS_GETCWD, buffer, size);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_chdir(const char* path)
++    {
++        auto ret = Syscall(SYS_CHDIR, path);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_fchdir(int fd)
++    {
++        auto ret = Syscall(SYS_FCHDIR, fd);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_mkdir(const char* path, mode_t mode)
++    {
++        auto ret = Syscall(SYS_MKDIR, path, mode);
 +        if (auto e = syscall_error(ret); e) return e;
 +
 +        return 0;
@@ -1462,157 +1719,6 @@ index 00000000..945d4a83
 +
 +        return 0;
 +    }
-+}; // namespace mlibc
-diff --git a/sysdeps/cryptix/sysdeps/internal.cpp b/sysdeps/cryptix/sysdeps/internal.cpp
-new file mode 100644
-index 00000000..63cd551b
---- /dev/null
-+++ b/sysdeps/cryptix/sysdeps/internal.cpp
-@@ -0,0 +1,97 @@
-+#include <cstddef>
-+#include <stdio.h>
-+#include <stdlib.h>
-+
-+#include "cryptix/syscall.h"
-+
-+#include <execinfo.h>
-+#include <mlibc/debug.hpp>
-+#include <mlibc/posix-sysdeps.hpp>
-+
-+#include <sys/mman.h>
-+
-+namespace mlibc
-+{
-+
-+    void sys_libc_log(const char* message)
-+    {
-+        static constexpr char MLIBC_SIG[] = "[mlibc]: ";
-+
-+        size_t                len         = strlen(message);
-+        char*                 messageEOL
-+            = reinterpret_cast<char*>(alloca(len + sizeof(MLIBC_SIG)));
-+
-+        memcpy(messageEOL, MLIBC_SIG, sizeof(MLIBC_SIG) - 1);
-+        memcpy(messageEOL + sizeof(MLIBC_SIG) - 1, message, len);
-+        len += sizeof(MLIBC_SIG) - 1;
-+
-+        Syscall(SYS_WRITE, 1, messageEOL, len);
-+    }
-+    [[noreturn]]
-+    void sys_libc_panic()
-+    {
-+        Syscall(SYS_PANIC, "mlibc crashed");
-+    }
-+
-+    //////
-+    STUB_RET(int sys_dup2(int fd, int flags, int newfd));
-+    int sys_fork(pid_t* child)
-+    {
-+        auto ret = Syscall(SYS_FORK);
-+        if (auto e = syscall_error(ret); e) return e;
-+
-+        *child = ret;
-+        return 0;
-+    }
-+
-+    int sys_execve(const char* path, char* const argv[], char* const envp[])
-+    {
-+        return Syscall(SYS_EXECVE, path, argv, envp);
-+    }
-+    STUB_RET(int sys_waitpid(pid_t pid, int* status, int flags,
-+                             struct rusage* ru, pid_t* ret_pid));
-+    STUB_RET(int sys_chdir(const char* path));
-+    STUB_RET(int sys_clone(void* tcb, pid_t* pid_out, void* stack));
-+
-+    STUB_RET(int sys_kill(pid_t, int));
-+
-+    //////
-+    int sys_tcb_set(void* pointer)
-+    {
-+        auto ret = Syscall(SYS_ARCH_PRCTL, 0x1002, pointer);
-+        if (auto e = syscall_error(ret); e) return e;
-+
-+        return ret;
-+    }
-+
-+    STUB_RET([[gnu::weak]] int sys_futex_tid());
-+    STUB_RET(int sys_futex_wait(int* pointer, int expected,
-+                                const struct timespec* time));
-+    STUB_RET(int sys_futex_wake(int* pointer));
-+
-+    int sys_anon_allocate(size_t size, void** pointer)
-+    {
-+        auto ret = sys_vm_map(nullptr, size, PROT_READ | PROT_WRITE, 0x20, -1,
-+                              0, pointer);
-+        if (auto e = syscall_error(ret); e) return e;
-+
-+        return 0;
-+    }
-+    STUB_RET(int sys_anon_free(void* pointer, size_t size));
-+
-+    int sys_vm_map(void* hint, size_t size, int prot, int flags, int fd,
-+                   off_t offset, void** window)
-+    {
-+        auto ret = Syscall(SYS_MMAP, hint, size, prot, flags, fd, offset);
-+        if (auto e = syscall_error(ret); e) return e;
-+
-+        *window = reinterpret_cast<void*>(ret);
-+        return 0;
-+    }
-+    STUB_RET(int sys_vm_unmap(void* pointer, size_t size));
-+    STUB_RET([[gnu::weak]] int sys_vm_protect(void* pointer, size_t size,
-+                                              int prot));
-+
-+    STUB_RET(int sys_clock_get(int, long*, long*));
-+    void sys_exit(int code) { Syscall(SYS_EXIT, code); }
-+} // namespace mlibc
-diff --git a/sysdeps/cryptix/sysdeps/process.cpp b/sysdeps/cryptix/sysdeps/process.cpp
-new file mode 100644
-index 00000000..f8592dcc
---- /dev/null
-+++ b/sysdeps/cryptix/sysdeps/process.cpp
-@@ -0,0 +1,27 @@
-+#include <mlibc/debug.hpp>
-+#include <mlibc/posix-sysdeps.hpp>
-+
-+#include "cryptix/syscall.h"
-+
-+namespace mlibc
-+{
-+    uid_t sys_getuid() { return Syscall(SYS_GETUID); }
-+    gid_t sys_getgid() { return Syscall(SYS_GETGID); }
-+    uid_t sys_geteuid() { return Syscall(SYS_GETEUID); }
-+
-+    gid_t sys_getegid() { return Syscall(SYS_GETEGID); }
-+
-+    pid_t sys_getpid() { return Syscall(SYS_GETPID); }
-+    pid_t sys_getppid() { return Syscall(SYS_GETPPID); }
-+    STUB_RET(int sys_setpgid(pid_t pid, pid_t pgid));
-+    pid_t sys_getpgid(pid_t pid, pid_t* out)
-+    {
-+        // TODO(v1tr10l7): sys_getpgid
-+
-+        return 0;
-+    }
-+
-+    STUB_RET(int sys_sigaction(int signum,
-+                               const struct sigaction* __restrict act,
-+                               struct sigaction* __restrict oldact));
-+}; // namespace mlibc
-diff --git a/sysdeps/cryptix/sysdeps/signal.cpp b/sysdeps/cryptix/sysdeps/signal.cpp
-new file mode 100644
-index 00000000..a8dc11dc
---- /dev/null
-+++ b/sysdeps/cryptix/sysdeps/signal.cpp
-@@ -0,0 +1,9 @@
-+#include <mlibc/debug.hpp>
-+#include <mlibc/posix-sysdeps.hpp>
-+
-+#include "cryptix/syscall.h"
-+
-+namespace mlibc
-+{
-+    STUB_RET(sys_sigprocmask(int how, const sigset_t* set, sigset_t* retrieve));
 +}; // namespace mlibc
 diff --git a/sysdeps/cryptix/x86_64/crt0.S b/sysdeps/cryptix/x86_64/crt0.S
 new file mode 100644
