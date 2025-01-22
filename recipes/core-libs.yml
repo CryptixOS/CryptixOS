@@ -1,0 +1,202 @@
+packages:
+  - name: linux-headers
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      url: 'https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.1.10.tar.xz'
+      extract_path: 'linux-6.1.10'
+      format: 'tar.xz'
+      version: '6.1.10'
+    implict_package: true
+    configure:
+      - args: ['cp', '-Tr', '@THIS_SOURCE_DIR@', '.']
+    build:
+      - args: |
+          LINUX_ARCH="@OPTION:arch@"
+          case "$LINUX_ARCH" in
+            "aarch64")
+              LINUX_ARCH="arm64"
+              ;;
+          esac
+          make ARCH="$LINUX_ARCH" headers_install
+      - args: ['find', 'usr/include', '-type', 'f', '!', '-name', '*.h', '-delete']
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr']
+      # remove this file, as mlibc will override it with one suited to mlibc
+      - args: ['rm', 'usr/include/linux/libc-compat.h']
+      - args: ['cp', '-Tr', 'usr/include', '@THIS_COLLECT_DIR@/usr/include']
+
+  - name: mlibc-headers
+    architecture: '@OPTION:arch@'
+    from_source: mlibc
+    pkgs_required:
+      - linux-headers
+    implict_package: true
+    configure:
+      - args:
+        - 'meson'
+        - 'setup'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/target-@OPTION:arch-triple@.cross-file'
+        - '--prefix=/usr'
+        - '@THIS_SOURCE_DIR@'
+        - '--wrap-mode=nofallback'
+        - '-Dheaders_only=true'
+        - '-Ddisable_crypt_option=true'
+        - '-Ddisable_iconv_option=true'
+        - '-Ddisable_intl_option=true'
+        - '-Dlinux_kernel_headers=@BUILD_ROOT@/packages/linux-headers/usr/include'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+
+  - name: mlibc
+    architecture: '@OPTION:arch@'
+    from_source: mlibc
+    tools_required:
+      - bootstrap-system-gcc
+      - virtual: pkgconfig-for-target
+        triple: "@OPTION:arch-triple@"
+    implict_package: true
+    pkgs_required:
+      - linux-headers
+      - mlibc-headers
+    configure:
+      - args:
+        - 'meson'
+        - 'setup'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/target-@OPTION:arch-triple@.cross-file'
+        - '--prefix=/usr'
+        - '--libdir=lib'
+        - '--buildtype=debugoptimized'
+        - '--wrap-mode=default'
+        - '-Db_sanitize=undefined'
+        - '-Dmlibc_no_headers=true'
+        - '-Ddefault_library=both'
+        - '-Ddisable_crypt_option=true'
+        - '-Ddisable_iconv_option=true'
+        - '-Ddisable_intl_option=true'
+        
+        - '-Dlinux_kernel_headers=@BUILD_ROOT@/packages/linux-headers/usr/include'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+      - args: ['ln', '-sf', 'crt0.o', '@THIS_COLLECT_DIR@/usr/lib/crt1.o']
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/lib/@OPTION:arch-triple@']
+      - args: ['ln', '-sf', '../ld.so', '@THIS_COLLECT_DIR@/usr/lib/@OPTION:arch-triple@/ld.so']
+
+
+  - name: ncurses
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/ThomasDickey/ncurses-snapshots.git'
+      tag: 'v6_2'
+      version: '6.2'
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+    revision: 11
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--without-ada'
+        - '--enable-pc-files'
+        - '--with-shared'
+        - '--without-normal'
+        - '--with-manpage-format=normal'
+        - '--with-pkg-config-libdir=/usr/lib/pkgconfig'
+        - '--with-termlib'
+        - '--enable-widec'
+        - '--disable-stripping'
+        - '--without-cxx-binding'
+#- 'CXXFLAGS=-fno-exceptions -fno-rtti'
+        environ:
+          cf_cv_func_nanosleep: 'yes'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
+        quiet: true
+      # As we build ncurses with wide character support, make some compatibility links
+      - args: |
+          for lib in ncurses form panel menu tinfo ; do
+              rm -vf                    @THIS_COLLECT_DIR@/usr/lib/lib${lib}.so
+              echo "INPUT(-l${lib}w)" > @THIS_COLLECT_DIR@/usr/lib/lib${lib}.so
+              ln -sfv ${lib}w.pc        @THIS_COLLECT_DIR@/usr/lib/pkgconfig/${lib}.pc
+          done
+          rm -vf                     @THIS_COLLECT_DIR@/usr/lib/libcursesw.so
+          echo "INPUT(-lncursesw)" > @THIS_COLLECT_DIR@/usr/lib/libcursesw.so
+          ln -sfv libncurses.so      @THIS_COLLECT_DIR@/usr/lib/libcurses.so
+
+  - name: readline
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      url: 'https://ftp.gnu.org/gnu/readline/readline-8.2.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'readline-8.2'
+      version: '8.2'
+      patch-path-strip: 1
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - ncurses
+    revision: 3
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--disable-static'
+        - '--enable-multibyte'
+        - '--with-curses'
+    build:
+      - args: ['make', 'SHLIB_LIBS="-lncursesw"', '-j@PARALLELISM@']
+      - args: ['make', 'SHLIB_LIBS="-lncursesw"', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: zlib
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      url: 'https://zlib.net/zlib-1.3.1.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'zlib-1.3.1'
+      version: '1.3.1'
+      patch-path-strip: 1
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+        - host-pkg-config
+      regenerate:
+        - args: ['autoreconf', '-fvi']
+          workdir: '@THIS_SOURCE_DIR@/contrib/minizip'
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=/usr'
+        environ:
+          CHOST: '@OPTION:arch-triple@'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true

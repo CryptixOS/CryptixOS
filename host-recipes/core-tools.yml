@@ -1,0 +1,303 @@
+tools:
+  - name: bootstrap-system-gcc
+    architecture: '@OPTION:arch@'
+    from_source: gcc
+    tools_required:
+      - tool: cross-binutils
+        recursive: true
+    revision: 2
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+        - '--target=@OPTION:arch-triple@'
+        - '--with-sysroot=@SYSROOT_DIR@'
+        - '--enable-languages=c,c++'
+        - '--disable-multilib'
+        - '--disable-shared'
+        - '--enable-initfini-array'
+        # -g blows up GCC's binary size.
+        - 'CFLAGS=-O2'
+        - 'CXXFLAGS=-O2'
+    stages:
+      - name: compiler
+        pkgs_required:
+         - mlibc-headers
+        compile:
+          # GCC complains if the include directory is non-existent.
+          - args: ['mkdir', '-p', '@SYSROOT_DIR@/usr/include']
+          - args: ['make', '-j@PARALLELISM@', 'inhibit_libc=true', 'all-gcc']
+        install:
+          - args: ['make', 'install-gcc']
+          # GCC does *not* look for target-prefixed LD/AS.
+          # Instead, it searches a list of prefix directories. Link AS/LD to make it happy.
+          - args: ['mkdir', '-p', '@PREFIX@/@OPTION:arch-triple@/bin']
+          - args: ['ln', '-sf', '../../../cross-binutils/@OPTION:arch-triple@/bin/as',
+                               '@PREFIX@/@OPTION:arch-triple@/bin/as']
+          - args: ['ln', '-sf', '../../../cross-binutils/@OPTION:arch-triple@/bin/ld',
+                               '@PREFIX@/@OPTION:arch-triple@/bin/ld']
+      - name: libgcc
+        tools_required:
+          - tool: bootstrap-system-gcc
+            stage_dependencies: [compiler]
+        compile:
+          - args: ['make', '-j@PARALLELISM@', 'inhibit_libc=true', 'all-target-libgcc']
+        install:
+          - args: ['make', 'install-target-libgcc']
+
+  - name: cross-binutils
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    from_source: binutils
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+        - '--target=@OPTION:arch-triple@'
+        - '--with-sysroot=@SYSROOT_DIR@'
+        - '--disable-werror'
+        - '--enable-targets=x86_64-elf,x86_64-pe'
+        # - '--enable-default-hash-style=gnu'
+        - 'CFLAGS=-O2'
+    compile:
+      - args: ['make', '-j@PARALLELISM@', 'all-binutils', 'all-gas', 'all-ld']
+    install:
+      - args: ['make', 'install-binutils', 'install-gas', 'install-ld']
+
+  - name: host-autoconf-v2.69
+    architecture: noarch
+    source:
+      name: autoconf-2v.69
+      subdir: 'sources'
+      url: 'https://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'autoconf-2.69'
+      version: '2.69'
+    revision: 2
+    configure:
+      - args: ['@THIS_SOURCE_DIR@/configure', '--prefix=@PREFIX@']
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
+  - name: host-automake-v1.11
+    architecture: noarch
+    source:
+      name: automake-v1.11
+      subdir: 'sources'
+      url: 'https://ftp.gnu.org/gnu/automake/automake-1.11.6.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'automake-1.11.6'
+      version: '1.11.6'
+      patch-path-strip: 1
+    tools_required:
+      - host-autoconf-v2.69
+    revision: 2
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+      # Stop aclocal from complaining.
+      - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.11', '@PREFIX@/share/aclocal']
+
+  - name: host-automake-v1.15
+    architecture: noarch
+    source:
+      name: automake-v1.15
+      subdir: 'sources'
+      url: 'https://ftp.gnu.org/gnu/automake/automake-1.15.1.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'automake-1.15.1'
+      version: '1.15.1'
+      patch-path-strip: 1
+    tools_required:
+      - host-autoconf-v2.69
+    revision: 2
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+        - 'MAKEINFO=/bin/true'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+      # Stop aclocal from complaining.
+      - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.15', '@PREFIX@/share/aclocal']
+
+  - name: host-cmake
+    architecture: noarch
+    from_source: cmake
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/bootstrap'
+        - '--prefix=@PREFIX@'
+        - '--parallel=@PARALLELISM@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+      - args: ['ln', '-sf', '@SOURCE_ROOT@/scripts/managarm.cmake', '@PREFIX@/share/cmake-3.26/Modules/Platform/']
+
+  - name: host-file
+    labels: [aarch64]
+    architecture: noarch
+    from_source: file
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-libtool
+    revision: 2
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
+  - name: host-libtool
+    architecture: noarch
+    exports_aclocal: true
+    source:
+      name: libtool
+      subdir: 'sources'
+      url: 'https://ftp.gnu.org/gnu/libtool/libtool-2.4.7.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'libtool-2.4.7'
+      version: '2.4.7'
+      patch-path-strip: 1
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+    revision: 2
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
+  - name: host-llvm-toolchain
+    architecture: noarch
+    exports_shared_libs: true
+    from_source: llvm
+    sources_required:
+      - binutils
+    tools_required:
+      - host-cmake
+    revision: 4
+    configure:
+      - args:
+        - 'cmake'
+        - '-GNinja'
+        - '-DCMAKE_INSTALL_PREFIX=@PREFIX@'
+        - '-DCMAKE_C_COMPILER=gcc'
+        - '-DCMAKE_CXX_COMPILER=g++'
+
+        # LLVM configuration options.
+        # We really have to build LLVM in Release mode.
+        # Building it in debug mode produces tens of GiB of debugging info.
+        - '-DCMAKE_BUILD_TYPE=Release'
+        - '-DLLVM_LINK_LLVM_DYLIB=ON'
+        - '-DLLVM_TARGETS_TO_BUILD=X86;AArch64;RISCV'
+        - '-DLLVM_ENABLE_PROJECTS=clang;clang-tools-extra;lld'
+
+        # clang configuration options.
+        - '-DDEFAULT_SYSROOT=@SYSROOT_DIR@'
+
+        # Gold linker configuration options.
+        - '-DLLVM_BINUTILS_INCDIR=@SOURCE_ROOT@/ports/binutils/include'
+
+        - '@THIS_SOURCE_DIR@/llvm'
+    compile:
+      - args: ['ninja']
+      # Build on a single CPU to prevent OOM on smaller systems.
+      #- args: ['ninja', '-j1']
+    install:
+      - args: ['ninja', 'install']
+        quiet: true
+
+  - name: host-pkg-config
+    architecture: noarch
+    exports_aclocal: true
+    source:
+      name: 'pkg-config'
+      subdir: 'sources'
+      url: 'https://pkgconfig.freedesktop.org/releases/pkg-config-0.29.2.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'pkg-config-0.29.2'
+      version: '0.29.2'
+    revision: 2
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+        - '--with-internal-glib'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
+  - name: system-gcc
+    architecture: '@OPTION:arch@'
+    from_source: gcc
+    tools_required:
+      - tool: cross-binutils
+        recursive: true
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+        - '--target=@OPTION:arch-triple@'
+        - '--with-sysroot=@SYSROOT_DIR@'
+        - '--enable-languages=c,c++'
+        - '--disable-multilib'
+        - '--enable-initfini-array'
+        - '--enable-libstdcxx-filesystem-ts'
+        # -g blows up GCC's binary size.
+        - 'CFLAGS=-O2'
+        - 'CXXFLAGS=-O2'
+    stages:
+      - name: compiler
+        pkgs_required:
+        - mlibc-headers
+        compile:
+          # GCC complains if the include directory is non-existent.
+          - args: ['mkdir', '-p', '@SYSROOT_DIR@/usr/include']
+          - args: ['make', '-j@PARALLELISM@', 'all-gcc']
+        install:
+          - args: ['make', 'install-gcc']
+          # GCC does *not* look for target-prefixed LD/AS.
+          # Instead, it searches a list of prefix directories. Link AS/LD to make it happy.
+          - args: ['mkdir', '-p', '@PREFIX@/@OPTION:arch-triple@/bin']
+          - args: ['ln', '-sf', '../../../cross-binutils/@OPTION:arch-triple@/bin/as',
+                               '@PREFIX@/@OPTION:arch-triple@/bin/as']
+          - args: ['ln', '-sf', '../../../cross-binutils/@OPTION:arch-triple@/bin/ld',
+                               '@PREFIX@/@OPTION:arch-triple@/bin/ld']
+      - name: libgcc
+        tools_required:
+          - tool: system-gcc
+            stage_dependencies: [compiler]
+        pkgs_required:
+          - mlibc
+        compile:
+          - args: ['make', '-j@PARALLELISM@', 'all-target-libgcc']
+        install:
+          - args: ['make', 'install-target-libgcc']
+      - name: libstdc++
+        tools_required:
+          - tool: system-gcc
+            stage_dependencies: [libgcc]
+        compile:
+          - args: ['make', '-j@PARALLELISM@', 'all-target-libstdc++-v3']
+        install:
+            - args: ['make', 'install-target-libstdc++-v3']
