@@ -11,6 +11,7 @@
 #include <Arch/x86_64/Drivers/Timers/RTC.hpp>
 
 #include <Scheduler/Process.hpp>
+#include <Time/Time.hpp>
 
 namespace Syscall::Time
 {
@@ -72,4 +73,20 @@ namespace Syscall::Time
 
         return std::errno_t(ENOSYS);
     }
+    ErrorOr<i32> SysClockGetTime(Arguments& args)
+    {
+        clockid_t clockId = args.Get<clockid_t>(0);
+        timespec* res     = args.Get<timespec*>(1);
+
+        switch (clockId)
+        {
+            case CLOCK_REALTIME: *res = ::Time::GetReal(); break;
+            case CLOCK_MONOTONIC: *res = ::Time::GetMonotonic(); break;
+
+            default: return Error(ENOSYS);
+        }
+
+        return 0;
+    }
+
 } // namespace Syscall::Time

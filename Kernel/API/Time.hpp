@@ -15,4 +15,5 @@ namespace Syscall::Time
 {
     ErrorOr<i32> SysGetTimeOfDay(Syscall::Arguments& args);
     ErrorOr<i32> SysSetTimeOfDay(Syscall::Arguments& args);
+    ErrorOr<i32> SysClockGetTime(Syscall::Arguments& args);
 } // namespace Syscall::Time
