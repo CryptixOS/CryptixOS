@@ -42,11 +42,16 @@ void ProcFsINode::InsertChild(INode* node, std::string_view name)
 }
 isize ProcFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
-    std::string& property    = *m_Property;
+    std::string& property = *m_Property;
 
-    usize        bytesCopied = property.copy(reinterpret_cast<char*>(buffer),
-                                             std::min(bytes, property.length()));
-    property                 = m_Property->GenerateProperty();
+    if (static_cast<usize>(offset) >= property.length()) return 0;
+
+    usize bytesCopied
+        = property.copy(reinterpret_cast<char*>(buffer) + offset,
+                        std::min(bytes, property.length() - offset));
+
+    if (offset + bytesCopied >= property.length())
+        property = m_Property->GenerateProperty();
     return bytesCopied;
 }
 isize ProcFsINode::Write(const void* buffer, off_t offset, usize bytes)
