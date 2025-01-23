@@ -36,6 +36,8 @@ class PathView
     constexpr usize       GetSize() const { return m_Path.size(); }
     constexpr const char* Raw() const { return m_Path.data(); }
 
+    std::string_view      GetLastComponent() const;
+
   private:
     std::string_view m_Path;
 };

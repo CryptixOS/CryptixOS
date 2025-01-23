@@ -119,6 +119,7 @@ namespace Syscall
         RegisterSyscall(ID::eChDir, VFS::SysChDir);
         RegisterSyscall(ID::eFChDir, VFS::SysFChDir);
         RegisterSyscall(ID::eMkDir, VFS::SysMkDir);
+        RegisterSyscall(ID::eRmDir, SysRmDir);
         RegisterSyscall(ID::eGetTimeOfDay, Time::SysGetTimeOfDay);
         RegisterSyscall(ID::eGet_eUid, Process::SysGet_eUid);
         RegisterSyscall(ID::eGet_eGid, Process::SysGet_eGid);
@@ -128,6 +129,7 @@ namespace Syscall
         RegisterSyscall(ID::eSetSid, Process::SysSetSid);
         RegisterSyscall(ID::eGet_pGid, Process::SysGet_pGid);
         RegisterSyscall(ID::eGetSid, Process::SysGetSid);
+        RegisterSyscall(ID::eUTime, SysUTime);
         RegisterSyscall(ID::eFork, Process::SysFork);
         RegisterSyscall(ID::eExecve, Process::SysExecve);
         RegisterSyscall(ID::eArchPrCtl, SysArchPrCtl);

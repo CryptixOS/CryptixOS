@@ -19,3 +19,9 @@ bool PathView::ValidateLength()
 
     return true;
 }
+
+std::string_view PathView::GetLastComponent() const
+{
+    auto forthSlash = m_Path.find_last_of('/');
+    return m_Path.substr(forthSlash, m_Path.size() - forthSlash);
+}

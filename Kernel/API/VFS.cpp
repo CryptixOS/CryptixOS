@@ -83,6 +83,48 @@ namespace API::VFS
         if (!fd) return Error(EBADF);
         return fd->Truncate(length);
     }
+
+    ErrorOr<isize> SysRmDir(PathView path)
+    {
+        Process* current = Process::GetCurrent();
+        if (!current->ValidateRead(path.Raw(), Limits::MAX_PATH_LENGTH))
+            return Error(EFAULT);
+        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
+
+        std::string_view lastComponent = path.GetLastComponent();
+        if (lastComponent == ".") return Error(EINVAL);
+        if (lastComponent == "..") return Error(ENOTEMPTY);
+
+        ErrorOr<INode*> nodeOrError = ::VFS::ResolvePath(path);
+        if (!nodeOrError) return nodeOrError.error();
+
+        INode* node = nodeOrError.value();
+        if (node->GetParent()
+            && !node->GetParent()->CanWrite(current->GetCredentials()))
+            return Error(EACCES);
+        if (!node->IsDirectory()) return Error(ENOTDIR);
+        for (const auto& child : node->GetChildren())
+        {
+            std::string_view name = child.second->GetName();
+            if (name != "." && name != "..") return Error(ENOTEMPTY);
+        }
+
+        ::VFS::RecursiveDelete(node);
+        return 0;
+    }
+
+    ErrorOr<isize> SysUTime(PathView path, const utimbuf* out)
+    {
+        ErrorOr<INode*> nodeOrError = ::VFS::ResolvePath(path);
+        if (!nodeOrError) return nodeOrError.error();
+
+        // FIXME(v1tr10l7): finish this
+        Process* process = Process::GetCurrent();
+        INode*   node    = nodeOrError.value();
+        (void)process;
+        (void)node;
+        return Error(ENOSYS);
+    }
 }; // namespace API::VFS
 
 namespace Syscall::VFS

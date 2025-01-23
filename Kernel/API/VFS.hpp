@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <API/Posix/utime.h>
 #include <API/Syscall.hpp>
 #include <API/UnixTypes.hpp>
 #include <Utility/PathView.hpp>
@@ -19,6 +20,10 @@ namespace API::VFS
 
     ErrorOr<isize> SysTruncate(PathView path, off_t length);
     ErrorOr<isize> SysFTruncate(i32 fdNum, off_t length);
+
+    ErrorOr<isize> SysRmDir(PathView path);
+
+    ErrorOr<isize> SysUTime(PathView path, const utimbuf* out);
 } // namespace API::VFS
 namespace Syscall::VFS
 {
