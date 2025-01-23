@@ -8,6 +8,8 @@
 
 #include <Common.hpp>
 
+#include <API/Posix/signal.h>
+
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
 
@@ -87,14 +89,19 @@ class Process
         return false;
     }
 
-    inline INode* GetRootNode() const { return m_RootNode; }
-    inline INode* GetCWD() const { return m_CWD; }
-    inline mode_t GetUMask() const { return m_UMask; }
+    inline INode*   GetRootNode() const { return m_RootNode; }
+    inline INode*   GetCWD() const { return m_CWD; }
+    inline mode_t   GetUMask() const { return m_UMask; }
 
-    ErrorOr<i32>  OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
-    ErrorOr<i32>  DupFd(i32 oldFdNum, i32 newFdNum = -1, i32 flags = 0);
-    i32           CloseFd(i32 fd);
-    inline bool   IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
+    inline sigset_t GetSignalMask() const { return m_SignalMask; }
+    inline void     SetSignalMask(sigset_t mask) { m_SignalMask = mask; }
+
+    void            SendSignal(i32 signal);
+
+    ErrorOr<i32>    OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
+    ErrorOr<i32>    DupFd(i32 oldFdNum, i32 newFdNum = -1, i32 flags = 0);
+    i32             CloseFd(i32 fd);
+    inline bool     IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
     inline FileDescriptor* GetFileHandle(i32 fd) { return m_FdTable.GetFd(fd); }
 
     ErrorOr<pid_t>         WaitPid(pid_t pid, i32* wstatus, i32 flags,
@@ -123,6 +130,7 @@ class Process
     mode_t                   m_UMask    = 0;
 
     FileDescriptorTable      m_FdTable;
+    sigset_t                 m_SignalMask = 0;
     std::vector<VMM::Region> m_AddressSpace{};
     uintptr_t                m_UserStackTop = 0x70000000000;
     usize                    m_Quantum      = 1000;

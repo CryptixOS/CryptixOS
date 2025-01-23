@@ -22,23 +22,23 @@ constexpr usize TTYDEF_SPEED = B9600;
  * Control Character Defaults
  */
 constexpr usize CTRL(u64 c) { return c & 037; }
-constexpr usize CEOF     = CTRL('d');
+constexpr usize CEOF     = CTRL('D');
 constexpr usize CEOL     = 0;
 constexpr usize CERASE   = 0177;
-constexpr usize CINTR    = CTRL('c');
+constexpr usize CINTR    = CTRL('C');
 constexpr usize CSTATUS  = 0;
-constexpr usize CKILL    = CTRL('u');
+constexpr usize CKILL    = CTRL('U');
 constexpr usize CMIN     = 1;
 constexpr usize CQUIT    = 034;
-constexpr usize CSUSP    = CTRL('z');
+constexpr usize CSUSP    = CTRL('Z');
 constexpr usize CTIME    = 0;
-constexpr usize CDSUSP   = CTRL('y');
-constexpr usize CSTART   = CTRL('q');
-constexpr usize CSTOP    = CTRL('s');
-constexpr usize CLNEXT   = CTRL('v');
-constexpr usize CDISCARD = CTRL('o');
-constexpr usize CWERASE  = CTRL('w');
-constexpr usize CREPRINT = CTRL('r');
+constexpr usize CDSUSP   = CTRL('Y');
+constexpr usize CSTART   = CTRL('Q');
+constexpr usize CSTOP    = CTRL('S');
+constexpr usize CLNEXT   = CTRL('V');
+constexpr usize CDISCARD = CTRL('O');
+constexpr usize CWERASE  = CTRL('W');
+constexpr usize CREPRINT = CTRL('R');
 constexpr usize CEOT     = CEOF;
 constexpr usize CBRK     = CEOL;
 constexpr usize CRPRNT   = CREPRINT;

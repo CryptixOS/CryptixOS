@@ -102,6 +102,11 @@ pid_t Process::SetSid()
     return m_Pid;
 }
 
+void Process::SendSignal(i32 signal)
+{
+    // TODO(v1tr10l7): implement signals
+}
+
 ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
     INode* parent = m_CWD;

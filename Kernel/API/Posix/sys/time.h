@@ -22,3 +22,6 @@ struct timezone
     i32 tz_minuteswest; /* minutes west of Greenwich */
     i32 tz_dsttime;     /* type of DST correction */
 };
+
+constexpr usize CLOCK_REALTIME  = 0;
+constexpr usize CLOCK_MONOTONIC = 1;

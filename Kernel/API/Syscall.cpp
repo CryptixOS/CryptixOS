@@ -99,6 +99,7 @@ namespace Syscall
         RegisterSyscall(ID::eLStat, VFS::SysLStat);
         RegisterSyscall(ID::eLSeek, VFS::SysLSeek);
         RegisterSyscall(ID::eMMap, MM::SysMMap);
+        RegisterSyscall(ID::eSigProcMask, Process::SysSigProcMask);
         RegisterSyscall(ID::eIoCtl, VFS::SysIoCtl);
         RegisterSyscall(ID::eAccess, VFS::SysAccess);
         RegisterSyscall(ID::eDup, VFS::SysDup);
@@ -106,6 +107,7 @@ namespace Syscall
         RegisterSyscall(ID::eGetPid, Process::SysGetPid);
         RegisterSyscall(ID::eExit, Process::SysExit);
         RegisterSyscall(ID::eWait4, Process::SysWait4);
+        RegisterSyscall(ID::eKill, Process::SysKill);
         RegisterSyscall(ID::eGetUid, Process::SysGetUid);
         RegisterSyscall(ID::eGetGid, Process::SysGetGid);
         RegisterSyscall(ID::eUname, System::SysUname);
@@ -119,6 +121,7 @@ namespace Syscall
         RegisterSyscall(ID::eGet_eGid, Process::SysGet_eGid);
         RegisterSyscall(ID::eSet_pGid, Process::SysSet_pGid);
         RegisterSyscall(ID::eGet_pPid, Process::SysGet_pPid);
+        RegisterSyscall(ID::eGetPgrp, Process::SysGetPgrp);
         RegisterSyscall(ID::eSetSid, Process::SysSetSid);
         RegisterSyscall(ID::eGet_pGid, Process::SysGet_pGid);
         RegisterSyscall(ID::eGetSid, Process::SysGetSid);
@@ -128,6 +131,8 @@ namespace Syscall
         RegisterSyscall(ID::eSetTimeOfDay, Time::SysSetTimeOfDay);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
         RegisterSyscall(ID::eGetDents64, VFS::SysGetDents64);
+        RegisterSyscall(ID::eClockGetTime, Time::SysClockGetTime);
+        RegisterSyscall(ID::eNanoSleep, Process::SysNanoSleep);
         RegisterSyscall(ID::ePanic, sysPanic);
         RegisterSyscall(ID::eOpenAt, VFS::SysOpenAt);
         RegisterSyscall(ID::eMkDirAt, VFS::SysMkDirAt);

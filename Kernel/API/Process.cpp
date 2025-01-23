@@ -4,6 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Posix/signal.h>
+#include <API/Posix/sys/mman.h>
 #include <API/Posix/sys/wait.h>
 #include <API/Process.hpp>
 
@@ -15,6 +17,38 @@
 
 namespace Syscall::Process
 {
+    ErrorOr<i32> SysSigProcMask(Arguments& args)
+    {
+        i32             how         = args.Get<i32>(0);
+        const sigset_t* set         = args.Get<const sigset_t*>(1);
+        sigset_t*       oldSet      = args.Get<sigset_t*>(2);
+
+        class Process*  current     = ::Process::GetCurrent();
+        sigset_t        currentMask = current->GetSignalMask();
+
+        if (oldSet)
+        {
+            if (!current->ValidateAddress(oldSet, PROT_READ | PROT_WRITE))
+                return Error(EFAULT);
+            *oldSet = currentMask;
+        }
+
+        if (!set) return 0;
+        if (!current->ValidateAddress(set, PROT_READ | PROT_WRITE))
+            return Error(EFAULT);
+
+        switch (how)
+        {
+            case SIG_BLOCK: currentMask &= ~(*set); break;
+            case SIG_UNBLOCK: currentMask |= *set; break;
+            case SIG_SETMASK: currentMask = *set; break;
+
+            default: return Error(EINVAL);
+        }
+
+        current->SetSignalMask(currentMask);
+        return 0;
+    }
     ErrorOr<pid_t> SysGetPid(Arguments& args)
     {
         class Process* current = CPU::GetCurrentThread()->parent;
@@ -50,7 +84,7 @@ namespace Syscall::Process
         auto* process = CPU::GetCurrentThread()->parent;
 
         CPU::SetInterruptFlag(false);
-        LogTrace("SysExit: exiting process: '{}'...", process->m_Name);
+        // LogTrace("SysExit: exiting process: '{}'...", process->m_Name);
         return process->Exit(code);
     }
     ErrorOr<i32> SysWait4(Arguments& args)
@@ -64,6 +98,30 @@ namespace Syscall::Process
         class Process* process = thread->parent;
 
         return process->WaitPid(pid, wstatus, flags, rusage);
+    }
+    ErrorOr<i32> SysKill(Arguments& args)
+    {
+        pid_t          pid     = args.Get<pid_t>(0);
+        i32            sig     = args.Get<i32>(1);
+
+        class Process* current = ::Process::GetCurrent();
+        class Process* target  = nullptr;
+        if (pid == 0) target = current;
+        else if (pid > 0) target = Scheduler::GetProcess(pid);
+        else if (pid == -1)
+        {
+            // Send to everyone
+        }
+        else if (pid < -1)
+        {
+            // Send to everyone in group
+            target = Scheduler::GetProcess(-pid);
+        }
+
+        (void)target;
+        (void)sig;
+
+        return Error(ENOSYS);
     }
 
     ErrorOr<uid_t> SysGetUid(Arguments&)
@@ -131,6 +189,11 @@ namespace Syscall::Process
 
         return current->GetParentPid();
     }
+    ErrorOr<pid_t> SysGetPgrp(Syscall::Arguments& args)
+    {
+        args.Args[0] = 0;
+        return SysGet_pGid(args);
+    }
     ErrorOr<pid_t> SysSetSid(Arguments&)
     {
         class Process* current = ::Process::GetCurrent();
@@ -167,5 +230,14 @@ namespace Syscall::Process
         if (current->GetSid() != process->GetSid()) return Error(EPERM);
         return process->GetSid();
     }
+    ErrorOr<i32> SysNanoSleep(Arguments& args)
+    {
+        const timespec* duration = args.Get<const timespec*>(0);
+        timespec*       rem      = args.Get<timespec*>(1);
 
+        (void)duration;
+        (void)rem;
+        // FIXME(v1tr10l7): sleep
+        return Error(ENOSYS);
+    }
 }; // namespace Syscall::Process
