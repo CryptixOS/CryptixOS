@@ -14,4 +14,5 @@ constexpr usize     MAP_ANONYMOUS = 0x20;
 namespace Syscall::MM
 {
     ErrorOr<intptr_t> SysMMap(Syscall::Arguments& args);
+    ErrorOr<i32>      SysMUnMap(Arguments& args);
 } // namespace Syscall::MM

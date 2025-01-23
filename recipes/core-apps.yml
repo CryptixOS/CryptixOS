@@ -173,7 +173,38 @@ packages:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/root']
       - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/init.cpp', '-o', '@THIS_COLLECT_DIR@/usr/sbin/init']
       #- args: ['@OPTION:arch-triple@-gcc', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/sh.c', '-o', '@THIS_COLLECT_DIR@/usr/sbin/sh']
-      #
+      
+  - name: less
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: Excellent text file viewer
+      description: This package contains a text file viewer.
+      spdx: 'GPL-3-only BSD-2-Clause'
+      website: 'https://www.greenwoodsoftware.com/less/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['sys-apps']
+    source:
+      subdir: sources
+      url: 'http://www.greenwoodsoftware.com/less/less-668.tar.gz'
+      format: 'tar.gz'
+      checksum: blake2b:0f6a85a1c66577dd2a28682a6f8399e42fdbe9fc1498b2e89c6bb7c47109e8d3ab934abe5dd998b2c8dfacfb174ad9daeb79b3d4c13df22fa035ea792b2eaf5e
+      extract_path: 'less-668'
+      version: '668'
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - ncurses
+    revision: 1
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
       
   - name: neofetch
     architecture: noarch

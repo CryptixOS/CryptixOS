@@ -5,8 +5,11 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <API/Posix/unistd.h>
+#include <Arch/CPU.hpp>
 
 #include <Scheduler/Process.hpp>
+#include <Scheduler/Scheduler.hpp>
+#include <Scheduler/Thread.hpp>
 
 #include <Utility/Math.hpp>
 #include <VFS/FileDescriptor.hpp>
@@ -63,7 +66,14 @@ ErrorOr<isize> FileDescriptor::Read(void* const outBuffer, usize count)
     if (!GetNode()) return Error(ENOENT);
     if (GetNode()->IsDirectory()) return Error(EISDIR);
 
-    // if (GetNode()->IsSocket())
+    if (WouldBlock())
+    {
+        if (IsNonBlocking()) return Error(IsSocket() ? EWOULDBLOCK : EAGAIN);
+        Thread* current = CPU::GetCurrentThread();
+        Scheduler::Block(current);
+
+        if (current->WasInterrupted()) return Error(EINTR);
+    }
 
     isize bytesRead
         = m_Description->Node->Read(outBuffer, m_Description->Offset, count);

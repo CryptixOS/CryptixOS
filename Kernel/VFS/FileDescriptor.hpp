@@ -117,7 +117,10 @@ struct FileDescriptor
     void                 Lock() { m_Description->Lock.Acquire(); }
     void                 Unlock() { m_Description->Lock.Release(); }
 
-    inline bool          IsPipe() const
+    // TODO(v1t10l7): verify whether the fd is blocking
+    inline bool          WouldBlock() const { return false; }
+    inline bool IsSocket() const { return m_Description->Node->IsSocket(); }
+    inline bool IsPipe() const
     {
         // FIXME(v1tr10l7): implement this once pipes are supported
 
@@ -131,6 +134,8 @@ struct FileDescriptor
     {
         return m_Description->AccessMode & FileAccessMode::eWrite;
     }
+
+    inline bool IsNonBlocking() const { return m_Flags & O_NONBLOCK; }
     inline bool CloseOnExec() const { return m_Flags & O_CLOEXEC; }
 
     [[clang::no_sanitize("alignment")]]

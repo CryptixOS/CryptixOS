@@ -81,7 +81,8 @@ void TTY::PutChar(char c)
         if (c == m_Termios.c_cc[VKILL] && m_Termios.c_lflag & ECHOK)
             return KillLine();
 
-        if (c == m_Termios.c_cc[VERASE] && m_Termios.c_lflag & ECHOE)
+        if ((c == m_Termios.c_cc[VERASE] || c == '\b')
+            && m_Termios.c_lflag & ECHOE)
             return EraseChar();
         if (c == m_Termios.c_cc[VWERASE] && m_Termios.c_lflag & ECHOE)
             return EraseWord();

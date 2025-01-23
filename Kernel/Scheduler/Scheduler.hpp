@@ -16,6 +16,7 @@ namespace Scheduler
     void Initialize();
     void PrepareAP(bool start = false);
 
+    void Block(Thread* thread);
     [[noreturn]]
     void     Yield();
 

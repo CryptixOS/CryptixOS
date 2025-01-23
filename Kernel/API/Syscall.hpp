@@ -39,6 +39,7 @@ namespace Syscall
         ePoll         = 7,
         eLSeek        = 8,
         eMMap         = 9,
+        eMUnMap       = 11,
         eSigProcMask  = 14,
         eIoCtl        = 16,
         eAccess       = 21,

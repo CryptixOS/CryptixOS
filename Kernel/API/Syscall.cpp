@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <API/Syscall.hpp>
+#include <API/SyscallEntryPoints.hpp>
 
 #include <API/MM.hpp>
 #include <API/Process.hpp>
@@ -90,7 +90,7 @@ namespace Syscall
         };
 
         Initialize();
-        RegisterSyscall(ID::eRead, VFS::SysRead);
+        RegisterSyscall(ID::eRead, SysRead);
         RegisterSyscall(ID::eWrite, VFS::SysWrite);
         RegisterSyscall(ID::eOpen, VFS::SysOpen);
         RegisterSyscall(ID::eClose, VFS::SysClose);
@@ -99,6 +99,7 @@ namespace Syscall
         RegisterSyscall(ID::eLStat, VFS::SysLStat);
         RegisterSyscall(ID::eLSeek, VFS::SysLSeek);
         RegisterSyscall(ID::eMMap, MM::SysMMap);
+        RegisterSyscall(ID::eMUnMap, MM::SysMUnMap);
         RegisterSyscall(ID::eSigProcMask, Process::SysSigProcMask);
         RegisterSyscall(ID::eIoCtl, VFS::SysIoCtl);
         RegisterSyscall(ID::eAccess, VFS::SysAccess);

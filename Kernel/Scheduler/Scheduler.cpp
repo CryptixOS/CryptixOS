@@ -125,6 +125,7 @@ namespace Scheduler
         }
     };
 
+    void Block(Thread* thread) { ToDo(); }
     [[noreturn]]
     void Yield()
     {

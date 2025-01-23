@@ -19,16 +19,17 @@
 
 namespace Syscall::MM
 {
-    ErrorOr<intptr_t> SysMMap(Syscall::Arguments& args)
+    ErrorOr<intptr_t> SysMMap(Arguments& args)
     {
-        uintptr_t addr    = args.Args[0];
-        usize     len     = args.Args[1];
-        usize     prot    = args.Args[2];
-        usize     flags   = args.Args[3];
-        i32       fd      = args.Args[4];
-        off_t     offset  = args.Args[5];
+        uintptr_t  addr    = args.Args[0];
+        usize      len     = args.Args[1];
+        usize      prot    = args.Args[2];
+        usize      flags   = args.Args[3];
+        i32        fd      = args.Args[4];
+        off_t      offset  = args.Args[5];
 
-        Process*  process = CPU::GetCurrentThread()->parent;
+        Process*   process = CPU::GetCurrentThread()->parent;
+        ScopedLock guard(process->m_Lock);
         DebugSyscall(
             "MMAP: hint: {:#x}, size: {}, prot: {}, flags: {}, fd: {}, offset: "
             "{}",
@@ -64,6 +65,32 @@ namespace Syscall::MM
 
         LogError("MMAP: Failed, only MAP_ANONYMOUS is implemented");
         return_err(MAP_FAILED, EINVAL);
+    }
+    ErrorOr<i32> SysMUnMap(Arguments& args)
+    {
+        Pointer    addr    = args.Get<uintptr_t>(0);
+        usize      length  = args.Get<usize>(1);
+
+        Process*   current = Process::GetCurrent();
+        ScopedLock guard(current->m_Lock);
+        current->PageMap->UnmapRange(addr, length);
+
+        Pointer                            phys = 0;
+        std::vector<VMM::Region>::iterator it = current->m_AddressSpace.begin();
+        for (; it < current->m_AddressSpace.end(); it++)
+        {
+            if (it->GetVirtualBase() == addr)
+            {
+                phys = it->GetPhysicalBase();
+                break;
+            }
+        }
+
+        if (!phys || it == current->m_AddressSpace.end()) return Error(EFAULT);
+        usize pageCount
+            = Math::AlignUp(length, PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
+        PMM::FreePages(phys.ToHigherHalf<uintptr_t>(), pageCount);
+        return 0;
     }
 
 }; // namespace Syscall::MM

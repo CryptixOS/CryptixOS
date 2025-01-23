@@ -8,8 +8,8 @@
 #include <Drivers/Serial.hpp>
 #include <Drivers/Terminal.hpp>
 
-#include <Memory/PMM.hpp>
 #include <Boot/BootInfo.hpp>
+#include <Memory/PMM.hpp>
 
 #include <backends/fb.h>
 
@@ -18,7 +18,22 @@
 std::vector<Terminal*> Terminal::s_Terminals = {};
 Terminal*              s_ActiveTerminal      = nullptr;
 
-bool                   Terminal::Initialize(Framebuffer& framebuffer)
+bool                   g_Decckm              = false;
+
+static void            DecPrivate(u64 escValCount, u32* escValues, u64 final)
+{
+    if (escValues[0] == 1)
+    {
+        if (final == 'h') g_Decckm = true;
+        else if (final == 'l') g_Decckm = false;
+    }
+}
+static void TerminalCallback(flanterm_context* term, u64 t, u64 a, u64 b, u64 c)
+{
+    if (t == 10) DecPrivate(a, (u32*)b, c);
+}
+
+bool Terminal::Initialize(Framebuffer& framebuffer)
 {
     m_Framebuffer = framebuffer;
     if (!framebuffer.address) return false;
@@ -37,6 +52,7 @@ bool                   Terminal::Initialize(Framebuffer& framebuffer)
         framebuffer.blue_mask_size, framebuffer.blue_mask_shift, nullptr,
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0, 1,
         0, 0, 0);
+    m_Context->callback = TerminalCallback;
 
     if (!s_ActiveTerminal) s_ActiveTerminal = this;
     return (m_Initialized = true);

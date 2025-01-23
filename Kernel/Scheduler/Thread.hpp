@@ -42,25 +42,28 @@ struct Thread
     Thread(Process* parent, uintptr_t pc, bool user = true);
     ~Thread();
 
-    Thread*                                  Fork(Process* parent);
+    Thread*     Fork(Process* parent);
 
-    usize                                    runningOn;
-    Thread*                                  self;
-    uintptr_t                                stack;
+    // FIXME(v1tr10l7): implement tthis once we have signals
+    inline bool WasInterrupted() const { return false; }
 
-    uintptr_t                                kernelStack;
-    uintptr_t                                pageFaultStack;
+    usize       runningOn;
+    Thread*     self;
+    uintptr_t   stack;
 
-    usize                                    fpuStoragePageCount;
-    uintptr_t                                fpuStorage;
+    uintptr_t   kernelStack;
+    uintptr_t   pageFaultStack;
 
-    tid_t                                    tid;
-    errno_t                                  error;
-    Process*                                 parent;
-    uintptr_t                                stackVirt;
+    usize       fpuStoragePageCount;
+    uintptr_t   fpuStorage;
 
-    CPUContext                               ctx;
-    CPUContext                               SavedContext;
+    tid_t       tid;
+    errno_t     error;
+    Process*    parent;
+    uintptr_t   stackVirt;
+
+    CPUContext  ctx;
+    CPUContext  SavedContext;
 
     std::vector<std::pair<uintptr_t, usize>> stacks;
     bool                                     user = false;

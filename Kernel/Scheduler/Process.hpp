@@ -138,4 +138,5 @@ class Process
     std::vector<VMM::Region> m_AddressSpace{};
     uintptr_t                m_UserStackTop = 0x70000000000;
     usize                    m_Quantum      = 1000;
+    Spinlock                 m_Lock;
 };
