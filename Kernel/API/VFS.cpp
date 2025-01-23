@@ -21,6 +21,21 @@
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
 
+namespace API::VFS
+{
+    ErrorOr<isize> SysRead(i32 fdNum, u8* out, usize bytes)
+    {
+        Process* current = Process::GetCurrent();
+        if (!current->ValidateWrite(out, bytes)) return Error(EFAULT);
+
+        FileDescriptor* fd = current->GetFileHandle(fdNum);
+        if (!fd) return Error(EBADF);
+
+        return fd->Read(out, bytes);
+    }
+
+}; // namespace API::VFS
+
 namespace Syscall::VFS
 {
     using Syscall::Arguments;

@@ -36,7 +36,7 @@ extern "C"
     //    FILE*          tmpfile(void);
     //    char*          tmpnam(char* s);
     //    int            fclose(FILE* stream);
-    //    int            fflush(FILE* stream);
+    int    fflush(FILE* stream);
     //    FILE* fopen(const char* restrict filename, const char* restrict
     //    GetMode); FILE* freopen(const char* restrict filename, const char*
     //    restrict GetMode,

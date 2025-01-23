@@ -10,6 +10,14 @@
 
 #include <Drivers/Device.hpp>
 
+enum class KeyModifiers
+{
+    eLeftShift,
+    eRightShift,
+    eLeftSuper,
+    eRightSuper,
+};
+
 struct CPUContext;
 class PS2Keyboard : public Device
 {
@@ -39,5 +47,40 @@ class PS2Keyboard : public Device
   private:
     CTOS_UNUSED PS2Port m_Port = PS2Port::eNone;
 
-    static void         HandleInterrupt(CPUContext* ctx);
+    enum class Command
+    {
+        eSetLED                         = 0xed,
+        eEcho                           = 0xee,
+        eIdentify                       = 0xf2,
+        eSetTypematicRateAndDelay       = 0xf3,
+        eEnableScanning                 = 0xf4,
+        eDisableScanning                = 0xf5,
+        eSetDefaultParameters           = 0xf6,
+        // Only scancode set 3
+        eSetAllKeysToAutoRepeat         = 0xf7,
+        // --||--
+        eSetKeysToMakeRelease           = 0xf8,
+        //  --||--
+        eSetKeysToMakeOnly              = 0xf9,
+        // --||--
+        eSetKeysToAutoRepeatMakeRelease = 0xfa,
+        // --||--
+        eSetKeyToAutoRepeat             = 0xfb,
+        // --||--
+        eSetKeyToMakeRelease            = 0xfc,
+        // --||--
+        eSetKeyToMakeOnly               = 0xfd,
+        eResendByte                     = 0xfe,
+        eResetAndStartSelfTest          = 0xff,
+    };
+
+    enum class Response
+    {
+        eKeyDetectionError = 0x00,
+        eSelfTestPassed    = 0xaa,
+        eEchoResponse      = 0xee,
+        eAcknowledge       = 0xfa,
+    };
+
+    static void HandleInterrupt(CPUContext* ctx);
 };

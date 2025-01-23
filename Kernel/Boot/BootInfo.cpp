@@ -153,14 +153,14 @@ namespace BootInfo
         (void)s_StackSizeRequest.response;
         (void)s_EntryPointRequest.response;
 
-        Logger::EnableOutput(LOG_OUTPUT_E9);
+        Logger::EnableSink(LOG_SINK_E9);
 
         if (LIMINE_BASE_REVISION_SUPPORTED == false)
             EarlyPanic("Boot: Limine base revision is not supported");
         if (!s_FramebufferRequest.response
             || s_FramebufferRequest.response->framebuffer_count < 1)
             EarlyPanic("Boot: Failed to acquire the framebuffer!");
-        Logger::EnableOutput(LOG_OUTPUT_TERMINAL);
+        Logger::EnableSink(LOG_SINK_TERMINAL);
 
         if (!s_MemmapRequest.response
             || s_MemmapRequest.response->entry_count == 0)

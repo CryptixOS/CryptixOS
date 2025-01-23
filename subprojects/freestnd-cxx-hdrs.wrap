@@ -1,0 +1,7 @@
+[wrap-git]
+url = https://github.com/osdev0/freestnd-cxx-hdrs
+revision = trunk
+depth = 1
+
+[provide]
+freestnd-cxx-hdrs = freestnd_cxx_hdrs_dep

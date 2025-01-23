@@ -73,6 +73,8 @@ void kernelThread()
     userProcess->PageMap = pageMap;
     uintptr_t address
         = ldPath.empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
+
+    Logger::DisableSink(LOG_SINK_TERMINAL);
     Scheduler::EnqueueThread(new Thread(userProcess, address, argv, envp,
                                         program, CPU::GetCurrent()->ID));
 
@@ -88,7 +90,7 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
 
     VMM::Initialize();
     Serial::Initialize();
-    Logger::EnableOutput(LOG_OUTPUT_SERIAL);
+    Logger::EnableSink(LOG_SINK_SERIAL);
 
     LogInfo(
         "Boot: Kernel loaded with {}-{} -> firmware type: {}, boot time: {}s",

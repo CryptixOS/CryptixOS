@@ -100,6 +100,7 @@ deps = [
 
   dependency('limine'),
   dependency('flanterm'),
+  #dependency('freestnd-cxx-hdrs'),
   dependency('libstdcxx_headers'),
   dependency(
     'compiler_rt_builtins',

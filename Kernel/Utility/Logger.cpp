@@ -32,7 +32,7 @@ namespace Logger
 {
     namespace
     {
-        usize    s_EnabledOutputs = 0;
+        usize    s_EnabledSinks = 0;
         Spinlock s_Lock;
         Terminal s_Terminal;
 
@@ -299,17 +299,14 @@ namespace Logger
         }
     }; // namespace
 
-    CTOS_NO_KASAN void EnableOutput(usize output)
+    CTOS_NO_KASAN void EnableSink(usize output)
     {
-        if (output == LOG_OUTPUT_TERMINAL)
+        if (output == LOG_SINK_TERMINAL)
             s_Terminal.Initialize(*BootInfo::GetFramebuffer());
 
-        s_EnabledOutputs |= output;
+        s_EnabledSinks |= output;
     }
-    CTOS_NO_KASAN void DisableOutput(usize output)
-    {
-        s_EnabledOutputs &= ~output;
-    }
+    CTOS_NO_KASAN void DisableSink(usize output) { s_EnabledSinks &= ~output; }
 
     CTOS_NO_KASAN void LogChar(u64 c)
     {
@@ -319,9 +316,9 @@ namespace Logger
 
     CTOS_NO_KASAN void LogString(std::string_view str)
     {
-        if (s_EnabledOutputs & LOG_OUTPUT_E9) E9::PrintString(str);
-        if (s_EnabledOutputs & LOG_OUTPUT_SERIAL) Serial::Write(str);
-        if (s_EnabledOutputs & LOG_OUTPUT_TERMINAL) s_Terminal.PrintString(str);
+        if (s_EnabledSinks & LOG_SINK_E9) E9::PrintString(str);
+        if (s_EnabledSinks & LOG_SINK_SERIAL) Serial::Write(str);
+        if (s_EnabledSinks & LOG_SINK_TERMINAL) s_Terminal.PrintString(str);
     }
 
     CTOS_NO_KASAN void Log(LogLevel logLevel, std::string_view string)

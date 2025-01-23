@@ -6,9 +6,13 @@
  */
 #pragma once
 
-#include "API/Syscall.hpp"
-#include "API/UnixTypes.hpp"
+#include <API/Syscall.hpp>
+#include <API/UnixTypes.hpp>
 
+namespace API::VFS
+{
+    ErrorOr<isize> SysRead(i32 fd, u8* out, usize bytes);
+}
 namespace Syscall::VFS
 {
     ErrorOr<isize> SysRead(Syscall::Arguments& args);

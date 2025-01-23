@@ -24,9 +24,9 @@ enum class LogLevel
     eFatal,
 };
 
-constexpr usize LOG_OUTPUT_E9            = Bit(0);
-constexpr usize LOG_OUTPUT_SERIAL        = Bit(1);
-constexpr usize LOG_OUTPUT_TERMINAL      = Bit(2);
+constexpr usize LOG_SINK_E9              = Bit(0);
+constexpr usize LOG_SINK_SERIAL          = Bit(1);
+constexpr usize LOG_SINK_TERMINAL        = Bit(2);
 
 constexpr u64   FOREGROUND_COLOR_BLACK   = 0x6d30335b1b;
 constexpr u64   FOREGROUND_COLOR_RED     = 0x6d31335b1b;
@@ -53,8 +53,8 @@ constexpr u64   RESET_COLOR              = 0x6d305b1b;
 class Terminal;
 namespace Logger
 {
-    CTOS_NO_KASAN void EnableOutput(usize output);
-    CTOS_NO_KASAN void DisableOutput(usize output);
+    CTOS_NO_KASAN void EnableSink(usize sink);
+    CTOS_NO_KASAN void DisableSink(usize sink);
 
     CTOS_NO_KASAN void LogChar(u64 c);
     CTOS_NO_KASAN void LogString(std::string_view string);

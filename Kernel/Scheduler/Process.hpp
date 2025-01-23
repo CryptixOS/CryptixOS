@@ -53,8 +53,12 @@ class Process
     static Process* CreateIdleProcess();
 
     bool            ValidateAddress(const Pointer address, i32 accessMode);
+    bool            ValidateWrite(const Pointer address, usize size)
+    {
+        return ValidateAddress(address, 0);
+    }
 
-    inline pid_t    GetParentPid() const
+    inline pid_t GetParentPid() const
     {
         if (m_Parent) return m_Parent->m_Pid;
 

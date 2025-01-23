@@ -40,7 +40,13 @@ extern "C"
       */
         return 0;
     }
-    int   fputws(const wchar_t* s, FILE* stream) { return -1; }
+    int fputws(const wchar_t* s, FILE* stream) { return -1; }
+
+    int fflush(FILE* stream)
+    {
+        assert(false);
+        return -1;
+    }
 
     int   fprintf(FILE* stream, const char* format, ...) { return -1; }
     usize fwrite(const void* buffer, usize size, usize count, FILE* stream)

@@ -135,7 +135,7 @@ isize TTY::Write(const void* src, off_t offset, usize bytes)
         return bytes;
     }
 
-    Logger::LogString(str);
+    m_Terminal->PrintString(str);
     return bytes;
 }
 
@@ -152,14 +152,13 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
             break;
         }
         case TCSETS:
-        {
+        case TCSETSW:
             std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
                         sizeof(termios));
             break;
-        }
         case TIOCGWINSZ:
         {
-            if (!m_Terminal->GetContext()) return_err(-1, ENOTTY);
+            // if (!m_Terminal->GetContext()) return_err(-1, ENOTTY);
 
             winsize* windowSize   = reinterpret_cast<winsize*>(argp);
             windowSize->ws_row    = m_Terminal->GetContext()->rows;
@@ -218,7 +217,16 @@ void TTY::Initialize()
 
 void TTY::SendSignal(i32 signal)
 {
+    LogTrace("Handling signal");
     if (m_Pgid < 0) return;
+
+    Process* current = Process::GetCurrent();
+    if (signal == SIGINT) current->Exit(0);
+
+    Process* groupLeader = Scheduler::GetProcess(m_Pgid);
+    groupLeader->SendSignal(signal);
+    for (const auto& child : groupLeader->GetChildren())
+        child->SendSignal(signal);
 }
 
 void TTY::EnqueueChar(u64 c)
@@ -229,10 +237,10 @@ void TTY::EnqueueChar(u64 c)
 }
 void TTY::Echo(u64 c)
 {
-    if (c == '\n' && m_Termios.c_oflag & ONLCR) Logger::LogChar('\r');
+    if (c == '\n' && m_Termios.c_oflag & ONLCR) m_Terminal->PutChar('\r');
     if (c == '\r' && m_Termios.c_oflag & ONLRET) return;
 
-    Logger::LogChar(c);
+    m_Terminal->PutChar(c);
 }
 void TTY::EraseChar()
 {
