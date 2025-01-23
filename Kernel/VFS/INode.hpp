@@ -51,6 +51,7 @@ class INode
             && this == m_Filesystem->GetMountedOn()->mountGate;
     }
     bool          IsEmpty();
+    bool          CanWrite(const Credentials& creds) const;
 
     inline bool   IsCharDevice() const { return S_ISCHR(m_Stats.st_mode); }
     inline bool   IsFifo() const { return S_ISFIFO(m_Stats.st_mode); }
@@ -66,7 +67,7 @@ class INode
     virtual isize Read(void* buffer, off_t offset, usize bytes)        = 0;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) = 0;
     virtual i32   IoCtl(usize request, usize arg) { return_err(-1, ENODEV); }
-    virtual isize Truncate(usize size) = 0;
+    virtual ErrorOr<isize> Truncate(usize size) = 0;
 
   protected:
     INode*                                       m_Parent;

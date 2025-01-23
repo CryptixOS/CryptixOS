@@ -13,6 +13,8 @@
 #include <Utility/Math.hpp>
 #include <VFS/FileDescriptor.hpp>
 
+#include <cctype>
+
 inline usize AllocatePid()
 {
     static Spinlock lock;
@@ -136,7 +138,7 @@ ErrorOr<i32> Process::DupFd(i32 oldFdNum, i32 newFdNum, i32 flags)
 }
 i32 Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
 
-i32 Process::Exec(const char* path, char** argv, char** envp)
+i32 Process::Exec(std::string path, char** argv, char** envp)
 {
     m_FdTable.Clear();
     m_FdTable.OpenStdioStreams();
@@ -146,7 +148,8 @@ i32 Process::Exec(const char* path, char** argv, char** envp)
     delete PageMap;
     PageMap = new class PageMap();
 
-    static ELF::Image program, ld;
+    std::vector<std::string_view> argvArr;
+    static ELF::Image             program, ld;
     if (!program.Load(path, PageMap, m_AddressSpace)) return Error(ENOEXEC);
 
     std::string_view ldPath = program.GetLdPath();
@@ -164,7 +167,6 @@ i32 Process::Exec(const char* path, char** argv, char** envp)
     uintptr_t address
         = ldPath.empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
 
-    std::vector<std::string_view> argvArr;
     for (char** arg = argv; *arg; arg++) argvArr.push_back(*arg);
 
     std::vector<std::string_view> envpArr;

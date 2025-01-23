@@ -17,6 +17,9 @@
 #include <Scheduler/Thread.hpp>
 #include <Utility/Spinlock.hpp>
 
+#include <VFS/ProcFs/ProcFs.hpp>
+#include <VFS/VFS.hpp>
+
 #include <deque>
 
 u8 g_ScheduleVector = 0x20;
@@ -29,6 +32,7 @@ namespace Scheduler
         Process*                            s_KernelProcess = nullptr;
         Spinlock                            s_ProcessListLock;
         std::unordered_map<pid_t, Process*> s_Processes;
+        ProcFs*                             s_ProcFs = nullptr;
 
         std::deque<Thread*>                 s_ExecutionQueue;
 
@@ -104,6 +108,14 @@ namespace Scheduler
         LogInfo("Scheduler: Kernel process created");
         LogInfo("Scheduler: Initialized");
     }
+    void InitializeProcFs()
+    {
+        VFS::CreateNode(VFS::GetRootNode(), "/proc", 0755 | S_IFDIR);
+        Assert(VFS::Mount(VFS::GetRootNode(), "", "/proc", "procfs"));
+        s_ProcFs = reinterpret_cast<ProcFs*>(VFS::GetMountPoints()["/proc"]);
+
+        s_ProcFs->AddProcess(s_KernelProcess);
+    }
     void PrepareAP(bool start)
     {
         Process* process    = Process::CreateIdleProcess();
@@ -143,6 +155,7 @@ namespace Scheduler
 
         ScopedLock guard(s_ProcessListLock);
         s_Processes[proc->GetPid()] = proc;
+        s_ProcFs->AddProcess(proc);
 
         return proc;
     }
@@ -150,6 +163,7 @@ namespace Scheduler
     {
         ScopedLock guard(s_ProcessListLock);
         s_Processes.erase(pid);
+        s_ProcFs->RemoveProcess(pid);
     }
 
     bool ValidatePid(pid_t pid)

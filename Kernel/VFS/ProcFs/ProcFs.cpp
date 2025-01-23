@@ -10,14 +10,23 @@ std::unordered_map<pid_t, Process*> ProcFs::s_Processes;
 
 void                                ProcFs::AddProcess(Process* process)
 {
+    ScopedLock guard(m_Lock);
     Assert(!s_Processes.contains(process->GetPid()));
     s_Processes[process->GetPid()] = process;
-}
-void   ProcFs::RemoveProcess(pid_t pid) { s_Processes.erase(pid); }
+    auto nodeName                  = std::to_string(process->GetPid());
 
+    m_Root->InsertChild(new ProcFsINode(m_Root, nodeName, this, 0755 | S_IFDIR),
+                        "pid: " + nodeName);
+}
+void ProcFs::RemoveProcess(pid_t pid)
+{
+    ScopedLock guard(m_Lock);
+    s_Processes.erase(pid);
+}
 INode* ProcFs::Mount(INode* parent, INode* source, INode* target,
                      std::string_view name, void* data)
 {
+    ScopedLock guard(m_Lock);
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
                : nullptr;

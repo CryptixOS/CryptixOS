@@ -58,15 +58,17 @@ bool   INode::IsEmpty()
     m_Filesystem->Populate(this);
     return m_Children.empty();
 }
+bool INode::CanWrite(const Credentials& creds) const
+{
+    if (creds.euid == 0 || m_Stats.st_mode & S_IWOTH) return true;
+    if (creds.euid == m_Stats.st_uid && m_Stats.st_mode & S_IWUSR) return true;
+
+    return m_Stats.st_gid == creds.egid && m_Stats.st_mode & S_IWGRP;
+}
 
 bool INode::ValidatePermissions(const Credentials& creds, u32 acc)
 {
     return true;
-}
-void INode::UpdateATime()
-{
-    // TODO(v1tr10l7): check if we should update atime
-    //  TODO(v1tr10l7): update atime
 }
 
 INode* INode::Reduce(bool symlinks, bool automount, usize cnt)

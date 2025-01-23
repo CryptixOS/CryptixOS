@@ -48,6 +48,7 @@ namespace Arch
         CtosUnreachable();
     }
     void  Pause() { __asm__ volatile("pause"); }
+    void  Reboot() { IO::Out<word>(0x604, 0x2000); }
 
     usize GetEpoch() { return RTC::CurrentTime(); }
 }; // namespace Arch

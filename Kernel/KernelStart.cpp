@@ -43,8 +43,7 @@ void kernelThread()
 
     VFS::CreateNode(VFS::GetRootNode(), "/dev", 0755 | S_IFDIR);
     Assert(VFS::Mount(VFS::GetRootNode(), "", "/dev", "devtmpfs"));
-    VFS::CreateNode(VFS::GetRootNode(), "/proc", 0755 | S_IFDIR);
-    Assert(VFS::Mount(VFS::GetRootNode(), "", "/proc", "procfs"));
+    Scheduler::InitializeProcFs();
 
     TTY::Initialize();
     MemoryDevices::Initialize();

@@ -14,6 +14,7 @@ struct Thread;
 namespace Scheduler
 {
     void Initialize();
+    void InitializeProcFs();
     void PrepareAP(bool start = false);
 
     void Block(Thread* thread);

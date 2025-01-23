@@ -117,6 +117,13 @@ namespace VFS
         return new FileDescriptor(node, flags, accMode);
     }
 
+    ErrorOr<INode*> ResolvePath(PathView path)
+    {
+        INode* node = std::get<1>(ResolvePath(s_RootNode, path));
+        if (!node) return std::unexpected(errno);
+
+        return node;
+    }
     std::tuple<INode*, INode*, std::string>
     ResolvePath(INode* parent, std::string_view path, bool automount)
     {
@@ -262,12 +269,12 @@ namespace VFS
 
         node->mountGate = mountGate;
 
-        if (source.length() == 0)
+        if (source.GetSize() == 0)
             LogTrace("VFS: Mounted Filesystem '{}' on '{}'", fsName.data(),
-                     target.data());
+                     target.Raw());
         else
             LogTrace("VFS: Mounted  '{}' on '{}' with Filesystem '{}'",
-                     source.data(), target.data(), fsName.data());
+                     source.Raw(), target.Raw(), fsName.data());
 
         s_MountPoints[target] = fs;
         return true;

@@ -6,49 +6,46 @@
  */
 #include <Utility/Path.hpp>
 
-namespace Path
+bool Path::IsAbsolute(std::string_view path)
 {
-    bool IsAbsolute(std::string_view path)
+    return !path.empty() && path[0] == '/';
+}
+
+std::vector<std::string> Path::SplitPath(std::string path)
+{
+    std::vector<std::string> segments;
+    usize                    start     = path[0] == '/' ? 1 : 0;
+    usize                    end       = start;
+
+    auto                     findSlash = [path](usize pos) -> usize
     {
-        return !path.empty() && path[0] == '/';
+        usize current = pos;
+        while (path[current] != '/' && current < path.size()) current++;
+
+        return current == path.size() ? std::string::npos : current;
+    };
+
+    while ((end = findSlash(start)) != std::string::npos)
+    {
+        std::string segment = path.substr(start, end - start);
+        if (start != end) segments.push_back(segment);
+
+        start = end + 1;
     }
 
-    std::vector<std::string> SplitPath(std::string path)
+    // handle last segment
+    if (start < path.length()) segments.push_back(path.substr(start));
+    return segments;
+}
+
+bool Path::ValidateLength(PathView path)
+{
+    usize pathLen = 0;
+    while (path[pathLen])
     {
-        std::vector<std::string> segments;
-        usize                    start     = path[0] == '/' ? 1 : 0;
-        usize                    end       = start;
-
-        auto                     findSlash = [path](usize pos) -> usize
-        {
-            usize current = pos;
-            while (path[current] != '/' && current < path.size()) current++;
-
-            return current == path.size() ? std::string::npos : current;
-        };
-
-        while ((end = findSlash(start)) != std::string::npos)
-        {
-            std::string segment = path.substr(start, end - start);
-            if (start != end) segments.push_back(segment);
-
-            start = end + 1;
-        }
-
-        // handle last segment
-        if (start < path.length()) segments.push_back(path.substr(start));
-        return segments;
+        if (pathLen >= Limits::MAX_PATH_LENGTH) return false;
+        ++pathLen;
     }
 
-    bool ValidateLength(PathView path)
-    {
-        usize pathLen = 0;
-        while (path[pathLen])
-        {
-            if (pathLen >= Limits::MAX_PATH_LENGTH) return false;
-            ++pathLen;
-        }
-
-        return true;
-    }
-} // namespace Path
+    return true;
+}

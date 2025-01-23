@@ -29,7 +29,7 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual i32   IoCtl(usize request, usize arg) override;
-    virtual isize Truncate(usize size) override { return_err(-1, ENOSYS); }
+    virtual ErrorOr<isize> Truncate(usize size) override;
 
   private:
     Device* m_Device   = nullptr;

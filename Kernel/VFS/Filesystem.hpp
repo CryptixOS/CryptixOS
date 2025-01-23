@@ -47,6 +47,10 @@ class Filesystem
         return nullptr;
     }
 
+    virtual bool ShouldUpdateATime() { return true; }
+    virtual bool ShouldUpdateMTime() { return true; }
+    virtual bool ShouldUpdateCTime() { return true; }
+
   protected:
     Spinlock           m_Lock;
 

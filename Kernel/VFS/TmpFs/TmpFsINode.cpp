@@ -5,8 +5,9 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Memory/KernelHeap.hpp>
-
 #include <Scheduler/Process.hpp>
+
+#include <Time/Time.hpp>
 #include <Utility/Math.hpp>
 
 #include <VFS/TmpFs/TmpFs.hpp>
@@ -29,10 +30,9 @@ TmpFsINode::TmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
     m_Stats.st_blksize = 512;
     m_Stats.st_blocks  = 0;
 
-    // TODO(v1tr10l7): Set to realtime
-    m_Stats.st_atim    = {};
-    m_Stats.st_mtim    = {};
-    m_Stats.st_ctim    = {};
+    m_Stats.st_atim    = Time::GetReal();
+    m_Stats.st_mtim    = Time::GetReal();
+    m_Stats.st_ctim    = Time::GetReal();
 
     if (parent && parent->GetStats().st_mode & S_ISGID)
     {
@@ -92,21 +92,26 @@ isize TmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
 
     return bytes;
 }
-isize TmpFsINode::Truncate(usize size)
+ErrorOr<isize> TmpFsINode::Truncate(usize size)
 {
     ScopedLock guard(m_Lock);
+    if (size == m_Capacity) return 0;
 
-    if (size > m_Capacity)
-    {
-        usize newCapacity = m_Capacity;
-        while (newCapacity < size) m_Capacity *= 2;
+    const Credentials& creds = Process::GetCurrent()->GetCredentials();
+    if (!CanWrite(creds)) return Error(EPERM);
 
-        void* newBuffer = new u8[newCapacity];
-        if (!newBuffer) return_err(-1, ENOMEM);
+    u8* newData = new u8[size];
+    std::memcpy(newData, m_Data, size > m_Capacity ? size : m_Capacity);
 
-        std::memcpy(newBuffer, m_Data, m_Capacity);
-        delete m_Data;
-    }
+    if (m_Capacity < size)
+        std::memset(newData + m_Capacity, 0, size - m_Capacity);
+    delete m_Data;
+
+    m_Data     = newData;
+    m_Capacity = size;
+
+    if (m_Filesystem->ShouldUpdateCTime()) m_Stats.st_ctim = Time::GetReal();
+    if (m_Filesystem->ShouldUpdateMTime()) m_Stats.st_mtim = Time::GetReal();
 
     m_Stats.st_size   = static_cast<off_t>(size);
     m_Stats.st_blocks = Math::DivRoundUp(m_Stats.st_size, m_Stats.st_blksize);

@@ -32,6 +32,8 @@ namespace Syscall
     ErrorOr<isize> SysGetGid(Arguments& args);
     ErrorOr<isize> SysUname(Arguments& args);
     ErrorOr<isize> SysFcntl(Arguments& args);
+    ErrorOr<isize> SysTruncate(Arguments& args);
+    ErrorOr<isize> SysFTruncate(Arguments& args);
     ErrorOr<isize> SysGetCwd(Arguments& args);
     ErrorOr<isize> SysChDir(Arguments& args);
     ErrorOr<isize> SysFChDir(Arguments& args);

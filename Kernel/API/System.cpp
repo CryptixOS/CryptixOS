@@ -5,12 +5,13 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <API/System.hpp>
+#include <Arch/Arch.hpp>
 
 #include <API/Posix/sys/utsname.h>
 
 namespace Syscall::System
 {
-    ErrorOr<isize> SysUname(Syscall::Arguments& args)
+    ErrorOr<isize> SysUname(Arguments& args)
     {
         utsname* out = reinterpret_cast<utsname*>(args.Args[0]);
         strncpy(out->sysname, "Cryptix", sizeof(out->sysname));
@@ -20,5 +21,10 @@ namespace Syscall::System
         strncpy(out->machine, CTOS_ARCH_STRING, sizeof(out->sysname));
 
         return 0;
+    }
+    ErrorOr<i32> SysReboot(Arguments& args)
+    {
+        Arch::Reboot();
+        return Error(ENOSYS);
     }
 } // namespace Syscall::System

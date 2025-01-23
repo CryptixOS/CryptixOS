@@ -14,7 +14,6 @@
 #include <Memory/VMM.hpp>
 
 #include <VFS/FileDescriptorTable.hpp>
-#include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
 
 #include <expected>
@@ -26,6 +25,7 @@ enum class PrivilegeLevel
     eUnprivileged,
 };
 
+class INode;
 struct Credentials
 {
     uid_t              uid;
@@ -116,7 +116,7 @@ class Process
                                    struct rusage* rusage);
 
     Process*               Fork();
-    i32                    Exec(const char* path, char** argv, char** envp);
+    i32                    Exec(std::string path, char** argv, char** envp);
     i32                    Exit(i32 code);
 
     friend struct Thread;

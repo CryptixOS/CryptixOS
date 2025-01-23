@@ -11,4 +11,5 @@
 namespace Syscall::System
 {
     ErrorOr<isize> SysUname(Syscall::Arguments& args);
-}
+    ErrorOr<i32>   SysReboot(Syscall::Arguments& args);
+} // namespace Syscall::System

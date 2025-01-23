@@ -42,6 +42,7 @@ srcs += files(
   'Utility/Kasan.cpp',
   'Utility/Logger.cpp',
   'Utility/Path.cpp',
+  'Utility/PathView.cpp',
   'Utility/Stacktrace.cpp',
   'Utility/Ubsan.cpp',
 

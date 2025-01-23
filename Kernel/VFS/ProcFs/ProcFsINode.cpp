@@ -58,4 +58,4 @@ isize ProcFsINode::Write(const void* buffer, off_t offset, usize bytes)
 {
     return -1;
 }
-isize ProcFsINode::Truncate(usize size) { return -1; }
+ErrorOr<isize> ProcFsINode::Truncate(usize size) { return Error(EROFS); }

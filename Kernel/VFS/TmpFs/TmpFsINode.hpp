@@ -35,7 +35,7 @@ class TmpFsINode final : public INode
     }
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
-    virtual isize Truncate(usize size) override;
+    virtual ErrorOr<isize> Truncate(usize size) override;
 
   private:
     u8*   m_Data     = nullptr;

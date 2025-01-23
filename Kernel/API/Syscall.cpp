@@ -92,7 +92,7 @@ namespace Syscall
         Initialize();
         RegisterSyscall(ID::eRead, SysRead);
         RegisterSyscall(ID::eWrite, SysWrite);
-        RegisterSyscall(ID::eOpen, VFS::SysOpen);
+        RegisterSyscall(ID::eOpen, SysOpen);
         RegisterSyscall(ID::eClose, SysClose);
         RegisterSyscall(ID::eStat, VFS::SysStat);
         RegisterSyscall(ID::eFStat, VFS::SysFStat);
@@ -113,6 +113,8 @@ namespace Syscall
         RegisterSyscall(ID::eGetGid, Process::SysGetGid);
         RegisterSyscall(ID::eUname, System::SysUname);
         RegisterSyscall(ID::eFcntl, VFS::SysFcntl);
+        RegisterSyscall(ID::eTruncate, SysTruncate);
+        RegisterSyscall(ID::eFTruncate, SysFTruncate);
         RegisterSyscall(ID::eGetCwd, VFS::SysGetCwd);
         RegisterSyscall(ID::eChDir, VFS::SysChDir);
         RegisterSyscall(ID::eFChDir, VFS::SysFChDir);
@@ -130,6 +132,7 @@ namespace Syscall
         RegisterSyscall(ID::eExecve, Process::SysExecve);
         RegisterSyscall(ID::eArchPrCtl, SysArchPrCtl);
         RegisterSyscall(ID::eSetTimeOfDay, Time::SysSetTimeOfDay);
+        RegisterSyscall(ID::eReboot, System::SysReboot);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
         RegisterSyscall(ID::eGetDents64, VFS::SysGetDents64);
         RegisterSyscall(ID::eClockGetTime, Time::SysClockGetTime);

@@ -171,8 +171,8 @@ packages:
     build:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/sbin']
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/root']
-      - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/init.cpp', '-o', '@THIS_COLLECT_DIR@/usr/sbin/init']
-      #- args: ['@OPTION:arch-triple@-gcc', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/sh.c', '-o', '@THIS_COLLECT_DIR@/usr/sbin/sh']
+      - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/init.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/init']
+      #- args: ['@OPTION:arch-triple@-gcc', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/reboot.c', '-o', '@THIS_COLLECT_DIR@/usr/sbin/reboot']
       
   - name: less
     architecture: '@OPTION:arch@'

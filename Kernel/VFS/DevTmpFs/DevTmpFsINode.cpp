@@ -4,7 +4,10 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Time/Time.hpp>
 #include <Utility/Math.hpp>
+
+#include <Scheduler/Process.hpp>
 #include <VFS/DevTmpFs/DevTmpFsINode.hpp>
 
 #include <cstdlib>
@@ -29,10 +32,9 @@ DevTmpFsINode::DevTmpFsINode(INode* parent, std::string_view name,
         m_Data     = new u8[m_Capacity];
     }
 
-    // TODO(v1tr10l7): Set to realtime
-    m_Stats.st_atim = {};
-    m_Stats.st_ctim = {};
-    m_Stats.st_mtim = {};
+    m_Stats.st_atim = Time::GetReal();
+    m_Stats.st_ctim = Time::GetReal();
+    m_Stats.st_mtim = Time::GetReal();
 }
 
 isize DevTmpFsINode::Read(void* buffer, off_t offset, usize bytes)
@@ -83,4 +85,29 @@ i32 DevTmpFsINode::IoCtl(usize request, usize arg)
     if (!m_Device) return_err(-1, ENOTTY);
 
     return m_Device->IoCtl(request, arg);
+}
+ErrorOr<isize> DevTmpFsINode::Truncate(usize size)
+{
+    ScopedLock guard(m_Lock);
+    if (m_Device || size == m_Capacity) return 0;
+
+    const Credentials& creds = Process::GetCurrent()->GetCredentials();
+    if (!CanWrite(creds)) return Error(EPERM);
+
+    u8* newData = new u8[size];
+    std::memcpy(newData, m_Data, size > m_Capacity ? size : m_Capacity);
+
+    if (m_Capacity < size)
+        std::memset(newData + m_Capacity, 0, size - m_Capacity);
+    delete m_Data;
+
+    m_Data     = newData;
+    m_Capacity = size;
+
+    if (m_Filesystem->ShouldUpdateCTime()) m_Stats.st_ctim = Time::GetReal();
+    if (m_Filesystem->ShouldUpdateMTime()) m_Stats.st_mtim = Time::GetReal();
+
+    m_Stats.st_size   = static_cast<off_t>(size);
+    m_Stats.st_blocks = Math::DivRoundUp(m_Stats.st_size, m_Stats.st_blksize);
+    return 0;
 }

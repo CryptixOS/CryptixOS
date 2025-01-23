@@ -7,16 +7,24 @@
 #pragma once
 
 #include <API/Limits.hpp>
+#include <Utility/PathView.hpp>
 
 #include <string_view>
 #include <vector>
 
-using PathView = std::string_view;
-
-namespace Path
+class Path
 {
-    bool                     IsAbsolute(std::string_view path);
-    bool                     ValidateLength(PathView path);
+  public:
+    Path(const char* path)
+        : m_Path(path)
+    {
+    }
 
-    std::vector<std::string> SplitPath(std::string path);
-} // namespace Path
+    static bool                     IsAbsolute(std::string_view path);
+    static bool                     ValidateLength(PathView path);
+
+    static std::vector<std::string> SplitPath(std::string path);
+
+  private:
+    std::string m_Path;
+};

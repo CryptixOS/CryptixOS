@@ -42,7 +42,7 @@ class ProcFsINode : public INode
     virtual void  InsertChild(INode* node, std::string_view name) override;
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
-    virtual isize Truncate(usize size) override;
+    virtual ErrorOr<isize> Truncate(usize size) override;
 
   private:
     ProcFsProperty* m_Property = nullptr;

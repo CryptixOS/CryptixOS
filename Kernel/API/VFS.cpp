@@ -43,11 +43,45 @@ namespace API::VFS
 
         return fd->Write(in, bytes);
     }
+    ErrorOr<isize> SysOpen(PathView path, i32 flags, mode_t mode)
+    {
+        Process* current = Process::GetCurrent();
+        if (!current->ValidateRead(path.Raw(), Limits::MAX_PATH_LENGTH))
+            return Error(EFAULT);
+        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
+        return current->OpenAt(AT_FDCWD, path, flags, mode);
+    }
     ErrorOr<isize> SysClose(i32 fdNum)
     {
         Process* current = Process::GetCurrent();
         return current->CloseFd(fdNum);
+    }
+
+    ErrorOr<isize> SysTruncate(PathView path, off_t length)
+    {
+        Process* current = Process::GetCurrent();
+        if (length < 0) return Error(EINVAL);
+
+        if (!current->ValidateRead(path.Raw(), Limits::MAX_PATH_LENGTH))
+            return Error(EFAULT);
+        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
+
+        ErrorOr<INode*> nodeOrError = ::VFS::ResolvePath(path);
+        if (!nodeOrError) return nodeOrError.error();
+
+        INode* node = nodeOrError.value();
+        if (node->IsDirectory()) return Error(EISDIR);
+        return node->Truncate(length);
+    }
+    ErrorOr<isize> SysFTruncate(i32 fdNum, off_t length)
+    {
+        if (length < 0) return Error(EINVAL);
+        Process*        current = Process::GetCurrent();
+
+        FileDescriptor* fd      = current->GetFileHandle(fdNum);
+        if (!fd) return Error(EBADF);
+        return fd->Truncate(length);
     }
 }; // namespace API::VFS
 
@@ -56,27 +90,13 @@ namespace Syscall::VFS
     using Syscall::Arguments;
     using namespace ::VFS;
 
-    ErrorOr<i32> SysOpen(Arguments& args)
-    {
-        Process*  current = CPU::GetCurrentThread()->parent;
-
-        uintptr_t path    = args.Args[0];
-        i32       flags   = static_cast<i32>(args.Args[1]);
-        mode_t    mode    = static_cast<mode_t>(args.Args[2]);
-
-        if (!path || !current->ValidateAddress(path, PROT_READ))
-            return std::errno_t(EFAULT);
-
-        return current->OpenAt(AT_FDCWD, reinterpret_cast<const char*>(path),
-                               flags, mode);
-    }
     ErrorOr<i32> SysStat(Arguments& args)
     {
         PathView path    = args.Get<const char*>(0);
         stat*    out     = args.Get<stat*>(1);
 
         Process* process = Process::GetCurrent();
-        if (!process->ValidateAddress(reinterpret_cast<uintptr_t>(path.data()),
+        if (!process->ValidateAddress(reinterpret_cast<uintptr_t>(path.Raw()),
                                       PROT_READ)
             || !process->ValidateAddress(out, PROT_READ | PROT_WRITE))
             return Error(EFAULT);
@@ -108,7 +128,7 @@ namespace Syscall::VFS
         stat*    out     = args.Get<stat*>(1);
 
         Process* process = Process::GetCurrent();
-        if (!process->ValidateAddress(reinterpret_cast<uintptr_t>(path.data()),
+        if (!process->ValidateAddress(reinterpret_cast<uintptr_t>(path.Raw()),
                                       PROT_READ)
             || !process->ValidateAddress(out, PROT_READ | PROT_WRITE))
             return Error(EFAULT);
@@ -261,7 +281,7 @@ namespace Syscall::VFS
         // TODO(v1tr10l7): validate whether user has appriopriate permissions
         Process* current = Process::GetCurrent();
 
-        if (!current->ValidateAddress(reinterpret_cast<uintptr_t>(path.data()),
+        if (!current->ValidateAddress(reinterpret_cast<uintptr_t>(path.Raw()),
                                       PROT_READ))
             return Error(EFAULT);
         if (!Path::ValidateLength(path)) return Error(ENAMETOOLONG);
@@ -318,7 +338,7 @@ namespace Syscall::VFS
         mode_t   mode    = args.Get<mode_t>(2);
 
         Process* process = CPU::GetCurrentThread()->parent;
-        if (!process->ValidateAddress(reinterpret_cast<uintptr_t>(path.data()),
+        if (!process->ValidateAddress(reinterpret_cast<uintptr_t>(path.Raw()),
                                       PROT_READ))
             return Error(EFAULT);
         if (!Path::ValidateLength(path)) return Error(ENAMETOOLONG);

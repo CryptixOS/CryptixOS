@@ -28,7 +28,14 @@ namespace Syscall
 
         return API::SysWrite(fdNum, input, bytes);
     }
-    ErrorOr<isize> SysOpen(Arguments& args);
+    ErrorOr<isize> SysOpen(Arguments& args)
+    {
+        const char* path  = args.Get<const char*>(0);
+        i32         flags = args.Get<i32>(1);
+        mode_t      mode  = args.Get<mode_t>(2);
+
+        return API::SysOpen(path, flags, mode);
+    }
     ErrorOr<isize> SysClose(Arguments& args)
     {
         i32 fdNum = args.Get<i32>(0);
@@ -53,6 +60,20 @@ namespace Syscall
     ErrorOr<isize> SysGetGid(Arguments& args);
     ErrorOr<isize> SysUname(Arguments& args);
     ErrorOr<isize> SysFcntl(Arguments& args);
+    ErrorOr<isize> SysTruncate(Arguments& args)
+    {
+        const char* path   = args.Get<const char*>(0);
+        off_t       length = args.Get<off_t>(1);
+
+        return API::SysTruncate(path, length);
+    }
+    ErrorOr<isize> SysFTruncate(Arguments& args)
+    {
+        i32   fdNum  = args.Get<i32>(0);
+        off_t length = args.Get<off_t>(1);
+
+        return API::SysFTruncate(fdNum, length);
+    }
     ErrorOr<isize> SysGetCwd(Arguments& args);
     ErrorOr<isize> SysChDir(Arguments& args);
     ErrorOr<isize> SysFChDir(Arguments& args);

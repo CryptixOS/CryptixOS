@@ -142,6 +142,16 @@ isize FileDescriptor::Seek(i32 whence, off_t offset)
     return m_Description->Offset;
 }
 
+ErrorOr<isize> FileDescriptor::Truncate(off_t size)
+{
+    if (m_Description->Node->IsDirectory()) return Error(EISDIR);
+    if (!(m_Description->AccessMode & FileAccessMode::eWrite)
+        || !m_Description->Node->IsRegular())
+        return Error(EBADF);
+
+    return m_Description->Node->Truncate(size);
+}
+
 [[clang::no_sanitize("alignment")]]
 ErrorOr<i32> FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
 {
