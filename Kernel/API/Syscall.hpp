@@ -60,6 +60,7 @@ namespace Syscall
         eFChDir       = 81,
         eMkDir        = 83,
         eRmDir        = 84,
+        eCreat        = 85,
         eGetTimeOfDay = 96,
         eGetUid       = 102,
         eGetGid       = 104,

@@ -5,6 +5,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Posix/fcntl.h>
 #include <API/SyscallEntryPoints.hpp>
 #include <API/VFS.hpp>
 
@@ -83,6 +84,13 @@ namespace Syscall
         const char* path = args.Get<const char*>(0);
 
         return API::SysRmDir(path);
+    }
+    ErrorOr<isize> SysCreat(Arguments& args)
+    {
+        const char* path = args.Get<const char*>(0);
+        mode_t      mode = args.Get<mode_t>(1);
+
+        return API::SysOpen(path, O_CREAT | O_WRONLY | O_TRUNC, mode);
     }
     ErrorOr<isize> SysGetTimeOfDay(Arguments& args);
     ErrorOr<isize> SysGet_eUid(Arguments& args);
