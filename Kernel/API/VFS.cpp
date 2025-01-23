@@ -33,45 +33,28 @@ namespace API::VFS
 
         return fd->Read(out, bytes);
     }
+    ErrorOr<isize> SysWrite(i32 fdNum, const u8* in, usize bytes)
+    {
+        Process* current = Process::GetCurrent();
+        if (!current->ValidateRead(in, bytes)) return Error(EFAULT);
 
+        FileDescriptor* fd = current->GetFileHandle(fdNum);
+        if (!fd) return Error(EBADF);
+
+        return fd->Write(in, bytes);
+    }
+
+    ErrorOr<isize> SysClose(i32 fdNum)
+    {
+        Process* current = Process::GetCurrent();
+        return current->CloseFd(fdNum);
+    }
 }; // namespace API::VFS
 
 namespace Syscall::VFS
 {
     using Syscall::Arguments;
     using namespace ::VFS;
-
-    ErrorOr<isize> SysRead(Arguments& args)
-    {
-        i32      fdNum   = static_cast<i32>(args.Args[0]);
-        void*    buffer  = reinterpret_cast<void*>(args.Args[1]);
-        usize    bytes   = static_cast<usize>(args.Args[2]);
-
-        Process* current = CPU::GetCurrentThread()->parent;
-        if (!buffer
-            || !current->ValidateAddress(buffer, PROT_READ | PROT_WRITE))
-            return std::errno_t(EFAULT);
-
-        FileDescriptor* fd = current->GetFileHandle(fdNum);
-        if (!fd) return std::errno_t(EBADF);
-
-        return fd->Read(buffer, bytes);
-    }
-    ErrorOr<isize> SysWrite(Arguments& args)
-    {
-        i32      fdNum   = static_cast<i32>(args.Args[0]);
-        void*    data    = reinterpret_cast<void*>(args.Args[1]);
-        usize    bytes   = static_cast<usize>(args.Args[2]);
-
-        Process* current = CPU::GetCurrentThread()->parent;
-        if (!data || !current->ValidateAddress(data, PROT_READ | PROT_WRITE))
-            return std::errno_t(EFAULT);
-
-        FileDescriptor* fd = current->GetFileHandle(fdNum);
-        if (!fd) return std::errno_t(EBADF);
-
-        return fd->Write(data, bytes);
-    }
 
     ErrorOr<i32> SysOpen(Arguments& args)
     {
@@ -86,13 +69,6 @@ namespace Syscall::VFS
 
         return current->OpenAt(AT_FDCWD, reinterpret_cast<const char*>(path),
                                flags, mode);
-    }
-    ErrorOr<i32> SysClose(Arguments& args)
-    {
-        Process* current = CPU::GetCurrentThread()->parent;
-
-        i32      fdNum   = static_cast<i32>(args.Args[0]);
-        return current->CloseFd(fdNum);
     }
     ErrorOr<i32> SysStat(Arguments& args)
     {

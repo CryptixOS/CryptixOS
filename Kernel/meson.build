@@ -11,6 +11,7 @@ srcs += files(
   'API/MM.cpp',
   'API/Process.cpp',
   'API/Syscall.cpp',
+  'API/SyscallEntryPoints.cpp',
   'API/System.cpp',
   'API/Time.cpp',
   'API/VFS.cpp',
@@ -52,6 +53,8 @@ srcs += files(
   'VFS/DevTmpFs/DevTmpFsINode.cpp',
   'VFS/Initrd/Initrd.cpp',
   'VFS/Initrd/Ustar.cpp',
+  'VFS/ProcFs/ProcFs.cpp',
+  'VFS/ProcFs/ProcFsINode.cpp',
   'VFS/TmpFs/TmpFs.cpp',
   'VFS/TmpFs/TmpFsINode.cpp',
 )

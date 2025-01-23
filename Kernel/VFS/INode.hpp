@@ -35,8 +35,8 @@ class INode
     INode*      Reduce(bool symlinks, bool automount = true, usize cnt = 0);
     std::string GetPath();
 
-    inline Filesystem* GetFilesystem() { return m_Filesystem; }
-    inline const stat& GetStats() const { return m_Stats; }
+    inline Filesystem*  GetFilesystem() { return m_Filesystem; }
+    virtual const stat& GetStats() { return m_Stats; }
     inline std::unordered_map<std::string_view, INode*>& GetChildren()
     {
         return m_Children;

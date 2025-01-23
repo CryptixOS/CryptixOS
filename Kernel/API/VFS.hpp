@@ -11,14 +11,13 @@
 
 namespace API::VFS
 {
-    ErrorOr<isize> SysRead(i32 fd, u8* out, usize bytes);
-}
+    ErrorOr<isize> SysRead(i32 fdNum, u8* out, usize bytes);
+    ErrorOr<isize> SysWrite(i32 fdNum, const u8* in, usize bytes);
+    ErrorOr<isize> SysClose(i32 fdNum);
+} // namespace API::VFS
 namespace Syscall::VFS
 {
-    ErrorOr<isize> SysRead(Syscall::Arguments& args);
-    ErrorOr<isize> SysWrite(Syscall::Arguments& args);
     ErrorOr<i32>   SysOpen(Syscall::Arguments& args);
-    ErrorOr<i32>   SysClose(Syscall::Arguments& args);
 
     ErrorOr<i32>   SysStat(Syscall::Arguments& args);
     ErrorOr<i32>   SysFStat(Syscall::Arguments& args);

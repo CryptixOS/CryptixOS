@@ -14,6 +14,7 @@
 
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/INode.hpp>
+#include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/TmpFs/TmpFs.hpp>
 #include <VFS/VFS.hpp>
 
@@ -23,8 +24,9 @@ namespace VFS
 {
     static INode*   s_RootNode = nullptr;
     static Spinlock s_Lock;
+    static std::unordered_map<std::string_view, Filesystem*> s_MountPoints;
 
-    INode*          GetRootNode()
+    INode*                                                   GetRootNode()
     {
         /*Thread* thread = CPU::GetCurrentThread();
         if (!thread) return s_RootNode;
@@ -43,6 +45,7 @@ namespace VFS
         Filesystem* fs = nullptr;
         if (name == "tmpfs") fs = new TmpFs(flags);
         else if (name == "devtmpfs") fs = new DevTmpFs(flags);
+        else if (name == "procfs") fs = new ProcFs(flags);
 
         return fs;
     }
@@ -199,6 +202,11 @@ namespace VFS
         return {nullptr, nullptr, ""};
     }
 
+    std::unordered_map<std::string_view, class Filesystem*>& GetMountPoints()
+    {
+        return s_MountPoints;
+    }
+
     bool MountRoot(std::string_view filesystemName)
     {
         auto fs = CreateFilesystem(filesystemName, 0);
@@ -223,6 +231,7 @@ namespace VFS
             LogError("VFS: Failed to mount filesystem '{}' on '/'",
                      filesystemName.data());
 
+        s_MountPoints["/"] = s_RootNode->GetFilesystem();
         return s_RootNode != nullptr;
     }
 
@@ -233,7 +242,7 @@ namespace VFS
         ScopedLock  guard(s_Lock);
 
         Filesystem* fs = CreateFilesystem(fsName, flags);
-        if (fs == nullptr)
+        if (!fs)
         {
             errno = ENODEV;
             return false;
@@ -241,14 +250,15 @@ namespace VFS
         [[maybe_unused]] INode* sourceNode = nullptr;
 
         auto [nparent, node, basename]     = ResolvePath(parent, target);
-        bool isRoot                        = (node == GetRootNode());
+        bool   isRoot                      = (node == GetRootNode());
+        INode* mountGate                   = nullptr;
 
-        if (!node) return false;
+        if (!node) goto fail;
 
         if (!isRoot && !node->IsDirectory()) return_err(false, ENOTDIR);
 
-        auto mountGate = fs->Mount(parent, nullptr, node, basename, data);
-        if (!mountGate) return false;
+        mountGate = fs->Mount(parent, nullptr, node, basename, data);
+        if (!mountGate) goto fail;
 
         node->mountGate = mountGate;
 
@@ -258,7 +268,13 @@ namespace VFS
         else
             LogTrace("VFS: Mounted  '{}' on '{}' with Filesystem '{}'",
                      source.data(), target.data(), fsName.data());
+
+        s_MountPoints[target] = fs;
         return true;
+    fail:
+        if (node) delete node;
+        if (fs) delete fs;
+        return false;
     }
 
     bool Unmount(INode* parent, PathView path, i32 flags)

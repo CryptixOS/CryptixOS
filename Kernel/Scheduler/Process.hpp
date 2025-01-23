@@ -53,7 +53,11 @@ class Process
     static Process* CreateIdleProcess();
 
     bool            ValidateAddress(const Pointer address, i32 accessMode);
-    bool            ValidateWrite(const Pointer address, usize size)
+    bool            ValidateRead(const Pointer address, usize size)
+    {
+        return ValidateAddress(address, 0);
+    }
+    bool ValidateWrite(const Pointer address, usize size)
     {
         return ValidateAddress(address, 0);
     }

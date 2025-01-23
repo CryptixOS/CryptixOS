@@ -44,7 +44,7 @@ namespace Syscall
     ErrorOr<isize> SysGet_pGid(Arguments& args);
     ErrorOr<isize> SysFork(Arguments& args);
     ErrorOr<isize> SysExecve(Arguments& args);
-    ErrorOr<isize> SysArchPrCtl(Arguments& args);
+    // ErrorOr<isize> SysArchPrCtl(Arguments& args);
     ErrorOr<isize> SysSetTimeOfDay(Arguments& args);
     ErrorOr<isize> SysGetDents64(Arguments& args);
     ErrorOr<isize> SysOpenAt(Arguments& args);

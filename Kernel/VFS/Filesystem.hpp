@@ -20,14 +20,16 @@ class Filesystem
         , m_Flags(flags)
     {
     }
+    virtual ~Filesystem() = default;
 
-    inline INode*  GetMountedOn() { return m_MountedOn; }
-    inline INode*  GetRootNode() { return m_Root; }
-    inline ino_t   GetNextINodeIndex() { return m_NextInodeIndex++; }
-    inline dev_t   GetDeviceID() const { return m_DeviceID; }
+    inline std::string_view GetName() const { return m_Name; }
+    inline INode*           GetMountedOn() { return m_MountedOn; }
+    inline INode*           GetRootNode() { return m_Root; }
+    inline ino_t            GetNextINodeIndex() { return m_NextInodeIndex++; }
+    inline dev_t            GetDeviceID() const { return m_DeviceID; }
 
-    virtual INode* Mount(INode* parent, INode* source, INode* target,
-                         std::string_view name, void* data = nullptr)
+    virtual INode*          Mount(INode* parent, INode* source, INode* target,
+                                  std::string_view name, void* data = nullptr)
         = 0;
     virtual INode* CreateNode(INode* parent, std::string_view name, mode_t mode)
         = 0;

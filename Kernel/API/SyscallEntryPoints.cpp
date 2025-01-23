@@ -14,15 +14,27 @@ namespace Syscall
 
     ErrorOr<isize> SysRead(Arguments& args)
     {
-        i32   fd    = args.Get<i32>(0);
+        i32   fdNum = args.Get<i32>(0);
         u8*   out   = args.Get<u8*>(1);
         usize bytes = args.Get<usize>(2);
 
-        return API::SysRead(fd, out, bytes);
+        return API::SysRead(fdNum, out, bytes);
     }
-    ErrorOr<isize> SysWrite(Arguments& args);
+    ErrorOr<isize> SysWrite(Arguments& args)
+    {
+        i32       fdNum = args.Get<i32>(0);
+        const u8* input = args.Get<const u8*>(1);
+        usize     bytes = args.Get<usize>(2);
+
+        return API::SysWrite(fdNum, input, bytes);
+    }
     ErrorOr<isize> SysOpen(Arguments& args);
-    ErrorOr<isize> SysClose(Arguments& args);
+    ErrorOr<isize> SysClose(Arguments& args)
+    {
+        i32 fdNum = args.Get<i32>(0);
+
+        return API::SysClose(fdNum);
+    }
 
     ErrorOr<isize> SysStat(Arguments& args);
     ErrorOr<isize> SysFStat(Arguments& args);

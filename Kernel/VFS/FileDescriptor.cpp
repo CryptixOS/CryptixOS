@@ -54,7 +54,7 @@ FileDescriptor::FileDescriptor(FileDescriptor* fd, i32 flags)
 }
 FileDescriptor::~FileDescriptor()
 {
-    --m_Description->RefCount;
+    m_Description->DecRefCount();
     if (m_Description->RefCount == 0) delete m_Description;
 }
 

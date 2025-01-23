@@ -84,6 +84,7 @@ struct FileDescription
     DirectoryEntries   DirEntries;
 
     inline void        IncRefCount() { ++RefCount; }
+    inline void        DecRefCount() { --RefCount; }
 };
 
 struct FileDescriptor

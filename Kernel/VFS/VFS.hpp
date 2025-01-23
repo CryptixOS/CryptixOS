@@ -13,6 +13,7 @@
 
 #include <cerrno>
 #include <expected>
+#include <unordered_map>
 
 class INode;
 
@@ -27,6 +28,8 @@ namespace VFS
 
     std::tuple<INode*, INode*, std::string>
     ResolvePath(INode* parent, std::string_view path, bool automount = true);
+
+    std::unordered_map<std::string_view, class Filesystem*>& GetMountPoints();
 
     bool                 MountRoot(std::string_view filesystemName);
     bool                 Mount(INode* parent, PathView source, PathView target,

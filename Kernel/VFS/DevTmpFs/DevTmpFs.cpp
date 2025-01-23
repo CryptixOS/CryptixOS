@@ -21,7 +21,7 @@ INode* DevTmpFs::Mount(INode* parent, INode* source, INode* target,
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
                : nullptr;
 
-    if (m_Root) delete m_Root;
+    if (m_Root) VFS::RecursiveDelete(m_Root);
     m_Root      = CreateNode(parent, name, 0755 | S_IFDIR);
     m_MountedOn = target;
 
