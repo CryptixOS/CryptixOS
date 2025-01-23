@@ -99,7 +99,7 @@ class Process
 
     inline INode*   GetRootNode() const { return m_RootNode; }
     inline INode*   GetCWD() const { return m_CWD; }
-    inline mode_t   GetUMask() const { return m_UMask; }
+    mode_t          Umask(mode_t mask);
 
     inline sigset_t GetSignalMask() const { return m_SignalMask; }
     inline void     SetSignalMask(sigset_t mask) { m_SignalMask = mask; }

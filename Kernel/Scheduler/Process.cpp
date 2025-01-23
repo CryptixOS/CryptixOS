@@ -104,6 +104,13 @@ pid_t Process::SetSid()
     return m_Pid;
 }
 
+mode_t Process::Umask(mode_t mask)
+{
+    mode_t previous = m_UMask;
+    m_UMask         = mask;
+
+    return previous;
+}
 void Process::SendSignal(i32 signal)
 {
     // TODO(v1tr10l7): implement signals

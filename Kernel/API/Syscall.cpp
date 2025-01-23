@@ -121,6 +121,7 @@ namespace Syscall
         RegisterSyscall(ID::eMkDir, VFS::SysMkDir);
         RegisterSyscall(ID::eRmDir, SysRmDir);
         RegisterSyscall(ID::eCreat, SysCreat);
+        RegisterSyscall(ID::eUmask, SysUmask);
         RegisterSyscall(ID::eGetTimeOfDay, Time::SysGetTimeOfDay);
         RegisterSyscall(ID::eGet_eUid, Process::SysGet_eUid);
         RegisterSyscall(ID::eGet_eGid, Process::SysGet_eGid);

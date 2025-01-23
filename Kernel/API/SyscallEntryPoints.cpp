@@ -92,6 +92,13 @@ namespace Syscall
 
         return API::SysOpen(path, O_CREAT | O_WRONLY | O_TRUNC, mode);
     }
+    ErrorOr<isize> SysUmask(Arguments& args)
+    {
+        mode_t   mask    = args.Get<mode_t>(0);
+        Process* current = Process::GetCurrent();
+
+        return current->Umask(mask);
+    }
     ErrorOr<isize> SysGetTimeOfDay(Arguments& args);
     ErrorOr<isize> SysGet_eUid(Arguments& args);
     ErrorOr<isize> SysGet_eGid(Arguments& args);
