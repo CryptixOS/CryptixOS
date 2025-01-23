@@ -6,11 +6,14 @@
  */
 #pragma once
 
+#include <API/UnixTypes.hpp>
 #include <Utility/Types.hpp>
 
 namespace Time
 {
-    usize GetEpoch();
-    usize GetReal();
-    usize GetMonotonic();
+    usize    GetEpoch();
+    timespec GetReal();
+    timespec GetMonotonic();
+
+    void     Tick(usize ns);
 } // namespace Time

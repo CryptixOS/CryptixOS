@@ -5,12 +5,21 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/Arch.hpp>
+
 #include <Time/Time.hpp>
 
 namespace Time
 {
-    // TODO(v1tr10l7): implement real and monotonic clocks
-    usize GetEpoch() { return Arch::GetEpoch(); }
-    usize GetReal() { return GetEpoch(); }
-    usize GetMonotonic() { return GetEpoch(); }
+    static timespec s_RealTime;
+    static timespec s_Monotonic;
+
+    usize           GetEpoch() { return Arch::GetEpoch(); }
+    timespec        GetReal() { return s_RealTime; }
+    timespec        GetMonotonic() { return s_Monotonic; }
+
+    void            Tick(usize ns)
+    {
+        s_RealTime.tv_nsec += ns;
+        s_Monotonic.tv_nsec += ns;
+    }
 }; // namespace Time

@@ -11,6 +11,8 @@
 #include <Arch/x86_64/IDT.hpp>
 #include <Arch/x86_64/IO.hpp>
 
+#include <Time/Time.hpp>
+
 #include <atomic>
 
 namespace Scheduler
@@ -33,8 +35,10 @@ namespace PIT
 
         void              TimerTick(struct CPUContext* ctx)
         {
-            Scheduler::Schedule(ctx);
             s_Tick++;
+            Time::Tick((1'000 / FREQUENCY) * 1'000'000);
+
+            Scheduler::Schedule(ctx);
         }
     } // namespace
 
