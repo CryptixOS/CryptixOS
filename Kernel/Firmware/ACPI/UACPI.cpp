@@ -5,9 +5,12 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/CPU.hpp>
+#include <Arch/x86_64/IO.hpp>
 #include <Firmware/ACPI/ACPI.hpp>
 
 #include <Memory/MMIO.hpp>
+#include <Time/Time.hpp>
+#include <Utility/Math.hpp>
 #include <Utility/Spinlock.hpp>
 
 #include <uacpi/kernel_api.h>
@@ -73,24 +76,31 @@ namespace uACPI
                                               uacpi_u8      byteWidth,
                                               uacpi_u64*    outValue)
         {
-            CtosUnused(address);
-            CtosUnused(byteWidth);
-            CtosUnused(outValue);
+            u16 port = address;
+            switch (byteWidth)
+            {
+                case 1: *outValue = IO::In<u8>(port); break;
+                case 2: *outValue = IO::In<u16>(port); break;
+                case 4: *outValue = IO::In<u32>(port); break;
+                default: return UACPI_STATUS_INVALID_ARGUMENT;
+            }
 
-            ToDo();
-            return UACPI_STATUS_UNIMPLEMENTED;
+            return UACPI_STATUS_OK;
         }
         uacpi_status uacpi_kernel_raw_io_write(uacpi_io_addr address,
                                                uacpi_u8      byteWidth,
                                                uacpi_u64     inValue)
         {
+            u16 port = address;
+            switch (byteWidth)
+            {
+                case 1: IO::Out<u8>(port, inValue); break;
+                case 2: IO::Out<u16>(port, inValue); break;
+                case 4: IO::Out<u32>(port, inValue); break;
+                default: return UACPI_STATUS_INVALID_ARGUMENT;
+            }
 
-            CtosUnused(address);
-            CtosUnused(byteWidth);
-            CtosUnused(inValue);
-
-            ToDo();
-            return UACPI_STATUS_UNIMPLEMENTED;
+            return UACPI_STATUS_OK;
         }
 
         uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
@@ -132,53 +142,46 @@ namespace uACPI
         uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len,
                                          uacpi_handle* outHandle)
         {
-            CtosUnused(base);
-            CtosUnused(len);
-            CtosUnused(outHandle);
-            ToDo();
+            *outHandle = reinterpret_cast<uacpi_handle>(base);
 
-            return UACPI_STATUS_UNIMPLEMENTED;
+            return UACPI_STATUS_OK;
         }
-        void uacpi_kernel_io_unmap(uacpi_handle handle)
+        void         uacpi_kernel_io_unmap(uacpi_handle) {}
+
+        uacpi_status uacpi_kernel_io_read(uacpi_handle handle,
+                                          uacpi_size offset, uacpi_u8 byteWidth,
+                                          uacpi_u64* value)
         {
-            CtosUnused(handle);
-            ToDo();
+            auto addr = reinterpret_cast<uacpi_io_addr>(handle);
+            return uacpi_kernel_raw_io_read(addr + offset, byteWidth, value);
         }
-
-        uacpi_status uacpi_kernel_io_read(uacpi_handle, uacpi_size offset,
-                                          uacpi_u8 byteWidth, uacpi_u64* value)
-        {
-            CtosUnused(offset);
-            CtosUnused(byteWidth);
-            CtosUnused(value);
-
-            ToDo();
-            return UACPI_STATUS_UNIMPLEMENTED;
-        }
-        uacpi_status uacpi_kernel_io_write(uacpi_handle, uacpi_size offset,
+        uacpi_status uacpi_kernel_io_write(uacpi_handle handle,
+                                           uacpi_size   offset,
                                            uacpi_u8 byteWidth, uacpi_u64 value)
         {
-            CtosUnused(offset);
-            CtosUnused(byteWidth);
-            CtosUnused(value);
-
-            ToDo();
-            return UACPI_STATUS_UNIMPLEMENTED;
+            auto addr = reinterpret_cast<uacpi_io_addr>(handle);
+            return uacpi_kernel_raw_io_write(addr + offset, byteWidth, value);
         }
 
         void* uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
         {
-            CtosUnused(addr);
-            CtosUnused(len);
+            PageMap*  pageMap = VMM::GetKernelPageMap();
 
-            ToDo();
-            return nullptr;
+            uintptr_t phys    = Math::AlignDown(addr, PMM::PAGE_SIZE);
+            uintptr_t virt    = VMM::AllocateSpace(len, PMM::PAGE_SIZE, true);
+            len = Math::AlignUp(addr - phys + len, PMM::PAGE_SIZE);
+            pageMap->MapRange(virt, phys, len);
+            return reinterpret_cast<u8*>(virt) + (addr - phys);
         }
         void uacpi_kernel_unmap(void* addr, uacpi_size len)
         {
-            CtosUnused(addr);
-            CtosUnused(len);
-            ToDo();
+            PageMap*  pageMap = VMM::GetKernelPageMap();
+            uintptr_t virt = Math::AlignDown(reinterpret_cast<uintptr_t>(addr),
+                                             PMM::PAGE_SIZE);
+            len = Math::AlignUp(reinterpret_cast<uintptr_t>(addr) - virt + len,
+                                PMM::PAGE_SIZE);
+
+            pageMap->UnmapRange(virt, len);
         }
 
         void* uacpi_kernel_alloc(uacpi_size size) { return new u8[size]; }
@@ -192,13 +195,21 @@ namespace uACPI
             delete[] reinterpret_cast<u8*>(memory);
         }
 
-        void uacpi_kernel_log(uacpi_log_level, const uacpi_char*) { ToDo(); }
+        void uacpi_kernel_log(uacpi_log_level level, const uacpi_char* message)
+        {
+            switch (level)
+            {
+                case UACPI_LOG_DEBUG: LogDebug("{}", message); break;
+                case UACPI_LOG_TRACE: LogTrace("{}", message); break;
+                case UACPI_LOG_INFO: LogInfo("{}", message); break;
+                case UACPI_LOG_WARN: LogWarn("{}", message); break;
+                case UACPI_LOG_ERROR: LogError("{}", message); break;
+            }
+        }
 
         uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void)
         {
-            ToDo();
-
-            return 0;
+            return Time::GetEpoch() - BootInfo::GetBootTime();
         }
         void uacpi_kernel_stall(uacpi_u8 usec)
         {
