@@ -9,6 +9,8 @@
 #include <API/SyscallEntryPoints.hpp>
 #include <API/VFS.hpp>
 
+#include <Scheduler/Process.hpp>
+
 namespace Syscall
 {
     namespace API = API::VFS;

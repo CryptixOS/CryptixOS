@@ -67,7 +67,7 @@ Process* Process::CreateKernelProcess()
     kernelProcess->m_Credentials = Credentials::s_Root;
     kernelProcess->m_Ring        = PrivilegeLevel::ePrivileged;
     kernelProcess->m_NextTid     = 0;
-    kernelProcess->m_UMask       = 0;
+    kernelProcess->m_Umask       = 0;
 
     // FIXME(v1tr10l7): What about m_AddressSpace?
 
@@ -106,8 +106,8 @@ pid_t Process::SetSid()
 
 mode_t Process::Umask(mode_t mask)
 {
-    mode_t previous = m_UMask;
-    m_UMask         = mask;
+    mode_t previous = m_Umask;
+    m_Umask         = mask;
 
     return previous;
 }

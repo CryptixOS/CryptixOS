@@ -96,7 +96,7 @@ namespace VFS
             if (!parent->ValidatePermissions(current->GetCredentials(), 5))
                 return std::unexpected(EACCES);
             node = VFS::CreateNode(parent, path,
-                                   (mode & ~current->GetUMask()) | S_IFREG);
+                                   (mode & ~current->GetUmask()) | S_IFREG);
 
             if (!node) return std::unexpected(ENOENT);
         }

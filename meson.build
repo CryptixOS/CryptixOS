@@ -77,6 +77,7 @@ add_global_arguments(
     '-DFMT_USE_LONG_DOUBLE=0',
     '-DFMT_USE_DOUBLE=0',
     '-DFMT_USE_FLOAT=0',
+    '-DMAGIC_ENUM_RANGE_MAX=0x8a00',
     '-MP',
   ],
   language: 'cpp',

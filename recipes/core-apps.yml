@@ -99,7 +99,6 @@ packages:
           DESTDIR: '@THIS_COLLECT_DIR@'
         quiet: true
 
-
   - name: dash
     architecture: '@OPTION:arch@'
     metadata:
@@ -205,6 +204,44 @@ packages:
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
+
+  - name: mini-lspci
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: Small lspci program
+      description: Small program for displaying PCI information.
+      spdx: 'Zlib'
+      website: 'https://github.com/qookei/mini-lspci'
+      maintainer: 'Kacper Słomiński <qookie@managarm.org>'
+      categories: ['sys-apps']
+    source:
+      subdir: 'sources'
+      url: 'https://github.com/qookei/mini-lspci/releases/download/v1.2.2/mini-lspci-1.2.2.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'mini-lspci-1.2.2'
+      checksum: blake2b:c16690a6b12c2297f3c2aca3f9b9d80b4fad73d6ba3ba3220b508f949788119ff60b753218b2b53dfff04bb0c88054c6f8f28d4a04fc4714d360fa66189f15e2
+      version: '1.2.2'
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - pciids
+    revision: 6
+    configure:
+      - args:
+        - 'meson'
+        - 'setup'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/target-@OPTION:arch-triple@.cross-file'
+        - '--prefix=/usr'
+        - '--buildtype=release'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
       
   - name: neofetch
     architecture: noarch
@@ -218,6 +255,55 @@ packages:
     configure:
       - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@']
     build:
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: procps
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: Standard informational utilities and process-handling tools
+      description: The Procps-ng package contains programs for monitoring processes.
+      spdx: 'GPL-2.0-or-later LGPL-2.0-or-later LGPL-2.1-or-later'
+      website: 'https://gitlab.com/procps-ng/procps'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['sys-process']
+    source:
+      subdir: sources
+      git: 'https://gitlab.com/procps-ng/procps.git'
+      tag: 'v4.0.4'
+      version: '4.0.4'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+        - host-pkg-config
+      regenerate:
+        - args: ['./autogen.sh']
+    tools_required:
+      - system-gcc
+      - virtual: pkgconfig-for-target
+        triple: "@OPTION:arch-triple@"
+    pkgs_required:
+      - mlibc
+      - ncurses
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--disable-static'
+        - '--disable-kill'
+        - '--docdir=/usr/share/doc/procps-ng-4.0.4'
+        - '--disable-numa'
+        - '--enable-colorwatch'
+        - '--disable-nls'
+        - '--disable-w'
+        environ:
+          ac_cv_func_malloc_0_nonnull: 'yes'
+          ac_cv_func_realloc_0_nonnull: 'yes'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'

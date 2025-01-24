@@ -20,8 +20,13 @@ class ProcFs : public Filesystem
     {
     }
 
-    void           AddProcess(Process* process);
-    void           RemoveProcess(pid_t pid);
+    void                     AddProcess(Process* process);
+    void                     RemoveProcess(pid_t pid);
+
+    virtual std::string_view GetMountFlagsString() const override
+    {
+        return "rw,nosuid,nodev,noexec,relatime";
+    }
 
     virtual INode* Mount(INode* parent, INode* source, INode* target,
                          std::string_view name, void* data = nullptr) override;

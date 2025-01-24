@@ -7,8 +7,11 @@
 #include <Firmware/ACPI/ACPI.hpp>
 #include <Firmware/ACPI/MADT.hpp>
 
-#include <Memory/VMM.hpp>
 #include <Boot/BootInfo.hpp>
+#include <Memory/VMM.hpp>
+
+#include <uacpi/event.h>
+#include <uacpi/uacpi.h>
 
 namespace ACPI
 {
@@ -97,6 +100,21 @@ namespace ACPI
         LogInfo("ACPI: Found {} at: {:#x}", s_XsdtAvailable ? "XSDT" : "RSDT",
                 reinterpret_cast<uintptr_t>(s_Rsdt));
         DetectACPIEntries();
+
+#define UacpiCall(x)                                                           \
+                                                                               \
+    {                                                                          \
+        uacpi_status status = (x);                                             \
+        if (uacpi_unlikely_error(status))                                      \
+            LogError("UACPI: '{}' failed -> {}", #x,                           \
+                     uacpi_status_to_string(status));                          \
+    }
+
+        LogTrace("UACPI: Initializing...");
+        // UacpiCall(uacpi_initialize(0));
+        //  UacpiCall(uacpi_namespace_load());
+        //  UacpiCall(uacpi_namespace_initialize());
+        //  UacpiCall(uacpi_finalize_gpe_initialization());
 
         LogInfo("ACPI: Initialized");
         MADT::Initialize();

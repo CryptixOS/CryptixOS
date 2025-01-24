@@ -1,0 +1,22 @@
+packages:
+  - name: pciids
+    architecture: noarch
+    metadata:
+      summary: The pci.ids file
+      description: Description file containing PCI vendor and device names.
+      spdx: 'GPL-2.0-or-later'
+      website: 'https://pci-ids.ucw.cz/'
+      maintainer: 'Kacper Słomiński <qookie@managarm.org>'
+      categories: ['app-misc']
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/pciutils/pciids.git'
+      branch: 'master'
+      commit: '58f9db8387118222b4c0cec079cffd88286fb495'
+      # The version indicates the date of the commit it's based on
+      version: '20230722'
+    revision: 5
+    configure: []
+    build:
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/share/hwdata/']
+      - args: ['cp', '-f', '@THIS_SOURCE_DIR@/pci.ids', '@THIS_COLLECT_DIR@/usr/share/hwdata/pci.ids']

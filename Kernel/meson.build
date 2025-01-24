@@ -20,6 +20,10 @@ srcs += files(
 
   'Drivers/Terminal.cpp',
   'Drivers/TTY.cpp',
+
+  'Drivers/PCI/Access.cpp',
+  'Drivers/PCI/PCI.cpp',
+  'Drivers/PCI/HostController.cpp',
   
   'Firmware/ACPI/ACPI.cpp',
   'Firmware/ACPI/MADT.cpp',

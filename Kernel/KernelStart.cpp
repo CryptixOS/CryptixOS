@@ -13,6 +13,7 @@
 #include <Arch/InterruptManager.hpp>
 
 #include <Drivers/MemoryDevices.hpp>
+#include <Drivers/PCI/PCI.hpp>
 #include <Drivers/Serial.hpp>
 #include <Drivers/TTY.hpp>
 
@@ -45,6 +46,7 @@ void kernelThread()
     Assert(VFS::Mount(VFS::GetRootNode(), "", "/dev", "devtmpfs"));
     Scheduler::InitializeProcFs();
 
+    PCI::Initialize();
     TTY::Initialize();
     MemoryDevices::Initialize();
 

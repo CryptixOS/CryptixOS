@@ -16,7 +16,7 @@ void                                ProcFs::AddProcess(Process* process)
     auto nodeName                  = std::to_string(process->GetPid());
 
     m_Root->InsertChild(new ProcFsINode(m_Root, nodeName, this, 0755 | S_IFDIR),
-                        "pid: " + nodeName);
+                        nodeName);
 }
 void ProcFs::RemoveProcess(pid_t pid)
 {
@@ -41,10 +41,12 @@ INode* ProcFs::Mount(INode* parent, INode* source, INode* target,
 
             for (const auto& mountPoint : VFS::GetMountPoints())
             {
-                ret += mountPoint.first;
-                ret += ' ';
-                ret += mountPoint.second->GetName();
-                ret += "\n";
+                std::string_view mountPath = mountPoint.first;
+                Filesystem*      fs        = mountPoint.second;
+
+                ret += std::format("{} {} {} {}\n", fs->GetDeviceName(),
+                                   mountPath, fs->GetName(),
+                                   fs->GetMountFlagsString());
             }
             return ret;
         });

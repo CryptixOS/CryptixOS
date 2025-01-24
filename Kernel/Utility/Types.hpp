@@ -80,6 +80,9 @@ struct Pointer
         return static_cast<T>(m_Pointer);
     }
 
+    auto&       operator->() { return *As<u64>(); }
+    auto&       operator*() { return *As<u64>(); }
+
     inline bool IsHigherHalf() const
     {
         return m_Pointer >= BootInfo::GetHHDMOffset();

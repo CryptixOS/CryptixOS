@@ -332,7 +332,7 @@ namespace Syscall::VFS
                                                       : current->GetCWD();
         auto [_, node, name] = VFS::ResolvePath(parent, path);
 
-        mode &= ~current->GetUMask() & 0777;
+        mode &= ~current->GetUmask() & 0777;
         if (!parent) return Error(ENOENT);
         if (!parent->IsDirectory()) return Error(ENOTDIR);
 
@@ -401,7 +401,7 @@ namespace Syscall::VFS
         if (!parent->IsDirectory()) return Error(ENOTDIR);
         (void)mode;
 
-        mode &= ~process->GetUMask() & 0777;
+        mode &= ~process->GetUmask() & 0777;
         if (!parent) return Error(ENOENT);
         if (!parent->IsDirectory()) return Error(ENOTDIR);
 

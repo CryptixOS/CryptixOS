@@ -99,6 +99,7 @@ class Process
 
     inline INode*   GetRootNode() const { return m_RootNode; }
     inline INode*   GetCWD() const { return m_CWD; }
+    inline mode_t   GetUmask() const { return m_Umask; }
     mode_t          Umask(mode_t mask);
 
     inline sigset_t GetSignalMask() const { return m_SignalMask; }
@@ -135,7 +136,7 @@ class Process
 
     INode*                   m_RootNode = VFS::GetRootNode();
     INode*                   m_CWD      = VFS::GetRootNode();
-    mode_t                   m_UMask    = 0;
+    mode_t                   m_Umask    = 0;
 
     FileDescriptorTable      m_FdTable;
     sigset_t                 m_SignalMask = 0;
