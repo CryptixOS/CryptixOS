@@ -40,7 +40,7 @@ CTOS_NO_KASAN [[noreturn]]
 void panic(std::string_view msg)
 {
     enterPanicMode();
-    EarlyLogError("Error Message: {}\n", msg.data());
+    EarlyLogError("Error Message: %s\n", msg.data());
 
     Stacktrace::Print(32);
     hcf();
