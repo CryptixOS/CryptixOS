@@ -121,6 +121,7 @@ namespace Syscall
         RegisterSyscall(ID::eMkDir, VFS::SysMkDir);
         RegisterSyscall(ID::eRmDir, SysRmDir);
         RegisterSyscall(ID::eCreat, SysCreat);
+        RegisterSyscall(ID::eReadLink, SysReadLink);
         RegisterSyscall(ID::eUmask, SysUmask);
         RegisterSyscall(ID::eGetTimeOfDay, Time::SysGetTimeOfDay);
         RegisterSyscall(ID::eGet_eUid, Process::SysGet_eUid);
@@ -149,13 +150,18 @@ namespace Syscall
     }
     void Handle(Arguments& args)
     {
-#define LOG_SYSCALLS true
+#define LOG_SYSCALLS false
 #if LOG_SYSCALLS == true
         static isize previousSyscall = -1;
 
         if (static_cast<isize>(args.Index) != previousSyscall)
-            LogTrace("Syscall[{}]: '{}'", args.Index,
-                     magic_enum::enum_name(static_cast<ID>(args.Index)));
+            LogTrace(
+                "Syscall[{}]: '{}'\nparams: {{ arg[0]: {}, arg[1]: {}"
+                "arg[2]: {}, arg[3]: {}, arg[4]: {}, arg[5]: {}, }}",
+                args.Index, magic_enum::enum_name(static_cast<ID>(args.Index)),
+                args.Get<u64>(0), args.Get<u64>(1), args.Get<u64>(2),
+                args.Get<u64>(3), args.Get<u64>(4), args.Get<u64>(5));
+
         previousSyscall = args.Index;
 #endif
 
@@ -163,7 +169,13 @@ namespace Syscall
         {
             args.ReturnValue = -1;
             errno            = ENOSYS;
-            LogError("Undefined syscall: {}", args.Index);
+            LogError(
+                "Undefined syscall: {}\nparams: {{ arg[0]: {}, arg[1]: {}, "
+                "arg[2]: {}, arg[3]: {}, arg[4]: {}, arg[5]: {}, }}",
+                args.Index, args.Get<u64>(0), args.Get<u64>(1),
+                args.Get<u64>(2), args.Get<u64>(3), args.Get<u64>(4),
+                args.Get<u64>(5));
+
             return;
         }
 

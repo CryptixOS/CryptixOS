@@ -106,6 +106,14 @@ namespace Syscall
 
         return API::SysOpen(path, O_CREAT | O_WRONLY | O_TRUNC, mode);
     }
+    ErrorOr<isize> SysReadLink(Arguments& args)
+    {
+        const char* path = args.Get<const char*>(0);
+        char*       out  = args.Get<char*>(1);
+        usize       size = args.Get<usize>(2);
+
+        return API::SysReadLink(path, out, size);
+    }
     ErrorOr<isize> SysUmask(Arguments& args)
     {
         mode_t   mask    = args.Get<mode_t>(0);

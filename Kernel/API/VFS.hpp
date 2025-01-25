@@ -22,6 +22,7 @@ namespace API::VFS
     ErrorOr<isize> SysFTruncate(i32 fdNum, off_t length);
 
     ErrorOr<isize> SysRmDir(PathView path);
+    ErrorOr<isize> SysReadLink(PathView path, char* out, usize size);
 
     ErrorOr<isize> SysUTime(PathView path, const utimbuf* out);
 } // namespace API::VFS

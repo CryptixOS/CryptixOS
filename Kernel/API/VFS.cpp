@@ -112,6 +112,25 @@ namespace API::VFS
         ::VFS::RecursiveDelete(node);
         return 0;
     }
+    ErrorOr<isize> SysReadLink(PathView path, char* out, usize size)
+    {
+        Process* current = Process::GetCurrent();
+        if (!current->ValidateRead(path.Raw(), size)) return Error(EFAULT);
+        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
+        if (!current->ValidateWrite(out, size)) return Error(EFAULT);
+
+        if (static_cast<isize>(size) <= 0) return Error(EINVAL);
+        ErrorOr<INode*> nodeOrError = ::VFS::ResolvePath(path);
+        if (!nodeOrError) return nodeOrError.error();
+
+        INode* node = nodeOrError.value();
+        if (!node->IsSymlink()) return Error(EINVAL);
+
+        std::string_view symlinkTarget = node->GetTarget();
+        size                           = std::min(size, symlinkTarget.size());
+
+        return symlinkTarget.copy(out, size);
+    }
 
     ErrorOr<isize> SysUTime(PathView path, const utimbuf* out)
     {

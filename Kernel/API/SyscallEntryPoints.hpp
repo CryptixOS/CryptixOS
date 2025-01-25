@@ -40,6 +40,7 @@ namespace Syscall
     ErrorOr<isize> SysMkDir(Arguments& args);
     ErrorOr<isize> SysRmDir(Arguments& args);
     ErrorOr<isize> SysCreat(Arguments& args);
+    ErrorOr<isize> SysReadLink(Arguments& args);
     ErrorOr<isize> SysUmask(Arguments& args);
     ErrorOr<isize> SysGetTimeOfDay(Arguments& args);
     ErrorOr<isize> SysGet_eUid(Arguments& args);
