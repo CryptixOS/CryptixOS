@@ -8,6 +8,7 @@
 
 #include <Common.hpp>
 
+#include <API/Posix/sys/mman.h>
 #include <Memory/AddressRange.hpp>
 
 namespace VirtualMemoryManager
@@ -16,9 +17,12 @@ namespace VirtualMemoryManager
     {
       public:
         Region() = default;
-        Region(Pointer phys, Pointer virt, usize size)
+        Region(Pointer phys, Pointer virt, usize size,
+               i32 flags = PROT_READ | PROT_WRITE)
             : m_VirtualSpace(virt, size)
             , m_PhysicalBase(phys)
+            , m_Flags(flags)
+
         {
         }
 
@@ -36,11 +40,20 @@ namespace VirtualMemoryManager
         {
             return m_VirtualSpace.GetBase();
         }
-        inline usize GetSize() const { return m_VirtualSpace.GetSize(); }
+        inline usize   GetSize() const { return m_VirtualSpace.GetSize(); }
+
+        constexpr bool ValidateFlags(i32 flags) const
+        {
+            return m_Flags & flags;
+        }
+        constexpr bool IsReadable() const { return m_Flags & PROT_READ; }
+        constexpr bool IsWriteable() const { return m_Flags & PROT_WRITE; }
+        constexpr bool IsExecutable() const { return m_Flags & PROT_EXEC; }
 
       private:
         AddressRange m_VirtualSpace;
         Pointer      m_PhysicalBase = nullptr;
+        i32          m_Flags        = 0;
     };
 
 }; // namespace VirtualMemoryManager

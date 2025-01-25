@@ -28,6 +28,7 @@ namespace PhysicalMemoryManager
         usize     s_UsableMemorySize = 0;
         usize     s_TotalMemory      = 0;
         usize     s_UsedMemory       = 0;
+
         Spinlock  s_Lock;
 
         void*     FindFreeRegion(usize& start, usize count, usize limit)
@@ -130,10 +131,6 @@ namespace PhysicalMemoryManager
         for (usize i = 0; i < entryCount; i++)
         {
             MemoryMapEntry* currentEntry = memoryMap[i];
-            /*EarlyLogTrace("MemoryMap[%zu]: base: %#zx, size: %zuKiB, type:
-               %s", i, currentEntry->base, currentEntry->length / 1024,
-                          entryTypeToString(currentEntry->type));*/
-
             if (currentEntry->type != MEMORY_MAP_USABLE) continue;
 
             for (uintptr_t page = currentEntry->base == 0 ? 4096 : 0;
@@ -160,6 +157,7 @@ namespace PhysicalMemoryManager
     void* AllocatePages(usize count)
     {
         ScopedLock guard(s_Lock);
+
         if (count == 0) return nullptr;
         static usize lastIndex = 0;
 
@@ -170,7 +168,8 @@ namespace PhysicalMemoryManager
         {
             lastIndex = 0;
             ret       = FindFreeRegion(lastIndex, count, i);
-            if (!ret) EarlyPanic("Out of memory!");
+            if (!ret)
+                EarlyPanic("Out of memory!, tried to allocate %d pages", count);
         }
 
         s_UsedMemory += count * PAGE_SIZE;
