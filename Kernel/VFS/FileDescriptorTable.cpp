@@ -40,7 +40,7 @@ void FileDescriptorTable::OpenStdioStreams()
 }
 void FileDescriptorTable::Clear()
 {
-    for (const auto& fd : m_Table) delete fd.second;
+    for (const auto& [i, fd] : m_Table) delete fd;
 
     m_Table.clear();
     m_NextIndex = 3;

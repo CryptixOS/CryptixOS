@@ -128,6 +128,11 @@ struct Pointer
         return m_Pointer + offset;
     }
 
+    Pointer& operator&(usize rhs)
+    {
+        m_Pointer &= rhs;
+        return *this;
+    }
     constexpr Pointer& operator|=(Pointer rhs)
     {
         m_Pointer |= rhs.m_Pointer;

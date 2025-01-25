@@ -140,7 +140,7 @@ qemu_args = [
   '-audiodev', 'id=audio,driver=alsa',
   '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
   '-smbios', 'type=1',
-  '-device', 'nvme,id=nvme-ctrl-0,serial=deadbeef'
+  '-device', 'nvme,id=nvme-ctrl1,serial=nvme',
 ]
 qemu = 'qemu-system-' + arch
 
@@ -269,7 +269,7 @@ ovmf = ovmf_binaries.get_variable(ovmf_id)
 run_uefi = custom_target(
   input: [iso],
   output: 'run_uefi',
-  command: [qemu, qemu_args, '-cdrom', '@INPUT@', '-bios', ovmf],
+  command: [qemu, qemu_args, '-drive', 'format=raw,file=@INPUT@,if=none,id=nvm1', '-device', 'nvme-ns,drive=nvm1,nsid=2,bus=nvme-ctrl1', '-bios', ovmf],
   console: true,
   install: false,
   depends: iso,

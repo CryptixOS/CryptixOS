@@ -8,6 +8,7 @@
 #include <Drivers/PCI/Device.hpp>
 #include <Drivers/PCI/HostController.hpp>
 #include <Drivers/PCI/PCI.hpp>
+#include <Drivers/Storage/NVMe/NVMeController.hpp>
 
 #include <Firmware/ACPI/MCFG.hpp>
 #include <VFS/INode.hpp>
@@ -93,7 +94,11 @@ namespace PCI
                            std::to_underlying(RegisterOffset::eSubClassID))
                            == 0x08)
                 {
-                    // TODO(v1tr10l7): Initialize the NVMeController
+                    LogInfo(
+                        "NVMe{}: {{ Domain: {}, Bus: {}, Slot: {}, Function: "
+                        "{} }}",
+                        0, addr.Domain, addr.Bus, addr.Slot, addr.Function);
+                    new NVMe::Controller(addr);
                 }
                 return false;
             });

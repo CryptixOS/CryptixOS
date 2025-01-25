@@ -25,6 +25,10 @@ srcs += files(
   'Drivers/PCI/Device.cpp',
   'Drivers/PCI/PCI.cpp',
   'Drivers/PCI/HostController.cpp',
+
+  'Drivers/Storage/NVMe/NVMeController.cpp',
+  'Drivers/Storage/NVMe/NVMeNameSpace.cpp',
+  'Drivers/Storage/NVMe/NVMeQueue.cpp',
   
   'Firmware/ACPI/ACPI.cpp',
   'Firmware/ACPI/MADT.cpp',

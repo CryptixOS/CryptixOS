@@ -239,10 +239,10 @@ ErrorOr<Process*> Process::Fork()
     }
 
     newProcess->m_NextTid.store(m_NextTid);
-    for (const auto& file : m_FdTable)
+    for (const auto& [i, fd] : m_FdTable)
     {
-        FileDescriptor* fd = new FileDescriptor(file.second);
-        newProcess->m_FdTable.Insert(fd, file.first);
+        FileDescriptor* newFd = new FileDescriptor(fd);
+        newProcess->m_FdTable.Insert(newFd, i);
     }
 
     Thread* thread             = currentThread->Fork(newProcess);
