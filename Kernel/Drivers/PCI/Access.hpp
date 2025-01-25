@@ -8,13 +8,15 @@
 
 #include <Utility/Types.hpp>
 
+#include <unordered_map>
+
 namespace PCI
 {
-    enum class AccessMethod
+    enum class AddressingMethod
     {
-        eNone             = 0,
-        eLegacyAddressing = 1,
-        eMemoryAddressing = 2,
+        eNone   = 0,
+        eLegacy = 1,
+        eMemory = 2,
     };
     enum class RegisterOffset
     {
@@ -49,31 +51,45 @@ namespace PCI
     };
 
     struct DeviceAddress;
-    class IoSpace
+    class AccessMechanism
     {
       public:
-        virtual u64 Read(const DeviceAddress& address, RegisterOffset reg,
-                         u8 byteWidth)
+        virtual u32 Read(const DeviceAddress& address, u32 reg, i32 accessSize)
             = 0;
-        virtual void Write(const DeviceAddress& address, RegisterOffset reg,
-                           u64 value, u8 byteWidth)
+        virtual void Write(const DeviceAddress& address, u32 reg, u32 value,
+                           i32 accessSize)
             = 0;
     };
 
-    class MemoryIoSpace : public IoSpace
+    class LegacyAccessMechanism : public AccessMechanism
     {
       public:
-        MemoryIoSpace(Pointer address)
-            : m_Address(address)
+        // NOTE(v1tr10l7): these are defined in Arch/${arch}/PCI.cpp
+        virtual u32  Read(const DeviceAddress& address, u32 reg,
+                          i32 accessSize) override;
+        virtual void Write(const DeviceAddress& address, u32 reg, u32 value,
+                           i32 accessSize) override;
+    };
+    class ECAM : public AccessMechanism
+    {
+      public:
+        ECAM(Pointer address, u8 busStart)
+            : m_Base(address)
+            , m_BusStart(busStart)
         {
         }
 
-        virtual u64  Read(const DeviceAddress& address, RegisterOffset reg,
-                          u8 byteWidth) override;
-        virtual void Write(const DeviceAddress& address, RegisterOffset reg,
-                           u64 value, u8 byteWidth) override;
+        virtual u32  Read(const DeviceAddress& address, u32 reg,
+                          i32 accessSize) override;
+        virtual void Write(const DeviceAddress& address, u32 reg, u32 value,
+                           i32 accessSize) override;
 
       private:
-        Pointer m_Address;
+        Pointer                                  m_Base;
+        u8                                       m_BusStart;
+
+        std::unordered_map<uintptr_t, uintptr_t> m_Mappings;
+
+        uintptr_t GetAddress(const DeviceAddress& address, u32 offset);
     };
 }; // namespace PCI

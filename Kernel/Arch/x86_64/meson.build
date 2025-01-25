@@ -18,6 +18,7 @@ srcs += files(
 
   'Drivers/I8042Controller.cpp',
   'Drivers/IoApic.cpp',
+  'Drivers/PCI.cpp',
   'Drivers/PCSpeaker.cpp',
   'Drivers/PIC.cpp',
   'Drivers/PS2Keyboard.cpp',

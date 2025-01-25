@@ -140,6 +140,7 @@ qemu_args = [
   '-audiodev', 'id=audio,driver=alsa',
   '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
   '-smbios', 'type=1',
+  '-device', 'nvme,id=nvme-ctrl-0,serial=deadbeef'
 ]
 qemu = 'qemu-system-' + arch
 

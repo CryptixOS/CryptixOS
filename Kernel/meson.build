@@ -22,6 +22,7 @@ srcs += files(
   'Drivers/TTY.cpp',
 
   'Drivers/PCI/Access.cpp',
+  'Drivers/PCI/Device.cpp',
   'Drivers/PCI/PCI.cpp',
   'Drivers/PCI/HostController.cpp',
   

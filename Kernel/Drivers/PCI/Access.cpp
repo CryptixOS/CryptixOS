@@ -5,23 +5,23 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Drivers/PCI/Access.hpp>
+#include <Drivers/PCI/Device.hpp>
 
+#include <Memory/MMIO.hpp>
+#include <Memory/VMM.hpp>
 #include <Utility/Types.hpp>
 
 namespace PCI
 {
-
-    u64 MemoryIoSpace::Read(const DeviceAddress& address, RegisterOffset reg,
-                            u8 byteWidth)
+    u32 ECAM::Read(const DeviceAddress& dev, u32 offset, i32 accessSize)
     {
-        uintptr_t offset     = static_cast<uintptr_t>(reg);
-        Pointer   regAddress = m_Address.Offset(offset);
+        Pointer addr = GetAddress(dev, offset);
 
-        switch (byteWidth)
+        switch (accessSize)
         {
-            case 1: return *regAddress.As<u8>();
-            case 2: return *regAddress.As<u16>();
-            case 4: return *regAddress.As<u32>();
+            case 1: return MMIO::Read<u8>(addr); break;
+            case 2: return MMIO::Read<u16>(addr); break;
+            case 4: return MMIO::Read<u32>(addr); break;
 
             default: break;
         }
@@ -29,19 +29,36 @@ namespace PCI
         assert(false);
         return -1;
     }
-    void MemoryIoSpace::Write(const DeviceAddress& address, RegisterOffset reg,
-                              u64 value, u8 byteWidth)
+    void ECAM::Write(const DeviceAddress& dev, u32 offset, u32 value,
+                     i32 accessSize)
     {
-        uintptr_t offset     = static_cast<uintptr_t>(reg);
-        Pointer   regAddress = m_Address.Offset(offset);
+        Pointer addr = GetAddress(dev, offset);
 
-        switch (byteWidth)
+        switch (accessSize)
         {
-            case 1: *regAddress.As<u8>() = value; break;
-            case 2: *regAddress.As<u16>() = value; break;
-            case 4: *regAddress.As<u32>() = value; break;
+            case 1: MMIO::Write<u8>(addr, value); break;
+            case 2: MMIO::Write<u16>(addr, value); break;
+            case 4: MMIO::Write<u32>(addr, value); break;
 
             default: assert(false); break;
         }
+    }
+
+    uintptr_t ECAM::GetAddress(const DeviceAddress& dev, u32 offset)
+    {
+        u64 phys = m_Base.Raw<u64>() + ((dev.Bus - m_BusStart) << 20)
+                 | (dev.Slot << 15) | (dev.Function << 12);
+
+        if (m_Mappings.contains(phys)) return m_Mappings[phys] + offset;
+
+        usize size = 1 << 20;
+        // FIXME(v1tr10l7): Research why it doesn't work
+        auto  virt = phys; // VMM::AllocateSpace(size, sizeof(u32));
+
+        VMM::GetKernelPageMap()->MapRange(virt, phys, size,
+                                          PageAttributes::eRW);
+        m_Mappings[phys] = virt;
+
+        return virt + offset;
     }
 } // namespace PCI

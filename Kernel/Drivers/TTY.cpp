@@ -164,8 +164,8 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
             winsize* windowSize   = reinterpret_cast<winsize*>(argp);
             windowSize->ws_row    = m_Terminal->GetContext()->rows;
             windowSize->ws_col    = m_Terminal->GetContext()->cols;
-            windowSize->ws_xpixel = m_Terminal->GetContext()->saved_cursor_x;
-            windowSize->ws_ypixel = m_Terminal->GetContext()->saved_cursor_y;
+            windowSize->ws_xpixel = m_Terminal->GetFramebuffer().width;
+            windowSize->ws_ypixel = m_Terminal->GetFramebuffer().height;
             break;
         }
         case TIOCGPGRP: *reinterpret_cast<i32*>(argp) = m_Pgid; break;

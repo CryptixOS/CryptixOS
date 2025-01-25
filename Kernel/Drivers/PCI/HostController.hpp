@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Drivers/PCI/Access.hpp>
+#include <Drivers/PCI/Device.hpp>
 #include <Drivers/PCI/PCI.hpp>
 
 #include <functional>
@@ -22,48 +22,58 @@ namespace PCI
       public:
         HostController(const Domain& domain, Pointer address)
             : m_Domain(domain)
-            , m_IoSpace(address ? new MemoryIoSpace(address) : nullptr)
             , m_Address(address)
         {
+            if (m_Address)
+            {
+                m_AccessMechanism = new ECAM(m_Address, m_Domain.BusStart);
+                return;
+            }
+
+            m_AccessMechanism = new LegacyAccessMechanism();
+            Assert(m_AccessMechanism);
         }
 
-        bool EnumerateDevices(Enumerator enumerator);
+        inline const Domain& GetDomain() const { return m_Domain; }
+
+        bool                 EnumerateDevices(Enumerator enumerator);
+
+        u32 Read(const DeviceAddress& dev, u32 offset, i32 accessSize)
+        {
+            Assert(m_AccessMechanism);
+            return m_AccessMechanism->Read(dev, offset, accessSize);
+        }
+        void Write(const DeviceAddress& dev, u32 offset, u32 value,
+                   i32 accessSize)
+        {
+            Assert(m_AccessMechanism);
+            return m_AccessMechanism->Write(dev, offset, value, accessSize);
+        }
 
         template <std::unsigned_integral T>
-        T Read(const DeviceAddress& address, RegisterOffset offset)
+            requires(sizeof(T) <= 4)
+        T Read(const DeviceAddress& address, u32 offset)
         {
-            static_assert(sizeof(T) <= 4);
-            return Read(address, static_cast<u8>(offset), sizeof(T));
+            return Read(address, offset, sizeof(T));
         }
         template <std::unsigned_integral T>
-        void Write(const DeviceAddress& address, RegisterOffset offset, T value)
+            requires(sizeof(T) <= 4)
+        void Write(const DeviceAddress& address, u32 offset, T value)
         {
-            static_assert(sizeof(T) <= 4);
-            return Write(address, static_cast<u8>(offset), value, sizeof(T));
+            return Write(address, offset, value, sizeof(T));
         }
 
       private:
         Domain                                   m_Domain;
-        IoSpace*                                 m_IoSpace = nullptr;
+        AccessMechanism*                         m_AccessMechanism = nullptr;
         Pointer                                  m_Address;
 
         std::unordered_map<uintptr_t, uintptr_t> m_MappedBuses;
 
         uintptr_t GetAddress(const DeviceAddress& address, u64 offset);
-        u64       Read(const DeviceAddress& address, u8 offset, u8 byteWidth);
-        void      Write(const DeviceAddress& address, u8 offset, u64 value,
-                        u8 byteWidth);
 
-        u16       GetDeviceType(const DeviceAddress& address)
-        {
-            return (static_cast<u16>(
-                        Read<u8>(address, RegisterOffset::eClassID))
-                    << 8)
-                 | Read<u8>(address, RegisterOffset::eSubClassID);
-        }
-
-        bool EnumerateRootBus(Enumerator enumerator);
-        bool EnumerateBus(u8 bus, Enumerator enumerator);
+        bool      EnumerateRootBus(Enumerator enumerator);
+        bool      EnumerateBus(u8 bus, Enumerator enumerator);
         bool EnumerateSlot(const u8 bus, const u8 slot, Enumerator enumerator);
         bool EnumerateFunction(const DeviceAddress& address,
                                Enumerator           enumerator);
