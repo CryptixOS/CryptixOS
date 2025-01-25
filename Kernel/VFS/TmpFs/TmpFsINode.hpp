@@ -12,12 +12,6 @@
 class TmpFsINode final : public INode
 {
   public:
-    TmpFsINode(std::string_view name)
-        : INode(name)
-    {
-        m_Capacity = 128;
-        m_Data     = new u8[m_Capacity];
-    }
     TmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
                mode_t mode);
 

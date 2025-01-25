@@ -42,8 +42,9 @@ TmpFsINode::TmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
 
     if (S_ISREG(mode))
     {
-        m_Capacity = GetDefaultSize();
-        m_Data     = new u8[m_Capacity];
+        m_Capacity      = GetDefaultSize();
+        m_Stats.st_size = GetDefaultSize();
+        m_Data          = new u8[m_Capacity];
     }
 }
 isize TmpFsINode::Read(void* buffer, off_t offset, usize bytes)
@@ -54,6 +55,7 @@ isize TmpFsINode::Read(void* buffer, off_t offset, usize bytes)
         bytes = bytes - ((offset + bytes) - m_Stats.st_size);
 
     Assert(buffer);
+    if (m_Filesystem->ShouldUpdateATime()) m_Stats.st_atim = Time::GetReal();
     std::memcpy(buffer, reinterpret_cast<u8*>(m_Data) + offset, bytes);
     return bytes;
 }
@@ -90,6 +92,9 @@ isize TmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
             = Math::DivRoundUp(m_Stats.st_size, m_Stats.st_blksize);
     }
 
+    if (m_Filesystem->ShouldUpdateATime()) m_Stats.st_atim = Time::GetReal();
+    if (m_Filesystem->ShouldUpdateMTime()) m_Stats.st_mtim = Time::GetReal();
+    m_Stats.st_size = m_Capacity;
     return bytes;
 }
 ErrorOr<isize> TmpFsINode::Truncate(usize size)
@@ -105,8 +110,8 @@ ErrorOr<isize> TmpFsINode::Truncate(usize size)
 
     if (m_Capacity < size)
         std::memset(newData + m_Capacity, 0, size - m_Capacity);
-    delete m_Data;
 
+    delete m_Data;
     m_Data     = newData;
     m_Capacity = size;
 

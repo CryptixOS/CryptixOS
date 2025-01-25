@@ -18,18 +18,23 @@ DevTmpFsINode::DevTmpFsINode(INode* parent, std::string_view name,
 {
     m_Device           = device;
 
-    m_Stats.st_size    = 0;
-    m_Stats.st_blocks  = 0;
-    m_Stats.st_blksize = 512;
     m_Stats.st_dev     = fs->GetDeviceID();
     m_Stats.st_ino     = fs->GetNextINodeIndex();
-    m_Stats.st_mode    = mode;
     m_Stats.st_nlink   = 1;
+    m_Stats.st_mode    = mode;
+    m_Stats.st_uid     = 0;
+    m_Stats.st_gid     = 0;
+    m_Stats.st_rdev    = device ? device->GetID() : 0;
+    m_Stats.st_size    = 0;
+    m_Stats.st_blksize = 512;
+    m_Stats.st_blocks  = 0;
 
     if (S_ISREG(mode))
     {
-        m_Capacity = 0x1000;
-        m_Data     = new u8[m_Capacity];
+        m_Capacity        = 0x1000;
+        m_Data            = new u8[m_Capacity];
+        m_Stats.st_size   = m_Capacity;
+        m_Stats.st_blocks = Math::AlignUp(m_Capacity, m_Stats.st_blksize);
     }
 
     m_Stats.st_atim = Time::GetReal();
@@ -48,6 +53,8 @@ isize DevTmpFsINode::Read(void* buffer, off_t offset, usize bytes)
         count = bytes - ((offset + bytes) - m_Stats.st_size);
 
     std::memcpy(buffer, reinterpret_cast<u8*>(m_Data) + offset, count);
+
+    if (m_Filesystem->ShouldUpdateATime()) m_Stats.st_atim = Time::GetReal();
     return count;
 }
 isize DevTmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
@@ -77,6 +84,8 @@ isize DevTmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
             = Math::DivRoundUp(m_Stats.st_size, m_Stats.st_blksize);
     }
 
+    if (m_Filesystem->ShouldUpdateMTime()) m_Stats.st_mtim = Time::GetReal();
+    if (m_Filesystem->ShouldUpdateATime()) m_Stats.st_atim = Time::GetReal();
     return bytes;
 }
 
