@@ -104,7 +104,7 @@ ErrorOr<const stat*> FileDescriptor::Stat() const
     return &node->GetStats();
 }
 
-isize FileDescriptor::Seek(i32 whence, off_t offset)
+ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
 {
     ScopedLock guard(m_Description->Lock);
     INode*     node = m_Description->Node;
@@ -192,8 +192,7 @@ bool FileDescriptor::GenerateDirEntries()
     DebugWarnIf(m_Description->Lock.Test(),
                 "FileDescriptor::GenerateDirEntries called without "
                 "m_Description->Lock being acquired!");
-    INode* node = GetNode();
-    if (!node || !node->IsDirectory()) return Error(ENOTDIR);
+    INode*            node       = GetNode();
 
     DirectoryEntries& dirEntries = GetDirEntries();
     dirEntries.Clear();

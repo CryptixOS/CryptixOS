@@ -113,7 +113,7 @@ struct FileDescriptor
     ErrorOr<isize>       Read(void* const outBuffer, usize count);
     ErrorOr<isize>       Write(const void* data, isize bytes);
     ErrorOr<const stat*> Stat() const;
-    isize                Seek(i32 whence, off_t offset);
+    ErrorOr<isize>       Seek(i32 whence, off_t offset);
     ErrorOr<isize>       Truncate(off_t size);
 
     void                 Lock() { m_Description->Lock.Acquire(); }
