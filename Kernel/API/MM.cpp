@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <API/MM.hpp>
+#include <API/Posix/sys/mman.h>
 #include <API/UnixTypes.hpp>
 
 #include <Arch/CPU.hpp>
@@ -17,55 +18,56 @@
 
 #include <Utility/Math.hpp>
 
+namespace API::MM
+{
+    ErrorOr<intptr_t> SysMMap(Pointer addr, usize len, i32 prot, i32 flags,
+                              i32 fdNum, off_t offset)
+    {
+        Process*        current = Process::GetCurrent();
+        FileDescriptor* fd      = nullptr;
+
+        // LogInfo(
+        //     "addr: {:#x}, len: {:#x}, prot: {:#x}, flags: {:#x}, fdNum:
+        //     {:#x}, " "offset: {:#x}", addr.Raw(), len, prot, flags, fdNum,
+        //     offset);
+
+        if (fdNum != -1 || !(flags & MAP_ANONYMOUS))
+        {
+            fd = current->GetFileHandle(fdNum);
+            if (!fd) return Error(EBADF);
+            // TODO(v1tr10l7): map fd
+            return Error(ENOSYS);
+        }
+        if (offset != 0) return Error(EINVAL);
+
+        if (len == 0) return Error(EINVAL);
+        len = Math::AlignUp(len, PMM::PAGE_SIZE);
+
+        if (!(flags & MAP_ANONYMOUS)) return Error(ENOSYS);
+        uintptr_t virt = addr;
+        if (!(flags & MAP_FIXED)) virt = VMM::AllocateSpace(len, 0, true);
+
+        usize pageCount = Math::AlignUp(len, PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
+        uintptr_t phys  = PMM::CallocatePages<uintptr_t>(pageCount);
+        if (!phys) return Error(ENOMEM);
+
+        PageAttributes attributes = PageAttributes::eUser;
+        if (prot & PROT_READ) attributes |= PageAttributes::eRead;
+        if (prot & PROT_WRITE) attributes |= PageAttributes::eWrite;
+        if (prot & PROT_EXEC) attributes |= PageAttributes::eExecutable;
+
+        current->PageMap->MapRange(virt, phys, len,
+                                   attributes | PageAttributes::eWriteBack);
+
+        ScopedLock guard(current->m_Lock);
+        current->m_AddressSpace.push_back({phys, virt, len, prot});
+        DebugSyscall("MMAP: virt: {:#x}", virt);
+        return virt;
+    }
+} // namespace API::MM
+
 namespace Syscall::MM
 {
-    ErrorOr<intptr_t> SysMMap(Arguments& args)
-    {
-        uintptr_t  addr    = args.Args[0];
-        usize      len     = args.Args[1];
-        usize      prot    = args.Args[2];
-        usize      flags   = args.Args[3];
-        i32        fd      = args.Args[4];
-        off_t      offset  = args.Args[5];
-
-        Process*   process = CPU::GetCurrentThread()->parent;
-        ScopedLock guard(process->m_Lock);
-        DebugSyscall(
-            "MMAP: hint: {:#x}, size: {}, prot: {}, flags: {}, fd: {}, offset: "
-            "{}",
-            addr, len, prot, flags, fd, offset);
-
-        if (flags & MAP_ANONYMOUS)
-        {
-            if (offset != 0)
-            {
-                LogError("MMAP: Failed, offset != 0 with MAP_ANONYMOUS");
-                return_err(MAP_FAILED, EINVAL);
-            }
-
-            usize pageCount
-                = Math::AlignUp(len, PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
-
-            auto virt = addr;
-
-            if (virt == 0) virt = VMM::AllocateSpace(len, 0, true);
-            uintptr_t phys = PMM::CallocatePages<uintptr_t>(pageCount);
-            process->PageMap->MapRange(virt, phys, len,
-                                       PageAttributes::eRWXU
-                                           | PageAttributes::eWriteBack);
-
-            process->m_AddressSpace.push_back({phys, virt, len});
-            DebugSyscall("MMAP: virt: {:#x}", virt);
-            return virt;
-        }
-
-        CtosUnused(addr);
-        CtosUnused(prot);
-        CtosUnused(fd);
-
-        LogError("MMAP: Failed, only MAP_ANONYMOUS is implemented");
-        return_err(MAP_FAILED, EINVAL);
-    }
     ErrorOr<i32> SysMUnMap(Arguments& args)
     {
         Pointer    addr    = args.Get<uintptr_t>(0);

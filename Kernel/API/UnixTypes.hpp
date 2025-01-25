@@ -8,26 +8,26 @@
 
 #include <Utility/Types.hpp>
 
-using ssize_t    = isize;
+using ssize_t   = isize;
 
-using blkcnt_t   = isize;
-using blksize_t  = isize;
-using clock_t    = i32;
-using clockid_t  = i64;
-using dev_t      = usize;
-using fsblkcnt_t = u64;
-using fsfilcnt_t = u64;
-using gid_t      = i32;
-using id_t       = i64;
-using ino_t      = unsigned long;
-using key_t      = u64;
-using mode_t     = u32;
-using nlink_t    = usize;
-using off_t      = long;
-using pid_t      = i32;
-using tid_t      = i32;
-using uid_t      = u32;
-using time_t     = isize;
+using blkcnt_t  = long;
+using blksize_t = long;
+// using clock_t   = i32;
+using clockid_t = int;
+using dev_t     = unsigned long;
+// using fsblkcnt_t = u64;
+// using fsfilcnt_t = u64;
+using gid_t     = unsigned int;
+// using id_t       = i64;
+using ino_t     = unsigned long;
+// using key_t      = u64;
+using mode_t    = unsigned int;
+using nlink_t   = unsigned long;
+using off_t     = long;
+using pid_t     = int;
+using tid_t     = int;
+using uid_t     = unsigned int;
+using time_t    = long;
 
 struct timespec
 {
@@ -44,13 +44,13 @@ constexpr usize S_IFDIR  = 0040000;
 constexpr usize S_IFLNK  = 0120000;
 constexpr usize S_IFSOCK = 0140000;
 
-#define S_ISBLK(mode)  (((mode) & S_IFMT) == S_IFBLK)
-#define S_ISCHR(mode)  (((mode) & S_IFMT) == S_IFCHR)
-#define S_ISDIR(mode)  (((mode) & S_IFMT) == S_IFDIR)
-#define S_ISFIFO(mode) (((mode) & S_IFMT) == S_IFIFO)
-#define S_ISREG(mode)  (((mode) & S_IFMT) == S_IFREG)
-#define S_ISLNK(mode)  (((mode) & S_IFMT) == S_IFLNK)
-#define S_ISSOCK(mode) (((mode) & S_IFMT) == S_IFSOCK)
+constexpr bool  S_ISBLK(mode_t mode) { return (mode & S_IFMT) == S_IFBLK; }
+constexpr bool  S_ISCHR(mode_t mode) { return (mode & S_IFMT) == S_IFCHR; }
+constexpr bool  S_ISDIR(mode_t mode) { return (mode & S_IFMT) == S_IFDIR; }
+constexpr bool  S_ISFIFO(mode_t mode) { return (mode & S_IFMT) == S_IFIFO; }
+constexpr bool  S_ISREG(mode_t mode) { return (mode & S_IFMT) == S_IFREG; }
+constexpr bool  S_ISLNK(mode_t mode) { return (mode & S_IFMT) == S_IFLNK; }
+constexpr bool  S_ISSOCK(mode_t mode) { return (mode & S_IFMT) == S_IFSOCK; }
 
 struct stat
 {

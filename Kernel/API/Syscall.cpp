@@ -98,7 +98,7 @@ namespace Syscall
         RegisterSyscall(ID::eFStat, VFS::SysFStat);
         RegisterSyscall(ID::eLStat, VFS::SysLStat);
         RegisterSyscall(ID::eLSeek, VFS::SysLSeek);
-        RegisterSyscall(ID::eMMap, MM::SysMMap);
+        RegisterSyscall(ID::eMMap, SysMMap);
         RegisterSyscall(ID::eMUnMap, MM::SysMUnMap);
         RegisterSyscall(ID::eSigProcMask, Process::SysSigProcMask);
         RegisterSyscall(ID::eIoCtl, VFS::SysIoCtl);
@@ -149,7 +149,7 @@ namespace Syscall
     }
     void Handle(Arguments& args)
     {
-#define LOG_SYSCALLS false
+#define LOG_SYSCALLS true
 #if LOG_SYSCALLS == true
         static isize previousSyscall = -1;
 

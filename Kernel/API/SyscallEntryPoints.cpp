@@ -5,6 +5,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/MM.hpp>
 #include <API/Posix/fcntl.h>
 #include <API/SyscallEntryPoints.hpp>
 #include <API/VFS.hpp>
@@ -14,6 +15,7 @@
 namespace Syscall
 {
     namespace API = API::VFS;
+    using namespace ::API;
 
     ErrorOr<isize> SysRead(Arguments& args)
     {
@@ -51,7 +53,17 @@ namespace Syscall
     ErrorOr<isize> SysLStat(Arguments& args);
     ErrorOr<isize> SysLSeek(Arguments& args);
 
-    ErrorOr<isize> SysMMap(Arguments& args);
+    ErrorOr<isize> SysMMap(Arguments& args)
+    {
+        uintptr_t addr   = args.Get<uintptr_t>(0);
+        usize     len    = args.Get<usize>(1);
+        i32       prot   = args.Get<uintptr_t>(2);
+        i32       flags  = args.Get<uintptr_t>(3);
+        i32       fdNum  = args.Get<uintptr_t>(4);
+        off_t     offset = args.Get<uintptr_t>(5);
+
+        return ::API::MM::SysMMap(addr, len, prot, flags, fdNum, offset);
+    }
     ErrorOr<isize> SysIoCtl(Arguments& args);
     ErrorOr<isize> SysAccess(Arguments& args);
     ErrorOr<isize> SysDup(Arguments& args);
