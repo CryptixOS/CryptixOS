@@ -69,7 +69,7 @@ namespace NVMe
         u16 Unused5;
         u32 SglSupport;
         u32 Unused6[1401];
-        u8  Vs[1024];
+        u8  VendorSpecific[1024];
     } __attribute__((packed));
 
     inline Configuration operator|(Configuration lhs, Configuration rhs)
@@ -119,10 +119,13 @@ namespace NVMe
       public:
         Controller(const PCI::DeviceAddress& address);
 
-        bool                     Initialize();
-        void                     Shutdown();
+        bool          Initialize();
+        void          Shutdown();
 
-        void                     Reset();
+        void          Reset();
+
+        inline Queue* GetAdminQueue() const { return m_AdminQueue; }
+        inline usize  GetMaxTransShift() const { return m_MaxTransShift; }
 
         virtual std::string_view GetName() const noexcept override
         {
@@ -141,18 +144,23 @@ namespace NVMe
         virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
 
       private:
-        usize m_Index                                    = 0;
-        ControllerRegister volatile* volatile m_Register = nullptr;
+        usize m_Index                                        = 0;
+        ControllerRegister volatile* volatile m_Register     = nullptr;
 
-        u64                       m_QueueSlots           = 0;
-        u64                       m_DoorbellStride       = 0;
+        CTOS_UNUSED u64                     m_QueueSlots     = 0;
+        CTOS_UNUSED u64                     m_DoorbellStride = 0;
 
-        Spinlock                  m_Lock;
-        class Queue*              m_AdminQueue = nullptr;
+        Spinlock                            m_Lock;
+        class Queue*                        m_AdminQueue    = nullptr;
+        usize                               m_MaxTransShift = 0;
+        std::unordered_map<u32, NameSpace*> m_NameSpaces;
 
-        static std::atomic<usize> s_ControllerCount;
+        static std::atomic<usize>           s_ControllerCount;
 
-        i32                       Identify(ControllerInfo* info);
-        void                      DetectNameSpaces();
+        i32                                 Identify(ControllerInfo* info);
+        bool  DetectNameSpaces(u32 namespaceCount);
+
+        isize SetQueueCount(i32 count);
+        bool  AddNameSpace(u32 id);
     };
 }; // namespace NVMe

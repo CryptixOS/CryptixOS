@@ -134,8 +134,8 @@ namespace NVMe
         delete info;
 
         LogInfo("NVMe: Controller #{} initialized successfully", m_Index);
-        // TODO(v1tr10l7): Enumerate namespaces
-        return true;
+
+        return DetectNameSpaces(namespaceCount);
     }
     void Controller::Shutdown() {}
 
@@ -166,10 +166,65 @@ namespace NVMe
         u16 status = m_AdminQueue->AwaitSubmit(&cmd);
         if (status) return -1;
 
-        // usize shift         = 12 + NVME_CAPMPSMIN(m_Register->Capabilities);
-        // usize maxTransShift = 20;
-        // if (info.Mdts) maxTransShift = shift + info.Mdts;
+        usize shift     = 12 + NVME_CAPMPSMIN(m_Register->Capabilities);
+        m_MaxTransShift = 20;
+        if (info->MaxDataTransferSize)
+            m_MaxTransShift = shift + info->MaxDataTransferSize;
 
         return 0;
+    }
+    bool Controller::DetectNameSpaces(u32 namespaceCount)
+    {
+        u32* namespaceIDs = reinterpret_cast<u32*>(
+            new u8[Math::AlignUp(namespaceCount * 4, PMM::PAGE_SIZE)]);
+        Submission getNamespace      = {};
+        getNamespace.Identify.opcode = 0x06;
+        getNamespace.Identify.cns    = 2;
+        getNamespace.Identify.prp1
+            = Pointer(namespaceIDs).FromHigherHalf<u64>();
+        AssertFmt(!m_AdminQueue->AwaitSubmit(&getNamespace),
+                  "NVMe: Failed to acquire namespaces for controller {}",
+                  m_Index);
+
+        SetQueueCount(4);
+        for (usize i = 0; i < namespaceCount; i++)
+        {
+            u32 namespaceID = namespaceIDs[i];
+            if (namespaceID && namespaceID < namespaceCount)
+            {
+                LogTrace("NVMe: Found namespace #{:#x}", namespaceID);
+                AddNameSpace(namespaceID);
+                // TODO(v1tr10l7): Initialize namespace
+            }
+        }
+
+        delete namespaceIDs;
+        return true;
+    }
+
+    isize Controller::SetQueueCount(i32 count)
+    {
+        Submission cmd      = {};
+        cmd.Features.opcode = 0x09;
+        cmd.Features.prp1   = 0;
+        cmd.Features.fid    = 0x07;
+        cmd.Features.dword  = (count - 1) | ((count - 1) << 14);
+        u16 status          = m_AdminQueue->AwaitSubmit(&cmd);
+        if (status) return -1;
+
+        return 0;
+    }
+    bool Controller::AddNameSpace(u32 namespaceID)
+    {
+        NameSpace* nameSpace = new NameSpace(namespaceID, this);
+        if (!nameSpace) return false;
+        if (!nameSpace->Initialize())
+        {
+            delete nameSpace;
+            return false;
+        }
+
+        m_NameSpaces[namespaceID] = nameSpace;
+        return true;
     }
 }; // namespace NVMe
