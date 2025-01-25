@@ -16,5 +16,44 @@ CTOS_NO_KASAN void logProcessState()
     if (!currentThread) return;
     Process* currentProcess = currentThread->parent;
 
-    LogInfo("Process: {}", currentProcess->m_Name);
+    EarlyLogInfo("Process: %s", currentProcess->m_Name.data());
+}
+
+inline static void enterPanicMode()
+{
+    // TODO(v1tr10l7): Halt all cpus
+    CPU::SetInterruptFlag(false);
+    Logger::Unlock();
+    EarlyLogError("Kernel Panic!");
+    logProcessState();
+}
+[[noreturn]]
+inline static void hcf()
+{
+    EarlyLogFatal("System Halted!\n");
+
+    Arch::Halt();
+    CtosUnreachable();
+}
+
+CTOS_NO_KASAN [[noreturn]]
+void panic(std::string_view msg)
+{
+    enterPanicMode();
+    EarlyLogError("Error Message: {}\n", msg.data());
+
+    Stacktrace::Print(32);
+    hcf();
+}
+CTOS_NO_KASAN [[noreturn]]
+void earlyPanic(const char* format, ...)
+{
+    enterPanicMode();
+
+    va_list args;
+    va_start(args, format);
+    Logger::Logv(LogLevel::eError, format, args);
+    va_end(args);
+
+    hcf();
 }

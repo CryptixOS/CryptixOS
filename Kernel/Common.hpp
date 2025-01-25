@@ -42,38 +42,6 @@ namespace CPU
 CTOS_NO_KASAN void logProcessState();
 
 CTOS_NO_KASAN [[noreturn]]
-inline void panic(std::string_view msg)
-{
-    CPU::SetInterruptFlag(false);
-    // TODO(v1tr10l7): Halt all cpus
-
-    Logger::Unlock();
-    Logger::Log(LogLevel::eNone, "\n");
-    LogFatal("Kernel Panic!");
-    logProcessState();
-    LogError("Error Message: {}\n", msg.data());
-    Stacktrace::Print(32);
-
-    LogFatal("System Halted!\n");
-    Arch::Halt();
-    CtosUnreachable();
-}
-CTOS_NO_KASAN inline void earlyPanic(const char* format, ...)
-{
-    CPU::SetInterruptFlag(false);
-
-    Logger::Unlock();
-    EarlyLogError("Kernel Panic!");
-    logProcessState();
-
-    va_list args;
-    va_start(args, format);
-    Logger::Logv(LogLevel::eError, format, args);
-    va_end(args);
-
-    Stacktrace::Print(32);
-
-    EarlyLogFatal("System Halted!");
-    Arch::Halt();
-    CtosUnreachable();
-}
+void panic(std::string_view msg);
+CTOS_NO_KASAN [[noreturn]]
+void earlyPanic(const char* format, ...);

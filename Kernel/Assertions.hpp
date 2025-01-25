@@ -26,7 +26,10 @@ namespace PMM = PhysicalMemoryManager;
     !(expr) ? Panic("{}[{}]: Assertion Failed =>\n{}", __FILE__, __LINE__,     \
                     std::format(fmt, __VA_ARGS__))                             \
             : (void)0
-#define ToDo()            AssertFmt(false, "{} is not implemented!", __PRETTY_FUNCTION__)
+#define ToDo() AssertFmt(false, "{} is not implemented!", __PRETTY_FUNCTION__)
+#define ToDoWarn()                                                             \
+    LogWarn("{}[{}]: {} is not implemented!", __FILE__, __LINE__,              \
+            __PRETTY_FUNCTION__)
 
 #define AssertPMM_Ready() Assert(PMM::IsInitialized())
 
