@@ -123,7 +123,7 @@ namespace uACPI
             CtosUnused(byteWidth);
             CtosUnused(value);
 
-            ToDo();
+            ToDoWarn();
             return UACPI_STATUS_UNIMPLEMENTED;
         }
         uacpi_status uacpi_kernel_pci_write(uacpi_handle device,
@@ -135,7 +135,7 @@ namespace uACPI
             CtosUnused(byteWidth);
             CtosUnused(value);
 
-            ToDo();
+            ToDoWarn();
             return UACPI_STATUS_UNIMPLEMENTED;
         }
 
@@ -199,11 +199,11 @@ namespace uACPI
         {
             switch (level)
             {
-                case UACPI_LOG_DEBUG: LogDebug("{}", message); break;
-                case UACPI_LOG_TRACE: LogTrace("{}", message); break;
-                case UACPI_LOG_INFO: LogInfo("{}", message); break;
-                case UACPI_LOG_WARN: LogWarn("{}", message); break;
-                case UACPI_LOG_ERROR: LogError("{}", message); break;
+                case UACPI_LOG_DEBUG: EarlyLogDebug("%s", message); break;
+                case UACPI_LOG_TRACE: EarlyLogTrace("%s", message); break;
+                case UACPI_LOG_INFO: EarlyLogInfo("%s", message); break;
+                case UACPI_LOG_WARN: EarlyLogWarn("%s", message); break;
+                case UACPI_LOG_ERROR: EarlyLogError("%s", message); break;
             }
         }
 
@@ -214,53 +214,53 @@ namespace uACPI
         void uacpi_kernel_stall(uacpi_u8 usec)
         {
             CtosUnused(usec);
-            ToDo();
+            ToDoWarn();
         }
         void uacpi_kernel_sleep(uacpi_u64 msec)
         {
             CtosUnused(msec);
-            ToDo();
+            ToDoWarn();
         }
 
         uacpi_handle uacpi_kernel_create_mutex(void)
         {
-            ToDo();
+            ToDoWarn();
             return {};
         }
-        void         uacpi_kernel_free_mutex(uacpi_handle) { ToDo(); }
+        void         uacpi_kernel_free_mutex(uacpi_handle) { ToDoWarn(); }
 
         uacpi_handle uacpi_kernel_create_event(void)
         {
-            ToDo();
+            ToDoWarn();
             return {};
         }
-        void            uacpi_kernel_free_event(uacpi_handle) { ToDo(); }
+        void            uacpi_kernel_free_event(uacpi_handle) { ToDoWarn(); }
 
         uacpi_thread_id uacpi_kernel_get_thread_id(void)
         {
-            ToDo();
+            ToDoWarn();
 
             return 0;
         }
 
         uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle, uacpi_u16)
         {
-            ToDo();
+            ToDoWarn();
             return UACPI_STATUS_UNIMPLEMENTED;
         }
-        void       uacpi_kernel_release_mutex(uacpi_handle) { ToDo(); }
+        void       uacpi_kernel_release_mutex(uacpi_handle) { ToDoWarn(); }
 
         uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle, uacpi_u16)
         {
-            ToDo();
+            ToDoWarn();
             return false;
         }
-        void uacpi_kernel_signal_event(uacpi_handle) { ToDo(); }
-        void uacpi_kernel_reset_event(uacpi_handle) { ToDo(); }
+        void uacpi_kernel_signal_event(uacpi_handle) { ToDoWarn(); }
+        void uacpi_kernel_reset_event(uacpi_handle) { ToDoWarn(); }
         uacpi_status
         uacpi_kernel_handle_firmware_request(uacpi_firmware_request*)
         {
-            ToDo();
+            ToDoWarn();
             return UACPI_STATUS_UNIMPLEMENTED;
         }
 
@@ -272,7 +272,7 @@ namespace uACPI
             CtosUnused(ctx);
             CtosUnused(outIrqHandle);
 
-            ToDo();
+            ToDoWarn();
             return UACPI_STATUS_UNIMPLEMENTED;
         }
 
@@ -281,7 +281,7 @@ namespace uACPI
                                                  uacpi_handle irqHandle)
         {
             CtosUnused(irqHandle);
-            ToDo();
+            ToDoWarn();
             return UACPI_STATUS_UNIMPLEMENTED;
         }
 
@@ -316,13 +316,13 @@ namespace uACPI
                                                 uacpi_handle ctx)
         {
             CtosUnused(ctx);
-            ToDo();
+            ToDoWarn();
 
             return UACPI_STATUS_UNIMPLEMENTED;
         }
         uacpi_status uacpi_kernel_wait_for_work_completion(void)
         {
-            ToDo();
+            ToDoWarn();
 
             return UACPI_STATUS_UNIMPLEMENTED;
         }
