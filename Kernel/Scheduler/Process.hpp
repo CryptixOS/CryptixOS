@@ -35,7 +35,7 @@ struct Credentials
     uid_t              suid;
     gid_t              sgid;
     pid_t              sid;
-    gid_t              pgid;
+    pid_t              pgid;
 
     static Credentials s_Root;
 };
@@ -116,8 +116,8 @@ class Process
     ErrorOr<pid_t>         WaitPid(pid_t pid, i32* wstatus, i32 flags,
                                    struct rusage* rusage);
 
-    Process*               Fork();
-    i32                    Exec(std::string path, char** argv, char** envp);
+    ErrorOr<Process*>      Fork();
+    ErrorOr<i32>           Exec(std::string path, char** argv, char** envp);
     i32                    Exit(i32 code);
 
     friend struct Thread;

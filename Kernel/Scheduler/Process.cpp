@@ -143,9 +143,9 @@ ErrorOr<i32> Process::DupFd(i32 oldFdNum, i32 newFdNum, i32 flags)
     newFd = new FileDescriptor(oldFd, flags);
     return m_FdTable.Insert(newFd, newFdNum);
 }
-i32 Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
+i32          Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
 
-i32 Process::Exec(std::string path, char** argv, char** envp)
+ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
 {
     m_FdTable.Clear();
     m_FdTable.OpenStdioStreams();
@@ -202,17 +202,21 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
         }
 }
 
-Process* Process::Fork()
+ErrorOr<Process*> Process::Fork()
 {
     Thread* currentThread = CPU::GetCurrentThread();
     Assert(currentThread && currentThread->parent == this);
 
-    Process*       newProcess = new Process(this, m_Name, m_Credentials);
+    Process* newProcess = Scheduler::CreateProcess(this, m_Name, m_Credentials);
 
-    class PageMap* pageMap    = new class PageMap();
-    newProcess->PageMap       = pageMap;
-    newProcess->m_CWD
-        = m_CWD ? m_CWD->Reduce(false) : VFS::GetRootNode()->Reduce(false);
+    // TODO(v1tr10l7): implement PageMap::Fork;
+    class PageMap* pageMap = new class PageMap();
+    if (!pageMap) return Error(ENOMEM);
+
+    newProcess->PageMap = pageMap;
+    newProcess->m_CWD   = m_CWD;
+    newProcess->m_Umask = m_Umask;
+    m_Children.push_back(newProcess);
 
     for (auto& range : m_AddressSpace)
     {
@@ -240,9 +244,6 @@ Process* Process::Fork()
         FileDescriptor* fd = new FileDescriptor(file.second);
         newProcess->m_FdTable.Insert(fd, file.first);
     }
-
-    m_Children.push_back(newProcess);
-    newProcess->m_Parent       = this;
 
     Thread* thread             = currentThread->Fork(newProcess);
     thread->enqueued           = false;

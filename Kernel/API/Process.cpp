@@ -15,6 +15,10 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
+namespace API::Proc
+{
+}
+
 namespace Syscall::Process
 {
     ErrorOr<i32> SysSigProcMask(Arguments& args)
@@ -62,10 +66,10 @@ namespace Syscall::Process
         class Process* process = CPU::GetCurrentThread()->parent;
 
         CPU::SetInterruptFlag(false);
-        class Process* newProcess = process->Fork();
-        Assert(newProcess);
+        auto procOrError = process->Fork();
 
-        return newProcess->GetPid();
+        return procOrError ? procOrError.value()->GetPid()
+                           : procOrError.error();
     }
     ErrorOr<i32> SysExecve(Arguments& args)
     {
@@ -153,7 +157,7 @@ namespace Syscall::Process
 
         return current->GetCredentials().egid;
     }
-    ErrorOr<gid_t> SysSet_pGid(Syscall::Arguments& args)
+    ErrorOr<pid_t> SysSet_pGid(Syscall::Arguments& args)
     {
         const pid_t    pid     = static_cast<pid_t>(args.Args[0]);
         const pid_t    pgid    = static_cast<pid_t>(args.Args[1]);
