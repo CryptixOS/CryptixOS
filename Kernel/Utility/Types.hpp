@@ -12,6 +12,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <fmt/format.h>
+#include <format>
 #include <type_traits>
 
 using usize     = std::size_t;
@@ -28,7 +30,7 @@ using i32       = std::int32_t;
 using i64       = std::int64_t;
 
 using symbol    = void*[];
-using Error     = std::errno_t;
+using Error     = std::unexpected<errno_t>;
 using ErrorType = std::errno_t;
 
 template <typename R>
@@ -44,8 +46,9 @@ namespace BootInfo
 
 struct Pointer
 {
+    constexpr Pointer() = default;
     template <std::unsigned_integral T = std::uintptr_t>
-    Pointer(const T m_Pointer)
+    constexpr Pointer(const T m_Pointer)
         : m_Pointer(m_Pointer)
     {
     }
@@ -55,10 +58,10 @@ struct Pointer
     {
     }
 
-    operator std::uintptr_t() { return m_Pointer; }
+    constexpr operator std::uintptr_t() { return m_Pointer; }
     operator void*() { return reinterpret_cast<void*>(m_Pointer); }
-    operator bool() { return m_Pointer != 0; }
-    Pointer& operator=(std::uintptr_t addr)
+    constexpr          operator bool() { return m_Pointer != 0; }
+    constexpr Pointer& operator=(std::uintptr_t addr)
     {
         m_Pointer = addr;
         return *this;
@@ -70,47 +73,44 @@ struct Pointer
     }
 
     template <typename T>
-    inline T* As() const
+    constexpr T* As() const
     {
         return reinterpret_cast<T*>(m_Pointer);
     }
     template <typename T = std::uintptr_t>
-    T Raw()
+    constexpr T Raw() const
     {
-        return static_cast<T>(m_Pointer);
+        return T(m_Pointer);
     }
 
-    auto&       operator->() { return *As<u64>(); }
-    auto&       operator*() { return *As<u64>(); }
+    constexpr auto& operator->() { return *As<u64>(); }
+    constexpr auto& operator*() { return *As<u64>(); }
 
-    inline bool IsHigherHalf() const
-    {
-        return m_Pointer >= BootInfo::GetHHDMOffset();
-    }
+    bool IsHigherHalf() const { return m_Pointer >= BootInfo::GetHHDMOffset(); }
 
     template <typename T = std::uintptr_t>
         requires(std::is_pointer_v<T> || std::is_integral_v<T>
                  || std::is_same_v<T, Pointer>)
-    inline T ToHigherHalf() const
+    constexpr T ToHigherHalf() const
     {
         return IsHigherHalf()
                  ? reinterpret_cast<T>(m_Pointer)
                  : reinterpret_cast<T>(m_Pointer + BootInfo::GetHHDMOffset());
     }
     template <>
-    inline Pointer ToHigherHalf() const
+    constexpr Pointer ToHigherHalf() const
     {
         return ToHigherHalf<std::uintptr_t>();
     }
 
-    inline Pointer ToHigherHalf() const
+    constexpr Pointer ToHigherHalf() const
     {
         return IsHigherHalf() ? m_Pointer
                               : m_Pointer + BootInfo::GetHHDMOffset();
     }
 
     template <typename T>
-    inline T FromHigherHalf() const
+    constexpr T FromHigherHalf() const
     {
         return IsHigherHalf()
                  ? reinterpret_cast<T>(m_Pointer - BootInfo::GetHHDMOffset())
@@ -118,18 +118,57 @@ struct Pointer
     }
 
     template <typename T = std::uintptr_t>
-    inline T Offset(std::uintptr_t offset) const
+    constexpr T Offset(std::uintptr_t offset) const
     {
         return reinterpret_cast<T>(m_Pointer + offset);
     }
     template <>
-    inline Pointer Offset(std::uintptr_t offset) const
+    constexpr Pointer Offset(std::uintptr_t offset) const
     {
         return m_Pointer + offset;
     }
 
-    inline auto operator<=>(const Pointer& other) const = default;
+    constexpr Pointer& operator|=(Pointer rhs)
+    {
+        m_Pointer |= rhs.m_Pointer;
+
+        return *this;
+    }
+    constexpr auto operator<=>(const Pointer& other) const = default;
+
+    constexpr operator std::string() const { return std::to_string(m_Pointer); }
 
   private:
     std::uintptr_t m_Pointer = 0;
 };
+
+template <>
+struct fmt::formatter<Pointer> : fmt::formatter<std::string>
+{
+    template <typename FormatContext>
+    auto format(const Pointer& addr, FormatContext& ctx) const
+    {
+        return fmt::formatter<std::string>::format(fmt::format("{}", 0), ctx);
+    }
+};
+
+/*
+template <>
+struct fmt::formatter<Pointer>
+{
+    template <typename ParseContext>
+    constexpr auto parse(ParseContext& ctx)
+    {
+        return ctx.begin();
+    }
+    template <typename FormatContext>
+    constexpr auto format(Pointer& addr, FormatContext& ctx)
+    {
+        return format_to(ctx.out(), "{}", 0);
+    }
+    template <typename FormatContext>
+    constexpr auto format(Pointer addr, FormatContext& ctx)
+    {
+        return format_to(ctx.out(), "{}", 0);
+    }
+};*/

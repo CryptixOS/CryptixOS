@@ -47,7 +47,7 @@ class Spinlock
         return;
 
     deadlock:
-        Panic("DEADLOCK");
+        earlyPanic("DEADLOCK");
     }
     inline void Release(bool restoreInterrupts = false)
     {

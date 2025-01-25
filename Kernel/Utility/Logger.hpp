@@ -72,14 +72,17 @@ namespace Logger
 #ifdef CTOS_BUILD_DEBUG
     #define LogDebug(...)                                                      \
         Logger::Log(LogLevel::eDebug, std::format(__VA_ARGS__))
+    #define EarlyLogDebug(...) Logger::Logf(LogLevel::eDebug, __VA_ARGS__)
 #else
     #define LogDebug(...)
+    #define EarlyLogDebug(...)
 #endif
 
 #define LogMessage(...)                                                        \
     Logger::Log(LogLevel::eNone, std::format(__VA_ARGS__).data())
+#define EarlyLogMessage(...) Logger::Logf(LogLevel::eNone, __VA_ARGS__)
 
-#define ENABLE_LOGGING true
+#define ENABLE_LOGGING       true
 #if ENABLE_LOGGING == true
     #define EarlyLogTrace(...) Logger::Logf(LogLevel::eTrace, __VA_ARGS__)
     #define EarlyLogInfo(...)  Logger::Logf(LogLevel::eInfo, __VA_ARGS__)
