@@ -87,8 +87,9 @@ struct FileDescription
     inline void        DecRefCount() { --RefCount; }
 };
 
-struct FileDescriptor
+class FileDescriptor
 {
+  public:
     FileDescriptor(INode* node, i32 flags, FileAccessMode accMode);
     FileDescriptor(FileDescriptor* fd, i32 flags = 0);
     ~FileDescriptor();

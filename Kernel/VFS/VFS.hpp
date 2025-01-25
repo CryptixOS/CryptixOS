@@ -17,7 +17,7 @@
 
 class INode;
 
-struct FileDescriptor;
+class FileDescriptor;
 namespace VFS
 {
     INode* GetRootNode();

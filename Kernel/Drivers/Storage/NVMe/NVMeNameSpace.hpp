@@ -6,7 +6,12 @@
  */
 #pragma once
 
+#include <API/UnixTypes.hpp>
+#include <Drivers/Device.hpp>
+
 #include <Utility/Types.hpp>
+
+#include <vector>
 
 namespace NVMe
 {
@@ -47,18 +52,50 @@ namespace NVMe
         u8  VendorSpecific[3712];
     } __attribute__((packed));
 
-    class NameSpace
+    struct CachedBlock
+    {
+        u8* Cache;
+        u64 Block;
+        u64 End;
+        i32 Status;
+    };
+
+    class Queue;
+    class NameSpace : public ::Device
     {
       public:
         NameSpace(u32 id, class Controller* controller);
+        virtual ~NameSpace() = default;
 
-        bool Initialize();
+        bool         Initialize();
+
+        inline usize GetMaxPhysRPgs() const { return m_MaxPhysRPages; }
+
+        virtual std::string_view GetName() const noexcept override;
+
+        virtual isize Read(void* dest, off_t offset, usize bytes) override
+        {
+            return 0;
+        }
+        virtual isize Write(const void* src, off_t offset, usize bytes) override
+        {
+            return 0;
+        }
+
+        virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
 
       private:
-        u32         m_ID            = 0;
-        Controller* m_Controller    = nullptr;
-        usize       m_MaxPhysRPages = 0;
+        u32                 m_ID            = 0;
+        Controller*         m_Controller    = nullptr;
+        usize               m_MaxPhysRPages = 0;
+        std::vector<Queue*> m_IoQueues;
 
-        bool        Identify(NameSpaceInfo* nsid);
+        u64                 m_LbaSize        = 0;
+        u64                 m_LbaCount       = 0;
+        u64                 m_CacheBlockSize = 0;
+        stat                m_Stats;
+        CachedBlock*        m_Cache = nullptr;
+
+        bool                Identify(NameSpaceInfo* nsid);
     };
 }; // namespace NVMe

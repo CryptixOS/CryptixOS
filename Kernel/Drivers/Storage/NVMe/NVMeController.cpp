@@ -51,55 +51,45 @@ namespace NVMe
         LogInfo("NVMe{}: bar0 = {{ Base: {:#x}, Size: {:#x}, IsMMIO: {} }}",
                 m_Index, bar.Address.Raw<u64>(), bar.Size, bar.IsMMIO);
 
-        usize   bar1      = PCI::Device::Read<u32>(PCI::RegisterOffset::eBar1);
+        usize bar1  = PCI::Device::Read<u32>(PCI::RegisterOffset::eBar1);
 
-        Pointer crAddress = (bar.Address.Raw<u64>() & -8ull) | bar1 << 32;
-        m_Register        = crAddress.As<volatile ControllerRegister>();
+        m_CrAddress = (bar.Address.Raw<u64>() & -8ull) | bar1 << 32;
+        m_Register  = m_CrAddress.As<volatile ControllerRegister>();
 
         AssertMsg(bar.IsMMIO, "PCI bar is not memory mapped!");
         Assert((ReadAt(0x10, 4) & 0b111) == 0b100);
 
-        uintptr_t addr = Math::AlignDown(crAddress.Raw<u64>(), PMM::PAGE_SIZE);
-        usize     len  = Math::AlignUp(bar.Size, PMM::PAGE_SIZE);
+        uintptr_t addr
+            = Math::AlignDown(m_CrAddress.Raw<u64>(), PMM::PAGE_SIZE);
+        usize len = Math::AlignUp(bar.Size, PMM::PAGE_SIZE);
         Assert(VMM::GetKernelPageMap()->MapRange(addr, addr, len,
                                                  PageAttributes::eRW));
 
         LogTrace("NVMe: Successfully mapped bar0");
 
-        u32 cc = m_Register->Configuration;
-        if (cc & Bit(0))
-        {
-            cc &= ~Bit(0);
-            m_Register->Configuration = cc;
-        }
+        auto nullOrError = Disable();
+        if (!nullOrError) return nullOrError.error();
 
-        while (m_Register->Status & Bit(0)) Arch::Pause();
-
-        usize doorbellStride = (m_Register->Capabilities >> 32) & 0xf;
-        usize queueSlots     = std::min(m_Register->Capabilities & 0xffff,
-                                        (m_Register->Capabilities >> 16) & 0xffff);
-        u32   queueId        = 0;
+        m_DoorbellStride = (m_Register->Capabilities >> 32) & 0xf;
+        m_QueueSlots     = std::min(m_Register->Capabilities & 0xffff,
+                                    (m_Register->Capabilities >> 16) & 0xffff);
+        u32 queueId      = 0;
 
         LogTrace("NVMe: Creating admin queue...");
-        volatile u32* submitDoorbell = reinterpret_cast<volatile u32*>(
-            crAddress.Offset<u64>(PMM::PAGE_SIZE)
-            + (2 * queueId * (4 << doorbellStride)));
 
-        volatile u32* completeDoorbell = reinterpret_cast<volatile uint32_t*>(
-            crAddress.Offset<u64>(PMM::PAGE_SIZE)
-            + ((2 * id + 1) * (4 << doorbellStride)));
-
-        u64 doorbell = u64(completeDoorbell);
+        u64 doorbell = u64(m_CrAddress.Offset<u64>(PMM::PAGE_SIZE)
+                           + ((2 * id) * (4 << m_DoorbellStride)));
         VMM::GetKernelPageMap()->MapRange(
             doorbell, doorbell, PMM::PAGE_SIZE * 4, PageAttributes::eRW);
 
-        m_AdminQueue = new Queue(submitDoorbell, completeDoorbell, queueId, 0,
-                                 queueSlots);
+        m_AdminQueue
+            = new Queue(m_CrAddress, queueId, m_DoorbellStride, m_QueueSlots);
 
-        u32 aqa      = queueSlots - 1;
+        u32 aqa = m_QueueSlots - 1;
         aqa |= aqa << 16;
         aqa |= aqa << 16;
         m_Register->AdminQueueAttributes = aqa;
+        auto cc                          = m_Register->Configuration;
         cc                               = (6 << 16) | (4 << 20) | (1 << 0);
 
         volatile uintptr_t asq
@@ -137,29 +127,96 @@ namespace NVMe
 
         return DetectNameSpaces(namespaceCount);
     }
-    void Controller::Shutdown() {}
+    void          Controller::Shutdown() {}
 
-    void Controller::Reset() {}
+    void          Controller::Reset() {}
 
-    i32  Controller::Identify(ControllerInfo* info)
+    ErrorOr<void> Controller::Disable()
+    {
+        auto cc = m_Register->Configuration;
+        if (cc & Bit(0))
+        {
+            cc &= ~Bit(0);
+            m_Register->Configuration = cc;
+        }
+
+        return WaitReady();
+    }
+    ErrorOr<void> Controller::Enable()
+    {
+        auto cc = m_Register->Configuration;
+        if (!(cc & Bit(0)))
+        {
+            cc |= Bit(0);
+            m_Register->Configuration = cc;
+        }
+
+        return WaitReady();
+    }
+    ErrorOr<void> Controller::WaitReady()
+    {
+        while (m_Register->Status & Bit(0)) Arch::Pause();
+        return {};
+    }
+
+    bool Controller::CreateIoQueues(NameSpace& ns, std::vector<Queue*>& queues,
+                                    u32 id)
+    {
+        Queue* ioQueue
+            = new Queue(m_CrAddress, ns, id, m_DoorbellStride, m_QueueSlots);
+        Submission cmd1                   = {};
+        cmd1.CreateCompletionQueue.OpCode = OpCode::ADMIN_CREATE_CQ;
+        cmd1.CreateCompletionQueue.Prp1
+            = Pointer(u64(ioQueue->GetComplete())).FromHigherHalf<u64>();
+        cmd1.CreateCompletionQueue.CompleteQueueID    = id;
+        cmd1.CreateCompletionQueue.Size               = m_QueueSlots - 1;
+        cmd1.CreateCompletionQueue.CompleteQueueFlags = Bit(0);
+        cmd1.CreateCompletionQueue.IrqVec             = 0;
+        u16 status = m_AdminQueue->AwaitSubmit(&cmd1);
+        if (status)
+        {
+            delete ioQueue;
+            return false;
+        }
+
+        Submission cmd2                   = {};
+        cmd2.CreateSubmissionQueue.OpCode = OpCode::ADMIN_CREATE_SQ;
+        cmd2.CreateSubmissionQueue.Prp1
+            = Pointer(u64(ioQueue->GetSubmit())).FromHigherHalf<u64>();
+        cmd2.CreateSubmissionQueue.SubmitQueueID    = id;
+        cmd2.CreateSubmissionQueue.CompleteQueueID  = id;
+        cmd2.CreateSubmissionQueue.Size             = m_QueueSlots - 1;
+        cmd2.CreateSubmissionQueue.SubmitQueueFlags = Bit(0) | (2 << 1);
+        status = m_AdminQueue->AwaitSubmit(&cmd2);
+        if (status)
+        {
+            delete ioQueue;
+            return false;
+        }
+
+        queues.push_back(ioQueue);
+        return true;
+    }
+
+    i32 Controller::Identify(ControllerInfo* info)
     {
         LogDebug("sizeof(Submission) = {}", sizeof(Submission));
         LogDebug("sizeof(Completion) = {}", sizeof(Completion));
 
-        u64        len      = sizeof(ControllerInfo);
-        Submission cmd      = {};
-        cmd.Identify.opcode = 0x06;
-        cmd.Identify.nsid   = 0;
-        cmd.Identify.cns    = 1;
-        cmd.Identify.prp1   = FromHigherHalfAddress<uintptr_t>(info);
-        i32 off             = u64(info) & (PMM::PAGE_SIZE - 1);
+        u64        len           = sizeof(ControllerInfo);
+        Submission cmd           = {};
+        cmd.Identify.OpCode      = OpCode::ADMIN_IDENTIFY;
+        cmd.Identify.NameSpaceID = 0;
+        cmd.Identify.Cns         = 1;
+        cmd.Identify.Prp1        = FromHigherHalfAddress<uintptr_t>(info);
+        i32 off                  = u64(info) & (PMM::PAGE_SIZE - 1);
 
         len -= (PMM::PAGE_SIZE - off);
-        if (len <= 0) cmd.Identify.prp2 = 0;
+        if (len <= 0) cmd.Identify.Prp2 = 0;
         else
         {
             u64 addr          = u64(info) + (PMM::PAGE_SIZE - off);
-            cmd.Identify.prp2 = addr;
+            cmd.Identify.Prp2 = addr;
         }
 
 #define NVME_CAPMPSMIN(cap) (((cap) >> 48) & 0xf)
@@ -178,9 +235,9 @@ namespace NVMe
         u32* namespaceIDs = reinterpret_cast<u32*>(
             new u8[Math::AlignUp(namespaceCount * 4, PMM::PAGE_SIZE)]);
         Submission getNamespace      = {};
-        getNamespace.Identify.opcode = 0x06;
-        getNamespace.Identify.cns    = 2;
-        getNamespace.Identify.prp1
+        getNamespace.Identify.OpCode = OpCode::ADMIN_IDENTIFY;
+        getNamespace.Identify.Cns    = 2;
+        getNamespace.Identify.Prp1
             = Pointer(namespaceIDs).FromHigherHalf<u64>();
         AssertFmt(!m_AdminQueue->AwaitSubmit(&getNamespace),
                   "NVMe: Failed to acquire namespaces for controller {}",
@@ -194,7 +251,6 @@ namespace NVMe
             {
                 LogTrace("NVMe: Found namespace #{:#x}", namespaceID);
                 AddNameSpace(namespaceID);
-                // TODO(v1tr10l7): Initialize namespace
             }
         }
 
@@ -205,10 +261,10 @@ namespace NVMe
     isize Controller::SetQueueCount(i32 count)
     {
         Submission cmd      = {};
-        cmd.Features.opcode = 0x09;
-        cmd.Features.prp1   = 0;
-        cmd.Features.fid    = 0x07;
-        cmd.Features.dword  = (count - 1) | ((count - 1) << 14);
+        cmd.Features.OpCode = OpCode::ADMIN_SETFT;
+        cmd.Features.Prp1   = 0;
+        cmd.Features.Fid    = 0x07;
+        cmd.Features.Dword  = (count - 1) | ((count - 1) << 14);
         u16 status          = m_AdminQueue->AwaitSubmit(&cmd);
         if (status) return -1;
 

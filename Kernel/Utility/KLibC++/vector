@@ -138,6 +138,17 @@ namespace std
             _data     = new_data;
             _capacity = _size;
         }
+        constexpr iterator erase(iterator pos)
+        {
+            size_t i = pos - _data;
+            for (; i < (_size - 1); i++)
+                _data[i] = std::move(_data[i + 1]);
+
+            --_size;
+
+            iterator next = ++pos;
+            return  next;
+        }
 
         constexpr void clear() noexcept
         {

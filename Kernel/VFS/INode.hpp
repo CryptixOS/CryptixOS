@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <unordered_map>
 
-struct FileDescriptor;
+class FileDescriptor;
 
 struct Credentials;
 class INode

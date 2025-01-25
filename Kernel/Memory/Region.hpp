@@ -11,6 +11,7 @@
 #include <API/Posix/sys/mman.h>
 #include <Memory/AddressRange.hpp>
 
+class FileDescriptor;
 namespace VirtualMemoryManager
 {
     class Region final
@@ -18,10 +19,11 @@ namespace VirtualMemoryManager
       public:
         Region() = default;
         Region(Pointer phys, Pointer virt, usize size,
-               i32 flags = PROT_READ | PROT_WRITE)
+               i32 flags = PROT_READ | PROT_WRITE, FileDescriptor* fd = nullptr)
             : m_VirtualSpace(virt, size)
             , m_PhysicalBase(phys)
             , m_Flags(flags)
+            , m_Fd(fd)
 
         {
         }
@@ -40,9 +42,10 @@ namespace VirtualMemoryManager
         {
             return m_VirtualSpace.GetBase();
         }
-        inline usize   GetSize() const { return m_VirtualSpace.GetSize(); }
+        inline usize GetSize() const { return m_VirtualSpace.GetSize(); }
+        inline FileDescriptor* GetFileDescriptor() const { return m_Fd; }
 
-        constexpr bool ValidateFlags(i32 flags) const
+        constexpr bool         ValidateFlags(i32 flags) const
         {
             return m_Flags & flags;
         }
@@ -51,9 +54,10 @@ namespace VirtualMemoryManager
         constexpr bool IsExecutable() const { return m_Flags & PROT_EXEC; }
 
       private:
-        AddressRange m_VirtualSpace;
-        Pointer      m_PhysicalBase = nullptr;
-        i32          m_Flags        = 0;
+        AddressRange    m_VirtualSpace;
+        Pointer         m_PhysicalBase = nullptr;
+        i32             m_Flags        = 0;
+        FileDescriptor* m_Fd           = nullptr;
     };
 
 }; // namespace VirtualMemoryManager

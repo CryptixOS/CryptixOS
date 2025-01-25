@@ -124,8 +124,14 @@ namespace NVMe
 
         void          Reset();
 
+        ErrorOr<void> Disable();
+        ErrorOr<void> Enable();
+        ErrorOr<void> WaitReady();
+
         inline Queue* GetAdminQueue() const { return m_AdminQueue; }
         inline usize  GetMaxTransShift() const { return m_MaxTransShift; }
+
+        bool CreateIoQueues(NameSpace& ns, std::vector<Queue*>& queues, u32 id);
 
         virtual std::string_view GetName() const noexcept override
         {
@@ -144,11 +150,12 @@ namespace NVMe
         virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
 
       private:
-        usize m_Index                                        = 0;
-        ControllerRegister volatile* volatile m_Register     = nullptr;
+        usize m_Index                                    = 0;
+        ControllerRegister volatile* volatile m_Register = nullptr;
+        Pointer                             m_CrAddress;
 
-        CTOS_UNUSED u64                     m_QueueSlots     = 0;
-        CTOS_UNUSED u64                     m_DoorbellStride = 0;
+        u64                                 m_QueueSlots     = 0;
+        u64                                 m_DoorbellStride = 0;
 
         Spinlock                            m_Lock;
         class Queue*                        m_AdminQueue    = nullptr;

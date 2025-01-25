@@ -6,34 +6,47 @@
  */
 #include <Common.hpp>
 
+#include <Drivers/Storage/NVMe/NVMeNameSpace.hpp>
 #include <Drivers/Storage/NVMe/NVMeQueue.hpp>
+#include <Memory/PMM.hpp>
 
 namespace NVMe
 {
-    Queue::Queue(volatile u32* submitDoorbell, volatile u32* completeDoorbell,
-                 u16 qid, u8 irq, u32 depth)
+    Queue::Queue(Pointer crAddress, u16 qid, u32 doorbellShift, u64 depth)
     {
 
-        m_Submit           = new volatile Submission[depth];
-        m_SubmitDoorbell   = submitDoorbell;
+        m_Submit         = new volatile Submission[depth];
+        m_SubmitDoorbell = reinterpret_cast<volatile u32*>(
+            crAddress.Offset<u64>(PMM::PAGE_SIZE)
+            + (2 * qid * (4 << doorbellShift)));
         m_SubmitHead       = 0;
         m_SubmitTail       = 0;
+
         m_Complete         = new volatile Completion[depth];
-        m_CompleteDoorbell = completeDoorbell;
-        m_CompleteVec      = 0;
-        m_CompleteHead     = 0;
-        m_CompletePhase    = 1;
-        m_Depth            = depth;
-        m_ID               = qid;
-        m_CmdId            = 0;
-        m_PhysRegPgs       = nullptr;
+        m_CompleteDoorbell = reinterpret_cast<volatile u32*>(
+            crAddress.Offset<u64>(PMM::PAGE_SIZE)
+            + ((2 * qid + 1) * (4 << doorbellShift)));
+        m_CompleteVec   = 0;
+        m_CompleteHead  = 0;
+        m_CompletePhase = 1;
+
+        m_Depth         = depth;
+        m_ID            = qid;
+        m_CmdId         = 0;
+        m_PhysRegPgs    = nullptr;
+    }
+    Queue::Queue(Pointer crAddress, NameSpace& ns, u16 qid, u32 doorbellShift,
+                 u64 depth)
+        : Queue(crAddress, qid, doorbellShift, depth)
+    {
+        m_PhysRegPgs = new u64[ns.GetMaxPhysRPgs() * depth];
     }
 
     u16 Queue::AwaitSubmit(Submission* cmd)
     {
-        u16 currentHead   = m_CompleteHead;
-        u16 currentPhase  = m_CompletePhase;
-        cmd->Identify.cid = m_CmdId++;
+        u16 currentHead          = m_CompleteHead;
+        u16 currentPhase         = m_CompletePhase;
+        cmd->Identify.CompleteID = m_CmdId++;
         Submit(cmd);
         u16 status = 0;
 
@@ -56,6 +69,7 @@ namespace NVMe
         *(m_CompleteDoorbell) = currentHead;
         return status;
     }
+
     void Queue::Submit(Submission* cmd)
     {
         u16       currentTail = m_SubmitTail;

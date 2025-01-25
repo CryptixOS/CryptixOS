@@ -10,109 +10,125 @@
 
 namespace NVMe
 {
+    namespace OpCode
+    {
+
+        constexpr usize ADMIN_CREATE_SQ = 0x01;
+        constexpr usize ADMIN_DELETE_CQ = 0x04;
+        constexpr usize ADMIN_CREATE_CQ = 0x05;
+        constexpr usize ADMIN_IDENTIFY  = 0x06;
+        constexpr usize ADMIN_ABORT     = 0x08;
+        constexpr usize ADMIN_SETFT     = 0x09;
+        constexpr usize ADMIN_GETFT     = 0x0a;
+
+        constexpr usize IO_FLUSH        = 0x00;
+        constexpr usize IO_WRITE        = 0x01;
+        constexpr usize IO_READ         = 0x02;
+    }; // namespace OpCode
+
     struct Command
     {
-        u8  opcode;
-        u8  flags;
-        u16 commandID;
-        u32 namespaceID;
-        u32 cdw2[2];
-        u64 metadata;
-        u64 prp1;
-        u64 prp2;
+        u8  OpCode;
+        u8  Flags;
+        u16 CommandID;
+        u32 NamespaceID;
+        u32 Cdw2[2];
+        u64 Metadata;
+        u64 Prp1;
+        u64 Prp2;
     };
     struct ReadWrite
     {
-        u8  opcode;
-        u8  flags;
-        u16 cid;
-        u32 nsid;
-        u64 unused;
-        u64 metadata;
-        u64 prp1;
-        u64 prp2;
-        u64 slba;
-        u16 len;
-        u16 control;
-        u32 dsmgmt;
-        u32 ref;
-        u16 apptag;
-        u16 appmask;
+        u8  OpCode;
+        u8  Flags;
+        u16 CompleteID;
+        u32 NameSpaceID;
+        u64 Unused0;
+        u64 Metadata;
+        u64 Prp1;
+        u64 Prp2;
+        u64 SLba;
+        u16 Len;
+        u16 Control;
+        u32 Dsmgmt;
+        u32 Ref;
+        u16 AppTag;
+        u16 AppMask;
     };
     struct Identify
     {
-        u8  opcode;
-        u8  flags;
-        u16 cid;
-        u32 nsid;
-        u64 unused1;
-        u64 unused2;
-        u64 prp1;
-        u64 prp2;
-        u32 cns;
-        u32 unused3[5];
+        u8  OpCode;
+        u8  Flags;
+        u16 CompleteID;
+        u32 NameSpaceID;
+        u64 Unused0;
+        u64 Unused1;
+        u64 Prp1;
+        u64 Prp2;
+        u32 Cns;
+        u32 Unused2[5];
     };
     struct Features
     {
-        u8  opcode;
-        u8  flags;
-        u16 cid;
-        u32 nsid;
-        u64 unused1;
-        u64 unused2;
-        u64 prp1;
-        u64 prp2;
-        u32 fid;
-        u32 dword;
-        u64 unused[2];
+        u8  OpCode;
+        u8  Flags;
+        u16 CompleteID;
+        u32 NameSpaceID;
+        u64 Unused0;
+        u64 Unused1;
+        u64 Prp1;
+        u64 Prp2;
+        u32 Fid;
+        u32 Dword;
+        u64 Unused2[2];
     };
     struct CreateCompletionQueue
     {
-        u8  opcode;
-        u8  flags;
-        u16 cid;
-        u32 unused1[5];
-        u64 prp1;
-        u64 unused2;
-        u16 cqid;
-        u16 size;
-        u16 cqflags;
-        u16 irqvec;
-        u64 unused3[2];
+        u8  OpCode;
+        u8  Flags;
+        u16 CompleteID;
+        u32 Unused0[5];
+        u64 Prp1;
+        u64 Unused1;
+        u16 CompleteQueueID;
+        u16 Size;
+        u16 CompleteQueueFlags;
+        u16 IrqVec;
+        u64 Unused2[2];
     };
     struct CreateSubmissionQueue
     {
-        u8  opcode;
-        u8  flags;
-        u16 cid;
-        u32 unused1[5];
-        u64 prp1;
-        u64 unused2;
-        u16 sqid;
-        u16 size;
-        u16 sqflags;
-        u16 cqid;
-        u64 unused3[2];
+        u8  OpCode;
+        u8  Flags;
+        u16 CompleteID;
+        u32 Unused1[5];
+        u64 Prp1;
+        u64 Unused2;
+        u16 SubmitQueueID;
+        u16 Size;
+        u16 SubmitQueueFlags;
+        u16 CompleteQueueID;
+        u64 Unused3[2];
     };
     struct DeleteQueue
     {
-        u8  opcode;
-        u8  flags;
-        u16 cid;
-        u32 unused1[9];
-        u16 qid;
-        u16 unused2;
-        u32 unused3[5];
+        u8  OpCode;
+        u8  Flags;
+        u16 CompleteID;
+        u32 Unused1[9];
+        u16 QueueID;
+        u16 Unused2;
+        u32 Unused3[5];
     };
     struct Abort
     {
-        u8  opcode;
-        u8  flags;
-        u16 cid;
-        u32 unused1[9];
-        u16 sqid;
-        u16 cqid;
-        u32 unused2[5];
+        u8  OpCode;
+        u8  Flags;
+        u16 CompleteID;
+        u32 Unused1[9];
+        u16 SubmitQueueID;
+        u16 CompleteQueueID;
+        u32 Unused2[5];
     };
     struct Submission
     {
@@ -132,18 +148,20 @@ namespace NVMe
     {
         u32 Result;
         u32 Reserved;
-        u16 SqHead;
-        u16 SqID;
+        u16 SubmitQueueHead;
+        u16 SubmitQueueID;
         u16 CommandID;
         u16 Status;
     } __attribute__((packed));
 
+    class NameSpace;
     class Queue
     {
       public:
         Queue() = default;
-        Queue(volatile u32* submitDoorbell, volatile u32* completeDoorbell,
-              u16 qid, u8 irq, u32 depth);
+        Queue(Pointer crAddress, u16 qid, u32 doorbellShift, u64 depth);
+        Queue(Pointer crAddress, NameSpace& ns, u16 qid, u32 doorbellShift,
+              u64 depth);
 
         inline volatile Submission* GetSubmit() const { return m_Submit; }
         inline volatile Completion* GetComplete() const { return m_Complete; }
