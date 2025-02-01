@@ -15,7 +15,7 @@ class TmpFsINode final : public INode
     TmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
                mode_t mode);
 
-    ~TmpFsINode()
+    virtual ~TmpFsINode()
     {
         if (m_Capacity > 0) delete m_Data;
     }

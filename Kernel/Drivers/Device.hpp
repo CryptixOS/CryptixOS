@@ -6,9 +6,9 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include <Common.hpp>
 
-#include "API/UnixTypes.hpp"
+#include <API/UnixTypes.hpp>
 
 constexpr dev_t makeDevice(usize major, usize minor)
 {
@@ -48,7 +48,9 @@ class Device
     }
 
     inline dev_t             GetID() const noexcept { return id; }
-    virtual std::string_view GetName() const noexcept                    = 0;
+    virtual std::string_view GetName() const noexcept = 0;
+
+    virtual const stat&      GetStats() { return m_Stats; }
 
     virtual isize            Read(void* dest, off_t offset, usize bytes) = 0;
     virtual isize Write(const void* src, off_t offset, usize bytes)      = 0;
@@ -57,4 +59,5 @@ class Device
 
   protected:
     dev_t id;
+    stat  m_Stats;
 };

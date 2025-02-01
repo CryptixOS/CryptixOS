@@ -1,0 +1,69 @@
+packages:
+  - name: vim
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: Vim, an improved vi-style text editor
+      description: This package contains a powerful text editor.
+      spdx: 'no-spdx: vim'
+      website: 'https://www.vim.org/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['app-editors']
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/vim/vim.git'
+      tag: 'v9.0.2112'
+      version: '9.0.2112'
+    tools_required:
+      - system-gcc
+      - host-pkg-config
+      - host-automake-v1.15
+    pkgs_required:
+      - mlibc
+      - ncurses
+      - libiconv
+    revision: 5
+    configure:
+      # vim does not seem to support out-of-tree builds, so we just copy
+      # the source tree into the build directory instead
+      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@']
+      - args:
+        - './configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--disable-gtktest'
+        - '--disable-icon-cache-update'
+        - '--disable-desktop-database-update'
+        - '--disable-canberra'
+        - '--disable-selinux'
+        - '--disable-xsmp'
+        - '--disable-channel'
+        - '--disable-netbeans'
+        - '--enable-multibyte'
+        - '--disable-acl'
+        - '--disable-gpm'
+        - '--disable-sysmouse'
+        - '--disable-nls'
+        - '--with-tlib=tinfo'
+        - '--enable-gui=no'
+        - '--without-x'
+        environ:
+          ac_cv_small_wchar_t: 'no'
+          ac_cv_func_sigsetjmp: 'no'
+          vim_cv_toupper_broken: 'no'
+          vim_cv_terminfo: 'yes'
+          vim_cv_tgetent: 'zero'
+          vim_cv_tty_group: ''
+          vim_cv_tty_mode: '0620'
+          vim_cv_getcwd_broken: 'no'
+          vim_cv_stat_ignores_slash: 'no'
+          vim_cv_memmove_handles_overlap: 'yes'
+          vim_cv_bcopy_handles_overlap: 'yes'
+          vim_cv_memcpy_handles_overlap: 'yes'
+          STRIP: '@OPTION:arch-triple@-strip'
+        workdir: '@THIS_BUILD_DIR@/src/'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true

@@ -44,9 +44,9 @@ namespace NVMe
 
     u16 Queue::AwaitSubmit(Submission* cmd)
     {
-        u16 currentHead          = m_CompleteHead;
-        u16 currentPhase         = m_CompletePhase;
-        cmd->Identify.CompleteID = m_CmdId++;
+        u16 currentHead  = m_CompleteHead;
+        u16 currentPhase = m_CompletePhase;
+        cmd->CompleteID  = m_CmdId++;
         Submit(cmd);
         u16 status = 0;
 

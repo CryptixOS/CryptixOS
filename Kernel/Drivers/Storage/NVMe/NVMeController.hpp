@@ -131,7 +131,7 @@ namespace NVMe
         inline Queue* GetAdminQueue() const { return m_AdminQueue; }
         inline usize  GetMaxTransShift() const { return m_MaxTransShift; }
 
-        bool CreateIoQueues(NameSpace& ns, std::vector<Queue*>& queues, u32 id);
+        bool          CreateIoQueues(NameSpace& ns, Queue*& queues, u32 id);
 
         virtual std::string_view GetName() const noexcept override
         {

@@ -20,6 +20,11 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
         if (m_Capacity > 0) delete m_Data;
     }
 
+    virtual const stat& GetStats() override
+    {
+        return m_Device ? m_Device->GetStats() : m_Stats;
+    }
+
     virtual void InsertChild(INode* node, std::string_view name) override
     {
         ScopedLock guard(m_Lock);

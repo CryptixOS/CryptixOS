@@ -159,15 +159,13 @@ namespace NVMe
         return {};
     }
 
-    bool Controller::CreateIoQueues(NameSpace& ns, std::vector<Queue*>& queues,
-                                    u32 id)
+    bool Controller::CreateIoQueues(NameSpace& ns, Queue*& ioQueue, u32 id)
     {
-        Queue* ioQueue
+        ioQueue
             = new Queue(m_CrAddress, ns, id, m_DoorbellStride, m_QueueSlots);
-        Submission cmd1                   = {};
-        cmd1.CreateCompletionQueue.OpCode = OpCode::ADMIN_CREATE_CQ;
-        cmd1.CreateCompletionQueue.Prp1
-            = Pointer(u64(ioQueue->GetComplete())).FromHigherHalf<u64>();
+        Submission cmd1 = {};
+        cmd1.OpCode     = OpCode::ADMIN_CREATE_CQ;
+        cmd1.Prp1 = Pointer(u64(ioQueue->GetComplete())).FromHigherHalf<u64>();
         cmd1.CreateCompletionQueue.CompleteQueueID    = id;
         cmd1.CreateCompletionQueue.Size               = m_QueueSlots - 1;
         cmd1.CreateCompletionQueue.CompleteQueueFlags = Bit(0);
@@ -179,10 +177,9 @@ namespace NVMe
             return false;
         }
 
-        Submission cmd2                   = {};
-        cmd2.CreateSubmissionQueue.OpCode = OpCode::ADMIN_CREATE_SQ;
-        cmd2.CreateSubmissionQueue.Prp1
-            = Pointer(u64(ioQueue->GetSubmit())).FromHigherHalf<u64>();
+        Submission cmd2 = {};
+        cmd2.OpCode     = OpCode::ADMIN_CREATE_SQ;
+        cmd2.Prp1 = Pointer(u64(ioQueue->GetSubmit())).FromHigherHalf<u64>();
         cmd2.CreateSubmissionQueue.SubmitQueueID    = id;
         cmd2.CreateSubmissionQueue.CompleteQueueID  = id;
         cmd2.CreateSubmissionQueue.Size             = m_QueueSlots - 1;
@@ -194,7 +191,6 @@ namespace NVMe
             return false;
         }
 
-        queues.push_back(ioQueue);
         return true;
     }
 
@@ -203,20 +199,20 @@ namespace NVMe
         LogDebug("sizeof(Submission) = {}", sizeof(Submission));
         LogDebug("sizeof(Completion) = {}", sizeof(Completion));
 
-        u64        len           = sizeof(ControllerInfo);
-        Submission cmd           = {};
-        cmd.Identify.OpCode      = OpCode::ADMIN_IDENTIFY;
-        cmd.Identify.NameSpaceID = 0;
-        cmd.Identify.Cns         = 1;
-        cmd.Identify.Prp1        = FromHigherHalfAddress<uintptr_t>(info);
-        i32 off                  = u64(info) & (PMM::PAGE_SIZE - 1);
+        u64        len   = sizeof(ControllerInfo);
+        Submission cmd   = {};
+        cmd.OpCode       = OpCode::ADMIN_IDENTIFY;
+        cmd.NameSpaceID  = 0;
+        cmd.Identify.Cns = 1;
+        cmd.Prp1         = FromHigherHalfAddress<uintptr_t>(info);
+        i32 off          = u64(info) & (PMM::PAGE_SIZE - 1);
 
         len -= (PMM::PAGE_SIZE - off);
-        if (len <= 0) cmd.Identify.Prp2 = 0;
+        if (len <= 0) cmd.Prp2 = 0;
         else
         {
-            u64 addr          = u64(info) + (PMM::PAGE_SIZE - off);
-            cmd.Identify.Prp2 = addr;
+            u64 addr = u64(info) + (PMM::PAGE_SIZE - off);
+            cmd.Prp2 = addr;
         }
 
 #define NVME_CAPMPSMIN(cap) (((cap) >> 48) & 0xf)
@@ -234,11 +230,10 @@ namespace NVMe
     {
         u32* namespaceIDs = reinterpret_cast<u32*>(
             new u8[Math::AlignUp(namespaceCount * 4, PMM::PAGE_SIZE)]);
-        Submission getNamespace      = {};
-        getNamespace.Identify.OpCode = OpCode::ADMIN_IDENTIFY;
-        getNamespace.Identify.Cns    = 2;
-        getNamespace.Identify.Prp1
-            = Pointer(namespaceIDs).FromHigherHalf<u64>();
+        Submission getNamespace   = {};
+        getNamespace.OpCode       = OpCode::ADMIN_IDENTIFY;
+        getNamespace.Identify.Cns = 2;
+        getNamespace.Prp1         = Pointer(namespaceIDs).FromHigherHalf<u64>();
         AssertFmt(!m_AdminQueue->AwaitSubmit(&getNamespace),
                   "NVMe: Failed to acquire namespaces for controller {}",
                   m_Index);
@@ -260,12 +255,12 @@ namespace NVMe
 
     isize Controller::SetQueueCount(i32 count)
     {
-        Submission cmd      = {};
-        cmd.Features.OpCode = OpCode::ADMIN_SETFT;
-        cmd.Features.Prp1   = 0;
-        cmd.Features.Fid    = 0x07;
-        cmd.Features.Dword  = (count - 1) | ((count - 1) << 14);
-        u16 status          = m_AdminQueue->AwaitSubmit(&cmd);
+        Submission cmd     = {};
+        cmd.OpCode         = OpCode::ADMIN_SETFT;
+        cmd.Prp1           = 0;
+        cmd.Features.Fid   = 0x07;
+        cmd.Features.Dword = (count - 1) | ((count - 1) << 14);
+        u16 status         = m_AdminQueue->AwaitSubmit(&cmd);
         if (status) return -1;
 
         return 0;

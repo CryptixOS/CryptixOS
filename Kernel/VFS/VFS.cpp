@@ -13,6 +13,7 @@
 #include <Utility/Spinlock.hpp>
 
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
+#include <VFS/EchFs/EchFs.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/TmpFs/TmpFs.hpp>
@@ -46,6 +47,7 @@ namespace VFS
         if (name == "tmpfs") fs = new TmpFs(flags);
         else if (name == "devtmpfs") fs = new DevTmpFs(flags);
         else if (name == "procfs") fs = new ProcFs(flags);
+        else if (name == "echfs") fs = new EchFs(flags);
 
         return fs;
     }
@@ -243,7 +245,7 @@ namespace VFS
     }
 
     // TODO: flags
-    bool Mount(INode* parent, PathView source, PathView target,
+    bool Mount(INode* parent, PathView sourcePath, PathView target,
                std::string_view fsName, i32 flags, void* data)
     {
         ScopedLock  guard(s_Lock);
@@ -254,27 +256,33 @@ namespace VFS
             errno = ENODEV;
             return false;
         }
-        [[maybe_unused]] INode* sourceNode = nullptr;
 
-        auto [nparent, node, basename]     = ResolvePath(parent, target);
-        bool   isRoot                      = (node == GetRootNode());
-        INode* mountGate                   = nullptr;
+        INode* sourceNode = nullptr;
+        if (!sourcePath.IsEmpty())
+        {
+            sourceNode = std::get<1>(ResolvePath(s_RootNode, sourcePath));
+            if (!sourceNode) return false;
+            if (sourceNode->IsDirectory()) return_err(false, EISDIR);
+        }
+        auto [nparent, node, basename] = ResolvePath(parent, target);
+        bool   isRoot                  = (node == GetRootNode());
+        INode* mountGate               = nullptr;
 
         if (!node) goto fail;
 
         if (!isRoot && !node->IsDirectory()) return_err(false, ENOTDIR);
 
-        mountGate = fs->Mount(parent, nullptr, node, basename, data);
+        mountGate = fs->Mount(parent, sourceNode, node, basename, data);
         if (!mountGate) goto fail;
 
         node->mountGate = mountGate;
 
-        if (source.GetSize() == 0)
+        if (sourcePath.IsEmpty())
             LogTrace("VFS: Mounted Filesystem '{}' on '{}'", fsName.data(),
                      target.Raw());
         else
             LogTrace("VFS: Mounted  '{}' on '{}' with Filesystem '{}'",
-                     source.Raw(), target.Raw(), fsName.data());
+                     sourcePath.Raw(), target.Raw(), fsName.data());
 
         s_MountPoints[target] = fs;
         return true;

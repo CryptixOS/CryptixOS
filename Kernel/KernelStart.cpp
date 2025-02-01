@@ -44,12 +44,15 @@ void kernelThread()
 
     VFS::CreateNode(VFS::GetRootNode(), "/dev", 0755 | S_IFDIR);
     Assert(VFS::Mount(VFS::GetRootNode(), "", "/dev", "devtmpfs"));
+    VFS::CreateNode(VFS::GetRootNode(), "/mnt", 0755 | S_IFDIR);
+
     Scheduler::InitializeProcFs();
 
     PCI::Initialize();
     TTY::Initialize();
     MemoryDevices::Initialize();
 
+    Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1", "/mnt", "echfs"));
     LogTrace("Loading user process...");
     Process* kernelProcess = Scheduler::GetKernelProcess();
     Process* userProcess   = Scheduler::CreateProcess(

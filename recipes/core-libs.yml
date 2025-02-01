@@ -1,4 +1,82 @@
 packages:
+  - name: libiconv
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: GNU charset conversion library for libc which doesn't implement it
+      description: GNU charset conversion library for libc which doesn't implement it.
+      spdx: 'LGPL-2.1-or-later GPL-3.0-or-later'
+      website: 'https://www.gnu.org/software/libiconv/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['dev-libs']
+    source:
+      subdir: 'sources'
+      git: 'https://git.savannah.gnu.org/git/libiconv.git'
+      tag: 'v1.17'
+      version: '1.17'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+        - host-pkg-config
+        - host-autoconf-archive
+        - host-gettext
+      regenerate:
+        - args: ['./gitsub.sh', 'pull']
+        # Checkout current gnulib master, 044bf893acee0a55b22b4be0ede0e3ce010c480a, 29-08-2022.
+        # This avoids random breakage in the future
+          isolate_network: false
+        - args: ['git', 'checkout', '044bf893acee0a55b22b4be0ede0e3ce010c480a']
+          workdir: '@THIS_SOURCE_DIR@/gnulib'
+        - args: ['./autogen.sh']
+          environ:
+            'NOCONFIGURE': 'yes'
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@THIS_SOURCE_DIR@/build-aux/']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@THIS_SOURCE_DIR@/libcharset/build-aux/']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-libtool/share/aclocal/libtool.m4',
+            '@THIS_SOURCE_DIR@/m4/']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-libtool/share/aclocal/libtool.m4',
+            '@THIS_SOURCE_DIR@/libcharset/m4/']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-libtool/share/libtool/build-aux/ltmain.sh',
+            '@THIS_SOURCE_DIR@/libcharset/build-aux/']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-libtool/share/libtool/build-aux/ltmain.sh',
+            '@THIS_SOURCE_DIR@/build-aux/']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-libtool/share/aclocal/ltversion.m4',
+            '@THIS_SOURCE_DIR@/m4/']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-libtool/share/aclocal/ltversion.m4',
+            '@THIS_SOURCE_DIR@/libcharset/m4/']
+        - args: ['autoreconf', '-fvi', '-I@THIS_SOURCE_DIR@/m4', '-I@THIS_SOURCE_DIR@/srcm4']
+    tools_required:
+      - system-gcc
+      - host-libtool
+    pkgs_required:
+      - mlibc
+    revision: 8
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+        - '--disable-nls'
+        - '--enable-shared'
+        - '--disable-static'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+
   - name: linux-headers
     architecture: '@OPTION:arch@'
     source:

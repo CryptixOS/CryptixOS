@@ -11,3 +11,4 @@ build-sysroot/
 sysroot/
 sources
 *.objdump
+image.hdd

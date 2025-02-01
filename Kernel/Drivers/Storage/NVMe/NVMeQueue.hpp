@@ -26,27 +26,8 @@ namespace NVMe
         constexpr usize IO_READ         = 0x02;
     }; // namespace OpCode
 
-    struct Command
-    {
-        u8  OpCode;
-        u8  Flags;
-        u16 CommandID;
-        u32 NamespaceID;
-        u32 Cdw2[2];
-        u64 Metadata;
-        u64 Prp1;
-        u64 Prp2;
-    };
     struct ReadWrite
     {
-        u8  OpCode;
-        u8  Flags;
-        u16 CompleteID;
-        u32 NameSpaceID;
-        u64 Unused0;
-        u64 Metadata;
-        u64 Prp1;
-        u64 Prp2;
         u64 SLba;
         u16 Len;
         u16 Control;
@@ -57,39 +38,17 @@ namespace NVMe
     };
     struct Identify
     {
-        u8  OpCode;
-        u8  Flags;
-        u16 CompleteID;
-        u32 NameSpaceID;
-        u64 Unused0;
-        u64 Unused1;
-        u64 Prp1;
-        u64 Prp2;
         u32 Cns;
         u32 Unused2[5];
     };
     struct Features
     {
-        u8  OpCode;
-        u8  Flags;
-        u16 CompleteID;
-        u32 NameSpaceID;
-        u64 Unused0;
-        u64 Unused1;
-        u64 Prp1;
-        u64 Prp2;
         u32 Fid;
         u32 Dword;
         u64 Unused2[2];
     };
     struct CreateCompletionQueue
     {
-        u8  OpCode;
-        u8  Flags;
-        u16 CompleteID;
-        u32 Unused0[5];
-        u64 Prp1;
-        u64 Unused1;
         u16 CompleteQueueID;
         u16 Size;
         u16 CompleteQueueFlags;
@@ -98,12 +57,6 @@ namespace NVMe
     };
     struct CreateSubmissionQueue
     {
-        u8  OpCode;
-        u8  Flags;
-        u16 CompleteID;
-        u32 Unused1[5];
-        u64 Prp1;
-        u64 Unused2;
         u16 SubmitQueueID;
         u16 Size;
         u16 SubmitQueueFlags;
@@ -112,29 +65,28 @@ namespace NVMe
     };
     struct DeleteQueue
     {
-        u8  OpCode;
-        u8  Flags;
-        u16 CompleteID;
-        u32 Unused1[9];
         u16 QueueID;
         u16 Unused2;
         u32 Unused3[5];
     };
     struct Abort
     {
-        u8  OpCode;
-        u8  Flags;
-        u16 CompleteID;
-        u32 Unused1[9];
         u16 SubmitQueueID;
         u16 CompleteQueueID;
         u32 Unused2[5];
     };
     struct Submission
     {
+        u8  OpCode;
+        u8  Flags;
+        u16 CompleteID;
+        u32 NameSpaceID;
+        u32 Cdw2[2];
+        u64 Metadata;
+        u64 Prp1;
+        u64 Prp2;
         union
         {
-            Command               Command;
             ReadWrite             ReadWrite;
             Identify              Identify;
             Features              Features;
@@ -165,6 +117,9 @@ namespace NVMe
 
         inline volatile Submission* GetSubmit() const { return m_Submit; }
         inline volatile Completion* GetComplete() const { return m_Complete; }
+
+        inline u32                  GetCommandID() const { return m_CmdId; }
+        inline u64*                 GetPhysRegPages() { return m_PhysRegPgs; }
 
         u16                         AwaitSubmit(Submission* submission);
         void                        Submit(Submission* cmd);

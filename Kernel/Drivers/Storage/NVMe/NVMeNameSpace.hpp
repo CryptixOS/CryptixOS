@@ -7,11 +7,10 @@
 #pragma once
 
 #include <API/UnixTypes.hpp>
-#include <Drivers/Device.hpp>
+#include <Drivers/Storage/StorageDevice.hpp>
 
+#include <Utility/Spinlock.hpp>
 #include <Utility/Types.hpp>
-
-#include <vector>
 
 namespace NVMe
 {
@@ -61,7 +60,7 @@ namespace NVMe
     };
 
     class Queue;
-    class NameSpace : public ::Device
+    class NameSpace : public StorageDevice
     {
       public:
         NameSpace(u32 id, class Controller* controller);
@@ -73,10 +72,7 @@ namespace NVMe
 
         virtual std::string_view GetName() const noexcept override;
 
-        virtual isize Read(void* dest, off_t offset, usize bytes) override
-        {
-            return 0;
-        }
+        virtual isize Read(void* dest, off_t offset, usize bytes) override;
         virtual isize Write(const void* src, off_t offset, usize bytes) override
         {
             return 0;
@@ -85,17 +81,27 @@ namespace NVMe
         virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
 
       private:
-        u32                 m_ID            = 0;
-        Controller*         m_Controller    = nullptr;
-        usize               m_MaxPhysRPages = 0;
-        std::vector<Queue*> m_IoQueues;
+        Spinlock               m_Lock;
+        u32                    m_ID            = 0;
+        Controller*            m_Controller    = nullptr;
+        usize                  m_MaxPhysRPages = 0;
+        Queue*                 m_IoQueue;
 
-        u64                 m_LbaSize        = 0;
-        u64                 m_LbaCount       = 0;
-        u64                 m_CacheBlockSize = 0;
-        stat                m_Stats;
-        CachedBlock*        m_Cache = nullptr;
+        u64                    m_LbaSize        = 0;
+        u64                    m_LbaCount       = 0;
+        u64                    m_CacheBlockSize = 0;
+        CachedBlock*           m_Cache          = nullptr;
+        usize                  m_Overwritten    = 0;
 
-        bool                Identify(NameSpaceInfo* nsid);
+        static constexpr usize CacheWait        = 0;
+        static constexpr usize CacheReady       = 1;
+        static constexpr usize CacheDirty       = 2;
+
+        bool                   Identify(NameSpaceInfo* nsid);
+
+        isize ReadWriteLba(u8* ddest, usize start, usize bytes, u8 write);
+
+        isize FindBlock(u64 block);
+        isize CacheBlock(u64 block);
     };
 }; // namespace NVMe

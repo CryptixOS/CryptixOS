@@ -26,6 +26,9 @@ srcs += files(
   'Drivers/PCI/PCI.cpp',
   'Drivers/PCI/HostController.cpp',
 
+  'Drivers/Storage/PartitionTable.cpp',
+  'Drivers/Storage/StorageDevice.cpp',
+
   'Drivers/Storage/NVMe/NVMeController.cpp',
   'Drivers/Storage/NVMe/NVMeNameSpace.cpp',
   'Drivers/Storage/NVMe/NVMeQueue.cpp',
@@ -61,6 +64,7 @@ srcs += files(
   'VFS/VFS.cpp',
   'VFS/DevTmpFs/DevTmpFs.cpp',
   'VFS/DevTmpFs/DevTmpFsINode.cpp',
+  'VFS/EchFs/EchFs.cpp',
   'VFS/Initrd/Initrd.cpp',
   'VFS/Initrd/Ustar.cpp',
   'VFS/ProcFs/ProcFs.cpp',

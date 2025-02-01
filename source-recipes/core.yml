@@ -13,6 +13,22 @@ sources:
       - args: ['automake']
         workdir: '@THIS_SOURCE_DIR@/ld'
 
+  - name: 'bison'
+    subdir: 'sources'
+    git: 'https://git.savannah.gnu.org/git/bison.git'
+    tag: 'v3.6.2'
+    version: '3.6.2'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-libtool
+    regenerate: 
+      - args: ['git', 'submodule', 'update', '--init']
+      - args: ['./bootstrap']
+      - args: ['cp',
+           '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+           '@THIS_SOURCE_DIR@/build-aux/']
+
   - name: 'cmake'
     subdir: 'sources'
     git: 'https://gitlab.kitware.com/cmake/cmake.git'
@@ -46,6 +62,28 @@ sources:
         workdir: '@THIS_SOURCE_DIR@/gcc'
       - args: ['autoconf']
         workdir: '@THIS_SOURCE_DIR@/libstdc++-v3'
+
+  - name: gettext
+    subdir: 'sources'
+    git: 'https://git.savannah.gnu.org/git/gettext.git'
+    tag: 'v0.19.8'
+    version: '0.19.8'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-libtool
+      - host-pkg-config
+    regenerate:
+       # The first sed removes the doc and man dirs from the makefile in gettext-runtime, the second sed does the same for gettext-tools
+       - args: 'sed -i s/"SUBDIRS = doc intl intl-java intl-csharp gnulib-lib \$(SUBDIR_libasprintf)\ src po man m4 tests"/"SUBDIRS = intl intl-java intl-csharp gnulib-lib \$(SUBDIR_libasprintf)\ src po m4 tests"/ @THIS_SOURCE_DIR@/gettext-runtime/Makefile.am'
+       - args: 'sed -i s/"SUBDIRS = doc intl gnulib-lib libgrep src libgettextpo po projects styles misc man m4 tests gnulib-tests examples its"/"SUBDIRS = intl gnulib-lib libgrep src libgettextpo po projects styles misc m4 tests gnulib-tests examples its"/ @THIS_SOURCE_DIR@/gettext-tools/Makefile.am'
+       - args: ['./autogen.sh']
+         environ:
+           'NOCONFIGURE': 'yes'
+       - args: ['cp',
+           '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+           '@THIS_SOURCE_DIR@/build-aux/']
+
 
   - name: llvm
     subdir: 'sources'

@@ -266,7 +266,7 @@ namespace std
             {
                 pos = std::min(size_type(_size - v._size), pos);
                 do {
-                    if (traits_type::compare(this->_M_str + pos, v._data,
+                    if (traits_type::compare(_data + pos, v._data,
                                              v._size)
                         == 0)
                         return pos;

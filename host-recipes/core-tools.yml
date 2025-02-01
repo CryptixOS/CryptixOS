@@ -64,6 +64,19 @@ tools:
     install:
       - args: ['make', 'install-binutils', 'install-gas', 'install-ld']
 
+  - name: host-autoconf-archive
+    architecture: noarch
+    exports_aclocal: true
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/autoconf-archive/autoconf-archive.git'
+      tag: 'v2019.01.06'
+      version: '2019.01.06'
+    revision: 2
+    install:
+      - args: ['mkdir', '-p', '@BUILD_ROOT@/tools/host-autoconf-archive/share/']
+      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/m4', '@BUILD_ROOT@/tools/host-autoconf-archive/share/aclocal']
+
   - name: host-autoconf-v2.69
     architecture: noarch
     source:
@@ -130,6 +143,22 @@ tools:
       # Stop aclocal from complaining.
       - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.15', '@PREFIX@/share/aclocal']
 
+  - name: host-bison
+    architecture: noarch
+    from_source: bison
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+    revision: 2
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
   - name: host-cmake
     architecture: noarch
     from_source: cmake
@@ -159,6 +188,24 @@ tools:
         - '--prefix=@PREFIX@'
     compile:
       - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
+  - name: host-gettext
+    architecture: noarch
+    from_source: gettext
+    exports_aclocal: true
+    tools_required:
+      - host-bison
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+    revision: 2
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: 'make'
     install:
       - args: ['make', 'install']
 

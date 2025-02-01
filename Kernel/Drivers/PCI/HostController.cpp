@@ -53,15 +53,18 @@ namespace PCI
                                        Enumerator enumerator)
     {
         DeviceAddress address{};
+        address.Domain   = m_Domain.ID;
         address.Bus      = bus;
         address.Slot     = slot;
         address.Function = 0;
-        if (Read<u16>(address, std::to_underlying(RegisterOffset::eVendorID))
-            == PCI_INVALID)
-            return false;
-        if ((Read<u8>(address, std::to_underlying(RegisterOffset::eHeaderType))
-             & Bit(7))
-            == 0)
+
+        u16 vendorID
+            = Read<u16>(address, std::to_underlying(RegisterOffset::eVendorID));
+        if (vendorID == PCI_INVALID) return false;
+
+        u8 headerType = Read<u8>(
+            address, std::to_underlying(RegisterOffset::eHeaderType));
+        if (!(headerType & Bit(7)))
         {
             if (EnumerateFunction(address, enumerator)) return true;
         }

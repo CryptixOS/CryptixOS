@@ -28,6 +28,7 @@ class PathView
     }
 
     bool                  ValidateLength();
+    constexpr bool        IsEmpty() const { return m_Path.empty(); }
 
     constexpr             operator std::string_view() const { return m_Path; }
 
