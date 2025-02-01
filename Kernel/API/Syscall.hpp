@@ -43,6 +43,7 @@ namespace Syscall
         eSigProcMask  = 14,
         eIoCtl        = 16,
         eAccess       = 21,
+        eSchedYield   = 24,
         eDup          = 32,
         eDup2         = 33,
         eGetPid       = 39,

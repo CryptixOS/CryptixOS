@@ -11,6 +11,7 @@
 #include <API/VFS.hpp>
 
 #include <Scheduler/Process.hpp>
+#include <Scheduler/Scheduler.hpp>
 
 namespace Syscall
 {
@@ -66,6 +67,11 @@ namespace Syscall
     }
     ErrorOr<isize> SysIoCtl(Arguments& args);
     ErrorOr<isize> SysAccess(Arguments& args);
+    ErrorOr<isize> SysSchedYield(Arguments& args)
+    {
+        Scheduler::Yield();
+        return 0;
+    }
     ErrorOr<isize> SysDup(Arguments& args);
     ErrorOr<isize> SysDup2(Arguments& args);
     ErrorOr<isize> SysGetPid(Arguments& args);

@@ -103,6 +103,7 @@ namespace Syscall
         RegisterSyscall(ID::eSigProcMask, Process::SysSigProcMask);
         RegisterSyscall(ID::eIoCtl, VFS::SysIoCtl);
         RegisterSyscall(ID::eAccess, VFS::SysAccess);
+        RegisterSyscall(ID::eSchedYield, SysSchedYield);
         RegisterSyscall(ID::eDup, VFS::SysDup);
         RegisterSyscall(ID::eDup2, VFS::SysDup2);
         RegisterSyscall(ID::eGetPid, Process::SysGetPid);

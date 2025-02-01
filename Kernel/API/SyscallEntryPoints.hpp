@@ -23,6 +23,7 @@ namespace Syscall
     ErrorOr<isize> SysMMap(Arguments& args);
     ErrorOr<isize> SysIoCtl(Arguments& args);
     ErrorOr<isize> SysAccess(Arguments& args);
+    ErrorOr<isize> SysSchedYield(Arguments& args);
     ErrorOr<isize> SysDup(Arguments& args);
     ErrorOr<isize> SysDup2(Arguments& args);
     ErrorOr<isize> SysGetPid(Arguments& args);
