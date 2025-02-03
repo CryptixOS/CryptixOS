@@ -45,8 +45,11 @@ class EchFs final : public Filesystem
     }
     virtual bool Populate(INode* node) override { return false; }
 
+    void         InsertDirectoryEntries(class EchFsINode* node);
+
   private:
-    usize m_BlockSize           = 0;
-    usize m_MainDirectoryOffset = 0;
-    usize m_MainDirectoryLength = 0;
+    INode* m_Device              = nullptr;
+    usize  m_BlockSize           = 0;
+    usize  m_MainDirectoryOffset = 0;
+    usize  m_MainDirectoryLength = 0;
 };

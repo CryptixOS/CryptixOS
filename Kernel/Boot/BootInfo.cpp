@@ -234,6 +234,10 @@ namespace BootInfo
                               s_SmbiosRequest.response->entry_64);
     }
 
+    Pointer GetEfiSystemTable()
+    {
+        return s_EfiSystemTableRequest.response->address;
+    }
     u64     GetBootTime() { return s_BootTimeRequest.response->boot_time; }
     Pointer GetKernelPhysicalAddress()
     {

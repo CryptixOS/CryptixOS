@@ -12,9 +12,8 @@
 
 CTOS_NO_KASAN void logProcessState()
 {
-    Thread* currentThread = CPU::GetCurrentThread();
-    if (!currentThread) return;
-    Process* currentProcess = currentThread->parent;
+    Process* currentProcess = Process::GetCurrent();
+    if (!currentProcess) return;
 
     EarlyLogInfo("Process: %s", currentProcess->m_Name.data());
 }
@@ -24,6 +23,7 @@ inline static void enterPanicMode()
     // TODO(v1tr10l7): Halt all cpus
     CPU::SetInterruptFlag(false);
     Logger::Unlock();
+    Logger::EnableSink(LOG_SINK_TERMINAL);
     EarlyLogError("Kernel Panic!");
     logProcessState();
 }
@@ -55,5 +55,6 @@ void earlyPanic(const char* format, ...)
     Logger::Logv(LogLevel::eError, format, args);
     va_end(args);
 
+    Stacktrace::Print(32);
     hcf();
 }

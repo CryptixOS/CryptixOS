@@ -74,6 +74,21 @@ namespace Syscall
     }
     ErrorOr<isize> SysDup(Arguments& args);
     ErrorOr<isize> SysDup2(Arguments& args);
+    ErrorOr<isize> SysNanoSleep(Arguments& args)
+    {
+        const timespec* duration = args.Get<const timespec*>(0);
+        timespec*       rem      = args.Get<timespec*>(1);
+
+        Process*        current  = Process::GetCurrent();
+        if (!current->ValidateRead(duration, sizeof(timespec))
+            || !current->ValidateRead(rem, sizeof(timespec)))
+            return Error(EFAULT);
+        if (duration->tv_sec < 0 || duration->tv_nsec < 0 || rem->tv_sec < 0
+            || rem->tv_nsec < 0)
+            return Error(EINVAL);
+
+        return Error(ENOSYS);
+    }
     ErrorOr<isize> SysGetPid(Arguments& args);
     ErrorOr<isize> SysExit(Arguments& args);
     ErrorOr<isize> SysWait4(Arguments& args);

@@ -299,6 +299,14 @@ namespace CPU
         return interruptFlag;
     }
     void Halt() { __asm__ volatile("hlt"); }
+    void WakeUp(usize id, bool everyone)
+    {
+        if (everyone)
+            GetCurrent()->Lapic.SendIpi(g_ScheduleVector | (0b10 << 18), 0);
+        else
+            GetCurrent()->Lapic.SendIpi(g_ScheduleVector | s_CPUs[id].LapicID,
+                                        0);
+    }
 
     void WriteMSR(u32 msr, u64 value)
     {
@@ -488,7 +496,12 @@ namespace CPU
 
         *ctx = thread->ctx;
     }
-    void Reschedule(usize ms) { PIT::Start(PIT::Mode::ONESHOT, 100); }
+    void Reschedule(usize ms)
+    {
+        auto* cpu = GetCurrent();
+        cpu->Lapic.Start(g_ScheduleVector, ms, Lapic::Mode::eOneshot);
+        /*PIT::Start(PIT::Mode::ONESHOT, 100);*/
+    }
 
     bool EnableSSE()
     {

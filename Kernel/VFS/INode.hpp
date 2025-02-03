@@ -38,7 +38,7 @@ class INode
 
     inline Filesystem*  GetFilesystem() { return m_Filesystem; }
     virtual const stat& GetStats() { return m_Stats; }
-    inline std::unordered_map<std::string_view, INode*>& GetChildren()
+    virtual std::unordered_map<std::string_view, INode*>& GetChildren()
     {
         return m_Children;
     }

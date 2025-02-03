@@ -106,6 +106,7 @@ namespace Syscall
         RegisterSyscall(ID::eSchedYield, SysSchedYield);
         RegisterSyscall(ID::eDup, VFS::SysDup);
         RegisterSyscall(ID::eDup2, VFS::SysDup2);
+        RegisterSyscall(ID::eNanoSleep, SysNanoSleep);
         RegisterSyscall(ID::eGetPid, Process::SysGetPid);
         RegisterSyscall(ID::eExit, Process::SysExit);
         RegisterSyscall(ID::eWait4, Process::SysWait4);

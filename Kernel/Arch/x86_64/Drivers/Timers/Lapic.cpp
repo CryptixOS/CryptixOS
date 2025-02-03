@@ -42,7 +42,7 @@ bool                           CheckX2Apic()
     CPU::ID id;
     if (!id(1, 0)) return false;
 
-    if (!(id.rcx & BIT(21))) return false;
+    if (!(id.rcx & Bit(21))) return false;
     auto dmar = ACPI::GetTable("DMAR");
     if (!dmar) return true;
 
@@ -56,8 +56,8 @@ void Lapic::Initialize()
     x2apic = CheckX2Apic();
     LogInfo("LAPIC: X2APIC available: {}", x2apic);
 
-    u64 base = CPU::ReadMSR(APIC_BASE_MSR) | BIT(11);
-    if (x2apic) base |= BIT(10);
+    u64 base = CPU::ReadMSR(APIC_BASE_MSR) | Bit(11);
+    if (x2apic) base |= Bit(10);
 
     CPU::WriteMSR(APIC_BASE_MSR, base);
 
@@ -67,7 +67,8 @@ void Lapic::Initialize()
 
         baseAddress   = VMM::AllocateSpace(0x1000, sizeof(u32), true);
         VMM::GetKernelPageMap()->Map(baseAddress, physAddr,
-                                     PageAttributes::eRW);
+                                     PageAttributes::eRW
+                                         | PageAttributes::eUncacheableStrong);
     }
 
     baseAddress = ToHigherHalfAddress<uintptr_t>(base & ~(0xfff));
@@ -75,12 +76,12 @@ void Lapic::Initialize()
                          : (Read(LAPIC_ID_REGISTER) >> 24) & 0xff;
 
     Write(LAPIC_TASK_PRIORITY_REGISTER, 0x00);
-    Write(LAPIC_SPURIOUS_REGISTER, 0xff | 0x100);
-    if (!x2apic)
+    Write(LAPIC_SPURIOUS_REGISTER, 0xff | Bit(8));
+    /*if (!x2apic)
     {
         Write(LAPIC_DFR_REGISTER, 0xf0000000);
         Write(LAPIC_LDR_REGISTER, Read(LAPIC_ID_REGISTER));
-    }
+    }*/
 
     // for (const auto& nmi : MADT::GetLAPIC_NMIEntries())
     //     SetNmi(2, CPU::GetCurrent()->archID, nmi->processor, nmi->flags,
@@ -104,15 +105,14 @@ void Lapic::SendIpi(u32 flags, u32 id)
     }
 
     Write(LAPIC_ICR_LOW_REGISTER,
-          (static_cast<uint64_t>(id) << 32) | BIT(14) | flags);
+          (static_cast<u64>(id) << 32) | Bit(14) | flags);
 }
 void Lapic::SendEOI() { Write(LAPIC_EOI_REGISTER, LAPIC_EOI_ACK); }
 
 void Lapic::Start(u8 vector, u64 ms, Mode mode)
 {
-    if (ticksPer10ms == 0) CalibrateTimer();
-    CPU::SetInterruptFlag(false);
-    Stop();
+    if (ticksPerMs == 0) CalibrateTimer();
+    u64 ticks = ticksPerMs * ms;
 
     Write(LAPIC_TIMER_DIVIDER_REGISTER, 0x03);
     u64 value = Read(LAPIC_TIMER_REGISTER) & ~(3 << 17);
@@ -122,12 +122,8 @@ void Lapic::Start(u8 vector, u64 ms, Mode mode)
     value |= vector;
     Write(LAPIC_TIMER_REGISTER, value);
 
-    u64 ticks = ((ticksPer10ms / 10) * ms);
-
     Write(LAPIC_TIMER_INITIAL_COUNT_REGISTER, ticks ? ticks : 1);
-    Write(LAPIC_TIMER_REGISTER, Read(LAPIC_TIMER_REGISTER) & ~BIT(16));
-
-    CPU::SetInterruptFlag(true);
+    Write(LAPIC_TIMER_REGISTER, Read(LAPIC_TIMER_REGISTER) & ~Bit(16));
 }
 void Lapic::Stop()
 {
@@ -156,14 +152,11 @@ void Lapic::CalibrateTimer()
     Write(LAPIC_TIMER_DIVIDER_REGISTER, 0x03);
     Write(LAPIC_TIMER_INITIAL_COUNT_REGISTER, 0xffffffff);
 
-    bool ints = CPU::SwapInterruptFlag(true);
+    Write(LAPIC_TIMER_REGISTER, Read(LAPIC_TIMER_REGISTER) & ~Bit(16));
+    // HPET::GetDevices()[0].Sleep(10 * 1000);
+    Write(LAPIC_TIMER_REGISTER, Read(LAPIC_TIMER_REGISTER) | Bit(16));
 
-    Write(LAPIC_TIMER_REGISTER, Read(LAPIC_TIMER_REGISTER) & ~BIT(16));
-    HPET::GetDevices()[0].Sleep(10 * 1000);
-    CPU::SetInterruptFlag(ints);
-    Write(LAPIC_TIMER_REGISTER, Read(LAPIC_TIMER_REGISTER) | BIT(16));
-
-    ticksPer10ms = (0xffffffff - Read(LAPIC_TIMER_CURRENT_COUNT_REGISTER));
+    ticksPerMs = (0xffffffff - Read(LAPIC_TIMER_CURRENT_COUNT_REGISTER)) / 10;
 }
 void Lapic::SetNmi(u8 vector, u8 currentCPUID, u8 cpuID, u16 flags, u8 lint)
 {

@@ -27,10 +27,10 @@ class Lapic
     void        Stop();
 
   private:
-    u32       id           = 0;
-    uintptr_t baseAddress  = 0;
-    bool      x2apic       = false;
-    u64       ticksPer10ms = 0;
+    u32       id          = 0;
+    uintptr_t baseAddress = 0;
+    bool      x2apic      = false;
+    u64       ticksPerMs  = 0;
 
     u32       Read(u32 reg);
     void      Write(u32 reg, u64 value);

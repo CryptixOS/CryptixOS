@@ -26,6 +26,7 @@ namespace Syscall
     ErrorOr<isize> SysSchedYield(Arguments& args);
     ErrorOr<isize> SysDup(Arguments& args);
     ErrorOr<isize> SysDup2(Arguments& args);
+    ErrorOr<isize> SysNanoSleep(Arguments& args);
     ErrorOr<isize> SysGetPid(Arguments& args);
     ErrorOr<isize> SysExit(Arguments& args);
     ErrorOr<isize> SysWait4(Arguments& args);

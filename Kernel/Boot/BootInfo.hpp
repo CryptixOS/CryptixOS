@@ -46,6 +46,7 @@ namespace BootInfo
     limine_file*                FindModule(const char* name);
     Pointer                     GetRSDPAddress();
     std::pair<Pointer, Pointer> GetSmBiosEntries();
+    Pointer                     GetEfiSystemTable();
     u64                         GetBootTime();
     Pointer                     GetKernelPhysicalAddress();
     Pointer                     GetKernelVirtualAddress();

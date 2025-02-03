@@ -28,10 +28,13 @@ packages:
       version: '1.0'
     pkgs_required:
       - base-files
-      - file
-      - mlibc
-      - init
       - bash
+      - cmatrix
+      - coreutils
+      - file
+      - init
+      - mlibc
+      - sl
     configure: []
     build: []
 

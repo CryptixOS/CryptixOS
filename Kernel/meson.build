@@ -65,6 +65,7 @@ srcs += files(
   'VFS/DevTmpFs/DevTmpFs.cpp',
   'VFS/DevTmpFs/DevTmpFsINode.cpp',
   'VFS/EchFs/EchFs.cpp',
+  'VFS/EchFs/EchFsINode.cpp',
   'VFS/Initrd/Initrd.cpp',
   'VFS/Initrd/Ustar.cpp',
   'VFS/ProcFs/ProcFs.cpp',

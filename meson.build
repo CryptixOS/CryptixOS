@@ -199,6 +199,17 @@ ksyms = custom_target(
   depends: [kernel_elf],
 )
 
+echfs_image = custom_target(
+  'echfs_image',
+  output: 'image.hdd',
+  command: [
+    './create_image.sh',
+  ],
+  build_by_default: true,
+  console: true,
+  install: false,
+)
+
 iso_files = [
   meson.project_source_root() / 'limine.conf',
   ksyms,
@@ -246,15 +257,11 @@ iso = custom_target(
     '&&',
     'rm',
     '-rf', iso_dir,
-    '&&',
-    './create_image.sh',
-    'echfs-util',
-    '-m', '-p0', 'image.hdd', 'format', '512',
   ],
   build_by_default: true,
   console: true,
   install: false,
-  depends: [kernel_elf, initrd],
+  depends: [kernel_elf, initrd, echfs_image],
 )
 
 run_bios = custom_target(
@@ -274,7 +281,7 @@ ovmf = ovmf_binaries.get_variable(ovmf_id)
 run_uefi = custom_target(
   input: [iso],
   output: 'run_uefi',
-  command: [qemu, qemu_args, '-cdrom', '@INPUT@', '-drive', 'format=raw,file=' + meson.source_root() / 'image.hdd' + ',if=none,id=nvm1', '-device', 'nvme-ns,drive=nvm1,nsid=2,bus=nvme-ctrl1', '-bios', ovmf],
+  command: [qemu, qemu_args, '-cdrom', '@INPUT@', '-drive', 'format=raw,file=' +  'image.hdd' + ',if=none,id=nvm1', '-device', 'nvme-ns,drive=nvm1,nsid=2,bus=nvme-ctrl1', '-bios', ovmf],
   console: true,
   install: false,
   depends: iso,

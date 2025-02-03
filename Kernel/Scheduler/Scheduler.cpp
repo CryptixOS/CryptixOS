@@ -129,9 +129,10 @@ namespace Scheduler
         {
             CPU::SetInterruptFlag(true);
 
-            // CPU::GetCurrent()->Lapic.Start(0x20, 20000,
-            // Lapic::Mode::eOneshot);
-            InterruptManager::Unmask(0);
+            CPU::WakeUp(0, true);
+            // CPU::GetCurrent()->Lapic.Start(g_ScheduleVector, 1000,
+            //                                Lapic::Mode::eOneshot);
+            //  InterruptManager::Unmask(0);
 
             for (;;) Arch::Halt();
         }
@@ -231,7 +232,8 @@ namespace Scheduler
             CPU::SaveThread(currentThread, ctx);
         }
 
-        CPU::Reschedule(newThread->parent->m_Quantum);
+        CPU::Reschedule(1000);
+        // CPU::Reschedule(newThread->parent->m_Quantum);
         CPU::LoadThread(newThread, ctx);
 
         if (currentThread && currentThread->state == ThreadState::eKilled
