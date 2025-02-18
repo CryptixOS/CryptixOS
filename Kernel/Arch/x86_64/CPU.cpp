@@ -220,8 +220,8 @@ namespace CPU
                 LogInfo("SMP: CPU {} is up", current->ID);
             }
 
+            Scheduler::PrepareAP();
             Halt();
-            // Scheduler::PrepareAP();
         };
 
         auto smpResponse = BootInfo::GetSMP_Response();
