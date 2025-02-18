@@ -113,26 +113,65 @@ namespace uACPI
         }
         void         uacpi_kernel_pci_device_close(uacpi_handle) {}
 
-        uacpi_status uacpi_kernel_pci_read(uacpi_handle device,
-                                           uacpi_size   offset,
-                                           uacpi_u8 byteWidth, uacpi_u64* value)
+        uacpi_status uacpi_kernel_pci_read8(uacpi_handle device,
+                                            uacpi_size offset, uacpi_u8* value)
         {
-
             CtosUnused(device);
             CtosUnused(offset);
-            CtosUnused(byteWidth);
             CtosUnused(value);
 
             ToDoWarn();
             return UACPI_STATUS_UNIMPLEMENTED;
         }
-        uacpi_status uacpi_kernel_pci_write(uacpi_handle device,
-                                            uacpi_size   offset,
-                                            uacpi_u8 byteWidth, uacpi_u64 value)
+        uacpi_status uacpi_kernel_pci_read16(uacpi_handle device,
+                                             uacpi_size   offset,
+                                             uacpi_u16*   value)
         {
             CtosUnused(device);
             CtosUnused(offset);
-            CtosUnused(byteWidth);
+            CtosUnused(value);
+
+            ToDoWarn();
+            return UACPI_STATUS_UNIMPLEMENTED;
+        }
+        uacpi_status uacpi_kernel_pci_read32(uacpi_handle device,
+                                             uacpi_size   offset,
+                                             uacpi_u32*   value)
+        {
+            CtosUnused(device);
+            CtosUnused(offset);
+            CtosUnused(value);
+
+            ToDoWarn();
+            return UACPI_STATUS_UNIMPLEMENTED;
+        }
+        uacpi_status uacpi_kernel_pci_write8(uacpi_handle device,
+                                             uacpi_size offset, uacpi_u8 value)
+        {
+            CtosUnused(device);
+            CtosUnused(offset);
+            CtosUnused(value);
+
+            ToDoWarn();
+            return UACPI_STATUS_UNIMPLEMENTED;
+        }
+        uacpi_status uacpi_kernel_pci_write16(uacpi_handle device,
+                                              uacpi_size   offset,
+                                              uacpi_u16    value)
+        {
+            CtosUnused(device);
+            CtosUnused(offset);
+            CtosUnused(value);
+
+            ToDoWarn();
+            return UACPI_STATUS_UNIMPLEMENTED;
+        }
+        uacpi_status uacpi_kernel_pci_write32(uacpi_handle device,
+                                              uacpi_size   offset,
+                                              uacpi_u32    value)
+        {
+            CtosUnused(device);
+            CtosUnused(offset);
             CtosUnused(value);
 
             ToDoWarn();
@@ -148,19 +187,44 @@ namespace uACPI
         }
         void         uacpi_kernel_io_unmap(uacpi_handle) {}
 
-        uacpi_status uacpi_kernel_io_read(uacpi_handle handle,
-                                          uacpi_size offset, uacpi_u8 byteWidth,
-                                          uacpi_u64* value)
+        uacpi_status uacpi_kernel_io_read8(uacpi_handle handle,
+                                           uacpi_size offset, uacpi_u8* out)
         {
             auto addr = reinterpret_cast<uacpi_io_addr>(handle);
-            return uacpi_kernel_raw_io_read(addr + offset, byteWidth, value);
+            return uacpi_kernel_raw_io_read(addr + offset, 1,
+                                            reinterpret_cast<uacpi_u64*>(out));
         }
-        uacpi_status uacpi_kernel_io_write(uacpi_handle handle,
-                                           uacpi_size   offset,
-                                           uacpi_u8 byteWidth, uacpi_u64 value)
+        uacpi_status uacpi_kernel_io_read16(uacpi_handle handle,
+                                            uacpi_size offset, uacpi_u16* out)
         {
             auto addr = reinterpret_cast<uacpi_io_addr>(handle);
-            return uacpi_kernel_raw_io_write(addr + offset, byteWidth, value);
+            return uacpi_kernel_raw_io_read(addr + offset, 2,
+                                            reinterpret_cast<uacpi_u64*>(out));
+        }
+        uacpi_status uacpi_kernel_io_read32(uacpi_handle handle,
+                                            uacpi_size offset, uacpi_u32* out)
+        {
+            auto addr = reinterpret_cast<uacpi_io_addr>(handle);
+            return uacpi_kernel_raw_io_read(addr + offset, 4,
+                                            reinterpret_cast<uacpi_u64*>(out));
+        }
+        uacpi_status uacpi_kernel_io_write8(uacpi_handle handle,
+                                            uacpi_size offset, uacpi_u8 value)
+        {
+            auto addr = reinterpret_cast<uacpi_io_addr>(handle);
+            return uacpi_kernel_raw_io_write(addr + offset, 1, value);
+        }
+        uacpi_status uacpi_kernel_io_write16(uacpi_handle handle,
+                                             uacpi_size offset, uacpi_u16 value)
+        {
+            auto addr = reinterpret_cast<uacpi_io_addr>(handle);
+            return uacpi_kernel_raw_io_write(addr + offset, 2, value);
+        }
+        uacpi_status uacpi_kernel_io_write32(uacpi_handle handle,
+                                             uacpi_size offset, uacpi_u32 value)
+        {
+            auto addr = reinterpret_cast<uacpi_io_addr>(handle);
+            return uacpi_kernel_raw_io_write(addr + offset, 4, value);
         }
 
         void* uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
