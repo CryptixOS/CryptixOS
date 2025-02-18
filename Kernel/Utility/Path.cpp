@@ -6,46 +6,29 @@
  */
 #include <Utility/Path.hpp>
 
-bool Path::IsAbsolute(std::string_view path)
-{
-    return !path.empty() && path[0] == '/';
-}
-
-std::vector<std::string> Path::SplitPath(std::string path)
+std::vector<std::string> Path::SplitPath()
 {
     std::vector<std::string> segments;
-    usize                    start     = path[0] == '/' ? 1 : 0;
+    usize                    start     = m_Path[0] == '/' ? 1 : 0;
     usize                    end       = start;
 
-    auto                     findSlash = [path](usize pos) -> usize
+    auto                     findSlash = [this](usize pos) -> usize
     {
         usize current = pos;
-        while (path[current] != '/' && current < path.size()) current++;
+        while (m_Path[current] != '/' && current < m_Path.size()) current++;
 
-        return current == path.size() ? std::string::npos : current;
+        return current == m_Path.size() ? std::string::npos : current;
     };
 
     while ((end = findSlash(start)) != std::string::npos)
     {
-        std::string segment = path.substr(start, end - start);
+        std::string segment = m_Path.substr(start, end - start);
         if (start != end) segments.push_back(segment);
 
         start = end + 1;
     }
 
     // handle last segment
-    if (start < path.length()) segments.push_back(path.substr(start));
+    if (start < m_Path.length()) segments.push_back(m_Path.substr(start));
     return segments;
-}
-
-bool Path::ValidateLength(PathView path)
-{
-    usize pathLen = 0;
-    while (path[pathLen])
-    {
-        if (pathLen >= Limits::MAX_PATH_LENGTH) return false;
-        ++pathLen;
-    }
-
-    return true;
 }

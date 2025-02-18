@@ -345,10 +345,10 @@ namespace Syscall::VFS
         if (!current->ValidateAddress(reinterpret_cast<uintptr_t>(path.Raw()),
                                       PROT_READ))
             return Error(EFAULT);
-        if (!Path::ValidateLength(path)) return Error(ENAMETOOLONG);
+        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
-        INode* parent        = Path::IsAbsolute(path) ? current->GetRootNode()
-                                                      : current->GetCWD();
+        INode* parent
+            = path.IsAbsolute() ? current->GetRootNode() : current->GetCWD();
         auto [_, node, name] = VFS::ResolvePath(parent, path);
 
         mode &= ~current->GetUmask() & 0777;
@@ -402,12 +402,12 @@ namespace Syscall::VFS
         if (!process->ValidateAddress(reinterpret_cast<uintptr_t>(path.Raw()),
                                       PROT_READ))
             return Error(EFAULT);
-        if (!Path::ValidateLength(path)) return Error(ENAMETOOLONG);
+        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
         INode*          parent = nullptr;
         FileDescriptor* fd     = process->GetFileHandle(dirFd);
 
-        if (!Path::IsAbsolute(path))
+        if (!path.IsAbsolute())
         {
             if (dirFd != AT_FDCWD && !fd) return Error(EBADF);
 

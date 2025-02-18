@@ -127,14 +127,15 @@ namespace VFS
         return node;
     }
     std::tuple<INode*, INode*, std::string>
-    ResolvePath(INode* parent, std::string_view path, bool automount)
+    ResolvePath(INode* parent, PathView path, bool automount)
     {
-        if (!parent || Path::IsAbsolute(path)) parent = GetRootNode();
+        if (!parent || path.IsAbsolute()) parent = GetRootNode();
 
         auto currentNode
             = parent == s_RootNode ? s_RootNode : parent->Reduce(false);
 
-        if (path == "/" || path.empty()) return {currentNode, currentNode, "/"};
+        if (path == "/" || path.IsEmpty())
+            return {currentNode, currentNode, "/"};
 
         auto getParent = [&currentNode]
         {
@@ -147,7 +148,7 @@ namespace VFS
             return currentNode->GetParent();
         };
 
-        auto segments = Path::SplitPath(path.data());
+        auto segments = path.SplitPath();
 
         for (usize i = 0; i < segments.size(); i++)
         {
@@ -313,7 +314,7 @@ namespace VFS
         if (newNode) newNodeParent->InsertChild(newNode, newNode->GetName());
         return newNode;
     }
-    ErrorOr<const stat*> Stat(i32 fdNum, std::string_view path, i32 flags)
+    ErrorOr<const stat*> Stat(i32 fdNum, PathView path, i32 flags)
     {
         if (flags & ~(AT_EMPTY_PATH | AT_NO_AUTOMOUNT | AT_SYMLINK_NOFOLLOW))
             return std::unexpected(Error(EINVAL));
@@ -322,7 +323,7 @@ namespace VFS
         FileDescriptor* fd             = process->GetFileHandle(fdNum);
         bool            followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
 
-        if (!path.data() || !path[0])
+        if (!path.Raw() || !path[0])
         {
             if (!(flags & AT_EMPTY_PATH)) return std::unexpected(ENOENT);
 
@@ -332,11 +333,11 @@ namespace VFS
             return &fd->GetNode()->GetStats();
         }
 
-        INode* parent = Path::IsAbsolute(path) ? VFS::GetRootNode() : nullptr;
+        INode* parent = path.IsAbsolute() ? VFS::GetRootNode() : nullptr;
         if (fdNum == AT_FDCWD) parent = process->GetCWD();
         else if (fd) parent = fd->GetNode();
 
-        if (!Path::ValidateLength(path)) return std::unexpected(ENAMETOOLONG);
+        if (!path.ValidateLength()) return std::unexpected(ENAMETOOLONG);
         if (!parent) return std::unexpected(EBADF);
         INode* node
             = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));

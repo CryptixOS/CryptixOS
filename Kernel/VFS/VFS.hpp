@@ -28,7 +28,7 @@ namespace VFS
 
     ErrorOr<INode*> ResolvePath(PathView path);
     std::tuple<INode*, INode*, std::string>
-    ResolvePath(INode* parent, std::string_view path, bool automount = true);
+    ResolvePath(INode* parent, PathView path, bool automount = true);
 
     std::unordered_map<std::string_view, class Filesystem*>& GetMountPoints();
 
@@ -39,7 +39,7 @@ namespace VFS
 
     INode*               CreateNode(INode* parent, PathView path, mode_t mode);
     ErrorOr<i32>         MkDir(INode* parent, mode_t mode);
-    ErrorOr<const stat*> Stat(i32 dirFd, std::string_view path, i32 flags);
+    ErrorOr<const stat*> Stat(i32 dirFd, PathView path, i32 flags);
 
     INode* MkNod(INode* parent, PathView path, mode_t mode, dev_t dev);
     INode* Symlink(INode* parent, PathView path, std::string_view target);

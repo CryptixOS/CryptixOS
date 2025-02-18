@@ -8,7 +8,7 @@
 
 #include <Utility/Types.hpp>
 
-#include <string>
+#include <vector>
 
 class PathView
 {
@@ -27,12 +27,20 @@ class PathView
     {
     }
 
-    bool                  ValidateLength();
-    constexpr bool        IsEmpty() const { return m_Path.empty(); }
+    bool           ValidateLength();
+    constexpr bool IsEmpty() const { return m_Path.empty(); }
+
+    inline bool    IsAbsolute() const { return !IsEmpty() && m_Path[0] == '/'; }
+    std::vector<std::string> SplitPath();
 
     constexpr             operator std::string_view() const { return m_Path; }
 
     constexpr const char& operator[](usize i) const { return m_Path[i]; }
+
+    constexpr int         Compare(const PathView& str) const noexcept
+    {
+        return m_Path.compare(str.m_Path);
+    }
 
     constexpr usize       GetSize() const { return m_Path.size(); }
     constexpr const char* Raw() const { return m_Path.data(); }
@@ -42,3 +50,14 @@ class PathView
   private:
     std::string_view m_Path;
 };
+
+constexpr bool operator==(const PathView& lhs, const PathView& rhs) noexcept
+{
+    return lhs.Compare(rhs) == 0;
+}
+
+constexpr std::strong_ordering operator<=>(const PathView& lhs,
+                                           const PathView& rhs) noexcept
+{
+    return lhs.Compare(rhs) <=> 0;
+}

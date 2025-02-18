@@ -9,22 +9,51 @@
 #include <API/Limits.hpp>
 #include <Utility/PathView.hpp>
 
-#include <string_view>
 #include <vector>
 
 class Path
 {
   public:
-    Path(const char* path)
+    Path(const char path[])
         : m_Path(path)
     {
     }
 
-    static bool                     IsAbsolute(std::string_view path);
-    static bool                     ValidateLength(PathView path);
+    constexpr          operator PathView() const { return m_Path; }
 
-    static std::vector<std::string> SplitPath(std::string path);
+    constexpr PathView GetView() const { return m_Path; }
+
+    constexpr bool     IsEmpty() const { return m_Path.size() == 0; }
+    constexpr bool IsAbsolute() const { return !IsEmpty() && m_Path[0] == '/'; }
+    std::vector<std::string> SplitPath();
+
+    constexpr int            Compare(const Path& str) const noexcept
+    {
+        return m_Path.compare(str.m_Path);
+    }
+
+    inline bool ValidateLength() const { return GetView().ValidateLength(); }
 
   private:
     std::string m_Path;
 };
+
+constexpr bool operator==(const Path& lhs, const Path& rhs) noexcept
+{
+    return lhs.Compare(rhs) == 0;
+}
+constexpr bool operator==(const Path& lhs, const char* rhs)
+{
+    return lhs.Compare(rhs) == 0;
+}
+
+constexpr std::strong_ordering operator<=>(const Path& lhs,
+                                           const Path& rhs) noexcept
+{
+    return lhs.Compare(rhs) <=> 0;
+}
+
+constexpr std::strong_ordering operator<=>(const Path& lhs, const char* rhs)
+{
+    return lhs.Compare(rhs) <=> 0;
+}

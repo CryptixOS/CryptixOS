@@ -88,7 +88,6 @@ namespace Syscall::Process
         auto* process = CPU::GetCurrentThread()->parent;
 
         CPU::SetInterruptFlag(false);
-        // LogTrace("SysExit: exiting process: '{}'...", process->m_Name);
         return process->Exit(code);
     }
     ErrorOr<i32> SysWait4(Arguments& args)

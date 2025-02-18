@@ -119,7 +119,7 @@ void Process::SendSignal(i32 signal)
 ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
     INode* parent = m_CWD;
-    if (Path::IsAbsolute(path)) parent = VFS::GetRootNode();
+    if (path.IsAbsolute()) parent = VFS::GetRootNode();
     else if (dirFd != AT_FDCWD)
     {
         auto* descriptor = GetFileHandle(dirFd);
