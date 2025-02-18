@@ -9,6 +9,6 @@
 
 std::unordered_map<std::string_view, INode*>& EchFsINode::GetChildren()
 {
-    reinterpret_cast<EchFs*>(m_Filesystem)->InsertDirectoryEntries(this);
+    reinterpret_cast<EchFs*>(m_Filesystem)->Populate(this);
     return m_Children;
 }

@@ -29,6 +29,7 @@
 
 #include <Utility/ELF.hpp>
 #include <Utility/ICxxAbi.hpp>
+#include <Utility/RedBlackTree.hpp>
 #include <Utility/Stacktrace.hpp>
 
 #include <VFS/INode.hpp>

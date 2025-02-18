@@ -26,7 +26,7 @@ class DevTmpFs : public Filesystem
                            std::string_view target) override;
     virtual INode* Link(INode* parent, std::string_view name,
                         INode* oldNode) override;
-    virtual bool   Populate(INode* node) override { return false; }
+    virtual bool   Populate(INode* node) override { return true; }
 
     virtual INode* MkNod(INode* parent, std::string_view path, mode_t mode,
                          dev_t dev) override;

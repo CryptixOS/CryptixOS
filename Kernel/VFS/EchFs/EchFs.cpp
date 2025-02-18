@@ -76,20 +76,36 @@ INode* EchFs::CreateNode(INode* parent, std::string_view name, mode_t mode)
     return nullptr; // new EchFsINode(parent, name, this, mode);
 }
 
-void EchFs::InsertDirectoryEntries(class EchFsINode* node)
+bool EchFs::Populate(INode* node)
 {
-    usize               offset = node->m_DirectoryEntryOffset;
+    EchFsINode*         inode  = reinterpret_cast<EchFsINode*>(node);
+    usize               offset = inode->m_DirectoryEntryOffset;
+
     EchFsDirectoryEntry entry{};
     m_Device->Read(&entry, offset, sizeof(EchFsDirectoryEntry));
 
-    while (entry.DirectoryID)
+    usize depth = 1;
+    for (;;)
     {
+        if (entry.DirectoryID == ECHFS_END_OF_DIRECTORY)
+        {
+            --depth;
+            if (depth == 0) break;
+        }
+
         mode_t type = 0;
         if (entry.ObjectType == 0) type = S_IFREG;
-        else if (entry.ObjectType == 1) type = S_IFDIR;
-        node->m_Children[std::string((char*)entry.Name)] = new EchFsINode(
-            node, (char*)entry.Name, this, 0644 | type, entry, offset);
+        else if (entry.ObjectType == 1)
+        {
+            type = S_IFDIR;
+            ++depth;
+        }
+        inode->m_Children[std::string(reinterpret_cast<char*>(entry.Name))]
+            = new EchFsINode(node, reinterpret_cast<char*>(entry.Name), this,
+                             0644 | type, entry, offset);
         offset += sizeof(EchFsDirectoryEntry);
         m_Device->Read(&entry, offset, sizeof(EchFsDirectoryEntry));
     }
+
+    return (inode->m_Populated = true);
 }

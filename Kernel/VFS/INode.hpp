@@ -69,6 +69,11 @@ class INode
     virtual isize Write(const void* buffer, off_t offset, usize bytes) = 0;
     virtual i32   IoCtl(usize request, usize arg) { return_err(-1, ENODEV); }
     virtual ErrorOr<isize> Truncate(usize size) = 0;
+    inline bool            Populate()
+    {
+        return (!m_Populated && IsDirectory()) ? m_Filesystem->Populate(this)
+                                               : true;
+    }
 
   protected:
     INode*                                       m_Parent;
@@ -78,4 +83,5 @@ class INode
     Filesystem*                                  m_Filesystem;
     std::unordered_map<std::string_view, INode*> m_Children;
     stat                                         m_Stats;
+    bool                                         m_Populated = false;
 };

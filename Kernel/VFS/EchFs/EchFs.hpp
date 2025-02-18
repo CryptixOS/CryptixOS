@@ -19,7 +19,11 @@ struct EchFsIdentityTable
     u64 UUID[2];
 } __attribute__((packed));
 
-class EchFs final : public Filesystem
+constexpr usize ECHFS_END_OF_DIRECTORY  = 0x0000'0000'0000'0000;
+constexpr usize ECHFS_DELETED_DIRECTORY = 0xffff'ffff'ffff'fffe;
+constexpr usize ECHFS_ROOT_DIRECTORY    = 0xffff'ffff'ffff'ffff;
+
+class EchFs     final : public Filesystem
 {
   public:
     EchFs(u32 flags)
@@ -43,9 +47,7 @@ class EchFs final : public Filesystem
     {
         return nullptr;
     }
-    virtual bool Populate(INode* node) override { return false; }
-
-    void         InsertDirectoryEntries(class EchFsINode* node);
+    virtual bool Populate(INode* node) override;
 
   private:
     INode* m_Device              = nullptr;

@@ -1,4 +1,3 @@
-
 /*
  * Created by v1tr10l7 on 19.11.2024.
  * Copyright (c) 2024-2024, Szymon Zemke <v1tr10l7@proton.me>
@@ -82,11 +81,11 @@ namespace VFS
                 accMode |= FileAccessMode::eRead | FileAccessMode::eWrite;
                 break;
 
-            default: return std::unexpected(EINVAL);
+            default: return Error(EINVAL);
         }
 
         if (flags & O_TMPFILE && !(accMode & FileAccessMode::eWrite))
-            return std::unexpected(EINVAL);
+            return Error(EINVAL);
 
         INode* node
             = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
@@ -96,22 +95,22 @@ namespace VFS
             if (errno != ENOENT || !(flags & O_CREAT)) return nullptr;
 
             if (!parent->ValidatePermissions(current->GetCredentials(), 5))
-                return std::unexpected(EACCES);
+                return Error(EACCES);
             node = VFS::CreateNode(parent, path,
                                    (mode & ~current->GetUmask()) | S_IFREG);
 
-            if (!node) return std::unexpected(ENOENT);
+            if (!node) return Error(ENOENT);
         }
 
-        if (flags & O_EXCL && didExist) return std::unexpected(EEXIST);
+        if (flags & O_EXCL && didExist) return Error(EEXIST);
         node = node->Reduce(followSymlinks, false);
-        if (!node) return std::unexpected(ENOENT);
+        if (!node) return Error(ENOENT);
 
-        if (node->IsSymlink()) return std::unexpected(ELOOP);
+        if (node->IsSymlink()) return Error(ELOOP);
         if ((flags & O_DIRECTORY && !node->IsDirectory()))
-            return std::unexpected(ENOTDIR);
+            return Error(ENOTDIR);
         if ((node->IsDirectory() && (acc & O_WRONLY || acc & O_RDWR)))
-            return std::unexpected(EISDIR);
+            return Error(EISDIR);
 
         // TODO(v1tr10l7): check acc modes and truncate
         if (flags & O_TRUNC && node->IsRegular() && didExist)
@@ -122,7 +121,7 @@ namespace VFS
     ErrorOr<INode*> ResolvePath(PathView path)
     {
         INode* node = std::get<1>(ResolvePath(s_RootNode, path));
-        if (!node) return std::unexpected(errno);
+        if (!node) return Error(errno);
 
         return node;
     }
@@ -130,9 +129,16 @@ namespace VFS
     ResolvePath(INode* parent, PathView path, bool automount)
     {
         if (!parent || path.IsAbsolute()) parent = GetRootNode();
+        if (path.IsEmpty())
+
+        {
+            errno = ENOENT;
+            return {nullptr, nullptr, ""};
+        }
 
         auto currentNode
             = parent == s_RootNode ? s_RootNode : parent->Reduce(false);
+        if (!currentNode->Populate()) return {nullptr, nullptr, ""};
 
         if (path == "/" || path.IsEmpty())
             return {currentNode, currentNode, "/"};
@@ -168,11 +174,11 @@ namespace VFS
                 continue;
             }
 
-            if (currentNode->GetChildren().contains(segment)
-                || currentNode->GetFilesystem()->Populate(currentNode))
+            if (currentNode->GetChildren().contains(segment))
             {
                 auto node = currentNode->GetChildren()[segment]->Reduce(
                     true, isLast ? automount : true);
+                if (!node->Populate()) return {nullptr, nullptr, ""};
 
                 auto getReal = [](INode* node) -> INode*
                 {
@@ -317,7 +323,7 @@ namespace VFS
     ErrorOr<const stat*> Stat(i32 fdNum, PathView path, i32 flags)
     {
         if (flags & ~(AT_EMPTY_PATH | AT_NO_AUTOMOUNT | AT_SYMLINK_NOFOLLOW))
-            return std::unexpected(Error(EINVAL));
+            return Error(EINVAL);
 
         Process*        process        = Process::GetCurrent();
         FileDescriptor* fd             = process->GetFileHandle(fdNum);
@@ -325,10 +331,10 @@ namespace VFS
 
         if (!path.Raw() || !path[0])
         {
-            if (!(flags & AT_EMPTY_PATH)) return std::unexpected(ENOENT);
+            if (!(flags & AT_EMPTY_PATH)) return Error(ENOENT);
 
             if (fdNum == AT_FDCWD) return &process->GetCWD()->GetStats();
-            else if (!fd) return std::unexpected(EBADF);
+            else if (!fd) return Error(EBADF);
 
             return &fd->GetNode()->GetStats();
         }
@@ -337,12 +343,12 @@ namespace VFS
         if (fdNum == AT_FDCWD) parent = process->GetCWD();
         else if (fd) parent = fd->GetNode();
 
-        if (!path.ValidateLength()) return std::unexpected(ENAMETOOLONG);
-        if (!parent) return std::unexpected(EBADF);
+        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
+        if (!parent) return Error(EBADF);
         INode* node
             = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
 
-        if (!node) return std::unexpected(errno);
+        if (!node) return Error(errno);
         return &node->GetStats();
     }
 

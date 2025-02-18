@@ -13,10 +13,10 @@ void                                ProcFs::AddProcess(Process* process)
     ScopedLock guard(m_Lock);
     Assert(!s_Processes.contains(process->GetPid()));
     s_Processes[process->GetPid()] = process;
-    auto nodeName                  = std::to_string(process->GetPid());
+    auto  nodeName                 = std::to_string(process->GetPid());
+    auto* processNode = new ProcFsINode(m_Root, nodeName, this, 0755 | S_IFDIR);
 
-    m_Root->InsertChild(new ProcFsINode(m_Root, nodeName, this, 0755 | S_IFDIR),
-                        nodeName);
+    m_Root->InsertChild(processNode, nodeName);
 }
 void ProcFs::RemoveProcess(pid_t pid)
 {
@@ -69,4 +69,4 @@ INode* ProcFs::Link(INode* parent, std::string_view name, INode* oldNode)
 {
     return nullptr;
 }
-bool ProcFs::Populate(INode* node) { return false; }
+bool ProcFs::Populate(INode* node) { return true; }
