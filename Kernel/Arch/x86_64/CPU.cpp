@@ -496,10 +496,11 @@ namespace CPU
 
         *ctx = thread->ctx;
     }
-    void Reschedule(usize ms)
+    void Reschedule(TimeStep interval)
     {
         auto* cpu = GetCurrent();
-        cpu->Lapic.Start(g_ScheduleVector, ms, Lapic::Mode::eOneshot);
+        Assert(
+            cpu->Lapic.Start(g_ScheduleVector, interval, TimerMode::eOneShot));
         /*PIT::Start(PIT::Mode::ONESHOT, 100);*/
     }
 

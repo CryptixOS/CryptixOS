@@ -6,9 +6,9 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include <Time/HardwareTimer.hpp>
 
-class Lapic
+class Lapic : public HardwareTimer
 {
   public:
     enum class Mode : u8
@@ -18,13 +18,13 @@ class Lapic
         eTscDeadline = 2,
     };
 
-    void        Initialize();
-    void        SendIpi(u32 flags, u32 id);
-    void        SendEOI();
+    void          Initialize();
+    void          SendIpi(u32 flags, u32 id);
+    void          SendEOI();
 
-    static void PanicIpi();
-    void        Start(u8 vector, u64 ms, Mode mode);
-    void        Stop();
+    static void   PanicIpi();
+    ErrorOr<void> Start(u8 vector, TimeStep interval, TimerMode mode) override;
+    void          Stop() override;
 
   private:
     u32       id          = 0;

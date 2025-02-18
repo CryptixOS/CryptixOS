@@ -257,6 +257,11 @@ ErrorOr<Process*> Process::Fork()
 
 i32 Process::Exit(i32 code)
 {
+    AssertMsg(this != Scheduler::GetKernelProcess(),
+              "Process::Exit(): The process with pid 1 tries to exit!");
+    CPU::SetInterruptFlag(false);
+
+    // FIXME(v1tr10l7): Do proper cleanup of all resources
     m_FdTable.Clear();
     for (Thread* thread : m_Threads) thread->state = ThreadState::eExited;
 

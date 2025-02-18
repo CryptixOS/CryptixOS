@@ -107,10 +107,14 @@ void Lapic::SendIpi(u32 flags, u32 id)
     Write(LAPIC_ICR_LOW_REGISTER,
           (static_cast<u64>(id) << 32) | Bit(14) | flags);
 }
-void Lapic::SendEOI() { Write(LAPIC_EOI_REGISTER, LAPIC_EOI_ACK); }
+void          Lapic::SendEOI() { Write(LAPIC_EOI_REGISTER, LAPIC_EOI_ACK); }
 
-void Lapic::Start(u8 vector, u64 ms, Mode mode)
+ErrorOr<void> Lapic::Start(u8 vector, TimeStep interval, TimerMode tm)
 {
+    Mode  mode = tm == TimerMode::eOneShot ? Mode::eOneshot : Mode::ePeriodic;
+
+    usize ms   = interval.Milliseconds();
+
     if (ticksPerMs == 0) CalibrateTimer();
     u64 ticks = ticksPerMs * ms;
 
@@ -124,6 +128,8 @@ void Lapic::Start(u8 vector, u64 ms, Mode mode)
 
     Write(LAPIC_TIMER_INITIAL_COUNT_REGISTER, ticks ? ticks : 1);
     Write(LAPIC_TIMER_REGISTER, Read(LAPIC_TIMER_REGISTER) & ~Bit(16));
+
+    return {};
 }
 void Lapic::Stop()
 {

@@ -154,7 +154,7 @@ namespace CPU
     CPU&              GetBsp();
 
     u64               GetCurrentID();
-    void              Reschedule(usize ms);
+    void              Reschedule(TimeStep interval);
 
     bool              EnableSSE();
     void              EnablePAT();

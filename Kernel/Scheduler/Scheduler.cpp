@@ -34,70 +34,72 @@ namespace Scheduler
         std::unordered_map<pid_t, Process*> s_Processes;
         ProcFs*                             s_ProcFs = nullptr;
 
-        std::deque<Thread*>                 s_ExecutionQueue;
-
         struct ThreadQueue
         {
-            Thread* Front()
+            mutable Spinlock    Lock;
+            std::deque<Thread*> Queue;
+
+            constexpr bool      IsEmpty() const { return Queue.empty(); }
+
+            inline Thread*      Front() const
             {
                 ScopedLock guard(Lock);
                 return Queue.front();
             }
-            Thread* Back()
+            inline Thread* Back() const
             {
                 ScopedLock guard(Lock);
                 return Queue.back();
             }
 
-            void PushBack(Thread* t)
+            inline void PushBack(Thread* t)
             {
                 ScopedLock guard(Lock);
                 Queue.push_back(t);
             }
-            void PushFront(Thread* t)
+            inline void PushFront(Thread* t)
             {
                 ScopedLock guard(Lock);
                 Queue.push_front(t);
             }
 
-            void PopBack()
+            inline void PopBack()
             {
                 ScopedLock guard(Lock);
                 Queue.pop_back();
             }
-            void PopFront()
+            inline void PopFront()
             {
                 ScopedLock guard(Lock);
                 Queue.pop_front();
             }
 
-            Thread* PopFrontElement()
+            inline Thread* PopFrontElement()
             {
                 ScopedLock guard(Lock);
                 return Queue.pop_front_element();
             }
-            Thread* PopBackElement()
+            inline Thread* PopBackElement()
             {
                 ScopedLock guard(Lock);
                 return Queue.pop_back_element();
             }
-
-            Spinlock            Lock;
-            std::deque<Thread*> Queue;
         };
 
-        // ThreadQueue s_WaitQueue;
-        // ThreadQueue s_ReadyQueue;
-        // ThreadQueue s_BlockedQueue;
+        ThreadQueue s_ExecutionQueue;
+        ThreadQueue s_WaitQueue;
+        ThreadQueue s_ReadyQueue;
+        ThreadQueue s_BlockedQueue;
 
-        Thread* GetNextThread(usize cpuID)
+        Thread*     GetNextThread(usize cpuID)
         {
             ScopedLock guard(s_Lock);
-            if (s_ExecutionQueue.empty()) return nullptr;
+            if (s_ExecutionQueue.IsEmpty()) return nullptr;
 
-            Thread* t = s_ExecutionQueue.front();
-            s_ExecutionQueue.pop_front();
-            return t;
+            auto thread      = s_ExecutionQueue.PopFrontElement();
+            thread->enqueued = false;
+
+            return thread;
         }
     } // namespace
     void Schedule(CPUContext* ctx);
@@ -175,7 +177,10 @@ namespace Scheduler
     Process* GetProcess(pid_t pid)
     {
         ScopedLock guard(s_ProcessListLock);
-        return s_Processes[pid];
+
+        auto       it = s_Processes.find(pid);
+
+        return it != s_Processes.end() ? s_Processes[pid] : nullptr;
     }
 
     Thread* CreateKernelThread(uintptr_t pc, uintptr_t arg, usize runningOn)
@@ -191,7 +196,7 @@ namespace Scheduler
 
         thread->enqueued = true;
         thread->state    = ThreadState::eReady;
-        s_ExecutionQueue.push_back(thread);
+        s_ExecutionQueue.PushBack(thread);
     }
 
     void EnqueueNotReady(Thread* thread)
@@ -202,7 +207,7 @@ namespace Scheduler
         if (thread->state == ThreadState::eRunning)
             thread->state = ThreadState::eReady;
 
-        s_ExecutionQueue.push_back(thread);
+        s_ExecutionQueue.PushBack(thread);
     }
 
     void Schedule(CPUContext* ctx)
@@ -232,8 +237,7 @@ namespace Scheduler
             CPU::SaveThread(currentThread, ctx);
         }
 
-        CPU::Reschedule(1000);
-        // CPU::Reschedule(newThread->parent->m_Quantum);
+        CPU::Reschedule(newThread->parent->m_Quantum * 1_ms);
         CPU::LoadThread(newThread, ctx);
 
         if (currentThread && currentThread->state == ThreadState::eKilled
