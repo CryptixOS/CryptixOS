@@ -1,0 +1,25 @@
+From 86599d3b579c63cdbf6a4d6e40ddb33b8eed6994 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Tue, 18 Feb 2025 03:17:10 +0100
+Subject: [PATCH] [cryptix]: link with tinfo
+
+---
+ Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+index c3005d2..55f3610 100644
+--- a/Makefile
++++ b/Makefile
+@@ -12,7 +12,7 @@ CFLAGS=-O -Wall
+ all: sl
+ 
+ sl: sl.c sl.h
+-	$(CC) $(CFLAGS) -o sl sl.c -lncurses
++	$(CC) $(CFLAGS) -o sl sl.c -lncurses -ltinfo
+ 
+ clean:
+ 	rm -f sl
+-- 
+2.48.1
+
