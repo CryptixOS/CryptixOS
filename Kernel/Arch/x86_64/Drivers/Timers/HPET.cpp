@@ -4,15 +4,17 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "HPET.hpp"
+#include <Arch/x86_64/Drivers/Timers/HPET.hpp>
 
-#include "Firmware/ACPI/ACPI.hpp"
+#include <Firmware/ACPI/ACPI.hpp>
 
-#include "Memory/VMM.hpp"
+#include <Memory/PMM.hpp>
+#include <Memory/VMM.hpp>
+#include <Utility/Math.hpp>
 
 namespace HPET
 {
-    static std::vector<Device> devices;
+    static std::vector<Device> s_Devices;
 
     struct RegisterAddress
     {
@@ -144,10 +146,28 @@ namespace HPET
         Table* table = nullptr;
         usize  index = 0;
 
-        LogTrace("HPET: Enumerating devices...");
         while ((table = ACPI::GetTable<Table>("HPET", index++)) != nullptr)
-            devices.push_back(table);
+        {
+            LogInfo("HPET: Table found at {:#x}",
+                    reinterpret_cast<uintptr_t>(table));
+
+            usize   length = Math::AlignUp(sizeof(Table), PMM::PAGE_SIZE);
+
+            Pointer virt   = VMM::AllocateSpace(length, alignof(Table));
+            Pointer phys = Math::AlignDown(Pointer(table).FromHigherHalf<u64>(),
+                                           PMM::PAGE_SIZE);
+
+            if (!VMM::GetKernelPageMap()->MapRange(
+                    virt, phys, length,
+                    PageAttributes::eRW | PageAttributes::eUncacheableStrong))
+            {
+                LogError("HPET: Failed to map the ACPI table!");
+                return;
+            }
+
+            s_Devices.push_back(table);
+        }
     }
 
-    const std::vector<Device>& GetDevices() { return devices; }
+    const std::vector<Device>& GetDevices() { return s_Devices; }
 }; // namespace HPET

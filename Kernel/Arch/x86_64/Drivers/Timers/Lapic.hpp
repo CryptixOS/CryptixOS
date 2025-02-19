@@ -23,8 +23,15 @@ class Lapic : public HardwareTimer
     void          SendEOI();
 
     static void   PanicIpi();
+
     ErrorOr<void> Start(u8 vector, TimeStep interval, TimerMode mode) override;
     void          Stop() override;
+
+    ErrorOr<void> SetFrequency(usize frequency) override
+    {
+        (void)frequency;
+        return {};
+    }
 
   private:
     u32       id          = 0;
