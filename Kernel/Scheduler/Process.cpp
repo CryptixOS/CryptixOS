@@ -163,7 +163,7 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
     if (!ldPath.empty())
         Assert(ld.Load(ldPath, PageMap, m_AddressSpace, 0x40000000));
     Thread* currentThread = CPU::GetCurrentThread();
-    currentThread->state  = ThreadState::eKilled;
+    currentThread->SetState(ThreadState::eKilled);
 
     for (auto& thread : m_Threads)
     {
@@ -190,7 +190,7 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
 {
     std::vector<Process*> procs;
 
-    if (m_Children.empty()) return std::errno_t(ECHILD);
+    if (m_Children.empty()) return Error(ECHILD);
     for (auto& child : m_Children) procs.push_back(child);
 
     for (;;)
@@ -263,7 +263,7 @@ i32 Process::Exit(i32 code)
 
     // FIXME(v1tr10l7): Do proper cleanup of all resources
     m_FdTable.Clear();
-    for (Thread* thread : m_Threads) thread->state = ThreadState::eExited;
+    for (Thread* thread : m_Threads) thread->SetState(ThreadState::eExited);
 
     Scheduler::RemoveProcess(m_Pid);
 

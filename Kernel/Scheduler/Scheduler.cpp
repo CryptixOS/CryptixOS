@@ -124,7 +124,7 @@ namespace Scheduler
 
         auto     idleThread = new Thread(
             process, reinterpret_cast<uintptr_t>(Arch::Halt), false);
-        idleThread->state       = ThreadState::eReady;
+        idleThread->SetState(ThreadState::eReady);
         CPU::GetCurrent()->Idle = idleThread;
 
         if (start)
@@ -132,15 +132,24 @@ namespace Scheduler
             CPU::SetInterruptFlag(true);
 
             CPU::WakeUp(0, true);
-            // CPU::GetCurrent()->Lapic.Start(g_ScheduleVector, 1000,
-            //                                Lapic::Mode::eOneshot);
-            //  InterruptManager::Unmask(0);
-
             for (;;) Arch::Halt();
         }
     };
 
-    void Block(Thread* thread) { ToDo(); }
+    void Block(Thread* thread)
+    {
+        if (thread->GetState() == ThreadState::eBlocked) return;
+        thread->SetState(ThreadState::eBlocked);
+
+        if (thread == Thread::GetCurrent()) Yield();
+    }
+    void Unblock(Thread* thread)
+    {
+        if (thread->GetState() != ThreadState::eBlocked) return;
+
+        thread->SetState(ThreadState::eReady);
+    }
+
     [[noreturn]]
     void Yield()
     {
@@ -195,7 +204,7 @@ namespace Scheduler
         if (thread->enqueued) return;
 
         thread->enqueued = true;
-        thread->state    = ThreadState::eReady;
+        thread->SetState(ThreadState::eReady);
         s_ExecutionQueue.PushBack(thread);
     }
 
@@ -204,8 +213,8 @@ namespace Scheduler
         ScopedLock guard(s_Lock);
 
         thread->enqueued = true;
-        if (thread->state == ThreadState::eRunning)
-            thread->state = ThreadState::eReady;
+        if (thread->GetState() == ThreadState::eRunning)
+            thread->SetState(ThreadState::eReady);
 
         s_ExecutionQueue.PushBack(thread);
     }
@@ -213,23 +222,25 @@ namespace Scheduler
     void Schedule(CPUContext* ctx)
     {
         auto newThread = GetNextThread(CPU::GetCurrent()->ID);
-        while (newThread && newThread->state != ThreadState::eReady)
+        while (newThread && newThread->GetState() != ThreadState::eReady)
         {
-            if (newThread->state == ThreadState::eKilled)
+            if (newThread->GetState() == ThreadState::eKilled)
             {
                 delete newThread;
                 continue;
             }
+            else if (newThread->GetState() == ThreadState::eBlocked)
+                s_BlockedQueue.PushBack(newThread);
 
             EnqueueNotReady(newThread);
             newThread = GetNextThread(CPU::GetCurrent()->ID);
         }
 
         if (!newThread) newThread = CPU::GetCurrent()->Idle;
-        else newThread->state = ThreadState::eRunning;
+        else newThread->SetState(ThreadState::eRunning);
 
         auto currentThread = CPU::GetCurrentThread();
-        if (currentThread && currentThread->state != ThreadState::eKilled)
+        if (currentThread && currentThread->GetState() != ThreadState::eKilled)
         {
             if (currentThread != CPU::GetCurrent()->Idle)
                 EnqueueNotReady(currentThread);
@@ -240,7 +251,7 @@ namespace Scheduler
         CPU::Reschedule(newThread->parent->m_Quantum * 1_ms);
         CPU::LoadThread(newThread, ctx);
 
-        if (currentThread && currentThread->state == ThreadState::eKilled
+        if (currentThread && currentThread->GetState() == ThreadState::eKilled
             && currentThread != CPU::GetCurrent()->Idle)
             delete currentThread;
     }

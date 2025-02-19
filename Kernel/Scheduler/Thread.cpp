@@ -17,17 +17,19 @@
 Thread::Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn)
     : runningOn(runOn)
     , self(this)
+    , m_State(ThreadState::eDequeued)
     , error(no_error)
     , parent(parent)
     , user(false)
     , enqueued(false)
-    , state(ThreadState::eDequeued)
 
 {
-    tid = parent->m_NextTid++;
+    m_Tid = parent->m_NextTid++;
     CPU::PrepareThread(this, pc, arg);
     parent->m_Threads.push_back(this);
 }
+
+Thread*          Thread::GetCurrent() { return CPU::GetCurrentThread(); }
 
 static uintptr_t prepareStack(uintptr_t _stack, uintptr_t sp,
                               std::vector<std::string_view> argv,
@@ -97,13 +99,13 @@ Thread::Thread(Process* parent, uintptr_t pc,
                i64 runOn)
     : runningOn(CPU::GetCurrent()->ID)
     , self(this)
+    , m_State(ThreadState::eDequeued)
     , error(no_error)
     , parent(parent)
     , user(true)
     , enqueued(false)
-    , state(ThreadState::eDequeued)
 {
-    tid = parent->m_NextTid++;
+    m_Tid = parent->m_NextTid++;
 
     if (!parent->PageMap) parent->PageMap = VMM::GetKernelPageMap();
 
@@ -141,13 +143,13 @@ Thread::Thread(Process* parent, uintptr_t pc,
 Thread::Thread(Process* parent, uintptr_t pc, bool user)
     : runningOn(CPU::GetCurrent()->ID)
     , self(this)
+    , m_State(ThreadState::eDequeued)
     , error(no_error)
     , parent(parent)
     , user(user)
     , enqueued(false)
-    , state(ThreadState::eDequeued)
 {
-    tid = parent->m_NextTid++;
+    m_Tid = parent->m_NextTid++;
 
     uintptr_t pstack
         = PMM::CallocatePages<uintptr_t>(CPU::USER_STACK_SIZE / PMM::PAGE_SIZE);
@@ -219,7 +221,7 @@ Thread* Thread::Fork(Process* process)
     newThread->gsBase  = gsBase;
     newThread->fsBase  = fsBase;
 
-    newThread->state   = ThreadState::eDequeued;
+    newThread->m_State = ThreadState::eDequeued;
 
     return newThread;
 }

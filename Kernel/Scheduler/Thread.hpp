@@ -42,11 +42,23 @@ struct Thread
     Thread(Process* parent, uintptr_t pc, bool user = true);
     ~Thread();
 
+    static Thread*     GetCurrent();
+
+    inline tid_t       GetTid() const { return m_Tid; }
+    inline ThreadState GetState() const { return m_State; }
+    inline void        SetState(ThreadState state)
+    {
+        ScopedLock guard(m_Lock);
+        m_State = state;
+    }
+
     Thread*     Fork(Process* parent);
 
     // FIXME(v1tr10l7): implement tthis once we have signals
     inline bool WasInterrupted() const { return false; }
 
+    // DON'T MOVE
+    //////////////////////
     usize       runningOn;
     Thread*     self;
     uintptr_t   stack;
@@ -56,8 +68,11 @@ struct Thread
 
     usize       fpuStoragePageCount;
     uintptr_t   fpuStorage;
+    //////////////////////
 
-    tid_t       tid;
+    Spinlock    m_Lock;
+    tid_t       m_Tid;
+    ThreadState m_State = ThreadState::eIdle;
     errno_t     error;
     Process*    parent;
     uintptr_t   stackVirt;
@@ -75,6 +90,5 @@ struct Thread
     uintptr_t el0Base;
 #endif
 
-    bool        enqueued = false;
-    ThreadState state    = ThreadState::eIdle;
+    bool enqueued = false;
 };
