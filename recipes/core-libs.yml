@@ -76,6 +76,56 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
         quiet: true
+  - name: libintl
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      url: 'https://ftp.gnu.org/gnu/gettext/gettext-0.21.1.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'gettext-0.21.1'
+      version: '0.21.1'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+        - host-libtool
+      regenerate:
+        - args: ['autoreconf', '-fvi']
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - libiconv
+    revision: 3
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--without-emacs'
+        - '--without-lispdir'
+        # Normally this controls nls behavior in general, but the libintl
+        # subdir is skipped unless this is explicitly set.
+        - '--enable-nls'
+        # This magic flag enables libintl.
+        - '--with-included-gettext'
+        - '--disable-c++'
+        - '--disable-libasprintf'
+        - '--disable-java'
+        - '--enable-shared'
+        - '--disable-static'
+        - '--enable-threads=posix'
+        - '--disable-curses'
+        - '--without-git'
+        - '--without-cvs'
+        - '--without-bzip2'
+        - '--without-xz'
+    build:
+      - args: ['make', '-C', 'gettext-runtime/intl', '-j@PARALLELISM@']
+      - args: ['make', '-C', 'gettext-runtime/intl', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
 
   - name: linux-headers
     architecture: '@OPTION:arch@'

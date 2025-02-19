@@ -34,6 +34,7 @@ packages:
       - file
       - init
       - mlibc
+      - nano
       - sl
     configure: []
     build: []
