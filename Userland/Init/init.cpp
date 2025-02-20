@@ -8,7 +8,7 @@ int main()
     setenv("TERM", "linux", 1);
     setenv("USER", "root", 1);
     setenv("HOME", "/root", 1);
-    setenv("PATH", "/usr/local/bin:/usr/bin", 1);
+    setenv("PATH", "/usr/local/bin:/usr/bin:/usr/sbin", 1);
 
     const char* path = "/usr/bin/bash";
     if (access(path, X_OK) == -1)

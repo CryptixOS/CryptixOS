@@ -53,6 +53,20 @@ packages:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/etc/']
       - args: ['ln', '-sf', 'bash', '@THIS_COLLECT_DIR@/usr/bin/sh']
 
+  - name: coretools
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      version: '1.0'
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - base-files
+      - mlibc
+    configure: []
+    build:
+      - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CoreTools/reboot.cpp',  '-o', '@SYSROOT_DIR@/usr/sbin/reboot']
+
   - name: coreutils
     architecture: '@OPTION:arch@'
     source:

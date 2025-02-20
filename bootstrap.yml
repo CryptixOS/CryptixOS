@@ -30,6 +30,7 @@ packages:
       - base-files
       - bash
       - cmatrix
+      - coretools
       - coreutils
       - file
       - init
