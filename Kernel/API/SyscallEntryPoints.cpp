@@ -8,6 +8,7 @@
 #include <API/MM.hpp>
 #include <API/Posix/fcntl.h>
 #include <API/SyscallEntryPoints.hpp>
+#include <API/System.hpp>
 #include <API/VFS.hpp>
 
 #include <Scheduler/Process.hpp>
@@ -159,6 +160,13 @@ namespace Syscall
     ErrorOr<isize> SysExecve(Arguments& args);
     ErrorOr<isize> SysArchPrCtl(Arguments& args);
     ErrorOr<isize> SysSetTimeOfDay(Arguments& args);
+    ErrorOr<isize> SysReboot(Arguments& args)
+    {
+        using System::RebootCommand;
+        RebootCommand cmd = args.Get<RebootCommand>(0);
+
+        return System::SysReboot(cmd);
+    }
     ErrorOr<isize> SysGetDents64(Arguments& args);
     ErrorOr<isize> SysOpenAt(Arguments& args);
     ErrorOr<isize> SysMkDirAt(Arguments& args);

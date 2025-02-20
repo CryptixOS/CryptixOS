@@ -25,6 +25,8 @@ namespace ACPI
 {
     void       Initialize();
 
+    void       Reboot();
+
     SDTHeader* GetTable(const char* signature, usize index = 0);
     template <typename T>
     inline T* GetTable(const char* signature, usize index = 0)

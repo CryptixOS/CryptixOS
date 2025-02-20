@@ -22,6 +22,8 @@ namespace Arch
 
     __attribute__((noreturn)) void Halt();
     void                           Pause();
+
+    void                           PowerOff();
     void                           Reboot();
 
     usize                          GetEpoch();

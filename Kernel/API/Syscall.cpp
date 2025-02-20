@@ -139,7 +139,7 @@ namespace Syscall
         RegisterSyscall(ID::eExecve, Process::SysExecve);
         RegisterSyscall(ID::eArchPrCtl, SysArchPrCtl);
         RegisterSyscall(ID::eSetTimeOfDay, Time::SysSetTimeOfDay);
-        RegisterSyscall(ID::eReboot, System::SysReboot);
+        RegisterSyscall(ID::eReboot, SysReboot);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
         RegisterSyscall(ID::eGetDents64, VFS::SysGetDents64);
         RegisterSyscall(ID::eClockGetTime, Time::SysClockGetTime);

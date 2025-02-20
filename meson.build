@@ -135,7 +135,7 @@ qemu_args = [
   '-d', 'cpu_reset',
   '-m', '2G',
   '-rtc', 'base=localtime',
-  '-no-shutdown', '-no-reboot',
+  #'-no-shutdown', '-no-reboot',
   '-D', meson.project_source_root() / 'qemu.log',
   '-boot', 'order=d,menu=on,splash-time=100',
   '-audiodev', 'id=audio,driver=alsa',

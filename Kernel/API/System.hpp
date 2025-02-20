@@ -10,6 +10,17 @@
 
 namespace Syscall::System
 {
+    enum class RebootCommand : isize
+    {
+        eRestart   = 0,
+        eHalt      = 1,
+        ePowerOff  = 2,
+        eRestart2  = 3,
+        eSuspend   = 4,
+        eKexec     = 5,
+        eUndefined = -1,
+    };
+
     ErrorOr<isize> SysUname(Syscall::Arguments& args);
-    ErrorOr<i32>   SysReboot(Syscall::Arguments& args);
+    ErrorOr<i32>   SysReboot(RebootCommand cmd);
 } // namespace Syscall::System

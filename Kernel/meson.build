@@ -16,6 +16,8 @@ srcs += files(
   'API/Time.cpp',
   'API/VFS.cpp',
 
+  'Arch/PowerManager.cpp',
+
   'Boot/BootInfo.cpp',
 
   'Drivers/Terminal.cpp',

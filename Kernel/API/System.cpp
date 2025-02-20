@@ -4,10 +4,11 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <API/System.hpp>
-#include <Arch/Arch.hpp>
-
 #include <API/Posix/sys/utsname.h>
+#include <API/System.hpp>
+
+#include <Arch/Arch.hpp>
+#include <Arch/PowerManager.hpp>
 
 namespace Syscall::System
 {
@@ -22,9 +23,15 @@ namespace Syscall::System
 
         return 0;
     }
-    ErrorOr<i32> SysReboot(Arguments& args)
+    ErrorOr<i32> SysReboot(RebootCommand cmd)
     {
-        Arch::Reboot();
+        switch (cmd)
+        {
+            case RebootCommand::eRestart: PowerManager::Reboot(); break;
+
+            default: LogError("SysReboot: Unknown OpCode!"); break;
+        }
+
         return Error(ENOSYS);
     }
 } // namespace Syscall::System
