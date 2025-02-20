@@ -6,15 +6,20 @@
  */
 #pragma once
 
+#include <Firmware/ACPI/HPET.hpp>
+
 #include <vector>
 
 namespace HPET
 {
-    class Device
+    using Table = ACPI::SDTs::HPET;
+    class TimerBlock
     {
       public:
-        Device() = default;
-        Device(struct Table* hpet);
+        static ErrorOr<TimerBlock*> GetFromTable(Pointer hpetPhys);
+
+        TimerBlock() = default;
+        TimerBlock(Table* hpet);
 
         void Disable() const;
 
@@ -22,11 +27,11 @@ namespace HPET
         void Sleep(u64 us) const;
 
       private:
-        struct Entry* entry      = nullptr;
+        struct Entry* m_Entry    = nullptr;
         usize         tickPeriod = 0;
     };
 
-    void                       Initialize();
+    ErrorOr<void>                  DetectAndSetup();
 
-    const std::vector<Device>& GetDevices();
+    const std::vector<TimerBlock>& GetDevices();
 }; // namespace HPET

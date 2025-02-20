@@ -6,11 +6,10 @@
  */
 #pragma once
 
-#include "Boot/BootInfo.hpp"
-#include "Utility/Types.hpp"
+#include <Boot/BootInfo.hpp>
 
-#include <format>
-#include <string>
+#include <Utility/Types.hpp>
+
 #include <string_view>
 
 enum class LogLevel

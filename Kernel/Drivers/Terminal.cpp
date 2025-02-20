@@ -86,6 +86,7 @@ void Terminal::PrintString(std::string_view str)
     for (auto c : str) PutChar(c);
 }
 
+Terminal*               Terminal::GetPrimary() { return s_ActiveTerminal; }
 std::vector<Terminal*>& Terminal::EnumerateTerminals()
 {
     static bool initialized = false;

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Utility/Types.hpp"
+#include <Utility/Pointer.hpp>
+#include <Utility/Types.hpp>
 
 #define LIMINE_API_REVISION 2
 #include <limine.h>

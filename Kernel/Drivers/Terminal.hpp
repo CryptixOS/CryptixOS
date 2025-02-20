@@ -56,6 +56,7 @@ class Terminal final
 
     void                           PrintString(std::string_view str);
 
+    static Terminal*               GetPrimary();
     static std::vector<Terminal*>& EnumerateTerminals();
 
   private:

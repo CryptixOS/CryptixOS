@@ -11,33 +11,13 @@
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 #include <Utility/Math.hpp>
+#include <Utility/Pointer.hpp>
+
+using namespace ACPI;
 
 namespace HPET
 {
-    static std::vector<Device> s_Devices;
-
-    struct RegisterAddress
-    {
-        u8  addressSpaceID;
-        u8  registerBitWidth;
-        u8  registerBitOffset;
-        u8  reserved;
-        u64 address;
-    } __attribute__((packed));
-    struct Table
-    {
-        SDTHeader       header;
-        u8              hardwareRevision;
-        u8              comparatorCount   : 5;
-        u8              counterSize       : 1;
-        u8              reserved          : 1;
-        u8              legacyReplacement : 1;
-        u16             pciVendorID;
-        RegisterAddress address;
-        u8              hpetNumber;
-        u16             minimumTick;
-        u8              pageProtection;
-    } __attribute__((packed));
+    static std::vector<TimerBlock> s_Devices;
 
     struct Comparator
     {
@@ -87,87 +67,103 @@ namespace HPET
         bool x64Capable  = false;
     } data;
 
-    Device::Device(Table* table)
+    ErrorOr<TimerBlock*> TimerBlock::GetFromTable(Pointer hpetPhys)
     {
-        auto vaddr = VMM::AllocateSpace(sizeof(Entry), sizeof(u64), true);
-        VMM::GetKernelPageMap()->Map(vaddr, table->address.address,
-                                     PageAttributes::eRW);
+        LogInfo("HPET: Table #{} found at {:#x}", s_Devices.size(),
+                hpetPhys.Raw<u64>());
 
-        entry = reinterpret_cast<Entry*>(vaddr);
-        if (!entry) LogError("HPET: Timer entry address is invalid");
+        auto virt = VMM::GetKernelPageMap()->MapIoRegion<SDTs::HPET>(hpetPhys);
+        if (!virt) return Error(EFAULT);
+
+        SDTs::HPET* table = virt.value();
+
+        // NOTE: HPET is only usable from SystemMemory
+        if (table->EventTimerBlock.AddressSpaceID
+            != AddressSpace::eSystemMemory)
+        {
+            LogError(
+                "HPET: TimerBlock is in address space other than System "
+                "Memory, so it cannot be used ",
+                s_Devices.size());
+
+            return Error(ENODEV);
+        }
+
+        return new TimerBlock(table);
+    }
+
+    TimerBlock::TimerBlock(SDTs::HPET* table)
+    {
+        auto virt = VMM::GetKernelPageMap()->MapIoRegion<Entry>(
+            table->EventTimerBlock.Address);
+        Assert(virt);
+        m_Entry = virt.value();
+
+        if (!m_Entry) LogError("HPET: Timer entry address is invalid");
         LogInfo("HPET: Found device at {:#x}",
-                reinterpret_cast<uintptr_t>(entry));
+                reinterpret_cast<uintptr_t>(m_Entry));
 
-        entry->configuration &= ~HPET_LEG_RT_CNF;
-        LogInfo("HPET: revision: {}", GetRevision(entry->capabilities));
+        m_Entry->configuration &= ~HPET_LEG_RT_CNF;
+        LogInfo("HPET: revision: {}", GetRevision(m_Entry->capabilities));
         LogInfo(
             "HPET: Legacy Replacement "
             "Route Capable: {}",
-            (entry->capabilities >> 15) & 1);
+            (m_Entry->capabilities >> 15) & 1);
 
         LogInfo("HPET: Available comparators: {}",
-                GetTimerCount(entry->capabilities));
-        data.vendorID   = GetVendorID(entry->capabilities);
-        data.x64Capable = entry->capabilities & BIT(13);
+                GetTimerCount(m_Entry->capabilities));
+        data.vendorID   = GetVendorID(m_Entry->capabilities);
+        data.x64Capable = m_Entry->capabilities & BIT(13);
         LogInfo("HPET: PCI vendorID = {}, x64Capable: {}", data.vendorID,
                 data.x64Capable);
 
-        tickPeriod = GetTickPeriod(entry->capabilities);
+        tickPeriod = GetTickPeriod(m_Entry->capabilities);
         Assert(tickPeriod > 1'000'000 && tickPeriod <= 0x05f5e100);
 
         data.frequency = 0x38d7ea4c68000 / tickPeriod;
         LogInfo("HPET: Frequency is set to {:#x}", data.frequency);
-        data.minimumTick   = table->minimumTick;
+        data.minimumTick = table->MinimumTick;
 
-        entry->mainCounter = 0;
-        entry->configuration |= HPET_ENABLE;
-        entry->interruptStatusRegister = entry->interruptStatusRegister;
+        LogDebug("Enabling hpet");
+        m_Entry->mainCounter = 0;
+        m_Entry->configuration |= HPET_ENABLE;
+        m_Entry->interruptStatusRegister = m_Entry->interruptStatusRegister;
 
         // TODO(v1tr10l7): Enumerate timers
-        [[maybe_unused]] u32 gsiMask   = 0xffffffff;
-        for (usize i = 0; i < GetTimerCount(entry->capabilities); i++)
+        [[maybe_unused]] u32 gsiMask     = 0xffffffff;
+        for (usize i = 0; i < GetTimerCount(m_Entry->capabilities); i++)
         {
-            auto& comparator = entry->comparators[i];
+            auto& comparator = m_Entry->comparators[i];
             (void)comparator;
         }
     }
-    void Device::Disable() const { entry->configuration &= ~HPET_ENABLE; }
+    void TimerBlock::Disable() const { m_Entry->configuration &= ~HPET_ENABLE; }
 
-    u64  Device::GetCounterValue() const { return entry->mainCounter; }
-    void Device::Sleep(u64 us) const
+    u64  TimerBlock::GetCounterValue() const { return m_Entry->mainCounter; }
+    void TimerBlock::Sleep(u64 us) const
     {
         usize target = GetCounterValue() + (us * 1'000'000'000) / tickPeriod;
         while (GetCounterValue() < target)
             ;
     }
 
-    void Initialize()
+    ErrorOr<void> DetectAndSetup()
     {
-        Table* table = nullptr;
-        usize  index = 0;
+        SDTs::HPET* hpetTable = nullptr;
+        usize       i         = 0;
 
-        while ((table = ACPI::GetTable<Table>("HPET", index++)) != nullptr)
+        while ((hpetTable = ACPI::GetTable<SDTs::HPET>("HPET", i++)) != nullptr)
         {
-            LogInfo("HPET: Table found at {:#x}",
-                    reinterpret_cast<uintptr_t>(table));
+            auto hpet = TimerBlock::GetFromTable(
+                Pointer(hpetTable).FromHigherHalf<>());
+            if (!hpet) return Error(hpet.error());
 
-            usize   length = Math::AlignUp(sizeof(Table), PMM::PAGE_SIZE);
-
-            Pointer virt   = VMM::AllocateSpace(length, alignof(Table));
-            Pointer phys = Math::AlignDown(Pointer(table).FromHigherHalf<u64>(),
-                                           PMM::PAGE_SIZE);
-
-            if (!VMM::GetKernelPageMap()->MapRange(
-                    virt, phys, length,
-                    PageAttributes::eRW | PageAttributes::eUncacheableStrong))
-            {
-                LogError("HPET: Failed to map the ACPI table!");
-                return;
-            }
-
-            s_Devices.push_back(table);
+            TimerBlock* timerBlock = hpet.value();
+            s_Devices.push_back(*timerBlock);
         }
+
+        return {};
     }
 
-    const std::vector<Device>& GetDevices() { return s_Devices; }
+    const std::vector<TimerBlock>& GetDevices() { return s_Devices; }
 }; // namespace HPET

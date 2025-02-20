@@ -24,7 +24,7 @@ namespace Arch
     {
         PIC::Remap(0x20, 0x28);
         IoApic::Initialize();
-        HPET::Initialize();
+        if (!HPET::DetectAndSetup()) LogError("HPET: Not Available");
 
         CPU::InitializeBSP();
         CPU::StartAPs();
@@ -47,8 +47,14 @@ namespace Arch
         Panic("Shouldn't Reach");
         CtosUnreachable();
     }
-    void  Pause() { __asm__ volatile("pause"); }
-    void  Reboot() { IO::Out<word>(0x604, 0x2000); }
+    void Pause() { __asm__ volatile("pause"); }
+
+    void PowerOff() {}
+    void Reboot()
+    {
+        I8042Controller::SendCommand(I8042Command::eResetCPU);
+        IO::Out<word>(0x604, 0x2000);
+    }
 
     usize GetEpoch() { return RTC::CurrentTime(); }
 }; // namespace Arch

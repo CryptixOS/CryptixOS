@@ -7,6 +7,10 @@
 #pragma once
 
 #include <Boot/BootInfo.hpp>
+
+#include <Memory/PMM.hpp>
+
+#include <Utility/Math.hpp>
 #include <Utility/Spinlock.hpp>
 
 inline constexpr usize operator""_kib(unsigned long long count)
@@ -246,9 +250,23 @@ class PageMap
     bool            InternalUnmap(uintptr_t      virt,
                                   PageAttributes flags = static_cast<PageAttributes>(0));
 
-    bool            Map(uintptr_t virt, uintptr_t phys,
-                        PageAttributes flags
-                        = PageAttributes::eRW | PageAttributes::eWriteBack)
+    template <typename T>
+    inline ErrorOr<T*> MapIoRegion(Pointer phys)
+    {
+        usize   length = Math::AlignUp(sizeof(T), PMM::PAGE_SIZE);
+
+        Pointer virt   = VMM::AllocateSpace(length, alignof(u64), true);
+        phys           = Math::AlignDown(phys, PMM::PAGE_SIZE);
+
+        if (MapRange(virt, phys, length,
+                     PageAttributes::eRW | PageAttributes::eUncacheableStrong))
+            return virt.As<T>();
+        return Error(ENODEV);
+    }
+
+    bool Map(uintptr_t virt, uintptr_t phys,
+             PageAttributes flags
+             = PageAttributes::eRW | PageAttributes::eWriteBack)
     {
         ScopedLock guard(s_Lock);
         return InternalMap(virt, phys, flags);
