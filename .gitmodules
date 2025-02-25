@@ -1,2 +1,3 @@
 [submodule "Prism"]
-	url = https://github.com/vitriol1744/Prism
+	path = Prism
+	url = https://github.com/Vitriol1744/Prism
