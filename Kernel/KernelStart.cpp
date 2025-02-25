@@ -29,8 +29,9 @@
 
 #include <Library/ELF.hpp>
 #include <Library/ICxxAbi.hpp>
-#include <Library/RedBlackTree.hpp>
 #include <Library/Stacktrace.hpp>
+
+#include <Prism/RedBlackTree.hpp>
 
 #include <VFS/INode.hpp>
 #include <VFS/Initrd/Initrd.hpp>
@@ -65,6 +66,17 @@ void kernelThread()
     argv.push_back("/usr/sbin/init");
     std::vector<std::string_view> envp;
     envp.push_back("TERM=linux");
+
+    Prism::RedBlackTree<int, char> t;
+    int                            key;
+    char                           val;
+    for (int i = 0; i < 15; i++)
+    {
+        key = i;
+        val = ('a' + i);
+        t.Insert(key, val);
+    }
+    t.PrintTree();
 
     static ELF::Image program, ld;
     PageMap*          pageMap = new PageMap();

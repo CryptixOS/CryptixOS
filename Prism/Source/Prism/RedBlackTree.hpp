@@ -6,7 +6,9 @@
  */
 #pragma once
 
-#include <Prism/Log.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <Prism/NonCopyable.hpp>
+#include <Prism/NonMovable.hpp>
 #include <Prism/Types.hpp>
 
 #include <magic_enum/magic_enum.hpp>
@@ -14,13 +16,11 @@
 
 namespace Prism
 {
-    template <typename K, typename T>
-    class RedBlackTree
+    template <typename K, typename V>
+    class RedBlackTree : public NonCopyable<RedBlackTree<K, V>>,
+                         public NonMovable<RedBlackTree<K, V>>
     {
       public:
-        RedBlackTree() = default;
-        ~RedBlackTree() { Clear(); }
-
         enum class Color : bool
         {
             eRed,
@@ -34,93 +34,59 @@ namespace Prism
 
             Color Color      = Color::eRed;
             K     Key;
+            V     Value;
 
             Node() = default;
-            Node(K key)
+            Node(K& key, V& value)
                 : Key(key)
+                , Value(value)
+            {
+            }
+            Node(K&& key, V&& value)
+                : Key(std::move(key))
+                , Value(std::move(value))
             {
             }
         };
+
+        RedBlackTree() = default;
+        ~RedBlackTree();
+
+        V&              At(const K& key);
+        const V&        At(const K& key) const;
+
+        V&              operator[](const K& key);
+        V&              operator[](K&& key);
 
         constexpr bool  IsEmpty() const { return m_Size == 0; }
         constexpr usize GetSize() const { return m_Size; }
 
         void            Clear();
-        inline void     Insert(K key, const T& value)
-        {
-            auto* node = new Node(key, std::move(value));
-            assert(node);
+        void            Insert(K& key, V& value);
+        bool            Erase(const K& key);
+        bool            Find(const K& key, V& value) const;
 
-            Node* parent  = nullptr;
-            Node* current = m_Root;
-            while (current)
-            {
-                parent  = current;
-                current = node->Key < current->Key ? current->LeftChild
-                                                   : current->RightChild;
-            }
+        bool            Contains(const K& key) const;
+        template <typename T>
+        bool        Contains(const K& k) const;
 
-            if (!parent)
-            {
-                node->Color = Color::eBlack;
-                m_Root      = node;
-                m_Size      = 1;
-                m_Least     = node;
-                return;
-            }
-
-            if (node->Key < parent->Key) parent->LeftChild = node;
-            else parent->RightChild = node;
-            node->Parent = parent;
-
-            // TODO(v1tr10l7): What about some insert-fixup?
-
-            ++m_Size;
-            if (m_Least->LeftChild == node) m_Least = node;
-        }
-
-        Node* Find(Node* node, K key)
-        {
-            while (node && node->Key != key)
-            {
-                if (key < node->Key) node = node->LeftChild;
-                else node = node->RightChild;
-            }
-
-            return node;
-        }
-
-        void PrintNode(Node* root, std::string indent, bool last)
-        {
-            if (!root) return;
-
-            PrismMessage("{}", indent);
-            if (last)
-            {
-                PrismMessage("R----");
-                indent += "   ";
-            }
-            else
-            {
-                PrismMessage("L----");
-                indent += "|  ";
-            }
-
-            PrismMessage("{}({})\n", root->Value,
-                         magic_enum::enum_name(root->Color));
-            PrintNode(root->LeftChild, indent, false);
-            PrintNode(root->RightChild, indent, true);
-        }
-        void Print()
-        {
-            if (!m_Root) return;
-            PrismDebug("Dumping RedBlackTree...");
-            PrintNode(m_Root, "", true);
-        }
+        inline void PrintTree();
+        void        PrintNode(const std::string& prefix, const Node* node,
+                              bool isLeft = false);
 
       private:
-        Node* m_Root  = nullptr;
-        Node* m_Least = nullptr;
-        usize m_Size  = 0;
+        Node* m_Root = nullptr;
+        usize m_Size = 0;
+
+        void  InsertFix(Node* node);
+        i32   Compare(const K& lhs, const K& rhs) const;
+
+        void  RotateLeft(Node* node);
+        void  RotateRight(Node* node);
+        void  RemoveNode(Node* node);
+
+        void  RecursiveDelete(Node* node);
     };
 }; // namespace Prism
+
+#include <Prism/RedBlackTree.inl>

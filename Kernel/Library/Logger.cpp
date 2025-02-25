@@ -256,7 +256,7 @@ namespace Logger
         PrintLogLevel(logLevel);
         Print(string);
 
-        LogChar('\n');
+        if (logLevel != LogLevel::eNone) LogChar('\n');
     }
 
     CTOS_NO_KASAN void Logf(LogLevel logLevel, const char* fmt, ...)

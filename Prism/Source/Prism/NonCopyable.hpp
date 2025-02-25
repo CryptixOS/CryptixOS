@@ -22,4 +22,7 @@ namespace Prism
         virtual ~NonCopyable() = default;
     };
 }; // namespace Prism
-CryptixNameSpace
+
+#ifdef PRISM_TARGET_CRYPTIX
+using Prism::NonCopyable;
+#endif
