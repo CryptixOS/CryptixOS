@@ -12,7 +12,7 @@
 #include <Scheduler/Thread.hpp>
 
 #include <Boot/BootInfo.hpp>
-#include <Utility/Math.hpp>
+#include <Prism/Math.hpp>
 
 extern u8 g_ScheduleVector;
 

@@ -11,7 +11,7 @@
 #include <Memory/VMM.hpp>
 
 #include <Boot/BootInfo.hpp>
-#include <Utility/Math.hpp>
+#include <Prism/Math.hpp>
 
 #include <magic_enum/magic_enum.hpp>
 

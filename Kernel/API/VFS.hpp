@@ -9,10 +9,13 @@
 #include <API/Posix/utime.h>
 #include <API/Syscall.hpp>
 #include <API/UnixTypes.hpp>
-#include <Utility/PathView.hpp>
+
+#include <Prism/PathView.hpp>
 
 namespace API::VFS
 {
+    using Prism::PathView;
+
     ErrorOr<isize> SysRead(i32 fdNum, u8* out, usize bytes);
     ErrorOr<isize> SysWrite(i32 fdNum, const u8* in, usize bytes);
     ErrorOr<isize> SysOpen(PathView path, i32 flags, mode_t mode);

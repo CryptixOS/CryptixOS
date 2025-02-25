@@ -7,9 +7,9 @@
 #pragma once
 
 #include <Boot/BootInfo.hpp>
-#include <Utility/Types.hpp>
+#include <Prism/Types.hpp>
 
-#include <Utility/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
 #include <flanterm.h>
 #include <string_view>

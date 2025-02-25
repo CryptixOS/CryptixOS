@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Utility/Types.hpp>
+#include <Prism/Types.hpp>
 
 constexpr usize O_RDONLY            = 0x0000;
 constexpr usize O_WRONLY            = 0x0001;

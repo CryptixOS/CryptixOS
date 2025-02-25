@@ -6,7 +6,8 @@
  */
 #pragma once
 
-#include <Utility/Types.hpp>
+#include <Prism/Pointer.hpp>
+#include <Prism/Types.hpp>
 
 namespace NVMe
 {
@@ -111,8 +112,8 @@ namespace NVMe
     {
       public:
         Queue() = default;
-        Queue(Pointer crAddress, u16 qid, u32 doorbellShift, u64 depth);
-        Queue(Pointer crAddress, NameSpace& ns, u16 qid, u32 doorbellShift,
+        Queue(PM::Pointer crAddress, u16 qid, u32 doorbellShift, u64 depth);
+        Queue(PM::Pointer crAddress, NameSpace& ns, u16 qid, u32 doorbellShift,
               u64 depth);
 
         inline volatile Submission* GetSubmit() const { return m_Submit; }

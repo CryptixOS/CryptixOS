@@ -18,6 +18,8 @@ namespace PowerManager
         terminal->Clear();
 
         terminal->PrintString("Restarting system...\n");
+        ACPI::Reboot();
+        // TODO(v1tr10l7): UEFI Service
         Arch::Reboot();
     }
 }; // namespace PowerManager

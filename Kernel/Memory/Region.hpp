@@ -18,7 +18,7 @@ namespace VirtualMemoryManager
     {
       public:
         Region() = default;
-        Region(Pointer phys, Pointer virt, usize size,
+        Region(PM::Pointer phys, PM::Pointer virt, usize size,
                i32 flags = PROT_READ | PROT_WRITE, FileDescriptor* fd = nullptr)
             : m_VirtualSpace(virt, size)
             , m_PhysicalBase(phys)
@@ -28,7 +28,7 @@ namespace VirtualMemoryManager
         {
         }
 
-        inline bool Contains(const Pointer address) const
+        inline bool Contains(const PM::Pointer address) const
         {
             return m_VirtualSpace.Contains(address);
         }
@@ -37,8 +37,8 @@ namespace VirtualMemoryManager
         {
             return m_VirtualSpace;
         }
-        inline Pointer GetPhysicalBase() const { return m_PhysicalBase; }
-        inline Pointer GetVirtualBase() const
+        inline PM::Pointer GetPhysicalBase() const { return m_PhysicalBase; }
+        inline PM::Pointer GetVirtualBase() const
         {
             return m_VirtualSpace.GetBase();
         }
@@ -55,7 +55,7 @@ namespace VirtualMemoryManager
 
       private:
         AddressRange    m_VirtualSpace;
-        Pointer         m_PhysicalBase = nullptr;
+        PM::Pointer     m_PhysicalBase = nullptr;
         i32             m_Flags        = 0;
         FileDescriptor* m_Fd           = nullptr;
     };

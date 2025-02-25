@@ -7,7 +7,7 @@
 
 #include <API/UnixTypes.hpp>
 #include <Drivers/Device.hpp>
-#include <Utility/Math.hpp>
+#include <Prism/Math.hpp>
 
 #include <VFS/INode.hpp>
 #include <VFS/Initrd/Ustar.hpp>

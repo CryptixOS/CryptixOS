@@ -10,8 +10,8 @@
 
 #include <Memory/MMIO.hpp>
 #include <Time/Time.hpp>
-#include <Utility/Math.hpp>
-#include <Utility/Spinlock.hpp>
+#include <Prism/Math.hpp>
+#include <Library/Spinlock.hpp>
 
 #include <uacpi/kernel_api.h>
 

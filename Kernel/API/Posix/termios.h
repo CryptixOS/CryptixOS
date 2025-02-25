@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Utility/Types.hpp>
+#include <Prism/Types.hpp>
 
 using cc_t           = u8;
 using speed_t        = u32;

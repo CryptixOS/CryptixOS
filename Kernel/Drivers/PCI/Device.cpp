@@ -13,7 +13,7 @@
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
-#include <Utility/Math.hpp>
+#include <Prism/Math.hpp>
 
 namespace PCI
 {

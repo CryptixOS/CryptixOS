@@ -11,7 +11,7 @@
 
 namespace API::MM
 {
-    ErrorOr<intptr_t> SysMMap(Pointer addr, usize len, i32 prot, i32 flags,
+    ErrorOr<intptr_t> SysMMap(PM::Pointer addr, usize len, i32 prot, i32 flags,
                               i32 fdNum, off_t offset);
 }
 

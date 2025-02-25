@@ -8,22 +8,12 @@
 
 #include <Common.hpp>
 
-struct SDTHeader
-{
-    char Signature[4];
-    u32  Length;
-    u8   Revision;
-    u8   Checksum;
-    char OemID[6];
-    u64  OemTableID;
-    u32  OemRevision;
-    u32  CreatorID;
-    u32  CreatorRevision;
-} __attribute__((packed));
+#include <Firmware/ACPI/Structures.hpp>
 
 namespace ACPI
 {
     void       Initialize();
+    void       Enable();
 
     void       Reboot();
 

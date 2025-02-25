@@ -29,7 +29,7 @@ namespace Syscall::System
         {
             case RebootCommand::eRestart: PowerManager::Reboot(); break;
 
-            default: LogError("SysReboot: Unknown OpCode!"); break;
+            default: Prism::Log::Warn("SysReboot: Unknown OpCode!"); break;
         }
 
         return Error(ENOSYS);

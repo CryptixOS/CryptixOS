@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Utility/Types.hpp>
+#include <Prism/Types.hpp>
 
 constexpr usize _UTSNAME_SYSNAME_LENGTH = 65;
 

@@ -9,9 +9,11 @@
 #include <Arch/CPU.hpp>
 #include <Boot/BootInfo.hpp>
 
-#include <Utility/Logger.hpp>
+#include <Library/Logger.hpp>
 
-#include <string.h>
+#include <cstring>
+
+using Prism::Pointer;
 
 #define LIMINE_REQUEST                                                         \
     __attribute__((used, section(".limine_requests"))) volatile

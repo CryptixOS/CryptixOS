@@ -9,17 +9,19 @@
 #include "Memory/PMM.hpp"
 
 #include "Boot/BootInfo.hpp"
-#include "Utility/Math.hpp"
+#include "Prism/Math.hpp"
 
-extern "C" symbol text_start_addr;
-extern "C" symbol text_end_addr;
-extern "C" symbol rodata_start_addr;
-extern "C" symbol rodata_end_addr;
-extern "C" symbol data_start_addr;
-extern "C" symbol data_end_addr;
+extern "C" symbol           text_start_addr;
+extern "C" symbol           text_end_addr;
+extern "C" symbol           rodata_start_addr;
+extern "C" symbol           rodata_end_addr;
+extern "C" symbol           data_start_addr;
+extern "C" symbol           data_end_addr;
 
-static PageMap*   kernelPageMap;
-static uintptr_t  virtualAddressSpace{};
+static PageMap*             s_KernelPageMap;
+static uintptr_t            s_VirtualAddressSpace{};
+
+static std::optional<usize> s_HigherHalfOffset = BootInfo::GetHHDMOffset();
 
 using namespace Arch::VMM;
 
@@ -50,14 +52,14 @@ namespace VirtualMemoryManager
         LogTrace("VMM: Initializing...");
         Arch::VMM::Initialize();
 
-        kernelPageMap = new PageMap();
-        Assert(kernelPageMap->GetTopLevel() != 0);
+        s_KernelPageMap = new PageMap();
+        Assert(s_KernelPageMap->GetTopLevel() != 0);
 
-        auto [pageSize, flags] = kernelPageMap->RequiredSize(4_gib);
+        auto [pageSize, flags] = s_KernelPageMap->RequiredSize(4_gib);
         for (uintptr_t i = 0; i < 1_gib * 4; i += pageSize)
-            Assert(kernelPageMap->Map(ToHigherHalfAddress<uintptr_t>(i), i,
-                                      PageAttributes::eRW | flags
-                                          | PageAttributes::eWriteBack));
+            Assert(s_KernelPageMap->Map(ToHigherHalfAddress<uintptr_t>(i), i,
+                                        PageAttributes::eRW | flags
+                                            | PageAttributes::eWriteBack));
 
         usize entryCount = 0;
         auto  entries    = BootInfo::GetMemoryMap(entryCount);
@@ -70,7 +72,7 @@ namespace VirtualMemoryManager
                 = Math::AlignUp(entry->base + entry->length, GetPageSize());
 
             auto size              = top - base;
-            auto [pageSize, flags] = kernelPageMap->RequiredSize(size);
+            auto [pageSize, flags] = s_KernelPageMap->RequiredSize(size);
 
             auto alignedSize       = Math::AlignDown(size, pageSize);
 
@@ -82,9 +84,9 @@ namespace VirtualMemoryManager
             {
                 if (t < 4_gib) continue;
 
-                Assert(kernelPageMap->Map(ToHigherHalfAddress<uintptr_t>(t), t,
-                                          PageAttributes::eRW | flags
-                                              | PageAttributes::eWriteBack));
+                Assert(s_KernelPageMap->Map(
+                    ToHigherHalfAddress<uintptr_t>(t), t,
+                    PageAttributes::eRW | flags | PageAttributes::eWriteBack));
             }
             base += alignedSize;
 
@@ -93,9 +95,9 @@ namespace VirtualMemoryManager
             {
                 if (t < 4_gib) continue;
 
-                Assert(kernelPageMap->Map(ToHigherHalfAddress<uintptr_t>(t), t,
-                                          PageAttributes::eRW
-                                              | PageAttributes::eWriteBack));
+                Assert(s_KernelPageMap->Map(
+                    ToHigherHalfAddress<uintptr_t>(t), t,
+                    PageAttributes::eRW | PageAttributes::eWriteBack));
             }
         }
 
@@ -104,18 +106,22 @@ namespace VirtualMemoryManager
         {
             uintptr_t phys = BootInfo::GetKernelPhysicalAddress().Raw<>() + i;
             uintptr_t virt = BootInfo::GetKernelVirtualAddress().Raw<>() + i;
-            Assert(kernelPageMap->Map(
+            Assert(s_KernelPageMap->Map(
                 virt, phys, PageAttributes::eRWX | PageAttributes::eWriteBack));
         }
 
         {
             auto base = ToHigherHalfAddress<uintptr_t>(
                 Math::AlignUp(PMM::GetMemoryTop(), 1_gib));
-            virtualAddressSpace = base + 4_gib;
+            s_VirtualAddressSpace = base + 4_gib;
         }
 
-        kernelPageMap->Load();
+        s_KernelPageMap->Load();
         LogInfo("VMM: Loaded kernel page map");
+    }
+    usize GetHigherHalfOffset()
+    {
+        return s_HigherHalfOffset.has_value() ? s_HigherHalfOffset.value() : 0;
     }
 
     uintptr_t AllocateSpace(usize increment, usize alignment, bool lowerHalf)
@@ -123,9 +129,9 @@ namespace VirtualMemoryManager
         Assert(alignment <= PMM::PAGE_SIZE);
 
         uintptr_t ret = alignment
-                          ? Math::AlignUp(virtualAddressSpace, alignment)
-                          : virtualAddressSpace;
-        virtualAddressSpace += increment + (ret - virtualAddressSpace);
+                          ? Math::AlignUp(s_VirtualAddressSpace, alignment)
+                          : s_VirtualAddressSpace;
+        s_VirtualAddressSpace += increment + (ret - s_VirtualAddressSpace);
 
         return lowerHalf ? FromHigherHalfAddress<uintptr_t>(ret) : ret;
     }
@@ -133,6 +139,6 @@ namespace VirtualMemoryManager
     PageMap* GetKernelPageMap()
     {
         if (!s_Initialized) Initialize();
-        return kernelPageMap;
+        return s_KernelPageMap;
     }
 } // namespace VirtualMemoryManager

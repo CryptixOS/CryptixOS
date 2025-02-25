@@ -17,7 +17,7 @@ namespace ACPI
 {
     namespace
     {
-        struct RSDP
+        struct [[gnu::packed]] RSDP
         {
             char Signature[8];
             u8   Checksum;
@@ -28,12 +28,12 @@ namespace ACPI
             u64  XsdtAddress;
             u8   ExtendedChecksum;
             u8   Reserved[3];
-        } __attribute__((packed));
-        struct RSDT
+        };
+        struct [[gnu::packed]] RSDT
         {
             SDTHeader Header;
             u64       Sdts[];
-        } __attribute__((packed));
+        };
 
         bool  s_XsdtAvailable = false;
         RSDT* s_Rsdt          = nullptr;
@@ -104,6 +104,26 @@ namespace ACPI
         LogInfo("ACPI: Initialized");
         MADT::Initialize();
     }
+    void Enable()
+    {
+        LogTrace("ACPI: Entering ACPI Mode");
+        uacpi_status status = uacpi_initialize(0);
+
+        if (uacpi_unlikely_error(status))
+        {
+            LogError("ACPI: Failed to enter acpi mode!");
+            return;
+        }
+    }
+
+    void Reboot()
+    {
+        // TODO(v1tr10l7): ACPI::Reboot
+        return;
+        LogTrace("ACPI: Attempting to reboot...");
+        LogInfo("");
+    }
+
     SDTHeader* GetTable(const char* signature, usize index)
     {
         Assert(signature != nullptr);

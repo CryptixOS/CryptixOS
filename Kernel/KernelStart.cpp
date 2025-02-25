@@ -27,10 +27,10 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-#include <Utility/ELF.hpp>
-#include <Utility/ICxxAbi.hpp>
-#include <Utility/RedBlackTree.hpp>
-#include <Utility/Stacktrace.hpp>
+#include <Library/ELF.hpp>
+#include <Library/ICxxAbi.hpp>
+#include <Library/RedBlackTree.hpp>
+#include <Library/Stacktrace.hpp>
 
 #include <VFS/INode.hpp>
 #include <VFS/Initrd/Initrd.hpp>
@@ -49,6 +49,7 @@ void kernelThread()
 
     Scheduler::InitializeProcFs();
 
+    ACPI::Enable();
     PCI::Initialize();
     TTY::Initialize();
     MemoryDevices::Initialize();

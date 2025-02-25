@@ -7,9 +7,9 @@
 #include <API/Limits.hpp>
 #include <Arch/CPU.hpp>
 
+#include <Library/Spinlock.hpp>
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
-#include <Utility/Spinlock.hpp>
 
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/EchFs/EchFs.hpp>

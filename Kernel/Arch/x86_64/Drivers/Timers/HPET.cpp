@@ -10,13 +10,15 @@
 
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
-#include <Utility/Math.hpp>
-#include <Utility/Pointer.hpp>
+
+#include <Prism/Math.hpp>
+#include <Prism/Pointer.hpp>
 
 using namespace ACPI;
 
 namespace HPET
 {
+    using Prism::Pointer;
     static std::vector<TimerBlock> s_Devices;
 
     struct Comparator

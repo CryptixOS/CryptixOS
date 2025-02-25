@@ -6,12 +6,12 @@
  */
 #pragma once
 
-#include "Arch/Arch.hpp"
+#include <Arch/Arch.hpp>
 
 #include <Assertions.hpp>
-#include <Utility/Logger.hpp>
-#include <Utility/Stacktrace.hpp>
-#include <Utility/Types.hpp>
+#include <Library/Logger.hpp>
+#include <Library/Stacktrace.hpp>
+#include <Prism/Types.hpp>
 
 #include <format>
 #include <string_view>
@@ -20,7 +20,6 @@ inline constexpr u64 BIT(u64 n) { return (1ull << n); }
 
 #define CTOS_UNUSED               [[maybe_unused]]
 #define CtosUnused(var)           ((void)var)
-#define CtosUnreachable()         __builtin_unreachable()
 #define CTOS_GET_FRAME_ADDRESS(n) __builtin_frame_address(n)
 
 #define CTOS_ARCH_X86_64          0

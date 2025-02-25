@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Utility/Types.hpp>
+#include <Prism/Types.hpp>
 
 #include <unordered_map>
 
@@ -73,7 +73,7 @@ namespace PCI
     class ECAM : public AccessMechanism
     {
       public:
-        ECAM(Pointer address, u8 busStart)
+        ECAM(PM::Pointer address, u8 busStart)
             : m_Base(address)
             , m_BusStart(busStart)
         {
@@ -85,7 +85,7 @@ namespace PCI
                            i32 accessSize) override;
 
       private:
-        Pointer                                  m_Base;
+        PM::Pointer                              m_Base;
         u8                                       m_BusStart;
 
         std::unordered_map<uintptr_t, uintptr_t> m_Mappings;

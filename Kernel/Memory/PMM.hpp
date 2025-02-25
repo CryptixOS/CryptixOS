@@ -25,7 +25,7 @@ namespace PhysicalMemoryManager
         return reinterpret_cast<T>(AllocatePages(count));
     }
     template <>
-    inline Pointer AllocatePages<Pointer>(usize count)
+    inline PM::Pointer AllocatePages<PM::Pointer>(usize count)
     {
         return reinterpret_cast<uintptr_t>(AllocatePages(count));
     }
@@ -36,7 +36,7 @@ namespace PhysicalMemoryManager
         return reinterpret_cast<T>(CallocatePages(count));
     }
     template <>
-    inline Pointer CallocatePages<Pointer>(usize count)
+    inline PM::Pointer CallocatePages<PM::Pointer>(usize count)
     {
         return reinterpret_cast<uintptr_t>(CallocatePages(count));
     }

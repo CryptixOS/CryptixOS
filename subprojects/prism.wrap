@@ -1,0 +1,5 @@
+[wrap-file]
+directory = prism
+
+[provide]
+prism = prism_dep

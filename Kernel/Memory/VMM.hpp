@@ -6,22 +6,20 @@
  */
 #pragma once
 
-#include <Boot/BootInfo.hpp>
-
 #include <Memory/PMM.hpp>
 
-#include <Utility/Math.hpp>
-#include <Utility/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
+#include <Prism/Math.hpp>
 
-inline constexpr usize operator""_kib(unsigned long long count)
+constexpr usize operator""_kib(unsigned long long count)
 {
     return count * 1024;
 }
-inline constexpr usize operator""_mib(unsigned long long count)
+constexpr usize operator""_mib(unsigned long long count)
 {
     return count * 1024_kib;
 }
-inline constexpr usize operator""_gib(unsigned long long count)
+constexpr usize operator""_gib(unsigned long long count)
 {
     return count * 1024_mib;
 }
@@ -178,6 +176,8 @@ namespace VirtualMemoryManager
 {
     void      Initialize();
 
+    usize     GetHigherHalfOffset();
+
     uintptr_t AllocateSpace(usize increment = 0, usize alignment = 0,
                             bool lowerHalf = false);
 
@@ -251,12 +251,12 @@ class PageMap
                                   PageAttributes flags = static_cast<PageAttributes>(0));
 
     template <typename T>
-    inline ErrorOr<T*> MapIoRegion(Pointer phys)
+    inline ErrorOr<T*> MapIoRegion(PM::Pointer phys)
     {
-        usize   length = Math::AlignUp(sizeof(T), PMM::PAGE_SIZE);
+        usize       length = Math::AlignUp(sizeof(T), PMM::PAGE_SIZE);
 
-        Pointer virt   = VMM::AllocateSpace(length, alignof(u64), true);
-        phys           = Math::AlignDown(phys, PMM::PAGE_SIZE);
+        PM::Pointer virt   = VMM::AllocateSpace(length, alignof(u64), true);
+        phys               = Math::AlignDown(phys, PMM::PAGE_SIZE);
 
         if (MapRange(virt, phys, length,
                      PageAttributes::eRW | PageAttributes::eUncacheableStrong))

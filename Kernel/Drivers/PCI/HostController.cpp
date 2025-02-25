@@ -9,7 +9,7 @@
 
 #include <Memory/MMIO.hpp>
 #include <Memory/VMM.hpp>
-#include <Utility/Logger.hpp>
+#include <Library/Logger.hpp>
 
 namespace PCI
 {

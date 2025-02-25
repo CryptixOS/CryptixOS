@@ -9,8 +9,11 @@
 #include <Drivers/Storage/StorageDevicePartition.hpp>
 
 #include <Memory/PMM.hpp>
+
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/VFS.hpp>
+
+using Prism::Pointer;
 
 namespace NVMe
 {

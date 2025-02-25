@@ -20,7 +20,7 @@ namespace PCI
     class HostController
     {
       public:
-        HostController(const Domain& domain, Pointer address)
+        HostController(const Domain& domain, PM::Pointer address)
             : m_Domain(domain)
             , m_Address(address)
         {
@@ -66,7 +66,7 @@ namespace PCI
       private:
         Domain                                   m_Domain;
         AccessMechanism*                         m_AccessMechanism = nullptr;
-        Pointer                                  m_Address;
+        PM::Pointer                              m_Address;
 
         std::unordered_map<uintptr_t, uintptr_t> m_MappedBuses;
 

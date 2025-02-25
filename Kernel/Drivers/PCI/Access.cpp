@@ -9,7 +9,7 @@
 
 #include <Memory/MMIO.hpp>
 #include <Memory/VMM.hpp>
-#include <Utility/Types.hpp>
+#include <Prism/Types.hpp>
 
 namespace PCI
 {

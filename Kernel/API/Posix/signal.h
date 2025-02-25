@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Utility/Types.hpp>
+#include <Prism/Types.hpp>
 
 constexpr usize SIGHUP      = 1;
 constexpr usize SIGINT      = 2;

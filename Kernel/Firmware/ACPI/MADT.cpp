@@ -8,14 +8,15 @@
 
 namespace MADT
 {
+    using Prism::Pointer;
     namespace
     {
         struct MADT
         {
-            SDTHeader Header;
-            u32       LapicAddress;
-            u32       Flags;
-            u8        Entries[];
+            ACPI::SDTHeader Header;
+            u32             LapicAddress;
+            u32             Flags;
+            u8              Entries[];
         } __attribute__((packed));
 
         constexpr const char* MADT_SIGNATURE = "APIC";

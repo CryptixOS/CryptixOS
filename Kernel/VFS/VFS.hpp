@@ -9,7 +9,7 @@
 #include <Common.hpp>
 
 #include <API/UnixTypes.hpp>
-#include <Utility/Path.hpp>
+#include <Prism/Path.hpp>
 
 #include <cerrno>
 #include <expected>
@@ -20,6 +20,8 @@ class INode;
 class FileDescriptor;
 namespace VFS
 {
+    using PM::PathView;
+
     INode* GetRootNode();
     void   RecursiveDelete(INode* node);
 

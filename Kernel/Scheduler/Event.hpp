@@ -6,8 +6,8 @@
  */
 #pragma once
 
-#include <Utility/Spinlock.hpp>
-#include <Utility/Types.hpp>
+#include <Library/Spinlock.hpp>
+#include <Prism/Types.hpp>
 
 constexpr usize MAX_LISTENERS = 32;
 struct EventListener

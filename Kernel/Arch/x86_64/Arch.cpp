@@ -45,7 +45,7 @@ namespace Arch
         for (;;) __asm__ volatile("hlt");
 
         Panic("Shouldn't Reach");
-        CtosUnreachable();
+        AssertNotReached();
     }
     void Pause() { __asm__ volatile("pause"); }
 

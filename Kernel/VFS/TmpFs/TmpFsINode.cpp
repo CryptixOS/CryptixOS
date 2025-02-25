@@ -8,7 +8,7 @@
 #include <Scheduler/Process.hpp>
 
 #include <Time/Time.hpp>
-#include <Utility/Math.hpp>
+#include <Prism/Math.hpp>
 
 #include <VFS/TmpFs/TmpFs.hpp>
 #include <VFS/TmpFs/TmpFsINode.hpp>

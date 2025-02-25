@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Utility/Types.hpp>
+#include <Prism/Types.hpp>
 
 constexpr usize     PROT_NONE     = 0x00;
 constexpr usize     PROT_READ     = 0x01;

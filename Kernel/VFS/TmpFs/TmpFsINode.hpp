@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Utility/Logger.hpp>
+#include <Library/Logger.hpp>
 #include <VFS/INode.hpp>
 
 class TmpFsINode final : public INode

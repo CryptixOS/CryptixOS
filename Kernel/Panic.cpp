@@ -33,7 +33,7 @@ inline static void hcf()
     EarlyLogFatal("System Halted!\n");
 
     Arch::Halt();
-    CtosUnreachable();
+    AssertNotReached();
 }
 
 CTOS_NO_KASAN [[noreturn]]

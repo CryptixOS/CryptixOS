@@ -9,7 +9,7 @@
 #include <API/Posix/termios.h>
 #include <Drivers/Device.hpp>
 
-#include <Utility/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
 #include <deque>
 #include <vector>

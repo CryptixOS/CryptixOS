@@ -152,7 +152,7 @@ namespace NVMe
       private:
         usize m_Index                                    = 0;
         ControllerRegister volatile* volatile m_Register = nullptr;
-        Pointer                             m_CrAddress;
+        PM::Pointer                         m_CrAddress;
 
         u64                                 m_QueueSlots     = 0;
         u64                                 m_DoorbellStride = 0;

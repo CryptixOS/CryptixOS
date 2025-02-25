@@ -8,10 +8,13 @@
 
 #include <Drivers/Storage/NVMe/NVMeNameSpace.hpp>
 #include <Drivers/Storage/NVMe/NVMeQueue.hpp>
+
 #include <Memory/PMM.hpp>
 
 namespace NVMe
 {
+    using Prism::Pointer;
+
     Queue::Queue(Pointer crAddress, u16 qid, u32 doorbellShift, u64 depth)
     {
 

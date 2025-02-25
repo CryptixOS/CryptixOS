@@ -10,7 +10,7 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-#include <Utility/Math.hpp>
+#include <Prism/Math.hpp>
 #include <VFS/FileDescriptor.hpp>
 
 #include <cctype>
@@ -270,5 +270,5 @@ i32 Process::Exit(i32 code)
     m_Status = code;
 
     Scheduler::Yield();
-    CtosUnreachable();
+    AssertNotReached();
 }

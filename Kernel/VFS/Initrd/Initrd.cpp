@@ -9,8 +9,8 @@
 #include "Memory/PMM.hpp"
 #include "Memory/VMM.hpp"
 
-#include "Utility/Logger.hpp"
-#include "Utility/Math.hpp"
+#include "Library/Logger.hpp"
+#include "Prism/Math.hpp"
 #include "VFS/Initrd/Ustar.hpp"
 
 namespace Initrd

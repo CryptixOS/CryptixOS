@@ -6,12 +6,12 @@
  */
 #pragma once
 
-#include "Memory/VMM.hpp"
+#include <Memory/VMM.hpp>
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
-    #include "Arch/x86_64/CPU.hpp"
+    #include <Arch/x86_64/CPU.hpp>
 #elif CTOS_ARCH == CTOS_ARCH_AARCH64
-    #include "Arch/aarch64/CPU.hpp"
+    #include <Arch/aarch64/CPU.hpp>
 #endif
 
 struct Thread;

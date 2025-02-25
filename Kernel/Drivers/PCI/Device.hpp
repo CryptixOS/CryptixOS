@@ -10,21 +10,21 @@
 #include <Drivers/PCI/Access.hpp>
 #include <Drivers/PCI/Definitions.hpp>
 
-#include <Utility/Spinlock.hpp>
-#include <Utility/Types.hpp>
+#include <Library/Spinlock.hpp>
+#include <Prism/Types.hpp>
 
 namespace PCI
 {
 
     struct Bar
     {
-        Pointer   Address      = 0;
-        usize     Size         = 0;
+        PM::Pointer Address      = 0;
+        usize       Size         = 0;
 
-        bool      IsMMIO       = false;
-        bool      DisableCache = false;
+        bool        IsMMIO       = false;
+        bool        DisableCache = false;
 
-        constexpr operator bool() const { return Address != nullptr; }
+        constexpr   operator bool() const { return Address != nullptr; }
     };
 
     struct DeviceAddress
@@ -80,9 +80,9 @@ namespace PCI
             return Read<u16>(RegisterOffset::eDeviceID);
         }
 
-        usize          GetInterruptLine();
+        usize              GetInterruptLine();
 
-        inline Pointer GetBarAddress(u8 index) const
+        inline PM::Pointer GetBarAddress(u8 index) const
         {
             u32 offset = index * 4 + std::to_underlying(RegisterOffset::eBar0);
             return Read<u16>(static_cast<RegisterOffset>(offset));

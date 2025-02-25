@@ -11,7 +11,7 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-#include <Utility/Math.hpp>
+#include <Prism/Math.hpp>
 #include <VFS/FileDescriptor.hpp>
 
 void DirectoryEntries::Push(INode* node, std::string_view name)

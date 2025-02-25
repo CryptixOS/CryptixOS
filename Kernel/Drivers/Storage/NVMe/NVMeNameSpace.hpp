@@ -7,10 +7,12 @@
 #pragma once
 
 #include <API/UnixTypes.hpp>
-#include <Drivers/Storage/StorageDevice.hpp>
 
-#include <Utility/Spinlock.hpp>
-#include <Utility/Types.hpp>
+#include <Drivers/Storage/StorageDevice.hpp>
+#include <Library/Spinlock.hpp>
+
+#include <Prism/Pointer.hpp>
+#include <Prism/Types.hpp>
 
 namespace NVMe
 {

@@ -15,7 +15,7 @@
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
-#include <Utility/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/VFS.hpp>

@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include "Utility/Types.hpp"
+#include "Prism/Types.hpp"
 
 #include <string_view>
 

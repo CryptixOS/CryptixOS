@@ -51,14 +51,14 @@ srcs += files(
     
   'Time/Time.cpp',
 
-  'Utility/ELF.cpp',
-  'Utility/ICxxAbi.cpp',
-  'Utility/Kasan.cpp',
-  'Utility/Logger.cpp',
-  'Utility/Path.cpp',
-  'Utility/PathView.cpp',
-  'Utility/Stacktrace.cpp',
-  'Utility/Ubsan.cpp',
+  'Library/ELF.cpp',
+  'Library/ICxxAbi.cpp',
+  'Library/Kasan.cpp',
+  'Library/Logger.cpp',
+  #'Library/Path.cpp',
+  #'Library/PathView.cpp',
+  'Library/Stacktrace.cpp',
+  #'Library/Ubsan.cpp',
 
   'VFS/FileDescriptor.cpp',
   'VFS/FileDescriptorTable.cpp',
@@ -98,8 +98,8 @@ else
   error('Unknown architecture: ' + arch)
 endif
 
-subdir('Utility/KLibC')
-subdir('Utility/KLibC++')
+subdir('Library/KLibC')
+subdir('Library/KLibC++')
 
 args = []
 kernel_elf = executable(

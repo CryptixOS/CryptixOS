@@ -12,10 +12,6 @@ namespace PhysicalMemoryManager
 }
 namespace PMM = PhysicalMemoryManager;
 
-#define EarlyPanic(fmt, ...)                                                   \
-    earlyPanic("Error Message: " fmt __VA_OPT__(, ) __VA_ARGS__)
-#define Panic(...)   panic(std::format(__VA_ARGS__).data())
-
 #define Assert(expr) AssertMsg(expr, #expr)
 #define AssertMsg(expr, msg)                                                   \
     !(expr)                                                                    \
@@ -26,7 +22,14 @@ namespace PMM = PhysicalMemoryManager;
     !(expr) ? Panic("{}[{}]: Assertion Failed =>\n{}", __FILE__, __LINE__,     \
                     std::format(fmt, __VA_ARGS__))                             \
             : (void)0
-#define ToDo() AssertFmt(false, "{} is not implemented!", __PRETTY_FUNCTION__)
+
+#define AssertNotReached() __builtin_unreachable();
+
+#define EarlyPanic(fmt, ...)                                                   \
+    earlyPanic("Error Message: " fmt __VA_OPT__(, ) __VA_ARGS__)
+#define Panic(...) panic(std::format(__VA_ARGS__).data())
+
+#define ToDo()     AssertFmt(false, "{} is not implemented!", __PRETTY_FUNCTION__)
 #define ToDoWarn()                                                             \
     LogWarn("{}[{}]: {} is not implemented!", __FILE__, __LINE__,              \
             __PRETTY_FUNCTION__)

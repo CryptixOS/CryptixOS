@@ -17,6 +17,11 @@ project(
   ],
 )
 
+if not meson.get_compiler('cpp').has_argument('-std=gnu++23')
+  error('C++23 support is needed. Please install clang 17 or higher.')
+endif
+
+
 c = meson.get_compiler('c')
 cxx = meson.get_compiler('cpp')
 ld = cxx.get_linker_id()
@@ -60,10 +65,6 @@ add_global_arguments(
   language: ['c', 'cpp'],
 )
 
-if not meson.get_compiler('cpp').has_argument('-std=gnu++23')
-  error('C++23 support is needed. Please install clang 17 or higher.')
-endif
-
 add_global_arguments(
   [
     '-fno-rtti',
@@ -79,6 +80,9 @@ add_global_arguments(
     '-DFMT_USE_DOUBLE=0',
     '-DFMT_USE_FLOAT=0',
     '-DMAGIC_ENUM_RANGE_MAX=0x8a00',
+    '-DPRISM_TARGET_CRYPTIX=1',
+    '-DPRISM_LOG_ENABLE=1',
+    '-DPRISM_BUILD_DEBUG=1',
     '-MP',
   ],
   language: 'cpp',
@@ -115,6 +119,7 @@ deps = [
   dependency('demangler'),
   dependency('magic_enum'),
   dependency('uacpi'),
+  dependency('prism'),
 ]
 
 inc_deps = []

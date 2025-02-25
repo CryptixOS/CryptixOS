@@ -20,7 +20,7 @@ struct MCFG
         u32 Reserved;
     } __attribute__((packed));
 
-    SDTHeader Header;
-    u64       Reserved;
-    Entry     Entries[];
+    ACPI::SDTHeader Header;
+    u64             Reserved;
+    Entry           Entries[];
 } __attribute__((packed));

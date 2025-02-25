@@ -6,24 +6,42 @@
  */
 #pragma once
 
-#include <Utility/Types.hpp>
+#include <Assertions.hpp>
+
+#include <Prism/Pointer.hpp>
+#include <Prism/Types.hpp>
 
 #include <concepts>
 
 namespace MMIO
 {
     template <std::unsigned_integral T>
-    inline static T Read(Pointer address)
+    inline static T Read(PM::Pointer address)
     {
         volatile T* reg = address.As<volatile T>();
 
         return *reg;
     }
     template <std::unsigned_integral T>
-    inline static void Write(Pointer address, T value)
+    inline static void Write(PM::Pointer address, T value)
     {
         volatile T* reg = address.As<volatile T>();
 
         *reg            = value;
+    }
+
+    inline static usize Read(PM::Pointer address, u8 accessSize)
+    {
+        switch (accessSize)
+        {
+            case 1: return Read<u8>(address);
+            case 2: return Read<u16>(address);
+            case 3: return Read<u32>(address);
+            case 4: return Read<u64>(address);
+
+            default: break;
+        }
+
+        AssertNotReached();
     }
 }; // namespace MMIO

@@ -7,31 +7,31 @@
 #include <Common.hpp>
 
 #include <Boot/BootInfo.hpp>
-#include <Utility/Bitmap.hpp>
-#include <Utility/Math.hpp>
+#include <Prism/Math.hpp>
+#include <Prism/Bitmap.hpp>
 
 #include <Memory/KernelHeap.hpp>
 #include <Memory/PMM.hpp>
 
-#include <Utility/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
 namespace PhysicalMemoryManager
 {
     namespace
     {
-        bool      s_Initialized = false;
-        Bitmap    s_Bitmap{};
+        bool          s_Initialized = false;
+        Prism::Bitmap s_Bitmap{};
 
-        uintptr_t s_MemoryTop        = 0;
-        uintptr_t s_UsableMemoryTop  = 0;
+        uintptr_t     s_MemoryTop        = 0;
+        uintptr_t     s_UsableMemoryTop  = 0;
 
-        usize     s_UsableMemorySize = 0;
-        usize     s_TotalMemory      = 0;
-        usize     s_UsedMemory       = 0;
+        usize         s_UsableMemorySize = 0;
+        usize         s_TotalMemory      = 0;
+        usize         s_UsedMemory       = 0;
 
-        Spinlock  s_Lock;
+        Spinlock      s_Lock;
 
-        void*     FindFreeRegion(usize& start, usize count, usize limit)
+        void*         FindFreeRegion(usize& start, usize count, usize limit)
         {
             usize contiguousPages = 0;
             while (start < limit)
@@ -96,9 +96,9 @@ namespace PhysicalMemoryManager
                 || currentEntry->length < s_BitmapSize)
                 continue;
 
-            s_Bitmap.data = reinterpret_cast<u8*>(currentEntry->base
-                                                  + BootInfo::GetHHDMOffset());
-            s_Bitmap.size = s_BitmapEntryCount;
+            s_Bitmap.Initialize(reinterpret_cast<u8*>(currentEntry->base)
+                                    + BootInfo::GetHHDMOffset(),
+                                s_BitmapEntryCount);
             s_Bitmap.SetAll(0xff);
             currentEntry->base += s_BitmapSize;
             currentEntry->length -= s_BitmapSize;
@@ -107,7 +107,7 @@ namespace PhysicalMemoryManager
             break;
         }
 
-        Assert(s_Bitmap.size != 0);
+        Assert(s_Bitmap.GetSize() != 0);
         [[maybe_unused]] auto entryTypeToString = [](u64 type)
         {
             switch (type)

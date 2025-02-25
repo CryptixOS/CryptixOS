@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Utility/Pointer.hpp>
-#include <Utility/Types.hpp>
+#include <Prism/Pointer.hpp>
+#include <Prism/Types.hpp>
 
 #define LIMINE_API_REVISION 2
 #include <limine.h>
@@ -36,21 +36,21 @@ enum class FirmwareType : i32
 
 namespace BootInfo
 {
-    const char*                 GetBootloaderName();
-    const char*                 GetBootloaderVersion();
-    FirmwareType                GetFirmwareType();
-    u64                         GetHHDMOffset();
-    Framebuffer*                GetFramebuffer();
-    Framebuffer**               GetFramebuffers(usize& outCount);
-    limine_mp_response*         GetSMP_Response();
-    MemoryMap                   GetMemoryMap(u64& entryCount);
-    limine_file*                FindModule(const char* name);
-    Pointer                     GetRSDPAddress();
-    std::pair<Pointer, Pointer> GetSmBiosEntries();
-    Pointer                     GetEfiSystemTable();
-    u64                         GetBootTime();
-    Pointer                     GetKernelPhysicalAddress();
-    Pointer                     GetKernelVirtualAddress();
-    usize                       GetPagingMode();
-    limine_file*                GetKernelFile();
+    const char*                         GetBootloaderName();
+    const char*                         GetBootloaderVersion();
+    FirmwareType                        GetFirmwareType();
+    u64                                 GetHHDMOffset();
+    Framebuffer*                        GetFramebuffer();
+    Framebuffer**                       GetFramebuffers(usize& outCount);
+    limine_mp_response*                 GetSMP_Response();
+    MemoryMap                           GetMemoryMap(u64& entryCount);
+    limine_file*                        FindModule(const char* name);
+    PM::Pointer                         GetRSDPAddress();
+    std::pair<PM::Pointer, PM::Pointer> GetSmBiosEntries();
+    PM::Pointer                         GetEfiSystemTable();
+    u64                                 GetBootTime();
+    PM::Pointer                         GetKernelPhysicalAddress();
+    PM::Pointer                         GetKernelVirtualAddress();
+    usize                               GetPagingMode();
+    limine_file*                        GetKernelFile();
 }; // namespace BootInfo

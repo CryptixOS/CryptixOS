@@ -7,7 +7,7 @@
 #pragma once
 
 #include <API/UnixTypes.hpp>
-#include <Utility/Types.hpp>
+#include <Prism/Types.hpp>
 
 namespace Time
 {

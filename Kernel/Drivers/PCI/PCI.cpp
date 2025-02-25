@@ -5,12 +5,15 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/x86_64/IO.hpp>
+
 #include <Drivers/PCI/Device.hpp>
 #include <Drivers/PCI/HostController.hpp>
 #include <Drivers/PCI/PCI.hpp>
 #include <Drivers/Storage/NVMe/NVMeController.hpp>
 
 #include <Firmware/ACPI/MCFG.hpp>
+#include <Library/Logger.hpp>
+
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
 
