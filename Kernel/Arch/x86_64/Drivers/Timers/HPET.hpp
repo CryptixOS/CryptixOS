@@ -6,13 +6,16 @@
  */
 #pragma once
 
+#include <Arch/x86_64/Drivers/Timers/HPETComparator.hpp>
 #include <Firmware/ACPI/HPET.hpp>
 
 #include <vector>
 
 namespace HPET
 {
-    using Table = ACPI::SDTs::HPET;
+    constexpr usize ABSOLUTE_MAXIMUM_COUNTER_TICK_PERIOD = 0x05f5e100;
+
+    using Table                                          = ACPI::SDTs::HPET;
     class TimerBlock
     {
       public:
@@ -21,14 +24,31 @@ namespace HPET
         TimerBlock() = default;
         TimerBlock(Table* hpet);
 
-        void Disable() const;
+        void            Enable() const;
+        void            Disable() const;
+        constexpr usize NsToRawCounterTicks(u64 ns) const
+        {
+            return (ns * 1000000ull) / (u64)m_MainCounterRegister;
+        }
+
+        constexpr usize RawCounterTicksToNs(u64 rawTicks) const
+        {
+            return (rawTicks * m_MainCounterRegister * 100ull)
+                 / ABSOLUTE_MAXIMUM_COUNTER_TICK_PERIOD;
+        }
 
         u64  GetCounterValue() const;
         void Sleep(u64 us) const;
 
       private:
-        struct Entry* m_Entry    = nullptr;
-        usize         tickPeriod = 0;
+        u16                         m_VendorID            = 0;
+        u16                         m_MinimimumTick       = 0;
+        usize                       m_TimerCount          = 0;
+        bool                        m_X64Capable          = false;
+        usize                       m_Frequency           = 0;
+        usize                       m_MainCounterRegister = 0;
+        struct Entry*               m_Entry               = nullptr;
+        std::vector<HPETComparator> m_Comparators;
     };
 
     ErrorOr<void>                  DetectAndSetup();

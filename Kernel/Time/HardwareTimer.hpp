@@ -6,8 +6,8 @@
  */
 #pragma once
 
-#include <Time/TimeStep.hpp>
 #include <Prism/Types.hpp>
+#include <Time/TimeStep.hpp>
 
 enum class TimerMode
 {
@@ -23,7 +23,14 @@ class HardwareTimer
 
     virtual ErrorOr<void> Start(u8 vector, TimeStep interval, TimerMode mode)
         = 0;
-    virtual void          Stop()                        = 0;
+    virtual void          Stop()                                = 0;
 
-    virtual ErrorOr<void> SetFrequency(usize frequency) = 0;
+    virtual bool          IsModeSupported(TimerMode mode) const = 0;
+    virtual ErrorOr<void> SetMode(TimerMode mode)               = 0;
+    virtual bool          CanQueryRaw() const                   = 0;
+    virtual u64           GetCurrentRaw() const                 = 0;
+    virtual u64           GetRawToNs(u64 raw) const             = 0;
+
+    virtual void          ResetToDefaultTicksPerSeconds() const = 0;
+    virtual ErrorOr<void> SetFrequency(usize frequency) const   = 0;
 };
