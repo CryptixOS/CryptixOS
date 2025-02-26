@@ -50,7 +50,7 @@ void kernelThread()
 
     Scheduler::InitializeProcFs();
 
-    ACPI::Enable();
+    // ACPI::Enable();
     PCI::Initialize();
     TTY::Initialize();
     MemoryDevices::Initialize();

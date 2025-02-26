@@ -13,6 +13,8 @@
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
 
+#include <Scheduler/Event.hpp>
+#include <Scheduler/ThreadEvent.hpp>
 #include <VFS/FileDescriptorTable.hpp>
 #include <VFS/VFS.hpp>
 
@@ -120,28 +122,32 @@ class Process
     ErrorOr<i32>           Exec(std::string path, char** argv, char** envp);
     i32                    Exit(i32 code);
 
-    friend struct Thread;
-    Process*                 m_Parent      = nullptr;
-    pid_t                    m_Pid         = -1;
-    std::string              m_Name        = "?";
-    PageMap*                 PageMap       = nullptr;
-    Credentials              m_Credentials = {};
-    PrivilegeLevel           m_Ring        = PrivilegeLevel::eUnprivileged;
-    std::optional<i32>       m_Status;
+    Process*               m_Parent      = nullptr;
+    pid_t                  m_Pid         = -1;
+    std::string            m_Name        = "?";
+    PageMap*               PageMap       = nullptr;
+    Credentials            m_Credentials = {};
+    PrivilegeLevel         m_Ring        = PrivilegeLevel::eUnprivileged;
+    std::optional<i32>     m_Status;
 
-    std::atomic<tid_t>       m_NextTid = m_Pid;
-    std::vector<Process*>    m_Children;
-    std::vector<Process*>    m_Zombies;
-    std::vector<Thread*>     m_Threads;
+    std::atomic<tid_t>     m_NextTid = m_Pid;
+    std::vector<Process*>  m_Children;
+    std::vector<Process*>  m_Zombies;
+    std::vector<Thread*>   m_Threads;
 
-    INode*                   m_RootNode = VFS::GetRootNode();
-    INode*                   m_CWD      = VFS::GetRootNode();
-    mode_t                   m_Umask    = 0;
+    INode*                 m_RootNode = VFS::GetRootNode();
+    INode*                 m_CWD      = VFS::GetRootNode();
+    mode_t                 m_Umask    = 0;
 
-    FileDescriptorTable      m_FdTable;
-    sigset_t                 m_SignalMask = 0;
+    FileDescriptorTable    m_FdTable;
+    sigset_t               m_SignalMask = 0;
     std::vector<VMM::Region> m_AddressSpace{};
     uintptr_t                m_UserStackTop = 0x70000000000;
     usize                    m_Quantum      = 1000;
     Spinlock                 m_Lock;
+    Event                    m_Event;
+    WaitEvent                m_WaitEvent;
+
+    friend class Scheduler;
+    friend struct Thread;
 };

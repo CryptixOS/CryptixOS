@@ -55,7 +55,7 @@ namespace Syscall::Process
     }
     ErrorOr<pid_t> SysGetPid(Arguments& args)
     {
-        class Process* current = CPU::GetCurrentThread()->parent;
+        class Process* current = ::Process::GetCurrent();
         Assert(current);
 
         return current->m_Pid;
@@ -63,7 +63,7 @@ namespace Syscall::Process
 
     ErrorOr<pid_t> SysFork(Arguments&)
     {
-        class Process* process = CPU::GetCurrentThread()->parent;
+        class Process* process = ::Process::GetCurrent();
 
         CPU::SetInterruptFlag(false);
         auto procOrError = process->Fork();
@@ -79,13 +79,13 @@ namespace Syscall::Process
 
         CPU::SetInterruptFlag(false);
 
-        return CPU::GetCurrentThread()->parent->Exec(path, argv, envp);
+        return CPU::GetCurrentThread()->GetParent()->Exec(path, argv, envp);
     }
     ErrorOr<i32> SysExit(Arguments& args)
     {
         i32   code    = args.Args[0];
 
-        auto* process = CPU::GetCurrentThread()->parent;
+        auto* process = ::Process::GetCurrent();
 
         CPU::SetInterruptFlag(false);
         return process->Exit(code);
@@ -98,7 +98,7 @@ namespace Syscall::Process
         rusage*        rusage  = reinterpret_cast<struct rusage*>(args.Args[3]);
 
         Thread*        thread  = CPU::GetCurrentThread();
-        class Process* process = thread->parent;
+        class Process* process = thread->GetParent();
 
         return process->WaitPid(pid, wstatus, flags, rusage);
     }
@@ -129,14 +129,14 @@ namespace Syscall::Process
 
     ErrorOr<uid_t> SysGetUid(Arguments&)
     {
-        class Process* current = CPU::GetCurrentThread()->parent;
+        class Process* current = ::Process::GetCurrent();
         Assert(current);
 
         return current->GetCredentials().uid;
     }
     ErrorOr<gid_t> SysGetGid(Arguments&)
     {
-        class Process* current = CPU::GetCurrentThread()->parent;
+        class Process* current = ::Process::GetCurrent();
         Assert(current);
 
         return current->GetCredentials().gid;
@@ -144,14 +144,14 @@ namespace Syscall::Process
 
     ErrorOr<uid_t> SysGet_eUid(Arguments&)
     {
-        class Process* current = CPU::GetCurrentThread()->parent;
+        class Process* current = ::Process::GetCurrent();
         Assert(current);
 
         return current->GetCredentials().euid;
     }
     ErrorOr<gid_t> SysGet_eGid(Arguments&)
     {
-        class Process* current = CPU::GetCurrentThread()->parent;
+        class Process* current = ::Process::GetCurrent();
         Assert(current);
 
         return current->GetCredentials().egid;
@@ -187,7 +187,7 @@ namespace Syscall::Process
 
     ErrorOr<pid_t> SysGet_pPid(Arguments&)
     {
-        class Process* current = CPU::GetCurrentThread()->parent;
+        class Process* current = ::Process::GetCurrent();
         Assert(current);
 
         return current->GetParentPid();

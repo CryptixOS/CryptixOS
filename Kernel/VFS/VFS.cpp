@@ -65,7 +65,7 @@ namespace VFS
     std::expected<FileDescriptor*, std::errno_t>
     Open(INode* parent, PathView path, i32 flags, mode_t mode)
     {
-        Process* current        = CPU::GetCurrentThread()->parent;
+        Process* current        = Process::GetCurrent();
         bool     followSymlinks = !(flags & O_NOFOLLOW);
         auto     acc            = flags & O_ACCMODE;
         mode &= ~(S_IRWXU | S_IRWXG | S_IRWXO | S_ISVTX | S_ISUID | S_ISGID);

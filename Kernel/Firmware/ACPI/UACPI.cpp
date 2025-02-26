@@ -8,11 +8,12 @@
 #include <Arch/x86_64/IO.hpp>
 #include <Firmware/ACPI/ACPI.hpp>
 
-#include <Memory/MMIO.hpp>
-#include <Time/Time.hpp>
-#include <Prism/Math.hpp>
 #include <Library/Spinlock.hpp>
+#include <Memory/MMIO.hpp>
+#include <Prism/Math.hpp>
+#include <Time/Time.hpp>
 
+#include <mutex>
 #include <uacpi/kernel_api.h>
 
 namespace uACPI
@@ -288,10 +289,15 @@ namespace uACPI
 
         uacpi_handle uacpi_kernel_create_mutex(void)
         {
-            ToDoWarn();
-            return {};
+            std::mutex* mutex = new std::mutex;
+
+            return reinterpret_cast<uacpi_handle>(mutex);
         }
-        void         uacpi_kernel_free_mutex(uacpi_handle) { ToDoWarn(); }
+        void uacpi_kernel_free_mutex(uacpi_handle mutexHandle)
+        {
+            std::mutex* mutex = reinterpret_cast<std::mutex*>(mutexHandle);
+            delete mutex;
+        }
 
         uacpi_handle uacpi_kernel_create_event(void)
         {
@@ -307,12 +313,21 @@ namespace uACPI
             return 0;
         }
 
-        uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle, uacpi_u16)
+        uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle handle,
+                                                uacpi_u16    timeout)
         {
-            ToDoWarn();
+            // TODO(v1tr10l7): timeout
+
+            std::mutex* mutex = reinterpret_cast<std::mutex*>(handle);
+            mutex->lock();
+
             return UACPI_STATUS_UNIMPLEMENTED;
         }
-        void       uacpi_kernel_release_mutex(uacpi_handle) { ToDoWarn(); }
+        void uacpi_kernel_release_mutex(uacpi_handle handle)
+        {
+            std::mutex* mutex = reinterpret_cast<std::mutex*>(handle);
+            mutex->unlock();
+        }
 
         uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle, uacpi_u16)
         {

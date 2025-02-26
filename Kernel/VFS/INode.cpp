@@ -18,7 +18,7 @@ INode::INode(INode* parent, std::string_view name, Filesystem* fs)
     , m_Filesystem(fs)
 {
     Thread*  thread  = CPU::GetCurrentThread();
-    Process* process = thread ? thread->parent : nullptr;
+    Process* process = thread ? thread->GetParent() : nullptr;
 
     if (parent && parent->m_Stats.st_mode & S_ISUID)
     {

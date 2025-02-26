@@ -9,20 +9,23 @@
 #include <Library/Spinlock.hpp>
 #include <Prism/Types.hpp>
 
+#include <deque>
+#include <span>
+
 constexpr usize MAX_LISTENERS = 32;
 struct EventListener
 {
-    class Thread* Thread;
-    usize         Which;
+    struct Thread* Thread;
+    usize          Which;
 };
 struct Event
 {
   public:
-    static isize  Await(Event** events, usize eventCount, bool block);
-    static usize  Trigger(Event* event, bool drop);
+    static std::optional<usize> Await(std::span<Event*> events,
+                                      bool              block = true);
+    static void                 Trigger(Event* event, bool drop = false);
 
-    Spinlock      Lock;
-    usize         Pending;
-    usize         ListenersI;
-    EventListener Listeners[MAX_LISTENERS];
+    Spinlock                    Lock;
+    usize                       Pending;
+    std::deque<EventListener>   Listeners;
 };

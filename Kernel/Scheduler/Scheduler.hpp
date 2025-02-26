@@ -7,32 +7,47 @@
 #pragma once
 
 #include <API/UnixTypes.hpp>
+
+#include <Prism/Singleton.hpp>
 #include <Scheduler/Process.hpp>
 
 class Process;
 struct Thread;
-namespace Scheduler
+class Scheduler
 {
-    void Initialize();
-    void InitializeProcFs();
-    void PrepareAP(bool start = false);
+  public:
+    static void Initialize();
+    static void InitializeProcFs();
+    static void PrepareAP(bool start = false);
 
-    void Block(Thread* thread);
+    static void Block(Thread* thread);
+    static void Unblock(Thread* thread);
+
     [[noreturn]]
-    void     Yield();
+    static void     Yield();
 
-    Process* GetKernelProcess();
+    static Process* GetKernelProcess();
 
-    Process* CreateProcess(Process* parent, std::string_view name,
-                           const Credentials& creds);
-    void     RemoveProcess(pid_t pid);
+    static Process* CreateProcess(Process* parent, std::string_view name,
+                                  const Credentials& creds);
+    static void     RemoveProcess(pid_t pid);
 
-    bool     ValidatePid(pid_t pid);
-    Process* GetProcess(pid_t pid);
+    static bool     ValidatePid(pid_t pid);
+    static Process* GetProcess(pid_t pid);
 
-    Thread*  CreateKernelThread(uintptr_t pc, uintptr_t arg,
-                                usize runningOn = -1);
+    static Thread*  CreateKernelThread(uintptr_t pc, uintptr_t arg,
+                                       usize runningOn = -1);
 
-    void     EnqueueThread(Thread* thread);
-    void     EnqueueNotReady(Thread* thread);
+    static void     EnqueueThread(Thread* thread);
+    static void     EnqueueNotReady(Thread* thread);
+    static void     DequeueThread(Thread* thread);
+
+  private:
+    Scheduler() = default;
+
+    static Thread* GetNextThread(usize cpuID);
+    static Thread* PickReadyThread();
+
+  public:
+    static void Tick(CPUContext* ctx);
 }; // namespace Scheduler

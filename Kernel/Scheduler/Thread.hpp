@@ -16,8 +16,11 @@
 #endif
 
 #include <Library/ELF.hpp>
+#include <Scheduler/Event.hpp>
+#include <Scheduler/ThreadEvent.hpp>
 
-#include <errno.h>
+#include <cerrno>
+#include <deque>
 #include <vector>
 
 enum class ThreadState
@@ -27,6 +30,7 @@ enum class ThreadState
     eKilled,
     eRunning,
     eDequeued,
+    eEnqueued,
     eBlocked,
     eExited,
 };
@@ -51,44 +55,81 @@ struct Thread
         ScopedLock guard(m_Lock);
         m_State = state;
     }
+    inline ErrorCode& GetError() { return m_ErrorCode; }
 
-    Thread*     Fork(Process* parent);
+    inline Process*   GetParent() const { return m_Parent; }
+    constexpr bool    IsUser() const { return m_IsUser; }
 
-    // FIXME(v1tr10l7): implement tthis once we have signals
-    inline bool WasInterrupted() const { return false; }
+    inline bool       IsEnqueued() const { return m_IsEnqueued; }
+    constexpr bool    IsDead() const
+    {
+        return m_State == ThreadState::eExited
+            || m_State == ThreadState::eKilled;
+    }
+    constexpr bool IsBlocked() const
+    {
+        return m_State == ThreadState::eBlocked;
+    }
+    constexpr bool             ReadyForCleanup() { return IsDead(); }
+
+    Thread*                    Fork(Process* parent);
+
+    // FIXME(v1tr10l7): implement this once we have signals
+    inline bool                WasInterrupted() const { return false; }
+
+    inline uintptr_t           GetFsBase() const { return m_FsBase; }
+    inline uintptr_t           GetGsBase() const { return m_GsBase; }
+
+    inline void                SetFsBase(uintptr_t fs) { m_FsBase = fs; }
+    inline void                SetGsBase(uintptr_t gs) { m_GsBase = gs; }
+
+    inline Event&              GetEvent() { return m_Event; }
+    inline std::deque<Event*>& GetEvents() { return m_Events; }
+    inline usize               GetWhich() const { return m_Which; }
+
+    inline void                SetWhich(usize which) { m_Which = which; }
 
     // DON'T MOVE
     //////////////////////
-    usize       runningOn;
-    Thread*     self;
-    uintptr_t   stack;
+    usize                      runningOn;
+    Thread*                    self;
+    uintptr_t                  stack;
 
-    uintptr_t   kernelStack;
-    uintptr_t   pageFaultStack;
+    uintptr_t                  kernelStack;
+    uintptr_t                  pageFaultStack;
 
-    usize       fpuStoragePageCount;
-    uintptr_t   fpuStorage;
+    usize                      fpuStoragePageCount;
+    uintptr_t                  fpuStorage;
     //////////////////////
 
+  private:
     Spinlock    m_Lock;
     tid_t       m_Tid;
     ThreadState m_State = ThreadState::eIdle;
-    errno_t     error;
-    Process*    parent;
-    uintptr_t   stackVirt;
+    ErrorCode   m_ErrorCode;
+    Process*    m_Parent;
+    uintptr_t   m_StackVirt;
 
-    CPUContext  ctx;
-    CPUContext  SavedContext;
+  public:
+    CPUContext ctx;
+    CPUContext SavedContext;
 
-    std::vector<std::pair<uintptr_t, usize>> stacks;
-    bool                                     user = false;
+  private:
+    std::vector<std::pair<uintptr_t, usize>> m_Stacks;
+    bool                                     m_IsUser = false;
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
-    uintptr_t gsBase;
-    uintptr_t fsBase;
+    uintptr_t m_GsBase;
+    uintptr_t m_FsBase;
 #elif CTOS_ARCH == CTOS_ARCH_AARCH64
-    uintptr_t el0Base;
+    uintptr_t m_El0Base;
 #endif
 
-    bool enqueued = false;
+    bool                      m_IsEnqueued = false;
+    struct Event              m_Event;
+    std::deque<struct Event*> m_Events;
+    usize                     m_Which = 0;
+
+    friend class Process;
+    friend class Scheduler;
 };

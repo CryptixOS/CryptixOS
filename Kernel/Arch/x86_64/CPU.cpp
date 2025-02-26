@@ -446,8 +446,8 @@ namespace CPU
         thread->fpuStorage
             = ToHigherHalfAddress<uintptr_t>(PMM::CallocatePages(fpuPageCount));
 
-        thread->gsBase = reinterpret_cast<uintptr_t>(thread);
-        if (thread->user)
+        thread->SetGsBase(reinterpret_cast<uintptr_t>(thread));
+        if (thread->IsUser())
         {
             thread->ctx.cs = GDT::USERLAND_CODE_SELECTOR | 0x03;
             thread->ctx.ss = GDT::USERLAND_DATA_SELECTOR | 0x03;
@@ -474,10 +474,10 @@ namespace CPU
     }
     void SaveThread(Thread* thread, CPUContext* ctx)
     {
-        thread->ctx    = *ctx;
+        thread->ctx = *ctx;
 
-        thread->gsBase = GetKernelGSBase();
-        thread->fsBase = GetFSBase();
+        thread->SetGsBase(GetKernelGSBase());
+        thread->SetFsBase(GetFSBase());
 
         GetCurrent()->FpuSave(thread->fpuStorage);
     }
@@ -488,11 +488,11 @@ namespace CPU
         GetCurrent()->TSS.ist[1] = thread->pageFaultStack;
         GetCurrent()->FpuRestore(thread->fpuStorage);
 
-        thread->parent->PageMap->Load();
+        thread->GetParent()->PageMap->Load();
 
         SetGSBase(reinterpret_cast<u64>(thread));
-        SetKernelGSBase(thread->gsBase);
-        SetFSBase(thread->fsBase);
+        SetKernelGSBase(thread->GetGsBase());
+        SetFSBase(thread->GetFsBase());
 
         *ctx = thread->ctx;
     }

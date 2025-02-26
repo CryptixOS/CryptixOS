@@ -11,17 +11,17 @@
 
 #include <Memory/PMM.hpp>
 
-#include <Scheduler/Process.hpp>
 #include <Prism/Math.hpp>
+#include <Scheduler/Process.hpp>
 
 Thread::Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn)
     : runningOn(runOn)
     , self(this)
     , m_State(ThreadState::eDequeued)
-    , error(no_error)
-    , parent(parent)
-    , user(false)
-    , enqueued(false)
+    , m_ErrorCode(no_error)
+    , m_Parent(parent)
+    , m_IsUser(false)
+    , m_IsEnqueued(false)
 
 {
     m_Tid = parent->m_NextTid++;
@@ -100,10 +100,10 @@ Thread::Thread(Process* parent, uintptr_t pc,
     : runningOn(CPU::GetCurrent()->ID)
     , self(this)
     , m_State(ThreadState::eDequeued)
-    , error(no_error)
-    , parent(parent)
-    , user(true)
-    , enqueued(false)
+    , m_ErrorCode(no_error)
+    , m_Parent(parent)
+    , m_IsUser(true)
+    , m_IsEnqueued(false)
 {
     m_Tid = parent->m_NextTid++;
 
@@ -113,18 +113,18 @@ Thread::Thread(Process* parent, uintptr_t pc,
     {
         uintptr_t pstack  = PMM::CallocatePages<uintptr_t>(CPU::USER_STACK_SIZE
                                                           / PMM::PAGE_SIZE);
-        uintptr_t vustack = this->parent->m_UserStackTop - CPU::USER_STACK_SIZE;
+        uintptr_t vustack = m_Parent->m_UserStackTop - CPU::USER_STACK_SIZE;
 
-        Assert(this->parent->PageMap->MapRange(
+        Assert(m_Parent->PageMap->MapRange(
             vustack, pstack, CPU::USER_STACK_SIZE,
             PageAttributes::eRWXU | PageAttributes::eWriteBack));
-        this->parent->m_AddressSpace.push_back(
+        m_Parent->m_AddressSpace.push_back(
             {pstack, vustack, CPU::USER_STACK_SIZE});
-        this->stackVirt              = vustack;
+        m_StackVirt              = vustack;
 
-        this->parent->m_UserStackTop = vustack - PMM::PAGE_SIZE;
+        m_Parent->m_UserStackTop = vustack - PMM::PAGE_SIZE;
 
-        this->stacks.push_back(std::make_pair(pstack, CPU::USER_STACK_SIZE));
+        m_Stacks.push_back(std::make_pair(pstack, CPU::USER_STACK_SIZE));
         return {ToHigherHalfAddress<uintptr_t>(pstack) + CPU::USER_STACK_SIZE,
                 vustack + CPU::USER_STACK_SIZE};
     };
@@ -144,10 +144,10 @@ Thread::Thread(Process* parent, uintptr_t pc, bool user)
     : runningOn(CPU::GetCurrent()->ID)
     , self(this)
     , m_State(ThreadState::eDequeued)
-    , error(no_error)
-    , parent(parent)
-    , user(user)
-    , enqueued(false)
+    , m_ErrorCode(no_error)
+    , m_Parent(parent)
+    , m_IsUser(user)
+    , m_IsEnqueued(false)
 {
     m_Tid = parent->m_NextTid++;
 
@@ -160,7 +160,7 @@ Thread::Thread(Process* parent, uintptr_t pc, bool user)
                                      PageAttributes::eRW | PageAttributes::eUser
                                          | PageAttributes::eWriteBack));
     parent->m_UserStackTop = vustack - PMM::PAGE_SIZE;
-    stacks.push_back(std::make_pair(pstack, CPU::USER_STACK_SIZE));
+    m_Stacks.push_back(std::make_pair(pstack, CPU::USER_STACK_SIZE));
 
     [[maybe_unused]] uintptr_t stack1
         = ToHigherHalfAddress<uintptr_t>(pstack) + CPU::USER_STACK_SIZE;
@@ -191,7 +191,7 @@ Thread* Thread::Fork(Process* process)
         = pfstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
             CPU::KERNEL_STACK_SIZE);
 
-    for (const auto& [stackPhys, size] : stacks)
+    for (const auto& [stackPhys, size] : m_Stacks)
     {
         uintptr_t newStack = PMM::CallocatePages<uintptr_t>(
             Math::AlignUp(size, PMM::PAGE_SIZE) / PMM::PAGE_SIZE);
@@ -199,10 +199,10 @@ Thread* Thread::Fork(Process* process)
         std::memcpy(Pointer(newStack).ToHigherHalf<void*>(),
                     Pointer(stackPhys).ToHigherHalf<void*>(), size);
 
-        process->PageMap->MapRange(stackVirt, newStack, size,
+        process->PageMap->MapRange(m_StackVirt, newStack, size,
                                    PageAttributes::eRWXU
                                        | PageAttributes::eWriteBack);
-        newThread->stacks.push_back({newStack, size});
+        newThread->m_Stacks.push_back({newStack, size});
     }
 
     newThread->fpuStoragePageCount = fpuStoragePageCount;
@@ -212,16 +212,16 @@ Thread* Thread::Fork(Process* process)
     std::memcpy((void*)newThread->fpuStorage, (void*)fpuStorage,
                 fpuStoragePageCount * PMM::PAGE_SIZE);
 
-    newThread->parent  = process;
-    newThread->ctx     = SavedContext;
-    newThread->ctx.rax = 0;
-    newThread->ctx.rdx = 0;
+    newThread->m_Parent = process;
+    newThread->ctx      = SavedContext;
+    newThread->ctx.rax  = 0;
+    newThread->ctx.rdx  = 0;
 
-    newThread->user    = user;
-    newThread->gsBase  = gsBase;
-    newThread->fsBase  = fsBase;
+    newThread->m_IsUser = m_IsUser;
+    newThread->m_GsBase = m_GsBase;
+    newThread->m_FsBase = m_FsBase;
 
-    newThread->m_State = ThreadState::eDequeued;
+    newThread->m_State  = ThreadState::eDequeued;
 
     return newThread;
 }

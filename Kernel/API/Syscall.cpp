@@ -59,21 +59,21 @@ namespace Syscall
         switch (op)
         {
             case ARCH_SET_GS:
-                thread->gsBase = addr;
-                CPU::SetKernelGSBase(thread->gsBase);
+                thread->SetGsBase(addr);
+                CPU::SetKernelGSBase(thread->GetGsBase());
                 break;
             case ARCH_SET_FS:
-                thread->fsBase = addr;
-                CPU::SetFSBase(thread->fsBase);
+                thread->SetFsBase(addr);
+                CPU::SetFSBase(thread->GetFsBase());
                 break;
             case ARCH_GET_FS:
-                *reinterpret_cast<uintptr_t*>(addr) = thread->fsBase;
+                *reinterpret_cast<uintptr_t*>(addr) = thread->GetFsBase();
                 break;
             case ARCH_GET_GS:
-                *reinterpret_cast<uintptr_t*>(addr) = thread->gsBase;
+                *reinterpret_cast<uintptr_t*>(addr) = thread->GetGsBase();
                 break;
 
-            default: thread->error = EINVAL; return -1;
+            default: return_err(-1, EINVAL);
         }
 
         return 0;

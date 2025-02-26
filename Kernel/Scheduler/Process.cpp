@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Posix/sys/wait.h>
 #include <Arch/CPU.hpp>
 
 #include <Scheduler/Process.hpp>
@@ -53,7 +54,7 @@ Process* Process::GetCurrent()
 {
     Thread* currentThread = CPU::GetCurrentThread();
 
-    return currentThread ? currentThread->parent : nullptr;
+    return currentThread ? currentThread->m_Parent : nullptr;
 }
 Process* Process::CreateKernelProcess()
 {
@@ -205,7 +206,7 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
 ErrorOr<Process*> Process::Fork()
 {
     Thread* currentThread = CPU::GetCurrentThread();
-    Assert(currentThread && currentThread->parent == this);
+    Assert(currentThread && currentThread->m_Parent == this);
 
     Process* newProcess = Scheduler::CreateProcess(this, m_Name, m_Credentials);
 
@@ -246,7 +247,7 @@ ErrorOr<Process*> Process::Fork()
     }
 
     Thread* thread             = currentThread->Fork(newProcess);
-    thread->enqueued           = false;
+    thread->m_IsEnqueued       = false;
     newProcess->m_UserStackTop = m_UserStackTop;
 
     newProcess->m_Threads.push_back(thread);
@@ -261,14 +262,29 @@ i32 Process::Exit(i32 code)
               "Process::Exit(): The process with pid 1 tries to exit!");
     CPU::SetInterruptFlag(false);
 
-    // FIXME(v1tr10l7): Do proper cleanup of all resources
-    m_FdTable.Clear();
-    for (Thread* thread : m_Threads) thread->SetState(ThreadState::eExited);
+    Thread* thread = Thread::GetCurrent();
+    VMM::LoadPageMap(*VMM::GetKernelPageMap(), false);
+    thread->m_Parent = Scheduler::GetKernelProcess();
 
+    m_FdTable.Clear();
+
+    if (m_Pid != -1)
+    {
+        Process* subreaper = Scheduler::GetProcess(1);
+        for (auto& child : m_Children) subreaper->m_Children.push_back(child);
+    }
+
+    delete PageMap;
+    m_Status = W_EXITCODE(code, 0);
     Scheduler::RemoveProcess(m_Pid);
 
-    m_Status = code;
+    //  FIXME(v1tr10l7): Do proper cleanup of all resources
+    // TODO(v1tr10l7): Free stacks
 
+    for (Thread* thread : m_Threads) thread->SetState(ThreadState::eExited);
+
+    Event::Trigger(&m_Event, false);
+    Scheduler::DequeueThread(thread);
     Scheduler::Yield();
     AssertNotReached();
 }

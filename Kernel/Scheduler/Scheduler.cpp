@@ -13,9 +13,9 @@
 
 #include <Memory/PMM.hpp>
 
+#include <Library/Spinlock.hpp>
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
-#include <Library/Spinlock.hpp>
 
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/VFS.hpp>
@@ -23,236 +23,282 @@
 #include <deque>
 
 u8 g_ScheduleVector = 0x20;
-namespace Scheduler
+namespace
 {
-    namespace
+    Spinlock                            s_Lock{};
+
+    Process*                            s_KernelProcess = nullptr;
+    Spinlock                            s_ProcessListLock;
+    std::unordered_map<pid_t, Process*> s_Processes;
+    ProcFs*                             s_ProcFs = nullptr;
+
+    struct ThreadQueue
     {
-        Spinlock                            s_Lock{};
+        mutable Spinlock    Lock;
+        std::deque<Thread*> Queue;
 
-        Process*                            s_KernelProcess = nullptr;
-        Spinlock                            s_ProcessListLock;
-        std::unordered_map<pid_t, Process*> s_Processes;
-        ProcFs*                             s_ProcFs = nullptr;
+        constexpr bool      IsEmpty() const { return Queue.empty(); }
 
-        struct ThreadQueue
+        auto                begin() { return Queue.begin(); }
+        auto                end() { return Queue.end(); }
+
+        inline Thread*      Front() const
         {
-            mutable Spinlock    Lock;
-            std::deque<Thread*> Queue;
-
-            constexpr bool      IsEmpty() const { return Queue.empty(); }
-
-            inline Thread*      Front() const
-            {
-                ScopedLock guard(Lock);
-                return Queue.front();
-            }
-            inline Thread* Back() const
-            {
-                ScopedLock guard(Lock);
-                return Queue.back();
-            }
-
-            inline void PushBack(Thread* t)
-            {
-                ScopedLock guard(Lock);
-                Queue.push_back(t);
-            }
-            inline void PushFront(Thread* t)
-            {
-                ScopedLock guard(Lock);
-                Queue.push_front(t);
-            }
-
-            inline void PopBack()
-            {
-                ScopedLock guard(Lock);
-                Queue.pop_back();
-            }
-            inline void PopFront()
-            {
-                ScopedLock guard(Lock);
-                Queue.pop_front();
-            }
-
-            inline Thread* PopFrontElement()
-            {
-                ScopedLock guard(Lock);
-                return Queue.pop_front_element();
-            }
-            inline Thread* PopBackElement()
-            {
-                ScopedLock guard(Lock);
-                return Queue.pop_back_element();
-            }
-        };
-
-        ThreadQueue s_ExecutionQueue;
-        ThreadQueue s_WaitQueue;
-        ThreadQueue s_ReadyQueue;
-        ThreadQueue s_BlockedQueue;
-
-        Thread*     GetNextThread(usize cpuID)
-        {
-            ScopedLock guard(s_Lock);
-            if (s_ExecutionQueue.IsEmpty()) return nullptr;
-
-            auto thread      = s_ExecutionQueue.PopFrontElement();
-            thread->enqueued = false;
-
-            return thread;
+            ScopedLock guard(Lock);
+            return Queue.front();
         }
-    } // namespace
-    void Schedule(CPUContext* ctx);
-
-    void Initialize()
-    {
-        s_KernelProcess = Process::CreateKernelProcess();
-        LogInfo("Scheduler: Kernel process created");
-        LogInfo("Scheduler: Initialized");
-    }
-    void InitializeProcFs()
-    {
-        VFS::CreateNode(VFS::GetRootNode(), "/proc", 0755 | S_IFDIR);
-        Assert(VFS::Mount(VFS::GetRootNode(), "", "/proc", "procfs"));
-        s_ProcFs = reinterpret_cast<ProcFs*>(VFS::GetMountPoints()["/proc"]);
-
-        s_ProcFs->AddProcess(s_KernelProcess);
-    }
-    void PrepareAP(bool start)
-    {
-        Process* process    = Process::CreateIdleProcess();
-
-        auto     idleThread = new Thread(
-            process, reinterpret_cast<uintptr_t>(Arch::Halt), false);
-        idleThread->SetState(ThreadState::eReady);
-        CPU::GetCurrent()->Idle = idleThread;
-
-        if (start)
+        inline Thread* Back() const
         {
-            CPU::SetInterruptFlag(true);
+            ScopedLock guard(Lock);
+            return Queue.back();
+        }
 
-            CPU::WakeUp(0, true);
-            for (;;) Arch::Halt();
+        inline void PushBack(Thread* t)
+        {
+            ScopedLock guard(Lock);
+            Queue.push_back(t);
+        }
+        inline void PushFront(Thread* t)
+        {
+            ScopedLock guard(Lock);
+            Queue.push_front(t);
+        }
+
+        inline void PopBack()
+        {
+            ScopedLock guard(Lock);
+            Queue.pop_back();
+        }
+        inline void PopFront()
+        {
+            ScopedLock guard(Lock);
+            Queue.pop_front();
+        }
+
+        inline Thread* PopFrontElement()
+        {
+            ScopedLock guard(Lock);
+            return Queue.pop_front_element();
+        }
+        inline Thread* PopBackElement()
+        {
+            ScopedLock guard(Lock);
+            return Queue.pop_back_element();
         }
     };
 
-    void Block(Thread* thread)
-    {
-        if (thread->GetState() == ThreadState::eBlocked) return;
-        thread->SetState(ThreadState::eBlocked);
+    ThreadQueue s_ExecutionQueue;
+    ThreadQueue s_WaitQueue;
+    ThreadQueue s_ReadyQueue;
+    ThreadQueue s_BlockedQueue;
 
-        if (thread == Thread::GetCurrent()) Yield();
-    }
-    void Unblock(Thread* thread)
-    {
-        if (thread->GetState() != ThreadState::eBlocked) return;
+} // namespace
 
-        thread->SetState(ThreadState::eReady);
-    }
+void Scheduler::Initialize()
+{
+    s_KernelProcess = Process::CreateKernelProcess();
+    LogInfo("Scheduler: Kernel process created");
+    LogInfo("Scheduler: Initialized");
+}
+void Scheduler::InitializeProcFs()
+{
+    VFS::CreateNode(VFS::GetRootNode(), "/proc", 0755 | S_IFDIR);
+    Assert(VFS::Mount(VFS::GetRootNode(), "", "/proc", "procfs"));
+    s_ProcFs = reinterpret_cast<ProcFs*>(VFS::GetMountPoints()["/proc"]);
 
-    [[noreturn]]
-    void Yield()
+    s_ProcFs->AddProcess(s_KernelProcess);
+}
+void Scheduler::PrepareAP(bool start)
+{
+    Process* process = Process::CreateIdleProcess();
+
+    auto     idleThread
+        = new Thread(process, reinterpret_cast<uintptr_t>(Arch::Halt), false);
+    idleThread->SetState(ThreadState::eReady);
+    CPU::GetCurrent()->Idle = idleThread;
+
+    if (start)
     {
         CPU::SetInterruptFlag(true);
 
+        CPU::WakeUp(0, true);
         for (;;) Arch::Halt();
     }
+};
 
-    Process* GetKernelProcess() { return s_KernelProcess; }
+void Scheduler::Block(Thread* thread)
+{
+    LogInfo("Blocking");
+    thread->m_IsEnqueued = false;
+    if (thread->GetState() == ThreadState::eBlocked) return;
+    thread->SetState(ThreadState::eBlocked);
 
-    Process* CreateProcess(Process* parent, std::string_view name,
-                           const Credentials& creds)
-    {
-        auto       proc = new Process(parent, name, creds);
+    if (thread == Thread::GetCurrent()) Yield();
+}
+void Scheduler::Unblock(Thread* thread)
+{
+    LogInfo("Unblocking");
+    if (thread->GetState() != ThreadState::eBlocked) return;
 
-        ScopedLock guard(s_ProcessListLock);
-        s_Processes[proc->GetPid()] = proc;
-        s_ProcFs->AddProcess(proc);
+    thread->SetState(ThreadState::eReady);
+    thread->m_IsEnqueued = true;
+    s_ExecutionQueue.PushBack(thread);
+}
 
-        return proc;
-    }
-    void RemoveProcess(pid_t pid)
-    {
-        ScopedLock guard(s_ProcessListLock);
-        s_Processes.erase(pid);
-        s_ProcFs->RemoveProcess(pid);
-    }
+[[noreturn]]
+void Scheduler::Yield()
+{
+    CPU::Reschedule(1000);
+    CPU::SetInterruptFlag(true);
 
-    bool ValidatePid(pid_t pid)
-    {
-        ScopedLock guard(s_ProcessListLock);
-        return s_Processes.contains(pid);
-    }
-    Process* GetProcess(pid_t pid)
-    {
-        ScopedLock guard(s_ProcessListLock);
+    for (;;) Arch::Halt();
+}
 
-        auto       it = s_Processes.find(pid);
+Process* Scheduler::GetKernelProcess() { return s_KernelProcess; }
 
-        return it != s_Processes.end() ? s_Processes[pid] : nullptr;
-    }
+Process* Scheduler::CreateProcess(Process* parent, std::string_view name,
+                                  const Credentials& creds)
+{
+    auto       proc = new Process(parent, name, creds);
 
-    Thread* CreateKernelThread(uintptr_t pc, uintptr_t arg, usize runningOn)
-    {
-        return new Thread(s_KernelProcess, pc, arg, runningOn);
-    }
+    ScopedLock guard(s_ProcessListLock);
+    s_Processes[proc->GetPid()] = proc;
+    s_ProcFs->AddProcess(proc);
 
-    void EnqueueThread(Thread* thread)
-    {
-        ScopedLock guard(s_Lock);
+    return proc;
+}
+void Scheduler::RemoveProcess(pid_t pid)
+{
+    ScopedLock guard(s_ProcessListLock);
+    s_Processes.erase(pid);
+    s_ProcFs->RemoveProcess(pid);
+}
 
-        if (thread->enqueued) return;
+bool Scheduler::ValidatePid(pid_t pid)
+{
+    ScopedLock guard(s_ProcessListLock);
+    return s_Processes.contains(pid);
+}
+Process* Scheduler::GetProcess(pid_t pid)
+{
+    ScopedLock guard(s_ProcessListLock);
 
-        thread->enqueued = true;
+    auto       it = s_Processes.find(pid);
+
+    return it != s_Processes.end() ? s_Processes[pid] : nullptr;
+}
+
+Thread* Scheduler::CreateKernelThread(uintptr_t pc, uintptr_t arg,
+                                      usize runningOn)
+{
+    return new Thread(s_KernelProcess, pc, arg, runningOn);
+}
+
+void Scheduler::EnqueueThread(Thread* thread)
+{
+    ScopedLock guard(s_Lock);
+    if (thread->IsEnqueued()) return;
+
+    thread->m_IsEnqueued = true;
+    thread->SetState(ThreadState::eReady);
+    s_ExecutionQueue.PushBack(thread);
+}
+
+void Scheduler::EnqueueNotReady(Thread* thread)
+{
+    ScopedLock guard(s_Lock);
+
+    thread->m_IsEnqueued = true;
+    if (thread->GetState() == ThreadState::eRunning)
         thread->SetState(ThreadState::eReady);
-        s_ExecutionQueue.PushBack(thread);
-    }
 
-    void EnqueueNotReady(Thread* thread)
-    {
-        ScopedLock guard(s_Lock);
+    s_ExecutionQueue.PushBack(thread);
+}
+void Scheduler::DequeueThread(Thread* thread)
+{
+    if (!thread->IsEnqueued()) return;
+    ScopedLock guard(s_Lock);
 
-        thread->enqueued = true;
-        if (thread->GetState() == ThreadState::eRunning)
-            thread->SetState(ThreadState::eReady);
-
-        s_ExecutionQueue.PushBack(thread);
-    }
-
-    void Schedule(CPUContext* ctx)
-    {
-        auto newThread = GetNextThread(CPU::GetCurrent()->ID);
-        while (newThread && newThread->GetState() != ThreadState::eReady)
+    for (auto& current : s_ExecutionQueue)
+        if (current == thread)
         {
-            if (newThread->GetState() == ThreadState::eKilled)
-            {
-                delete newThread;
-                continue;
-            }
-            else if (newThread->GetState() == ThreadState::eBlocked)
-                s_BlockedQueue.PushBack(newThread);
+            thread->m_IsEnqueued = false;
+            thread->SetState(ThreadState::eDequeued);
+        }
+}
 
-            EnqueueNotReady(newThread);
-            newThread = GetNextThread(CPU::GetCurrent()->ID);
+Thread* Scheduler::GetNextThread(usize cpuID)
+{
+    ScopedLock guard(s_Lock);
+    if (s_ExecutionQueue.IsEmpty()) return nullptr;
+
+    auto thread          = s_ExecutionQueue.PopFrontElement();
+    thread->m_IsEnqueued = false;
+
+    return thread;
+}
+Thread* Scheduler::PickReadyThread()
+{
+    ScopedLock guard(s_Lock);
+    Thread*    newThread = nullptr;
+    for (newThread = GetNextThread(CPU::GetCurrent()->ID);
+         newThread && newThread->GetState() != ThreadState::eReady;)
+    {
+        if (newThread->IsDead() && newThread->ReadyForCleanup())
+
+        {
+            delete newThread;
+            continue;
+        }
+        else if (newThread->IsBlocked())
+        {
+            s_BlockedQueue.PushBack(newThread);
+            continue;
         }
 
-        if (!newThread) newThread = CPU::GetCurrent()->Idle;
-        else newThread->SetState(ThreadState::eRunning);
+        EnqueueNotReady(newThread);
+    }
 
-        auto currentThread = CPU::GetCurrentThread();
-        if (currentThread && currentThread->GetState() != ThreadState::eKilled)
+    return newThread;
+}
+
+void Scheduler::Tick(CPUContext* ctx)
+{
+    Thread* newThread = GetNextThread(CPU::GetCurrent()->ID);
+    for (; newThread && newThread->GetState() != ThreadState::eReady;)
+    {
+        if (newThread->GetState() == ThreadState::eKilled
+            && newThread->GetState() == ThreadState::eExited)
         {
-            if (currentThread != CPU::GetCurrent()->Idle)
-                EnqueueNotReady(currentThread);
-
-            CPU::SaveThread(currentThread, ctx);
+            delete newThread;
+            continue;
+        }
+        else if (newThread->IsBlocked())
+        {
+            s_BlockedQueue.PushBack(newThread);
+            continue;
         }
 
-        CPU::Reschedule(newThread->parent->m_Quantum * 1_ms);
-        CPU::LoadThread(newThread, ctx);
-
-        if (currentThread && currentThread->GetState() == ThreadState::eKilled
-            && currentThread != CPU::GetCurrent()->Idle)
-            delete currentThread;
+        Scheduler::EnqueueNotReady(newThread);
+        newThread = GetNextThread(CPU::GetCurrent()->ID);
     }
-}; // namespace Scheduler
+
+    if (!newThread) newThread = CPU::GetCurrent()->Idle;
+    else newThread->SetState(ThreadState::eRunning);
+
+    auto currentThread = CPU::GetCurrentThread();
+    if (currentThread && currentThread->GetState() != ThreadState::eKilled)
+    {
+        if (currentThread != CPU::GetCurrent()->Idle)
+            Scheduler::EnqueueNotReady(currentThread);
+
+        CPU::SaveThread(currentThread, ctx);
+    }
+
+    CPU::Reschedule(newThread->GetParent()->m_Quantum * 1_ms);
+    CPU::LoadThread(newThread, ctx);
+
+    if (currentThread && currentThread->GetState() == ThreadState::eKilled
+        && currentThread != CPU::GetCurrent()->Idle)
+        delete currentThread;
+}

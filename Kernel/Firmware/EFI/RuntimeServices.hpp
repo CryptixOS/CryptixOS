@@ -16,6 +16,14 @@ namespace EFI
     using TimeCapabilities = void;
     using MemoryDescriptor = void;
 
+    enum ResetType
+    {
+        eResetCold,
+        eResetWarm,
+        eResetShutdown,
+        eResetPlatformSpecific,
+    };
+
     using GetTimeFn = Status (*)(Time* time, TimeCapabilities* capabilities);
     using SetTimeFn = Status (*)(Time* time);
     using GetWakeUpTimeFn
@@ -38,8 +46,11 @@ namespace EFI
         = Status (*)(char16_t* variableName, Guid* vendorGuid, u32 attributes,
                      usize dataSize, void* data);
 
-    using GetNextHighMonoCountFn     = void*;
-    using ResetSystemFn              = void*;
+    using GetNextHighMonoCountFn = void*;
+    using ResetSystemFn
+        = u64(__attribute__((ms_abi)) *)(ResetType resetType,
+                                         Status resetStatus, usize dataSize,
+                                         u16* resetData);
 
     using UpdateCapsuleFn            = void*;
     using QueryCapsuleCapabilitiesFn = void*;
