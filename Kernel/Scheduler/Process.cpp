@@ -217,14 +217,25 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
 
     if (m_Children.empty()) return Error(ECHILD);
     for (auto& child : m_Children) procs.push_back(child);
+    std::vector<Event*> events;
+    for (auto& proc : procs) events.push_back(&proc->m_Event);
 
     for (;;)
-        for (const auto& child : procs)
-        {
-            if (!child->GetStatus()) continue;
-            if (wstatus) *wstatus = child->GetStatus().value();
-            return child->GetPid();
-        }
+    {
+        auto ret = Event::Await(std::span(events.begin(), events.end()));
+        if (!ret.has_value()) return Error(EINTR);
+
+        auto which = procs[ret.value()];
+        if (!(flags & WUNTRACED) && WIFSTOPPED(which->GetStatus().value_or(0)))
+            continue;
+        if (!(flags & WCONTINUED)
+            && WIFCONTINUED(which->GetStatus().value_or(0)))
+            continue;
+
+        if (wstatus) *wstatus = W_EXITCODE(which->GetStatus().value_or(0), 0);
+
+        return which->GetPid();
+    }
 }
 
 ErrorOr<Process*> Process::Fork()
@@ -289,11 +300,10 @@ i32 Process::Exit(i32 code)
     // FIXME(v1tr10l7): Do proper cleanup of all resources
     m_FdTable.Clear();
 
-    Thread* thread = Thread::GetCurrent();
-    VMM::LoadPageMap(*VMM::GetKernelPageMap(), false);
-    thread->m_Parent   = Scheduler::GetKernelProcess();
+    Thread* currentThread   = Thread::GetCurrent();
+    currentThread->m_Parent = Scheduler::GetKernelProcess();
 
-    Process* subreaper = Scheduler::GetProcess(1);
+    Process* subreaper      = Scheduler::GetProcess(1);
     if (m_Pid > 1)
     {
         for (auto& child : m_Children)
@@ -313,11 +323,9 @@ i32 Process::Exit(i32 code)
     delete PageMap;
     m_Status = W_EXITCODE(code, 0);
     m_Exited = true;
-    Scheduler::RemoveProcess(m_Pid);
 
     // TODO(v1tr10l7): Free stacks
 
-    // Thread* currentThread = Thread::GetCurrent();
     for (Thread* thread : m_Threads)
     {
         // TODO(v1tr10l7): Wake up threads
@@ -328,8 +336,11 @@ i32 Process::Exit(i32 code)
         //   CPU::WakeUp(thread->runningOn, false);
     }
 
+    currentThread->SetState(ThreadState::eExited);
+    Scheduler::RemoveProcess(m_Pid);
+    VMM::LoadPageMap(*VMM::GetKernelPageMap(), false);
+
     Event::Trigger(&m_Event, false);
-    Scheduler::DequeueThread(thread);
 
     Scheduler::Yield();
     AssertNotReached();

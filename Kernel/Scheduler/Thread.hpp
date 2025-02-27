@@ -110,6 +110,7 @@ struct Thread
 
     CPUContext                 ctx;
     CPUContext                 SavedContext;
+    Spinlock                   YieldAwaitLock;
 
     std::vector<std::pair<uintptr_t, usize>> m_Stacks;
     bool                                     m_IsUser = false;

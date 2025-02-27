@@ -6,9 +6,9 @@
  */
 #pragma once
 
-#include "Prism/Types.hpp"
+#include <Prism/Types.hpp>
 
-#include <string_view>
+#include <vector>
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
     #define CTOS_ARCH_STRING "x86-64"
@@ -26,5 +26,6 @@ namespace Arch
     void                           PowerOff();
     void                           Reboot();
 
-    usize                          GetEpoch();
+    void  ProbeTimers(std::vector<class HardwareTimer*> timers);
+    usize GetEpoch();
 }; // namespace Arch

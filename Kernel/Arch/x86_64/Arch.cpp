@@ -56,5 +56,6 @@ namespace Arch
         IO::Out<word>(0x604, 0x2000);
     }
 
+    void  ProbeTimers(std::vector<class HardwareTimer*> timers) {}
     usize GetEpoch() { return RTC::CurrentTime(); }
 }; // namespace Arch

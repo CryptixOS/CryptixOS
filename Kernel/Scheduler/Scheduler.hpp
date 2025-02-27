@@ -16,15 +16,14 @@ struct Thread;
 class Scheduler
 {
   public:
-    static void Initialize();
-    static void InitializeProcFs();
-    static void PrepareAP(bool start = false);
+    static void     Initialize();
+    static void     InitializeProcFs();
+    static void     PrepareAP(bool start = false);
 
-    static void Block(Thread* thread);
-    static void Unblock(Thread* thread);
+    static void     Block(Thread* thread);
+    static void     Unblock(Thread* thread);
 
-    [[noreturn]]
-    static void     Yield();
+    static void     Yield(bool saveCtx = false);
 
     static Process* GetKernelProcess();
 

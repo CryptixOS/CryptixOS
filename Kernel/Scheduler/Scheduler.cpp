@@ -38,6 +38,7 @@ struct ThreadQueue
     mutable Spinlock    Lock;
     std::deque<Thread*> Queue;
 
+    constexpr usize     Size() const { return Queue.size(); }
     constexpr bool      IsEmpty() const { return Queue.empty(); }
 
     auto                begin() { return Queue.begin(); }
@@ -86,6 +87,12 @@ struct ThreadQueue
         ScopedLock guard(Lock);
         return Queue.pop_back_element();
     }
+
+    inline void Erase(Thread** it)
+    {
+        ScopedLock guard(Lock);
+        Queue.erase(it);
+    }
 };
 
 ThreadQueue s_ExecutionQueue;
@@ -131,24 +138,50 @@ void Scheduler::Block(Thread* thread)
     if (thread->GetState() == ThreadState::eBlocked) return;
     thread->SetState(ThreadState::eBlocked);
 
-    thread->m_IsEnqueued = false;
-    if (thread == Thread::GetCurrent()) Yield();
+    if (thread == Thread::GetCurrent()) Yield(true);
 }
 void Scheduler::Unblock(Thread* thread)
 {
     if (thread->GetState() != ThreadState::eBlocked) return;
 
     thread->SetState(ThreadState::eReady);
-    EnqueueThread(thread);
+    if (!thread->m_IsEnqueued) EnqueueThread(thread);
+
+    for (auto it = s_BlockedQueue.begin(); it != s_BlockedQueue.end(); it++)
+        if (*it == thread)
+        {
+            s_BlockedQueue.Erase(it);
+            break;
+        }
+
+    CPU::GetCurrent()->Lapic.SendIpi(48, CPU::GetCurrent()->LapicID);
 }
 
-[[noreturn]]
-void Scheduler::Yield()
+void Scheduler::Yield(bool saveCtx)
 {
-    CPU::Reschedule(1000);
+    CPU::SetInterruptFlag(false);
+    CPU::GetCurrent()->Lapic.Stop();
+
+    Thread* currentThread = Thread::GetCurrent();
+    if (saveCtx) currentThread->YieldAwaitLock.Acquire();
+    else
+    {
+        CPU::SetGSBase(reinterpret_cast<uintptr_t>(CPU::GetCurrent()->Idle));
+        CPU::SetKernelGSBase(
+            reinterpret_cast<uintptr_t>(CPU::GetCurrent()->Idle));
+    }
+
+    CPU::GetCurrent()->Lapic.SendIpi(48, CPU::GetCurrent()->LapicID);
+
     CPU::SetInterruptFlag(true);
 
-    for (;;) Arch::Halt();
+    if (saveCtx)
+    {
+        currentThread->YieldAwaitLock.Acquire();
+        currentThread->YieldAwaitLock.Release();
+    }
+    else
+        for (;;) Arch::Halt();
 }
 
 Process* Scheduler::GetKernelProcess() { return s_KernelProcess; }
@@ -221,7 +254,6 @@ void Scheduler::DequeueThread(Thread* thread)
 
 Thread* Scheduler::GetNextThread(usize cpuID)
 {
-    ScopedLock guard(s_Lock);
     if (s_ExecutionQueue.IsEmpty()) return nullptr;
 
     auto thread          = s_ExecutionQueue.PopFrontElement();
@@ -242,6 +274,7 @@ Thread* Scheduler::PickReadyThread()
         else if (newThread->IsBlocked())
         {
             s_BlockedQueue.PushBack(newThread);
+            newThread = GetNextThread(CPU::GetCurrent()->ID);
             continue;
         }
 
@@ -257,6 +290,8 @@ Thread* Scheduler::PickReadyThread()
 void Scheduler::SwitchContext(Thread* newThread, CPUContext* oldContext)
 {
     auto currentThread = CPU::GetCurrentThread();
+    if (currentThread) currentThread->YieldAwaitLock.Release();
+
     if (currentThread && !currentThread->IsDead())
     {
         if (currentThread != CPU::GetCurrent()->Idle)
