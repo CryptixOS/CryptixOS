@@ -21,9 +21,18 @@ class HardwareTimer
     HardwareTimer()          = default;
     virtual ~HardwareTimer() = default;
 
+    using OnTickCallback     = void (*)(struct CPUContext*);
+    inline void                 SetCallback(OnTickCallback onTickCallback)
+    {
+        m_OnTickCallback = onTickCallback;
+    }
+
     virtual ErrorOr<void> Start(TimerMode mode, TimeStep interval, u8 vector)
         = 0;
     virtual void          Stop()                        = 0;
 
     virtual ErrorOr<void> SetFrequency(usize frequency) = 0;
+
+  protected:
+    OnTickCallback m_OnTickCallback = nullptr;
 };
