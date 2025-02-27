@@ -6,8 +6,7 @@
  */
 #pragma once
 
-#include <Common.hpp>
-
+#include <cassert>
 #include <limits>
 #include <memory>
 #include <new>
@@ -46,13 +45,13 @@ namespace std
 
         constexpr reference at(size_type pos)
         {
-            Assert(pos < _size);
+            assert(pos < _size);
 
             return _data[pos];
         }
         constexpr const_reference at(size_type pos) const
         {
-            Assert(pos < _size);
+            assert(pos < _size);
 
             return _data[pos];
         }
