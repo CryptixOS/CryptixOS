@@ -38,13 +38,13 @@ xbstrap install base # build and install the base packages
 ## Actual building
 Now you are able to build the actual kernel and generate an bootable .iso image
 first choose the architecture you want to build the kernel for and generate the meson cache 
-`./setup.sh <x86_64|aarch64>`
+`./Meta/setup.sh <x86_64|aarch64>`
 next you can just build the image
-`./build.sh`
+`./Meta/build.sh`
 
 ## Running
 To run the CryptixOS you will use the ./run.sh script with either uefi or bios option(bios is only available for x86)
-`./run.sh <run_uefi|run_bios>`
+`./Meta/run.sh <run_uefi|run_bios>`
 
 ### References and Credits
 * [Meson](https://mesonbuild.com/) - Meson is an open source build system meant to be both extremely fast, and, even more importantly, as user friendly as possible.

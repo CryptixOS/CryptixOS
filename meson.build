@@ -197,7 +197,7 @@ ksyms = custom_target(
   'ksyms',
   input: [kernel_elf],
   output: 'ksyms.sym',
-  command: ['./generate_symbols.sh'],
+  command: ['./Meta/generate_symbols.sh'],
   build_by_default: true,
   console: true,
   install: false,
@@ -208,7 +208,7 @@ echfs_image = custom_target(
   'echfs_image',
   output: 'image.hdd',
   command: [
-    './create_image.sh',
+    './Meta/create_image.sh',
   ],
   build_by_default: true,
   console: true,
