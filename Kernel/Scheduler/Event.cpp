@@ -78,12 +78,14 @@ std::optional<usize> Event::Await(std::span<Event*> events, bool drop)
     }
 
     AttachListeners(events, thread);
-    Scheduler::DequeueThread(thread);
     UnlockEvents(events);
-    Scheduler::Yield();
-    CPU::SetInterruptFlag(false);
+    CPU::SetInterruptFlag(true);
 
+    Scheduler::Block(thread);
+
+    CPU::SetInterruptFlag(false);
     LockEvents(events);
+
     DetachListeners(thread);
     UnlockEvents(events);
 
