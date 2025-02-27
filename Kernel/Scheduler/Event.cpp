@@ -57,7 +57,7 @@ static void UnlockEvents(std::span<Event*> events)
     for (auto& event : events) event->Lock.Release();
 }
 
-std::optional<usize> Event::Await(std::span<Event*> events, bool drop)
+std::optional<usize> Event::Await(std::span<Event*> events, bool block)
 {
     auto thread   = Thread::GetCurrent();
     bool intState = CPU::SwapInterruptFlag(false);
@@ -71,10 +71,11 @@ std::optional<usize> Event::Await(std::span<Event*> events, bool drop)
         return i;
     }
 
-    if (!drop)
+    if (!block)
     {
         UnlockEvents(events);
         CPU::SetInterruptFlag(intState);
+        return std::nullopt;
     }
 
     AttachListeners(events, thread);

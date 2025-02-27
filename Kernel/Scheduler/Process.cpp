@@ -213,16 +213,56 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
 ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
                                 rusage* rusage)
 {
+    Process*              process = Process::GetCurrent();
     std::vector<Process*> procs;
-
     if (m_Children.empty()) return Error(ECHILD);
-    for (auto& child : m_Children) procs.push_back(child);
+
+    if (pid < -1)
+    {
+        pid_t gid = -pid;
+        auto  it  = std::find_if(m_Children.begin(), m_Children.end(),
+                                 [gid](Process* proc) -> bool
+                                 {
+                                   if (proc->GetPGid() == gid) return true;
+                                   return false;
+                               });
+        if (it == m_Children.end()) return Error(ECHILD);
+        procs.push_back(*it);
+    }
+    else if (pid == -1) procs = process->m_Children;
+    else if (pid == 0)
+    {
+        auto it = std::find_if(m_Children.begin(), m_Children.end(),
+                               [process](Process* proc) -> bool
+                               {
+                                   if (proc->GetPGid() == process->GetPGid())
+                                       return true;
+                                   return false;
+                               });
+
+        if (it == m_Children.end()) return Error(ECHILD);
+        procs.push_back(*it);
+    }
+    else if (pid > 0)
+    {
+        auto it = std::find_if(m_Children.begin(), m_Children.end(),
+                               [pid](Process* proc) -> bool
+                               {
+                                   if (proc->GetPid() == pid) return true;
+                                   return false;
+                               });
+
+        if (it == m_Children.end()) return Error(ECHILD);
+        procs.push_back(*it);
+    }
+
     std::vector<Event*> events;
     for (auto& proc : procs) events.push_back(&proc->m_Event);
 
+    bool block = !(flags & WNOHANG);
     for (;;)
     {
-        auto ret = Event::Await(std::span(events.begin(), events.end()));
+        auto ret = Event::Await(std::span(events.begin(), events.end()), block);
         if (!ret.has_value()) return Error(EINTR);
 
         auto which = procs[ret.value()];
