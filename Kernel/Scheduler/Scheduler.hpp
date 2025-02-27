@@ -7,6 +7,8 @@
 #pragma once
 
 #include <API/UnixTypes.hpp>
+
+#include <Prism/Singleton.hpp>
 #include <Scheduler/Process.hpp>
 
 class Process;
@@ -38,7 +40,15 @@ class Scheduler
 
     static void     EnqueueThread(Thread* thread);
     static void     EnqueueNotReady(Thread* thread);
+    static void     DequeueThread(Thread* thread);
 
-    static void     Tick(struct CPUContext*);
-    static Thread*  GetNextThread(usize cpuID);
+  private:
+    Scheduler() = default;
+
+    static Thread* GetNextThread(usize cpuID);
+    static Thread* PickReadyThread();
+    static void    SwitchContext(Thread* newThread, struct CPUContext* context);
+
+  public:
+    static void Tick(struct CPUContext*);
 }; // namespace Scheduler

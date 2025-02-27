@@ -95,8 +95,9 @@ void kernelThread()
         = ldPath.empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
 
     Logger::DisableSink(LOG_SINK_TERMINAL);
-    Scheduler::EnqueueThread(new Thread(userProcess, address, argv, envp,
-                                        program, CPU::GetCurrent()->ID));
+    auto userThread = userProcess->CreateThread(address, argv, envp, program,
+                                                CPU::GetCurrent()->ID);
+    Scheduler::EnqueueThread(userThread);
 
     for (;;) Arch::Halt();
 }
@@ -129,8 +130,10 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
 
     SMBIOS::Initialize();
 
-    auto thread = Scheduler::CreateKernelThread(
-        reinterpret_cast<uintptr_t>(kernelThread), 0, CPU::GetCurrent()->ID);
+    auto process = Scheduler::GetKernelProcess();
+    auto thread
+        = process->CreateThread(reinterpret_cast<uintptr_t>(kernelThread),
+                                false, CPU::GetCurrent()->ID);
 
     Scheduler::EnqueueThread(thread);
 

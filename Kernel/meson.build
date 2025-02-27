@@ -45,6 +45,7 @@ srcs += files(
   'Memory/PMM.cpp',
   'Memory/VMM.cpp',
 
+  'Scheduler/Event.cpp',
   'Scheduler/Process.cpp',
   'Scheduler/Scheduler.cpp',
   'Scheduler/Thread.cpp',

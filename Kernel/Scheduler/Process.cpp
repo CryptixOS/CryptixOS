@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Posix/sys/wait.h>
 #include <Arch/CPU.hpp>
 
 #include <Scheduler/Process.hpp>
@@ -89,6 +90,29 @@ Process* Process::CreateIdleProcess()
     return idle;
 }
 
+Thread* Process::CreateThread(uintptr_t rip, bool isUser, i64 runOn)
+{
+    auto thread      = new Thread(this, rip, 0, runOn);
+    thread->m_IsUser = isUser;
+
+    if (m_Threads.empty()) m_MainThread = thread;
+
+    m_Threads.push_back(thread);
+    return thread;
+}
+Thread* Process::CreateThread(uintptr_t                      rip,
+                              std::vector<std::string_view>& argv,
+                              std::vector<std::string_view>& envp,
+                              ELF::Image& program, i64 runOn)
+{
+    auto thread = new Thread(this, rip, argv, envp, program, runOn);
+
+    if (m_Threads.empty()) m_MainThread = thread;
+
+    m_Threads.push_back(thread);
+    return thread;
+}
+
 bool Process::ValidateAddress(Pointer address, i32 accessMode)
 {
     // TODO(v1tr10l7): Validate access mode
@@ -163,7 +187,7 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
     if (!ldPath.empty())
         Assert(ld.Load(ldPath, PageMap, m_AddressSpace, 0x40000000));
     Thread* currentThread = CPU::GetCurrentThread();
-    currentThread->SetState(ThreadState::eKilled);
+    currentThread->SetState(ThreadState::eExited);
 
     for (auto& thread : m_Threads)
     {
@@ -179,8 +203,9 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
     std::vector<std::string_view> envpArr;
     for (char** env = envp; *env; env++) envpArr.push_back(*env);
 
-    Scheduler::EnqueueThread(new Thread(this, address, argvArr, envpArr,
-                                        program, CPU::GetCurrent()->ID));
+    auto thread = CreateThread(address, argvArr, envpArr, program,
+                               CPU::GetCurrent()->ID);
+    Scheduler::EnqueueThread(thread);
 
     Scheduler::Yield();
     return 0;
@@ -249,7 +274,6 @@ ErrorOr<Process*> Process::Fork()
     thread->m_IsEnqueued       = false;
     newProcess->m_UserStackTop = m_UserStackTop;
 
-    newProcess->m_Threads.push_back(thread);
     Scheduler::EnqueueThread(thread);
 
     return newProcess;
@@ -260,14 +284,52 @@ i32 Process::Exit(i32 code)
     AssertMsg(this != Scheduler::GetKernelProcess(),
               "Process::Exit(): The process with pid 1 tries to exit!");
     CPU::SetInterruptFlag(false);
+    ScopedLock guard(m_Lock);
 
     // FIXME(v1tr10l7): Do proper cleanup of all resources
     m_FdTable.Clear();
-    for (Thread* thread : m_Threads) thread->SetState(ThreadState::eExited);
 
+    Thread* thread = Thread::GetCurrent();
+    VMM::LoadPageMap(*VMM::GetKernelPageMap(), false);
+    thread->m_Parent   = Scheduler::GetKernelProcess();
+
+    Process* subreaper = Scheduler::GetProcess(1);
+    if (m_Pid > 1)
+    {
+        for (auto& child : m_Children)
+        {
+            child->m_Parent = subreaper;
+            subreaper->m_Children.push_back(child);
+        }
+    }
+
+    for (auto& zombie : m_Zombies)
+    {
+        zombie->m_Parent = m_Parent;
+        m_Parent->m_Zombies.push_back(zombie);
+    }
+    m_Zombies.clear();
+
+    delete PageMap;
+    m_Status = W_EXITCODE(code, 0);
+    m_Exited = true;
     Scheduler::RemoveProcess(m_Pid);
 
-    m_Status = code;
+    // TODO(v1tr10l7): Free stacks
+
+    // Thread* currentThread = Thread::GetCurrent();
+    for (Thread* thread : m_Threads)
+    {
+        // TODO(v1tr10l7): Wake up threads
+        // auto state = thread->m_State;
+        thread->SetState(ThreadState::eExited);
+
+        // if (thread != currentThread && state != ThreadState::eRunning)
+        //   CPU::WakeUp(thread->runningOn, false);
+    }
+
+    Event::Trigger(&m_Event, false);
+    Scheduler::DequeueThread(thread);
 
     Scheduler::Yield();
     AssertNotReached();

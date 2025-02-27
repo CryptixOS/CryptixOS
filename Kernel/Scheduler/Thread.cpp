@@ -26,7 +26,6 @@ Thread::Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn)
 {
     m_Tid = parent->m_NextTid++;
     CPU::PrepareThread(this, pc, arg);
-    parent->m_Threads.push_back(this);
 }
 
 Thread*          Thread::GetCurrent() { return CPU::GetCurrentThread(); }
@@ -137,7 +136,6 @@ Thread::Thread(Process* parent, uintptr_t pc,
     this->stack            = prepareStack(vstack, vustack, argv, envp, program);
 
     CPU::PrepareThread(this, pc, 0);
-    parent->m_Threads.push_back(this);
 }
 
 Thread::Thread(Process* parent, uintptr_t pc, bool user)
@@ -169,18 +167,17 @@ Thread::Thread(Process* parent, uintptr_t pc, bool user)
     this->stack                       = Math::AlignDown(stack1, 16);
 
     CPU::PrepareThread(this, pc, 0);
-    parent->m_Threads.push_back(this);
 }
 Thread::~Thread() {}
 
 Thread* Thread::Fork(Process* process)
 {
-    Thread* newThread    = new Thread();
-    newThread->runningOn = -1;
-    newThread->self      = newThread;
-    newThread->stack     = stack;
+    Thread* newThread
+        = process->CreateThread(ctx.rip, m_IsUser, CPU::GetCurrent()->ID);
+    newThread->self  = newThread;
+    newThread->stack = stack;
 
-    Pointer kstack       = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
+    Pointer kstack   = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
                                                     / PMM::PAGE_SIZE);
     newThread->kernelStack = kstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
         CPU::KERNEL_STACK_SIZE);
@@ -222,6 +219,5 @@ Thread* Thread::Fork(Process* process)
     newThread->m_FsBase = m_FsBase;
 
     newThread->m_State  = ThreadState::eDequeued;
-
     return newThread;
 }

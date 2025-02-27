@@ -13,6 +13,9 @@
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
 
+#include <Library/ELF.hpp>
+#include <Scheduler/Event.hpp>
+
 #include <VFS/FileDescriptorTable.hpp>
 #include <VFS/VFS.hpp>
 
@@ -52,8 +55,13 @@ class Process
     static Process* CreateKernelProcess();
     static Process* CreateIdleProcess();
 
-    bool            ValidateAddress(const Pointer address, i32 accessMode);
-    bool            ValidateRead(const Pointer address, usize size)
+    Thread* CreateThread(uintptr_t rip, bool isUser = true, i64 runOn = -1);
+    Thread* CreateThread(uintptr_t rip, std::vector<std::string_view>& argv,
+                         std::vector<std::string_view>& envp,
+                         ELF::Image& program, i64 runOn = -1);
+
+    bool    ValidateAddress(const Pointer address, i32 accessMode);
+    bool    ValidateRead(const Pointer address, usize size)
     {
         return ValidateAddress(address, 0);
     }
@@ -74,6 +82,8 @@ class Process
     inline std::string_view   GetName() const { return m_Name; }
     inline const Credentials& GetCredentials() const { return m_Credentials; }
     inline std::optional<i32> GetStatus() const { return m_Status; }
+
+    inline Thread*            GetMainThread() { return m_MainThread; }
 
     inline pid_t              GetSid() const { return m_Credentials.sid; }
     inline pid_t              GetPGid() const { return m_Credentials.pgid; }
@@ -128,8 +138,10 @@ class Process
     Credentials              m_Credentials = {};
     PrivilegeLevel           m_Ring        = PrivilegeLevel::eUnprivileged;
     std::optional<i32>       m_Status;
+    bool                     m_Exited     = false;
 
-    std::atomic<tid_t>       m_NextTid = m_Pid;
+    Thread*                  m_MainThread = nullptr;
+    std::atomic<tid_t>       m_NextTid    = m_Pid;
     std::vector<Process*>    m_Children;
     std::vector<Process*>    m_Zombies;
     std::vector<Thread*>     m_Threads;
@@ -144,4 +156,8 @@ class Process
     uintptr_t                m_UserStackTop = 0x70000000000;
     usize                    m_Quantum      = 1000;
     Spinlock                 m_Lock;
+    Event                    m_Event;
+
+    friend class Scheduler;
+    friend struct Thread;
 };
