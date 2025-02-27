@@ -18,6 +18,8 @@
 #include <Arch/x86_64/Drivers/Timers/RTC.hpp>
 #include <Arch/x86_64/IO.hpp>
 
+#include <Time/HardwareTimer.hpp>
+
 namespace Arch
 {
     void Initialize()
@@ -56,6 +58,9 @@ namespace Arch
         IO::Out<word>(0x604, 0x2000);
     }
 
-    void  ProbeTimers(std::vector<class HardwareTimer*> timers) {}
+    void ProbeTimers(std::vector<HardwareTimer*>& timers)
+    {
+        if (Lapic::IsInitialized()) timers.push_back(Lapic::Instance());
+    }
     usize GetEpoch() { return RTC::CurrentTime(); }
 }; // namespace Arch

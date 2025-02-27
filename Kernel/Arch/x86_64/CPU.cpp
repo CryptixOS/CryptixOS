@@ -152,7 +152,7 @@ namespace CPU
         WriteMSR(MSR::LSTAR, reinterpret_cast<uintptr_t>(syscall_entry));
         WriteMSR(MSR::SFMASK, ~u32(2));
 
-        current->Lapic.Initialize();
+        Lapic::Instance()->Initialize();
 
         GetCurrent()->TSS.ist[0]
             = ToHigherHalfAddress<uintptr_t>(PMM::AllocatePages<uintptr_t>(
@@ -198,7 +198,7 @@ namespace CPU
             SetKernelGSBase(smpInfo->extra_argument);
             SetGSBase(smpInfo->extra_argument);
 
-            current->Lapic.Initialize();
+            Lapic::Instance()->Initialize();
             InitializeCPU(smpInfo);
             current->IsOnline = true;
         }
@@ -309,15 +309,15 @@ namespace CPU
     void Halt() { __asm__ volatile("hlt"); }
     void HaltAll()
     {
-        GetCurrent()->Lapic.SendIpi(g_PanicIpiVector | (0b10 < 18), 0);
+        Lapic::Instance()->SendIpi(g_PanicIpiVector | (0b10 < 18), 0);
     }
     void WakeUp(usize id, bool everyone)
     {
         if (everyone)
-            GetCurrent()->Lapic.SendIpi(g_ScheduleVector | (0b10 << 18), 0);
+            Lapic::Instance()->SendIpi(g_ScheduleVector | (0b10 << 18), 0);
         else
-            GetCurrent()->Lapic.SendIpi(g_ScheduleVector | s_CPUs[id].LapicID,
-                                        0);
+            Lapic::Instance()->SendIpi(g_ScheduleVector | s_CPUs[id].LapicID,
+                                       0);
     }
 
     void WriteMSR(u32 msr, u64 value)
@@ -510,9 +510,8 @@ namespace CPU
     }
     void Reschedule(TimeStep interval)
     {
-        auto* cpu = GetCurrent();
-        Assert(
-            cpu->Lapic.Start(TimerMode::eOneShot, interval, g_ScheduleVector));
+        Assert(Lapic::Instance()->Start(TimerMode::eOneShot, interval,
+                                        g_ScheduleVector));
     }
 
     bool EnableSSE()

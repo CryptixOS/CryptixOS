@@ -38,6 +38,8 @@ constexpr u32                  LAPIC_TIMER_DIVIDER_REGISTER       = 0x3e0;
 CTOS_UNUSED constexpr u32      LAPIC_TIMER_MASKED                 = 0x10000;
 CTOS_UNUSED constexpr u32      LAPIC_TIMER_PERIODIC               = 0x20000;
 
+std::atomic_bool               Lapic::s_Initialized               = false;
+
 bool                           Checkm_X2Apic()
 {
     CPU::ID m_ID;
@@ -93,20 +95,14 @@ void Lapic::Initialize()
     // Write(LAPIC_TIMER_DIVIDER_REGISTER, 0x03);
     // Write(LAPIC_TIMER_INITIAL_COUNT_REGISTER, ticksPer10ms / 10);
 
-    static std::atomic_bool s_Initialized = false;
     if (!s_Initialized)
     {
         s_Initialized      = true;
         m_InterruptHandler = IDT::AllocateHandler();
         m_InterruptHandler->Reserve();
-        LogWarn("LAPIC: Interrupt Vector: {}",
+        LogInfo("LAPIC: Interrupt Vector: {}",
                 m_InterruptHandler->GetInterruptVector());
-        m_InterruptHandler->SetHandler(
-            [](CPUContext* context)
-            {
-                Scheduler::Tick(context);
-                // CPU::GetCurrent()->Lapic.m_OnTickCallback(context);
-            });
+        m_InterruptHandler->SetHandler(Tick);
     }
     LogInfo("LAPIC: Initialized");
 };
@@ -192,4 +188,9 @@ void Lapic::SetNmi(u8 vector, u8 currentCPUID, u8 cpuID, u16 flags, u8 lint)
 
     if (lint == 0) Write(LAPIC_LINT0_REGISTER, nmi);
     else if (lint == 1) Write(LAPIC_LINT1_REGISTER, nmi);
+}
+
+void Lapic::Tick(CPUContext* context)
+{
+    if (Instance()->m_OnTickCallback) Instance()->m_OnTickCallback(context);
 }

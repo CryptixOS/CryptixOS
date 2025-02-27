@@ -11,18 +11,19 @@
 #include <Arch/InterruptManager.hpp>
 #include <Arch/x86_64/Drivers/IoApic.hpp>
 
+#include <Library/Spinlock.hpp>
 #include <Memory/PMM.hpp>
 
-#include <Library/Spinlock.hpp>
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
+#include <Time/Time.hpp>
 
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/VFS.hpp>
 
 #include <deque>
 
-u8 g_ScheduleVector = 0x20;
+u8 g_ScheduleVector = 48;
 namespace
 {
     Spinlock                            s_Lock{};
@@ -103,6 +104,9 @@ ThreadQueue s_BlockedQueue;
 void        Scheduler::Initialize()
 {
     s_KernelProcess = Process::CreateKernelProcess();
+    Time::Initialize();
+    Time::GetSchedulerTimer()->SetCallback(Tick);
+
     LogInfo("Scheduler: Kernel process created");
     LogInfo("Scheduler: Initialized");
 }
@@ -154,13 +158,13 @@ void Scheduler::Unblock(Thread* thread)
             break;
         }
 
-    CPU::GetCurrent()->Lapic.SendIpi(48, CPU::GetCurrent()->LapicID);
+    Lapic::Instance()->SendIpi(g_ScheduleVector, CPU::GetCurrent()->LapicID);
 }
 
 void Scheduler::Yield(bool saveCtx)
 {
     CPU::SetInterruptFlag(false);
-    CPU::GetCurrent()->Lapic.Stop();
+    Lapic::Instance()->Stop();
 
     Thread* currentThread = Thread::GetCurrent();
     if (saveCtx) currentThread->YieldAwaitLock.Acquire();
@@ -171,7 +175,7 @@ void Scheduler::Yield(bool saveCtx)
             reinterpret_cast<uintptr_t>(CPU::GetCurrent()->Idle));
     }
 
-    CPU::GetCurrent()->Lapic.SendIpi(48, CPU::GetCurrent()->LapicID);
+    Lapic::Instance()->SendIpi(g_ScheduleVector, CPU::GetCurrent()->LapicID);
 
     CPU::SetInterruptFlag(true);
 

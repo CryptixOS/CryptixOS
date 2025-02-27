@@ -16,6 +16,7 @@
     #define CTOS_ARCH_STRING "aarch64"
 #endif
 
+class HardwareTimer;
 namespace Arch
 {
     void                           Initialize();
@@ -26,6 +27,6 @@ namespace Arch
     void                           PowerOff();
     void                           Reboot();
 
-    void  ProbeTimers(std::vector<class HardwareTimer*> timers);
+    void  ProbeTimers(std::vector<HardwareTimer*>& timers);
     usize GetEpoch();
 }; // namespace Arch

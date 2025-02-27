@@ -98,8 +98,7 @@ namespace CPU
         uintptr_t        ThreadStack;
         uintptr_t        KernelStack;
 
-        u64              LapicID = 0;
-        Lapic            Lapic;
+        u64              LapicID  = 0;
         bool             IsOnline = false;
         TaskStateSegment TSS{};
 

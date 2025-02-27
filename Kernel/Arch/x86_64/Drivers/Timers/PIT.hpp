@@ -16,7 +16,9 @@ class PIT : public HardwareTimer, public PM::Singleton<PIT>
   public:
     PIT();
 
-    static void   Initialize();
+    static void      Initialize();
+
+    std::string_view GetModelString() const override { return "i8253"; }
 
     ErrorOr<void> Start(TimerMode mode, TimeStep interval, u8 vector) override;
     void          Stop() override;

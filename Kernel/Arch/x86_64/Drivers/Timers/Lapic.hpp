@@ -6,9 +6,10 @@
  */
 #pragma once
 
+#include <Prism/Singleton.hpp>
 #include <Time/HardwareTimer.hpp>
 
-class Lapic : public HardwareTimer
+class Lapic : public HardwareTimer, public PM::Singleton<Lapic>
 {
   public:
     enum class Mode : u8
@@ -18,11 +19,16 @@ class Lapic : public HardwareTimer
         eTscDeadline = 2,
     };
 
-    void          Initialize();
-    void          SendIpi(u32 flags, u32 id);
-    void          SendEOI();
+    void             Initialize();
 
-    static void   PanicIpi();
+    static bool      IsInitialized() { return s_Initialized; }
+
+    std::string_view GetModelString() const override { return "Local APIC"; }
+
+    void             SendIpi(u32 flags, u32 id);
+    void             SendEOI();
+
+    static void      PanicIpi();
 
     ErrorOr<void> Start(TimerMode mode, TimeStep interval, u8 vector) override;
     void          Stop() override;
@@ -34,6 +40,8 @@ class Lapic : public HardwareTimer
     }
 
   private:
+    static std::atomic_bool s_Initialized;
+
     u32                     m_ID               = 0;
     uintptr_t               m_BaseAddress      = 0;
     bool                    m_X2Apic           = false;
@@ -46,4 +54,6 @@ class Lapic : public HardwareTimer
 
     void                    CalibrateTimer();
     void SetNmi(u8 vector, u8 currentCPUID, u8 cpuID, u16 flags, u8 lint);
+
+    static void Tick(CPUContext* context);
 };

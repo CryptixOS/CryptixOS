@@ -7,13 +7,18 @@
 #pragma once
 
 #include <API/UnixTypes.hpp>
+
 #include <Prism/Types.hpp>
+#include <Time/HardwareTimer.hpp>
 
 namespace Time
 {
-    usize    GetEpoch();
-    timespec GetReal();
-    timespec GetMonotonic();
+    void           Initialize();
+    HardwareTimer* GetSchedulerTimer();
 
-    void     Tick(usize ns);
+    usize          GetEpoch();
+    timespec       GetReal();
+    timespec       GetMonotonic();
+
+    void           Tick(usize ns);
 } // namespace Time

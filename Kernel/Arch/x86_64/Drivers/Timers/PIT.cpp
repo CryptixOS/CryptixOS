@@ -87,6 +87,4 @@ void PIT::Tick(struct CPUContext* ctx)
 {
     Instance()->m_Tick++;
     Time::Tick((1'000 / FREQUENCY) * 1'000'000);
-
-    Scheduler::Tick(ctx);
 }

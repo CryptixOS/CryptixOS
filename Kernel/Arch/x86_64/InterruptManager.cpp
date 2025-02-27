@@ -47,7 +47,7 @@ namespace InterruptManager
 
     void SendEOI(u8 vector)
     {
-        if (IoApic::IsAnyEnabled()) CPU::GetCurrent()->Lapic.SendEOI();
+        if (IoApic::IsAnyEnabled()) Lapic::Instance()->SendEOI();
         else PIC::SendEOI(vector);
     }
 }; // namespace InterruptManager
