@@ -54,9 +54,10 @@ namespace Logger
     {
         Spinlock s_Lock;
         u64      s_LogForegroundColors[] = {
-            FOREGROUND_COLOR_WHITE, FOREGROUND_COLOR_MAGENTA,
-            FOREGROUND_COLOR_GREEN, FOREGROUND_COLOR_CYAN,
-            FOREGROUND_COLOR_RED,   FOREGROUND_COLOR_RED,
+            FOREGROUND_COLOR_WHITE,  FOREGROUND_COLOR_MAGENTA,
+            FOREGROUND_COLOR_GREEN,  FOREGROUND_COLOR_CYAN,
+            FOREGROUND_COLOR_YELLOW, FOREGROUND_COLOR_RED,
+            FOREGROUND_COLOR_WHITE,
         };
 
         template <typename T>
