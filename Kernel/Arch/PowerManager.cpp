@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/PowerManager.hpp>
+#include <Arch/x86_64/IO.hpp>
 
 #include <Drivers/Terminal.hpp>
 #include <Firmware/ACPI/ACPI.hpp>
@@ -21,5 +22,14 @@ namespace PowerManager
         ACPI::Reboot();
         // TODO(v1tr10l7): UEFI Service
         Arch::Reboot();
+    }
+    void Shutdown()
+    {
+        // Qemu shutdown
+        IO::Out<u16>(0x604, 0x2000);
+        IO::Out<u16>(0xb004, 0x2000);
+
+        // Virtualbox shutdown
+        IO::Out<u16>(0x4004, 0x3400);
     }
 }; // namespace PowerManager
