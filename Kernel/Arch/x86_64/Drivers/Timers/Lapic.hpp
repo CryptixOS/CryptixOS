@@ -34,14 +34,16 @@ class Lapic : public HardwareTimer
     }
 
   private:
-    u32       id          = 0;
-    uintptr_t baseAddress = 0;
-    bool      x2apic      = false;
-    u64       ticksPerMs  = 0;
+    u32                     m_ID               = 0;
+    uintptr_t               m_BaseAddress      = 0;
+    bool                    m_X2Apic           = false;
+    u64                     m_TicksPerMs       = 0;
 
-    u32       Read(u32 reg);
-    void      Write(u32 reg, u64 value);
+    class InterruptHandler* m_InterruptHandler = nullptr;
 
-    void      CalibrateTimer();
-    void      SetNmi(u8 vector, u8 currentCPUID, u8 cpuID, u16 flags, u8 lint);
+    u32                     Read(u32 reg);
+    void                    Write(u32 reg, u64 value);
+
+    void                    CalibrateTimer();
+    void SetNmi(u8 vector, u8 currentCPUID, u8 cpuID, u16 flags, u8 lint);
 };

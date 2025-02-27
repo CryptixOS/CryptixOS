@@ -12,6 +12,7 @@
 #include <Firmware/ACPI/ACPI.hpp>
 
 #include <Memory/VMM.hpp>
+#include <Scheduler/Scheduler.hpp>
 
 constexpr u32                  LAPIC_EOI_ACK                      = 0x00;
 CTOS_UNUSED constexpr u32      APIC_BASE_MSR                      = 0x1b;
@@ -32,17 +33,17 @@ constexpr u32                  LAPIC_LINT1_REGISTER               = 0x360;
 constexpr u32                  LAPIC_TIMER_INITIAL_COUNT_REGISTER = 0x380;
 constexpr u32                  LAPIC_TIMER_CURRENT_COUNT_REGISTER = 0x390;
 constexpr u32                  LAPIC_TIMER_DIVIDER_REGISTER       = 0x3e0;
-[[maybe_unused]] constexpr u32 LAPIC_X2APIC_ICR_REGISTER          = 0x830;
+[[maybe_unused]] constexpr u32 LAPIC_m_X2Apic_ICR_REGISTER        = 0x830;
 
 CTOS_UNUSED constexpr u32      LAPIC_TIMER_MASKED                 = 0x10000;
 CTOS_UNUSED constexpr u32      LAPIC_TIMER_PERIODIC               = 0x20000;
 
-bool                           CheckX2Apic()
+bool                           Checkm_X2Apic()
 {
-    CPU::ID id;
-    if (!id(1, 0)) return false;
+    CPU::ID m_ID;
+    if (!m_ID(1, 0)) return false;
 
-    if (!(id.rcx & Bit(21))) return false;
+    if (!(m_ID.rcx & Bit(21))) return false;
     auto dmar = ACPI::GetTable("DMAR");
     if (!dmar) return true;
 
@@ -53,31 +54,31 @@ void Lapic::Initialize()
 {
     PIT::Initialize();
     LogTrace("LAPIC: Initializing for cpu #{}...", CPU::GetCurrent()->LapicID);
-    x2apic = CheckX2Apic();
-    LogInfo("LAPIC: X2APIC available: {}", x2apic);
+    m_X2Apic = Checkm_X2Apic();
+    LogInfo("LAPIC: m_X2Apic available: {}", m_X2Apic);
 
     u64 base = CPU::ReadMSR(APIC_BASE_MSR) | Bit(11);
-    if (x2apic) base |= Bit(10);
+    if (m_X2Apic) base |= Bit(10);
 
     CPU::WriteMSR(APIC_BASE_MSR, base);
 
-    if (!x2apic)
+    if (!m_X2Apic)
     {
         auto physAddr = base & ~(0xfff);
 
-        baseAddress   = VMM::AllocateSpace(0x1000, sizeof(u32), true);
-        VMM::GetKernelPageMap()->Map(baseAddress, physAddr,
+        m_BaseAddress = VMM::AllocateSpace(0x1000, sizeof(u32), true);
+        VMM::GetKernelPageMap()->Map(m_BaseAddress, physAddr,
                                      PageAttributes::eRW
                                          | PageAttributes::eUncacheableStrong);
     }
 
-    baseAddress = ToHigherHalfAddress<uintptr_t>(base & ~(0xfff));
-    id          = x2apic ? Read(LAPIC_ID_REGISTER)
-                         : (Read(LAPIC_ID_REGISTER) >> 24) & 0xff;
+    m_BaseAddress = ToHigherHalfAddress<uintptr_t>(base & ~(0xfff));
+    m_ID          = m_X2Apic ? Read(LAPIC_ID_REGISTER)
+                             : (Read(LAPIC_ID_REGISTER) >> 24) & 0xff;
 
     Write(LAPIC_TASK_PRIORITY_REGISTER, 0x00);
     Write(LAPIC_SPURIOUS_REGISTER, 0xff | Bit(8));
-    /*if (!x2apic)
+    /*if (!m_X2Apic)
     {
         Write(LAPIC_DFR_REGISTER, 0xf0000000);
         Write(LAPIC_LDR_REGISTER, Read(LAPIC_ID_REGISTER));
@@ -92,31 +93,46 @@ void Lapic::Initialize()
     // Write(LAPIC_TIMER_DIVIDER_REGISTER, 0x03);
     // Write(LAPIC_TIMER_INITIAL_COUNT_REGISTER, ticksPer10ms / 10);
 
+    static std::atomic_bool s_Initialized = false;
+    if (!s_Initialized)
+    {
+        s_Initialized      = true;
+        m_InterruptHandler = IDT::AllocateHandler();
+        m_InterruptHandler->Reserve();
+        LogWarn("LAPIC: Interrupt Vector: {}",
+                m_InterruptHandler->GetInterruptVector());
+        m_InterruptHandler->SetHandler(
+            [](CPUContext* context)
+            {
+                Scheduler::Tick(context);
+                // CPU::GetCurrent()->Lapic.m_OnTickCallback(context);
+            });
+    }
     LogInfo("LAPIC: Initialized");
 };
 
-void Lapic::SendIpi(u32 flags, u32 id)
+void Lapic::SendIpi(u32 flags, u32 m_ID)
 {
-    if (!x2apic)
+    if (!m_X2Apic)
     {
-        Write(LAPIC_ICR_HIGH_REGISTER, id << 24);
+        Write(LAPIC_ICR_HIGH_REGISTER, m_ID << 24);
         Write(LAPIC_ICR_LOW_REGISTER, flags);
         return;
     }
 
     Write(LAPIC_ICR_LOW_REGISTER,
-          (static_cast<u64>(id) << 32) | Bit(14) | flags);
+          (static_cast<u64>(m_ID) << 32) | Bit(14) | flags);
 }
 void          Lapic::SendEOI() { Write(LAPIC_EOI_REGISTER, LAPIC_EOI_ACK); }
 
 ErrorOr<void> Lapic::Start(TimerMode tm, TimeStep interval, u8 vector)
 {
-    Mode  mode = tm == TimerMode::eOneShot ? Mode::eOneshot : Mode::ePeriodic;
+    Mode mode = tm == TimerMode::eOneShot ? Mode::eOneshot : Mode::ePeriodic;
+    vector    = m_InterruptHandler->GetInterruptVector();
+    usize ms  = interval.Milliseconds();
 
-    usize ms   = interval.Milliseconds();
-
-    if (ticksPerMs == 0) CalibrateTimer();
-    u64 ticks = ticksPerMs * ms;
+    if (m_TicksPerMs == 0) CalibrateTimer();
+    u64 ticks = m_TicksPerMs * ms;
 
     Write(LAPIC_TIMER_DIVIDER_REGISTER, 0x03);
     u64 value = Read(LAPIC_TIMER_REGISTER) & ~(3 << 17);
@@ -139,17 +155,17 @@ void Lapic::Stop()
 
 u32 Lapic::Read(u32 reg)
 {
-    if (x2apic) return CPU::ReadMSR((reg >> 4) + 0x800);
+    if (m_X2Apic) return CPU::ReadMSR((reg >> 4) + 0x800);
 
-    volatile auto ptr = reinterpret_cast<volatile u32*>(baseAddress);
+    volatile auto ptr = reinterpret_cast<volatile u32*>(m_BaseAddress);
     return *ptr;
 }
 
 void Lapic::Write(u32 reg, u64 value)
 {
-    if (x2apic) return CPU::WriteMSR((reg >> 4) + 0x800, value);
+    if (m_X2Apic) return CPU::WriteMSR((reg >> 4) + 0x800, value);
 
-    volatile auto ptr = reinterpret_cast<volatile u32*>(baseAddress + reg);
+    volatile auto ptr = reinterpret_cast<volatile u32*>(m_BaseAddress + reg);
     *ptr              = value;
 }
 
@@ -162,7 +178,7 @@ void Lapic::CalibrateTimer()
     // HPET::GetDevices()[0].Sleep(10 * 1000);
     Write(LAPIC_TIMER_REGISTER, Read(LAPIC_TIMER_REGISTER) | Bit(16));
 
-    ticksPerMs = (0xffffffff - Read(LAPIC_TIMER_CURRENT_COUNT_REGISTER)) / 10;
+    m_TicksPerMs = (0xffffffff - Read(LAPIC_TIMER_CURRENT_COUNT_REGISTER)) / 10;
 }
 void Lapic::SetNmi(u8 vector, u8 currentCPUID, u8 cpuID, u16 flags, u8 lint)
 {
