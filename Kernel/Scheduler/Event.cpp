@@ -9,106 +9,85 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-static std::optional<usize> CheckPending(std::span<Event*> events)
+static isize CheckPending(Event** events, usize eventCount)
 {
-    for (usize i = 0; auto& event : events)
-    {
-        if (event->Pending > 0)
+    for (usize i = 0; i < eventCount; i++)
+        if (events[i]->Pending > 0)
         {
             --events[i]->Pending;
             return i;
         }
-        ++i;
-    }
-    return std::nullopt;
+    return -1;
 }
 
-static void AttachListeners(std::span<Event*> events, Thread* thread)
+static void AttachListeners(Event** events, usize eventCount, Thread* thread)
 {
-    thread->GetEvents().clear();
+    thread->AttachedEventsI = 0;
 
-    for (usize i = 0; const auto& event : events)
+    for (usize i = 0; i < eventCount; i++)
     {
-        event->Listeners.emplace_back(thread, i);
-        thread->GetEvents().push_back(event);
-        i++;
+        Event* event = events[i];
+        if (event->ListenersI == MAX_LISTENERS)
+            Panic("Event Listeners exhausted");
+
+        EventListener* listener = &event->Listeners[event->ListenersI++];
+        listener->Thread        = thread;
+        listener->Which         = i;
+
+        if (thread->AttachedEventsI == MAX_EVENTS)
+            Panic("Listening on too many events");
+        thread->AttachedEvents[thread->AttachedEventsI++] = event;
     }
 }
-static void DetachListeners(Thread* thread)
+static void DetachListeners(Thread* thread);
+
+static void LockEvents(Event** events, usize eventCount)
 {
-    for (const auto& event : thread->GetEvents())
+    for (usize i = 0; i < eventCount; i++) events[i]->Lock.Acquire();
+}
+static void UnlockEvents(Event** events, usize eventCount)
+{
+    for (usize i = 0; i < eventCount; i++) events[i]->Lock.Release();
+}
+
+isize Event::Await(Event** events, usize eventCount, bool block)
+{
+    isize   ret           = -1;
+
+    Thread* thread        = CPU::GetCurrentThread();
+
+    bool    interruptFlag = CPU::SwapInterruptFlag(false);
+    LockEvents(events, eventCount);
+
+    isize i = CheckPending(events, eventCount);
+    if (i != -1)
     {
-        for (auto it = event->Listeners.begin(); it < event->Listeners.end();
-             it++)
-        {
-            if (it->Thread != thread) continue;
-            it = event->Listeners.erase(it);
-        }
+        ret = i;
+        UnlockEvents(events, eventCount);
+        goto cleanup;
     }
-    thread->GetEvents().clear();
-}
 
-static void LockEvents(std::span<Event*> events)
-{
-    for (auto& event : events) event->Lock.Acquire();
-}
-static void UnlockEvents(std::span<Event*> events)
-{
-    for (auto& event : events) event->Lock.Release();
-}
-
-std::optional<usize> Event::Await(std::span<Event*> events, bool drop)
-{
-    auto thread   = Thread::GetCurrent();
-    bool intState = CPU::SwapInterruptFlag(false);
-    LockEvents(events);
-
-    auto i = CheckPending(events);
-    if (i.has_value())
+    if (!block)
     {
-        UnlockEvents(events);
-        CPU::SetInterruptFlag(intState);
-        return i;
+        UnlockEvents(events, eventCount);
+        goto cleanup;
     }
 
-    if (!drop)
-    {
-        UnlockEvents(events);
-        CPU::SetInterruptFlag(intState);
-    }
+    AttachListeners(events, eventCount, thread);
+    Scheduler::Block(thread);
+    UnlockEvents(events, eventCount);
 
-    AttachListeners(events, thread);
-    Scheduler::DequeueThread(thread);
-    UnlockEvents(events);
     Scheduler::Yield();
     CPU::SetInterruptFlag(false);
 
-    LockEvents(events);
+    if (thread->EnqueuedBySignal()) goto cleanup2;
+    ret = thread->GetWhichEvent();
+
+cleanup2:
+    LockEvents(events, eventCount);
     DetachListeners(thread);
-    UnlockEvents(events);
-
-    CPU::SetInterruptFlag(intState);
-    return thread->GetWhich();
-}
-
-void Event::Trigger(Event* event, bool drop)
-{
-    bool       intState = CPU::SwapInterruptFlag(false);
-    ScopedLock guard(event->Lock);
-
-    if (event->Listeners.empty())
-    {
-        if (!drop) ++event->Pending;
-        return;
-    }
-
-    for (const auto& listener : event->Listeners)
-    {
-        auto thread = listener.Thread;
-        thread->SetWhich(listener.Which);
-        Scheduler::Unblock(thread);
-    }
-
-    event->Listeners.clear();
-    CPU::SetInterruptFlag(intState);
+    UnlockEvents(events, eventCount);
+cleanup:
+    CPU::SetInterruptFlag(interruptFlag);
+    return ret;
 }

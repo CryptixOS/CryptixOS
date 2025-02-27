@@ -16,102 +16,58 @@
 
 using namespace ACPI;
 
-constexpr usize NanoSecondPeriodToHertz(usize x) { return 1000000000 / x; }
-constexpr usize HertzToMegaHertz(usize x) { return (x / 1000000); }
-
 namespace HPET
 {
     using Prism::Pointer;
     static std::vector<TimerBlock> s_Devices;
 
-    enum class Attributes : u32
+    struct Comparator
     {
-        eRevisionID                      = 0xff,
-        eComparatorCount                 = 0xf00,
-        e64BitCounter                    = Bit(13),
-        eLegacyReplacementMappingCapable = Bit(15),
-        eVendorID                        = 0xff00,
-    };
+        u64       capabilities;
+        u64       valueRegister;
+        u64       fsbInterruptRouteRegister;
+        const u64 reserved;
+    } __attribute__((packed));
 
-    u64 operator&(Attributes lhs, const Attributes rhs)
+    inline constexpr usize HPET_ENABLE     = BIT(0);
+    inline constexpr usize HPET_LEG_RT_CNF = BIT(1);
+    struct Entry
     {
-        u64 result = static_cast<u64>(lhs) & static_cast<u64>(rhs);
+        const u64   capabilities;
+        u64         reserved1;
+        u64         configuration;
+        u64         reserved2;
+        u64         interruptStatusRegister;
+        u64         reserved3[25];
+        u64         mainCounter;
+        u64         reserved4;
+        Comparator* comparators;
+    } __attribute__((packed));
 
-        return result;
+    inline constexpr u8 GetRevision(const u64 capabilities)
+    {
+        return capabilities;
     }
-    enum class Configuration : u32
+    inline constexpr u8 GetTimerCount(const u64 capabilities)
     {
-        eEnableMainCounter              = Bit(0),
-        eLegacyReplacementMappingEnable = Bit(1),
-    };
-
-    Configuration operator~(Configuration lhs)
-    {
-        u64 result = ~static_cast<u64>(lhs);
-
-        return static_cast<Configuration>(result);
+        return (((capabilities >> 8) & 0x1f) + 1);
     }
-    Configuration operator|=(Configuration lhs, Configuration rhs)
+    inline constexpr u16 GetVendorID(const u64 capabilities)
     {
-        u64 result = static_cast<u64>(lhs) | static_cast<u64>(rhs);
-
-        return static_cast<Configuration>(result);
+        return (capabilities >> 16) ^ 0xffff;
     }
-    Configuration operator&=(Configuration lhs, Configuration rhs)
+    inline constexpr u32 GetTickPeriod(const u64 capabilities)
     {
-        u64 result = static_cast<u64>(lhs) & static_cast<u64>(rhs);
-
-        return static_cast<Configuration>(result);
-    }
-
-    struct [[gnu::packed]] CapabilityRegister
-    {
-        volatile Attributes    Attributes;
-        volatile Configuration MainCounterTickPeriod;
-        u64                    Reserved;
-    };
-
-    enum class ComparatorCapabilities : u64
-    {
-        eGeneratesLevelTriggeredInterrupts = Bit(1),
-        eEnablesInterrupts                 = Bit(2),
-        eEnablePeriodicTimer               = Bit(3),
-        ePeriodicTimerSupport              = Bit(4),
-        e64BitTimer                        = Bit(5),
-        eAllowSoftwareToSetAccumulator     = Bit(6),
-        eEnable32BitMode                   = Bit(8),
-        eEnableIoApicRouting               = 0xf << 9,
-        eEnableFsbInterruptMapping         = Bit(14),
-        eSupportFsbMapping                 = Bit(15),
-    };
-
-    u64 operator&(ComparatorCapabilities lhs, ComparatorCapabilities rhs)
-    {
-        u64 result = static_cast<u64>(lhs) & static_cast<u64>(rhs);
-
-        return result;
+        return capabilities >> 32;
     }
 
-    struct [[gnu::packed]] Comparator
+    static struct
     {
-        ComparatorCapabilities Capabilities;
-        u64                    ValueRegister;
-        u64                    FsbInterruptRouteRegister;
-        const u64              Reserved;
-    };
-
-    struct [[gnu::packed]] Entry
-    {
-        const CapabilityRegister Capabilities;
-        u64                      Reserved1;
-        Configuration            Configuration;
-        u64                      Reserved2;
-        u64                      InterruptStatusRegister;
-        u64                      Reserved3[25];
-        u64                      MainCounter;
-        u64                      Reserved4;
-        Comparator*              Comparators;
-    };
+        u64  frequency   = 0;
+        u16  vendorID    = 0;
+        u16  minimumTick = 0;
+        bool x64Capable  = false;
+    } data;
 
     ErrorOr<TimerBlock*> TimerBlock::GetFromTable(Pointer hpetPhys)
     {
@@ -149,85 +105,48 @@ namespace HPET
         LogInfo("HPET: Found device at {:#x}",
                 reinterpret_cast<uintptr_t>(m_Entry));
 
-        m_VendorID      = table->PCI_VendorID;
-        m_MinimimumTick = table->MinimumTick;
-        LogInfo("HPET: Revision: {}",
-                m_Entry->Capabilities.Attributes & Attributes::eRevisionID);
-        LogInfo("HPET: Minimum clock tick - {}", m_MinimimumTick);
-
-        m_TimerCount
-            = m_Entry->Capabilities.Attributes & Attributes::eComparatorCount;
-        m_X64Capable
-            = m_Entry->Capabilities.Attributes & Attributes::e64BitCounter;
-        LogInfo("HPET: Available comparators: {}", m_TimerCount);
-        LogInfo("HPET: Main Counter size: {}",
-                m_X64Capable ? "64-bit" : "32-bit");
+        m_Entry->configuration &= ~HPET_LEG_RT_CNF;
+        LogInfo("HPET: revision: {}", GetRevision(m_Entry->capabilities));
         LogInfo(
             "HPET: Legacy Replacement "
             "Route Capable: {}",
-            m_Entry->Capabilities.Attributes
-                & Attributes::eLegacyReplacementMappingCapable);
+            (m_Entry->capabilities >> 15) & 1);
 
-        return; // TODO(v1tr10l7): Initialize all comparators
-        for (usize i = 0; i < m_TimerCount; i++)
+        LogInfo("HPET: Available comparators: {}",
+                GetTimerCount(m_Entry->capabilities));
+        data.vendorID   = GetVendorID(m_Entry->capabilities);
+        data.x64Capable = m_Entry->capabilities & BIT(13);
+        LogInfo("HPET: PCI vendorID = {}, x64Capable: {}", data.vendorID,
+                data.x64Capable);
+
+        tickPeriod = GetTickPeriod(m_Entry->capabilities);
+        Assert(tickPeriod > 1'000'000 && tickPeriod <= 0x05f5e100);
+
+        data.frequency = 0x38d7ea4c68000 / tickPeriod;
+        LogInfo("HPET: Frequency is set to {:#x}", data.frequency);
+        data.minimumTick = table->MinimumTick;
+
+        LogDebug("Enabling hpet");
+        m_Entry->mainCounter = 0;
+        m_Entry->configuration |= HPET_ENABLE;
+        m_Entry->interruptStatusRegister = m_Entry->interruptStatusRegister;
+
+        // TODO(v1tr10l7): Enumerate timers
+        [[maybe_unused]] u32 gsiMask     = 0xffffffff;
+        for (usize i = 0; i < GetTimerCount(m_Entry->capabilities); i++)
         {
-            bool capable64Bit = m_Entry->Comparators[i].Capabilities
-                              & ComparatorCapabilities::e64BitTimer;
-            LogInfo("HPET: Comparator[{}]: {{ size: {}, mode: {} }}", i,
-                    capable64Bit ? "64bit" : "32bit",
-                    ((!capable64Bit
-                              || (m_Entry->Comparators[i].Capabilities
-                                  & ComparatorCapabilities::eEnable32BitMode)
-                          ? "32-bit"
-                          : "64-bit")));
+            auto& comparator = m_Entry->comparators[i];
+            (void)comparator;
         }
-        Assert(m_TimerCount >= 2);
-        Disable();
-
-        m_Frequency = NanoSecondPeriodToHertz(RawCounterTicksToNs(1));
-        LogInfo("HPET: frequency: {} Hz ({} MHz) resolution: {} ns",
-                m_Frequency, HertzToMegaHertz(m_Frequency),
-                RawCounterTicksToNs(1));
-
-        Assert(GetCounterValue() <= ABSOLUTE_MAXIMUM_COUNTER_TICK_PERIOD);
-
-        m_Entry->MainCounter = 0;
-        if (m_Entry->Capabilities.Attributes
-            & Attributes::eLegacyReplacementMappingCapable)
-            m_Entry->Configuration
-                |= Configuration::eLegacyReplacementMappingEnable;
-
-        m_Comparators.push_back(
-            HPETComparator(0, 0,
-                           m_Entry->Comparators[0].Capabilities
-                               & ComparatorCapabilities::ePeriodicTimerSupport,
-                           m_Entry->Comparators[0].Capabilities
-                               & ComparatorCapabilities::e64BitTimer));
-
-        m_Comparators.push_back(
-            HPETComparator(1, 8,
-                           m_Entry->Comparators[1].Capabilities
-                               & ComparatorCapabilities::ePeriodicTimerSupport,
-                           m_Entry->Comparators[1].Capabilities
-                               & ComparatorCapabilities::e64BitTimer));
-
-        Enable();
     }
+    void TimerBlock::Disable() const { m_Entry->configuration &= ~HPET_ENABLE; }
 
-    void TimerBlock::Enable() const
-    {
-        m_Entry->Configuration |= Configuration::eEnableMainCounter;
-    }
-    void TimerBlock::Disable() const
-    {
-        m_Entry->Configuration &= ~Configuration::eEnableMainCounter;
-    }
-    u64  TimerBlock::GetCounterValue() const { return m_Entry->MainCounter; }
+    u64  TimerBlock::GetCounterValue() const { return m_Entry->mainCounter; }
     void TimerBlock::Sleep(u64 us) const
     {
-        // usize target = GetCounterValue() + (us * 1'000'000'000) / tickPeriod;
-        // while (GetCounterValue() < target)
-        //    ;
+        usize target = GetCounterValue() + (us * 1'000'000'000) / tickPeriod;
+        while (GetCounterValue() < target)
+            ;
     }
 
     ErrorOr<void> DetectAndSetup()

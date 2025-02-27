@@ -14,92 +14,79 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Time/Time.hpp>
 
-#include <atomic>
+PIT* PIT::s_Instance = nullptr;
 
-namespace PIT
+PIT::PIT()
 {
-    namespace
-    {
-        constexpr usize   FREQUENCY     = 1000;
-        // NOTE(v1tr10l7): When using PIC, we cannot choose irq number of PIT,
-        // and it will have to be IRQ, only IoApic allows to redirect irqs
-        constexpr usize   IRQ_HINT      = 0x20;
-        std::atomic<u64>  s_Tick        = 0;
-        u8                s_TimerVector = 0;
-        InterruptHandler* s_Handler     = nullptr;
-        usize             s_CurrentMode = Mode::RATE;
+    LogTrace("PIT: Initializing...");
+    (void)SetFrequency(FREQUENCY / 10);
+    LogInfo("PIT: Frequency set to {}Hz", FREQUENCY);
 
-        void              TimerTick(struct CPUContext* ctx)
-        {
-            s_Tick++;
-            Time::Tick((1'000 / FREQUENCY) * 1'000'000);
+    m_Handler = IDT::AllocateHandler(IRQ_HINT);
+    m_Handler->SetHandler(Tick);
+    m_Handler->Reserve();
+    m_Handler->eoiFirst = true;
 
-            Scheduler::Tick(ctx);
-        }
-    } // namespace
+    m_TimerVector       = m_Handler->GetInterruptVector();
+    LogInfo("PIT: Installed on interrupt gate #{:#x}", m_TimerVector);
+}
 
-    void Initialize()
-    {
-        static bool initialized = false;
-        if (initialized) return;
+void          PIT::Initialize() { s_Instance = Instance(); }
 
-        LogTrace("PIT: Initializing...");
-        SetFrequency(FREQUENCY / 10);
-        LogInfo("PIT: Frequency set to {}Hz", FREQUENCY);
+ErrorOr<void> PIT::Start(TimerMode mode, TimeStep interval, u8 vector)
+{
+    if (mode == TimerMode::eOneShot) m_CurrentMode = Mode::eOneShot;
+    else if (mode == TimerMode::ePeriodic) m_CurrentMode = Mode::eSquareWave;
+    else return Error(ENOSYS);
 
-        s_Handler = IDT::AllocateHandler(IRQ_HINT);
-        s_Handler->SetHandler(TimerTick);
-        s_Handler->Reserve();
-        s_Handler->eoiFirst = true;
+    usize reloadValue = (interval.Milliseconds() * BASE_FREQUENCY) / 3000;
+    SetReloadValue(reloadValue);
+    IO::Out<byte>(COMMAND, CHANNEL0_DATA | SEND_WORD | m_CurrentMode);
 
-        s_TimerVector       = s_Handler->GetInterruptVector();
-        LogInfo("PIT: Installed on interrupt gate #{:#x}", s_TimerVector);
-        LogInfo("PIT: Initialized\nTimer vector = {} ", s_TimerVector);
-        initialized = true;
-    }
+    return {};
+}
+void PIT::Stop()
+{
+    InterruptManager::Mask(m_TimerVector);
+    SetReloadValue(0);
+}
 
-    void Start(usize mode, usize ms)
-    {
-        s_CurrentMode     = mode;
+u8  PIT::GetInterruptVector() { return m_TimerVector; }
 
-        usize reloadValue = (ms * BASE_FREQUENCY) / 3000;
-        SetReloadValue(reloadValue);
-        IO::Out<byte>(COMMAND, CHANNEL0_DATA | SEND_WORD | mode);
-    }
-    void Stop()
-    {
-        InterruptManager::Mask(s_TimerVector);
-        SetReloadValue(0);
-    }
+u64 PIT::GetCurrentCount()
+{
+    IO::Out<byte>(COMMAND, SELECT_CHANNEL0);
+    auto lo = IO::In<byte>(CHANNEL0_DATA);
+    auto hi = IO::In<byte>(CHANNEL0_DATA) << 8;
+    return static_cast<u16>(hi << 8) | lo;
+}
+u64           PIT::GetMilliseconds() { return m_Tick * (1000z / FREQUENCY); }
 
-    u8  GetInterruptVector() { return s_TimerVector; }
+ErrorOr<void> PIT::SetFrequency(usize frequency)
+{
+    u64 reloadValue = BASE_FREQUENCY / frequency;
+    if (BASE_FREQUENCY % frequency > frequency / 2) reloadValue++;
+    SetReloadValue(reloadValue);
 
-    u64 GetCurrentCount()
-    {
-        IO::Out<byte>(COMMAND, SELECT_CHANNEL0);
-        auto lo = IO::In<byte>(CHANNEL0_DATA);
-        auto hi = IO::In<byte>(CHANNEL0_DATA) << 8;
-        return static_cast<u16>(hi << 8) | lo;
-    }
-    u64  GetMilliseconds() { return s_Tick * (1000z / FREQUENCY); }
+    return {};
+}
+void PIT::SetReloadValue(u16 reloadValue)
+{
+    IO::Out<byte>(COMMAND, SEND_WORD | m_CurrentMode);
+    IO::Out<byte>(CHANNEL0_DATA, static_cast<byte>(reloadValue));
+    IO::Out<byte>(CHANNEL0_DATA, static_cast<byte>(reloadValue >> 8));
+}
 
-    void SetFrequency(usize frequency)
-    {
-        u64 reloadValue = BASE_FREQUENCY / frequency;
-        if (BASE_FREQUENCY % frequency > frequency / 2) reloadValue++;
-        SetReloadValue(reloadValue);
-    }
-    void SetReloadValue(u16 reloadValue)
-    {
-        IO::Out<byte>(COMMAND, SEND_WORD | s_CurrentMode);
-        IO::Out<byte>(CHANNEL0_DATA, static_cast<byte>(reloadValue));
-        IO::Out<byte>(CHANNEL0_DATA, static_cast<byte>(reloadValue >> 8));
-    }
+void PIT::Sleep(u64 ms)
+{
+    volatile u64 target = GetMilliseconds() + ms;
+    while (GetMilliseconds() < target) Arch::Pause();
+}
 
-    void Sleep(u64 ms)
-    {
-        volatile u64 target = GetMilliseconds() + ms;
-        while (GetMilliseconds() < target) Arch::Pause();
-    }
+void PIT::Tick(struct CPUContext* ctx)
+{
+    Instance()->m_Tick++;
+    Time::Tick((1'000 / FREQUENCY) * 1'000'000);
 
-}; // namespace PIT
+    Scheduler::Tick(ctx);
+}

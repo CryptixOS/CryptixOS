@@ -119,8 +119,8 @@ namespace Stacktrace
 
             std::string   demangledName
                 = symbol ? llvm::demangle(symbol->name) : "??";
-            LogMessage("[\u001b[33mStacktrace\u001b[0m]: {}. {} <{:#x}>\n",
-                       i + 1, demangledName, rip);
+            LogMessage("[\u001b[33mStacktrace\u001b[0m]: {}. {} <{:#x}>", i + 1,
+                       demangledName, rip);
         }
     }
 }; // namespace Stacktrace

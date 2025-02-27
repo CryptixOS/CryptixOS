@@ -128,6 +128,7 @@ namespace CPU
     };
 
     void              Halt();
+    void              HaltAll();
     void              WakeUp(usize id, bool everyone);
 
     void              WriteXCR(u64 reg, u64 value);

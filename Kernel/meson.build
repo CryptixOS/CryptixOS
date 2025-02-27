@@ -6,7 +6,6 @@
 #*/
 srcs += files(
   'KernelStart.cpp',
-  'Panic.cpp',
 
   'API/MM.cpp',
   'API/Process.cpp',
@@ -19,6 +18,7 @@ srcs += files(
   'Arch/PowerManager.cpp',
 
   'Boot/BootInfo.cpp',
+  'Debug/Panic.cpp',
 
   'Drivers/Terminal.cpp',
   'Drivers/TTY.cpp',
@@ -45,7 +45,6 @@ srcs += files(
   'Memory/PMM.cpp',
   'Memory/VMM.cpp',
 
-  'Scheduler/Event.cpp',
   'Scheduler/Process.cpp',
   'Scheduler/Scheduler.cpp',
   'Scheduler/Thread.cpp',
@@ -56,10 +55,7 @@ srcs += files(
   'Library/ICxxAbi.cpp',
   'Library/Kasan.cpp',
   'Library/Logger.cpp',
-  #'Library/Path.cpp',
-  #'Library/PathView.cpp',
   'Library/Stacktrace.cpp',
-  #'Library/Ubsan.cpp',
 
   'VFS/FileDescriptor.cpp',
   'VFS/FileDescriptorTable.cpp',

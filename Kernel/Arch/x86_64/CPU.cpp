@@ -7,14 +7,17 @@
 #include <Arch/x86_64/CPU.hpp>
 #include <Arch/x86_64/Drivers/Timers/PIT.hpp>
 
+#include <Boot/BootInfo.hpp>
+#include <Debug/Panic.hpp>
+
+#include <Prism/Math.hpp>
+
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-#include <Boot/BootInfo.hpp>
-#include <Prism/Math.hpp>
-
 extern u8 g_ScheduleVector;
+u8        g_PanicIpiVector = 255;
 
 namespace CPU
 {
@@ -237,6 +240,11 @@ namespace CPU
             cpu->goto_address   = apEntryPoint;
             while (!s_CPUs[i].IsOnline) Arch::Pause();
         }
+
+        auto handler = IDT::GetHandler(255);
+        handler->Reserve();
+        handler->SetInterruptVector(255);
+        handler->SetHandler(HaltAndCatchFire);
     }
 
     ID::ID(u64 leaf, u64 subleaf)
@@ -299,6 +307,10 @@ namespace CPU
         return interruptFlag;
     }
     void Halt() { __asm__ volatile("hlt"); }
+    void HaltAll()
+    {
+        GetCurrent()->Lapic.SendIpi(g_PanicIpiVector | (0b10 < 18), 0);
+    }
     void WakeUp(usize id, bool everyone)
     {
         if (everyone)
@@ -500,8 +512,7 @@ namespace CPU
     {
         auto* cpu = GetCurrent();
         Assert(
-            cpu->Lapic.Start(g_ScheduleVector, interval, TimerMode::eOneShot));
-        /*PIT::Start(PIT::Mode::ONESHOT, 100);*/
+            cpu->Lapic.Start(TimerMode::eOneShot, interval, g_ScheduleVector));
     }
 
     bool EnableSSE()

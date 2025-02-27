@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Assertions.hpp>
+#include <Debug/Assertions.hpp>
 
 #include <Prism/Pointer.hpp>
 #include <Prism/Types.hpp>

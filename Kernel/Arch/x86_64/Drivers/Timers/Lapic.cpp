@@ -109,7 +109,7 @@ void Lapic::SendIpi(u32 flags, u32 id)
 }
 void          Lapic::SendEOI() { Write(LAPIC_EOI_REGISTER, LAPIC_EOI_ACK); }
 
-ErrorOr<void> Lapic::Start(u8 vector, TimeStep interval, TimerMode tm)
+ErrorOr<void> Lapic::Start(TimerMode tm, TimeStep interval, u8 vector)
 {
     Mode  mode = tm == TimerMode::eOneShot ? Mode::eOneshot : Mode::ePeriodic;
 

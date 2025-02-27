@@ -14,7 +14,7 @@ namespace PCSpeaker
     void ToneOn(u64 frequency)
     {
         IO::Out<byte>(PIT::COMMAND, PIT::SELECT_CHANNEL2 | PIT::SEND_WORD
-                                        | PIT::Mode::SQUARE_WAVE);
+                                        | PIT::Mode::eSquareWave);
         u16 reloadValue = PIT::BASE_FREQUENCY / frequency;
 
         IO::Out<byte>(PIT::CHANNEL2_DATA, reloadValue);

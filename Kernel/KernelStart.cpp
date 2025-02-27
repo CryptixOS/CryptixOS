@@ -31,7 +31,7 @@
 #include <Library/ICxxAbi.hpp>
 #include <Library/Stacktrace.hpp>
 
-#include <Prism/RedBlackTree.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
 
 #include <VFS/INode.hpp>
 #include <VFS/Initrd/Initrd.hpp>
@@ -50,7 +50,7 @@ void kernelThread()
 
     Scheduler::InitializeProcFs();
 
-    // ACPI::Enable();
+    ACPI::Enable();
     PCI::Initialize();
     TTY::Initialize();
     MemoryDevices::Initialize();

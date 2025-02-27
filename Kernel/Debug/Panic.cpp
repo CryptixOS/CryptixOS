@@ -4,13 +4,14 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Arch/CPU.hpp>
+
 #include <Common.hpp>
 
-#include <Arch/CPU.hpp>
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 
-CTOS_NO_KASAN void logProcessState()
+CTOS_NO_KASAN void dumpProcessInfo()
 {
     Process* currentProcess = Process::GetCurrent();
     if (!currentProcess) return;
@@ -25,14 +26,20 @@ inline static void enterPanicMode()
     Logger::Unlock();
     Logger::EnableSink(LOG_SINK_TERMINAL);
     EarlyLogError("Kernel Panic!");
-    logProcessState();
+    dumpProcessInfo();
 }
-[[noreturn]]
-inline static void hcf()
-{
-    EarlyLogFatal("System Halted!\n");
 
-    Arch::Halt();
+static std::atomic<u64> s_HaltedCPUs = 0;
+[[noreturn]]
+void HaltAndCatchFire(CPUContext* context)
+{
+    EarlyLogFatal("CPU[%d]: Halted", CPU::GetCurrentID());
+
+    ++s_HaltedCPUs;
+    if (s_HaltedCPUs == CPU::GetOnlineCPUsCount())
+        EarlyLogFatal("System Halted!\n");
+
+    for (;;) Arch::Halt();
     AssertNotReached();
 }
 
@@ -42,8 +49,12 @@ void panic(std::string_view msg)
     enterPanicMode();
     EarlyLogError("Error Message: %s\n", msg.data());
 
-    Stacktrace::Print(32);
-    hcf();
+    Stacktrace::Print(16);
+    EarlyLogFatal("CPU[%d]: Halted", CPU::GetCurrentID());
+
+    s_HaltedCPUs++;
+    CPU::HaltAll();
+    for (;;) Arch::Halt();
 }
 CTOS_NO_KASAN [[noreturn]]
 void earlyPanic(const char* format, ...)
@@ -56,5 +67,10 @@ void earlyPanic(const char* format, ...)
     va_end(args);
 
     Stacktrace::Print(32);
-    hcf();
+
+    EarlyLogFatal("CPU[%d]: Halted", CPU::GetCurrentID());
+
+    s_HaltedCPUs++;
+    CPU::HaltAll();
+    for (;;) Arch::Halt();
 }

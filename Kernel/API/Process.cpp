@@ -79,7 +79,7 @@ namespace Syscall::Process
 
         CPU::SetInterruptFlag(false);
 
-        return CPU::GetCurrentThread()->GetParent()->Exec(path, argv, envp);
+        return ::Process::GetCurrent()->Exec(path, argv, envp);
     }
     ErrorOr<i32> SysExit(Arguments& args)
     {

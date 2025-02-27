@@ -6,43 +6,62 @@
  */
 #pragma once
 
-#include "Prism/Types.hpp"
+#include <Prism/Singleton.hpp>
+#include <Prism/Types.hpp>
 
-namespace PIT
+#include <Time/HardwareTimer.hpp>
+
+class PIT : public HardwareTimer, public PM::Singleton<PIT>
 {
-    constexpr usize BASE_FREQUENCY  = 1193182ull;
+  public:
+    PIT();
 
-    constexpr usize SEND_WORD       = 0x30;
+    static void   Initialize();
 
-    constexpr usize CHANNEL0_DATA   = 0x40;
-    constexpr usize CHANNEL1_DATA   = 0x41;
-    constexpr usize CHANNEL2_DATA   = 0x42;
-    constexpr usize COMMAND         = 0x43;
+    ErrorOr<void> Start(TimerMode mode, TimeStep interval, u8 vector) override;
+    void          Stop() override;
 
-    constexpr usize SELECT_CHANNEL0 = 0x00;
-    constexpr usize SELECT_CHANNEL1 = 0x40;
-    constexpr usize SELECT_CHANNEL2 = 0x80;
+    u8            GetInterruptVector();
 
-    namespace Mode
+    u64           GetCurrentCount();
+    u64           GetMilliseconds();
+
+    ErrorOr<void> SetFrequency(usize frequency) override;
+    void          SetReloadValue(u16 reloadValue);
+
+    void          Sleep(u64 ms);
+
+    static constexpr usize BASE_FREQUENCY  = 1193182ull;
+    static constexpr usize SEND_WORD       = 0x30;
+
+    static constexpr usize CHANNEL0_DATA   = 0x40;
+    static constexpr usize CHANNEL1_DATA   = 0x41;
+    static constexpr usize CHANNEL2_DATA   = 0x42;
+    static constexpr usize COMMAND         = 0x43;
+
+    static constexpr usize SELECT_CHANNEL0 = 0x00;
+    static constexpr usize SELECT_CHANNEL1 = 0x40;
+    static constexpr usize SELECT_CHANNEL2 = 0x80;
+
+    enum Mode
     {
-        constexpr usize COUNTDOWN   = 0x00;
-        constexpr usize ONESHOT     = 0x02;
-        constexpr usize RATE        = 0x04;
-        constexpr usize SQUARE_WAVE = 0x06;
-    }; // namespace Mode
+        eCountDown  = 0x00,
+        eOneShot    = 0x02,
+        eRate       = 0x04,
+        eSquareWave = 0x06,
+    };
 
-    void Initialize();
+  private:
+    static PIT*             s_Instance;
+    class InterruptHandler* m_Handler     = nullptr;
+    // NOTE(v1tr10l7): When using PIC, we cannot choose irq number of PIT,
+    // and it will have to be IRQ, only IoApic allows to redirect irqs
+    u8                      m_TimerVector = 0;
+    usize                   m_CurrentMode = Mode::eRate;
+    std::atomic<u64>        m_Tick        = 0;
 
-    void Start(usize mode, usize ms);
-    void Stop();
+    static constexpr usize  FREQUENCY     = 1000;
+    static constexpr usize  IRQ_HINT      = 0x20;
 
-    u8   GetInterruptVector();
-
-    u64  GetCurrentCount();
-    u64  GetMilliseconds();
-
-    void SetFrequency(usize frequency);
-    void SetReloadValue(u16 reloadValue);
-
-    void Sleep(u64 ms);
+    static void             Tick(struct CPUContext* ctx);
 }; // namespace PIT

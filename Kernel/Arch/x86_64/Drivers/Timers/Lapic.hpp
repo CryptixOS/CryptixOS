@@ -24,24 +24,10 @@ class Lapic : public HardwareTimer
 
     static void   PanicIpi();
 
-    ErrorOr<void> Start(u8 vector, TimeStep interval, TimerMode mode) override;
+    ErrorOr<void> Start(TimerMode mode, TimeStep interval, u8 vector) override;
     void          Stop() override;
 
-    virtual bool  IsModeSupported(TimerMode mode) const override
-    {
-        return false;
-    }
-    virtual ErrorOr<void> SetMode(TimerMode mode) override
-    {
-        return Error(ENOSYS);
-    }
-    virtual bool  CanQueryRaw() const override { return false; }
-    virtual u64   GetCurrentRaw() const override { return 0; }
-    virtual u64   GetRawToNs(u64 raw) const override { return 0; }
-
-    virtual void  ResetToDefaultTicksPerSeconds() const override { ; }
-
-    ErrorOr<void> SetFrequency(usize frequency) const override
+    ErrorOr<void> SetFrequency(usize frequency) override
     {
         (void)frequency;
         return {};

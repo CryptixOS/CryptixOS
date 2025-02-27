@@ -4,7 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <API/Posix/sys/wait.h>
 #include <Arch/CPU.hpp>
 
 #include <Scheduler/Process.hpp>
@@ -262,29 +261,14 @@ i32 Process::Exit(i32 code)
               "Process::Exit(): The process with pid 1 tries to exit!");
     CPU::SetInterruptFlag(false);
 
-    Thread* thread = Thread::GetCurrent();
-    VMM::LoadPageMap(*VMM::GetKernelPageMap(), false);
-    thread->m_Parent = Scheduler::GetKernelProcess();
-
+    // FIXME(v1tr10l7): Do proper cleanup of all resources
     m_FdTable.Clear();
-
-    if (m_Pid != -1)
-    {
-        Process* subreaper = Scheduler::GetProcess(1);
-        for (auto& child : m_Children) subreaper->m_Children.push_back(child);
-    }
-
-    delete PageMap;
-    m_Status = W_EXITCODE(code, 0);
-    Scheduler::RemoveProcess(m_Pid);
-
-    //  FIXME(v1tr10l7): Do proper cleanup of all resources
-    // TODO(v1tr10l7): Free stacks
-
     for (Thread* thread : m_Threads) thread->SetState(ThreadState::eExited);
 
-    Event::Trigger(&m_Event, false);
-    Scheduler::DequeueThread(thread);
+    Scheduler::RemoveProcess(m_Pid);
+
+    m_Status = code;
+
     Scheduler::Yield();
     AssertNotReached();
 }

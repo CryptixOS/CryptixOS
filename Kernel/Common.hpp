@@ -8,7 +8,7 @@
 
 #include <Arch/Arch.hpp>
 
-#include <Assertions.hpp>
+#include <Debug/Assertions.hpp>
 #include <Library/Logger.hpp>
 #include <Library/Stacktrace.hpp>
 #include <Prism/Types.hpp>

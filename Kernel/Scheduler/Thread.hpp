@@ -17,10 +17,9 @@
 
 #include <Library/ELF.hpp>
 #include <Scheduler/Event.hpp>
-#include <Scheduler/ThreadEvent.hpp>
 
-#include <cerrno>
 #include <deque>
+#include <errno.h>
 #include <vector>
 
 enum class ThreadState
@@ -74,7 +73,7 @@ struct Thread
 
     Thread*                    Fork(Process* parent);
 
-    // FIXME(v1tr10l7): implement this once we have signals
+    // FIXME(v1tr10l7): implement tthis once we have signals
     inline bool                WasInterrupted() const { return false; }
 
     inline uintptr_t           GetFsBase() const { return m_FsBase; }
@@ -102,19 +101,16 @@ struct Thread
     uintptr_t                  fpuStorage;
     //////////////////////
 
-  private:
-    Spinlock    m_Lock;
-    tid_t       m_Tid;
-    ThreadState m_State = ThreadState::eIdle;
-    ErrorCode   m_ErrorCode;
-    Process*    m_Parent;
-    uintptr_t   m_StackVirt;
+    Spinlock                   m_Lock;
+    tid_t                      m_Tid;
+    ThreadState                m_State = ThreadState::eIdle;
+    errno_t                    m_ErrorCode;
+    Process*                   m_Parent;
+    uintptr_t                  m_StackVirt;
 
-  public:
-    CPUContext ctx;
-    CPUContext SavedContext;
+    CPUContext                 ctx;
+    CPUContext                 SavedContext;
 
-  private:
     std::vector<std::pair<uintptr_t, usize>> m_Stacks;
     bool                                     m_IsUser = false;
 
@@ -125,10 +121,10 @@ struct Thread
     uintptr_t m_El0Base;
 #endif
 
-    bool                      m_IsEnqueued = false;
-    struct Event              m_Event;
-    std::deque<struct Event*> m_Events;
-    usize                     m_Which = 0;
+    bool               m_IsEnqueued = false;
+    Event              m_Event;
+    std::deque<Event*> m_Events;
+    usize              m_Which = 0;
 
     friend class Process;
     friend class Scheduler;

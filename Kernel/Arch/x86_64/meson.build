@@ -25,7 +25,6 @@ srcs += files(
   'Drivers/Serial.cpp',
 
   'Drivers/Timers/HPET.cpp',
-  'Drivers/Timers/HPETComparator.cpp',
   'Drivers/Timers/Lapic.cpp',
   'Drivers/Timers/PIT.cpp',
   'Drivers/Timers/RTC.cpp',

@@ -7,8 +7,8 @@
 #include <Common.hpp>
 
 #include <Boot/BootInfo.hpp>
+#include <Prism/Containers/Bitmap.hpp>
 #include <Prism/Math.hpp>
-#include <Prism/Bitmap.hpp>
 
 #include <Memory/KernelHeap.hpp>
 #include <Memory/PMM.hpp>
