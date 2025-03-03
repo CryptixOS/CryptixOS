@@ -42,7 +42,7 @@ namespace PCI
         eBar5                = 0x24,
         eCardBusCisPointer   = 0x28,
         eSubsystemVendorID   = 0x2c,
-        eSybsystemID         = 0x2e,
+        eSubsystemID         = 0x2e,
         eCapabilitiesPointer = 0x34,
         eInterruptLine       = 0x3c,
         eInterruptPin        = 0x3d,

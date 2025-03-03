@@ -102,7 +102,7 @@ namespace I8042Controller
 
     enum Response
     {
-        ePortTestSuccees        = 0x00,
+        ePortTestSuccess        = 0x00,
         ePortClockLineStuckLow  = 0x01,
         ePortClockLineStuckHigh = 0x02,
         ePortDataLineStuckLow   = 0x03,

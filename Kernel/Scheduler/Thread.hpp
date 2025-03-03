@@ -73,7 +73,7 @@ struct Thread
 
     Thread*                    Fork(Process* parent);
 
-    // FIXME(v1tr10l7): implement tthis once we have signals
+    // FIXME(v1tr10l7): implement this once we have signals
     inline bool                WasInterrupted() const { return false; }
 
     inline uintptr_t           GetFsBase() const { return m_FsBase; }

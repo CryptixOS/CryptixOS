@@ -339,7 +339,7 @@ namespace Syscall::VFS
         PathView path    = args.Get<const char*>(0);
         mode_t   mode    = args.Get<mode_t>(1);
 
-        // TODO(v1tr10l7): validate whether user has appriopriate permissions
+        // TODO(v1tr10l7): validate whether user has appropriate permissions
         Process* current = Process::GetCurrent();
 
         if (!current->ValidateAddress(reinterpret_cast<uintptr_t>(path.Raw()),

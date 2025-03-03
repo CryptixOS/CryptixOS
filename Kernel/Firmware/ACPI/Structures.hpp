@@ -30,7 +30,7 @@ namespace ACPI
         eSystemMemory                 = 0,
         eSystemIO                     = 1,
         ePciConfigurationSpace        = 2,
-        eEmbeddedControler            = 3,
+        eEmbeddedController            = 3,
         eSMBus                        = 4,
         eSystemCMOS                   = 5,
         ePciDeviceBar                 = 6,
@@ -54,7 +54,7 @@ namespace ACPI
                 case AddressSpace::eSystemMemory:
                 case AddressSpace::eSystemIO:
                 case AddressSpace::ePciConfigurationSpace:
-                case AddressSpace::eEmbeddedControler:
+                case AddressSpace::eEmbeddedController:
                 case AddressSpace::eSMBus:
                 case AddressSpace::eSystemCMOS:
                 case AddressSpace::ePciDeviceBar:
@@ -94,7 +94,7 @@ namespace ACPI
         u32                       FirmwareControl;
         u32                       DSDT;
         u8                        Reserved;
-        u8                        PrefferedPmProfile;
+        u8                        PreferredPmProfile;
         u16                       SciInterrupt;
         u32                       SmiCmd;
         u8                        AcpiEnable;

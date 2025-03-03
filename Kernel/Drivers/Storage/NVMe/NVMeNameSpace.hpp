@@ -45,11 +45,11 @@ namespace NVMe
         u16 AtomicWriteUnitPowerFailBoundSize;
         u16 Unused2;
         u64 NvmCapacity[2];
-        u64 Unusued3[5];
+        u64 Unused3[5];
         u8  GuID[16];
         u8  ExtendedUID[8];
         LBA LbaFormatUpper[16];
-        u64 Unused3[24];
+        u64 Unused4[24];
         u8  VendorSpecific[3712];
     } __attribute__((packed));
 

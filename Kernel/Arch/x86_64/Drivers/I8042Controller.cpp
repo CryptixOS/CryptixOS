@@ -106,7 +106,7 @@ namespace I8042Controller
                                                    : Command::eTestPort2);
             Response status = static_cast<Response>(ReadBlocking());
 
-            if (status == Response::ePortTestSuccees)
+            if (status == Response::ePortTestSuccess)
             {
                 LogTrace("I8042Controller: Port #{} is working correctly",
                          std::to_underlying(port));
@@ -198,7 +198,7 @@ namespace I8042Controller
 
     void Initialize()
     {
-        LogTrace("I8042Controller: Initiailizing...");
+        LogTrace("I8042Controller: Initializing...");
         DisableDevices();
         Flush();
 

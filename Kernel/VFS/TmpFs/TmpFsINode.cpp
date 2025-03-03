@@ -63,7 +63,7 @@ isize TmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
 {
     ScopedLock guard(m_Lock);
 
-    // TODO(v1tr10l7): we should resize in seperate function
+    // TODO(v1tr10l7): we should resize in separate function
     if (offset + bytes > m_Capacity)
     {
         usize newCapacity = m_Capacity;
