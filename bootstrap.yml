@@ -31,7 +31,7 @@ packages:
       version: '1.0'
     pkgs_required:
       - base-files
-      - coretools
+      - cryptix-utils
       - coreutils
       - file
       - init
