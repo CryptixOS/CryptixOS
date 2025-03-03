@@ -4,78 +4,21 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/x86_64/Drivers/PS2Keyboard.hpp>
 
 #include <Arch/InterruptHandler.hpp>
 #include <Arch/InterruptManager.hpp>
 
 #include <Arch/x86_64/Drivers/I8042Controller.hpp>
+#include <Arch/x86_64/Drivers/PS2Keyboard.hpp>
+#include <Arch/x86_64/Drivers/PS2Scancodes.hpp>
 #include <Arch/x86_64/IO.hpp>
 
 #include <Drivers/TTY.hpp>
 
 #include <cctype>
 
-extern bool       g_Decckm;
-static const char s_CapsLockMap[]
-    = {'\0', '\e', '1',  '2',  '3',  '4',  '5',  '6',  '7',  '8', '9', '0',
-       '-',  '=',  '\b', '\t', 'Q',  'W',  'E',  'R',  'T',  'Y', 'U', 'I',
-       'O',  'P',  '[',  ']',  '\n', '\0', 'A',  'S',  'D',  'F', 'G', 'H',
-       'J',  'K',  'L',  ';',  '\'', '`',  '\0', '\\', 'Z',  'X', 'C', 'V',
-       'B',  'N',  'M',  ',',  '.',  '/',  '\0', '\0', '\0', ' '};
+extern bool g_Decckm;
 
-static const char s_ShiftMap[]
-    = {'\0', '\e', '!',  '@',  '#',  '$',  '%',  '^',  '&',  '*', '(', ')',
-       '_',  '+',  '\b', '\t', 'Q',  'W',  'E',  'R',  'T',  'Y', 'U', 'I',
-       'O',  'P',  '{',  '}',  '\n', '\0', 'A',  'S',  'D',  'F', 'G', 'H',
-       'J',  'K',  'L',  ':',  '"',  '~',  '\0', '|',  'Z',  'X', 'C', 'V',
-       'B',  'N',  'M',  '<',  '>',  '?',  '\0', '\0', '\0', ' '};
-
-static const char s_ShiftCapsLockMap[]
-    = {'\0', '\e', '!',  '@',  '#',  '$',  '%',  '^',  '&',  '*', '(', ')',
-       '_',  '+',  '\b', '\t', 'q',  'w',  'e',  'r',  't',  'y', 'u', 'i',
-       'o',  'p',  '{',  '}',  '\n', '\0', 'a',  's',  'd',  'f', 'g', 'h',
-       'j',  'k',  'l',  ':',  '"',  '~',  '\0', '|',  'z',  'x', 'c', 'v',
-       'b',  'n',  'm',  '<',  '>',  '?',  '\0', '\0', '\0', ' '};
-
-static const char s_Map[]
-    = {'\0', '\e', '1',  '2',  '3',  '4',  '5',  '6',  '7',  '8', '9', '0',
-       '-',  '=',  '\b', '\t', 'q',  'w',  'e',  'r',  't',  'y', 'u', 'i',
-       'o',  'p',  '[',  ']',  '\n', '\0', 'a',  's',  'd',  'f', 'g', 'h',
-       'j',  'k',  'l',  ';',  '\'', '`',  '\0', '\\', 'z',  'x', 'c', 'v',
-       'b',  'n',  'm',  ',',  '.',  '/',  '\0', '\0', '\0', ' '};
-
-/*
-
-static const char s_Map[]
-    = {'\0', '\e', '1',  '2',  '3',  '4',  '5',  '6',  '7',  '8', '9', '0',
-       '-',  '=',  '\b', '\t', 'q',  'w',  'e',  'r',  't',  'y', 'u', 'i',
-       'o',  'p',  '[',  ']',  '\n', '\0', 'a',  's',  'd',  'f', 'g', 'h',
-       'j',  'k',  'l',  ';',  '\'', '`',  '\0', '\\', 'z',  'x', 'c', 'v',
-       'b',  'n',  'm',  ',',  '.',  '/',  '\0', '\0', '\0', ' '};
-
-static const char s_ShiftMap[]
-    = {'\0', '\e', '!',  '@',  '#',  '$',  '%',  '^',  '&',  '*', '(', ')',
-       '_',  '+',  '\b', '\t', 'Q',  'W',  'E',  'R',  'T',  'Y', 'U', 'I',
-       'O',  'P',  '{',  '}',  '\n', '\0', 'A',  'S',  'D',  'F', 'G', 'H',
-       'J',  'K',  'L',  ':',  '"',  '~',  '\0', '|',  'Z',  'X', 'C', 'V',
-       'B',  'N',  'M',  '<',  '>',  '?',  '\0', '\0', '\0', ' '};
-*/
-
-/*
-static char s_Map[0x100]
-    = {0,   0,   '1',  '2', '3',  '4', '5', '6',  '7', '8', '9', '0',
-       '-', '=', 0177, 0,   'q',  'w', 'e', 'r',  't', 'y', 'u', 'i',
-       'o', 'p', '[',  ']', 0,    0,   'a', 's',  'd', 'f', 'g', 'h',
-       'j', 'k', 'l',  ';', '\'', '`', 0,   '\\', 'z', 'x', 'c', 'v',
-       'b', 'n', 'm',  ',', '.',  '/', 0,   0,    0,   ' '};
-
-static char s_ShiftMap[0x100] = {
-    0,   0,   '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', 0,
-    0,   'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', 0,   0,
-    'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', 0,   '|', 'Z',
-    'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 0,   0,   0,   ' '};
-    */
 enum KeyModifier
 {
     eModAlt      = 0x01,
@@ -99,14 +42,12 @@ enum KeyModifier
 
 static int s_Modifiers = (KeyModifier)0;
 
-void       ClearBuffer();
-void       HandleInterrupt(CPUContext* ctx);
-
-void       PS2Keyboard::Initialize(PS2Port port)
+void       PS2Keyboard::Initialize()
 {
-    m_Port = port;
-    I8042Controller::SendCommand(I8042Command::eReadConfigurationByte);
-    u8 configuration = I8042Controller::ReadBlocking();
+    I8042Controller* controller
+        = reinterpret_cast<I8042Controller*>(m_Controller);
+    (void)controller->SendCommand(I8042Command::eReadConfigurationByte);
+    u8 configuration = controller->ReadBlocking();
 
     // TODO(v1tr10l7): I think we should disable the port1 translation later
     // on
@@ -114,17 +55,20 @@ void       PS2Keyboard::Initialize(PS2Port port)
                    | I8042Configuration::eEnablePort1Translation;
     configuration &= ~I8042Configuration::eDisablePort1Clock;
 
-    I8042Controller::SendCommand(I8042Command::eWriteConfigurationByte);
-    I8042Controller::WriteBlocking(I8042Port::eBuffer, configuration);
+    (void)controller->SendCommand(I8042Command::eWriteConfigurationByte);
+    controller->WriteBlocking(I8042Port::eBuffer, configuration);
 
-    I8042Controller::SendCommand(I8042Command::eEnablePort1);
+    (void)controller->SendCommand(m_Port == PS2Port::ePort1
+                                      ? I8042Command::eEnablePort1
+                                      : I8042Command::eEnablePort2);
 
     auto handler = InterruptManager::AllocateHandler(0x21);
     handler->Reserve();
     handler->SetHandler(HandleInterrupt);
     InterruptManager::Unmask(0x01);
 
-    while (!I8042Controller::IsInputEmpty());
+    while (!controller->IsInputEmpty())
+        ;
 
     LogInfo("PS2Keyboard: Installed handler at vector: {}",
             handler->GetInterruptVector());
@@ -142,30 +86,28 @@ void Emit(const char* ptr, usize count)
 
 void PS2Keyboard::HandleInterrupt(CPUContext* ctx)
 {
-    bool extraScancodes = false;
+    bool             extraScancodes = false;
 
-    while (!I8042Controller::IsOutputEmpty())
+    I8042Controller* controller     = I8042Controller::GetInstance();
+    while (!controller->IsOutputEmpty())
     {
-        byte raw = I8042Controller::ReadBlocking();
+        byte raw = controller->ReadBlocking();
 
-        if (raw == 0xe8)
+        if (raw == 0xe0)
         {
             extraScancodes = true;
             continue;
         }
         if (extraScancodes)
         {
-
+            extraScancodes = false;
             switch (raw)
             {
                 case SCANCODE_CTRL: s_Modifiers |= eModControl; continue;
                 case SCANCODE_CTRL_REL: s_Modifiers &= ~eModControl; continue;
                 case 0x1c: Emit("\n", 1); continue;
                 case 0x35: Emit("/", 1); continue;
-                case 0x48:
-                    if (!g_Decckm) Emit("\e[A", 3);
-                    else Emit("\e0A", 3);
-                    continue;
+                case 0x48: Emit("\e[A", 3); continue;
                 case 0x4b:
                     if (!g_Decckm) Emit("\e[D", 3);
                     else Emit("\e0D", 3);
@@ -185,7 +127,6 @@ void PS2Keyboard::HandleInterrupt(CPUContext* ctx)
                 case 0x53: Emit("\e[3~", 4); continue;
             }
         }
-        extraScancodes = false;
 
         switch (raw)
         {
@@ -208,28 +149,28 @@ void PS2Keyboard::HandleInterrupt(CPUContext* ctx)
         char c = 0;
         if (raw >= SCANCODE_MAX) continue;
         if (!(s_Modifiers & eModCapsLock) && !(s_Modifiers & eModShift))
-            c = s_Map[raw];
+            c = s_Ps2ScanCodeSet1_Map[raw];
         if (!(s_Modifiers & eModCapsLock) && s_Modifiers & eModShift)
-            c = s_ShiftMap[raw];
+            c = s_Ps2ScanCodeSet1_ShiftMap[raw];
         if (s_Modifiers & eModCapsLock && !(s_Modifiers & eModShift))
-            c = s_CapsLockMap[raw];
+            c = s_Ps2ScanCodeSet1_CapsLockMap[raw];
         if (s_Modifiers & eModCapsLock && s_Modifiers & eModShift)
-            c = s_ShiftCapsLockMap[raw];
+            c = s_Ps2ScanCodeSet1_ShiftCapsLockMap[raw];
 
         if (s_Modifiers & eModControl) c = std::toupper(c) - 0x40;
-        Emit(&c, 1);
-        continue;
-
-        byte ch      = raw & 0x7f;
         bool pressed = !(raw & 0x80);
+
+        if (!pressed) continue;
+        Emit(&c, 1);
 
 // #define KEYBOARD_DEBUG
 #ifdef KEYBOARD_DEBUG
         LogDebug("Keyboard::HandleInterrupt: {} {}\n", ch,
                  pressed ? "down" : "up");
 #endif
-        TTY* current = TTY::GetCurrent();
+        // TTY* current = TTY::GetCurrent();
 
+        /*
         switch (ch)
         {
             case 0x38:
@@ -256,6 +197,6 @@ void PS2Keyboard::HandleInterrupt(CPUContext* ctx)
                     current->PutChar(s_ShiftMap[ch]);
                 else if (!s_Modifiers) current->PutChar(s_Map[ch]);
                 break;
-        }
+        }*/
     }
 }

@@ -8,12 +8,32 @@
 
 #include <Arch/x86_64/Types.hpp>
 
-#include <errno.h>
+#include <Drivers/HID/Ps2Controller.hpp>
+
 #include <expected>
 #include <utility>
 
-namespace I8042Controller
+enum class Ps2DeviceType
 {
+    eUndefined = 0,
+    eATKeyboard,
+    eStandardMouse,
+    eScrollWheelMouse,
+    e5ButtonMouse,
+    eMf2Keyboard,
+    eThinkPadKeyboard,
+    eNcdKeyboard,
+    eHostConnected122KeysKeyboard,
+    eStandardKeyboard,
+    eJapaneseGKeyboard,
+    eJapanesePKeyboard,
+    eJapaneseAKeyboard,
+    eNcdSunKeyboard
+};
+
+class I8042Controller : public Ps2Controller
+{
+  public:
     enum class Port : u16
     {
         eBuffer  = 0x60,
@@ -66,29 +86,6 @@ namespace I8042Controller
         eDisablePort2Clock      = Bit(5),
         eEnablePort1Translation = Bit(6),
     };
-    inline u8 operator~(Configuration lhs) { return ~std::to_underlying(lhs); }
-    inline u8 operator&(u8 lhs, const Configuration rhs)
-    {
-        return lhs & std::to_underlying(rhs);
-    }
-    inline Configuration operator|(Configuration lhs, const Configuration rhs)
-    {
-        u8 config = std::to_underlying(lhs) | std::to_underlying(rhs);
-
-        return static_cast<Configuration>(config);
-    }
-    inline u8& operator&=(u8& lhs, const Configuration rhs)
-    {
-        lhs &= std::to_underlying(rhs);
-
-        return lhs;
-    }
-    inline u8& operator|=(u8& lhs, const Configuration rhs)
-    {
-        lhs |= std::to_underlying(rhs);
-
-        return lhs;
-    }
 
     enum class Output
     {
@@ -102,7 +99,7 @@ namespace I8042Controller
 
     enum Response
     {
-        ePortTestSuccess        = 0x00,
+        ePortTestSuccees        = 0x00,
         ePortClockLineStuckLow  = 0x01,
         ePortClockLineStuckHigh = 0x02,
         ePortDataLineStuckLow   = 0x03,
@@ -114,53 +111,111 @@ namespace I8042Controller
         eResend                 = 0xfe,
     };
 
-    enum class DeviceCommand
+    static ErrorOr<void>    Probe();
+    static I8042Controller* GetInstance()
     {
-        eIdentify        = 0xf2,
-        eEnableScanning  = 0xf4,
-        eDisableScanning = 0xf5,
-        eReset           = 0xff,
-    };
-    enum class DevicePort
-    {
-        eNone  = 0,
-        ePort1 = 1,
-        ePort2 = 2,
-    };
+        return reinterpret_cast<I8042Controller*>(s_Instance);
+    }
 
-    // TODO(v1tr10l7): Detect the ps/2 controller, instead of assuming it exists
-    void                         Initialize();
+    ErrorOr<void>         Initialize();
 
-    bool                         IsOutputEmpty();
-    bool                         IsInputEmpty();
+    virtual bool          IsOutputEmpty() override;
+    bool                  IsInputEmpty();
 
-    u8                           ReadBlocking();
-    void                         WriteBlocking(Port port, u8 data);
+    u8                    ReadBlocking();
+    void                  WriteBlocking(Port port, u8 data);
 
-    std::expected<u8, errno_t>   TryRead();
-    std::expected<void, errno_t> TryWrite(Port port, u8 data);
+    ErrorOr<u8>           TryRead();
+    ErrorOr<void>         TryWrite(Port port, u8 data);
 
-    void                         Flush();
-
-    inline void                  SendCommand(Command command)
-    {
+    ErrorOr<void>         FlushReadBuffer();
+    ErrorOr<void>         SendCommand(Command command);
+    /*{
         WriteBlocking(Port::eCommand, std::to_underlying(command));
-    }
+    }*/
 
-    std::expected<void, errno_t> WriteToDevice(DevicePort port, byte data);
+    ErrorOr<u8>           ReadDevicePort(DevicePort port);
+    ErrorOr<void>         WriteDevicePort(DevicePort port, byte data);
 
-    inline std::expected<void, errno_t> SendDeviceCommand(DevicePort    port,
-                                                          DeviceCommand command)
+    virtual ErrorOr<void> SendDeviceCommand(DevicePort    port,
+                                            DeviceCommand command) override
     {
-        return WriteToDevice(port, std::to_underlying(command));
+        return WriteDevicePort(port, std::to_underlying(command));
+    }
+    virtual ErrorOr<void>
+    SendDeviceCommand(DevicePort port, DeviceCommand command, u8 data) override
+    {
+        auto successOr = SendDeviceCommand(port, command);
+        if (!successOr) return successOr;
+        successOr = WriteDevicePort(port, data);
+        if (!successOr) return successOr;
+
+        return {};
     }
 
-    std::expected<void, errno_t> ResetDevice(DevicePort port);
+    virtual ErrorOr<void> EnableDevice(DevicePort port) override;
+    virtual ErrorOr<void> DisableDevice(DevicePort port) override;
 
-}; // namespace I8042Controller
+    virtual ErrorOr<void> EnablePort1Translation() override;
+    virtual ErrorOr<void> DisablePort1Translation() override;
+    virtual ErrorOr<void> ResetDevice(DevicePort port) override;
+
+  private:
+    static constexpr isize READ_WRITE_TIMEOUT = 10'000;
+
+    bool                   m_Port1Available   = false;
+    bool                   m_Port2Available   = false;
+
+    static bool            QuerySupport();
+    static void            HandleInterrupt(struct CPUContext* context);
+
+    I8042Controller();
+
+    ErrorOr<void>          DisableDevices();
+
+    bool                   PerformSelfTest();
+    bool                   IsDualChannel();
+
+    bool                   TestInterfaces();
+    bool                   TestSingleInterface(DevicePort port);
+
+    void                   EnumerateDevices();
+    ErrorOr<Ps2DeviceType> ScanPortForDevices(DevicePort port);
+
+    ErrorOr<void>          WaitForIncomingData();
+    ErrorOr<void>          WaitForWriteReady();
+
+    u8                     ReadPort(Port port);
+    void                   WritePort(Port port, u8 data);
+};
 
 using I8042Port          = I8042Controller::Port;
 using I8042Command       = I8042Controller::Command;
 using I8042Configuration = I8042Controller::Configuration;
 using I8042Response      = I8042Controller::Response;
 using PS2Port            = I8042Controller::DevicePort;
+
+inline u8 operator~(I8042Configuration lhs) { return ~std::to_underlying(lhs); }
+inline u8 operator&(u8 lhs, const I8042Configuration rhs)
+{
+    return lhs & std::to_underlying(rhs);
+}
+inline I8042Configuration operator|(I8042Configuration       lhs,
+                                    const I8042Configuration rhs)
+{
+    u8 config = std::to_underlying(lhs) | std::to_underlying(rhs);
+
+    return static_cast<I8042Configuration>(config);
+}
+inline u8& operator&=(u8& lhs, const I8042Configuration rhs)
+{
+    lhs &= std::to_underlying(rhs);
+
+    return lhs;
+}
+inline u8& operator|=(u8& lhs, const I8042Configuration rhs)
+{
+    lhs |= std::to_underlying(rhs);
+
+    return lhs;
+}

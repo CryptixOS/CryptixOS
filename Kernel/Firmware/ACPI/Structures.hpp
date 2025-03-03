@@ -30,7 +30,7 @@ namespace ACPI
         eSystemMemory                 = 0,
         eSystemIO                     = 1,
         ePciConfigurationSpace        = 2,
-        eEmbeddedController            = 3,
+        eEmbeddedController           = 3,
         eSMBus                        = 4,
         eSystemCMOS                   = 5,
         ePciDeviceBar                 = 6,

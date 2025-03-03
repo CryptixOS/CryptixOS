@@ -9,6 +9,7 @@
 #include <Arch/x86_64/Drivers/I8042Controller.hpp>
 
 #include <Drivers/Device.hpp>
+#include <Drivers/HID/Ps2Controller.hpp>
 
 enum class KeyModifiers
 {
@@ -26,13 +27,15 @@ class PS2Keyboard : public Device
         : Device(DriverType(0), DeviceType(0))
     {
     }
-    PS2Keyboard(PS2Port port)
+    PS2Keyboard(Ps2Controller* controller, PS2Port port)
         : Device({}, {})
+        , m_Controller(controller)
+        , m_Port(port)
     {
-        Initialize(port);
+        Initialize();
     }
 
-    void                     Initialize(PS2Port port);
+    void                     Initialize();
 
     virtual std::string_view GetName() const noexcept { return "ps2keyboard"; }
 
@@ -45,7 +48,8 @@ class PS2Keyboard : public Device
     virtual i32 IoCtl(usize request, uintptr_t argp) { return -1; }
 
   private:
-    CTOS_UNUSED PS2Port m_Port = PS2Port::eNone;
+    Ps2Controller* m_Controller = nullptr;
+    PS2Port        m_Port       = PS2Port::eNone;
 
     enum class Command
     {

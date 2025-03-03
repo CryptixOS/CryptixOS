@@ -53,13 +53,14 @@ class Ps2KeyboardDevice : public RefCounted, public Device
         eSet3,
     };
 
-    Ps2KeyboardDevice(Prism::Ref<Ps2Controller> controller, PS2_DevicePort port,
+    Ps2KeyboardDevice(Ps2Controller* controller, PS2_DevicePort port,
                       ScanCodeSet scanCodeSet)
         : Device(DriverType(69), DeviceType(69))
         , m_Controller(controller)
         , m_Port(port)
         , m_ScanCodeSet(scanCodeSet)
     {
+        Initialize();
     }
     virtual ~Ps2KeyboardDevice() = default;
 
@@ -90,17 +91,17 @@ class Ps2KeyboardDevice : public RefCounted, public Device
     void OnByteReceived(u8 byte);
 
   private:
-    WeakRef<Ps2Controller> m_Controller;
-    PS2_DevicePort         m_Port;
-    ScanCodeSet            m_ScanCodeSet   = ScanCodeSet::eSet1;
+    Ps2Controller* m_Controller = nullptr;
+    PS2_DevicePort m_Port;
+    ScanCodeSet    m_ScanCodeSet   = ScanCodeSet::eSet1;
 
-    KeyModifier            m_Modifiers     = KeyModifier::eNone;
-    bool                   m_ExtraScanCode = false;
+    KeyModifier    m_Modifiers     = KeyModifier::eNone;
+    bool           m_ExtraScanCode = false;
 
-    void                   HandleScanCodeSet1Key(u8 raw);
-    void                   HandleScanCodeSet2Key(u8 raw);
+    void           HandleScanCodeSet1Key(u8 raw);
+    void           HandleScanCodeSet2Key(u8 raw);
 
-    void                   Emit(const char* str, usize count);
+    void           Emit(const char* str, usize count);
 };
 
 using Ps2ScanCodeSet = Ps2KeyboardDevice::ScanCodeSet;

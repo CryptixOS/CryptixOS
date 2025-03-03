@@ -9,7 +9,7 @@
 #include <Prism/Core/Types.hpp>
 #include <Prism/Memory/Ref.hpp>
 
-class Ps2Controller : public RefCounted
+class Ps2Controller
 {
   public:
     enum class DevicePort

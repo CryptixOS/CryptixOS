@@ -18,6 +18,8 @@
 #include <Arch/x86_64/Drivers/Timers/RTC.hpp>
 #include <Arch/x86_64/IO.hpp>
 
+#include <Drivers/HID/Ps2Controller.hpp>
+
 #include <Time/HardwareTimer.hpp>
 
 namespace Arch
@@ -35,7 +37,7 @@ namespace Arch
         IO::Delay(1000);
         PCSpeaker::ToneOff();
 
-        I8042Controller::Initialize();
+        I8042Controller::Probe();
 
         LogInfo("Date: {:02}/{:02}/{:04} {:02}:{:02}:{:02}", RTC::GetDay(),
                 RTC::GetMonth(), RTC::GetCentury() * 100 + RTC::GetYear(),
@@ -54,7 +56,7 @@ namespace Arch
     void PowerOff() {}
     void Reboot()
     {
-        I8042Controller::SendCommand(I8042Command::eResetCPU);
+        I8042Controller::GetInstance()->SendCommand(I8042Command::eResetCPU);
         IO::Out<word>(0x604, 0x2000);
     }
 
