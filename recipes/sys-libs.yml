@@ -269,17 +269,15 @@ packages:
     architecture: '@OPTION:arch@'
     source:
       subdir: 'sources'
-      url: 'https://ftp.gnu.org/gnu/readline/readline-8.2.tar.gz'
-      format: 'tar.gz'
-      extract_path: 'readline-8.2'
-      version: '8.2'
-      patch-path-strip: 1
+      git: 'https://git.savannah.gnu.org/git/readline.git'
+      tag: 'readline-8.1'
+      version: '8.1'
     tools_required:
       - system-gcc
     pkgs_required:
       - mlibc
       - ncurses
-    revision: 3
+    revision: 9
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
@@ -293,6 +291,8 @@ packages:
       - args: ['make', 'SHLIB_LIBS="-lncursesw"', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
+      - args: ['patchelf', '--set-soname', 'libreadline.so.8', '@THIS_COLLECT_DIR@/usr/lib/libreadline.so.8']
+      - args: ['patchelf', '--set-soname', 'libhistory.so.8', '@THIS_COLLECT_DIR@/usr/lib/libhistory.so.8']
 
   - name: zlib
     architecture: '@OPTION:arch@'
