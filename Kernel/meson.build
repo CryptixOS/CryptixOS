@@ -111,6 +111,7 @@ kernel_elf = executable(
   include_directories: include_directories,
   c_args: c_args,
   cpp_args: cxx_args,
+  cpp_pch: 'Library/PrecompiledHeader.hpp',
   link_args: ld_args,
   install: false,
 )
