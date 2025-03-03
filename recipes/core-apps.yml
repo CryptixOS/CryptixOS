@@ -248,7 +248,7 @@ packages:
         - 'meson'
         - 'setup'
         - '--cross-file'
-        - '@SOURCE_ROOT@/CrossFiles/target-@OPTION:arch-triple@.cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/@OPTION:arch-triple@-target.cross-file'
         - '--prefix=/usr'
         - '--buildtype=release'
         - '@THIS_SOURCE_DIR@'

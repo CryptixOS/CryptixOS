@@ -9,8 +9,11 @@ pkg-config = 'pkg-config'
 cmake = 'cmake'
 
 [built-in options]
+b_pie = 'true'
 c_args = ['-target', 'aarch64-linux-none']
 cpp_args = ['-target', 'aarch64-linux-none']
+cpp_eh = 'none'
+cpp_rtti = 'false'
 
 [host_machine]
 system = 'none'

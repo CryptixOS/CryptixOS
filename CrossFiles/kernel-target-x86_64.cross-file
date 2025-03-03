@@ -10,8 +10,12 @@ cmake = 'cmake'
 nasm = 'nasm'
 
 [built-in options]
+b_pie = 'true'
 c_args = ['-target', 'x86_64-pc-elf']
 cpp_args = ['-target', 'x86_64-pc-elf']
+cpp_eh = 'none'
+cpp_rtti = 'false'
+
 
 [host_machine]
 system = 'pc'
