@@ -6,8 +6,8 @@
  */
 #pragma once
 
-#include <Prism/Core/Types.hpp>
 #include <Prism/Memory/Pointer.hpp>
+#include <Prism/Core/Types.hpp>
 
 #include <limine.h>
 
