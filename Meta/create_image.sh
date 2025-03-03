@@ -1,3 +1,5 @@
+#!/usr/bin/env zsh
+
 # Create an empty zeroed out 512MiB image file.
 dd if=/dev/zero of=image.hdd bs=4M count=128
  

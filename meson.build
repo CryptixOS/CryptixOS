@@ -4,16 +4,17 @@
 #*
 #* SPDX-License-Identifier: GPL-3
 #*/
-project(
-  'CryptixOS',
-  ['c', 'cpp'],
-  version: 'v0.0.1',
-  license: 'GPL-3.0',
+project('CryptixOS', ['c', 'cpp'],
+  version: 'v0.0.1', license: 'GPL-3.0',
   default_options: [
-    'c_std=c17',
-    'cpp_std=c++23',
+    'optimization=3',
     'warning_level=2',
     'werror=true',
+    'wrap_mode=forcefallback',
+    'b_lundef=true',
+    'b_pie=true',
+    'c_std=c17',
+    'cpp_std=c++23',
   ],
 )
 
@@ -57,8 +58,6 @@ add_global_arguments(
     '-mstack-protector-guard=global',
     '-fno-PIC',
     '-fPIE',
-    '-O3',
-    '-ffast-math',
     '-nostdlib',
     '-static',
   ],
@@ -67,8 +66,6 @@ add_global_arguments(
 
 add_global_arguments(
   [
-    '-fno-rtti',
-    '-fno-exceptions',
     '-fsized-deallocation',
     '-Wno-unused-parameter',
     '-Wno-non-virtual-dtor',
@@ -103,33 +100,30 @@ phmap_opts.add_cmake_defines(
 
 limine = subproject('limine', default_options: 'arch=' + arch)
 deps = [
-  cmake.subproject('parallel_hashmap', options: phmap_opts).dependency('phmap'),
 
-  dependency('limine'),
-  dependency('flanterm'),
-  #dependency('freestnd-cxx-hdrs'),
-  dependency('libstdcxx_headers'),
   dependency(
     'compiler_rt_builtins',
-    default_options: 'custom_includes=' + meson.project_source_root() / 'Kernel/Utility/KLibC',
+    default_options: 'custom_includes=' + 
+      meson.project_source_root() / 'Kernel/Library/KLibC',
   ),
-  dependency('smart_ptr'),
-  dependency('veque'),
-  dependency('fmt'),
-  dependency('string'),
   dependency('demangler'),
-  dependency('magic_enum'),
-  dependency('uacpi'),
+  dependency('flanterm'),
+  dependency('fmt'),
+  #dependency('freestnd-cxx-hdrs'),
+  dependency('libstdcxx_headers'),
+  dependency('limine'),
+  dependency('magic_enum', default_options: [
+    'test=false',
+  ]),
+  cmake.subproject('parallel_hashmap', options: phmap_opts).dependency('phmap'),
   dependency('prism'),
+  dependency('smart_ptr'),
+  dependency('string'),
+  dependency('uacpi'),
+  dependency('veque'),
 ]
 
-inc_deps = []
-foreach dep : deps
-  inc_deps += dep.partial_dependency(includes: true)
-endforeach
-
 subdir('Kernel')
-
 # ==============================================================================
 ### Qemu args
 qemu_args = [
@@ -193,6 +187,9 @@ else
 endif
 # ==============================================================================
 
+
+# ==============================================================================
+### Targets
 iso_dir = 'iso_root'
 ksyms = custom_target(
   'ksyms',

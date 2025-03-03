@@ -1,3 +1,3 @@
-#!/usr/bin/sh
+#!/usr/bin/env zsh
 
-ninja -C build run_${1:-uefi}
+meson compile -C build run_${1:-uefi}
