@@ -22,7 +22,9 @@ jobs:
         with:
           python-version: '3.x'
       - name: Install dependencies
-        run: sudo apt update -y && sudo apt install -y meson ninja-build clang lld llvm git cmake python3 pipx build-essential qemu-system parted udev bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo libisl-dev gperf gettext autopoint
+        run: sudo apt update -y && sudo apt install -y meson ninja-build clang lld llvm git cmake python3 pipx
+          && sudo apt install build-essential qemu-system parted udev bison flex libgmp3-dev libmpc-dev libmpfr-dev
+          && sudo apt install texinfo libisl-dev gperf gettext autopoint libreadline-dev 
           && pipx install xbstrap
       - name: Build sysroot
         run: mkdir build-sysroot && pushd build-sysroot && xbstrap init .. && xbstrap install base && popd
