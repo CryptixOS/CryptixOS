@@ -439,7 +439,7 @@ bool I8042Controller::TestSingleInterface(DevicePort port)
         return false;
     Response status = static_cast<Response>(ReadBlocking());
 
-    if (status == Response::ePortTestSuccees)
+    if (status == Response::ePortTestSuccess)
     {
         LogTrace("I8042: Port #{} is working correctly",
                  std::to_underlying(port));
