@@ -1,0 +1,32 @@
+name: CI Meson
+
+on:
+  push:
+    branches: ["master", "dev"]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build-linux:
+    runs-on: [ubuntu-latest]
+    strategy:
+      fail-fast: false
+      matrix:
+        build-configuration: [Debug]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install dependencies
+        run: sudo apt update -y && sudo apt install -y meson ninja-build clang lld llvm git cmake python3 pipx build-essential qemu-system parted udev &&
+          && pipx install xbstrap
+      - name: Build sysroot
+        run: mkdir build-sysroot && pushd build-sysroot && xbstrap init .. && xbstrap install base && popd
+      - name: Configure Project
+        run: ./Meta/setup.sh x86_64 &&
+             ./Meta/build.sh
+    
