@@ -108,7 +108,9 @@ namespace PhysicalMemoryManager
         }
 
         Assert(s_Bitmap.GetSize() != 0);
-        [[maybe_unused]] auto entryTypeToString = [](u64 type)
+        [[maybe_unused]]
+        auto entryTypeToString
+            = [](u64 type)
         {
             switch (type)
             {

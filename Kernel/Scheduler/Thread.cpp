@@ -111,7 +111,7 @@ Thread::Thread(Process* parent, uintptr_t pc,
     auto mapUserStack = [this]() -> std::pair<uintptr_t, uintptr_t>
     {
         uintptr_t pstack  = PMM::CallocatePages<uintptr_t>(CPU::USER_STACK_SIZE
-                                                          / PMM::PAGE_SIZE);
+                                                           / PMM::PAGE_SIZE);
         uintptr_t vustack = m_Parent->m_UserStackTop - CPU::USER_STACK_SIZE;
 
         Assert(m_Parent->PageMap->MapRange(
@@ -160,11 +160,14 @@ Thread::Thread(Process* parent, uintptr_t pc, bool user)
     parent->m_UserStackTop = vustack - PMM::PAGE_SIZE;
     m_Stacks.push_back(std::make_pair(pstack, CPU::USER_STACK_SIZE));
 
-    [[maybe_unused]] uintptr_t stack1
+    [[maybe_unused]]
+    uintptr_t stack1
         = ToHigherHalfAddress<uintptr_t>(pstack) + CPU::USER_STACK_SIZE;
-    [[maybe_unused]] uintptr_t stack2 = vustack + CPU::USER_STACK_SIZE;
+    [[maybe_unused]]
+    uintptr_t stack2
+        = vustack + CPU::USER_STACK_SIZE;
 
-    this->stack                       = Math::AlignDown(stack1, 16);
+    this->stack = Math::AlignDown(stack1, 16);
 
     CPU::PrepareThread(this, pc, 0);
 }
@@ -178,7 +181,7 @@ Thread* Thread::Fork(Process* process)
     newThread->stack = stack;
 
     Pointer kstack   = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
-                                                    / PMM::PAGE_SIZE);
+                                                      / PMM::PAGE_SIZE);
     newThread->kernelStack = kstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
         CPU::KERNEL_STACK_SIZE);
 

@@ -85,8 +85,8 @@ extern "C"
         __builtin_unreachable();
     }
 
-    [[maybe_unused]] void __attribute__((no_stack_protector))
-    __guard_setup(void)
+    [[maybe_unused]]
+    void __attribute__((no_stack_protector)) __guard_setup(void)
     {
         unsigned char* p;
         if (__stack_chk_guard != 0) return;
@@ -129,10 +129,10 @@ namespace icxxabi
 {
     using ConstructorFunction = void (*)();
 
-    extern "C" ConstructorFunction   __init_array_start[];
-    extern "C" ConstructorFunction   __init_array_end[];
+    extern "C" ConstructorFunction __init_array_start[];
+    extern "C" ConstructorFunction __init_array_end[];
 
-    void                             Initialize()
+    void                           Initialize()
     {
         LogTrace("icxxabi: Calling global constructors...");
         for (ConstructorFunction* entry = __init_array_start;

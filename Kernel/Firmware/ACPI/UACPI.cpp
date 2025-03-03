@@ -8,9 +8,9 @@
 #include <Arch/x86_64/IO.hpp>
 #include <Firmware/ACPI/ACPI.hpp>
 
-#include <Prism/Spinlock.hpp>
 #include <Memory/MMIO.hpp>
 #include <Prism/Math.hpp>
+#include <Prism/Spinlock.hpp>
 #include <Time/Time.hpp>
 
 #include <uacpi/kernel_api.h>

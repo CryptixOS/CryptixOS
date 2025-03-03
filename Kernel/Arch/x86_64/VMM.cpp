@@ -8,20 +8,28 @@
 
 #include "Common.hpp"
 
-constexpr usize                  PTE_PRESENT    = Bit(0);
-constexpr usize                  PTE_WRITEABLE  = Bit(1);
-constexpr usize                  PTE_USER_SUPER = Bit(2);
-constexpr usize                  PTE_PWT        = Bit(3);
-constexpr usize                  PTE_PCD        = Bit(4);
-[[maybe_unused]] constexpr usize PTE_ACCESSED   = Bit(5);
-constexpr usize                  PTE_LPAGE      = Bit(7);
-constexpr usize                  PTE_PAT4K      = Bit(7);
-constexpr usize                  PTE_GLOBAL     = Bit(8);
-[[maybe_unused]] constexpr usize PTE_CUSTOM0    = Bit(9);
-[[maybe_unused]] constexpr usize PTE_CUSTOM1    = Bit(10);
-[[maybe_unused]] constexpr usize PTE_CUSTOM2    = Bit(11);
-constexpr usize                  PTE_PATLG      = Bit(12);
-constexpr usize                  PTE_NOEXEC     = Bit(63ull);
+constexpr usize PTE_PRESENT    = Bit(0);
+constexpr usize PTE_WRITEABLE  = Bit(1);
+constexpr usize PTE_USER_SUPER = Bit(2);
+constexpr usize PTE_PWT        = Bit(3);
+constexpr usize PTE_PCD        = Bit(4);
+[[maybe_unused]]
+constexpr usize PTE_ACCESSED
+    = Bit(5);
+constexpr usize PTE_LPAGE  = Bit(7);
+constexpr usize PTE_PAT4K  = Bit(7);
+constexpr usize PTE_GLOBAL = Bit(8);
+[[maybe_unused]]
+constexpr usize PTE_CUSTOM0
+    = Bit(9);
+[[maybe_unused]]
+constexpr usize PTE_CUSTOM1
+    = Bit(10);
+[[maybe_unused]]
+constexpr usize PTE_CUSTOM2
+    = Bit(11);
+constexpr usize PTE_PATLG  = Bit(12);
+constexpr usize PTE_NOEXEC = Bit(63ull);
 
 struct PageTable
 {
@@ -150,7 +158,7 @@ PageTableEntry* PageMap::Virt2Pte(PageTable* topLevel, uintptr_t virt,
     PageTable* pml4
         = BootInfo::GetPagingMode() == LIMINE_PAGING_MODE_X86_64_5LVL
             ? static_cast<PageTable*>(
-                GetNextLevel(topLevel->entries[pml5Entry], allocate))
+                  GetNextLevel(topLevel->entries[pml5Entry], allocate))
             : topLevel;
     if (!pml4) return nullptr;
 

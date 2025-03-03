@@ -7,8 +7,8 @@
 #include <Memory/KernelHeap.hpp>
 #include <Scheduler/Process.hpp>
 
-#include <Time/Time.hpp>
 #include <Prism/Math.hpp>
+#include <Time/Time.hpp>
 
 #include <VFS/TmpFs/TmpFs.hpp>
 #include <VFS/TmpFs/TmpFsINode.hpp>

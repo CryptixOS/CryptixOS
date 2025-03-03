@@ -8,8 +8,8 @@
 
 #include <Boot/BootInfo.hpp>
 
-#include <Prism/Debug/Log.hpp>
 #include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
 
 #include <string_view>
 

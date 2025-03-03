@@ -17,13 +17,27 @@ struct PageTable
     TTBR* ttbr1;
 };
 
-[[maybe_unused]] constexpr usize PA_RANGE_BITS32 = 0xb0000;
-[[maybe_unused]] constexpr usize PA_RANGE_BITS36 = 0xb0001;
-[[maybe_unused]] constexpr usize PA_RANGE_BITS40 = 0xb0010;
-[[maybe_unused]] constexpr usize PA_RANGE_BITS42 = 0xb0011;
-[[maybe_unused]] constexpr usize PA_RANGE_BITS44 = 0xb0100;
-[[maybe_unused]] constexpr usize PA_RANGE_BITS48 = 0xb0101;
-[[maybe_unused]] constexpr usize PA_RANGE_BITS52 = 0xb0110;
+[[maybe_unused]]
+constexpr usize PA_RANGE_BITS32
+    = 0xb0000;
+[[maybe_unused]]
+constexpr usize PA_RANGE_BITS36
+    = 0xb0001;
+[[maybe_unused]]
+constexpr usize PA_RANGE_BITS40
+    = 0xb0010;
+[[maybe_unused]]
+constexpr usize PA_RANGE_BITS42
+    = 0xb0011;
+[[maybe_unused]]
+constexpr usize PA_RANGE_BITS44
+    = 0xb0100;
+[[maybe_unused]]
+constexpr usize PA_RANGE_BITS48
+    = 0xb0101;
+[[maybe_unused]]
+constexpr usize PA_RANGE_BITS52
+    = 0xb0110;
 
 union MMFR0
 {
@@ -80,37 +94,47 @@ static constexpr size_t PAGE_SIZE_64KIB = 64_kib;
 
 namespace Arch::VMM
 {
-    constexpr usize                  VALID           = (1 << 0);
-    constexpr usize                  TABLE           = (1 << 1);
-    [[maybe_unused]] constexpr usize BLOCK           = (0 << 1);
-    constexpr usize                  PAGE            = Bit(1);
+    constexpr usize VALID = (1 << 0);
+    constexpr usize TABLE = (1 << 1);
+    [[maybe_unused]]
+    constexpr usize BLOCK
+        = (0 << 1);
+    constexpr usize PAGE = Bit(1);
 
-    constexpr usize                  USER            = Bit(6);
+    constexpr usize USER = Bit(6);
 
-    [[maybe_unused]] constexpr usize RW              = (0 << 7);
-    constexpr usize                  RO              = (1 << 7);
+    [[maybe_unused]]
+    constexpr usize RW
+        = (0 << 7);
+    constexpr usize RO        = (1 << 7);
 
-    constexpr usize                  ACCESS          = (1 << 10);
-    constexpr usize                  NOTGLOBAL       = (1 << 11);
-    constexpr usize                  EXECNEVER       = (1ul << 54);
+    constexpr usize ACCESS    = (1 << 10);
+    constexpr usize NOTGLOBAL = (1 << 11);
+    constexpr usize EXECNEVER = (1ul << 54);
 
-    [[maybe_unused]] constexpr usize NONSHARE        = (0 << 8);
-    constexpr usize                  OUTSHARE        = (0b10 << 8);
-    constexpr usize                  INSHARE         = (0b11 << 8);
+    [[maybe_unused]]
+    constexpr usize NONSHARE
+        = (0 << 8);
+    constexpr usize OUTSHARE = (0b10 << 8);
+    constexpr usize INSHARE  = (0b11 << 8);
 
-    constexpr usize                  WB              = (0b00 << 2) | INSHARE;
-    [[maybe_unused]] constexpr usize NC              = (0b01 << 2) | OUTSHARE;
-    [[maybe_unused]] constexpr usize WT              = (0b10 << 2) | OUTSHARE;
+    constexpr usize WB       = (0b00 << 2) | INSHARE;
+    [[maybe_unused]]
+    constexpr usize NC
+        = (0b01 << 2) | OUTSHARE;
+    [[maybe_unused]]
+    constexpr usize WT
+        = (0b10 << 2) | OUTSHARE;
 
-    static usize                     vaWidth         = 0;
-    static usize                     pageSize        = 0;
-    static usize                     lPageSize       = 0;
-    static usize                     llPageSize      = 0;
+    static usize vaWidth         = 0;
+    static usize pageSize        = 0;
+    static usize lPageSize       = 0;
+    static usize llPageSize      = 0;
 
-    uintptr_t                        pteAddressMask  = 0;
-    uintptr_t                        defaultPteFlags = VALID | TABLE;
+    uintptr_t    pteAddressMask  = 0;
+    uintptr_t    defaultPteFlags = VALID | TABLE;
 
-    void                             Initialize()
+    void         Initialize()
     {
         MMFR0 mmfr0;
         MMFR2 mmfr2;

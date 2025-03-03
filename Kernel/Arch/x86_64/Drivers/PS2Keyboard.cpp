@@ -124,8 +124,7 @@ void       PS2Keyboard::Initialize(PS2Port port)
     handler->SetHandler(HandleInterrupt);
     InterruptManager::Unmask(0x01);
 
-    while (!I8042Controller::IsInputEmpty())
-        ;
+    while (!I8042Controller::IsInputEmpty());
 
     LogInfo("PS2Keyboard: Installed handler at vector: {}",
             handler->GetInterruptVector());

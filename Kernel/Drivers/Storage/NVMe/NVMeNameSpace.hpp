@@ -11,8 +11,8 @@
 #include <Drivers/Storage/StorageDevice.hpp>
 #include <Prism/Spinlock.hpp>
 
-#include <Prism/Memory/Pointer.hpp>
 #include <Prism/Core/Types.hpp>
+#include <Prism/Memory/Pointer.hpp>
 
 namespace NVMe
 {

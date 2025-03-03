@@ -6,9 +6,9 @@
  */
 #pragma once
 
+#include <Library/Stacktrace.hpp>
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
-#include <Library/Stacktrace.hpp>
 
 #include <vector>
 

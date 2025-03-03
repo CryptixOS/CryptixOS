@@ -4,8 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Time/Time.hpp>
 #include <Prism/Math.hpp>
+#include <Time/Time.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <VFS/DevTmpFs/DevTmpFsINode.hpp>

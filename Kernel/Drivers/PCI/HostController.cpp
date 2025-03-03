@@ -7,9 +7,9 @@
 #include <Arch/x86_64/IO.hpp>
 #include <Drivers/PCI/HostController.hpp>
 
+#include <Library/Logger.hpp>
 #include <Memory/MMIO.hpp>
 #include <Memory/VMM.hpp>
-#include <Library/Logger.hpp>
 
 namespace PCI
 {

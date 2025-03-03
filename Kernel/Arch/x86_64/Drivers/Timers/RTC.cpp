@@ -82,8 +82,7 @@ namespace RTC
 
     time_t CurrentTime()
     {
-        while (IsUpdateInProgress())
-            ;
+        while (IsUpdateInProgress());
 
         return DaysSinceEpoch(GetYear() - 1) * 86400
              + DaysInMonth(GetMonth() - 1, GetYear()) * 86400 + GetDay() * 86400

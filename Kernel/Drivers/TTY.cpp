@@ -171,8 +171,7 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         case TIOCGPGRP: *reinterpret_cast<i32*>(argp) = m_Pgid; break;
         case TIOCSPGRP: m_Pgid = *reinterpret_cast<i32*>(argp); break;
         case TIOCSCTTY:
-            m_ControlSid
-                = Process::GetCurrent()->GetCredentials().sid;
+            m_ControlSid = Process::GetCurrent()->GetCredentials().sid;
             break;
         case TIOCNOTTY: m_ControlSid = -1; break;
 

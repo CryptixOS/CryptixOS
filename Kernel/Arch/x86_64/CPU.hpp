@@ -25,7 +25,7 @@
 struct Thread;
 namespace CPU
 {
-    using FPUSaveFunc    = void    (*)(uintptr_t ctx);
+    using FPUSaveFunc    = void (*)(uintptr_t ctx);
     using FPURestoreFunc = void (*)(uintptr_t ctx);
 
     namespace PAT
@@ -113,8 +113,8 @@ namespace CPU
         Thread*          CurrentThread;
     };
 
-    void      InitializeBSP();
-    void      StartAPs();
+    void InitializeBSP();
+    void StartAPs();
 
     struct ID final
     {

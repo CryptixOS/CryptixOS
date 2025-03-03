@@ -18,13 +18,13 @@ enum class TimerMode
 class HardwareTimer
 {
   public:
-    HardwareTimer()                                    = default;
-    virtual ~HardwareTimer()                           = default;
+    HardwareTimer()                                 = default;
+    virtual ~HardwareTimer()                        = default;
 
-    virtual std::string_view    GetModelString() const = 0;
+    virtual std::string_view GetModelString() const = 0;
 
     using OnTickCallback = void (*)(struct CPUContext*);
-    inline void                 SetCallback(OnTickCallback onTickCallback)
+    inline void SetCallback(OnTickCallback onTickCallback)
     {
         m_OnTickCallback = onTickCallback;
     }

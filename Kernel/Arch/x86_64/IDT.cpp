@@ -56,7 +56,7 @@ struct IDTEntry
 [[maybe_unused]] alignas(0x10) static IDTEntry idtEntries[256] = {};
 extern "C" void*        interrupt_handlers[];
 static InterruptHandler interruptHandlers[256];
-static void             (*exceptionHandlers[32])(CPUContext*);
+static void (*exceptionHandlers[32])(CPUContext*);
 
 static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
 {
@@ -205,7 +205,7 @@ namespace IDT
 } // namespace IDT
 
 #pragma region exception_names
-const char*    exceptionNames[] = {
+const char* exceptionNames[] = {
     "Divide-by-zero",
     "Debug",
     "Non-Maskable Interrupt",

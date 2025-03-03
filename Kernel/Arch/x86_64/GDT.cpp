@@ -45,12 +45,12 @@ namespace GDT
             TaskStateSegmentDescriptor tss;
         } __attribute__((packed)) gdtEntries;
 
-        constexpr usize GDT_SEGMENT_PRESENT = Bit(7);
-        constexpr usize GDT_RING3           = Bit(5) | Bit(6);
-        constexpr usize GDT_CODE_OR_DATA    = Bit(4);
-        constexpr usize GDT_CODE_SEGMENT    = Bit(3);
-        constexpr usize GDT_CODE_READABLE   = Bit(1);
-        constexpr usize GDT_DATA_WRITEABLE  = Bit(1);
+        constexpr usize           GDT_SEGMENT_PRESENT = Bit(7);
+        constexpr usize           GDT_RING3           = Bit(5) | Bit(6);
+        constexpr usize           GDT_CODE_OR_DATA    = Bit(4);
+        constexpr usize           GDT_CODE_SEGMENT    = Bit(3);
+        constexpr usize           GDT_CODE_READABLE   = Bit(1);
+        constexpr usize           GDT_DATA_WRITEABLE  = Bit(1);
     }; // namespace
 
 #define GDTWriteEntry(_entry, _base, _limit, _access, _flags)                  \

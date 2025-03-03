@@ -28,4 +28,4 @@ namespace ACPI
             u8                      OemAttributes  : 4;
         };
     }; // namespace SDTs
-};     // namespace ACPI
+}; // namespace ACPI

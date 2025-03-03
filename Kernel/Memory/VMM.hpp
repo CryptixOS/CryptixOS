@@ -8,8 +8,8 @@
 
 #include <Memory/PMM.hpp>
 
-#include <Prism/Spinlock.hpp>
 #include <Prism/Math.hpp>
+#include <Prism/Spinlock.hpp>
 
 constexpr usize operator""_kib(unsigned long long count)
 {
