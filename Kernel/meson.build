@@ -18,10 +18,13 @@ srcs += files(
   'Arch/PowerManager.cpp',
 
   'Boot/BootInfo.cpp',
+  'Boot/CommandLine.cpp',
   'Debug/Panic.cpp',
 
   'Drivers/Terminal.cpp',
   'Drivers/TTY.cpp',
+
+  'Drivers/HID/Ps2KeyboardDevice.cpp',
 
   'Drivers/PCI/Access.cpp',
   'Drivers/PCI/Device.cpp',
