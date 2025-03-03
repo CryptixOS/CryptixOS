@@ -1,59 +1,5 @@
 packages:
-  - name: bash
-    architecture: '@OPTION:arch@'
-    metadata:
-      summary: The standard GNU Bourne again shell
-      description: This package provides the Bourne-Again SHell.
-      spdx: 'GPL-3.0-or-later'
-      website: 'https://tiswww.case.edu/php/chet/bash/bashtop.html'
-      maintainer: "Dennis Bonke <dennis@managarm.org>"
-      categories: ['app-shells']
-    source:
-      subdir: 'sources'
-      git: 'https://git.savannah.gnu.org/git/bash.git'
-      # Checkout bash 5.1 patch 16
-      branch: 'master'
-      commit: '9439ce094c9aa7557a9d53ac7b412a23aa66e36b'
-      version: '5.1.16'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.15
-      regenerate:
-        # While we do not need to regenerate the configure script, we need to touch it
-        # after patching config.sub so that make does not try to regenerate it.
-        - args: ['autoconf']
-    tools_required:
-      - host-autoconf-v2.69
-      - host-automake-v1.15
-      - system-gcc
-    pkgs_required:
-      - mlibc
-      - ncurses
-      - readline
-      #- libiconv
-    revision: 12
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=@OPTION:arch-triple@'
-        - '--prefix=/usr'
-        - '--without-bash-malloc'
-        - '--disable-nls'
-        - '--disable-readline'
-        - '--with-curses'
-        #- '--with-installed-readline=$SYSROOT_DIR$/usr'
-        environ:
-          ac_cv_func_wcswidth: 'no'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
-        quiet: true
-      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/root/']
-      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/home/cryptix/']
-      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/etc/']
-      - args: ['ln', '-sf', 'bash', '@THIS_COLLECT_DIR@/usr/bin/sh']
-
-  - name: coretools
+  - name: cryptix-utils
     architecture: '@OPTION:arch@'
     source:
       subdir: 'sources'
@@ -67,7 +13,7 @@ packages:
     build:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/sbin']
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/root']
-      - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CoreTools/reboot.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/reboot']
+      - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CryptixUtils/reboot.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/reboot']
 
   - name: coreutils
     architecture: '@OPTION:arch@'
@@ -114,41 +60,6 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
         quiet: true
-
-  - name: dash
-    architecture: '@OPTION:arch@'
-    metadata:
-      summary: Debian Almquist SHell
-      description: This package provides the Debian Almquist SHell, the default shell on debian.
-      spdx: 'BSD'
-      website: 'http://gondor.apana.org.au/~herbert/dash/'
-      maintainer: "Dennis Bonke <dennis@managarm.org>"
-    source:
-      subdir: 'sources'
-      git: 'https://git.kernel.org/pub/scm/utils/dash/dash.git'
-      tag: 'v0.5.12'
-      version: '0.5.12'
-      tools_required:
-        - host-autoconf-v2.69
-        - host-automake-v1.15
-      regenerate:
-        - args: ['./autogen.sh']
-    tools_required:
-      - system-gcc
-    pkgs_required:
-      - mlibc
-    revision: 1
-    configure:
-      - args:
-        - '@THIS_SOURCE_DIR@/configure'
-        - '--host=@OPTION:arch-triple@'
-        - '--prefix=/usr'
-        - '--enable-fnmatch'
-    build:
-      - args: ['make', '-j@PARALLELISM@']
-      - args: ['make', 'install']
-        environ:
-          DESTDIR: '@THIS_COLLECT_DIR@'
 
   - name: file
     architecture: '@OPTION:arch@'
@@ -323,7 +234,6 @@ packages:
       - args: ['make', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
-
 
   - name: which
     architecture: '@OPTION:arch@'

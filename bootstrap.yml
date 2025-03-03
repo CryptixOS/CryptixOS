@@ -13,11 +13,14 @@ declare_options:
 
 imports:
   - file: host-recipes/core-tools.yml
-  - file: recipes/core-apps.yml
-  - file: recipes/core-libs.yml
-  - file: recipes/text-editors.yml
+
+  - file: recipes/sys-apps.yml
+  - file: recipes/sys-libs.yml
   - file: recipes/misc.yml
   - file: recipes/misc-apps.yml
+  - file: recipes/shell-apps.yml
+  - file: recipes/text-editors.yml
+
   - file: source-recipes/core.yml
 
 packages:
@@ -28,16 +31,15 @@ packages:
       version: '1.0'
     pkgs_required:
       - base-files
-      - bash
-      - cmatrix
       - coretools
       - coreutils
       - file
       - init
       - mlibc
-      - nano
-      - sl
       - which
+      - shell-apps
+      - misc-apps
+      - text-editors
     configure: []
     build: []
 

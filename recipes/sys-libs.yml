@@ -220,7 +220,6 @@ packages:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/lib/@OPTION:arch-triple@']
       - args: ['ln', '-sf', '../ld.so', '@THIS_COLLECT_DIR@/usr/lib/@OPTION:arch-triple@/ld.so']
 
-
   - name: ncurses
     architecture: '@OPTION:arch@'
     source:
@@ -248,7 +247,7 @@ packages:
         - '--enable-widec'
         - '--disable-stripping'
         - '--without-cxx-binding'
-#- 'CXXFLAGS=-fno-exceptions -fno-rtti'
+        #- 'CXXFLAGS=-fno-exceptions -fno-rtti'
         environ:
           cf_cv_func_nanosleep: 'yes'
     build:

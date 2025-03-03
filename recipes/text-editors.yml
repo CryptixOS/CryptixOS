@@ -1,4 +1,16 @@
 packages:
+
+  - name: text-editors
+    architecture: noarch
+    source:
+      subdir: 'sources'
+      version: '1.0'
+    pkgs_required:
+      - nano
+      - vim
+    configure: []
+    build: []
+
   - name: nano
     architecture: '@OPTION:arch@'
     source:

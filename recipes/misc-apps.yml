@@ -1,4 +1,16 @@
 packages:  
+  - name: misc-apps
+    architecture: noarch
+    source:
+      subdir: 'sources'
+      version: '1.0'
+    pkgs_required:
+      - cmatrix
+      - sl
+    configure: []
+    build: []
+    
+
   - name: cmatrix
     architecture: '@OPTION:arch@'
     metadata:
