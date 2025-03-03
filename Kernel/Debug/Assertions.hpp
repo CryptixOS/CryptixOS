@@ -6,6 +6,8 @@
  */
 #pragma once
 
+#include <Debug/Panic.hpp>
+
 namespace PhysicalMemoryManager
 {
     extern bool IsInitialized();

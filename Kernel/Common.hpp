@@ -33,14 +33,15 @@ inline constexpr u64 BIT(u64 n) { return (1ull << n); }
     #define DebugSyscall(...)
 #endif
 
-namespace CPU
+constexpr usize operator""_kib(unsigned long long count)
 {
-    void SetInterruptFlag(bool);
+    return count * 1024;
 }
-
-CTOS_NO_KASAN void logProcessState();
-
-CTOS_NO_KASAN [[noreturn]]
-void panic(std::string_view msg);
-CTOS_NO_KASAN [[noreturn]]
-void earlyPanic(const char* format, ...);
+constexpr usize operator""_mib(unsigned long long count)
+{
+    return count * 1024_kib;
+}
+constexpr usize operator""_gib(unsigned long long count)
+{
+    return count * 1024_mib;
+}

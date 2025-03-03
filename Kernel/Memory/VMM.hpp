@@ -11,19 +11,6 @@
 #include <Prism/Math.hpp>
 #include <Prism/Spinlock.hpp>
 
-constexpr usize operator""_kib(unsigned long long count)
-{
-    return count * 1024;
-}
-constexpr usize operator""_mib(unsigned long long count)
-{
-    return count * 1024_kib;
-}
-constexpr usize operator""_gib(unsigned long long count)
-{
-    return count * 1024_mib;
-}
-
 enum class PageAttributes : isize
 {
     eRead              = Bit(0),

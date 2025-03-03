@@ -6,5 +6,12 @@
  */
 #pragma once
 
+#include <string_view>
+
 [[noreturn]]
 void HaltAndCatchFire(struct CPUContext* context);
+
+[[noreturn]]
+void panic(std::string_view message);
+[[noreturn]]
+void earlyPanic(const char* format, ...);
