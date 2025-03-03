@@ -1,0 +1,12 @@
+diff --color -Naur nano-7.2/config.sub nano/config.sub
+--- nano-7.2/config.sub	2020-12-21 18:16:35.000000000 +0100
++++ nano/config.sub	2025-03-03 12:55:23.610389849 +0100
+@@ -1390,7 +1390,7 @@
+ 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
+ 	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* \
+ 	      | -onefs* | -tirtos* | -phoenix* | -fuchsia* | -redox* | -bme* \
+-	      | -midnightbsd*)
++	      | -midnightbsd* | -cryptix*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	-qnx*)
