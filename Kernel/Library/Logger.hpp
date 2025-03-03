@@ -9,7 +9,7 @@
 #include <Boot/BootInfo.hpp>
 
 #include <Prism/Debug/Log.hpp>
-#include <Prism/Types.hpp>
+#include <Prism/Core/Types.hpp>
 
 #include <string_view>
 

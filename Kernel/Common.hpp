@@ -11,7 +11,7 @@
 #include <Debug/Assertions.hpp>
 #include <Library/Logger.hpp>
 #include <Library/Stacktrace.hpp>
-#include <Prism/Types.hpp>
+#include <Prism/Core/Types.hpp>
 
 #include <format>
 #include <string_view>

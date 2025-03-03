@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Prism/Singleton.hpp>
+#include <Prism/Core/Singleton.hpp>
 #include <Time/HardwareTimer.hpp>
 
 class Lapic : public HardwareTimer, public PM::Singleton<Lapic>

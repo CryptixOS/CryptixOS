@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Prism/Types.hpp>
+#include <Prism/Core/Types.hpp>
 
 using time_t      = isize;
 using suseconds_t = isize;

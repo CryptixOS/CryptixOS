@@ -6,8 +6,8 @@
  */
 #pragma once
 
-#include <Prism/Singleton.hpp>
-#include <Prism/Types.hpp>
+#include <Prism/Core/Singleton.hpp>
+#include <Prism/Core/Types.hpp>
 
 #include <Time/HardwareTimer.hpp>
 

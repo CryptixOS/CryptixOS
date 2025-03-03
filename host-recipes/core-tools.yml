@@ -204,6 +204,7 @@ tools:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
         - '--prefix=@PREFIX@'
+        - 'CFLAGS=-Wno-implicit-function-declaration'
     compile:
       - args: 'make'
     install:

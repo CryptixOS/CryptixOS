@@ -1,9 +1,14 @@
+/*
+ * Created by v1tr10l7 on 16.11.2024.
+ * Copyright (c) 2024-2024, Szymon Zemke <v1tr10l7@proton.me>
+ *
+ * SPDX-License-Identifier: GPL-3
+ */
 #pragma once
 
-#include <Prism/Pointer.hpp>
-#include <Prism/Types.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Core/Types.hpp>
 
-#define LIMINE_API_REVISION 2
 #include <limine.h>
 
 #include <utility>
@@ -38,19 +43,22 @@ namespace BootInfo
 {
     const char*                         GetBootloaderName();
     const char*                         GetBootloaderVersion();
+    std::string_view                    GetKernelCommandLine();
     FirmwareType                        GetFirmwareType();
     u64                                 GetHHDMOffset();
-    Framebuffer*                        GetFramebuffer();
     Framebuffer**                       GetFramebuffers(usize& outCount);
+    Framebuffer*                        GetPrimaryFramebuffer();
+    usize                               GetPagingMode();
     limine_mp_response*                 GetSMP_Response();
     MemoryMap                           GetMemoryMap(u64& entryCount);
+    limine_file*                        GetExecutableFile();
     limine_file*                        FindModule(const char* name);
     PM::Pointer                         GetRSDPAddress();
     std::pair<PM::Pointer, PM::Pointer> GetSmBiosEntries();
-    PM::Pointer                         GetEfiSystemTable();
-    u64                                 GetBootTime();
-    PM::Pointer                         GetKernelPhysicalAddress();
-    PM::Pointer                         GetKernelVirtualAddress();
-    usize                               GetPagingMode();
-    limine_file*                        GetKernelFile();
+    Pointer                             GetEfiSystemTable();
+    limine_efi_memmap_response*         GetEfiMemoryMap();
+    u64                                 GetDateAtBoot();
+    Pointer                             GetKernelPhysicalAddress();
+    Pointer                             GetKernelVirtualAddress();
+    Pointer                             GetDeviceTreeBlobAddress();
 }; // namespace BootInfo

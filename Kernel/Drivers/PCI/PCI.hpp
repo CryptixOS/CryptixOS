@@ -6,8 +6,8 @@
  */
 #pragma once
 
-#include <Library/Spinlock.hpp>
-#include <Prism/Types.hpp>
+#include <Prism/Spinlock.hpp>
+#include <Prism/Core/Types.hpp>
 
 namespace PCI
 {

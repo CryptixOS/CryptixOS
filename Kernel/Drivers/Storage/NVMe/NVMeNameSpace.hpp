@@ -9,10 +9,10 @@
 #include <API/UnixTypes.hpp>
 
 #include <Drivers/Storage/StorageDevice.hpp>
-#include <Library/Spinlock.hpp>
+#include <Prism/Spinlock.hpp>
 
-#include <Prism/Pointer.hpp>
-#include <Prism/Types.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Core/Types.hpp>
 
 namespace NVMe
 {

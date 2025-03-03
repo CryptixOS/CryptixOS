@@ -9,7 +9,7 @@
 #include <Drivers/Terminal.hpp>
 
 #include <Library/Logger.hpp>
-#include <Library/Spinlock.hpp>
+#include <Prism/Spinlock.hpp>
 
 #include <Prism/Debug/LogSink.hpp>
 #include <Prism/Math.hpp>
@@ -235,7 +235,7 @@ namespace Logger
     CTOS_NO_KASAN void EnableSink(usize output)
     {
         if (output == LOG_SINK_TERMINAL)
-            s_Terminal.Initialize(*BootInfo::GetFramebuffer());
+            s_Terminal.Initialize(*BootInfo::GetPrimaryFramebuffer());
 
         s_EnabledSinks |= output;
     }

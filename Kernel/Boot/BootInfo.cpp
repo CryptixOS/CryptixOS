@@ -22,7 +22,7 @@ namespace
 {
     __attribute__((
         used, section(".limine_requests"))) volatile LIMINE_BASE_REVISION(3);
-}
+} // namespace
 
 namespace BootInfo
 {
@@ -31,6 +31,11 @@ namespace BootInfo
 
 LIMINE_REQUEST limine_bootloader_info_request s_BootloaderInfoRequest = {
     .id       = LIMINE_BOOTLOADER_INFO_REQUEST,
+    .revision = 0,
+    .response = nullptr,
+};
+LIMINE_REQUEST limine_executable_cmdline_request s_ExecutableCmdlineRequest = {
+    .id       = LIMINE_EXECUTABLE_CMDLINE_REQUEST,
     .revision = 0,
     .response = nullptr,
 };
@@ -80,7 +85,7 @@ LIMINE_REQUEST limine_entry_point_request s_EntryPointRequest = {
     .response = nullptr,
     .entry    = BootInfo::Initialize,
 };
-LIMINE_REQUEST limine_executable_file_request s_KernelFileRequest = {
+LIMINE_REQUEST limine_executable_file_request s_ExecutableRequest = {
     .id       = LIMINE_EXECUTABLE_FILE_REQUEST,
     .revision = 0,
     .response = nullptr,
@@ -108,8 +113,13 @@ LIMINE_REQUEST limine_efi_system_table_request s_EfiSystemTableRequest = {
     .revision = 0,
     .response = nullptr,
 };
-LIMINE_REQUEST limine_boot_time_request s_BootTimeRequest = {
-    .id       = LIMINE_BOOT_TIME_REQUEST,
+LIMINE_REQUEST limine_efi_memmap_request s_EfiMemmapRequest = {
+    .id       = LIMINE_EFI_MEMMAP_REQUEST,
+    .revision = 0,
+    .response = nullptr,
+};
+LIMINE_REQUEST limine_date_at_boot_request s_DateAtBootRequest = {
+    .id       = LIMINE_DATE_AT_BOOT_REQUEST,
     .revision = 0,
     .response = nullptr,
 };
@@ -148,6 +158,10 @@ namespace
 extern "C" CTOS_NO_KASAN [[noreturn]]
 void kernelStart();
 
+#define VerifyExistenceOrRet(requestName)                                      \
+    if (!requestName.response) return nullptr;
+#define VerifyExistenceOrRetValue(requestName, value)                          \
+    if (!requestName.response) return value;
 namespace BootInfo
 {
     extern "C" __attribute__((no_sanitize("address"))) void Initialize()
@@ -192,68 +206,128 @@ namespace BootInfo
     }
     const char* GetBootloaderName()
     {
+        VerifyExistenceOrRet(s_BootloaderInfoRequest);
         return s_BootloaderInfoRequest.response->name;
     }
     const char* GetBootloaderVersion()
     {
+        VerifyExistenceOrRet(s_BootloaderInfoRequest);
         return s_BootloaderInfoRequest.response->version;
     }
-    FirmwareType GetFirmwareType() { return s_FirmwareType; }
-
-    u64          GetHHDMOffset() { return s_HhdmRequest.response->offset; }
-    Framebuffer* GetFramebuffer()
+    std::string_view GetKernelCommandLine()
     {
-        return s_FramebufferRequest.response->framebuffers[0];
+        VerifyExistenceOrRet(s_ExecutableCmdlineRequest);
+        return s_ExecutableCmdlineRequest.response->cmdline;
+    }
+    FirmwareType GetFirmwareType()
+    {
+        VerifyExistenceOrRetValue(s_FirmwareTypeRequest, FirmwareType(0));
+
+        return s_FirmwareType;
+    }
+    u64 GetHHDMOffset()
+    {
+        VerifyExistenceOrRetValue(s_HhdmRequest, 0);
+
+        return s_HhdmRequest.response->offset;
     }
     Framebuffer** GetFramebuffers(usize& outCount)
     {
+        VerifyExistenceOrRet(s_FramebufferRequest);
+
         outCount = s_FramebufferRequest.response->framebuffer_count;
         return s_FramebufferRequest.response->framebuffers;
     }
-    limine_mp_response* GetSMP_Response() { return s_SmpRequest.response; }
-    MemoryMap           GetMemoryMap(u64& entryCount)
+    Framebuffer* GetPrimaryFramebuffer()
     {
-        entryCount = memoryMapEntryCount;
+        VerifyExistenceOrRet(s_FramebufferRequest);
+        return s_FramebufferRequest.response->framebuffers[0];
+    }
+    usize GetPagingMode()
+    {
+        VerifyExistenceOrRetValue(s_PagingModeRequest, 0);
+        return s_PagingModeRequest.response->mode;
+    }
+    limine_mp_response* GetSMP_Response()
+    {
+        VerifyExistenceOrRet(s_SmpRequest);
+
+        return s_SmpRequest.response;
+    }
+    MemoryMap GetMemoryMap(u64& entryCount)
+    {
+        VerifyExistenceOrRet(s_MemmapRequest)
+
+            entryCount
+            = memoryMapEntryCount;
         return memoryMap;
+    }
+    limine_file* GetExecutableFile()
+    {
+        VerifyExistenceOrRet(s_ExecutableRequest);
+
+        return s_ExecutableRequest.response->executable_file;
     }
     limine_file* FindModule(const char* name)
     {
+        VerifyExistenceOrRet(s_ModuleRequest);
+
         for (usize i = 0; i < s_ModuleRequest.response->module_count; i++)
         {
-            if (!strcmp(s_ModuleRequest.response->modules[i]->cmdline, name))
+            if (!strcmp(s_ModuleRequest.response->modules[i]->string, name))
                 return s_ModuleRequest.response->modules[i];
         }
         return nullptr;
     }
     Pointer GetRSDPAddress()
-
     {
+        VerifyExistenceOrRet(s_RsdpRequest);
+
         return reinterpret_cast<uintptr_t>(s_RsdpRequest.response->address);
     }
     std::pair<Pointer, Pointer> GetSmBiosEntries()
     {
+        VerifyExistenceOrRetValue(s_SmbiosRequest,
+                                  std::make_pair(nullptr, nullptr));
+
         return std::make_pair(s_SmbiosRequest.response->entry_32,
                               s_SmbiosRequest.response->entry_64);
     }
 
     Pointer GetEfiSystemTable()
     {
+        VerifyExistenceOrRet(s_EfiSystemTableRequest);
+
         return s_EfiSystemTableRequest.response->address;
     }
-    u64     GetBootTime() { return s_BootTimeRequest.response->boot_time; }
+    limine_efi_memmap_response* GetEfiMemoryMap()
+    {
+        VerifyExistenceOrRet(s_EfiMemmapRequest);
+
+        return s_EfiMemmapRequest.response;
+    }
+    u64 GetDateAtBoot()
+    {
+        VerifyExistenceOrRetValue(s_DateAtBootRequest, 0);
+
+        return s_DateAtBootRequest.response->timestamp;
+    }
     Pointer GetKernelPhysicalAddress()
     {
+        VerifyExistenceOrRet(s_KernelAddressRequest);
+
         return s_KernelAddressRequest.response->physical_base;
     }
     Pointer GetKernelVirtualAddress()
     {
+        VerifyExistenceOrRet(s_KernelAddressRequest);
+
         return s_KernelAddressRequest.response->virtual_base;
     }
-
-    usize        GetPagingMode() { return s_PagingModeRequest.response->mode; }
-    limine_file* GetKernelFile()
+    Pointer GetDeviceTreeBlobAddress()
     {
-        return s_KernelFileRequest.response->executable_file;
-    }
+        VerifyExistenceOrRet(s_DtbRequest);
 
+        return s_DtbRequest.response->dtb_ptr;
+    }
 } // namespace BootInfo

@@ -7,7 +7,7 @@
 #pragma once
 
 #include <API/UnixTypes.hpp>
-#include <Library/Spinlock.hpp>
+#include <Prism/Spinlock.hpp>
 
 #include <atomic>
 

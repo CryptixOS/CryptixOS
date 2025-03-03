@@ -8,7 +8,7 @@
 
 #include <API/UnixTypes.hpp>
 
-#include <Prism/Types.hpp>
+#include <Prism/Core/Types.hpp>
 #include <Time/HardwareTimer.hpp>
 
 namespace Time

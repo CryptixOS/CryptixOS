@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Prism/Types.hpp>
+#include <Prism/Core/Types.hpp>
 
 constexpr usize SEEK_SET = 0;
 constexpr usize SEEK_CUR = 1;

@@ -8,7 +8,7 @@
 
 #include <API/Posix/sys/time.h>
 
-#include <Prism/Types.hpp>
+#include <Prism/Core/Types.hpp>
 
 namespace RTC
 {

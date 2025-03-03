@@ -117,7 +117,7 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
         "Boot: Kernel loaded with {}-{} -> firmware type: {}, boot time: {}s",
         BootInfo::GetBootloaderName(), BootInfo::GetBootloaderVersion(),
         magic_enum::enum_name(BootInfo::GetFirmwareType()),
-        BootInfo::GetBootTime());
+        BootInfo::GetDateAtBoot());
 
     LogInfo("Boot: Kernel Physical Address: {:#x}",
             BootInfo::GetKernelPhysicalAddress().Raw<>());
@@ -125,7 +125,7 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
             BootInfo::GetKernelVirtualAddress().Raw<>());
 
     Stacktrace::Initialize();
-    ACPI::Initialize();
+    ACPI::LoadTables();
     Arch::Initialize();
 
     SMBIOS::Initialize();

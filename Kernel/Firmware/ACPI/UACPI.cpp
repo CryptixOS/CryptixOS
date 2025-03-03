@@ -8,10 +8,10 @@
 #include <Arch/x86_64/IO.hpp>
 #include <Firmware/ACPI/ACPI.hpp>
 
+#include <Prism/Spinlock.hpp>
 #include <Memory/MMIO.hpp>
-#include <Time/Time.hpp>
 #include <Prism/Math.hpp>
-#include <Library/Spinlock.hpp>
+#include <Time/Time.hpp>
 
 #include <uacpi/kernel_api.h>
 
@@ -273,7 +273,7 @@ namespace uACPI
 
         uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void)
         {
-            return Time::GetEpoch() - BootInfo::GetBootTime();
+            return Time::GetEpoch() - BootInfo::GetDateAtBoot();
         }
         void uacpi_kernel_stall(uacpi_u8 usec)
         {

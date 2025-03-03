@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Prism/Types.hpp>
+#include <Prism/Core/Types.hpp>
 
 using ssize_t   = isize;
 

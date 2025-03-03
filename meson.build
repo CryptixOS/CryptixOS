@@ -83,6 +83,7 @@ add_global_arguments(
     '-DPRISM_TARGET_CRYPTIX=1',
     '-DPRISM_LOG_ENABLE=1',
     '-DPRISM_BUILD_DEBUG=1',
+    '-DLIMINE_API_REVISION=3',
     '-MP',
   ],
   language: 'cpp',

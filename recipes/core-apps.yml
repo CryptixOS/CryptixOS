@@ -65,7 +65,9 @@ packages:
       - mlibc
     configure: []
     build:
-      - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CoreTools/reboot.cpp',  '-o', '@SYSROOT_DIR@/usr/sbin/reboot']
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/sbin']
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/root']
+      - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CoreTools/reboot.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/reboot']
 
   - name: coreutils
     architecture: '@OPTION:arch@'

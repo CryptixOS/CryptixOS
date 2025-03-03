@@ -12,7 +12,7 @@
 #include <Memory/VMM.hpp>
 
 #include <Prism/Math.hpp>
-#include <Prism/Pointer.hpp>
+#include <Prism/Memory/Pointer.hpp>
 
 using namespace ACPI;
 

@@ -7,7 +7,7 @@
 #include <stdio.h>
 
 #include <Common.hpp>
-#include <Prism/Types.hpp>
+#include <Prism/Core/Types.hpp>
 
 using Prism::LogLevel;
 

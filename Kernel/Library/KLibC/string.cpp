@@ -8,7 +8,7 @@
 
 #include <stdlib.h>
 
-#include "Prism/Types.hpp"
+#include "Prism/Core/Types.hpp"
 
 extern "C"
 {

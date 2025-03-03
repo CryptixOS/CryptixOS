@@ -7,7 +7,7 @@
 #include <API/Limits.hpp>
 #include <Arch/CPU.hpp>
 
-#include <Library/Spinlock.hpp>
+#include <Prism/Spinlock.hpp>
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 

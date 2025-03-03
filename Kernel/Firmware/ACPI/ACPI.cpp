@@ -37,6 +37,7 @@ namespace ACPI
 
         bool  s_XsdtAvailable = false;
         RSDT* s_Rsdt          = nullptr;
+        FADT* s_FADT          = nullptr;
 
         bool  ValidateChecksum(SDTHeader* header)
         {
@@ -77,14 +78,14 @@ namespace ACPI
         }
     } // namespace
 
-    void Initialize()
+    void LoadTables()
     {
+        using namespace std::literals;
+
         LogTrace("ACPI: Initializing...");
-        constexpr const char RSDP_SIGNATURE[] = "RSD PTR";
+        constexpr std::string_view RSDP_SIGNATURE = "RSD PTR"sv;
         RSDP* rsdp = BootInfo::GetRSDPAddress().ToHigherHalf<RSDP*>();
-        if (std::strncmp(rsdp->Signature, RSDP_SIGNATURE,
-                         std::size(RSDP_SIGNATURE) - 1)
-            != 0)
+        if (RSDP_SIGNATURE.compare(0, 7, rsdp->Signature) == 0)
         {
             LogError("ACPI: Invalid RSDP signature!");
             return;
@@ -101,8 +102,10 @@ namespace ACPI
                 reinterpret_cast<uintptr_t>(s_Rsdt));
         DetectACPIEntries();
 
-        LogInfo("ACPI: Initialized");
         MADT::Initialize();
+        s_FADT = GetTable<FADT>("FACP");
+
+        LogInfo("ACPI: Loaded static tables");
     }
     void Enable()
     {
@@ -114,14 +117,6 @@ namespace ACPI
             LogError("ACPI: Failed to enter acpi mode!");
             return;
         }
-    }
-
-    void Reboot()
-    {
-        // TODO(v1tr10l7): ACPI::Reboot
-        return;
-        LogTrace("ACPI: Attempting to reboot...");
-        LogInfo("");
     }
 
     SDTHeader* GetTable(const char* signature, usize index)
@@ -138,7 +133,7 @@ namespace ACPI
                 continue;
             if (!ValidateChecksum(header)) continue;
 
-            if (std::strncmp(header->Signature, signature, 4) == 0)
+            if (std::strncmp(signature, header->Signature, 4) == 0)
             {
                 if (index == 0) return header;
                 ++index;
@@ -147,4 +142,19 @@ namespace ACPI
 
         return nullptr;
     }
+
+    IA32BootArchitectureFlags GetIA32BootArchitectureFlags()
+    {
+        return s_FADT ? s_FADT->IA32BootArchitectureFlags
+                      : IA32BootArchitectureFlags(0);
+    }
+
+    void Reboot()
+    {
+        // TODO(v1tr10l7): ACPI::Reboot
+        return;
+        LogTrace("ACPI: Attempting to reboot...");
+        LogInfo("");
+    }
+
 } // namespace ACPI

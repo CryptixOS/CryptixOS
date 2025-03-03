@@ -9,9 +9,9 @@
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
-#include <Library/Spinlock.hpp>
+#include <Prism/Spinlock.hpp>
 #include <Prism/Math.hpp>
-#include <Prism/Types.hpp>
+#include <Prism/Core/Types.hpp>
 
 class SlabAllocatorBase
 {

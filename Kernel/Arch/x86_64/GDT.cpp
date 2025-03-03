@@ -6,7 +6,7 @@
  */
 #include "GDT.hpp"
 
-#include <Library/Spinlock.hpp>
+#include <Prism/Spinlock.hpp>
 
 namespace GDT
 {

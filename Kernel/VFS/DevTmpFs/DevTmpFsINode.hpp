@@ -7,7 +7,7 @@
 #pragma once
 
 #include <Drivers/Device.hpp>
-#include <Prism/NonCopyable.hpp>
+#include <Prism/Core/NonCopyable.hpp>
 #include <VFS/INode.hpp>
 
 class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>

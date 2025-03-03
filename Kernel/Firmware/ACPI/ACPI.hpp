@@ -12,10 +12,8 @@
 
 namespace ACPI
 {
-    void       Initialize();
+    void       LoadTables();
     void       Enable();
-
-    void       Reboot();
 
     SDTHeader* GetTable(const char* signature, usize index = 0);
     template <typename T>
@@ -23,4 +21,8 @@ namespace ACPI
     {
         return reinterpret_cast<T*>(GetTable(signature, index));
     }
+
+    IA32BootArchitectureFlags GetIA32BootArchitectureFlags();
+
+    void                      Reboot();
 } // namespace ACPI

@@ -8,8 +8,8 @@
 
 #include <Debug/Assertions.hpp>
 
-#include <Prism/Pointer.hpp>
-#include <Prism/Types.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Core/Types.hpp>
 
 #include <concepts>
 

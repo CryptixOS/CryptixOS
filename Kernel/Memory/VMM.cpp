@@ -101,7 +101,7 @@ namespace VirtualMemoryManager
             }
         }
 
-        for (usize i = 0; i < BootInfo::GetKernelFile()->size;
+        for (usize i = 0; i < BootInfo::GetExecutableFile()->size;
              i += GetPageSize())
         {
             uintptr_t phys = BootInfo::GetKernelPhysicalAddress().Raw<>() + i;

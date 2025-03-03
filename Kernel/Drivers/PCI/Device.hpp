@@ -10,8 +10,8 @@
 #include <Drivers/PCI/Access.hpp>
 #include <Drivers/PCI/Definitions.hpp>
 
-#include <Library/Spinlock.hpp>
-#include <Prism/Types.hpp>
+#include <Prism/Spinlock.hpp>
+#include <Prism/Core/Types.hpp>
 
 namespace PCI
 {

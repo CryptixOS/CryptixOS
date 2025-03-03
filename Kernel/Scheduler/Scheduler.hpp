@@ -8,7 +8,7 @@
 
 #include <API/UnixTypes.hpp>
 
-#include <Prism/Singleton.hpp>
+#include <Prism/Core/Singleton.hpp>
 #include <Scheduler/Process.hpp>
 
 class Process;

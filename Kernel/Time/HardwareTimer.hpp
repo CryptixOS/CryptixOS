@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Prism/Types.hpp>
+#include <Prism/Core/Types.hpp>
 #include <Time/TimeStep.hpp>
 
 enum class TimerMode

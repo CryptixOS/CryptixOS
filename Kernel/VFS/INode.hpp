@@ -8,7 +8,7 @@
 
 #include <API/UnixTypes.hpp>
 
-#include <Library/Spinlock.hpp>
+#include <Prism/Spinlock.hpp>
 
 #include <VFS/Filesystem.hpp>
 #include <VFS/VFS.hpp>
