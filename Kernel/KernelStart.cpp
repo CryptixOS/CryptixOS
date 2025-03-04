@@ -120,7 +120,12 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
 
     VMM::Initialize();
     Serial::Initialize();
-    Logger::EnableSink(LOG_SINK_SERIAL);
+    if (CommandLine::GetBoolean("log.serial").value_or(true))
+        Logger::EnableSink(LOG_SINK_SERIAL);
+    if (!CommandLine::GetBoolean("log.boot.terminal").value_or(true))
+        Logger::DisableSink(LOG_SINK_SERIAL);
+    if (!CommandLine::GetBoolean("log.e9").value_or(true))
+        Logger::DisableSink(LOG_SINK_E9);
 
     LogInfo(
         "Boot: Kernel loaded with {}-{} -> firmware type: {}, boot time: {}s",

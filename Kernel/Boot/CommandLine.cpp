@@ -77,4 +77,13 @@ namespace CommandLine
         for (auto& [arg, value] : s_OptionMap)
             LogInfo("CommandLine: {} -> {}", arg, value);
     }
+
+    std::optional<bool> GetBoolean(std::string_view key)
+    {
+        auto it = s_OptionMap.find(key);
+        if (it != s_OptionMap.end())
+            return it->second == "true" || it->second == "1";
+
+        return std::nullopt;
+    }
 }; // namespace CommandLine
