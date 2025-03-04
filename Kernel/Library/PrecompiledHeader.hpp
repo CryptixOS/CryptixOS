@@ -7,7 +7,6 @@
  */
 #pragma once
 
-#include <fmt/format.h>
 #include <magic_enum/magic_enum.hpp>
 #include <owner_less.hpp>
 

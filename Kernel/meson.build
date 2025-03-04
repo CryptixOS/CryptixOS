@@ -105,13 +105,13 @@ subdir('Library/KLibC++')
 args = []
 kernel_elf = executable(
   'Cryptix.elf',
-  [srcs],
+  srcs,
   dependencies: deps,
   link_depends: meson.current_source_dir() / 'linker.' + arch + '.ld',
   include_directories: include_directories,
   c_args: c_args,
   cpp_args: cxx_args,
-  cpp_pch: 'Library/PrecompiledHeader.hpp',
+  #cpp_pch: 'Library/PrecompiledHeader.hpp',
   link_args: ld_args,
   install: false,
 )
