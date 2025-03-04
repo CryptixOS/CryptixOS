@@ -21,7 +21,7 @@ fi
 
 # Function to set up a Meson build
 setup_build() {
-  local build_dir="build_$1"
+  local build_dir="build_$1_$TARGET_ARCH"
   local build_type=$2
   echo "🔧 Setting up $build_dir with buildtype=$build_type..."
   rm -rf "$build_dir"  # Remove only the relevant build directory
