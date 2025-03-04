@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Limits.hpp>
 #include <API/Posix/dirent.h>
 #include <API/Posix/fcntl.h>
 #include <API/Posix/sys/mman.h>
@@ -363,8 +364,8 @@ namespace Syscall::VFS
         return 0;
     }
 
-    [[clang::no_sanitize("alignment")]]
-    ErrorOr<i32> SysGetDents64(Arguments& args)
+    [[clang::no_sanitize("alignment")]] ErrorOr<i32>
+    SysGetDents64(Arguments& args)
     {
         u32           fdNum     = static_cast<u32>(args.Args[0]);
         dirent* const outBuffer = reinterpret_cast<dirent* const>(args.Args[1]);
