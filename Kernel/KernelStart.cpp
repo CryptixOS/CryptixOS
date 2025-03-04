@@ -34,6 +34,7 @@
 #include <Library/Stacktrace.hpp>
 
 #include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Delegate.hpp>
 
 #include <VFS/INode.hpp>
 #include <VFS/Initrd/Initrd.hpp>
@@ -61,6 +62,20 @@ void kernelThread()
     ACPI::LoadNameSpace();
     ACPI::EnumerateDevices();
 
+    auto kernelExecutable = BootInfo::GetExecutableFile();
+    auto header   = reinterpret_cast<ELF::Header*>(kernelExecutable->address);
+    auto sections = reinterpret_cast<ELF::SectionHeader*>(
+        reinterpret_cast<u64>(kernelExecutable->address)
+        + header->SectionHeaderTableOffset);
+    auto stringTable = reinterpret_cast<char*>(
+        reinterpret_cast<u64>(kernelExecutable->address)
+        + sections[header->SectionNamesIndex].Offset);
+
+    LogTrace("Loading kernel drivers");
+    if (!ELF::Image::LoadModules(header->SectionEntryCount, sections,
+                                 stringTable))
+        LogError("ELF: Could not find any builtin drivers");
+
     LogTrace("Loading user process...");
     Process* kernelProcess = Scheduler::GetKernelProcess();
     Process* userProcess   = Scheduler::CreateProcess(
@@ -71,17 +86,6 @@ void kernelThread()
     argv.push_back("/usr/sbin/init");
     std::vector<std::string_view> envp;
     envp.push_back("TERM=linux");
-
-    Prism::RedBlackTree<int, char> t;
-    int                            key;
-    char                           val;
-    for (int i = 0; i < 15; i++)
-    {
-        key = i;
-        val = ('a' + i);
-        t.Insert(key, val);
-    }
-    t.PrintTree();
 
     static ELF::Image program, ld;
     PageMap*          pageMap = new PageMap();

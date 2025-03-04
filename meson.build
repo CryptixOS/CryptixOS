@@ -125,6 +125,17 @@ deps = [
   dependency('veque'),
 ]
 
+inc_deps = [ ]
+foreach dep : deps
+    inc_deps += dep.partial_dependency(includes : true)
+endforeach
+
+mod_deps = [ ]
+ext_mods = [ ]
+subdir('Modules')
+
+no_ext_mods = ext_mods.length() == 0
+
 subdir('Kernel')
 # ==============================================================================
 ### Qemu args
@@ -223,12 +234,17 @@ iso_files = [
 
 initrd = custom_target(
   'initrd',
-  input: initrd_dir / 'usr' / 'sbin' / 'init',
+  input: [initrd_dir / 'usr' / 'sbin' / 'init', ext_mods],
   output: 'initrd.img.gz',
-  command: ['tar', '-cvf', '@OUTPUT@', '-C', initrd_dir, '.'],
+  command: [
+    'rm', '-rf', initrd_dir / 'usr/lib/modules', '&&',
+    'mkdir', '-p', initrd_dir / 'usr/lib/modules', '&&',
+    no_ext_mods ? [] : ['cp', '@INPUT@', initrd_dir / 'usr/lib/modules/', '&&'],
+    'tar', '-cvf', '@OUTPUT@', '-C', initrd_dir, '.'],
   build_by_default: true,
   console: true,
   install: false,
+  depends: ext_mods
 )
 iso = custom_target(
   'iso',

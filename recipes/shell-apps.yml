@@ -21,7 +21,10 @@ packages:
       categories: ['app-shells']
     source:
       subdir: 'sources'
-      git: 'https://git.savannah.gnu.org/git/bash.git'
+      url: 'https://git.savannah.gnu.org/cgit/bash.git/snapshot/bash-9439ce094c9aa7557a9d53ac7b412a23aa66e36b.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'bash-5.1.6'
+      #git: 'https://git.savannah.gnu.org/git/bash.git'
       # Checkout bash 5.1 patch 16
       branch: 'master'
       commit: '9439ce094c9aa7557a9d53ac7b412a23aa66e36b'

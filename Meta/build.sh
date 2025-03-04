@@ -41,7 +41,7 @@ fi
 
 # Compile the project using Meson
 log_info "Starting compilation..."
-if meson compile -C "$BUILD_DIR" -j16 build; then
+if meson compile -C "$BUILD_DIR" -j5 build; then
     log_success "Compilation completed successfully."
 else
     log_error "Compilation failed."

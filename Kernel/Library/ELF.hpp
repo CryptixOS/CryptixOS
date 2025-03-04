@@ -16,41 +16,41 @@ namespace ELF
 {
     constexpr const char* MAGIC = "\177ELF";
 
-    struct Header
+    struct [[gnu::packed]] Header
     {
-        u32 magic;
-        u8  bitness;
-        u8  endianness;
-        u8  headerVersion;
-        u8  abi;
-        u64 padding;
-        u16 type;
-        u16 instructionSet;
-        u32 elfVersion;
-        u64 entryPoint;
-        u64 programHeaderTableOffset;
-        u64 sectionHeaderTableOffset;
-        u32 flags;
-        u16 headerSize;
-        u16 programEntrySize;
-        u16 programEntryCount;
-        u16 sectionEntrySize;
-        u16 sectionEntryCount;
-        u16 sectionNamesIndex;
-    } __attribute__((packed));
-    struct SectionHeader
+        u32 Magic;
+        u8  Bitness;
+        u8  Endianness;
+        u8  HeaderVersion;
+        u8  Abi;
+        u64 Padding;
+        u16 Type;
+        u16 InstructionSet;
+        u32 ElfVersion;
+        u64 EntryPoint;
+        u64 ProgramHeaderTableOffset;
+        u64 SectionHeaderTableOffset;
+        u32 Flags;
+        u16 HeaderSize;
+        u16 ProgramEntrySize;
+        u16 ProgramEntryCount;
+        u16 SectionEntrySize;
+        u16 SectionEntryCount;
+        u16 SectionNamesIndex;
+    };
+    struct [[gnu::packed]] SectionHeader
     {
-        u32       name;
-        u32       type;
-        u64       flags;
-        uintptr_t addr;
-        u64       offset;
-        u64       size;
-        u32       link;
-        u32       info;
-        u64       alignment;
-        u64       entrySize;
-    } __attribute__((packed));
+        u32       Name;
+        u32       Type;
+        u64       Flags;
+        uintptr_t Address;
+        u64       Offset;
+        u64       Size;
+        u32       Link;
+        u32       Info;
+        u64       Alignment;
+        u64       EntrySize;
+    };
 
     enum class HeaderType : u32
     {
@@ -78,27 +78,26 @@ namespace ELF
         eReadable   = 4,
     };
 
-    struct ProgramHeader
+    struct [[gnu::packed]] ProgramHeader
     {
-        HeaderType        type;
-        SegmentAttributes attributes;
-        u64               offset;
-        u64               virtualAddress;
-        u64               physicalAddress;
-        u64               segmentSizeInFile;
-        u64               segmentSizeInMemory;
-        u64               alignment;
-
-    } __attribute__((packed));
-    struct Sym
+        HeaderType        Type;
+        SegmentAttributes Attributes;
+        u64               Offset;
+        u64               VirtualAddress;
+        u64               PhysicalAddress;
+        u64               SegmentSizeInFile;
+        u64               SegmentSizeInMemory;
+        u64               Alignment;
+    };
+    struct [[gnu::packed]] Sym
     {
-        u32 name;
-        u8  info;
-        u8  other;
-        u16 sectionIndex;
-        u64 value;
-        u64 size;
-    } __attribute__((packed));
+        u32 Name;
+        u8  Info;
+        u8  Other;
+        u16 SectionIndex;
+        u64 Value;
+        u64 Size;
+    };
 
     struct AuxiliaryVector
     {
@@ -110,36 +109,50 @@ namespace ELF
     class Image
     {
       public:
-        bool             Load(std::string_view path, PageMap* pageMap,
-                              std::vector<VMM::Region>& addressSpace,
-                              uintptr_t                 loadBase = 0);
+        bool        Load(std::string_view path, PageMap* pageMap,
+                         std::vector<VMM::Region>& addressSpace,
+                         uintptr_t                 loadBase = 0);
+        bool        Load(Pointer image, usize size);
 
-        inline uintptr_t GetEntryPoint() const { return auxv.EntryPoint; }
+        static bool LoadModules(const u64 sectionCount, SectionHeader* sections,
+                                char* stringTable);
+
+        inline uintptr_t GetEntryPoint() const
+        {
+            return m_AuxiliaryVector.EntryPoint;
+        }
         inline uintptr_t GetAtPhdr() const
         {
-            return auxv.ProgramHeadersAddress;
+            return m_AuxiliaryVector.ProgramHeadersAddress;
         }
         inline uintptr_t GetPhent() const
         {
-            return auxv.ProgramHeaderEntrySize;
+            return m_AuxiliaryVector.ProgramHeaderEntrySize;
         }
-        inline uintptr_t GetPhNum() const { return auxv.ProgramHeaderCount; }
+        inline uintptr_t GetPhNum() const
+        {
+            return m_AuxiliaryVector.ProgramHeaderCount;
+        }
 
-        inline const std::vector<Symbol>& GetSymbols() const { return symbols; }
-        inline std::string_view           GetLdPath() const { return ldPath; }
+        inline const std::vector<Symbol>& GetSymbols() const
+        {
+            return m_Symbols;
+        }
+        inline std::string_view GetLdPath() const { return m_LdPath; }
 
       private:
-        u8*                        image = nullptr;
-        Header                     header;
-        std::vector<ProgramHeader> programHeaders;
-        std::vector<SectionHeader> sections;
-        AuxiliaryVector            auxv;
+        u8*                        m_Image = nullptr;
+        Header                     m_Header;
+        std::vector<ProgramHeader> m_ProgramHeaders;
+        std::vector<SectionHeader> m_Sections;
+        AuxiliaryVector            m_AuxiliaryVector;
 
-        std::optional<u64>         stringSectionIndex;
-        std::optional<u64>         symbolSectionIndex;
+        std::optional<u64>         m_StringSectionIndex;
+        std::optional<u64>         m_SymbolSectionIndex;
+        u8*                        m_StringTable = nullptr;
 
-        std::vector<Symbol>        symbols;
-        std::string_view           ldPath;
+        std::vector<Symbol>        m_Symbols;
+        std::string_view           m_LdPath;
 
         bool                       Parse();
         void                       LoadSymbols();
@@ -147,7 +160,7 @@ namespace ELF
         template <typename T>
         void Read(T* buffer, isize offset, isize count = sizeof(T))
         {
-            std::memcpy(buffer, image + offset, count);
+            std::memcpy(buffer, m_Image + offset, count);
         }
     };
 }; // namespace ELF

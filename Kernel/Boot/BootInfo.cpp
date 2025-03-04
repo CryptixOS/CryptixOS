@@ -155,8 +155,7 @@ namespace
     u64              memoryMapEntryCount = 0;
 } // namespace
 
-extern "C" CTOS_NO_KASAN [[noreturn]]
-void kernelStart();
+extern "C" CTOS_NO_KASAN [[noreturn]] void kernelStart();
 
 #define VerifyExistenceOrRet(requestName)                                      \
     if (!requestName.response) return nullptr;
@@ -170,8 +169,11 @@ namespace BootInfo
         (void)s_EntryPointRequest.response;
 
         Logger::EnableSink(LOG_SINK_E9);
+#if CTOS_ARCH == CTOS_ARCH_X86_64
+        Logger::EnableSink(LOG_SINK_SERIAL);
+#endif
 
-        if (LIMINE_BASE_REVISION_SUPPORTED == false)
+        if (!LIMINE_BASE_REVISION_SUPPORTED)
             EarlyPanic("Boot: Limine base revision is not supported");
         if (!s_FramebufferRequest.response
             || s_FramebufferRequest.response->framebuffer_count < 1)

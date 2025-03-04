@@ -59,6 +59,7 @@ srcs += files(
   'Library/ICxxAbi.cpp',
   'Library/Kasan.cpp',
   'Library/Logger.cpp',
+  'Library/Module.cpp',
   'Library/Stacktrace.cpp',
 
   'VFS/FileDescriptor.cpp',
@@ -106,7 +107,7 @@ args = []
 kernel_elf = executable(
   'Cryptix.elf',
   srcs,
-  dependencies: deps,
+  dependencies: [deps, mod_deps],
   link_depends: meson.current_source_dir() / 'linker.' + arch + '.ld',
   include_directories: include_directories,
   c_args: c_args,
