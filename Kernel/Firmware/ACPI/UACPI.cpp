@@ -6,12 +6,19 @@
  */
 #include <Arch/CPU.hpp>
 #include <Arch/x86_64/IO.hpp>
+
+#include <Drivers/PCI/Device.hpp>
+#include <Drivers/PCI/HostController.hpp>
+#include <Drivers/PCI/PCI.hpp>
 #include <Firmware/ACPI/ACPI.hpp>
 
+#include <Library/Mutex.hpp>
 #include <Memory/MMIO.hpp>
+
+#include <Time/Time.hpp>
+
 #include <Prism/Math.hpp>
 #include <Prism/Spinlock.hpp>
-#include <Time/Time.hpp>
 
 #include <uacpi/kernel_api.h>
 
@@ -106,76 +113,71 @@ namespace uACPI
         uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
                                                   uacpi_handle*     outHandle)
         {
-            CtosUnused(address);
-            CtosUnused(outHandle);
+            PCI::DeviceAddress* addr = new PCI::DeviceAddress;
+            addr->Domain             = address.segment;
+            addr->Bus                = address.bus;
+            addr->Function           = address.function;
+            addr->Slot               = address.device;
 
-            return UACPI_STATUS_UNIMPLEMENTED;
+            *outHandle               = addr;
+            return UACPI_STATUS_OK;
         }
-        void         uacpi_kernel_pci_device_close(uacpi_handle) {}
+        void uacpi_kernel_pci_device_close(uacpi_handle handle)
+        {
+            delete reinterpret_cast<PCI::DeviceAddress*>(handle);
+        }
 
         uacpi_status uacpi_kernel_pci_read8(uacpi_handle device,
                                             uacpi_size offset, uacpi_u8* value)
         {
-            CtosUnused(device);
-            CtosUnused(offset);
-            CtosUnused(value);
+            auto& addr = *reinterpret_cast<PCI::DeviceAddress*>(device);
+            *value = PCI::GetHostController(addr.Domain)->Read(addr, offset, 1);
 
-            ToDoWarn();
-            return UACPI_STATUS_UNIMPLEMENTED;
+            return UACPI_STATUS_OK;
         }
         uacpi_status uacpi_kernel_pci_read16(uacpi_handle device,
                                              uacpi_size   offset,
                                              uacpi_u16*   value)
         {
-            CtosUnused(device);
-            CtosUnused(offset);
-            CtosUnused(value);
+            auto& addr = *reinterpret_cast<PCI::DeviceAddress*>(device);
+            *value = PCI::GetHostController(addr.Domain)->Read(addr, offset, 2);
 
-            ToDoWarn();
-            return UACPI_STATUS_UNIMPLEMENTED;
+            return UACPI_STATUS_OK;
         }
         uacpi_status uacpi_kernel_pci_read32(uacpi_handle device,
                                              uacpi_size   offset,
                                              uacpi_u32*   value)
         {
-            CtosUnused(device);
-            CtosUnused(offset);
-            CtosUnused(value);
+            auto& addr = *reinterpret_cast<PCI::DeviceAddress*>(device);
+            *value = PCI::GetHostController(addr.Domain)->Read(addr, offset, 4);
 
-            ToDoWarn();
-            return UACPI_STATUS_UNIMPLEMENTED;
+            return UACPI_STATUS_OK;
         }
         uacpi_status uacpi_kernel_pci_write8(uacpi_handle device,
                                              uacpi_size offset, uacpi_u8 value)
         {
-            CtosUnused(device);
-            CtosUnused(offset);
-            CtosUnused(value);
+            auto& addr = *reinterpret_cast<PCI::DeviceAddress*>(device);
+            PCI::GetHostController(addr.Domain)->Write(addr, offset, value, 1);
 
-            ToDoWarn();
-            return UACPI_STATUS_UNIMPLEMENTED;
+            return UACPI_STATUS_OK;
         }
         uacpi_status uacpi_kernel_pci_write16(uacpi_handle device,
                                               uacpi_size   offset,
                                               uacpi_u16    value)
         {
-            CtosUnused(device);
-            CtosUnused(offset);
-            CtosUnused(value);
+            auto& addr = *reinterpret_cast<PCI::DeviceAddress*>(device);
+            PCI::GetHostController(addr.Domain)->Write(addr, offset, value, 2);
 
-            ToDoWarn();
-            return UACPI_STATUS_UNIMPLEMENTED;
+            return UACPI_STATUS_OK;
         }
         uacpi_status uacpi_kernel_pci_write32(uacpi_handle device,
                                               uacpi_size   offset,
                                               uacpi_u32    value)
         {
-            CtosUnused(device);
-            CtosUnused(offset);
-            CtosUnused(value);
+            auto& addr = *reinterpret_cast<PCI::DeviceAddress*>(device);
+            PCI::GetHostController(addr.Domain)->Write(addr, offset, value, 4);
 
-            ToDoWarn();
-            return UACPI_STATUS_UNIMPLEMENTED;
+            return UACPI_STATUS_OK;
         }
 
         uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len,
@@ -261,6 +263,10 @@ namespace uACPI
 
         void uacpi_kernel_log(uacpi_log_level level, const uacpi_char* message)
         {
+            char* c = const_cast<char*>(message);
+            for (; *c != 0 && *c != '\n'; c++)
+                ;
+            *c = 0;
             switch (level)
             {
                 case UACPI_LOG_DEBUG: EarlyLogDebug("%s", message); break;
@@ -288,39 +294,69 @@ namespace uACPI
 
         uacpi_handle uacpi_kernel_create_mutex(void)
         {
-            ToDoWarn();
-            return {};
+            auto mutex = new std::mutex;
+
+            return reinterpret_cast<uacpi_handle>(mutex);
         }
-        void         uacpi_kernel_free_mutex(uacpi_handle) { ToDoWarn(); }
+        void uacpi_kernel_free_mutex(uacpi_handle handle)
+        {
+            delete reinterpret_cast<std::mutex*>(handle);
+        }
 
         uacpi_handle uacpi_kernel_create_event(void)
         {
-            ToDoWarn();
-            return {};
+            Event* event = new Event;
+
+            return reinterpret_cast<uacpi_handle>(event);
         }
-        void            uacpi_kernel_free_event(uacpi_handle) { ToDoWarn(); }
+        void uacpi_kernel_free_event(uacpi_handle handle)
+        {
+            delete reinterpret_cast<Event*>(handle);
+        }
 
         uacpi_thread_id uacpi_kernel_get_thread_id(void)
         {
-            ToDoWarn();
+            auto thread = Thread::GetCurrent();
+            if (thread)
+                return reinterpret_cast<uacpi_thread_id>(thread->GetTid());
 
-            return 0;
+            return UACPI_THREAD_ID_NONE;
         }
 
-        uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle, uacpi_u16)
+        uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle handle,
+                                                uacpi_u16    timeout)
         {
-            ToDoWarn();
-            return UACPI_STATUS_UNIMPLEMENTED;
-        }
-        void       uacpi_kernel_release_mutex(uacpi_handle) { ToDoWarn(); }
+            auto& mutex = *reinterpret_cast<std::mutex*>(handle);
+            mutex.lock();
 
-        uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle, uacpi_u16)
-        {
-            ToDoWarn();
-            return false;
+            return UACPI_STATUS_OK;
         }
-        void uacpi_kernel_signal_event(uacpi_handle) { ToDoWarn(); }
-        void uacpi_kernel_reset_event(uacpi_handle) { ToDoWarn(); }
+        void uacpi_kernel_release_mutex(uacpi_handle handle)
+        {
+            auto& mutex = *reinterpret_cast<std::mutex*>(handle);
+            mutex.unlock();
+        }
+
+        uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle handle, uacpi_u16)
+        {
+            auto&      event = *reinterpret_cast<Event*>(handle);
+
+            std::array evs   = {&event};
+            Event::Await(evs);
+
+            return true;
+        }
+        void uacpi_kernel_signal_event(uacpi_handle handle)
+        {
+            auto& event = *reinterpret_cast<Event*>(handle);
+            Event::Trigger(&event);
+        }
+        void uacpi_kernel_reset_event(uacpi_handle handle)
+        {
+            auto& event   = *reinterpret_cast<Event*>(handle);
+            event.Pending = 0;
+            event.Listeners.clear();
+        }
         uacpi_status
         uacpi_kernel_handle_firmware_request(uacpi_firmware_request*)
         {
@@ -328,16 +364,28 @@ namespace uACPI
             return UACPI_STATUS_UNIMPLEMENTED;
         }
 
+        uacpi_interrupt_handler s_Handlers[255]{};
+        uacpi_handle            s_Contexts[255]{};
+        void                    OnInterrupt(CPUContext* ctx)
+        {
+            auto handler = s_Handlers[ctx->interruptVector];
+            if (handler) handler(s_Contexts[ctx->interruptVector]);
+        }
+
         uacpi_status uacpi_kernel_install_interrupt_handler(
-            uacpi_u32 irq, uacpi_interrupt_handler, uacpi_handle ctx,
+            uacpi_u32 irq, uacpi_interrupt_handler uhandler, uacpi_handle ctx,
             uacpi_handle* outIrqHandle)
         {
-            CtosUnused(irq);
-            CtosUnused(ctx);
-            CtosUnused(outIrqHandle);
+            auto handler = InterruptManager::AllocateHandler(irq);
+            handler->Reserve();
+            handler->SetHandler(OnInterrupt);
+            s_Handlers[irq] = uhandler;
+            s_Contexts[irq] = ctx;
+            InterruptManager::Unmask(irq);
 
-            ToDoWarn();
-            return UACPI_STATUS_UNIMPLEMENTED;
+            *reinterpret_cast<usize*>(outIrqHandle)
+                = handler->GetInterruptVector();
+            return UACPI_STATUS_OK;
         }
 
         uacpi_status

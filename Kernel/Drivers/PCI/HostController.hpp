@@ -14,8 +14,8 @@
 
 namespace PCI
 {
-    using Enumerator = bool (*)(
-        const DeviceAddress&); // std::function<bool(const DeviceAddress&)>;
+    using Enumerator = bool (*)(const DeviceAddress&);
+    // using Enumerator = std::function<bool(const DeviceAddress&)>;
 
     class HostController
     {

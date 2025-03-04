@@ -15,6 +15,9 @@ namespace ACPI
     void       LoadTables();
     void       Enable();
 
+    void       LoadNameSpace();
+    void       EnumerateDevices();
+
     SDTHeader* GetTable(const char* signature, usize index = 0);
     template <typename T>
     inline T* GetTable(const char* signature, usize index = 0)

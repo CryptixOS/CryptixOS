@@ -11,7 +11,19 @@
 #include <Memory/VMM.hpp>
 
 #include <uacpi/event.h>
+#include <uacpi/resources.h>
 #include <uacpi/uacpi.h>
+#include <uacpi/utilities.h>
+
+#define uAcpiCall(cmd, ...)                                                    \
+    {                                                                          \
+        auto status = (cmd);                                                   \
+        if (uacpi_unlikely_error(status))                                      \
+        {                                                                      \
+            LogError(__VA_ARGS__);                                             \
+            return;                                                            \
+        }                                                                      \
+    }
 
 namespace ACPI
 {
@@ -107,16 +119,65 @@ namespace ACPI
 
         LogInfo("ACPI: Loaded static tables");
     }
+
+    static uacpi_iteration_decision
+    EnumerateDevice(void* ctx, uacpi_namespace_node* node, uacpi_u32 node_depth)
+    {
+        uacpi_namespace_node_info* info;
+        (void)node_depth;
+
+        uacpi_status ret = uacpi_get_namespace_node_info(node, &info);
+        if (uacpi_unlikely_error(ret))
+        {
+            const char* path
+                = uacpi_namespace_node_generate_absolute_path(node);
+            LogError("ACPI: Unable to retrieve node %s information: {}", path,
+                     uacpi_status_to_string(ret));
+            uacpi_free_absolute_path(path);
+            return UACPI_ITERATION_DECISION_CONTINUE;
+        }
+
+        LogInfo("ACPI: Found device - {}", info->name.text);
+        uacpi_free_namespace_node_info(info);
+        return UACPI_ITERATION_DECISION_CONTINUE;
+    }
     void Enable()
     {
         LogTrace("ACPI: Entering ACPI Mode");
-        uacpi_status status = uacpi_initialize(0);
+        auto status = uacpi_initialize(0);
 
         if (uacpi_unlikely_error(status))
         {
             LogError("ACPI: Failed to enter acpi mode!");
             return;
         }
+    }
+    void LoadNameSpace()
+    {
+        auto status = uacpi_namespace_load();
+        if (uacpi_unlikely_error(status))
+        {
+            LogError("ACPI: Failed to load namespace");
+            return;
+        }
+        status = uacpi_set_interrupt_model(UACPI_INTERRUPT_MODEL_IOAPIC);
+        if (uacpi_unlikely_error(status))
+        {
+            LogError("ACPI: Failed to set uACPI interrupt model");
+            return;
+        }
+        status = uacpi_namespace_initialize();
+        if (uacpi_unlikely_error(status))
+        {
+            LogError("ACPI: Failed to initialize namespace");
+            return;
+        }
+    }
+    void EnumerateDevices()
+    {
+        uacpi_namespace_for_each_child(uacpi_namespace_root(), EnumerateDevice,
+                                       UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
+                                       UACPI_MAX_DEPTH_ANY, UACPI_NULL);
     }
 
     SDTHeader* GetTable(const char* signature, usize index)

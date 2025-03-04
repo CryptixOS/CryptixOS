@@ -58,11 +58,13 @@ void kernelThread()
 
     Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1", "/mnt", "echfs"));
     ACPI::Enable();
+    ACPI::LoadNameSpace();
+    ACPI::EnumerateDevices();
 
     LogTrace("Loading user process...");
     Process* kernelProcess = Scheduler::GetKernelProcess();
     Process* userProcess   = Scheduler::CreateProcess(
-          kernelProcess, "/usr/sbin/init", Credentials::s_Root);
+        kernelProcess, "/usr/sbin/init", Credentials::s_Root);
     userProcess->PageMap = VMM::GetKernelPageMap();
 
     std::vector<std::string_view> argv;
