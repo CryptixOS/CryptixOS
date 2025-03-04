@@ -1,3 +1,6 @@
 #!/usr/bin/env zsh
 
-meson compile -C build run_${1:-uefi}
+BUILD_DIR=build_${1:-release}
+
+echo "running $BUILD_DIR"
+meson compile -C $BUILD_DIR run_${2:-uefi}

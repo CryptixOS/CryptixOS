@@ -1,4 +1,7 @@
 #!/usr/bin/env zsh
 
-meson compile -C ${1:-build_debug} -j16 build
-mkdir -p build/iso_root
+BUILD_DIR=build_${1:-release}
+echo $BUILD_DIR
+meson compile -C $BUILD_DIR -j16 build
+mkdir -p $BUILD_DIR/iso_root
+
