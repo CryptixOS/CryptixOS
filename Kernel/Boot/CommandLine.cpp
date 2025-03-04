@@ -6,6 +6,7 @@
  */
 #include <Boot/CommandLine.hpp>
 
+#include <cctype>
 #include <unordered_map>
 
 namespace CommandLine
@@ -13,52 +14,67 @@ namespace CommandLine
     static std::string_view s_KernelCommandLine = "";
     static std::unordered_map<std::string, std::string> s_OptionMap;
 
-    static void                                         ParseCommandLine()
+    // Function to parse command-line arguments from a string_view
+    void ParseArguments(std::string_view args)
     {
-        usize keyStart     = 0;
-        usize keyEnd       = 0;
-        usize valueStart   = 0;
-        usize valueEnd     = 0;
+        std::unordered_map<std::string, std::string>& result = s_OptionMap;
+        usize                                         pos    = 0;
 
-        bool  parsingValue = false;
-        for (usize pos = 0; char c : s_KernelCommandLine)
+        while (pos < args.size())
         {
-            if (c == '=')
-            {
-                parsingValue = true;
-                keyEnd       = pos - 1;
-                valueStart   = pos + 1;
-            }
-            if (c == '-' && keyEnd != 0)
-            {
+            // Skip leading whitespace
+            while (pos < args.size()
+                   && std::isspace(static_cast<unsigned char>(args[pos])))
+                ++pos;
 
-                if (parsingValue)
+            // Ensure there's an argument to process
+            if (pos >= args.size()) break;
+
+            // Check if the argument starts with '-'
+            if (args[pos] == '-')
+            {
+                ++pos;
+                usize start = pos;
+
+                // Find the end of the argument
+                while (pos < args.size()
+                       && !std::isspace(static_cast<unsigned char>(args[pos])))
+                    ++pos;
+
+                // Extract the argument substring
+                std::string_view arg          = args.substr(start, pos - start);
+
+                // Find the '=' delimiter
+                usize            delimiterPos = arg.find('=');
+                if (delimiterPos != std::string_view::npos)
                 {
-                    valueEnd = pos - 1;
-                    s_OptionMap[s_KernelCommandLine.substr(keyStart,
-                                                           keyEnd - keyStart)]
-                        = s_KernelCommandLine.substr(valueStart,
-                                                     valueEnd - valueStart);
+                    // Argument has a key=value format
+                    std::string key = std::string(arg.substr(0, delimiterPos));
+                    std::string value
+                        = std::string(arg.substr(delimiterPos + 1));
+                    result[key] = value;
                 }
                 else
-                    s_OptionMap[s_KernelCommandLine.substr(keyStart,
-                                                           keyEnd - keyStart)]
-                        = "";
-                keyStart = pos;
+                    // Argument is a flag without a value
+                    result[std::string(arg)] = "";
             }
-
-            ++pos;
+            else
+                // Handle cases where arguments do not start with '-'
+                ++pos;
         }
 
-        for (auto option : s_OptionMap)
-            LogInfo("CMD: {} = {}", option.first, option.second);
+        LogTrace("CommandLine: Finished parsing the arguments");
     }
 
     void Initialize()
     {
         s_KernelCommandLine = BootInfo::GetKernelCommandLine();
 
-        ParseCommandLine();
-        // TODO(v1tr10l7): Parse the options
+        LogInfo("CommandLine: Parsing '{}'...", s_KernelCommandLine);
+        ParseArguments(s_KernelCommandLine);
+
+        LogInfo("CommandLine: Kernel Arguments:");
+        for (auto& [arg, value] : s_OptionMap)
+            LogInfo("CommandLine: {} -> {}", arg, value);
     }
 }; // namespace CommandLine

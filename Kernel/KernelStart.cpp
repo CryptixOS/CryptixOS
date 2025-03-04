@@ -12,6 +12,8 @@
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptManager.hpp>
 
+#include <Boot/CommandLine.hpp>
+
 #include <Drivers/MemoryDevices.hpp>
 #include <Drivers/PCI/PCI.hpp>
 #include <Drivers/Serial.hpp>
@@ -50,12 +52,13 @@ void kernelThread()
 
     Scheduler::InitializeProcFs();
 
-    ACPI::Enable();
     PCI::Initialize();
     TTY::Initialize();
     MemoryDevices::Initialize();
 
     Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1", "/mnt", "echfs"));
+    ACPI::Enable();
+
     LogTrace("Loading user process...");
     Process* kernelProcess = Scheduler::GetKernelProcess();
     Process* userProcess   = Scheduler::CreateProcess(
@@ -125,6 +128,7 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
             BootInfo::GetKernelVirtualAddress().Raw<>());
 
     Stacktrace::Initialize();
+    CommandLine::Initialize();
     ACPI::LoadTables();
     Arch::Initialize();
 
