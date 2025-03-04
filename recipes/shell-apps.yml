@@ -50,9 +50,9 @@ packages:
         - '--prefix=/usr'
         - '--without-bash-malloc'
         - '--disable-nls'
-        - '--disable-readline'
+        #- '--disable-readline'
         - '--with-curses'
-        #- '--with-installed-readline=$SYSROOT_DIR$/usr'
+        - '--with-installed-readline=$SYSROOT_DIR$/usr'
         environ:
           ac_cv_func_wcswidth: 'no'
     build:
