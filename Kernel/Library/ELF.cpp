@@ -150,15 +150,16 @@ namespace ELF
         ElfDebugLog("ELF: Loading symbols...");
         Assert(symbolSectionIndex.has_value());
         Assert(stringSectionIndex.has_value());
-        if (symbolSectionIndex.value() >= sections.size()) return;
+        if (symbolSectionIndex.value() > sections.size()) return;
 
-        const Sym* symtab = reinterpret_cast<Sym*>(
-            image + sections[symbolSectionIndex.value()].offset);
-        const char* stringTable = reinterpret_cast<const char*>(
-            image + sections[stringSectionIndex.value()].offset);
+        auto& section = sections[symbolSectionIndex.value()];
+        if (section.size <= 0) return;
 
-        usize entryCount = sections[symbolSectionIndex.value()].size
-                         / sections[symbolSectionIndex.value()].entrySize;
+        const Sym*  symtab = reinterpret_cast<Sym*>(image + section.offset);
+        const char* stringTable
+            = reinterpret_cast<const char*>(image + section.offset);
+
+        usize entryCount = section.size / section.entrySize;
         for (usize i = 0; i < entryCount; i++)
         {
             auto name = std::string_view(&stringTable[symtab[i].name]);
