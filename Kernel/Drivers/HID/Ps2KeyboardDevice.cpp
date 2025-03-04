@@ -26,7 +26,16 @@ constexpr usize SCANCODE_NUMLOCK           = 0x45;
 void            Ps2KeyboardDevice::Initialize()
 {
     // TODO(v1tr10l7): initialize the keyboard device
-    m_Controller->EnableDevice(m_Port);
+    if (!m_Controller->ResetDevice(m_Port))
+    {
+        LogError("Ps2KeyboardDevice: Failed to reset the device");
+        return;
+    }
+    if (!m_Controller->EnableDevice(m_Port))
+    {
+        LogError("Ps2KeyboardDevice: Failed to enable the device's port");
+        return;
+    }
 }
 
 void Ps2KeyboardDevice::OnByteReceived(u8 byte)
