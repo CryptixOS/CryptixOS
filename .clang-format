@@ -31,4 +31,4 @@ IndentPPDirectives: BeforeHash
 IndentWidth: 4
 NamespaceIndentation: All
 PointerAlignment: Left
-BreakAfterAttributes: Always
+#AttributeBreakingStyle: Always
