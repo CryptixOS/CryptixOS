@@ -1,0 +1,22 @@
+[binaries]
+c = ['x86_64-none-elf-gcc']
+cpp = ['x86_64-none-elf-g++']
+c_ld = 'bfd'
+cpp_ld = 'bfd'
+ar = 'x86_64-none-elf-ar'
+strip = 'x86_64-none-elf-nm'
+pkg-config = 'pkg-config'
+cmake = 'cmake'
+
+[built-in options]
+c_args = ['-target', 'x86_64-none-elf']
+cpp_args = ['-target', 'x86_64-none-elf']
+cpp_eh = 'none'
+cpp_rtti = 'false'
+
+[host_machine]
+system = 'none'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'
+

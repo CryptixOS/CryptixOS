@@ -52,6 +52,7 @@ namespace Syscall
 #define ARCH_GET_GS 0x1004
     static uintptr_t SysArchPrCtl(Arguments& args)
     {
+#ifdef CTOS_TARGET_X86_64
         auto      thread = CPU::GetCurrentThread();
         i32       op     = args.Args[0];
         uintptr_t addr   = args.Args[1];
@@ -75,6 +76,7 @@ namespace Syscall
 
             default: return_err(-1, EINVAL);
         }
+#endif
 
         return 0;
     }

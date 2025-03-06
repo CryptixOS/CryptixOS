@@ -28,7 +28,11 @@ namespace Syscall::Time
             if (!current->ValidateAddress(tv, PROT_READ | PROT_WRITE))
                 return std::errno_t(EFAULT);
 
-            time_t now  = RTC::CurrentTime();
+            time_t now = 0;
+#if CTOS_ARCH_X86_64
+            now = RTC::CurrentTime();
+#endif
+
             tv->tv_sec  = now;
             tv->tv_usec = 0;
         }
@@ -56,7 +60,10 @@ namespace Syscall::Time
             if (!current->ValidateAddress(tv, PROT_READ | PROT_WRITE))
                 return std::errno_t(EFAULT);
 
-            time_t now = RTC::CurrentTime();
+            time_t now = 0;
+#ifdef CTOS_TARGET_X86_64
+            now = RTC::CurrentTime();
+#endif
             if (tv->tv_sec < 0 || tv->tv_sec < now || tv->tv_usec < 0
                 || tv->tv_usec < now / 1000)
                 return std::errno_t(EINVAL);

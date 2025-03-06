@@ -21,11 +21,16 @@ namespace CPU
         else __asm__ volatile("msr daifset, #0b1111");
     }
 
+    usize GetOnlineCPUsCount() { return 1; }
+
     struct CPU;
     CPU*    GetCurrent() { return nullptr; }
+    u64     GetCurrentID() { return 0; }
     Thread* GetCurrentThread() { return nullptr; }
 
-    void    PrepareThread(Thread* thread, uintptr_t pc)
+    bool    SwapInterruptFlag(bool) { return false; }
+
+    void    PrepareThread(Thread* thread, uintptr_t pc, uintptr_t)
     {
         (void)thread;
         (void)pc;
@@ -41,4 +46,9 @@ namespace CPU
         (void)thread;
         (void)ctx;
     }
+
+    void Reschedule(TimeStep) {}
+
+    void HaltAll() {}
+    void WakeUp(usize, bool) {}
 } // namespace CPU

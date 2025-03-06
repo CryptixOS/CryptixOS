@@ -6,23 +6,23 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include <Common.hpp>
 
 struct Thread;
 namespace CPU
 {
     struct CPU
     {
-        usize     id;
-        void*     empty;
+        usize     ID;
+        void*     Empty;
 
-        uintptr_t threadStack;
-        uintptr_t kernelStack;
+        uintptr_t ThreadStack;
+        uintptr_t KernelStack;
 
-        usize     hardwareID;
-        bool      isOnline = false;
+        usize     HardwareID;
+        bool      IsOnline = false;
 
-        Thread*   idle;
-        Thread*   currentThread;
+        Thread*   Idle;
+        Thread*   CurrentThread;
     };
 }; // namespace CPU

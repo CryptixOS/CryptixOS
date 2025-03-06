@@ -4,8 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/x86_64/IO.hpp>
-
 #include <Drivers/PCI/Device.hpp>
 #include <Drivers/PCI/HostController.hpp>
 #include <Drivers/PCI/PCI.hpp>

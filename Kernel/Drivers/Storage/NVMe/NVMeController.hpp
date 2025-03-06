@@ -135,7 +135,7 @@ namespace NVMe
 
         virtual std::string_view GetName() const noexcept override
         {
-            return std::format("nvme{}", m_Index);
+            return m_Name;
         }
 
         virtual isize Read(void* dest, off_t offset, usize bytes) override
@@ -150,7 +150,8 @@ namespace NVMe
         virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
 
       private:
-        usize m_Index                                    = 0;
+        std::string m_Name                               = "nvme";
+        usize       m_Index                              = 0;
         ControllerRegister volatile* volatile m_Register = nullptr;
         PM::Pointer                         m_CrAddress;
 

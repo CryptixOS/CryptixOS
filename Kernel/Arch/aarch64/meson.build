@@ -8,14 +8,16 @@ srcs += files(
   'Arch.cpp',
   'CPU.cpp',
   'InterruptManager.cpp',
+  'Syscall.cpp',
   'VMM.cpp',
   'interrupts.S',
 
   'Drivers/Serial.cpp'
 )
 
-ld_args += ['-Wl,-maarch64elf']
-cxx_args += [
+#ld_args += ['-Wl,-maarch64elf']
+args += [
   '-mgeneral-regs-only',
+  '-march=armv8-a+nofp+nosimd',
   '-mcmodel=small',
 ]

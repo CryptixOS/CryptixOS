@@ -19,17 +19,18 @@ else
   BUILD_SELECTION=(${(k)BUILD_TYPES})  # Get all keys (debug, release, dist)
 fi
 
+BUILD_DIR=""
 # Function to set up a Meson build
 setup_build() {
+        BUILD_DIR="build_$1_$TARGET_ARCH"
   local build_dir="build_$1_$TARGET_ARCH"
   local build_type=$2
   echo "🔧 Setting up $build_dir with buildtype=$build_type..."
   rm -rf "$build_dir"  # Remove only the relevant build directory
   meson setup "$build_dir" \
-    --cross-file="CrossFiles/kernel-target-${TARGET_ARCH}.cross-file" \
+    --cross-file="CrossFiles/kernel-target-clang-${TARGET_ARCH}.cross-file" \
     --force-fallback-for=fmt \
     --buildtype="$build_type" \
-    --debug
 }
 
 # Iterate through selected build configurations and set them up
@@ -38,6 +39,6 @@ for build in $BUILD_SELECTION; do
 done
 
 # Ensure iso_root directory exists
-mkdir -p build/iso_root
+mkdir -p $BUILD_DIR/iso_root
 echo "✅ All selected builds are set up!"
 

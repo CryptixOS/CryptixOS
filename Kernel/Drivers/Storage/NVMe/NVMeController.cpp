@@ -23,8 +23,11 @@ namespace NVMe
         , m_Index(s_ControllerCount++)
     {
         if (m_Index == 0) DevTmpFs::RegisterDevice(this);
-        VFS::MkNod(VFS::GetRootNode(), std::format("/dev/{}", GetName()), 0666,
-                   GetID());
+
+        m_Name += std::to_string(m_Index);
+        // VFS::MkNod(VFS::GetRootNode(), std::format("/dev/{}", GetName()),
+        // 0666,
+        //          GetID());
 
         LogTrace("NVMe{}: Initializing...", m_Index);
         if (!Initialize())

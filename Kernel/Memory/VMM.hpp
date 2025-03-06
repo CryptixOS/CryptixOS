@@ -190,18 +190,10 @@ class PageMap
         this->topLevel = reinterpret_cast<PageTable*>(topLevel);
     }
 
-    [[nodiscard]]
-    inline bool Exists() const
-    {
-        return topLevel;
-    }
-    [[nodiscard]]
-    inline PageTable* GetTopLevel() const
-    {
-        return topLevel;
-    }
+    [[nodiscard]] inline bool       Exists() const { return topLevel; }
+    [[nodiscard]] inline PageTable* GetTopLevel() const { return topLevel; }
 
-    inline PageAttributes GetPageSizeFlags(usize pageSize) const
+    inline PageAttributes           GetPageSizeFlags(usize pageSize) const
     {
         if (pageSize == Arch::VMM::GetPageSize(PageAttributes::eLPage))
             return PageAttributes::eLPage;
@@ -255,14 +247,14 @@ class PageMap
              PageAttributes flags
              = PageAttributes::eRW | PageAttributes::eWriteBack)
     {
-        ScopedLock guard(s_Lock);
+        ScopedLock guard(m_Lock);
         return InternalMap(virt, phys, flags);
     }
 
     bool Unmap(uintptr_t      virt,
                PageAttributes flags = static_cast<PageAttributes>(0))
     {
-        ScopedLock guard(s_Lock);
+        ScopedLock guard(m_Lock);
         return InternalUnmap(virt, flags);
     }
 
@@ -332,7 +324,7 @@ class PageMap
 
   private:
     PageTable* topLevel = 0;
-    Spinlock   s_Lock;
+    Spinlock   m_Lock;
 
     usize      pageSize = 0;
 };

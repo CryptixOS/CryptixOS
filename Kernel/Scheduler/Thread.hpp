@@ -69,18 +69,20 @@ struct Thread
     {
         return m_State == ThreadState::eBlocked;
     }
-    constexpr bool             ReadyForCleanup() { return IsDead(); }
+    constexpr bool ReadyForCleanup() { return IsDead(); }
 
-    Thread*                    Fork(Process* parent);
+    Thread*        Fork(Process* parent);
 
     // FIXME(v1tr10l7): implement this once we have signals
-    inline bool                WasInterrupted() const { return false; }
+    inline bool    WasInterrupted() const { return false; }
 
-    inline uintptr_t           GetFsBase() const { return m_FsBase; }
-    inline uintptr_t           GetGsBase() const { return m_GsBase; }
+#ifdef CTOS_TARGET_X86_64
+    inline uintptr_t GetFsBase() const { return m_FsBase; }
+    inline uintptr_t GetGsBase() const { return m_GsBase; }
 
-    inline void                SetFsBase(uintptr_t fs) { m_FsBase = fs; }
-    inline void                SetGsBase(uintptr_t gs) { m_GsBase = gs; }
+    inline void      SetFsBase(uintptr_t fs) { m_FsBase = fs; }
+    inline void      SetGsBase(uintptr_t gs) { m_GsBase = gs; }
+#endif
 
     inline Event&              GetEvent() { return m_Event; }
     inline std::deque<Event*>& GetEvents() { return m_Events; }

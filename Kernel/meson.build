@@ -90,12 +90,13 @@ ld_args = [
   '-Wl,-T,' + meson.current_source_dir() + '/linker.' + arch + '.ld',
 ]
 
+args = []
 if arch == 'x86_64'
-  cxx_args += ['-DCTOS_ARCH=CTOS_ARCH_X86_64']
+  cxx_args += ['-DCTOS_ARCH=CTOS_ARCH_X86_64', '-DCTOS_TARGET_X86_64']
   subdir('Arch/x86_64')
 elif arch == 'aarch64'
   subdir('Arch/aarch64')
-  cxx_args += ['-DCTOS_ARCH=CTOS_ARCH_AARCH64']
+  cxx_args += ['-DCTOS_ARCH=CTOS_ARCH_AARCH64', '-DCTOS_TARGET_AARCH64']
 else
   error('Unknown architecture: ' + arch)
 endif
@@ -103,15 +104,14 @@ endif
 subdir('Library/KLibC')
 subdir('Library/KLibC++')
 
-args = []
 kernel_elf = executable(
   'Cryptix.elf',
   srcs,
   dependencies: [deps, mod_deps],
   link_depends: meson.current_source_dir() / 'linker.' + arch + '.ld',
-  include_directories: include_directories,
-  c_args: c_args,
-  cpp_args: cxx_args,
+  include_directories: [include_directories, incs],
+  c_args: [c_args, args],
+  cpp_args: [cxx_args, args],
   #cpp_pch: 'Library/PrecompiledHeader.hpp',
   link_args: ld_args,
   install: false,

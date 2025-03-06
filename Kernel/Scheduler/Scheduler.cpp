@@ -157,25 +157,32 @@ void Scheduler::Unblock(Thread* thread)
             s_BlockedQueue.Erase(it);
             break;
         }
-
+#ifdef CTOS_TARGET_X86_64
     Lapic::Instance()->SendIpi(g_ScheduleVector, CPU::GetCurrent()->LapicID);
+#endif
 }
 
 void Scheduler::Yield(bool saveCtx)
 {
     CPU::SetInterruptFlag(false);
+#ifdef CTOS_TARGET_X86_64
     Lapic::Instance()->Stop();
+#endif
 
     Thread* currentThread = Thread::GetCurrent();
     if (saveCtx) currentThread->YieldAwaitLock.Acquire();
     else
     {
+#ifdef CTOS_TARGET_X86_64
         CPU::SetGSBase(reinterpret_cast<uintptr_t>(CPU::GetCurrent()->Idle));
         CPU::SetKernelGSBase(
             reinterpret_cast<uintptr_t>(CPU::GetCurrent()->Idle));
+#endif
     }
 
+#ifdef CTOS_TARGET_X86_64
     Lapic::Instance()->SendIpi(g_ScheduleVector, CPU::GetCurrent()->LapicID);
+#endif
 
     CPU::SetInterruptFlag(true);
 

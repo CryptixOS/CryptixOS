@@ -30,7 +30,7 @@ log_error() {
 }
 
 # Define the build directory name
-BUILD_DIR=build_${BUILD_TYPE} #_$TARGET_ARCH
+BUILD_DIR=build_${BUILD_TYPE}_$TARGET_ARCH
 log_info "Build directory: $BUILD_DIR"
 
 # Ensure the build directory exists

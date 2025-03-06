@@ -1,0 +1,23 @@
+[binaries]
+c = ['clang']
+cpp = ['clang++']
+c_ld = 'lld'
+cpp_ld = 'lld'
+ar = 'llvm-ar'
+strip = 'llvm-strip'
+pkg-config = 'pkg-config'
+cmake = 'cmake'
+nasm = 'nasm'
+
+[built-in options]
+c_args = ['-target', 'x86_64-pc-elf']
+cpp_args = ['-target', 'x86_64-pc-elf']
+cpp_eh = 'none'
+cpp_rtti = 'false'
+
+
+[host_machine]
+system = 'pc'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'

@@ -6,9 +6,9 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include <Common.hpp>
 
-#include "Arch/InterruptManager.hpp"
+#include <Arch/InterruptManager.hpp>
 
 #include <functional>
 #include <optional>
@@ -20,36 +20,36 @@ class InterruptHandler
   public:
     bool        eoiFirst = false;
 
-    inline bool IsUsed() const { return routine != nullptr; }
-    inline bool IsReserved() const { return reserved; }
+    inline bool IsUsed() const { return m_Routine != nullptr; }
+    inline bool IsReserved() const { return m_Reserved; }
 
     bool        Reserve()
     {
         if (IsReserved()) return false;
-        return reserved = true;
+        return m_Reserved = true;
     }
 
-    inline void SetHandler(InterruptRoutine handler) { routine = handler; }
+    inline void SetHandler(InterruptRoutine handler) { m_Routine = handler; }
 
     inline void SetInterruptVector(u8 interruptVector)
     {
-        this->interruptVector = interruptVector;
+        m_InterruptVector = interruptVector;
     }
     inline u8 GetInterruptVector() const
     {
-        return interruptVector.has_value() ? interruptVector.value() : 0;
+        return m_InterruptVector.has_value() ? m_InterruptVector.value() : 0;
     }
 
-    operator bool() { return routine; }
+    operator bool() { return m_Routine; }
     bool operator()(struct CPUContext* ctx) { return HandleInterrupt(ctx); }
     virtual bool HandleInterrupt(CPUContext* ctx)
     {
-        if (routine) routine(ctx);
+        if (m_Routine) m_Routine(ctx);
         return true;
     }
 
   private:
-    std::optional<u8> interruptVector = 0;
-    InterruptRoutine  routine         = nullptr;
-    bool              reserved        = false;
+    std::optional<u8> m_InterruptVector = 0;
+    InterruptRoutine  m_Routine         = nullptr;
+    bool              m_Reserved        = false;
 };

@@ -5,7 +5,15 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/CPU.hpp>
-#include <Arch/x86_64/IO.hpp>
+#ifdef CTOS_TARGET_X86_64
+    #include <Arch/x86_64/IO.hpp>
+
+    #define ArchReadIo(port, type)         IO::Read<type>(port)
+    #define ArchWriteIo(port, value, type) IO::Read<type>(port)
+#else
+    #define ArchReadIo(port, type)
+    #define ArchWriteIo(port, value, type)
+#endif
 
 #include <Drivers/PCI/Device.hpp>
 #include <Drivers/PCI/HostController.hpp>

@@ -50,6 +50,7 @@ namespace NVMe
 
         std::string_view path
             = std::format("/dev/{}n{}", m_Controller->GetName(), m_ID);
+        LogTrace("NVMe: Creating device at '{}'", path);
         VFS::MkNod(VFS::GetRootNode(), path, m_Stats.st_mode, GetID());
         // TODO(v1tr10l7): enumerate partitions
 

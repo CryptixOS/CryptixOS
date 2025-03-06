@@ -4,9 +4,9 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Common.hpp"
+#include <Common.hpp>
 
-#include "Arch/InterruptHandler.hpp"
+#include <Arch/InterruptHandler.hpp>
 
 extern "C" void raiseSyncException()
 {

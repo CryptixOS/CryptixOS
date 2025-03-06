@@ -7,6 +7,7 @@
 #pragma once
 
 #include <Memory/VMM.hpp>
+#include <Time/TimeStep.hpp>
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
     #include <Arch/x86_64/CPU.hpp>
@@ -26,12 +27,20 @@ namespace CPU
     void            SetInterruptFlag(bool enabled);
     bool            SwapInterruptFlag(bool enabled);
 
+    u64             GetOnlineCPUsCount();
+
     struct CPU;
     CPU*    GetCurrent();
+    u64     GetCurrentID();
     Thread* GetCurrentThread();
 
     void    PrepareThread(Thread* thread, uintptr_t pc, uintptr_t arg = 0);
 
     void    SaveThread(Thread* thread, CPUContext* ctx);
     void    LoadThread(Thread* thread, CPUContext* ctx);
+
+    void    Reschedule(TimeStep us);
+
+    void    HaltAll();
+    void    WakeUp(usize id, bool everyone);
 }; // namespace CPU

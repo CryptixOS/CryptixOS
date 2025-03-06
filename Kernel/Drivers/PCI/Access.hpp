@@ -64,11 +64,36 @@ namespace PCI
     class LegacyAccessMechanism : public AccessMechanism
     {
       public:
+#ifdef CTOS_TARGET_X86_64
         // NOTE(v1tr10l7): these are defined in Arch/${arch}/PCI.cpp
         virtual u32  Read(const DeviceAddress& address, u32 reg,
                           i32 accessSize) override;
         virtual void Write(const DeviceAddress& address, u32 reg, u32 value,
                            i32 accessSize) override;
+#else
+        LegacyAccessMechanism() { AssertNotReached(); }
+
+        virtual u32 Read(const DeviceAddress& address, u32 reg,
+                         i32 accessSize) override
+        {
+            CtosUnused(address);
+            CtosUnused(reg);
+            CtosUnused(accessSize);
+
+            AssertNotReached();
+            return 0;
+        }
+        virtual void Write(const DeviceAddress& address, u32 reg, u32 value,
+                           i32 accessSize) override
+        {
+            CtosUnused(address);
+            CtosUnused(reg);
+            CtosUnused(accessSize);
+            CtosUnused(value);
+
+            AssertNotReached();
+        }
+#endif
     };
     class ECAM : public AccessMechanism
     {

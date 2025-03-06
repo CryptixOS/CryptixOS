@@ -1,0 +1,1169 @@
+diff --color -Naur fmt-orig/include/fmt/core.h fmt-10.2.0/include/fmt/core.h
+--- fmt-orig/include/fmt/core.h	2024-01-01 20:10:16.000000000 +0100
++++ fmt-10.2.0/include/fmt/core.h	2025-03-06 05:08:56.166217100 +0100
+@@ -174,12 +174,9 @@
+ #endif
+ 
+ #ifndef FMT_BEGIN_NAMESPACE
+-#  define FMT_BEGIN_NAMESPACE \
+-    namespace fmt {           \
+-    inline namespace v10 {
+-#  define FMT_END_NAMESPACE \
+-    }                       \
+-    }
++#  define FMT_BEGIN_NAMESPACE namespace fmt {
++#  define FMT_END_NAMESPACE }
++
+ #endif
+ 
+ #ifndef FMT_EXPORT
+@@ -582,11 +579,7 @@
+   bool_type,
+   char_type,
+   last_integer_type = char_type,
+-  // followed by floating-point types.
+-  float_type,
+-  double_type,
+-  long_double_type,
+-  last_numeric_type = long_double_type,
++  last_numeric_type = last_integer_type,
+   cstring_type,
+   string_type,
+   pointer_type,
+@@ -610,9 +603,6 @@
+ FMT_TYPE_CONSTANT(uint128_opt, uint128_type);
+ FMT_TYPE_CONSTANT(bool, bool_type);
+ FMT_TYPE_CONSTANT(Char, char_type);
+-FMT_TYPE_CONSTANT(float, float_type);
+-FMT_TYPE_CONSTANT(double, double_type);
+-FMT_TYPE_CONSTANT(long double, long_double_type);
+ FMT_TYPE_CONSTANT(const Char*, cstring_type);
+ FMT_TYPE_CONSTANT(basic_string_view<Char>, string_type);
+ FMT_TYPE_CONSTANT(const void*, pointer_type);
+@@ -637,8 +627,6 @@
+              set(type::uint128_type),
+   bool_set = set(type::bool_type),
+   char_set = set(type::char_type),
+-  float_set = set(type::float_type) | set(type::double_type) |
+-              set(type::long_double_type),
+   string_set = set(type::string_type),
+   cstring_set = set(type::cstring_type),
+   pointer_set = set(type::pointer_type)
+@@ -1268,9 +1256,6 @@
+     uint128_opt uint128_value;
+     bool bool_value;
+     char_type char_value;
+-    float float_value;
+-    double double_value;
+-    long double long_double_value;
+     const void* pointer;
+     string_value<char_type> string;
+     custom_value<Context> custom;
+@@ -1284,10 +1269,6 @@
+   constexpr FMT_INLINE value(unsigned long long val) : ulong_long_value(val) {}
+   FMT_INLINE value(int128_opt val) : int128_value(val) {}
+   FMT_INLINE value(uint128_opt val) : uint128_value(val) {}
+-  constexpr FMT_INLINE value(float val) : float_value(val) {}
+-  constexpr FMT_INLINE value(double val) : double_value(val) {}
+-  FMT_INLINE value(long double val) : long_double_value(val) {}
+-  constexpr FMT_INLINE value(bool val) : bool_value(val) {}
+   constexpr FMT_INLINE value(char_type val) : char_value(val) {}
+   FMT_CONSTEXPR FMT_INLINE value(const char_type* val) {
+     string.data = val;
+@@ -1399,12 +1380,6 @@
+     return {};
+   }
+ 
+-  FMT_CONSTEXPR FMT_INLINE auto map(float val) -> float { return val; }
+-  FMT_CONSTEXPR FMT_INLINE auto map(double val) -> double { return val; }
+-  FMT_CONSTEXPR FMT_INLINE auto map(long double val) -> long double {
+-    return val;
+-  }
+-
+   FMT_CONSTEXPR FMT_INLINE auto map(char_type* val) -> const char_type* {
+     return val;
+   }
+@@ -1716,12 +1691,6 @@
+     return vis(arg.value_.bool_value);
+   case detail::type::char_type:
+     return vis(arg.value_.char_value);
+-  case detail::type::float_type:
+-    return vis(arg.value_.float_value);
+-  case detail::type::double_type:
+-    return vis(arg.value_.double_value);
+-  case detail::type::long_double_type:
+-    return vis(arg.value_.long_double_value);
+   case detail::type::cstring_type:
+     return vis(arg.value_.string.data);
+   case detail::type::string_type:
+@@ -2052,24 +2021,22 @@
+ 
+ enum class presentation_type : unsigned char {
+   none,
+-  dec,             // 'd'
+-  oct,             // 'o'
+-  hex_lower,       // 'x'
+-  hex_upper,       // 'X'
+-  bin_lower,       // 'b'
+-  bin_upper,       // 'B'
+-  hexfloat_lower,  // 'a'
+-  hexfloat_upper,  // 'A'
+-  exp_lower,       // 'e'
+-  exp_upper,       // 'E'
+-  fixed_lower,     // 'f'
+-  fixed_upper,     // 'F'
+-  general_lower,   // 'g'
+-  general_upper,   // 'G'
+-  chr,             // 'c'
+-  string,          // 's'
+-  pointer,         // 'p'
+-  debug            // '?'
++  dec,            // 'd'
++  oct,            // 'o'
++  hex_lower,      // 'x'
++  hex_upper,      // 'X'
++  bin_lower,      // 'b'
++  bin_upper,      // 'B'
++  exp_lower,      // 'e'
++  exp_upper,      // 'E'
++  fixed_lower,    // 'f'
++  fixed_upper,    // 'F'
++  general_lower,  // 'g'
++  general_upper,  // 'G'
++  chr,            // 'c'
++  string,         // 's'
++  pointer,        // 'p'
++  debug           // '?'
+ };
+ 
+ // Format specifiers for built-in and string types.
+@@ -2357,7 +2324,6 @@
+     case '-':
+     case ' ':
+       if (arg_type == type::none_type) return begin;
+-      enter_state(state::sign, in(arg_type, sint_set | float_set));
+       switch (c) {
+       case '+':
+         specs.sign = sign::plus;
+@@ -2405,8 +2371,6 @@
+       break;
+     case '.':
+       if (arg_type == type::none_type) return begin;
+-      enter_state(state::precision,
+-                  in(arg_type, float_set | string_set | cstring_set));
+       begin = parse_precision(begin, end, specs.precision, specs.precision_ref,
+                               ctx);
+       break;
+@@ -2428,22 +2392,6 @@
+       return parse_presentation_type(pres::bin_lower, integral_set);
+     case 'B':
+       return parse_presentation_type(pres::bin_upper, integral_set);
+-    case 'a':
+-      return parse_presentation_type(pres::hexfloat_lower, float_set);
+-    case 'A':
+-      return parse_presentation_type(pres::hexfloat_upper, float_set);
+-    case 'e':
+-      return parse_presentation_type(pres::exp_lower, float_set);
+-    case 'E':
+-      return parse_presentation_type(pres::exp_upper, float_set);
+-    case 'f':
+-      return parse_presentation_type(pres::fixed_lower, float_set);
+-    case 'F':
+-      return parse_presentation_type(pres::fixed_upper, float_set);
+-    case 'g':
+-      return parse_presentation_type(pres::general_lower, float_set);
+-    case 'G':
+-      return parse_presentation_type(pres::general_upper, float_set);
+     case 'c':
+       if (arg_type == type::bool_type)
+         throw_format_error("invalid format specifier");
+diff --color -Naur fmt-orig/include/fmt/format.h fmt-10.2.0/include/fmt/format.h
+--- fmt-orig/include/fmt/format.h	2024-01-01 20:10:16.000000000 +0100
++++ fmt-10.2.0/include/fmt/format.h	2025-03-06 05:14:32.325253429 +0100
+@@ -1101,10 +1101,7 @@
+ 
+ template <typename T>
+ FMT_CONSTEXPR auto is_supported_floating_point(T) -> bool {
+-  if (std::is_same<T, float>()) return FMT_USE_FLOAT;
+-  if (std::is_same<T, double>()) return FMT_USE_DOUBLE;
+-  if (std::is_same<T, long double>()) return FMT_USE_LONG_DOUBLE;
+-  return true;
++  return false;
+ }
+ 
+ // Smallest of uint32_t, uint64_t, uint128_t that is large enough to
+@@ -2460,12 +2457,6 @@
+     result.format = float_format::fixed;
+     result.showpoint |= specs.precision != 0;
+     break;
+-  case presentation_type::hexfloat_upper:
+-    result.upper = true;
+-    FMT_FALLTHROUGH;
+-  case presentation_type::hexfloat_lower:
+-    result.format = float_format::hex;
+-    break;
+   default:
+     throw_format_error("invalid format specifier");
+     break;
+@@ -2596,112 +2587,6 @@
+                                          buffer.end(), out);
+ }
+ 
+-template <typename OutputIt, typename DecimalFP, typename Char,
+-          typename Grouping = digit_grouping<Char>>
+-FMT_CONSTEXPR20 auto do_write_float(OutputIt out, const DecimalFP& f,
+-                                    const format_specs<Char>& specs,
+-                                    float_specs fspecs, locale_ref loc)
+-    -> OutputIt {
+-  auto significand = f.significand;
+-  int significand_size = get_significand_size(f);
+-  const Char zero = static_cast<Char>('0');
+-  auto sign = fspecs.sign;
+-  size_t size = to_unsigned(significand_size) + (sign ? 1 : 0);
+-  using iterator = reserve_iterator<OutputIt>;
+-
+-  Char decimal_point =
+-      fspecs.locale ? detail::decimal_point<Char>(loc) : static_cast<Char>('.');
+-
+-  int output_exp = f.exponent + significand_size - 1;
+-  auto use_exp_format = [=]() {
+-    if (fspecs.format == float_format::exp) return true;
+-    if (fspecs.format != float_format::general) return false;
+-    // Use the fixed notation if the exponent is in [exp_lower, exp_upper),
+-    // e.g. 0.0001 instead of 1e-04. Otherwise use the exponent notation.
+-    const int exp_lower = -4, exp_upper = 16;
+-    return output_exp < exp_lower ||
+-           output_exp >= (fspecs.precision > 0 ? fspecs.precision : exp_upper);
+-  };
+-  if (use_exp_format()) {
+-    int num_zeros = 0;
+-    if (fspecs.showpoint) {
+-      num_zeros = fspecs.precision - significand_size;
+-      if (num_zeros < 0) num_zeros = 0;
+-      size += to_unsigned(num_zeros);
+-    } else if (significand_size == 1) {
+-      decimal_point = Char();
+-    }
+-    auto abs_output_exp = output_exp >= 0 ? output_exp : -output_exp;
+-    int exp_digits = 2;
+-    if (abs_output_exp >= 100) exp_digits = abs_output_exp >= 1000 ? 4 : 3;
+-
+-    size += to_unsigned((decimal_point ? 1 : 0) + 2 + exp_digits);
+-    char exp_char = fspecs.upper ? 'E' : 'e';
+-    auto write = [=](iterator it) {
+-      if (sign) *it++ = detail::sign<Char>(sign);
+-      // Insert a decimal point after the first digit and add an exponent.
+-      it = write_significand(it, significand, significand_size, 1,
+-                             decimal_point);
+-      if (num_zeros > 0) it = detail::fill_n(it, num_zeros, zero);
+-      *it++ = static_cast<Char>(exp_char);
+-      return write_exponent<Char>(output_exp, it);
+-    };
+-    return specs.width > 0 ? write_padded<align::right>(out, specs, size, write)
+-                           : base_iterator(out, write(reserve(out, size)));
+-  }
+-
+-  int exp = f.exponent + significand_size;
+-  if (f.exponent >= 0) {
+-    // 1234e5 -> 123400000[.0+]
+-    size += to_unsigned(f.exponent);
+-    int num_zeros = fspecs.precision - exp;
+-    abort_fuzzing_if(num_zeros > 5000);
+-    if (fspecs.showpoint) {
+-      ++size;
+-      if (num_zeros <= 0 && fspecs.format != float_format::fixed) num_zeros = 0;
+-      if (num_zeros > 0) size += to_unsigned(num_zeros);
+-    }
+-    auto grouping = Grouping(loc, fspecs.locale);
+-    size += to_unsigned(grouping.count_separators(exp));
+-    return write_padded<align::right>(out, specs, size, [&](iterator it) {
+-      if (sign) *it++ = detail::sign<Char>(sign);
+-      it = write_significand<Char>(it, significand, significand_size,
+-                                   f.exponent, grouping);
+-      if (!fspecs.showpoint) return it;
+-      *it++ = decimal_point;
+-      return num_zeros > 0 ? detail::fill_n(it, num_zeros, zero) : it;
+-    });
+-  } else if (exp > 0) {
+-    // 1234e-2 -> 12.34[0+]
+-    int num_zeros = fspecs.showpoint ? fspecs.precision - significand_size : 0;
+-    size += 1 + to_unsigned(num_zeros > 0 ? num_zeros : 0);
+-    auto grouping = Grouping(loc, fspecs.locale);
+-    size += to_unsigned(grouping.count_separators(exp));
+-    return write_padded<align::right>(out, specs, size, [&](iterator it) {
+-      if (sign) *it++ = detail::sign<Char>(sign);
+-      it = write_significand(it, significand, significand_size, exp,
+-                             decimal_point, grouping);
+-      return num_zeros > 0 ? detail::fill_n(it, num_zeros, zero) : it;
+-    });
+-  }
+-  // 1234e-6 -> 0.001234
+-  int num_zeros = -exp;
+-  if (significand_size == 0 && fspecs.precision >= 0 &&
+-      fspecs.precision < num_zeros) {
+-    num_zeros = fspecs.precision;
+-  }
+-  bool pointy = num_zeros != 0 || significand_size != 0 || fspecs.showpoint;
+-  size += 1 + (pointy ? 1 : 0) + to_unsigned(num_zeros);
+-  return write_padded<align::right>(out, specs, size, [&](iterator it) {
+-    if (sign) *it++ = detail::sign<Char>(sign);
+-    *it++ = zero;
+-    if (!pointy) return it;
+-    *it++ = decimal_point;
+-    it = detail::fill_n(it, num_zeros, zero);
+-    return write_significand<Char>(it, significand, significand_size);
+-  });
+-}
+-
+ template <typename Char> class fallback_digit_grouping {
+  public:
+   constexpr fallback_digit_grouping(locale_ref, bool) {}
+@@ -2716,19 +2601,6 @@
+   }
+ };
+ 
+-template <typename OutputIt, typename DecimalFP, typename Char>
+-FMT_CONSTEXPR20 auto write_float(OutputIt out, const DecimalFP& f,
+-                                 const format_specs<Char>& specs,
+-                                 float_specs fspecs, locale_ref loc)
+-    -> OutputIt {
+-  if (is_constant_evaluated()) {
+-    return do_write_float<OutputIt, DecimalFP, Char,
+-                          fallback_digit_grouping<Char>>(out, f, specs, fspecs,
+-                                                         loc);
+-  } else {
+-    return do_write_float(out, f, specs, fspecs, loc);
+-  }
+-}
+ 
+ template <typename T> constexpr auto isnan(T value) -> bool {
+   return !(value >= value);  // std::isnan doesn't support __float128.
+@@ -2741,14 +2613,6 @@
+ struct has_isfinite<T, enable_if_t<sizeof(std::isfinite(T())) != 0>>
+     : std::true_type {};
+ 
+-template <typename T, FMT_ENABLE_IF(std::is_floating_point<T>::value&&
+-                                        has_isfinite<T>::value)>
+-FMT_CONSTEXPR20 auto isfinite(T value) -> bool {
+-  constexpr T inf = T(std::numeric_limits<double>::infinity());
+-  if (is_constant_evaluated())
+-    return !detail::isnan(value) && value < inf && value > -inf;
+-  return std::isfinite(value);
+-}
+ template <typename T, FMT_ENABLE_IF(!has_isfinite<T>::value)>
+ FMT_CONSTEXPR auto isfinite(T value) -> bool {
+   T inf = T(std::numeric_limits<double>::infinity());
+@@ -2756,19 +2620,6 @@
+   return !detail::isnan(value) && value < inf && value > -inf;
+ }
+ 
+-template <typename T, FMT_ENABLE_IF(is_floating_point<T>::value)>
+-FMT_INLINE FMT_CONSTEXPR bool signbit(T value) {
+-  if (is_constant_evaluated()) {
+-#ifdef __cpp_if_constexpr
+-    if constexpr (std::numeric_limits<double>::is_iec559) {
+-      auto bits = detail::bit_cast<uint64_t>(static_cast<double>(value));
+-      return (bits >> (num_bits<uint64_t>() - 1)) != 0;
+-    }
+-#endif
+-  }
+-  return std::signbit(static_cast<double>(value));
+-}
+-
+ inline FMT_CONSTEXPR20 void adjust_precision(int& precision, int exp10) {
+   // Adjust fixed precision by exponent because it is relative to decimal
+   // point.
+@@ -3040,637 +2891,6 @@
+   fixed = 4,
+ };
+ 
+-// Formats a floating-point number using a variation of the Fixed-Precision
+-// Positive Floating-Point Printout ((FPP)^2) algorithm by Steele & White:
+-// https://fmt.dev/papers/p372-steele.pdf.
+-FMT_CONSTEXPR20 inline void format_dragon(basic_fp<uint128_t> value,
+-                                          unsigned flags, int num_digits,
+-                                          buffer<char>& buf, int& exp10) {
+-  bigint numerator;    // 2 * R in (FPP)^2.
+-  bigint denominator;  // 2 * S in (FPP)^2.
+-  // lower and upper are differences between value and corresponding boundaries.
+-  bigint lower;             // (M^- in (FPP)^2).
+-  bigint upper_store;       // upper's value if different from lower.
+-  bigint* upper = nullptr;  // (M^+ in (FPP)^2).
+-  // Shift numerator and denominator by an extra bit or two (if lower boundary
+-  // is closer) to make lower and upper integers. This eliminates multiplication
+-  // by 2 during later computations.
+-  bool is_predecessor_closer = (flags & dragon::predecessor_closer) != 0;
+-  int shift = is_predecessor_closer ? 2 : 1;
+-  if (value.e >= 0) {
+-    numerator = value.f;
+-    numerator <<= value.e + shift;
+-    lower = 1;
+-    lower <<= value.e;
+-    if (is_predecessor_closer) {
+-      upper_store = 1;
+-      upper_store <<= value.e + 1;
+-      upper = &upper_store;
+-    }
+-    denominator.assign_pow10(exp10);
+-    denominator <<= shift;
+-  } else if (exp10 < 0) {
+-    numerator.assign_pow10(-exp10);
+-    lower.assign(numerator);
+-    if (is_predecessor_closer) {
+-      upper_store.assign(numerator);
+-      upper_store <<= 1;
+-      upper = &upper_store;
+-    }
+-    numerator *= value.f;
+-    numerator <<= shift;
+-    denominator = 1;
+-    denominator <<= shift - value.e;
+-  } else {
+-    numerator = value.f;
+-    numerator <<= shift;
+-    denominator.assign_pow10(exp10);
+-    denominator <<= shift - value.e;
+-    lower = 1;
+-    if (is_predecessor_closer) {
+-      upper_store = 1ULL << 1;
+-      upper = &upper_store;
+-    }
+-  }
+-  int even = static_cast<int>((value.f & 1) == 0);
+-  if (!upper) upper = &lower;
+-  bool shortest = num_digits < 0;
+-  if ((flags & dragon::fixup) != 0) {
+-    if (add_compare(numerator, *upper, denominator) + even <= 0) {
+-      --exp10;
+-      numerator *= 10;
+-      if (num_digits < 0) {
+-        lower *= 10;
+-        if (upper != &lower) *upper *= 10;
+-      }
+-    }
+-    if ((flags & dragon::fixed) != 0) adjust_precision(num_digits, exp10 + 1);
+-  }
+-  // Invariant: value == (numerator / denominator) * pow(10, exp10).
+-  if (shortest) {
+-    // Generate the shortest representation.
+-    num_digits = 0;
+-    char* data = buf.data();
+-    for (;;) {
+-      int digit = numerator.divmod_assign(denominator);
+-      bool low = compare(numerator, lower) - even < 0;  // numerator <[=] lower.
+-      // numerator + upper >[=] pow10:
+-      bool high = add_compare(numerator, *upper, denominator) + even > 0;
+-      data[num_digits++] = static_cast<char>('0' + digit);
+-      if (low || high) {
+-        if (!low) {
+-          ++data[num_digits - 1];
+-        } else if (high) {
+-          int result = add_compare(numerator, numerator, denominator);
+-          // Round half to even.
+-          if (result > 0 || (result == 0 && (digit % 2) != 0))
+-            ++data[num_digits - 1];
+-        }
+-        buf.try_resize(to_unsigned(num_digits));
+-        exp10 -= num_digits - 1;
+-        return;
+-      }
+-      numerator *= 10;
+-      lower *= 10;
+-      if (upper != &lower) *upper *= 10;
+-    }
+-  }
+-  // Generate the given number of digits.
+-  exp10 -= num_digits - 1;
+-  if (num_digits <= 0) {
+-    denominator *= 10;
+-    auto digit = add_compare(numerator, numerator, denominator) > 0 ? '1' : '0';
+-    buf.push_back(digit);
+-    return;
+-  }
+-  buf.try_resize(to_unsigned(num_digits));
+-  for (int i = 0; i < num_digits - 1; ++i) {
+-    int digit = numerator.divmod_assign(denominator);
+-    buf[i] = static_cast<char>('0' + digit);
+-    numerator *= 10;
+-  }
+-  int digit = numerator.divmod_assign(denominator);
+-  auto result = add_compare(numerator, numerator, denominator);
+-  if (result > 0 || (result == 0 && (digit % 2) != 0)) {
+-    if (digit == 9) {
+-      const auto overflow = '0' + 10;
+-      buf[num_digits - 1] = overflow;
+-      // Propagate the carry.
+-      for (int i = num_digits - 1; i > 0 && buf[i] == overflow; --i) {
+-        buf[i] = '0';
+-        ++buf[i - 1];
+-      }
+-      if (buf[0] == overflow) {
+-        buf[0] = '1';
+-        if ((flags & dragon::fixed) != 0)
+-          buf.push_back('0');
+-        else
+-          ++exp10;
+-      }
+-      return;
+-    }
+-    ++digit;
+-  }
+-  buf[num_digits - 1] = static_cast<char>('0' + digit);
+-}
+-
+-// Formats a floating-point number using the hexfloat format.
+-template <typename Float, FMT_ENABLE_IF(!is_double_double<Float>::value)>
+-FMT_CONSTEXPR20 void format_hexfloat(Float value, int precision,
+-                                     float_specs specs, buffer<char>& buf) {
+-  // float is passed as double to reduce the number of instantiations and to
+-  // simplify implementation.
+-  static_assert(!std::is_same<Float, float>::value, "");
+-
+-  using info = dragonbox::float_info<Float>;
+-
+-  // Assume Float is in the format [sign][exponent][significand].
+-  using carrier_uint = typename info::carrier_uint;
+-
+-  constexpr auto num_float_significand_bits =
+-      detail::num_significand_bits<Float>();
+-
+-  basic_fp<carrier_uint> f(value);
+-  f.e += num_float_significand_bits;
+-  if (!has_implicit_bit<Float>()) --f.e;
+-
+-  constexpr auto num_fraction_bits =
+-      num_float_significand_bits + (has_implicit_bit<Float>() ? 1 : 0);
+-  constexpr auto num_xdigits = (num_fraction_bits + 3) / 4;
+-
+-  constexpr auto leading_shift = ((num_xdigits - 1) * 4);
+-  const auto leading_mask = carrier_uint(0xF) << leading_shift;
+-  const auto leading_xdigit =
+-      static_cast<uint32_t>((f.f & leading_mask) >> leading_shift);
+-  if (leading_xdigit > 1) f.e -= (32 - countl_zero(leading_xdigit) - 1);
+-
+-  int print_xdigits = num_xdigits - 1;
+-  if (precision >= 0 && print_xdigits > precision) {
+-    const int shift = ((print_xdigits - precision - 1) * 4);
+-    const auto mask = carrier_uint(0xF) << shift;
+-    const auto v = static_cast<uint32_t>((f.f & mask) >> shift);
+-
+-    if (v >= 8) {
+-      const auto inc = carrier_uint(1) << (shift + 4);
+-      f.f += inc;
+-      f.f &= ~(inc - 1);
+-    }
+-
+-    // Check long double overflow
+-    if (!has_implicit_bit<Float>()) {
+-      const auto implicit_bit = carrier_uint(1) << num_float_significand_bits;
+-      if ((f.f & implicit_bit) == implicit_bit) {
+-        f.f >>= 4;
+-        f.e += 4;
+-      }
+-    }
+-
+-    print_xdigits = precision;
+-  }
+-
+-  char xdigits[num_bits<carrier_uint>() / 4];
+-  detail::fill_n(xdigits, sizeof(xdigits), '0');
+-  format_uint<4>(xdigits, f.f, num_xdigits, specs.upper);
+-
+-  // Remove zero tail
+-  while (print_xdigits > 0 && xdigits[print_xdigits] == '0') --print_xdigits;
+-
+-  buf.push_back('0');
+-  buf.push_back(specs.upper ? 'X' : 'x');
+-  buf.push_back(xdigits[0]);
+-  if (specs.showpoint || print_xdigits > 0 || print_xdigits < precision)
+-    buf.push_back('.');
+-  buf.append(xdigits + 1, xdigits + 1 + print_xdigits);
+-  for (; print_xdigits < precision; ++print_xdigits) buf.push_back('0');
+-
+-  buf.push_back(specs.upper ? 'P' : 'p');
+-
+-  uint32_t abs_e;
+-  if (f.e < 0) {
+-    buf.push_back('-');
+-    abs_e = static_cast<uint32_t>(-f.e);
+-  } else {
+-    buf.push_back('+');
+-    abs_e = static_cast<uint32_t>(f.e);
+-  }
+-  format_decimal<char>(appender(buf), abs_e, detail::count_digits(abs_e));
+-}
+-
+-template <typename Float, FMT_ENABLE_IF(is_double_double<Float>::value)>
+-FMT_CONSTEXPR20 void format_hexfloat(Float value, int precision,
+-                                     float_specs specs, buffer<char>& buf) {
+-  format_hexfloat(static_cast<double>(value), precision, specs, buf);
+-}
+-
+-constexpr auto fractional_part_rounding_thresholds(int index) -> uint32_t {
+-  // For checking rounding thresholds.
+-  // The kth entry is chosen to be the smallest integer such that the
+-  // upper 32-bits of 10^(k+1) times it is strictly bigger than 5 * 10^k.
+-  // It is equal to ceil(2^31 + 2^32/10^(k + 1)).
+-  // These are stored in a string literal because we cannot have static arrays
+-  // in constexpr functions and non-static ones are poorly optimized.
+-  return U"\x9999999a\x828f5c29\x80418938\x80068db9\x8000a7c6\x800010c7"
+-         U"\x800001ae\x8000002b"[index];
+-}
+-
+-template <typename Float>
+-FMT_CONSTEXPR20 auto format_float(Float value, int precision, float_specs specs,
+-                                  buffer<char>& buf) -> int {
+-  // float is passed as double to reduce the number of instantiations.
+-  static_assert(!std::is_same<Float, float>::value, "");
+-  FMT_ASSERT(value >= 0, "value is negative");
+-  auto converted_value = convert_float(value);
+-
+-  const bool fixed = specs.format == float_format::fixed;
+-  if (value <= 0) {  // <= instead of == to silence a warning.
+-    if (precision <= 0 || !fixed) {
+-      buf.push_back('0');
+-      return 0;
+-    }
+-    buf.try_resize(to_unsigned(precision));
+-    fill_n(buf.data(), precision, '0');
+-    return -precision;
+-  }
+-
+-  int exp = 0;
+-  bool use_dragon = true;
+-  unsigned dragon_flags = 0;
+-  if (!is_fast_float<Float>() || is_constant_evaluated()) {
+-    const auto inv_log2_10 = 0.3010299956639812;  // 1 / log2(10)
+-    using info = dragonbox::float_info<decltype(converted_value)>;
+-    const auto f = basic_fp<typename info::carrier_uint>(converted_value);
+-    // Compute exp, an approximate power of 10, such that
+-    //   10^(exp - 1) <= value < 10^exp or 10^exp <= value < 10^(exp + 1).
+-    // This is based on log10(value) == log2(value) / log2(10) and approximation
+-    // of log2(value) by e + num_fraction_bits idea from double-conversion.
+-    auto e = (f.e + count_digits<1>(f.f) - 1) * inv_log2_10 - 1e-10;
+-    exp = static_cast<int>(e);
+-    if (e > exp) ++exp;  // Compute ceil.
+-    dragon_flags = dragon::fixup;
+-  } else if (precision < 0) {
+-    // Use Dragonbox for the shortest format.
+-    if (specs.binary32) {
+-      auto dec = dragonbox::to_decimal(static_cast<float>(value));
+-      write<char>(buffer_appender<char>(buf), dec.significand);
+-      return dec.exponent;
+-    }
+-    auto dec = dragonbox::to_decimal(static_cast<double>(value));
+-    write<char>(buffer_appender<char>(buf), dec.significand);
+-    return dec.exponent;
+-  } else {
+-    // Extract significand bits and exponent bits.
+-    using info = dragonbox::float_info<double>;
+-    auto br = bit_cast<uint64_t>(static_cast<double>(value));
+-
+-    const uint64_t significand_mask =
+-        (static_cast<uint64_t>(1) << num_significand_bits<double>()) - 1;
+-    uint64_t significand = (br & significand_mask);
+-    int exponent = static_cast<int>((br & exponent_mask<double>()) >>
+-                                    num_significand_bits<double>());
+-
+-    if (exponent != 0) {  // Check if normal.
+-      exponent -= exponent_bias<double>() + num_significand_bits<double>();
+-      significand |=
+-          (static_cast<uint64_t>(1) << num_significand_bits<double>());
+-      significand <<= 1;
+-    } else {
+-      // Normalize subnormal inputs.
+-      FMT_ASSERT(significand != 0, "zeros should not appear here");
+-      int shift = countl_zero(significand);
+-      FMT_ASSERT(shift >= num_bits<uint64_t>() - num_significand_bits<double>(),
+-                 "");
+-      shift -= (num_bits<uint64_t>() - num_significand_bits<double>() - 2);
+-      exponent = (std::numeric_limits<double>::min_exponent -
+-                  num_significand_bits<double>()) -
+-                 shift;
+-      significand <<= shift;
+-    }
+-
+-    // Compute the first several nonzero decimal significand digits.
+-    // We call the number we get the first segment.
+-    const int k = info::kappa - dragonbox::floor_log10_pow2(exponent);
+-    exp = -k;
+-    const int beta = exponent + dragonbox::floor_log2_pow10(k);
+-    uint64_t first_segment;
+-    bool has_more_segments;
+-    int digits_in_the_first_segment;
+-    {
+-      const auto r = dragonbox::umul192_upper128(
+-          significand << beta, dragonbox::get_cached_power(k));
+-      first_segment = r.high();
+-      has_more_segments = r.low() != 0;
+-
+-      // The first segment can have 18 ~ 19 digits.
+-      if (first_segment >= 1000000000000000000ULL) {
+-        digits_in_the_first_segment = 19;
+-      } else {
+-        // When it is of 18-digits, we align it to 19-digits by adding a bogus
+-        // zero at the end.
+-        digits_in_the_first_segment = 18;
+-        first_segment *= 10;
+-      }
+-    }
+-
+-    // Compute the actual number of decimal digits to print.
+-    if (fixed) adjust_precision(precision, exp + digits_in_the_first_segment);
+-
+-    // Use Dragon4 only when there might be not enough digits in the first
+-    // segment.
+-    if (digits_in_the_first_segment > precision) {
+-      use_dragon = false;
+-
+-      if (precision <= 0) {
+-        exp += digits_in_the_first_segment;
+-
+-        if (precision < 0) {
+-          // Nothing to do, since all we have are just leading zeros.
+-          buf.try_resize(0);
+-        } else {
+-          // We may need to round-up.
+-          buf.try_resize(1);
+-          if ((first_segment | static_cast<uint64_t>(has_more_segments)) >
+-              5000000000000000000ULL) {
+-            buf[0] = '1';
+-          } else {
+-            buf[0] = '0';
+-          }
+-        }
+-      }  // precision <= 0
+-      else {
+-        exp += digits_in_the_first_segment - precision;
+-
+-        // When precision > 0, we divide the first segment into three
+-        // subsegments, each with 9, 9, and 0 ~ 1 digits so that each fits
+-        // in 32-bits which usually allows faster calculation than in
+-        // 64-bits. Since some compiler (e.g. MSVC) doesn't know how to optimize
+-        // division-by-constant for large 64-bit divisors, we do it here
+-        // manually. The magic number 7922816251426433760 below is equal to
+-        // ceil(2^(64+32) / 10^10).
+-        const uint32_t first_subsegment = static_cast<uint32_t>(
+-            dragonbox::umul128_upper64(first_segment, 7922816251426433760ULL) >>
+-            32);
+-        const uint64_t second_third_subsegments =
+-            first_segment - first_subsegment * 10000000000ULL;
+-
+-        uint64_t prod;
+-        uint32_t digits;
+-        bool should_round_up;
+-        int number_of_digits_to_print = precision > 9 ? 9 : precision;
+-
+-        // Print a 9-digits subsegment, either the first or the second.
+-        auto print_subsegment = [&](uint32_t subsegment, char* buffer) {
+-          int number_of_digits_printed = 0;
+-
+-          // If we want to print an odd number of digits from the subsegment,
+-          if ((number_of_digits_to_print & 1) != 0) {
+-            // Convert to 64-bit fixed-point fractional form with 1-digit
+-            // integer part. The magic number 720575941 is a good enough
+-            // approximation of 2^(32 + 24) / 10^8; see
+-            // https://jk-jeon.github.io/posts/2022/12/fixed-precision-formatting/#fixed-length-case
+-            // for details.
+-            prod = ((subsegment * static_cast<uint64_t>(720575941)) >> 24) + 1;
+-            digits = static_cast<uint32_t>(prod >> 32);
+-            *buffer = static_cast<char>('0' + digits);
+-            number_of_digits_printed++;
+-          }
+-          // If we want to print an even number of digits from the
+-          // first_subsegment,
+-          else {
+-            // Convert to 64-bit fixed-point fractional form with 2-digits
+-            // integer part. The magic number 450359963 is a good enough
+-            // approximation of 2^(32 + 20) / 10^7; see
+-            // https://jk-jeon.github.io/posts/2022/12/fixed-precision-formatting/#fixed-length-case
+-            // for details.
+-            prod = ((subsegment * static_cast<uint64_t>(450359963)) >> 20) + 1;
+-            digits = static_cast<uint32_t>(prod >> 32);
+-            copy2(buffer, digits2(digits));
+-            number_of_digits_printed += 2;
+-          }
+-
+-          // Print all digit pairs.
+-          while (number_of_digits_printed < number_of_digits_to_print) {
+-            prod = static_cast<uint32_t>(prod) * static_cast<uint64_t>(100);
+-            digits = static_cast<uint32_t>(prod >> 32);
+-            copy2(buffer + number_of_digits_printed, digits2(digits));
+-            number_of_digits_printed += 2;
+-          }
+-        };
+-
+-        // Print first subsegment.
+-        print_subsegment(first_subsegment, buf.data());
+-
+-        // Perform rounding if the first subsegment is the last subsegment to
+-        // print.
+-        if (precision <= 9) {
+-          // Rounding inside the subsegment.
+-          // We round-up if:
+-          //  - either the fractional part is strictly larger than 1/2, or
+-          //  - the fractional part is exactly 1/2 and the last digit is odd.
+-          // We rely on the following observations:
+-          //  - If fractional_part >= threshold, then the fractional part is
+-          //    strictly larger than 1/2.
+-          //  - If the MSB of fractional_part is set, then the fractional part
+-          //    must be at least 1/2.
+-          //  - When the MSB of fractional_part is set, either
+-          //    second_third_subsegments being nonzero or has_more_segments
+-          //    being true means there are further digits not printed, so the
+-          //    fractional part is strictly larger than 1/2.
+-          if (precision < 9) {
+-            uint32_t fractional_part = static_cast<uint32_t>(prod);
+-            should_round_up =
+-                fractional_part >= fractional_part_rounding_thresholds(
+-                                       8 - number_of_digits_to_print) ||
+-                ((fractional_part >> 31) &
+-                 ((digits & 1) | (second_third_subsegments != 0) |
+-                  has_more_segments)) != 0;
+-          }
+-          // Rounding at the subsegment boundary.
+-          // In this case, the fractional part is at least 1/2 if and only if
+-          // second_third_subsegments >= 5000000000ULL, and is strictly larger
+-          // than 1/2 if we further have either second_third_subsegments >
+-          // 5000000000ULL or has_more_segments == true.
+-          else {
+-            should_round_up = second_third_subsegments > 5000000000ULL ||
+-                              (second_third_subsegments == 5000000000ULL &&
+-                               ((digits & 1) != 0 || has_more_segments));
+-          }
+-        }
+-        // Otherwise, print the second subsegment.
+-        else {
+-          // Compilers are not aware of how to leverage the maximum value of
+-          // second_third_subsegments to find out a better magic number which
+-          // allows us to eliminate an additional shift. 1844674407370955162 =
+-          // ceil(2^64/10) < ceil(2^64*(10^9/(10^10 - 1))).
+-          const uint32_t second_subsegment =
+-              static_cast<uint32_t>(dragonbox::umul128_upper64(
+-                  second_third_subsegments, 1844674407370955162ULL));
+-          const uint32_t third_subsegment =
+-              static_cast<uint32_t>(second_third_subsegments) -
+-              second_subsegment * 10;
+-
+-          number_of_digits_to_print = precision - 9;
+-          print_subsegment(second_subsegment, buf.data() + 9);
+-
+-          // Rounding inside the subsegment.
+-          if (precision < 18) {
+-            // The condition third_subsegment != 0 implies that the segment was
+-            // of 19 digits, so in this case the third segment should be
+-            // consisting of a genuine digit from the input.
+-            uint32_t fractional_part = static_cast<uint32_t>(prod);
+-            should_round_up =
+-                fractional_part >= fractional_part_rounding_thresholds(
+-                                       8 - number_of_digits_to_print) ||
+-                ((fractional_part >> 31) &
+-                 ((digits & 1) | (third_subsegment != 0) |
+-                  has_more_segments)) != 0;
+-          }
+-          // Rounding at the subsegment boundary.
+-          else {
+-            // In this case, the segment must be of 19 digits, thus
+-            // the third subsegment should be consisting of a genuine digit from
+-            // the input.
+-            should_round_up = third_subsegment > 5 ||
+-                              (third_subsegment == 5 &&
+-                               ((digits & 1) != 0 || has_more_segments));
+-          }
+-        }
+-
+-        // Round-up if necessary.
+-        if (should_round_up) {
+-          ++buf[precision - 1];
+-          for (int i = precision - 1; i > 0 && buf[i] > '9'; --i) {
+-            buf[i] = '0';
+-            ++buf[i - 1];
+-          }
+-          if (buf[0] > '9') {
+-            buf[0] = '1';
+-            if (fixed)
+-              buf[precision++] = '0';
+-            else
+-              ++exp;
+-          }
+-        }
+-        buf.try_resize(to_unsigned(precision));
+-      }
+-    }  // if (digits_in_the_first_segment > precision)
+-    else {
+-      // Adjust the exponent for its use in Dragon4.
+-      exp += digits_in_the_first_segment - 1;
+-    }
+-  }
+-  if (use_dragon) {
+-    auto f = basic_fp<uint128_t>();
+-    bool is_predecessor_closer = specs.binary32
+-                                     ? f.assign(static_cast<float>(value))
+-                                     : f.assign(converted_value);
+-    if (is_predecessor_closer) dragon_flags |= dragon::predecessor_closer;
+-    if (fixed) dragon_flags |= dragon::fixed;
+-    // Limit precision to the maximum possible number of significant digits in
+-    // an IEEE754 double because we don't need to generate zeros.
+-    const int max_double_digits = 767;
+-    if (precision > max_double_digits) precision = max_double_digits;
+-    format_dragon(f, dragon_flags, precision, buf, exp);
+-  }
+-  if (!fixed && !specs.showpoint) {
+-    // Remove trailing zeros.
+-    auto num_digits = buf.size();
+-    while (num_digits > 0 && buf[num_digits - 1] == '0') {
+-      --num_digits;
+-      ++exp;
+-    }
+-    buf.try_resize(num_digits);
+-  }
+-  return exp;
+-}
+-template <typename Char, typename OutputIt, typename T>
+-FMT_CONSTEXPR20 auto write_float(OutputIt out, T value,
+-                                 format_specs<Char> specs, locale_ref loc)
+-    -> OutputIt {
+-  float_specs fspecs = parse_float_type_spec(specs);
+-  fspecs.sign = specs.sign;
+-  if (detail::signbit(value)) {  // value < 0 is false for NaN so use signbit.
+-    fspecs.sign = sign::minus;
+-    value = -value;
+-  } else if (fspecs.sign == sign::minus) {
+-    fspecs.sign = sign::none;
+-  }
+-
+-  if (!detail::isfinite(value))
+-    return write_nonfinite(out, detail::isnan(value), specs, fspecs);
+-
+-  if (specs.align == align::numeric && fspecs.sign) {
+-    auto it = reserve(out, 1);
+-    *it++ = detail::sign<Char>(fspecs.sign);
+-    out = base_iterator(out, it);
+-    fspecs.sign = sign::none;
+-    if (specs.width != 0) --specs.width;
+-  }
+-
+-  memory_buffer buffer;
+-  if (fspecs.format == float_format::hex) {
+-    if (fspecs.sign) buffer.push_back(detail::sign<char>(fspecs.sign));
+-    format_hexfloat(convert_float(value), specs.precision, fspecs, buffer);
+-    return write_bytes<align::right>(out, {buffer.data(), buffer.size()},
+-                                     specs);
+-  }
+-  int precision = specs.precision >= 0 || specs.type == presentation_type::none
+-                      ? specs.precision
+-                      : 6;
+-  if (fspecs.format == float_format::exp) {
+-    if (precision == max_value<int>())
+-      throw_format_error("number is too big");
+-    else
+-      ++precision;
+-  } else if (fspecs.format != float_format::fixed && precision == 0) {
+-    precision = 1;
+-  }
+-  if (const_check(std::is_same<T, float>())) fspecs.binary32 = true;
+-  int exp = format_float(convert_float(value), precision, fspecs, buffer);
+-  fspecs.precision = precision;
+-  auto f = big_decimal_fp{buffer.data(), static_cast<int>(buffer.size()), exp};
+-  return write_float(out, f, specs, fspecs, loc);
+-}
+-
+-template <typename Char, typename OutputIt, typename T,
+-          FMT_ENABLE_IF(is_floating_point<T>::value)>
+-FMT_CONSTEXPR20 auto write(OutputIt out, T value, format_specs<Char> specs,
+-                           locale_ref loc = {}) -> OutputIt {
+-  if (const_check(!is_supported_floating_point(value))) return out;
+-  return specs.localized && write_loc(out, value, specs, loc)
+-             ? out
+-             : write_float(out, value, specs, loc);
+-}
+-
+-template <typename Char, typename OutputIt, typename T,
+-          FMT_ENABLE_IF(is_fast_float<T>::value)>
+-FMT_CONSTEXPR20 auto write(OutputIt out, T value) -> OutputIt {
+-  if (is_constant_evaluated()) return write(out, value, format_specs<Char>());
+-  if (const_check(!is_supported_floating_point(value))) return out;
+-
+-  auto fspecs = float_specs();
+-  if (detail::signbit(value)) {
+-    fspecs.sign = sign::minus;
+-    value = -value;
+-  }
+-
+-  constexpr auto specs = format_specs<Char>();
+-  using floaty = conditional_t<std::is_same<T, long double>::value, double, T>;
+-  using floaty_uint = typename dragonbox::float_info<floaty>::carrier_uint;
+-  floaty_uint mask = exponent_mask<floaty>();
+-  if ((bit_cast<floaty_uint>(value) & mask) == mask)
+-    return write_nonfinite(out, std::isnan(value), specs, fspecs);
+-
+-  auto dec = dragonbox::to_decimal(static_cast<floaty>(value));
+-  return write_float(out, dec, specs, fspecs, {});
+-}
+-
+-template <typename Char, typename OutputIt, typename T,
+-          FMT_ENABLE_IF(is_floating_point<T>::value &&
+-                        !is_fast_float<T>::value)>
+-inline auto write(OutputIt out, T value) -> OutputIt {
+-  return write(out, value, format_specs<Char>());
+-}
+-
+ template <typename Char, typename OutputIt>
+ auto write(OutputIt out, monostate, format_specs<Char> = {}, locale_ref = {})
+     -> OutputIt {
+diff --color -Naur fmt-orig/include/fmt/format-inl.h fmt-10.2.0/include/fmt/format-inl.h
+--- fmt-orig/include/fmt/format-inl.h	2024-01-01 20:10:16.000000000 +0100
++++ fmt-10.2.0/include/fmt/format-inl.h	2025-03-06 04:42:24.659780814 +0100
+@@ -1240,129 +1240,6 @@
+   return ret_value;
+ }
+ 
+-template <typename T> auto to_decimal(T x) noexcept -> decimal_fp<T> {
+-  // Step 1: integer promotion & Schubfach multiplier calculation.
+-
+-  using carrier_uint = typename float_info<T>::carrier_uint;
+-  using cache_entry_type = typename cache_accessor<T>::cache_entry_type;
+-  auto br = bit_cast<carrier_uint>(x);
+-
+-  // Extract significand bits and exponent bits.
+-  const carrier_uint significand_mask =
+-      (static_cast<carrier_uint>(1) << num_significand_bits<T>()) - 1;
+-  carrier_uint significand = (br & significand_mask);
+-  int exponent =
+-      static_cast<int>((br & exponent_mask<T>()) >> num_significand_bits<T>());
+-
+-  if (exponent != 0) {  // Check if normal.
+-    exponent -= exponent_bias<T>() + num_significand_bits<T>();
+-
+-    // Shorter interval case; proceed like Schubfach.
+-    // In fact, when exponent == 1 and significand == 0, the interval is
+-    // regular. However, it can be shown that the end-results are anyway same.
+-    if (significand == 0) return shorter_interval_case<T>(exponent);
+-
+-    significand |= (static_cast<carrier_uint>(1) << num_significand_bits<T>());
+-  } else {
+-    // Subnormal case; the interval is always regular.
+-    if (significand == 0) return {0, 0};
+-    exponent =
+-        std::numeric_limits<T>::min_exponent - num_significand_bits<T>() - 1;
+-  }
+-
+-  const bool include_left_endpoint = (significand % 2 == 0);
+-  const bool include_right_endpoint = include_left_endpoint;
+-
+-  // Compute k and beta.
+-  const int minus_k = floor_log10_pow2(exponent) - float_info<T>::kappa;
+-  const cache_entry_type cache = cache_accessor<T>::get_cached_power(-minus_k);
+-  const int beta = exponent + floor_log2_pow10(-minus_k);
+-
+-  // Compute zi and deltai.
+-  // 10^kappa <= deltai < 10^(kappa + 1)
+-  const uint32_t deltai = cache_accessor<T>::compute_delta(cache, beta);
+-  const carrier_uint two_fc = significand << 1;
+-
+-  // For the case of binary32, the result of integer check is not correct for
+-  // 29711844 * 2^-82
+-  // = 6.1442653300000000008655037797566933477355632930994033813476... * 10^-18
+-  // and 29711844 * 2^-81
+-  // = 1.2288530660000000001731007559513386695471126586198806762695... * 10^-17,
+-  // and they are the unique counterexamples. However, since 29711844 is even,
+-  // this does not cause any problem for the endpoints calculations; it can only
+-  // cause a problem when we need to perform integer check for the center.
+-  // Fortunately, with these inputs, that branch is never executed, so we are
+-  // fine.
+-  const typename cache_accessor<T>::compute_mul_result z_mul =
+-      cache_accessor<T>::compute_mul((two_fc | 1) << beta, cache);
+-
+-  // Step 2: Try larger divisor; remove trailing zeros if necessary.
+-
+-  // Using an upper bound on zi, we might be able to optimize the division
+-  // better than the compiler; we are computing zi / big_divisor here.
+-  decimal_fp<T> ret_value;
+-  ret_value.significand = divide_by_10_to_kappa_plus_1(z_mul.result);
+-  uint32_t r = static_cast<uint32_t>(z_mul.result - float_info<T>::big_divisor *
+-                                                        ret_value.significand);
+-
+-  if (r < deltai) {
+-    // Exclude the right endpoint if necessary.
+-    if (r == 0 && (z_mul.is_integer & !include_right_endpoint)) {
+-      --ret_value.significand;
+-      r = float_info<T>::big_divisor;
+-      goto small_divisor_case_label;
+-    }
+-  } else if (r > deltai) {
+-    goto small_divisor_case_label;
+-  } else {
+-    // r == deltai; compare fractional parts.
+-    const typename cache_accessor<T>::compute_mul_parity_result x_mul =
+-        cache_accessor<T>::compute_mul_parity(two_fc - 1, cache, beta);
+-
+-    if (!(x_mul.parity | (x_mul.is_integer & include_left_endpoint)))
+-      goto small_divisor_case_label;
+-  }
+-  ret_value.exponent = minus_k + float_info<T>::kappa + 1;
+-
+-  // We may need to remove trailing zeros.
+-  ret_value.exponent += remove_trailing_zeros(ret_value.significand);
+-  return ret_value;
+-
+-  // Step 3: Find the significand with the smaller divisor.
+-
+-small_divisor_case_label:
+-  ret_value.significand *= 10;
+-  ret_value.exponent = minus_k + float_info<T>::kappa;
+-
+-  uint32_t dist = r - (deltai / 2) + (float_info<T>::small_divisor / 2);
+-  const bool approx_y_parity =
+-      ((dist ^ (float_info<T>::small_divisor / 2)) & 1) != 0;
+-
+-  // Is dist divisible by 10^kappa?
+-  const bool divisible_by_small_divisor =
+-      check_divisibility_and_divide_by_pow10<float_info<T>::kappa>(dist);
+-
+-  // Add dist / 10^kappa to the significand.
+-  ret_value.significand += dist;
+-
+-  if (!divisible_by_small_divisor) return ret_value;
+-
+-  // Check z^(f) >= epsilon^(f).
+-  // We have either yi == zi - epsiloni or yi == (zi - epsiloni) - 1,
+-  // where yi == zi - epsiloni if and only if z^(f) >= epsilon^(f).
+-  // Since there are only 2 possibilities, we only need to care about the
+-  // parity. Also, zi and r should have the same parity since the divisor
+-  // is an even number.
+-  const auto y_mul = cache_accessor<T>::compute_mul_parity(two_fc, cache, beta);
+-
+-  // If z^(f) >= epsilon^(f), we might have a tie when z^(f) == epsilon^(f),
+-  // or equivalently, when y is an integer.
+-  if (y_mul.parity != approx_y_parity)
+-    --ret_value.significand;
+-  else if (y_mul.is_integer & (ret_value.significand % 2 != 0))
+-    --ret_value.significand;
+-  return ret_value;
+-}
+ }  // namespace dragonbox
+ }  // namespace detail
+ 
+diff --color -Naur fmt-orig/meson.build fmt-10.2.0/meson.build
+--- fmt-orig/meson.build	1970-01-01 01:00:00.000000000 +0100
++++ fmt-10.2.0/meson.build	2025-03-06 05:21:50.896397181 +0100
+@@ -0,0 +1,14 @@
++project('fmt', 'cpp', license: 'BSD', default_options: ['cpp_std=c++14'])
++
++args = [
++    '-DFMT_STATIC_THOUSANDS_SEPARATOR=1',
++    '-DFMT_USE_LONG_DOUBLE=0',
++    '-DFMT_USE_DOUBLE=0',
++    '-DFMT_USE_FLOAT=0'
++]
++
++fmt_dep = declare_dependency(compile_args : args, include_directories : include_directories('include'))
++
++if meson.version().version_compare('>=0.54.0')
++    meson.override_dependency('fmt', fmt_dep)
++endif
+diff --color -Naur fmt-orig/.meson-subproject-wrap-hash.txt fmt-10.2.0/.meson-subproject-wrap-hash.txt
+--- fmt-orig/.meson-subproject-wrap-hash.txt	1970-01-01 01:00:00.000000000 +0100
++++ fmt-10.2.0/.meson-subproject-wrap-hash.txt	2025-03-06 02:23:02.047864695 +0100
+@@ -0,0 +1 @@
++638de195c6aaef146c2e5cc245b61ed726776973300d710d43aa3f340724e25e

@@ -30,7 +30,7 @@ arch = host_machine.cpu_family()
 qemulog = meson.project_source_root() / 'qemu.log'
 
 srcs = []
-initrd_dir = meson.project_source_root() / 'sysroot'
+initrd_dir = meson.project_source_root() / 'build-sysroot/system-root'
 
 include_directories = [
   include_directories('Kernel'),
@@ -39,13 +39,12 @@ include_directories = [
 # ==============================================================================
 ### Compiler arguments
 warnings = [
-  '-Wno-error=#warnings',
+  #'-Wno-error=#warnings',
   '-Wno-builtin-macro-redefined',
   '-Wno-macro-redefined',
   '-Wno-nan-infinity-disabled',
   '-Wno-deprecated-builtins',
   '-Wno-unused-parameter',
-  '-Wno-non-virtual-dtor',
   '-Wno-frame-address',
 ]
 
@@ -67,6 +66,7 @@ add_global_arguments(
     '-DFMT_USE_LONG_DOUBLE=0',
     '-DFMT_USE_DOUBLE=0',
     '-DFMT_USE_FLOAT=0',
+    '-DFMT_USE_EXCEPTIONS=0',
     '-DFMT_HEADER_ONLY',
     '-DMAGIC_ENUM_RANGE_MAX=0x8a00',
     '-DPRISM_LOG_ENABLE=1',
@@ -84,6 +84,9 @@ add_global_arguments(
     '-D__cplusplus=202302L',
     '-D__cpp_concepts=202207L',
     '-MP',
+    '-fno-exceptions',
+    '-fno-rtti',
+    '-Wno-non-virtual-dtor',
   ],
   language: 'cpp',
 )
@@ -97,6 +100,8 @@ phmap_opts.add_cmake_defines(
     'PHMAP_BUILD_EXAMPLES': false,
     'PHMAP_BUILD_TESTS': false,
     'PHMAP_INSTALL': false,
+    'CMAKE_TRY_COMPILE_TARGET_TYPE': 'STATIC_LIBRARY',
+    'CMAKE_CROSSCOMPILING': true,
   },
 )
 
@@ -110,7 +115,7 @@ deps = [
   ),
   dependency('demangler'),
   dependency('flanterm'),
-  dependency('fmt'),
+  dependency('fmt10'),
   #dependency('freestnd-cxx-hdrs'),
   dependency('libstdcxx_headers'),
   dependency('limine'),
@@ -118,7 +123,7 @@ deps = [
     'test=false',
   ]),
   cmake.subproject('parallel_hashmap', options: phmap_opts).dependency('phmap'),
-  dependency('prism'),
+  #dependency('prism'),
   dependency('smart_ptr'),
   dependency('string'),
   dependency('uacpi'),
@@ -136,6 +141,8 @@ subdir('Modules')
 
 no_ext_mods = ext_mods.length() == 0
 
+incs = []
+subdir('Prism/Source')
 subdir('Kernel')
 # ==============================================================================
 ### Qemu args
@@ -300,12 +307,12 @@ ovmf_binaries = subproject('ovmf_binaries')
 ovmf = ovmf_binaries.get_variable(ovmf_id)
 
 run_uefi = custom_target(
-  input: [iso],
+  input: [iso, echfs_image],
   output: 'run_uefi',
-  command: [qemu, qemu_args, '-cdrom', '@INPUT@', '-drive', 'format=raw,file=' +  'image.hdd' + ',if=none,id=nvm1', '-device', 'nvme-ns,drive=nvm1,nsid=2,bus=nvme-ctrl1', '-bios', ovmf],
+  command: [qemu, qemu_args, '-cdrom', '@INPUT0@', '-drive', 'format=raw,file=@INPUT1@,if=none,id=nvm1', '-device', 'nvme-ns,drive=nvm1,nsid=2,bus=nvme-ctrl1', '-bios', ovmf],
   console: true,
   install: false,
-  depends: iso,
+  depends: [iso, echfs_image]
 )
 
 run_uefi_gdb = custom_target(
