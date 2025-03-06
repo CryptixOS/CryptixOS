@@ -267,7 +267,8 @@ namespace Logger
         Logv(logLevel, fmt, args);
         va_end(args);
     }
-    CTOS_NO_KASAN void Logv(LogLevel level, const char* fmt, va_list& args)
+    CTOS_NO_KASAN void Logv(LogLevel level, const char* fmt, va_list& args,
+                            bool printNewline)
     {
         ScopedLock guard(s_Lock, true);
         PrintLogLevel(level);
@@ -283,7 +284,7 @@ namespace Logger
             else LogChar(*fmt++);
         }
 
-        LogChar('\n');
+        if (printNewline) LogChar('\n');
     }
 
     Terminal& GetTerminal() { return s_Terminal; }

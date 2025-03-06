@@ -269,20 +269,21 @@ namespace uACPI
             delete[] reinterpret_cast<u8*>(memory);
         }
 
-        void uacpi_kernel_log(uacpi_log_level level, const uacpi_char* message)
+        void uacpi_kernel_log(uacpi_log_level level, const uacpi_char* format)
         {
-            char* c = const_cast<char*>(message);
-            for (; *c != 0 && *c != '\n'; c++)
-                ;
-            *c = 0;
-            switch (level)
-            {
-                case UACPI_LOG_DEBUG: EarlyLogDebug("%s", message); break;
-                case UACPI_LOG_TRACE: EarlyLogTrace("%s", message); break;
-                case UACPI_LOG_INFO: EarlyLogInfo("%s", message); break;
-                case UACPI_LOG_WARN: EarlyLogWarn("%s", message); break;
-                case UACPI_LOG_ERROR: EarlyLogError("%s", message); break;
-            }
+            constexpr LogLevel uacpiToPrismLogLevels[] = {
+                LogLevel::eNone, LogLevel::eError, LogLevel::eWarn,
+                LogLevel::eInfo, LogLevel::eTrace, LogLevel::eDebug,
+            };
+
+            Assert(level < std::size(uacpiToPrismLogLevels));
+            LogLevel pLevel = uacpiToPrismLogLevels[level];
+
+            va_list  args;
+
+            va_start(args, format);
+            Logger::Logv(pLevel, format, args, false);
+            va_end(args);
         }
 
         uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void)

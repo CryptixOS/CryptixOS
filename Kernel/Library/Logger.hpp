@@ -53,7 +53,7 @@ namespace Logger
     CTOS_NO_KASAN void Log(LogLevel logLevel, std::string_view str);
     CTOS_NO_KASAN void Logf(LogLevel logLevel, const char* format, ...);
     CTOS_NO_KASAN void Logv(LogLevel logLevel, const char* format,
-                            va_list& args);
+                            va_list& args, bool printNewline = true);
 
     Terminal&          GetTerminal();
     void               Unlock();
