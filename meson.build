@@ -48,9 +48,28 @@ warnings = [
   '-Wno-frame-address',
 ]
 
+macros = [
+    '-DFMT_HEADER_ONLY',
+    '-DFMT_STATIC_THOUSANDS_SEPARATOR=1',
+    '-DFMT_USE_LONG_DOUBLE=0',
+    '-DFMT_USE_DOUBLE=0',
+    '-DFMT_USE_FLOAT=0',
+    '-DFMT_USE_FLOAT128=0',
+    '-DFMT_USE_EXCEPTIONS=0',
+    '-DLIMINE_API_REVISION=3',
+    '-DMAGIC_ENUM_NO_STREAMS=1',
+    '-DMAGIC_ENUM_RANGE_MAX=0x8a00',
+    '-DPRISM_BUILD_DEBUG=1',
+    '-DPRISM_LOG_ENABLE=1',
+    '-DPRISM_TARGET_CRYPTIX=1',
+    '-DUACPI_FORMATTED_LOGGING',
+    '-DFMT_BUILTIN_TYPES=0'
+]
+
 add_global_arguments(
   [
     warnings,
+    macros,
     '-ffreestanding',
     '-fno-omit-frame-pointer',
     '-fno-lto',
@@ -62,18 +81,6 @@ add_global_arguments(
     '-fPIE',
     '-nostdlib',
     '-static',
-    '-DFMT_STATIC_THOUSANDS_SEPARATOR=1',
-    '-DFMT_USE_LONG_DOUBLE=0',
-    '-DFMT_USE_DOUBLE=0',
-    '-DFMT_USE_FLOAT=0',
-    '-DFMT_USE_EXCEPTIONS=0',
-    '-DFMT_HEADER_ONLY',
-    '-DMAGIC_ENUM_RANGE_MAX=0x8a00',
-    '-DPRISM_LOG_ENABLE=1',
-    '-DLIMINE_API_REVISION=3',
-
-    '-DPRISM_BUILD_DEBUG=1',
-    '-DPRISM_TARGET_CRYPTIX=1',
   ],
   language: ['c', 'cpp'],
 )
