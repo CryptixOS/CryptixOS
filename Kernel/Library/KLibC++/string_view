@@ -237,7 +237,7 @@ namespace std
             while (len >= v._size)
             {
                 begin = traits_type::find(begin, len - v._size + 1, first);
-                if (*begin == '\0') return npos;
+                if (!begin || *begin == '\0') return npos;
 
                 if (traits_type::compare(begin, v._data, v._size) == 0)
                     return begin - _data;
