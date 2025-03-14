@@ -15,6 +15,7 @@
 #include <Prism/Math.hpp>
 #include <Prism/StringUtils.hpp>
 
+#include <cctype>
 #include <magic_enum/magic_enum.hpp>
 
 namespace E9
@@ -99,11 +100,13 @@ namespace Logger
         CTOS_NO_KASAN void PrintArg(const char*& fmt, va_list& args)
         {
             ++fmt;
-            bool leftJustify   = false;
-            bool plusSign      = false;
-            bool spaceIfNoSign = false;
-            bool altConversion = false;
-            bool zeroPadding   = false;
+            bool  leftJustify    = false;
+            bool  plusSign       = false;
+            bool  spaceIfNoSign  = false;
+            bool  altConversion  = false;
+            bool  zeroPadding    = false;
+            char* precisionStart = nullptr;
+
             while (true)
             {
                 switch (*fmt)
@@ -114,27 +117,39 @@ namespace Logger
                     case ' ': spaceIfNoSign = true; break;
                     case '#': altConversion = true; break;
                     case '0': zeroPadding = true; break;
+                    case '.':
+                        precisionStart = const_cast<char*>(fmt) + 1;
+                        break;
 
                     default: goto loop_end;
                 }
                 fmt++;
             }
         loop_end:
-            char* numStart  = const_cast<char*>(fmt);
-            int   numStrLen = 0;
-            while (*fmt >= '0' && *fmt <= '9')
+
+            auto parseNumber = [](const char*& fmt) -> isize
             {
-                numStrLen++;
-                fmt++;
-            }
-            int lengthSpecifier = 0;
-            if (numStrLen > 0)
-                lengthSpecifier = ToNumber<i32>(numStart, numStrLen);
-            if (*fmt == '*')
+                char* start  = const_cast<char*>(fmt);
+                usize length = 0;
+
+                for (; std::isdigit(*fmt); length++, fmt++)
+                    ;
+
+                return ToNumber<isize>(start, length);
+            };
+
+            isize width     = 0;
+            isize precision = 1000;
+            if (fmt != precisionStart)
             {
-                lengthSpecifier = va_arg(args, i32);
-                fmt++;
+                if (std::isdigit(*fmt)) width = parseNumber(fmt);
+                else if (*fmt == '*') width = va_arg(args, i32);
             }
+            if (*fmt == '*' && fmt == precisionStart)
+                precision = va_arg(args, i32);
+            else if (std::isdigit(*fmt) && fmt == precisionStart)
+                precision = parseNumber(fmt);
+
             enum class ArgLength
             {
                 eInt,
@@ -164,7 +179,7 @@ namespace Logger
 
 #define LogNum(type)                                                           \
     LogNumber<type>(args, base, leftJustify, plusSign, spaceIfNoSign,          \
-                    zeroPadding, lengthSpecifier)
+                    zeroPadding, width)
             switch (*fmt)
             {
                 case 'b':
@@ -208,7 +223,8 @@ namespace Logger
                 case 's':
                 {
                     char* str = va_arg(args, char*);
-                    while (*str != '\0') LogChar(*str++);
+                    for (; *str != '\0' && precision > 0; --precision)
+                        LogChar(*str++);
                 }
                 break;
             }
