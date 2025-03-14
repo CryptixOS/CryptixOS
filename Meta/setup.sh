@@ -11,6 +11,8 @@ declare -A BUILD_TYPES=(
   [dist]=release
 )
 
+. Meta/log.sh
+
 # If a specific build type is provided, use only that one; otherwise, set up all
 BUILD_SELECTION=()
 if [[ -n "$2" && -n ${BUILD_TYPES[$2]} ]]; then
@@ -25,7 +27,7 @@ setup_build() {
         BUILD_DIR="build_$1_$TARGET_ARCH"
   local build_dir="build_$1_$TARGET_ARCH"
   local build_type=$2
-  echo "🔧 Setting up $build_dir with buildtype=$build_type..."
+  log_info "🔧 Setting up $build_dir with buildtype=$build_type..."
   rm -rf "$build_dir"  # Remove only the relevant build directory
   meson setup "$build_dir" \
     --cross-file="CrossFiles/kernel-target-clang-${TARGET_ARCH}.cross-file" \
@@ -40,5 +42,5 @@ done
 
 # Ensure iso_root directory exists
 mkdir -p $BUILD_DIR/iso_root
-echo "✅ All selected builds are set up!"
+log_success "✅ All selected builds are set up!"
 
