@@ -22,19 +22,20 @@
 #include <Firmware/ACPI/ACPI.hpp>
 #include <Firmware/SMBIOS/SMBIOS.hpp>
 
-#include <Memory/PMM.hpp>
-#include <Memory/VMM.hpp>
-
-#include <Scheduler/Process.hpp>
-#include <Scheduler/Scheduler.hpp>
-#include <Scheduler/Thread.hpp>
-
 #include <Library/ELF.hpp>
 #include <Library/ICxxAbi.hpp>
 #include <Library/Stacktrace.hpp>
 
+#include <Memory/PMM.hpp>
+#include <Memory/VMM.hpp>
+
 #include <Prism/Containers/RedBlackTree.hpp>
 #include <Prism/Delegate.hpp>
+#include <Prism/Endian.hpp>
+
+#include <Scheduler/Process.hpp>
+#include <Scheduler/Scheduler.hpp>
+#include <Scheduler/Thread.hpp>
 
 #include <VFS/INode.hpp>
 #include <VFS/Initrd/Initrd.hpp>
@@ -145,6 +146,7 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
 
     SMBIOS::Initialize();
 
+    Scheduler::Initialize();
     auto process = Scheduler::GetKernelProcess();
     auto thread
         = process->CreateThread(reinterpret_cast<uintptr_t>(kernelThread),

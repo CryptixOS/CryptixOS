@@ -291,8 +291,10 @@ packages:
       - args: ['make', 'SHLIB_LIBS="-lncursesw"', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
-      - args: ['patchelf', '--set-soname', 'libreadline.so.8', '@THIS_COLLECT_DIR@/usr/lib/libreadline.so.8']
-      - args: ['patchelf', '--set-soname', 'libhistory.so.8', '@THIS_COLLECT_DIR@/usr/lib/libhistory.so.8']
+      - args: ['patchelf', '--set-soname', 'libreadline.so', '@THIS_COLLECT_DIR@/usr/lib/libreadline.so.8']
+      - args: ['patchelf', '--set-soname', 'libhistory.so', '@THIS_COLLECT_DIR@/usr/lib/libhistory.so.8']
+      - args: ['mv', '@THIS_COLLECT_DIR@/usr/lib/libreadline.so.8', '@THIS_COLLECT_DIR@/usr/lib/libreadline.so']
+      - args: ['mv', '@THIS_COLLECT_DIR@/usr/lib/libhistory.so.8', '@THIS_COLLECT_DIR@/usr/lib/libhistory.so']
 
   - name: zlib
     architecture: '@OPTION:arch@'

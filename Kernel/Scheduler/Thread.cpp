@@ -8,6 +8,7 @@
 #include <Scheduler/Thread.hpp>
 
 #include <Arch/CPU.hpp>
+#include <Arch/InterruptGuard.hpp>
 
 #include <Memory/PMM.hpp>
 
@@ -169,6 +170,79 @@ Thread::Thread(Process* parent, uintptr_t pc, bool user)
     CPU::PrepareThread(this, pc, 0);
 }
 Thread::~Thread() {}
+
+void Thread::SendSignal(u8 signal)
+{
+    InterruptGuard guard(false);
+    if (ShouldIgnoreSignal(signal)) return;
+    m_PendingSignals |= 1 << signal;
+}
+bool Thread::DispatchAnyPendingSignal()
+{
+    Assert(!CPU::GetInterruptFlag());
+    u32 pendingSignals = m_PendingSignals & ~m_SignalMask;
+
+    u8  signal         = 0;
+    for (; signal < 32; ++signal)
+        if (pendingSignals & Bit(signal)) return DispatchSignal(signal);
+
+    return false;
+}
+bool Thread::DispatchSignal(u8 signal)
+{
+    Assert(!CPU::GetInterruptFlag());
+    Assert(signal < 32);
+
+    m_PendingSignals &= ~Bit(signal);
+    switch (signal)
+    {
+        case SIGHUP:
+        case SIGINT:
+        case SIGKILL:
+        case SIGPIPE:
+        case SIGALRM:
+        case SIGUSR1:
+        case SIGUSR2:
+        case SIGVTALRM:
+        case SIGSTKFLT:
+        case SIGIO:
+        case SIGPROF:
+        case SIGTERM:
+            // TODO(v1tr10l7): Terminate
+            if (m_Parent->m_Pid != m_Parent->m_Credentials.pgid)
+                m_Parent->Exit(0);
+            break;
+        case SIGCHLD:
+        case SIGURG:
+        case SIGWINCH:
+            // TODO(v1tr10l7): Ignore
+            break;
+        case SIGQUIT:
+        case SIGILL:
+        case SIGTRAP:
+        case SIGABRT:
+        case SIGBUS:
+        case SIGFPE:
+        case SIGSEGV:
+        case SIGXCPU:
+        case SIGXFSZ:
+            // TODO(v1tr10l7): Dump Core
+            break;
+        case SIGCONT:
+            // TODO(v1trSystem Management Bus - Wikipedia10l7): Continue
+            break;
+        case SIGSTOP:
+        case SIGTSTP:
+        case SIGTTIN:
+        case SIGTTOU:
+            // TODO(v1tr10l7): Stop
+            break;
+
+        default: AssertNotReached(); break;
+    }
+    // TODO(v1tr10l7): Dispatch signals
+    return false;
+}
 
 Thread* Thread::Fork(Process* process)
 {

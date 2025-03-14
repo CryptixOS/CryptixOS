@@ -16,7 +16,7 @@
 #include <cstring>
 #include <magic_enum/magic_enum.hpp>
 
-#if 1
+#if 0
     #define ElfDebugLog(...) LogDebug(__VA_ARGS__)
 #else
     #define ElfDebugLog(...)
@@ -113,13 +113,14 @@ namespace ELF
         {
             auto section = &sections[i];
             if (section->Size != 0 && section->Size >= sizeof(Module)
-                && std::strncmp(MODULE_SECTION,
-                               stringTable
-                                + section->Name, std::strlen(MODULE_SECTION))
+                && std::strncmp(MODULE_SECTION, stringTable + section->Name,
+                                std::strlen(MODULE_SECTION))
                        == 0)
             {
-                std::string_view modName = stringTable + section->Name + strlen(MODULE_SECTION) + 1;
+                std::string_view modName
+                    = stringTable + section->Name + strlen(MODULE_SECTION) + 1;
 
+                LogInfo("Mod: {}", stringTable + section->Name);
                 LogInfo("Mod: {}", modName);
                 for (auto offset = section->Address;
                      offset < section->Address + section->Size;
@@ -196,7 +197,7 @@ namespace ELF
         if (m_SymbolSectionIndex.value() > m_Sections.size()) return;
 
         auto& section = m_Sections[m_SymbolSectionIndex.value()];
-        if (section.Size <= 0) return;
+        if (section.Size <= 0 || section.EntrySize == 0) return;
 
         const Sym* symtab = reinterpret_cast<Sym*>(m_Image + section.Offset);
         m_StringTable     = reinterpret_cast<u8*>(m_Image + section.Offset);

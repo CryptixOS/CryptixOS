@@ -44,6 +44,9 @@ class Scheduler
   private:
     Scheduler() = default;
 
+    static std::unordered_map<pid_t, Process*>& GetProcessMap();
+    friend class Process;
+
     static Thread* GetNextThread(usize cpuID);
     static Thread* PickReadyThread();
     static void    SwitchContext(Thread* newThread, struct CPUContext* context);

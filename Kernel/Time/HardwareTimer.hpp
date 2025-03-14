@@ -7,6 +7,8 @@
 #pragma once
 
 #include <Prism/Core/Types.hpp>
+#include <Prism/Delegate.hpp>
+
 #include <Time/TimeStep.hpp>
 
 enum class TimerMode
@@ -23,10 +25,12 @@ class HardwareTimer
 
     virtual std::string_view GetModelString() const = 0;
 
-    using OnTickCallback = void (*)(struct CPUContext*);
-    inline void SetCallback(OnTickCallback onTickCallback)
+    using OnTickCallback = Delegate<void(struct CPUContext*)>;
+
+    template <void (*Callback)(CPUContext*)>
+    inline void SetCallback()
     {
-        m_OnTickCallback = onTickCallback;
+        m_OnTickCallback.Bind<Callback>();
     }
 
     virtual ErrorOr<void> Start(TimerMode mode, TimeStep interval, u8 vector)

@@ -27,18 +27,19 @@ namespace Syscall::Process
         const sigset_t* set         = args.Get<const sigset_t*>(1);
         sigset_t*       oldSet      = args.Get<sigset_t*>(2);
 
-        class Process*  current     = ::Process::GetCurrent();
-        sigset_t        currentMask = current->GetSignalMask();
+        auto            process     = ::Process::GetCurrent();
+        Thread*         thread      = Thread::GetCurrent();
+        sigset_t        currentMask = thread->GetSignalMask();
 
         if (oldSet)
         {
-            if (!current->ValidateAddress(oldSet, PROT_READ | PROT_WRITE))
+            if (!process->ValidateAddress(oldSet, PROT_READ | PROT_WRITE))
                 return Error(EFAULT);
             *oldSet = currentMask;
         }
 
         if (!set) return 0;
-        if (!current->ValidateAddress(set, PROT_READ | PROT_WRITE))
+        if (!process->ValidateAddress(set, PROT_READ | PROT_WRITE))
             return Error(EFAULT);
 
         switch (how)
@@ -50,7 +51,7 @@ namespace Syscall::Process
             default: return Error(EINVAL);
         }
 
-        current->SetSignalMask(currentMask);
+        thread->SetSignalMask(currentMask);
         return 0;
     }
     ErrorOr<pid_t> SysGetPid(Arguments& args)

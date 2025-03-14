@@ -39,7 +39,7 @@ class TTY : public Device
     Spinlock                 m_Lock;
 
     Terminal*                m_Terminal = nullptr;
-    termios                  m_Termios;
+    termios2                 m_Termios;
 
     pid_t                    m_ControlSid = -1;
     gid_t                    m_Pgid       = 100;

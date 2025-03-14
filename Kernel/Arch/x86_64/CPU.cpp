@@ -203,7 +203,6 @@ namespace CPU
             current->IsOnline = true;
         }
 
-        Scheduler::Initialize();
         IDT::SetIST(g_ScheduleVector, 1);
         LogInfo("BSP: Initialized");
     }

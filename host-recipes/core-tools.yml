@@ -311,6 +311,7 @@ tools:
         - '--disable-multilib'
         - '--enable-initfini-array'
         - '--enable-libstdcxx-filesystem-ts'
+        - '--enable-libsupcxx'
         # -g blows up GCC's binary size.
         - 'CFLAGS=-O2'
         - 'CXXFLAGS=-O2'

@@ -8,6 +8,7 @@
 #include <API/Posix/sys/ttydefaults.h>
 
 #include <Arch/CPU.hpp>
+#include <Arch/InterruptGuard.hpp>
 
 #include <Drivers/TTY.hpp>
 #include <Drivers/Terminal.hpp>
@@ -63,7 +64,7 @@ void TTY::PutChar(char c)
 
     if ((m_Termios.c_lflag & ISIG) == ISIG)
     {
-        if (c == m_Termios.c_cc[VINFO]) return SendSignal(SIGINFO);
+        // if (c == m_Termios.c_cc[VINFO]) return SendSignal(SIGINFO);
         if (c == m_Termios.c_cc[VINTR]) return SendSignal(SIGINT);
         if (c == m_Termios.c_cc[VQUIT]) return SendSignal(SIGQUIT);
         if (c == m_Termios.c_cc[VSUSP]) return SendSignal(SIGTSTP);
@@ -143,23 +144,71 @@ isize TTY::Write(const void* src, off_t offset, usize bytes)
 i32 TTY::IoCtl(usize request, uintptr_t argp)
 {
     if (!argp) return_err(-1, EFAULT);
+    Process* current = Process::GetCurrent();
 
+    if (!m_Terminal->GetContext()) return_err(-1, ENOTTY);
     switch (request)
     {
         case TCGETS:
         {
             std::memcpy(reinterpret_cast<void*>(argp), &m_Termios,
-                        sizeof(termios));
+                        sizeof(termios2));
             break;
         }
         case TCSETS:
-        case TCSETSW:
             std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
-                        sizeof(termios));
+                        sizeof(termios2));
             break;
+        case TCSETSW:
+            // TODO(v1tr10l7): Drain the output buffer
+            std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
+                        sizeof(termios2));
+            break;
+        case TCSETSF:
+            // TODO(v1tr10l7): Allow current output buffer to drain,
+            //  and discard the input buffer
+            std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
+                        sizeof(termios2));
+            break;
+
+        case TCGETS2:
+        {
+            std::memcpy(reinterpret_cast<void*>(argp), &m_Termios,
+                        sizeof(termios2));
+            break;
+        }
+        case TCSETS2:
+        {
+            std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
+                        sizeof(termios2));
+            break;
+        }
+        case TCSETSW2:
+        {
+            // TODO(v1tr10l7): Drain the output buffer
+            std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
+                        sizeof(termios2));
+            break;
+        }
+        case TCSETSF2:
+        {
+            // TODO(v1tr10l7): Allow current output buffer to drain,
+            //  and discard the input buffer
+            std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
+                        sizeof(termios2));
+            break;
+        }
+
+        case TCGETA: return_err(-1, ENOSYS); break;
+        case TCSETA: return_err(-1, ENOSYS); break;
+        case TCSETAW: return_err(-1, ENOSYS); break;
+        case TCSETAF: return_err(-1, ENOSYS); break;
+
+        case TIOCGLCKTRMIOS: return_err(-1, ENOSYS); break;
+        case TIOCSLCKTRMIOS: return_err(-1, ENOSYS); break;
+
         case TIOCGWINSZ:
         {
-            // if (!m_Terminal->GetContext()) return_err(-1, ENOTTY);
 
             winsize* windowSize   = reinterpret_cast<winsize*>(argp);
             windowSize->ws_row    = m_Terminal->GetContext()->rows;
@@ -168,12 +217,59 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
             windowSize->ws_ypixel = m_Terminal->GetFramebuffer().height;
             break;
         }
-        case TIOCGPGRP: *reinterpret_cast<i32*>(argp) = m_Pgid; break;
-        case TIOCSPGRP: m_Pgid = *reinterpret_cast<i32*>(argp); break;
-        case TIOCSCTTY:
-            m_ControlSid = Process::GetCurrent()->GetCredentials().sid;
+        case TIOCSWINSZ:
+        {
+            return_err(-1, ENOSYS);
             break;
-        case TIOCNOTTY: m_ControlSid = -1; break;
+        }
+
+        case TIOCINQ:
+            *reinterpret_cast<u32*>(argp) = m_InputBuffer.size();
+            break;
+
+        case TIOCGETD: *reinterpret_cast<u32*>(argp) = m_Termios.c_line; break;
+        case TIOCSETD: m_Termios.c_line = *reinterpret_cast<u32*>(argp); break;
+
+        case TIOCSCTTY:
+            if (current->GetSid() != current->GetPid() || current->GetTTY())
+                return_err(-1, EINVAL);
+            if (m_ControlSid && current->GetCredentials().uid != 0)
+                return_err(-1, EPERM);
+            current->SetTTY(this);
+            m_ControlSid = current->GetCredentials().sid;
+            break;
+        case TIOCNOTTY:
+            if (current->GetTTY() != this
+                || m_ControlSid != current->GetCredentials().sid)
+                return_err(-1, EINVAL);
+
+            current->SetTTY(nullptr);
+            m_ControlSid = -1;
+
+            // TODO(v1tr10l7): Send SIGHUP and SIGCONT to everyone in the
+            // process group
+            if (current->IsSessionLeader())
+            {
+                current->SendSignal(SIGHUP);
+                current->SendSignal(SIGCONT);
+            }
+            break;
+
+        // Get the pgid of the foreground process on this terminal
+        case TIOCGPGRP: *reinterpret_cast<i32*>(argp) = m_Pgid; break;
+        // Set the foreground process group ID of this terminal
+        case TIOCSPGRP:
+        {
+            auto pgid = *reinterpret_cast<i32*>(argp);
+            if (pgid < 0) return_err(-1, EINVAL);
+            m_Pgid = pgid;
+            break;
+        }
+        // Get the session ID
+        case TIOCGSID:
+            *reinterpret_cast<pid_t*>(argp) = m_ControlSid;
+            break;
+            // Make the TTY the controlling terminal of the calling process
 
         default:
             LogInfo("Request: {:#x}, argp: {}", request, argp);
@@ -218,7 +314,12 @@ void TTY::Initialize()
 void TTY::SendSignal(i32 signal)
 {
     LogTrace("Handling signal");
-    if (m_Pgid < 0) return;
+    if (m_Pgid == 0) return;
+    InterruptGuard guard(false);
+
+    LogDebug("TTY: Sending signal to everyone in '{}' process group", m_Pgid);
+    Process::SendGroupSignal(m_Pgid, signal);
+    return;
 
     Process* current = Process::GetCurrent();
     if (signal == SIGINT) current->Exit(0);

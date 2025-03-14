@@ -8,7 +8,9 @@
 
 #include <Common.hpp>
 
+#include <API/Posix/signal.h>
 #include <API/UnixTypes.hpp>
+
 #if CTOS_ARCH == CTOS_ARCH_X86_64
     #include <Arch/x86_64/CPUContext.hpp>
 #elif CTOS_ARCH == CTOS_ARCH_AARCH64
@@ -69,12 +71,23 @@ struct Thread
     {
         return m_State == ThreadState::eBlocked;
     }
-    constexpr bool ReadyForCleanup() { return IsDead(); }
+    constexpr bool  ReadyForCleanup() { return IsDead(); }
 
-    Thread*        Fork(Process* parent);
+    Thread*         Fork(Process* parent);
+
+    inline sigset_t GetSignalMask() const { return m_SignalMask; }
+    inline void     SetSignalMask(sigset_t mask) { m_SignalMask = mask; }
+
+    inline bool     ShouldIgnoreSignal(u8 signal) const
+    {
+        return m_SignalMask & signal;
+    }
 
     // FIXME(v1tr10l7): implement this once we have signals
-    inline bool    WasInterrupted() const { return false; }
+    inline bool WasInterrupted() const { return false; }
+    void        SendSignal(u8 signal);
+    bool        DispatchAnyPendingSignal();
+    bool        DispatchSignal(u8 signal);
 
 #ifdef CTOS_TARGET_X86_64
     inline uintptr_t GetFsBase() const { return m_FsBase; }
@@ -114,6 +127,7 @@ struct Thread
     CPUContext                 SavedContext;
     Spinlock                   YieldAwaitLock;
 
+  private:
     std::vector<std::pair<uintptr_t, usize>> m_Stacks;
     bool                                     m_IsUser = false;
 
@@ -124,7 +138,10 @@ struct Thread
     uintptr_t m_El0Base;
 #endif
 
-    bool               m_IsEnqueued = false;
+    bool               m_IsEnqueued     = false;
+    sigset_t           m_SignalMask     = 0;
+    sigset_t           m_PendingSignals = 0;
+
     Event              m_Event;
     std::deque<Event*> m_Events;
     usize              m_Which = 0;

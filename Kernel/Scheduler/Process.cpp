@@ -135,10 +135,14 @@ mode_t Process::Umask(mode_t mask)
 
     return previous;
 }
-void Process::SendSignal(i32 signal)
+
+void Process::SendGroupSignal(pid_t pgid, i32 signal)
 {
-    // TODO(v1tr10l7): implement signals
+    auto& processMap = Scheduler::GetProcessMap();
+    for (auto [pid, process] : processMap)
+        if (process->m_Credentials.pgid == pgid) process->SendSignal(signal);
 }
+void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
 ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
@@ -167,7 +171,34 @@ ErrorOr<i32> Process::DupFd(i32 oldFdNum, i32 newFdNum, i32 flags)
     newFd = new FileDescriptor(oldFd, flags);
     return m_FdTable.Insert(newFd, newFdNum);
 }
-i32          Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
+i32 Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
+
+std::vector<std::string> SplitArguments(const std::string& str)
+{
+    std::vector<std::string> segments;
+    usize                    start     = str[0] == ' ' ? 1 : 0;
+    usize                    end       = start;
+
+    auto                     findSlash = [str](usize pos) -> usize
+    {
+        usize current = pos;
+        while (str[current] != ' ' && current < str.size()) current++;
+
+        return current == str.size() ? std::string::npos : current;
+    };
+
+    while ((end = findSlash(start)) != std::string::npos)
+    {
+        std::string segment = str.substr(start, end - start);
+        if (start != end) segments.push_back(segment);
+
+        start = end + 1;
+    }
+
+    // handle last segment
+    if (start < str.length()) segments.push_back(str.substr(start));
+    return segments;
+}
 
 ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
 {
@@ -177,11 +208,50 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
     m_Name = path;
     Arch::VMM::DestroyPageMap(PageMap);
     delete PageMap;
-    PageMap = new class PageMap();
+    PageMap     = new class PageMap();
 
+    auto nodeOr = VFS::ResolvePath(path);
+    if (!nodeOr) return nodeOr.error();
+
+    std::string shellPath;
+    char        shebang[2];
+    nodeOr.value()->Read(shebang, 0, 2);
+    if (shebang[0] == '#' && shebang[1] == '!')
+    {
+        std::string buffer;
+        buffer.resize(20);
+        usize offset = 0;
+        usize index  = 0;
+        nodeOr.value()->Read(buffer.data(), offset + 2, 20);
+        for (;;)
+        {
+            if (index >= buffer.size())
+            {
+                nodeOr.value()->Read(buffer.data(), offset + 2, 20);
+                index = 0;
+            }
+
+            if (buffer[index] == '\n' || buffer[index] == '\r') break;
+            ++index;
+            ++offset;
+        }
+
+        shellPath.resize(offset + 1);
+        nodeOr.value()->Read(shellPath.data(), 2, offset);
+
+        shellPath[offset] = 0;
+        EarlyLogInfo("Shell: %s", shellPath.data());
+    }
+
+    std::vector<std::string>      args = SplitArguments(shellPath);
     std::vector<std::string_view> argvArr;
-    static ELF::Image             program, ld;
-    if (!program.Load(path, PageMap, m_AddressSpace)) return Error(ENOEXEC);
+    for (auto& arg : args) argvArr.push_back(arg);
+    if (!shellPath.empty()) argvArr.push_back(path);
+
+    static ELF::Image program, ld;
+    if (!program.Load(shellPath.empty() ? path : argvArr[0], PageMap,
+                      m_AddressSpace))
+        return Error(ENOEXEC);
 
     std::string_view ldPath = program.GetLdPath();
     if (!ldPath.empty())
@@ -199,6 +269,9 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
         = ldPath.empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
 
     for (char** arg = argv; *arg; arg++) argvArr.push_back(*arg);
+
+    for (usize i = 0; auto& arg : args)
+        LogDebug("Process::Exec: argv[{}] = '{}'", i++, arg);
 
     std::vector<std::string_view> envpArr;
     for (char** env = envp; *env; env++) envpArr.push_back(*env);

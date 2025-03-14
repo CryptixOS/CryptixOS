@@ -33,7 +33,7 @@ bool LoadModule(Module* drv);
 
 #define MODULE_INIT(name, init)                                                \
     extern "C" [[gnu::section(MODULE_SECTION), gnu::used]] const Module        \
-    CONCAT(__acpi_driver, UNIQUE_NAME(name))                                   \
+    CONCAT(kernel_module, UNIQUE_NAME(name))                                   \
         = {.Name        = #name,                                               \
            .Initialized = false,                                               \
            .Failed      = false,                                               \

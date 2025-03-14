@@ -104,8 +104,9 @@ ThreadQueue s_BlockedQueue;
 void        Scheduler::Initialize()
 {
     s_KernelProcess = Process::CreateKernelProcess();
+
     Time::Initialize();
-    Time::GetSchedulerTimer()->SetCallback(Tick);
+    Time::GetSchedulerTimer()->SetCallback<Tick>();
 
     LogInfo("Scheduler: Kernel process created");
     LogInfo("Scheduler: Initialized");
@@ -263,6 +264,11 @@ void Scheduler::DequeueThread(Thread* thread)
         }
 }
 
+std::unordered_map<pid_t, Process*>& Scheduler::GetProcessMap()
+{
+    return s_Processes;
+}
+
 Thread* Scheduler::GetNextThread(usize cpuID)
 {
     if (s_ExecutionQueue.IsEmpty()) return nullptr;
@@ -296,6 +302,8 @@ Thread* Scheduler::PickReadyThread()
     Thread* currentThread = Thread::GetCurrent();
     if (!newThread)
         return currentThread ? currentThread : CPU::GetCurrent()->Idle;
+
+    newThread->DispatchAnyPendingSignal();
     return newThread;
 }
 void Scheduler::SwitchContext(Thread* newThread, CPUContext* oldContext)

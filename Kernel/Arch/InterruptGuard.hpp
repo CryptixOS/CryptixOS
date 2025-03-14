@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include "Arch/CPU.hpp"
+#include <Arch/CPU.hpp>
 
 class InterruptGuard final
 {

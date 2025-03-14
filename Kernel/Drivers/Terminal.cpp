@@ -30,6 +30,7 @@ static void            DecPrivate(u64 escValCount, u32* escValues, u64 final)
 }
 static void TerminalCallback(flanterm_context* term, u64 t, u64 a, u64 b, u64 c)
 {
+    LogWarn("Terminal: Unhandled event");
     if (t == 10) DecPrivate(a, (u32*)b, c);
 }
 
