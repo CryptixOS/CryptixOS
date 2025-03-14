@@ -34,6 +34,20 @@ namespace SMBIOS
             eSystemBootInformation   = 32,
         };
 
+        struct [[gnu::packed]] SystemInformation
+        {
+            u8  SystemInformationIndicator;
+            u8  Length;
+            u16 Handle;
+            u8  ManufacturerStringID;
+            u8  ProductNameStringID;
+            u8  VersionStringID;
+            u8  SerialNumberStringID;
+            u16 UUID;
+            u8  WakeUpType;
+            u16 SkuNumberStringID;
+        };
+
         struct EntryPoint32
         {
             u32 AnchorString;
@@ -71,6 +85,8 @@ namespace SMBIOS
             u8         Length;
             u16        Handle;
         } __attribute__((packed));
+
+        void ParseEntry(Header& header) {}
     }; // namespace
 
     static usize CalculateStructLength(Header& header)
@@ -89,7 +105,7 @@ namespace SMBIOS
     {
         auto smbiosEntries = BootInfo::GetSmBiosEntries();
         // TODO(v1tr10l7): Verify which entry should we use
-        Assert(smbiosEntries.first);
+        if (!smbiosEntries.first) return;
 
         Pointer entryPointVirt   = smbiosEntries.first.ToHigherHalf<Pointer>();
         EntryPoint32* entryPoint = entryPointVirt.As<EntryPoint32>();
@@ -134,13 +150,13 @@ namespace SMBIOS
         {
             Header* header = reinterpret_cast<Header*>(tableStart);
 
-            LogTrace("Structure Type: {}", magic_enum::enum_name(header->Type));
-            LogTrace("Length: {}", header->Length);
+            LogTrace("SMBIOS: Found entry {:#x} - {}", usize(header->Type),
+                     magic_enum::enum_name(header->Type));
+            ParseEntry(*header);
 
             if (header->Type == static_cast<HeaderType>(127)) break;
 
             usize structLength = CalculateStructLength(*header);
-            LogTrace("StructLength: {}", structLength);
 
             tableStart += structLength;
         }

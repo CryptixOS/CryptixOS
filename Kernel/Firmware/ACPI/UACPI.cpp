@@ -5,11 +5,14 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/CPU.hpp>
+#include <Arch/InterruptHandler.hpp>
+#include <Arch/InterruptManager.hpp>
+
 #ifdef CTOS_TARGET_X86_64
     #include <Arch/x86_64/IO.hpp>
 
-    #define ArchReadIo(port, type)         IO::Read<type>(port)
-    #define ArchWriteIo(port, value, type) IO::Read<type>(port)
+    #define ArchReadIo(port, type)         IO::In<type>(port)
+    #define ArchWriteIo(port, value, type) IO::Out<type>(port)
 #else
     #define ArchReadIo(port, type)
     #define ArchWriteIo(port, value, type)
@@ -91,6 +94,9 @@ namespace uACPI
                                               uacpi_u8      byteWidth,
                                               uacpi_u64*    outValue)
         {
+#ifndef CTOS_TARGET_X86_64
+            return UACPI_STATUS_UNIMPLEMENTED;
+#else
             u16 port = address;
             switch (byteWidth)
             {
@@ -101,11 +107,15 @@ namespace uACPI
             }
 
             return UACPI_STATUS_OK;
+#endif
         }
         uacpi_status uacpi_kernel_raw_io_write(uacpi_io_addr address,
                                                uacpi_u8      byteWidth,
                                                uacpi_u64     inValue)
         {
+#ifndef CTOS_TARGET_X86_64
+            return UACPI_STATUS_UNIMPLEMENTED;
+#else
             u16 port = address;
             switch (byteWidth)
             {
@@ -116,6 +126,7 @@ namespace uACPI
             }
 
             return UACPI_STATUS_OK;
+#endif
         }
 
         uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
@@ -269,7 +280,8 @@ namespace uACPI
             delete[] reinterpret_cast<u8*>(memory);
         }
 
-        void uacpi_kernel_log(uacpi_log_level level, const uacpi_char* format)
+        void uacpi_kernel_log(uacpi_log_level level, const uacpi_char* format,
+                              ...)
         {
             constexpr LogLevel uacpiToPrismLogLevels[] = {
                 LogLevel::eNone, LogLevel::eError, LogLevel::eWarn,

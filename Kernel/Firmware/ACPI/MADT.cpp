@@ -31,6 +31,10 @@ namespace MADT
             eLapicAddressOverride    = 0x05,
 
             eProcessorLocalX2Apic    = 0x09,
+            eLocalX2ApicNmi          = 0x0a,
+            eGicCpuInterface         = 0x0b,
+            eGicDistributor          = 0x0c,
+            eGicMsiFrame             = 0x0d,
         };
 
         static MADT*                s_MADT;
@@ -44,38 +48,40 @@ namespace MADT
     void Initialize()
     {
         s_MADT = ACPI::GetTable<MADT>(MADT_SIGNATURE);
-        Assert(s_MADT != nullptr);
+        Assert(s_MADT);
 
         for (usize off = 0; s_MADT->Header.Length - sizeof(MADT) - off >= 2;)
 
         {
-            Header* header = Pointer(s_MADT->Entries + off).As<Header>();
+            Header*   header    = Pointer(s_MADT->Entries + off).As<Header>();
+
+            EntryType entryType = static_cast<EntryType>(header->ID);
+            LogTrace("MADT: Found '{}' entry",
+                     magic_enum::enum_name(entryType));
 
             switch (static_cast<EntryType>(header->ID))
             {
                 case EntryType::eProcessorLapic:
-                    LogTrace("MADT: Found local APIC #{}",
-                             s_LapicEntries.size());
                     s_LapicEntries.push_back(
                         reinterpret_cast<LapicEntry*>(header));
                     break;
                 case EntryType::eIoApic:
-                    LogTrace("MADT: Found IO APIC #{}", s_IoApicEntries.size());
                     s_IoApicEntries.push_back(
                         reinterpret_cast<IoApicEntry*>(header));
                     break;
                 case EntryType::eInterruptSourceOverride:
-                    LogTrace("MADT: Found ISO #{}", s_IsoEntries.size());
                     s_IsoEntries.push_back(reinterpret_cast<IsoEntry*>(header));
                     break;
                 case EntryType::eNmiSource: break;
                 case EntryType::eLapicNmi:
-                    LogTrace("MADT: Found NMI #{}", s_LapicNmiEntries.size());
                     s_LapicNmiEntries.push_back(
                         reinterpret_cast<LapicNmiEntry*>(header));
                     break;
                 case EntryType::eLapicAddressOverride: break;
                 case EntryType::eProcessorLocalX2Apic: break;
+                case EntryType::eGicCpuInterface: break;
+                case EntryType::eGicDistributor: break;
+                case EntryType::eGicMsiFrame: break;
 
                 default:
                     LogWarn("MADT: Encountered unrecognized header(id = {})",
