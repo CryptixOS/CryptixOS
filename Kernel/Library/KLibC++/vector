@@ -154,6 +154,13 @@ namespace std
             for (size_type i = 0; i < _size; i++) _data[i].~value_type();
             _size = 0;
         }
+
+        template <typename... Args>
+        void emplace_back(Args&&... args)
+        {
+            push_back(T(std::forward<Args&&>(args)...));
+
+        }
         void push_back(T& value)
         {
             if (_size >= _capacity) reserve(_capacity ? _capacity * 2 : 1);
