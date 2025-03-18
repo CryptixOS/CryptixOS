@@ -64,6 +64,7 @@ macros = [
     '-DPRISM_TARGET_CRYPTIX=1',
     '-DUACPI_FORMATTED_LOGGING',
     '-DFMT_BUILTIN_TYPES=0'
+    '-D_LIBCPP_HAS_NO_THREADS',
 ]
 
 add_global_arguments(
@@ -94,6 +95,7 @@ add_global_arguments(
     '-fno-exceptions',
     '-fno-rtti',
     '-Wno-non-virtual-dtor',
+    '-nostdinc++'
   ],
   language: 'cpp',
 )
@@ -195,12 +197,10 @@ if arch == 'x86_64'
 
 elif arch == 'aarch64'
   qemu_args += [
-    '-M', 'virt',
-    '-cpu', 'cortex-a72',
+    '-M', 'virt,acpi=off', 
+    #'-dtb', meson.project_source_root() / 'qemu.dtb',
+    '-cpu', 'max',
     '-device', 'ramfb',
-    '-device', 'qemu-xhci',
-    '-device', 'usb-kbd',
-    '-device', 'usb-mouse'
   ]
   ovmf_id = 'AA64'
   xorriso_args = [
@@ -244,6 +244,7 @@ iso_files = [
   meson.project_source_root() / 'limine.conf',
   ksyms,
   limine.get_variable('limine_binaries'),
+  meson.project_source_root() / 'qemu.dtb',
 ]
 
 initrd = custom_target(
@@ -317,6 +318,15 @@ run_uefi = custom_target(
   input: [iso, echfs_image],
   output: 'run_uefi',
   command: [qemu, qemu_args, '-cdrom', '@INPUT0@', '-drive', 'format=raw,file=@INPUT1@,if=none,id=nvm1', '-device', 'nvme-ns,drive=nvm1,nsid=2,bus=nvme-ctrl1', '-bios', ovmf],
+  console: true,
+  install: false,
+  depends: [iso, echfs_image]
+)
+
+run_uefi_vnc = custom_target(
+  input: [iso, echfs_image],
+  output: 'run_uefi_vnc',
+  command: [qemu, qemu_args, '-display', 'vnc=127.0.0.1:0', '-cdrom', '@INPUT0@', '-drive', 'format=raw,file=@INPUT1@,if=none,id=nvm1', '-device', 'nvme-ns,drive=nvm1,nsid=2,bus=nvme-ctrl1', '-bios', ovmf],
   console: true,
   install: false,
   depends: [iso, echfs_image]

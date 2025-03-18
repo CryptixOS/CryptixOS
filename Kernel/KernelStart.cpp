@@ -20,6 +20,7 @@
 #include <Drivers/TTY.hpp>
 
 #include <Firmware/ACPI/ACPI.hpp>
+#include <Firmware/DeviceTree/DeviceTree.hpp>
 #include <Firmware/SMBIOS/SMBIOS.hpp>
 
 #include <Library/ELF.hpp>
@@ -59,10 +60,13 @@ void kernelThread()
     MemoryDevices::Initialize();
 
     Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1", "/mnt", "echfs"));
-    ACPI::Enable();
-    ACPI::LoadNameSpace();
-    ACPI::EnumerateDevices();
 
+    if (ACPI::IsAvailable())
+    {
+        ACPI::Enable();
+        ACPI::LoadNameSpace();
+        ACPI::EnumerateDevices();
+    }
     auto kernelExecutable = BootInfo::GetExecutableFile();
     auto header   = reinterpret_cast<ELF::Header*>(kernelExecutable->address);
     auto sections = reinterpret_cast<ELF::SectionHeader*>(
@@ -141,6 +145,7 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
 
     Stacktrace::Initialize();
     CommandLine::Initialize();
+    DeviceTree::Initialize();
     ACPI::LoadTables();
     Arch::Initialize();
 
