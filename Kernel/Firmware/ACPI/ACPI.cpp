@@ -90,25 +90,29 @@ namespace ACPI
         }
     } // namespace
 
-    void LoadTables()
+    bool IsAvailable() { return BootInfo::GetRSDPAddress().operator bool(); }
+    bool LoadTables()
     {
         using namespace std::literals;
 
         LogTrace("ACPI: Initializing...");
         constexpr std::string_view RSDP_SIGNATURE = "RSD PTR"sv;
-        RSDP* rsdp = BootInfo::GetRSDPAddress().ToHigherHalf<RSDP*>();
+        auto                       rsdpPointer    = BootInfo::GetRSDPAddress();
+        if (!rsdpPointer) return false;
+
+        RSDP* rsdp = rsdpPointer.As<RSDP>();
         if (RSDP_SIGNATURE.compare(0, 7, rsdp->Signature) == 0)
         {
             LogError("ACPI: Invalid RSDP signature!");
-            return;
+            return false;
         }
 
         s_XsdtAvailable = rsdp->Revision >= 2 && rsdp->XsdtAddress != 0;
         Pointer rsdtPointer
             = s_XsdtAvailable ? rsdp->XsdtAddress : rsdp->RsdtAddress;
 
+        if (!rsdtPointer) return false;
         s_Rsdt = rsdtPointer.ToHigherHalf<RSDT*>();
-        Assert(s_Rsdt != nullptr);
 
         LogInfo("ACPI: Found {} at: {:#x}", s_XsdtAvailable ? "XSDT" : "RSDT",
                 reinterpret_cast<uintptr_t>(s_Rsdt));
@@ -118,6 +122,7 @@ namespace ACPI
         s_FADT = GetTable<FADT>("FACP");
 
         LogInfo("ACPI: Loaded static tables");
+        return true;
     }
 
     static uacpi_iteration_decision

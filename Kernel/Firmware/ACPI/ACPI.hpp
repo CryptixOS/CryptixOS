@@ -12,7 +12,9 @@
 
 namespace ACPI
 {
-    void       LoadTables();
+    bool       IsAvailable();
+
+    bool       LoadTables();
     void       Enable();
 
     void       LoadNameSpace();
