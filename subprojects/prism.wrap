@@ -1,7 +1,0 @@
-[wrap-git]
-url = https://github.com/Vitriol1744/Prism.git
-revision = master
-depth = 1
-
-[provide]
-prism = prism_dep
