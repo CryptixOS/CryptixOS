@@ -50,7 +50,8 @@ namespace Logger
     CTOS_NO_KASAN void Print(std::string_view string);
     CTOS_NO_KASAN i32  Printv(const char* format, va_list* args);
 
-    CTOS_NO_KASAN void Log(LogLevel logLevel, std::string_view str);
+    CTOS_NO_KASAN void Log(LogLevel logLevel, std::string_view str,
+                           bool printNewline = true);
     CTOS_NO_KASAN void Logf(LogLevel logLevel, const char* format, ...);
     CTOS_NO_KASAN void Logv(LogLevel logLevel, const char* format,
                             va_list& args, bool printNewline = true);

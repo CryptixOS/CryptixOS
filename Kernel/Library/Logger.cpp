@@ -266,14 +266,15 @@ namespace Logger
         return 0;
     }
 
-    CTOS_NO_KASAN void Log(LogLevel logLevel, std::string_view string)
+    CTOS_NO_KASAN void Log(LogLevel logLevel, std::string_view string,
+                           bool printNewline)
     {
         ScopedLock guard(s_Lock, true);
 
         PrintLogLevel(logLevel);
         Print(string);
 
-        if (logLevel != LogLevel::eNone) LogChar('\n');
+        if (printNewline && logLevel != LogLevel::eNone) LogChar('\n');
     }
 
     CTOS_NO_KASAN void Logf(LogLevel logLevel, const char* fmt, ...)
