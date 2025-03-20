@@ -21,6 +21,13 @@ struct EventListener
 struct Event
 {
   public:
+    void Await(bool block = true)
+    {
+        std::array evs = {this};
+        Await(evs, block);
+    }
+    void Trigger(bool drop = false) { Trigger(this, drop); }
+
     static std::optional<usize> Await(std::span<Event*> events,
                                       bool              block = true);
     static void                 Trigger(Event* event, bool drop = false);
