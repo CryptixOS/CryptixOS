@@ -6,6 +6,8 @@
  */
 #pragma once
 
+#include <Firmware/DeviceTree/Node.hpp>
+
 #include <Prism/Endian.hpp>
 
 constexpr usize FDT_MAGIC = 0xd00dfeed;
@@ -30,8 +32,7 @@ struct FDT_Header
 static_assert(sizeof(FDT_Header) == 40,
               "FDT header's size doesn't match the specification!");
 
-class DeviceTree
+namespace DeviceTree
 {
-  public:
-    static bool Initialize();
+    bool Initialize();
 };

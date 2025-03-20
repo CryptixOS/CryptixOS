@@ -100,7 +100,7 @@ namespace ACPI
         auto                       rsdpPointer    = BootInfo::GetRSDPAddress();
         if (!rsdpPointer) return false;
 
-        RSDP* rsdp = rsdpPointer.As<RSDP>();
+        RSDP* rsdp = rsdpPointer.ToHigherHalf<Pointer>().As<RSDP>();
         if (RSDP_SIGNATURE.compare(0, 7, rsdp->Signature) == 0)
         {
             LogError("ACPI: Invalid RSDP signature!");
