@@ -46,7 +46,7 @@ Process::Process(Process* parent, std::string_view name,
     , m_NextTid(m_Pid)
 
 {
-    m_CWD = VFS::GetRootNode();
+    m_CWD = "/";
     m_FdTable.OpenStdioStreams();
 }
 
@@ -146,7 +146,7 @@ void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
 ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
-    INode* parent = m_CWD;
+    INode* parent = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), m_CWD));
     if (path.IsAbsolute()) parent = VFS::GetRootNode();
     else if (dirFd != AT_FDCWD)
     {

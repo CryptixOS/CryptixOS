@@ -92,7 +92,7 @@ namespace VFS
         if (!node)
         {
             didExist = false;
-            if (errno != ENOENT || !(flags & O_CREAT)) return nullptr;
+            if (errno != ENOENT || !(flags & O_CREAT)) return Error(ENOENT);
 
             if (!parent->ValidatePermissions(current->GetCredentials(), 5))
                 return Error(EACCES);
@@ -329,18 +329,19 @@ namespace VFS
         FileDescriptor* fd             = process->GetFileHandle(fdNum);
         bool            followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
 
+        auto cwd = std::get<1>(ResolvePath(GetRootNode(), process->GetCWD()));
         if (!path.Raw() || !path[0])
         {
             if (!(flags & AT_EMPTY_PATH)) return Error(ENOENT);
 
-            if (fdNum == AT_FDCWD) return &process->GetCWD()->GetStats();
+            if (fdNum == AT_FDCWD) return &cwd->GetStats();
             else if (!fd) return Error(EBADF);
 
             return &fd->GetNode()->GetStats();
         }
 
         INode* parent = path.IsAbsolute() ? VFS::GetRootNode() : nullptr;
-        if (fdNum == AT_FDCWD) parent = process->GetCWD();
+        if (fdNum == AT_FDCWD) parent = cwd;
         else if (fd) parent = fd->GetNode();
 
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);

@@ -9,6 +9,7 @@
 #include <API/Posix/fcntl.h>
 #include <API/SyscallEntryPoints.hpp>
 #include <API/System.hpp>
+#include <API/Time.hpp>
 #include <API/VFS.hpp>
 
 #include <Scheduler/Process.hpp>
@@ -168,6 +169,13 @@ namespace Syscall
         return System::SysReboot(cmd);
     }
     ErrorOr<isize> SysGetDents64(Arguments& args);
+    ErrorOr<isize> SysClockGetTime(Arguments& args)
+    {
+        clockid_t id  = args.Get<clockid_t>(0);
+        timespec* res = args.Get<timespec*>(1);
+
+        return ::API::Time::SysClockGetTime(id, res);
+    }
     ErrorOr<isize> SysOpenAt(Arguments& args);
     ErrorOr<isize> SysMkDirAt(Arguments& args);
     ErrorOr<isize> SysFStatAt(Arguments& args);

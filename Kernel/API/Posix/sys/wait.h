@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <API/Posix/sys/time.h>
+#include <API/Posix/time.h>
 
 constexpr usize WNOHANG    = 0x00000001;
 constexpr usize WUNTRACED  = 0x00000002;

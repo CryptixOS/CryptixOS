@@ -152,8 +152,8 @@ ErrorOr<isize> FileDescriptor::Truncate(off_t size)
     return m_Description->Node->Truncate(size);
 }
 
-[[clang::no_sanitize("alignment")]]
-ErrorOr<i32> FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
+[[clang::no_sanitize("alignment")]] ErrorOr<i32>
+FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
 {
     ScopedLock guard(m_Description->Lock);
 
@@ -201,7 +201,8 @@ bool FileDescriptor::GenerateDirEntries()
     for (const auto [name, child] : node->GetChildren()) dirEntries.Push(child);
 
     // . && ..
-    INode* cwd = Process::GetCurrent()->GetCWD();
+    std::string_view cwdPath = Process::GetCurrent()->GetCWD();
+    auto cwd = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), cwdPath));
     if (!cwd) return true;
 
     dirEntries.Push(cwd, ".");

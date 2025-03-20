@@ -6,34 +6,27 @@
  */
 #pragma once
 
+#include <API/Posix/time.h>
+
 #include <Prism/Core/Types.hpp>
 
-using ssize_t   = isize;
+using ssize_t            = isize;
 
-using blkcnt_t  = long;
-using blksize_t = long;
-// using clock_t   = i32;
-using clockid_t = int;
-using dev_t     = unsigned long;
+using blkcnt_t           = long;
+using blksize_t          = long;
+using dev_t              = unsigned long;
 // using fsblkcnt_t = u64;
 // using fsfilcnt_t = u64;
-using gid_t     = unsigned int;
+using gid_t              = unsigned int;
 // using id_t       = i64;
-using ino_t     = unsigned long;
+using ino_t              = unsigned long;
 // using key_t      = u64;
-using mode_t    = unsigned int;
-using nlink_t   = unsigned long;
-using off_t     = long;
-using pid_t     = int;
-using tid_t     = int;
-using uid_t     = unsigned int;
-using time_t    = long;
-
-struct timespec
-{
-    time_t tv_sec;
-    long   tv_nsec;
-};
+using mode_t             = unsigned int;
+using nlink_t            = unsigned long;
+using off_t              = long;
+using pid_t              = int;
+using tid_t              = int;
+using uid_t              = unsigned int;
 
 constexpr usize S_IFMT   = 0170000;
 constexpr usize S_IFBLK  = 0060000;

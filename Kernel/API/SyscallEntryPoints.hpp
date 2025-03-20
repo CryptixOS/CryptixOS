@@ -57,6 +57,7 @@ namespace Syscall
     ErrorOr<isize> SysSetTimeOfDay(Arguments& args);
     ErrorOr<isize> SysReboot(Arguments& args);
     ErrorOr<isize> SysGetDents64(Arguments& args);
+    ErrorOr<isize> SysClockGetTime(Arguments& args);
     ErrorOr<isize> SysOpenAt(Arguments& args);
     ErrorOr<isize> SysMkDirAt(Arguments& args);
     ErrorOr<isize> SysFStatAt(Arguments& args);

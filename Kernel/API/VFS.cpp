@@ -298,13 +298,10 @@ namespace Syscall::VFS
         if (!buffer || size == 0) return Error(EINVAL);
         if (!process->ValidateAddress(buffer, PROT_READ)) return Error(EFAULT);
 
-        INode* cwd = process->GetCWD();
-        if (!cwd) return Error(ENOENT);
+        std::string_view cwd = process->GetCWD();
+        if (size < cwd.length()) return Error(ERANGE);
 
-        std::string_view cwdPath = cwd->GetPath();
-        if (size < cwdPath.length()) return Error(ERANGE);
-
-        cwdPath.copy(buffer, cwdPath.length());
+        cwd.copy(buffer, cwd.length());
         return 0;
     }
     ErrorOr<i32> SysChDir(Arguments& args)
@@ -312,11 +309,13 @@ namespace Syscall::VFS
         const char* path    = reinterpret_cast<const char*>(args.Args[0]);
         Process*    current = Process::GetCurrent();
 
-        INode* node = std::get<1>(VFS::ResolvePath(current->GetCWD(), path));
+        INode*      cwd     = std::get<1>(
+            VFS::ResolvePath(current->GetRootNode(), current->GetCWD()));
+        INode* node = std::get<1>(VFS::ResolvePath(cwd, path));
         if (!node) return std::errno_t(ENOENT);
         if (!node->IsDirectory()) return std::errno_t(ENOTDIR);
 
-        current->m_CWD = node;
+        current->m_CWD = node->GetPath();
         return 0;
     }
     ErrorOr<i32> SysFChDir(Arguments& args)
@@ -331,7 +330,7 @@ namespace Syscall::VFS
         if (!node) return std::errno_t(ENOENT);
 
         if (!node->IsDirectory()) return std::errno_t(ENOTDIR);
-        current->m_CWD = node;
+        current->m_CWD = node->GetPath();
 
         return 0;
     }
@@ -348,8 +347,10 @@ namespace Syscall::VFS
             return Error(EFAULT);
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
-        INode* parent
-            = path.IsAbsolute() ? current->GetRootNode() : current->GetCWD();
+        INode* parent        = path.IsAbsolute()
+                                 ? current->GetRootNode()
+                                 : std::get<1>(VFS::ResolvePath(VFS::GetRootNode(),
+                                                                current->GetCWD()));
         auto [_, node, name] = VFS::ResolvePath(parent, path);
 
         mode &= ~current->GetUmask() & 0777;
@@ -391,6 +392,7 @@ namespace Syscall::VFS
         i32      flags   = static_cast<i32>(args.Args[2]);
         mode_t   mode    = static_cast<mode_t>(args.Args[3]);
 
+        LogDebug("OpenAt: {}", path.Raw());
         return current->OpenAt(dirFd, path, flags, mode);
     }
     ErrorOr<i32> SysMkDirAt(Syscall::Arguments& args)

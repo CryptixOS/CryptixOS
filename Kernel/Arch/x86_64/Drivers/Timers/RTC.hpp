@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <API/Posix/sys/time.h>
+#include <API/Posix/time.h>
 
 #include <Prism/Core/Types.hpp>
 

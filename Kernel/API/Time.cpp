@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <API/Posix/sys/mman.h>
-#include <API/Posix/sys/time.h>
+#include <API/Posix/time.h>
 #include <API/Time.hpp>
 
 #include <Arch/x86_64/Drivers/Timers/RTC.hpp>
@@ -39,13 +39,13 @@ namespace Syscall::Time
         if (tz)
         {
             if (!current->ValidateAddress(tz, PROT_READ | PROT_WRITE))
-                return std::errno_t(EFAULT);
+                return Error(EFAULT);
 
             tz->tz_dsttime     = 0;
             tz->tz_minuteswest = 0;
         }
 
-        return std::errno_t(ENOSYS);
+        return Error(ENOSYS);
     }
     ErrorOr<i32> SysSetTimeOfDay(Arguments& args)
     {
@@ -58,7 +58,7 @@ namespace Syscall::Time
         if (tv)
         {
             if (!current->ValidateAddress(tv, PROT_READ | PROT_WRITE))
-                return std::errno_t(EFAULT);
+                return Error(EFAULT);
 
             time_t now = 0;
 #ifdef CTOS_TARGET_X86_64
@@ -66,34 +66,42 @@ namespace Syscall::Time
 #endif
             if (tv->tv_sec < 0 || tv->tv_sec < now || tv->tv_usec < 0
                 || tv->tv_usec < now / 1000)
-                return std::errno_t(EINVAL);
+                return Error(EINVAL);
 
             // TODO(vt1r10l7): Set the time of day
         }
         if (tz)
         {
             if (!current->ValidateAddress(tz, PROT_READ | PROT_WRITE))
-                return std::errno_t(EFAULT);
+                return Error(EFAULT);
 
             // TODO(vt1r10l7): Set the timezone
         }
 
-        return std::errno_t(ENOSYS);
+        return Error(ENOSYS);
     }
-    ErrorOr<i32> SysClockGetTime(Arguments& args)
-    {
-        clockid_t clockId = args.Get<clockid_t>(0);
-        timespec* res     = args.Get<timespec*>(1);
+} // namespace Syscall::Time
 
-        switch (clockId)
+namespace API::Time
+{
+    ErrorOr<isize> SysClockGetTime(clockid_t clockID, timespec* res)
+    {
+        switch (clockID)
         {
-            case CLOCK_REALTIME: *res = ::Time::GetReal(); break;
-            case CLOCK_MONOTONIC: *res = ::Time::GetMonotonic(); break;
+            case CLOCK_REALTIME:
+            case CLOCK_REALTIME_COARSE: *res = ::Time::GetReal(); break;
+            case CLOCK_MONOTONIC:
+            case CLOCK_MONOTONIC_RAW:
+            case CLOCK_MONOTONIC_COARSE:
+            case CLOCK_BOOTTIME: *res = ::Time::GetMonotonic(); break;
+            case CLOCK_PROCESS_CPUTIME_ID:
+            case CLOCK_THREAD_CPUTIME_ID:
+                *res = {.tv_sec = 0, .tv_nsec = 0};
+                break;
 
             default: return Error(ENOSYS);
         }
 
         return 0;
     }
-
-} // namespace Syscall::Time
+}; // namespace API::Time

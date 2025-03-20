@@ -113,18 +113,18 @@ class Process
         return false;
     }
 
-    inline INode* GetRootNode() const { return m_RootNode; }
-    inline INode* GetCWD() const { return m_CWD; }
-    inline mode_t GetUmask() const { return m_Umask; }
-    mode_t        Umask(mode_t mask);
+    inline INode*           GetRootNode() const { return m_RootNode; }
+    inline std::string_view GetCWD() const { return m_CWD; }
+    inline mode_t           GetUmask() const { return m_Umask; }
+    mode_t                  Umask(mode_t mask);
 
-    static void   SendGroupSignal(pid_t pgid, i32 signal);
-    void          SendSignal(i32 signal);
+    static void             SendGroupSignal(pid_t pgid, i32 signal);
+    void                    SendSignal(i32 signal);
 
-    ErrorOr<i32>  OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
-    ErrorOr<i32>  DupFd(i32 oldFdNum, i32 newFdNum = -1, i32 flags = 0);
-    i32           CloseFd(i32 fd);
-    inline bool   IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
+    ErrorOr<i32> OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
+    ErrorOr<i32> DupFd(i32 oldFdNum, i32 newFdNum = -1, i32 flags = 0);
+    i32          CloseFd(i32 fd);
+    inline bool  IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
     inline FileDescriptor* GetFileHandle(i32 fd) { return m_FdTable.GetFd(fd); }
 
     ErrorOr<pid_t>         WaitPid(pid_t pid, i32* wstatus, i32 flags,
@@ -152,7 +152,7 @@ class Process
     std::vector<Thread*>     m_Threads;
 
     INode*                   m_RootNode = VFS::GetRootNode();
-    INode*                   m_CWD      = VFS::GetRootNode();
+    std::string              m_CWD      = "/";
     mode_t                   m_Umask    = 0;
 
     FileDescriptorTable      m_FdTable;

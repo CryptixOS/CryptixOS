@@ -144,7 +144,7 @@ namespace Syscall
         RegisterSyscall(ID::eReboot, SysReboot);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
         RegisterSyscall(ID::eGetDents64, VFS::SysGetDents64);
-        RegisterSyscall(ID::eClockGetTime, Time::SysClockGetTime);
+        RegisterSyscall(ID::eClockGetTime, SysClockGetTime);
         RegisterSyscall(ID::eNanoSleep, Process::SysNanoSleep);
         RegisterSyscall(ID::ePanic, sysPanic);
         RegisterSyscall(ID::eOpenAt, VFS::SysOpenAt);
@@ -160,7 +160,7 @@ namespace Syscall
 
         if (static_cast<isize>(args.Index) != previousSyscall)
             LogTrace(
-                "Syscall[{}]: '{}'\nparams: {{ arg[0]: {}, arg[1]: {}"
+                "Syscall[{}]: '{}'\nparams: {{ arg[0]: {}, arg[1]: {}, "
                 "arg[2]: {}, arg[3]: {}, arg[4]: {}, arg[5]: {}, }}",
                 args.Index, magic_enum::enum_name(static_cast<ID>(args.Index)),
                 args.Get<u64>(0), args.Get<u64>(1), args.Get<u64>(2),
