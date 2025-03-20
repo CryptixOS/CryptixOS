@@ -10,6 +10,7 @@
 #include <Drivers/Device.hpp>
 
 #include <Prism/Spinlock.hpp>
+#include <Scheduler/Event.hpp>
 
 #include <deque>
 #include <vector>
@@ -45,6 +46,7 @@ class TTY : public Device
     gid_t                    m_Pgid       = 100;
     std::deque<char>         m_InputBuffer;
     std::deque<std::string>  m_LineQueue;
+    Event                    m_OnAddLine;
 
     void                     SendSignal(i32 signal);
 
@@ -56,6 +58,8 @@ class TTY : public Device
         ScopedLock guard(m_Lock);
         m_LineQueue.emplace_back(m_InputBuffer.begin(), m_InputBuffer.end());
         m_InputBuffer.clear();
+
+        m_OnAddLine.Trigger();
     }
     inline void KillLine()
     {

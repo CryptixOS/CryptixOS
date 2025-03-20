@@ -105,7 +105,7 @@ isize TTY::Read(void* buffer, off_t offset, usize bytes)
 {
     if (IsCanonicalMode())
     {
-        while (m_LineQueue.empty()) Arch::Pause();
+        m_OnAddLine.Await();
         ScopedLock         guard(m_Lock);
 
         const std::string& line  = m_LineQueue.pop_front_element();
@@ -146,6 +146,7 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
     if (!argp) return_err(-1, EFAULT);
     Process* current = Process::GetCurrent();
 
+    LogDebug("TTY::ioctl: {:#x}", request);
     if (!m_Terminal->GetContext()) return_err(-1, ENOTTY);
     switch (request)
     {
@@ -209,8 +210,8 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
 
         case TIOCGWINSZ:
         {
-
             winsize* windowSize   = reinterpret_cast<winsize*>(argp);
+
             windowSize->ws_row    = m_Terminal->GetContext()->rows;
             windowSize->ws_col    = m_Terminal->GetContext()->cols;
             windowSize->ws_xpixel = m_Terminal->GetFramebuffer().width;
@@ -229,7 +230,7 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
 
         case TIOCGETD: *reinterpret_cast<u32*>(argp) = m_Termios.c_line; break;
         case TIOCSETD: m_Termios.c_line = *reinterpret_cast<u32*>(argp); break;
-
+        // Make the TTY the controlling terminal of the calling process
         case TIOCSCTTY:
             if (current->GetSid() != current->GetPid() || current->GetTTY())
                 return_err(-1, EINVAL);
@@ -266,10 +267,7 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
             break;
         }
         // Get the session ID
-        case TIOCGSID:
-            *reinterpret_cast<pid_t*>(argp) = m_ControlSid;
-            break;
-            // Make the TTY the controlling terminal of the calling process
+        case TIOCGSID: *reinterpret_cast<pid_t*>(argp) = m_ControlSid; break;
 
         default:
             LogInfo("Request: {:#x}, argp: {}", request, argp);
