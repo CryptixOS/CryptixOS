@@ -56,13 +56,16 @@ namespace Arch
     void PowerOff() {}
     void Reboot()
     {
-        I8042Controller::GetInstance()->SendCommand(I8042Command::eResetCPU);
+        if (!I8042Controller::GetInstance()->SendCommand(
+                I8042Command::eResetCPU))
+            return;
         IO::Out<word>(0x604, 0x2000);
     }
 
     void ProbeTimers(std::vector<HardwareTimer*>& timers)
     {
         if (Lapic::IsInitialized()) timers.push_back(Lapic::Instance());
+        if (PIT::IsInitialized()) timers.push_back(PIT::Instance());
     }
     usize GetEpoch() { return RTC::CurrentTime(); }
 }; // namespace Arch

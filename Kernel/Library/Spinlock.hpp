@@ -14,7 +14,8 @@
 namespace CPU
 {
     bool SwapInterruptFlag(bool);
-}
+    void SetInterruptFlag(bool);
+} // namespace CPU
 
 class Spinlock
 {

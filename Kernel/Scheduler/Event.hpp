@@ -21,10 +21,10 @@ struct EventListener
 struct Event
 {
   public:
-    void Await(bool block = true)
+    bool Await(bool block = true)
     {
         std::array evs = {this};
-        Await(evs, block);
+        return Await(evs, block) != std::nullopt;
     }
     void Trigger(bool drop = false) { Trigger(this, drop); }
 

@@ -17,6 +17,7 @@ class PIT : public HardwareTimer, public Singleton<PIT>
     PIT();
 
     static void            Initialize();
+    static bool            IsInitialized();
 
     std::string_view       GetModelString() const override { return "i8253"; }
 
@@ -26,12 +27,9 @@ class PIT : public HardwareTimer, public Singleton<PIT>
     u8                     GetInterruptVector();
 
     u64                    GetCurrentCount();
-    u64                    GetMilliseconds();
 
     ErrorOr<void>          SetFrequency(usize frequency) override;
     void                   SetReloadValue(u16 reloadValue);
-
-    void                   Sleep(u64 ms);
 
     static constexpr usize BASE_FREQUENCY  = 1193182ull;
     static constexpr usize SEND_WORD       = 0x30;

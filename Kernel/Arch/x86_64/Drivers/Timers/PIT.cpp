@@ -32,6 +32,7 @@ PIT::PIT()
 }
 
 void          PIT::Initialize() { s_Instance = Instance(); }
+bool          PIT::IsInitialized() { return s_Instance != nullptr; }
 
 ErrorOr<void> PIT::Start(TimerMode mode, TimeStep interval)
 {
@@ -60,7 +61,6 @@ u64 PIT::GetCurrentCount()
     auto hi = IO::In<byte>(CHANNEL0_DATA) << 8;
     return static_cast<u16>(hi << 8) | lo;
 }
-u64           PIT::GetMilliseconds() { return m_Tick * (1000z / FREQUENCY); }
 
 ErrorOr<void> PIT::SetFrequency(usize frequency)
 {
@@ -75,12 +75,6 @@ void PIT::SetReloadValue(u16 reloadValue)
     IO::Out<byte>(COMMAND, SEND_WORD | m_CurrentMode);
     IO::Out<byte>(CHANNEL0_DATA, static_cast<byte>(reloadValue));
     IO::Out<byte>(CHANNEL0_DATA, static_cast<byte>(reloadValue >> 8));
-}
-
-void PIT::Sleep(u64 ms)
-{
-    volatile u64 target = GetMilliseconds() + ms;
-    while (GetMilliseconds() < target) Arch::Pause();
 }
 
 void PIT::Tick(struct CPUContext* ctx)

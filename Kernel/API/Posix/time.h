@@ -14,8 +14,33 @@ using suseconds_t = isize;
 
 struct timespec
 {
-    time_t tv_sec;
-    time_t tv_nsec;
+    time_t           tv_sec;
+    time_t           tv_nsec;
+
+    constexpr auto   operator<=>(const timespec& other) const = default;
+    inline timespec& operator-=(const timespec& other)
+    {
+        if (other.tv_nsec > tv_nsec)
+        {
+            tv_nsec = 999999999 - (other.tv_nsec - tv_nsec);
+            if (tv_sec == 0)
+            {
+                tv_sec = tv_nsec = 0;
+                return *this;
+            }
+            tv_sec--;
+        }
+        else tv_nsec -= other.tv_nsec;
+
+        if (other.tv_sec > tv_sec)
+        {
+            tv_sec = tv_nsec = 0;
+            return *this;
+        }
+        tv_sec -= other.tv_sec;
+
+        return *this;
+    }
 };
 
 struct timeval

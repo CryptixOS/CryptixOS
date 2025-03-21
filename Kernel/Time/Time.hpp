@@ -20,5 +20,8 @@ namespace Time
     timespec       GetReal();
     timespec       GetMonotonic();
 
+    ErrorOr<void>  NanoSleep(usize ns);
+    ErrorOr<void>  Sleep(const timespec* duration, timespec* remaining);
+
     void           Tick(usize ns);
 } // namespace Time

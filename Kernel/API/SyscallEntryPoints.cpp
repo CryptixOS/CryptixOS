@@ -15,6 +15,8 @@
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
 
+#include <Time/Time.hpp>
+
 namespace Syscall
 {
     namespace API = API::VFS;
@@ -78,18 +80,22 @@ namespace Syscall
     ErrorOr<isize> SysDup2(Arguments& args);
     ErrorOr<isize> SysNanoSleep(Arguments& args)
     {
+        LogDebug("SysNanoSleep");
         const timespec* duration = args.Get<const timespec*>(0);
         timespec*       rem      = args.Get<timespec*>(1);
 
         Process*        current  = Process::GetCurrent();
         if (!current->ValidateRead(duration, sizeof(timespec))
-            || !current->ValidateRead(rem, sizeof(timespec)))
+            || (rem && !current->ValidateRead(rem, sizeof(timespec))))
             return Error(EFAULT);
-        if (duration->tv_sec < 0 || duration->tv_nsec < 0 || rem->tv_sec < 0
-            || rem->tv_nsec < 0)
+        if (duration->tv_sec < 0 || duration->tv_nsec < 0
+            || (rem && (rem->tv_sec < 0 || rem->tv_nsec < 0)))
             return Error(EINVAL);
 
-        return Error(ENOSYS);
+        auto errorOr = ::Time::Sleep(duration, rem);
+        if (!errorOr) return errorOr.error();
+
+        return 0;
     }
     ErrorOr<isize> SysGetPid(Arguments& args);
     ErrorOr<isize> SysExit(Arguments& args);
