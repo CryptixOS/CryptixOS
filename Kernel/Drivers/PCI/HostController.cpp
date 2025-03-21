@@ -24,7 +24,7 @@ namespace PCI
              & Bit(7))
             == 0)
         {
-            EnumerateBus(0, enumerator);
+            if (EnumerateBus(0, enumerator)) return true;
             return false;
         }
         else
@@ -86,17 +86,6 @@ namespace PCI
     bool HostController::EnumerateFunction(const DeviceAddress& address,
                                            Enumerator           enumerator)
     {
-        if (Read<u8>(address, std::to_underlying(RegisterOffset::eHeaderType))
-            == 0)
-        {
-            LogDebug(
-                "Interrupt Line: {:#x}, Interrupt Pin: {:#x}",
-                Read<u8>(address,
-                         std::to_underlying(RegisterOffset::eInterruptLine)),
-                Read<u8>(address,
-                         std::to_underlying(RegisterOffset::eInterruptPin)));
-        }
-
         if (enumerator(address)) return true;
         u16 type
             = Read<u8>(address, std::to_underlying(RegisterOffset::eClassID))

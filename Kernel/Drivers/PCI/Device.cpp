@@ -4,6 +4,9 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Arch/InterruptHandler.hpp>
+#include <Arch/InterruptManager.hpp>
+
 #include <Drivers/PCI/Device.hpp>
 #include <Drivers/PCI/HostController.hpp>
 #include <Drivers/PCI/PCI.hpp>
@@ -30,6 +33,31 @@ namespace PCI
         value |= Bit(0);
 
         Write<u16>(RegisterOffset::eCommand, value);
+    }
+
+    bool Device::MatchID(std::span<DeviceID> idTable, DeviceID& outID)
+    {
+        for (DeviceID& id : idTable)
+        {
+            if (id.VendorID != DeviceID::ANY_ID && id.VendorID != m_ID.VendorID)
+                continue;
+            if (id.ID != DeviceID::ANY_ID && id.ID != m_ID.ID) continue;
+            if (id.SubsystemID != DeviceID::ANY_ID
+                && id.SubsystemID != m_ID.SubsystemID)
+                continue;
+            if (id.SubsystemVendorID != DeviceID::ANY_ID
+                && id.SubsystemVendorID != m_ID.SubsystemVendorID)
+                continue;
+            if (id.Class != DeviceID::ANY_ID && id.Class != m_ID.Class)
+                continue;
+            if (id.Subclass != DeviceID::ANY_ID && id.Subclass != m_ID.Subclass)
+                continue;
+
+            outID = id;
+            return true;
+        }
+
+        return false;
     }
 
     Bar Device::GetBar(u8 index)
@@ -64,7 +92,23 @@ namespace PCI
         return bar;
     }
 
-    u32 Device::ReadAt(u32 offset, i32 accessSize) const
+    bool Device::RegisterIrq(u64 cpuid, Delegate<void()> callback)
+    {
+        auto handler = InterruptManager::AllocateHandler();
+        handler->Reserve();
+        // handler->SetHandler(OnIrq);
+
+        if (MsiXSet(cpuid, handler->GetInterruptVector(), -1)) return true;
+        if (MsiSet(cpuid, handler->GetInterruptVector(), -1)) return true;
+
+        // TODO(v1tr10l7): MSI and MSI-X
+        return false;
+    }
+
+    bool Device::MsiSet(u64 cpuid, u16 vector, u16 index) { return false; }
+    bool Device::MsiXSet(u64 cpuid, u16 vector, u16 index) { return false; }
+
+    u32  Device::ReadAt(u32 offset, i32 accessSize) const
     {
         auto* controller = GetHostController(m_Address.Domain);
         return controller->Read(m_Address, offset, accessSize);

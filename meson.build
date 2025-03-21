@@ -171,6 +171,7 @@ qemu_args = [
   '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
   '-smbios', 'type=1',
   '-device', 'nvme,id=nvme-ctrl1,serial=nvme',
+  '-nic', 'user,model=rtl8139',
 ]
 qemu = 'qemu-system-' + arch
 

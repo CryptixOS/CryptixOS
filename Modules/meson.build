@@ -15,6 +15,7 @@ ld_args = [
 ]
 
 subdir(arch)
+subdir('noarch')
 
 foreach name, mod : all_modules
   external = mod[0]

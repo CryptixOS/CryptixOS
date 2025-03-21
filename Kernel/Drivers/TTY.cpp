@@ -146,7 +146,6 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
     if (!argp) return_err(-1, EFAULT);
     Process* current = Process::GetCurrent();
 
-    LogDebug("TTY::ioctl: {:#x}", request);
     if (!m_Terminal->GetContext()) return_err(-1, ENOTTY);
     switch (request)
     {

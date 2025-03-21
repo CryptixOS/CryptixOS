@@ -56,10 +56,11 @@ namespace PCI
             s_HostControllers[domain.ID] = new HostController(domain, address);
         }
     }
-    static void EnumerateDevices(Enumerator enumerator)
+    static bool EnumerateDevices(Enumerator enumerator)
     {
         for (auto& [domain, controller] : s_HostControllers)
-            if (controller->EnumerateDevices(enumerator)) break;
+            if (controller->EnumerateDevices(enumerator)) return true;
+        return false;
     }
 
     void Initialize()
@@ -71,21 +72,28 @@ namespace PCI
             s_HostControllers[0] = new HostController(domain, 0);
         }
 
-        EnumerateDevices(
-            [](const DeviceAddress& addr)
+        Enumerator enumerator;
+        enumerator.BindLambda(
+            [](const DeviceAddress& addr) -> bool
             {
                 HostController* controller = s_HostControllers[addr.Domain];
                 VendorID vendorID = static_cast<VendorID>(controller->Read<u16>(
                     addr, std::to_underlying(RegisterOffset::eVendorID)));
                 u16      deviceID = controller->Read<u16>(
                     addr, std::to_underlying(RegisterOffset::eDeviceID));
+                u8 classID = controller->Read<u8>(
+                    addr, std::to_underlying(RegisterOffset::eClassID));
+                u8 subclassID = controller->Read<u8>(
+                    addr, std::to_underlying(RegisterOffset::eSubClassID));
 
                 std::string_view vendorName = magic_enum::enum_name(vendorID);
                 if (vendorName.empty()) vendorName = "Unrecognized";
 
-                LogInfo("PCI: {:#x}:{:#x}:{:#x}, ID: {:#x}:{:#x} - {}",
-                        addr.Bus, addr.Slot, addr.Function,
-                        static_cast<u16>(vendorID), deviceID, vendorName);
+                LogInfo(
+                    "PCI: {:#x}:{:#x}:{:#x}, ID: {:#x}:{:#x}:{:#x}:{:#x} - {}",
+                    addr.Bus, addr.Slot, addr.Function,
+                    static_cast<u16>(vendorID), deviceID, classID, subclassID,
+                    vendorName);
 
                 if (s_HostControllers[addr.Domain]->Read<u8>(
                         addr, std::to_underlying(RegisterOffset::eClassID))
@@ -103,11 +111,44 @@ namespace PCI
                 }
                 return false;
             });
+
+        EnumerateDevices(enumerator);
     }
 
     HostController* GetHostController(u32 domain)
     {
         Assert(s_HostControllers.contains(domain));
         return s_HostControllers[domain];
+    }
+    bool RegisterDriver(struct Driver& driver)
+    {
+        DeviceID      foundID;
+        DeviceAddress foundAddress;
+        bool          found = false;
+
+        Enumerator    enumerator;
+        enumerator.BindLambda(
+            [&](const DeviceAddress& addr) -> bool
+            {
+                PCI::Device device(addr);
+
+                if (device.MatchID(driver.MatchIDs, foundID))
+                {
+                    foundAddress = addr;
+                    found        = true;
+                    return true;
+                }
+
+                return false;
+            });
+
+        if (EnumerateDevices(enumerator))
+        {
+            Device device(foundAddress);
+            driver.Probe(foundAddress, foundID);
+            return true;
+        }
+
+        return false;
     }
 }; // namespace PCI

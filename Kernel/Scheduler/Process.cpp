@@ -151,12 +151,12 @@ ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
     else if (dirFd != AT_FDCWD)
     {
         auto* descriptor = GetFileHandle(dirFd);
-        if (!descriptor) return std::errno_t(EBADF);
+        if (!descriptor) return Error(EBADF);
         parent = descriptor->GetNode();
     }
 
     auto descriptor = VFS::Open(parent, path, flags, mode);
-    if (!descriptor) return descriptor.error();
+    if (!descriptor) return Error(descriptor.error());
 
     return m_FdTable.Insert(descriptor.value());
 }

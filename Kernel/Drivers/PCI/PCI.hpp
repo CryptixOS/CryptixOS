@@ -13,6 +13,7 @@ namespace PCI
 {
     void                  Initialize();
     class HostController* GetHostController(u32 domain);
+    bool                  RegisterDriver(struct Driver& driver);
 
     constexpr usize       PCI_CONFIG_ADDRESS = 0x0cf8;
     constexpr usize       PCI_CONFIG_DATA    = 0x0cfc;

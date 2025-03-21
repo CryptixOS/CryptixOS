@@ -50,6 +50,8 @@ srcs += files(
   'Memory/PMM.cpp',
   'Memory/VMM.cpp',
 
+  'Network/NetworkAdapter.cpp',
+
   'Scheduler/Event.cpp',
   'Scheduler/Process.cpp',
   'Scheduler/Scheduler.cpp',

@@ -9,13 +9,14 @@
 #include <Drivers/PCI/Device.hpp>
 #include <Drivers/PCI/PCI.hpp>
 
+#include <Prism/Delegate.hpp>
+
 #include <functional>
 #include <unordered_map>
 
 namespace PCI
 {
-    using Enumerator = bool (*)(const DeviceAddress&);
-    // using Enumerator = std::function<bool(const DeviceAddress&)>;
+    using Enumerator = Delegate<bool(const DeviceAddress&)>;
 
     class HostController
     {
