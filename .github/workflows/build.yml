@@ -31,6 +31,7 @@ jobs:
       - name: Build sysroot
         run: mkdir build-sysroot && pushd build-sysroot && xbstrap init .. && xbstrap install base && popd
       - name: Configure Project
-        run: ./Meta/setup.sh x86_64 release &&
-             ./Meta/build.sh release x86_64
+        run: ./Meta/setup.sh x86_64 release 
+          && (cd subprojects/fmt-10.2.0/ && patch -p 1 < ../../fmt-10.2.0.patch)
+          && ./Meta/build.sh release x86_64
     

@@ -210,10 +210,15 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
 
         case TIOCGWINSZ:
         {
-            winsize* windowSize   = reinterpret_cast<winsize*>(argp);
+            winsize* windowSize = reinterpret_cast<winsize*>(argp);
 
-            windowSize->ws_row    = m_Terminal->GetContext()->rows;
-            windowSize->ws_col    = m_Terminal->GetContext()->cols;
+            usize    columns, rows;
+            flanterm_get_dimensions(
+                const_cast<flanterm_context*>(m_Terminal->GetContext()),
+                &columns, &rows);
+
+            windowSize->ws_col    = columns;
+            windowSize->ws_row    = rows;
             windowSize->ws_xpixel = m_Terminal->GetFramebuffer().width;
             windowSize->ws_ypixel = m_Terminal->GetFramebuffer().height;
             break;

@@ -53,7 +53,7 @@ bool Terminal::Initialize(Framebuffer& framebuffer)
         framebuffer.blue_mask_size, framebuffer.blue_mask_shift, nullptr,
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0, 1,
         0, 0, 0);
-    m_Context->callback = TerminalCallback;
+    flanterm_set_callback(m_Context, TerminalCallback);
 
     if (!s_ActiveTerminal) s_ActiveTerminal = this;
     return (m_Initialized = true);
