@@ -11,7 +11,6 @@
 #include <Arch/x86_64/IO.hpp>
 
 #include <Arch/x86_64/Drivers/I8042Controller.hpp>
-#include <Arch/x86_64/Drivers/PS2Keyboard.hpp>
 
 #include <Drivers/HID/Ps2KeyboardDevice.hpp>
 #include <Firmware/ACPI/ACPI.hpp>
@@ -21,7 +20,6 @@
 #include <magic_enum/magic_enum.hpp>
 
 Ref<Ps2KeyboardDevice>  s_Keyboard;
-// PS2Keyboard*            s_Keyboard2               = nullptr;
 
 Ps2Controller*          Ps2Controller::s_Instance = nullptr;
 static I8042Controller* s_Controller              = nullptr;
@@ -469,7 +467,6 @@ void I8042Controller::EnumerateDevices()
                      magic_enum::enum_name(deviceType.value()));
         LogTrace("I8042: Detected device on port #2");
     }
-    // s_Keyboard2 = new PS2Keyboard(this, PS2Port::ePort1);
 
     auto scancodeSet = Ps2ScanCodeSet::eSet1;
 

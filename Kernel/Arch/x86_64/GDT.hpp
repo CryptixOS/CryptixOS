@@ -6,9 +6,9 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include <Common.hpp>
 
-struct TaskStateSegment
+struct [[gnu::packed]] TaskStateSegment
 {
     u32 reserved1;
     u64 rsp[3];
@@ -17,7 +17,7 @@ struct TaskStateSegment
     u64 reserved3;
     u16 reserved4;
     u16 ioMapBase;
-} __attribute__((packed));
+};
 
 namespace GDT
 {

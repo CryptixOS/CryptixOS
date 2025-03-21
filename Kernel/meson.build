@@ -42,6 +42,8 @@ srcs += files(
   'Firmware/ACPI/MADT.cpp',
   'Firmware/ACPI/UACPI.cpp',
 
+  'Firmware/DeviceTree/DeviceTree.cpp',
+
   'Firmware/SMBIOS/SMBIOS.cpp',
 
   'Memory/KernelHeap.cpp',

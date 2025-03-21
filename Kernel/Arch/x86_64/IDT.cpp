@@ -18,7 +18,7 @@
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 
-extern const char* exceptionNames[];
+extern const char* s_ExceptionNames[];
 
 constexpr u32      MAX_IDT_ENTRIES     = 256;
 constexpr u32      IDT_ENTRY_PRESENT   = BIT(7);
@@ -32,48 +32,47 @@ namespace Exception
     constexpr u8 PAGE_FAULT = 0x0e;
 }; // namespace Exception
 
-struct IDTEntry
+struct [[gnu::packed]] IDTEntry
 {
-    u16 isrLow;
-    u16 kernelCS;
-    u8  ist;
+    u16 IsrLow;
+    u16 KernelCS;
+    u8  IST;
     union
     {
-        u8 attributes;
-        struct
+        u8 Attributes;
+        struct [[gnu::packed]]
         {
-            u8 gateType : 4;
-            u8 unused   : 1;
-            u8 dpl      : 2;
-            u8 present  : 1;
-        } __attribute__((packed));
+            u8 GateType : 4;
+            u8 Unused   : 1;
+            u8 DPL      : 2;
+            u8 Present  : 1;
+        };
     };
-    u16 isrMiddle;
-    u32 isrHigh;
-    u32 reserved;
-} __attribute__((packed));
+    u16 IsrMiddle;
+    u32 IsrHigh;
+    u32 Reserved;
+};
 
-[[maybe_unused]] alignas(0x10) static IDTEntry idtEntries[256] = {};
+[[maybe_unused]] alignas(0x10) static IDTEntry s_IdtEntries[256] = {};
 extern "C" void*        interrupt_handlers[];
-static InterruptHandler interruptHandlers[256];
-static void (*exceptionHandlers[32])(CPUContext*);
+static InterruptHandler s_InterruptHandlers[256];
+static void             (*exceptionHandlers[32])(CPUContext*);
 
 static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
 {
     Assert(vector < MAX_IDT_ENTRIES);
-    IDTEntry* entry   = idtEntries + vector;
+    IDTEntry* entry   = s_IdtEntries + vector;
 
-    entry->isrLow     = handler & 0xffff;
-    entry->kernelCS   = GDT::KERNEL_CODE_SELECTOR;
-    entry->attributes = attributes;
-    entry->reserved   = 0;
-    entry->ist        = 0;
-    entry->isrMiddle  = (handler & 0xffff0000) >> 16;
-    entry->isrHigh    = (handler & 0xffffffff00000000) >> 32;
+    entry->IsrLow     = handler & 0xffff;
+    entry->KernelCS   = GDT::KERNEL_CODE_SELECTOR;
+    entry->Attributes = attributes;
+    entry->Reserved   = 0;
+    entry->IST        = 0;
+    entry->IsrMiddle  = (handler & 0xffff0000) >> 16;
+    entry->IsrHigh    = (handler & 0xffffffff00000000) >> 32;
 }
 
-[[noreturn]]
-static void raiseException(CPUContext* ctx)
+[[noreturn]] static void raiseException(CPUContext* ctx)
 {
     u64 cpuID = CPU::GetCurrentID();
 
@@ -81,7 +80,7 @@ static void raiseException(CPUContext* ctx)
         "Captured exception[%#x] on cpu %zu: '%s'\n\rError Code: "
         "%#b\n\rrip: "
         "%#p",
-        ctx->interruptVector, cpuID, exceptionNames[ctx->interruptVector],
+        ctx->interruptVector, cpuID, s_ExceptionNames[ctx->interruptVector],
         ctx->errorCode, ctx->rip);
 
     Arch::Halt();
@@ -99,7 +98,7 @@ static void pageFault(CPUContext* ctx)
         "SoftwareGuardExtensions: %d\n"
         "\nerrorCode: %#zb\n\rrip: "
         "%#p\nCR2: %#zx",
-        ctx->interruptVector, 0, exceptionNames[ctx->interruptVector],
+        ctx->interruptVector, 0, s_ExceptionNames[ctx->interruptVector],
         (ctx->errorCode & Bit(0)) != 0, (ctx->errorCode & Bit(1)) != 0,
         (ctx->errorCode & Bit(2)) != 0, (ctx->errorCode & Bit(3)) != 0,
         (ctx->errorCode & Bit(4)) != 0, (ctx->errorCode & Bit(5)) != 0,
@@ -110,8 +109,7 @@ static void pageFault(CPUContext* ctx)
     raiseException(ctx);
 }
 
-[[noreturn]]
-static void unhandledInterrupt(CPUContext* context)
+[[noreturn]] static void unhandledInterrupt(CPUContext* context)
 {
     EarlyLogError("\nAn unhandled interrupt %#x occurred",
                   context->interruptVector);
@@ -120,7 +118,7 @@ static void unhandledInterrupt(CPUContext* context)
 }
 extern "C" void raiseInterrupt(CPUContext* ctx)
 {
-    auto& handler = interruptHandlers[ctx->interruptVector];
+    auto& handler = s_InterruptHandlers[ctx->interruptVector];
 
     if (ctx->interruptVector < 0x20)
         exceptionHandlers[ctx->interruptVector](ctx);
@@ -148,7 +146,7 @@ namespace IDT
                 IDT_ENTRY_PRESENT
                     | (i < 0x20 ? GATE_TYPE_TRAP : GATE_TYPE_INTERRUPT));
 
-            interruptHandlers[i].SetInterruptVector(i);
+            s_InterruptHandlers[i].SetInterruptVector(i);
             if (i < 32) exceptionHandlers[i] = raiseException;
         }
 
@@ -160,13 +158,13 @@ namespace IDT
     }
     void Load()
     {
-        struct
+        struct [[gnu::packed]]
         {
-            u16       limit;
-            uintptr_t base;
-        } __attribute__((packed)) idtr;
-        idtr.limit = sizeof(idtEntries) - 1;
-        idtr.base  = reinterpret_cast<uintptr_t>(idtEntries);
+            u16       Limit;
+            uintptr_t Base;
+        } idtr;
+        idtr.Limit = sizeof(s_IdtEntries) - 1;
+        idtr.Base  = reinterpret_cast<uintptr_t>(s_IdtEntries);
         __asm__ volatile("lidt %0" : : "m"(idtr));
     }
 
@@ -178,18 +176,18 @@ namespace IDT
         if (MADT::LegacyPIC())
         {
             if ((hint >= 0x20 && hint <= (0x20 + 15))
-                && !interruptHandlers[hint].IsUsed())
-                return &interruptHandlers[hint];
+                && !s_InterruptHandlers[hint].IsUsed())
+                return &s_InterruptHandlers[hint];
         }
 
         for (usize i = hint; i < 256; i++)
         {
-            if (!interruptHandlers[i].IsUsed()
-                && !interruptHandlers[i].IsReserved())
+            if (!s_InterruptHandlers[i].IsUsed()
+                && !s_InterruptHandlers[i].IsReserved())
             {
-                interruptHandlers[i].Reserve();
-                interruptHandlers[i].SetInterruptVector(i);
-                return &interruptHandlers[i];
+                s_InterruptHandlers[i].Reserve();
+                s_InterruptHandlers[i].SetInterruptVector(i);
+                return &s_InterruptHandlers[i];
             }
         }
 
@@ -197,15 +195,15 @@ namespace IDT
     }
     InterruptHandler* GetHandler(u8 vector)
     {
-        return &interruptHandlers[vector];
+        return &s_InterruptHandlers[vector];
     }
 
-    void SetIST(u8 vector, u32 value) { idtEntries[vector].ist = value; }
-    void SetDPL(u8 vector, u8 dpl) { idtEntries[vector].dpl = dpl; }
+    void SetIST(u8 vector, u32 value) { s_IdtEntries[vector].IST = value; }
+    void SetDPL(u8 vector, u8 dpl) { s_IdtEntries[vector].DPL = dpl; }
 } // namespace IDT
 
 #pragma region exception_names
-const char* exceptionNames[] = {
+const char*    s_ExceptionNames[] = {
     "Divide-by-zero",
     "Debug",
     "Non-Maskable Interrupt",

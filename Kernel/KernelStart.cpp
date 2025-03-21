@@ -146,6 +146,7 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
     Stacktrace::Initialize();
     CommandLine::Initialize();
     DeviceTree::Initialize();
+
     ACPI::LoadTables();
     Arch::Initialize();
 

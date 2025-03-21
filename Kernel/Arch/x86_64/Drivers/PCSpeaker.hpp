@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include <Common.hpp>
 
 namespace PCSpeaker
 {

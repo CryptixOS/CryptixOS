@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include "Prism/Core/Types.hpp"
+#include <Prism/Core/Types.hpp>
 
 using byte  = u8;
 using word  = u16;

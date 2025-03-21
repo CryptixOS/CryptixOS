@@ -8,6 +8,8 @@
 #include <Debug/Assertions.hpp>
 
 #include <Library/Logger.hpp>
+#include <Prism/Utility/Time.hpp>
+
 #include <Time/Time.hpp>
 
 namespace Time
@@ -17,12 +19,17 @@ namespace Time
         std::vector<HardwareTimer*> s_HardwareTimers;
         HardwareTimer*              s_SchedulerTimer = nullptr;
 
+        std::optional<i64>          s_BootTime       = std::nullopt;
         timespec                    s_RealTime;
         timespec                    s_Monotonic;
     } // namespace
 
     void Initialize()
     {
+        s_BootTime = BootInfo::GetDateAtBoot();
+        DateTime dateAtBoot(s_BootTime.value());
+        LogInfo("Time: Boot Date: {}", dateAtBoot);
+
         LogTrace("Time: Probing available timers...");
         Arch::ProbeTimers(s_HardwareTimers);
         Assert(s_HardwareTimers.size() > 0);

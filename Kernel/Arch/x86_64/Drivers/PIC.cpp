@@ -4,11 +4,10 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "PIC.hpp"
+#include <Common.hpp>
 
-#include "Common.hpp"
-
-#include "Arch/x86_64/IO.hpp"
+#include <Arch/x86_64/Drivers/PIC.hpp>
+#include <Arch/x86_64/IO.hpp>
 
 // https://pdos.csail.mit.edu/6.828/2005/readings/hardware/8259A.pdf
 inline static constexpr const uint32_t PIC1          = 0x20;
@@ -26,24 +25,24 @@ inline static constexpr const uint32_t OCW3_GET_ISR  = 0x0b;
 
 enum class ICW1Flags : uint32_t
 {
-    eICW4Needed         = BIT(0),
+    eICW4Needed         = Bit(0),
     // Single mode if set, cascade GetMode otherwise
-    eSingleMode         = BIT(1),
+    eSingleMode         = Bit(1),
     // If set address interval is 4, otherwise it's 8
-    eAddressInterval4   = BIT(2),
+    eAddressInterval4   = Bit(2),
     // Level triggered mode if set, edge triggered GetMode otherwise
-    eLevelTriggeredMode = BIT(3),
+    eLevelTriggeredMode = Bit(3),
     // 1 means that it is Initialization Command Word
-    eICW                = BIT(4),
+    eICW                = Bit(4),
 };
 
 enum class ICW4Flags : uint32_t
 {
-    e8086Mode               = BIT(0),
-    eAutoEOI                = BIT(1),
-    eBufferedModeSlave      = BIT(3),
-    eBufferedModeMaster     = BIT(2) | BIT(3),
-    eSpecialFullyNestedMode = BIT(4),
+    e8086Mode               = Bit(0),
+    eAutoEOI                = Bit(1),
+    eBufferedModeSlave      = Bit(3),
+    eBufferedModeMaster     = Bit(2) | Bit(3),
+    eSpecialFullyNestedMode = Bit(4),
 };
 
 ICW1Flags operator|(ICW1Flags lhs, ICW1Flags rhs)

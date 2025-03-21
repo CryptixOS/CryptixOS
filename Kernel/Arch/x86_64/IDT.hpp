@@ -6,12 +6,12 @@
  */
 #pragma once
 
-#include "Common.hpp"
+#include <Common.hpp>
 
-#include "Arch/InterruptHandler.hpp"
+#include <Arch/InterruptHandler.hpp>
 
-inline constexpr const usize DPL_RING0 = 0x00;
-inline constexpr const usize DPL_RING3 = 0x03;
+constexpr usize DPL_RING0 = 0x00;
+constexpr usize DPL_RING3 = 0x03;
 
 namespace IDT
 {

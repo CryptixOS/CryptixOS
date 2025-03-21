@@ -11,7 +11,7 @@
 
 #include <Time/HardwareTimer.hpp>
 
-class PIT : public HardwareTimer, public PM::Singleton<PIT>
+class PIT : public HardwareTimer, public Singleton<PIT>
 {
   public:
     PIT();

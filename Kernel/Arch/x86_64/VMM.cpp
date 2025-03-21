@@ -4,9 +4,9 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Memory/VMM.hpp"
+#include <Common.hpp>
 
-#include "Common.hpp"
+#include <Memory/VMM.hpp>
 
 constexpr usize                  PTE_PRESENT    = Bit(0);
 constexpr usize                  PTE_WRITEABLE  = Bit(1);

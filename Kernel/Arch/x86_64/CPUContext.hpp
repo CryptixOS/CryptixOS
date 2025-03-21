@@ -8,7 +8,7 @@
 
 #include <Common.hpp>
 
-struct CPUContext
+struct [[gnu::packed]] CPUContext
 {
     u64 ds;
     u64 es;
@@ -37,4 +37,4 @@ struct CPUContext
     u64 rflags;
     u64 rsp;
     u64 ss;
-} __attribute__((packed));
+};
