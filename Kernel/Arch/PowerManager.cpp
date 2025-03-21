@@ -25,7 +25,7 @@ namespace PowerManager
         // TODO(v1tr10l7): UEFI Service
         Arch::Reboot();
     }
-    void Shutdown()
+    void PowerOff()
     {
 #ifdef CTOS_TARGET_X86_64
         // Qemu shutdown

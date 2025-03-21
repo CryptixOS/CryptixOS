@@ -28,6 +28,7 @@ namespace Syscall::System
         switch (cmd)
         {
             case RebootCommand::eRestart: PowerManager::Reboot(); break;
+            case RebootCommand::ePowerOff: PowerManager::PowerOff(); break;
 
             default: Prism::Log::Warn("SysReboot: Unknown OpCode!"); break;
         }
