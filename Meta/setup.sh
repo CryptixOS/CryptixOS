@@ -40,8 +40,6 @@ for build in $BUILD_SELECTION; do
   setup_build "$build" "${BUILD_TYPES[$build]}"
 done
 
-(cd subprojects/fmt-10.2.0 && patch -p1 < ../../fmt-10.2.0.patch)
-
 # Ensure iso_root directory exists
 mkdir -p $BUILD_DIR/iso_root
 log_success "✅ All selected builds are set up!"
