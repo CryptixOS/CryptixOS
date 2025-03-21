@@ -33,7 +33,7 @@ PIT::PIT()
 
 void          PIT::Initialize() { s_Instance = Instance(); }
 
-ErrorOr<void> PIT::Start(TimerMode mode, TimeStep interval, u8 vector)
+ErrorOr<void> PIT::Start(TimerMode mode, TimeStep interval)
 {
     if (mode == TimerMode::eOneShot) m_CurrentMode = Mode::eOneShot;
     else if (mode == TimerMode::ePeriodic) m_CurrentMode = Mode::eSquareWave;

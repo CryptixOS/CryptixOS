@@ -12,7 +12,7 @@
 #include <Prism/Spinlock.hpp>
 
 #include <Prism/Debug/LogSink.hpp>
-#include <Prism/Math.hpp>
+#include <Prism/Utility/Math.hpp>
 #include <Prism/StringUtils.hpp>
 
 #include <cctype>

@@ -30,10 +30,10 @@ class Lapic : public HardwareTimer, public PM::Singleton<Lapic>
 
     static void      PanicIpi();
 
-    ErrorOr<void> Start(TimerMode mode, TimeStep interval, u8 vector) override;
-    void          Stop() override;
+    ErrorOr<void>    Start(TimerMode mode, TimeStep interval) override;
+    void             Stop() override;
 
-    ErrorOr<void> SetFrequency(usize frequency) override
+    ErrorOr<void>    SetFrequency(usize frequency) override
     {
         (void)frequency;
         return {};

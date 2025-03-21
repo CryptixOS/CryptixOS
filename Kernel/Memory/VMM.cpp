@@ -4,12 +4,12 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "VMM.hpp"
+#include <Boot/BootInfo.hpp>
 
-#include "Memory/PMM.hpp"
+#include <Memory/PMM.hpp>
+#include <Memory/VMM.hpp>
 
-#include "Boot/BootInfo.hpp"
-#include "Prism/Math.hpp"
+#include <Prism/Utility/Math.hpp>
 
 extern "C" symbol           text_start_addr;
 extern "C" symbol           text_end_addr;

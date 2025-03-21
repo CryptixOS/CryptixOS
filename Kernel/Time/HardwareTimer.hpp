@@ -33,11 +33,10 @@ class HardwareTimer
         m_OnTickCallback.Bind<Callback>();
     }
 
-    virtual ErrorOr<void> Start(TimerMode mode, TimeStep interval, u8 vector)
-        = 0;
-    virtual void          Stop()                        = 0;
+    virtual ErrorOr<void> Start(TimerMode mode, TimeStep interval) = 0;
+    virtual void          Stop()                                   = 0;
 
-    virtual ErrorOr<void> SetFrequency(usize frequency) = 0;
+    virtual ErrorOr<void> SetFrequency(usize frequency)            = 0;
 
   protected:
     OnTickCallback m_OnTickCallback = nullptr;

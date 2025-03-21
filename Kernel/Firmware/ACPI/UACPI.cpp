@@ -28,7 +28,7 @@
 
 #include <Time/Time.hpp>
 
-#include <Prism/Math.hpp>
+#include <Prism/Utility/Math.hpp>
 #include <Prism/Spinlock.hpp>
 
 #include <uacpi/kernel_api.h>

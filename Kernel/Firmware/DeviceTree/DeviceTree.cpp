@@ -40,18 +40,19 @@ namespace DeviceTree
     }
 
     // Function to iterate through FDT nodes
-    void iterate_fdt_nodes(const void* fdt)
+    bool ParseFDT(FDT_Header* header)
     {
-        FDT_Header* header  = (FDT_Header*)fdt;
-        char* struct_block  = (char*)fdt + header->StructureBlockOffset.Load();
-        char* strings_block = (char*)fdt + header->StringBlockOffset.Load();
+        char* struct_block
+            = (char*)header + header->StructureBlockOffset.Load();
+        char* strings_block = (char*)header + header->StringBlockOffset.Load();
         uint32_t             offset = 0;
         [[maybe_unused]] int depth  = 0;
 
         while (offset < header->StructureBlockLength.Load())
         {
-            auto tokenOffset = *reinterpret_cast<u32*>(struct_block + offset);
-            uint32_t token   = fdt32_to_cpu(tokenOffset);
+            BigEndian<u32> tokenOffset
+                = *reinterpret_cast<u32*>(struct_block + offset);
+            uint32_t token = tokenOffset.Load();
             offset += sizeof(uint32_t);
 
             switch (token)
@@ -103,31 +104,37 @@ namespace DeviceTree
                 case FDT_NOP:
                     // No operation; skip
                     break;
-                case FDT_END: return;
+                case FDT_END: return true;
                 default:
                     Logger::Logf(LogLevel::eTrace, "Unknown token: 0x%x\n",
                                  token);
-                    return;
+                    return false;
             }
         }
+
+        return true;
     }
+    bool ParseFDT(FDT_Header* header);
 
     bool Initialize()
     {
         auto        dtb    = BootInfo::GetDeviceTreeBlobAddress();
         FDT_Header* header = dtb.As<FDT_Header>();
 
+        if (!header)
 #ifdef CTOS_TARGET_AARCH64
-        AssertMsg(header, "AARCH64: Cannot boot without FDT header");
+            AssertMsg(header, "AARCH64: Cannot boot without FDT header");
 #else
-        return false;
+            return false;
 #endif
 
         auto magic = header->Magic;
-        LogTrace("DeviceTree: Magic: {:#x}", magic.Load());
-        LogTrace("DeviceTree: Magic: {}", magic == 0xd00dfeed);
-        iterate_fdt_nodes(header);
+        if (magic.Load() != FDT_MAGIC)
+        {
+            LogError("FDT: Invalid magic: {:#x}", magic.Load());
+            return false;
+        }
 
-        return magic == 0xd00dfeed;
+        return ParseFDT(header);
     }
 } // namespace DeviceTree

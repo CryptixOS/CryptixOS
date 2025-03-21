@@ -10,7 +10,7 @@
 #include "Memory/VMM.hpp"
 
 #include "Library/Logger.hpp"
-#include "Prism/Math.hpp"
+#include "Prism/Utility/Math.hpp"
 #include "VFS/Initrd/Ustar.hpp"
 
 namespace Initrd

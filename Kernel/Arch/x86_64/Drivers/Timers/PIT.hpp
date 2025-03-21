@@ -16,22 +16,22 @@ class PIT : public HardwareTimer, public Singleton<PIT>
   public:
     PIT();
 
-    static void      Initialize();
+    static void            Initialize();
 
-    std::string_view GetModelString() const override { return "i8253"; }
+    std::string_view       GetModelString() const override { return "i8253"; }
 
-    ErrorOr<void> Start(TimerMode mode, TimeStep interval, u8 vector) override;
-    void          Stop() override;
+    ErrorOr<void>          Start(TimerMode mode, TimeStep interval) override;
+    void                   Stop() override;
 
-    u8            GetInterruptVector();
+    u8                     GetInterruptVector();
 
-    u64           GetCurrentCount();
-    u64           GetMilliseconds();
+    u64                    GetCurrentCount();
+    u64                    GetMilliseconds();
 
-    ErrorOr<void> SetFrequency(usize frequency) override;
-    void          SetReloadValue(u16 reloadValue);
+    ErrorOr<void>          SetFrequency(usize frequency) override;
+    void                   SetReloadValue(u16 reloadValue);
 
-    void          Sleep(u64 ms);
+    void                   Sleep(u64 ms);
 
     static constexpr usize BASE_FREQUENCY  = 1193182ull;
     static constexpr usize SEND_WORD       = 0x30;

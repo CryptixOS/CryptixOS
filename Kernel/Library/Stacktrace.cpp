@@ -13,7 +13,7 @@
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
-#include <Prism/Math.hpp>
+#include <Prism/Utility/Math.hpp>
 
 #include <demangler/Demangle.h>
 #include <vector>

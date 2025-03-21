@@ -9,7 +9,7 @@
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
-#include <Prism/Math.hpp>
+#include <Prism/Utility/Math.hpp>
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/VFS.hpp>
 

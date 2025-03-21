@@ -10,7 +10,7 @@
 #include <Boot/BootInfo.hpp>
 #include <Debug/Panic.hpp>
 
-#include <Prism/Math.hpp>
+#include <Prism/Utility/Math.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
@@ -509,8 +509,7 @@ namespace CPU
     }
     void Reschedule(TimeStep interval)
     {
-        Assert(Lapic::Instance()->Start(TimerMode::eOneShot, interval,
-                                        g_ScheduleVector));
+        Assert(Lapic::Instance()->Start(TimerMode::eOneShot, interval));
     }
 
     bool EnableSSE()

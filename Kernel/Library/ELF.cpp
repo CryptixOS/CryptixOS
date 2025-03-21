@@ -8,7 +8,7 @@
 #include <Library/Module.hpp>
 
 #include <Memory/PMM.hpp>
-#include <Prism/Math.hpp>
+#include <Prism/Utility/Math.hpp>
 
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>

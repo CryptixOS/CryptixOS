@@ -12,7 +12,7 @@
 
 #include <Memory/PMM.hpp>
 
-#include <Prism/Math.hpp>
+#include <Prism/Utility/Math.hpp>
 #include <Scheduler/Process.hpp>
 
 Thread::Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn)

@@ -14,35 +14,33 @@
 #include <Memory/VMM.hpp>
 #include <Scheduler/Scheduler.hpp>
 
-constexpr u32             LAPIC_EOI_ACK                      = 0x00;
-CTOS_UNUSED constexpr u32 APIC_BASE_MSR                      = 0x1b;
+constexpr u32                  LAPIC_EOI_ACK                      = 0x00;
+CTOS_UNUSED constexpr u32      APIC_BASE_MSR                      = 0x1b;
 
-CTOS_UNUSED constexpr u32 LAPIC_ID_REGISTER                  = 0x20;
-CTOS_UNUSED constexpr u32 LAPIC_VERSION_REGISTER             = 0x30;
-CTOS_UNUSED constexpr u32 LAPIC_TASK_PRIORITY_REGISTER       = 0x80;
-constexpr u32             LAPIC_EOI_REGISTER                 = 0xb0;
-CTOS_UNUSED constexpr u32 LAPIC_LDR_REGISTER                 = 0xd0;
-CTOS_UNUSED constexpr u32 LAPIC_DFR_REGISTER                 = 0xe0;
-CTOS_UNUSED constexpr u32 LAPIC_SPURIOUS_REGISTER            = 0xf0;
-CTOS_UNUSED constexpr u32 LAPIC_ESR_REGISTER                 = 0x280;
-constexpr u32             LAPIC_ICR_LOW_REGISTER             = 0x300;
-constexpr u32             LAPIC_ICR_HIGH_REGISTER            = 0x310;
-constexpr u32             LAPIC_TIMER_REGISTER               = 0x320;
-constexpr u32             LAPIC_LINT0_REGISTER               = 0x350;
-constexpr u32             LAPIC_LINT1_REGISTER               = 0x360;
-constexpr u32             LAPIC_TIMER_INITIAL_COUNT_REGISTER = 0x380;
-constexpr u32             LAPIC_TIMER_CURRENT_COUNT_REGISTER = 0x390;
-constexpr u32             LAPIC_TIMER_DIVIDER_REGISTER       = 0x3e0;
-[[maybe_unused]]
-constexpr u32 LAPIC_m_X2Apic_ICR_REGISTER
-    = 0x830;
+CTOS_UNUSED constexpr u32      LAPIC_ID_REGISTER                  = 0x20;
+CTOS_UNUSED constexpr u32      LAPIC_VERSION_REGISTER             = 0x30;
+CTOS_UNUSED constexpr u32      LAPIC_TASK_PRIORITY_REGISTER       = 0x80;
+constexpr u32                  LAPIC_EOI_REGISTER                 = 0xb0;
+CTOS_UNUSED constexpr u32      LAPIC_LDR_REGISTER                 = 0xd0;
+CTOS_UNUSED constexpr u32      LAPIC_DFR_REGISTER                 = 0xe0;
+CTOS_UNUSED constexpr u32      LAPIC_SPURIOUS_REGISTER            = 0xf0;
+CTOS_UNUSED constexpr u32      LAPIC_ESR_REGISTER                 = 0x280;
+constexpr u32                  LAPIC_ICR_LOW_REGISTER             = 0x300;
+constexpr u32                  LAPIC_ICR_HIGH_REGISTER            = 0x310;
+constexpr u32                  LAPIC_TIMER_REGISTER               = 0x320;
+constexpr u32                  LAPIC_LINT0_REGISTER               = 0x350;
+constexpr u32                  LAPIC_LINT1_REGISTER               = 0x360;
+constexpr u32                  LAPIC_TIMER_INITIAL_COUNT_REGISTER = 0x380;
+constexpr u32                  LAPIC_TIMER_CURRENT_COUNT_REGISTER = 0x390;
+constexpr u32                  LAPIC_TIMER_DIVIDER_REGISTER       = 0x3e0;
+[[maybe_unused]] constexpr u32 LAPIC_m_X2Apic_ICR_REGISTER        = 0x830;
 
-CTOS_UNUSED constexpr u32 LAPIC_TIMER_MASKED   = 0x10000;
-CTOS_UNUSED constexpr u32 LAPIC_TIMER_PERIODIC = 0x20000;
+CTOS_UNUSED constexpr u32      LAPIC_TIMER_MASKED                 = 0x10000;
+CTOS_UNUSED constexpr u32      LAPIC_TIMER_PERIODIC               = 0x20000;
 
-std::atomic_bool          Lapic::s_Initialized = false;
+std::atomic_bool               Lapic::s_Initialized               = false;
 
-bool                      Checkm_X2Apic()
+bool                           Checkm_X2Apic()
 {
     CPU::ID m_ID;
     if (!m_ID(1, 0)) return false;
@@ -123,11 +121,11 @@ void Lapic::SendIpi(u32 flags, u32 m_ID)
 }
 void          Lapic::SendEOI() { Write(LAPIC_EOI_REGISTER, LAPIC_EOI_ACK); }
 
-ErrorOr<void> Lapic::Start(TimerMode tm, TimeStep interval, u8 vector)
+ErrorOr<void> Lapic::Start(TimerMode tm, TimeStep interval)
 {
-    Mode mode = tm == TimerMode::eOneShot ? Mode::eOneshot : Mode::ePeriodic;
-    vector    = m_InterruptHandler->GetInterruptVector();
-    usize ms  = interval.Milliseconds();
+    Mode  mode   = tm == TimerMode::eOneShot ? Mode::eOneshot : Mode::ePeriodic;
+    u8    vector = m_InterruptHandler->GetInterruptVector();
+    usize ms     = interval.Milliseconds();
 
     if (m_TicksPerMs == 0) CalibrateTimer();
     u64 ticks = m_TicksPerMs * ms;

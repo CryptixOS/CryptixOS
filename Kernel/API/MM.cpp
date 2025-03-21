@@ -17,7 +17,7 @@
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 
-#include <Prism/Math.hpp>
+#include <Prism/Utility/Math.hpp>
 
 namespace API::MM
 {

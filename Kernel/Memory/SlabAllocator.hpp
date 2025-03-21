@@ -10,7 +10,7 @@
 #include <Memory/VMM.hpp>
 
 #include <Prism/Core/Types.hpp>
-#include <Prism/Math.hpp>
+#include <Prism/Utility/Math.hpp>
 #include <Prism/Spinlock.hpp>
 
 class SlabAllocatorBase

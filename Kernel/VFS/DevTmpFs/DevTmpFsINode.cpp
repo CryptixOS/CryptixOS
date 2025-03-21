@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Prism/Math.hpp>
+#include <Prism/Utility/Math.hpp>
 #include <Time/Time.hpp>
 
 #include <Scheduler/Process.hpp>
