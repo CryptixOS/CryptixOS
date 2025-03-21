@@ -15,5 +15,5 @@ int main()
     printf("The system will reboot...\n");
     reboot(LINUX_REBOOT_CMD_RESTART);
 
-    return EXIT_SUCCESS;
+    return EXIT_FAILURE;
 }
