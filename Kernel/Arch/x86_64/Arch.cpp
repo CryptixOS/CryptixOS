@@ -67,5 +67,5 @@ namespace Arch
         if (Lapic::IsInitialized()) timers.push_back(Lapic::Instance());
         if (PIT::IsInitialized()) timers.push_back(PIT::Instance());
     }
-    usize GetEpoch() { return RTC::CurrentTime(); }
+    time_t GetEpoch() { return RTC::CurrentTime(); }
 }; // namespace Arch
