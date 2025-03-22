@@ -90,11 +90,13 @@ namespace PCI
                         uacpi_free_resources(resources);
                     }
 
+#if 0
                     LogInfo(
                         "PCI: Adding irq entry: {{ gsi: {}, device: {}, "
                         "function: {}, pin: {}, edge: {}, high: {} }}",
                         gsi, slot, func, entry.pin + 1, edgeTriggered,
                         activeHigh);
+#endif
                     s_IrqRoutes.emplace_back(gsi, slot, func,
                                              static_cast<u8>(entry.pin + 1),
                                              edgeTriggered, activeHigh);

@@ -101,12 +101,12 @@ namespace PCI
         auto handler = InterruptManager::AllocateHandler();
         handler->Reserve();
         handler->SetHandler(
-            [callback](CPUContext*)
+            [this](CPUContext*)
             {
-                LogInfo("Hello");
-                callback.Invoke();
+                if (m_OnIrq) m_OnIrq.Invoke();
             });
 
+        m_OnIrq = callback;
         if (MsiXSet(cpuid, handler->GetInterruptVector(), -1)) return true;
         if (MsiSet(cpuid, handler->GetInterruptVector(), -1)) return true;
 

@@ -225,26 +225,25 @@ namespace PCI
         bool        RegisterIrq(u64 cpuid, Delegate<void()> handler);
 
       protected:
-        Spinlock      m_Lock;
-        DeviceAddress m_Address{};
-        DeviceID      m_ID;
-        bool          m_MsiSupported  = false;
-        u8            m_MsiOffset     = 0;
-        bool          m_MsixSupported = false;
-        u8            m_MsixOffset    = 0;
-        u16           m_MsixMessages  = 0;
-        Bitmap        m_MsixIrqs;
-        u8            m_MsixTableBar;
-        u32           m_MsixTableOffset;
-        u8            m_MsixPendingBar;
-        u32           m_MsixPendingOffset;
+        Spinlock         m_Lock;
+        DeviceAddress    m_Address{};
+        DeviceID         m_ID;
+        bool             m_MsiSupported  = false;
+        u8               m_MsiOffset     = 0;
+        bool             m_MsixSupported = false;
+        u8               m_MsixOffset    = 0;
+        u16              m_MsixMessages  = 0;
+        Bitmap           m_MsixIrqs;
+        u8               m_MsixTableBar;
+        u32              m_MsixTableOffset;
+        u8               m_MsixPendingBar;
+        u32              m_MsixPendingOffset;
+        Delegate<void()> m_OnIrq;
 
-        void          OnIrq(CPUContext* ctx);
+        bool             MsiSet(u64 cpuid, u16 vector, u16 index);
+        bool             MsiXSet(u64 cpuid, u16 vector, u16 index);
 
-        bool          MsiSet(u64 cpuid, u16 vector, u16 index);
-        bool          MsiXSet(u64 cpuid, u16 vector, u16 index);
-
-        void          SendCommand(u16 cmd, bool flag)
+        void             SendCommand(u16 cmd, bool flag)
         {
             u16 command = Read<u16>(RegisterOffset::eCommand);
 
