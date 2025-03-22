@@ -13,3 +13,5 @@ echfs-utils -m -p0 image.hdd mkdir dir1
 echfs-utils -m -p0 image.hdd mkdir dir2
 echfs-utils -m -p0 image.hdd mkdir dir3
 
+python ../Meta/import_files.py
+
