@@ -115,6 +115,12 @@ namespace PCI
         EnumerateDevices(enumerator);
     }
 
+    void InitializeIrqRoutes()
+    {
+        for (const auto& [domain, controller] : s_HostControllers)
+            controller->InitializeIrqRoutes();
+    }
+
     HostController* GetHostController(u32 domain)
     {
         Assert(s_HostControllers.contains(domain));

@@ -12,9 +12,114 @@
 
 namespace PCI
 {
+    std::vector<HostController::IrqRoute> HostController::s_IrqRoutes;
+
+    void                                  HostController::InitializeIrqRoutes()
+    {
+        static const char* rootIds[] = {
+            "PNP0A03",
+            "PNP0A08",
+            nullptr,
+        };
+
+        uacpi_find_devices_at(
+            uacpi_namespace_get_predefined(UACPI_PREDEFINED_NAMESPACE_SB),
+            rootIds,
+            [](void* userData, uacpi_namespace_node* node,
+               u32) -> uacpi_iteration_decision
+            {
+                u64 seg = 0, bus = 0;
+
+                uacpi_eval_integer(node, "_SEG", nullptr, &seg);
+                uacpi_eval_integer(node, "_BBN", nullptr, &bus);
+
+                uacpi_pci_routing_table* pciRoutes;
+                auto ret = uacpi_get_pci_routing_table(node, &pciRoutes);
+
+                if (ret != UACPI_STATUS_OK)
+                    return UACPI_ITERATION_DECISION_CONTINUE;
+
+                for (usize i = 0; i < pciRoutes->num_entries; i++)
+                {
+                    auto& entry         = pciRoutes->entries[i];
+
+                    bool  edgeTriggered = false;
+                    bool  activeHigh    = false;
+
+                    auto  gsi           = entry.index;
+
+                    i32   slot          = (entry.address >> 16) & 0xffff;
+                    i32   func          = entry.address & 0xffff;
+                    if (func == 0xffff) func = -1;
+
+                    if (entry.source)
+                    {
+                        Assert(entry.index == 0);
+                        uacpi_resources* resources;
+                        ret = uacpi_get_current_resources(entry.source,
+                                                          &resources);
+
+                        switch (resources->entries[0].type)
+                        {
+                            case UACPI_RESOURCE_TYPE_IRQ:
+                            {
+                                auto* irq = &resources->entries[0].irq;
+                                gsi       = irq->irqs[0];
+
+                                if (irq->triggering == UACPI_TRIGGERING_EDGE)
+                                    edgeTriggered = true;
+                                if (irq->polarity == UACPI_POLARITY_ACTIVE_HIGH)
+                                    activeHigh = true;
+                                break;
+                            }
+                            case UACPI_RESOURCE_TYPE_EXTENDED_IRQ:
+                            {
+                                auto* irq = &resources->entries[0].extended_irq;
+                                gsi       = irq->irqs[0];
+
+                                if (irq->triggering == UACPI_TRIGGERING_EDGE)
+                                    edgeTriggered = true;
+                                if (irq->polarity == UACPI_POLARITY_ACTIVE_HIGH)
+                                    activeHigh = true;
+                                break;
+                            }
+
+                            default: Assert(false);
+                        }
+
+                        uacpi_free_resources(resources);
+                    }
+
+                    LogInfo(
+                        "PCI: Adding irq entry: {{ gsi: {}, device: {}, "
+                        "function: {}, pin: {}, edge: {}, high: {} }}",
+                        gsi, slot, func, entry.pin + 1, edgeTriggered,
+                        activeHigh);
+                    s_IrqRoutes.emplace_back(gsi, slot, func,
+                                             static_cast<u8>(entry.pin + 1),
+                                             edgeTriggered, activeHigh);
+                }
+
+                uacpi_free_pci_routing_table(pciRoutes);
+                return UACPI_ITERATION_DECISION_CONTINUE;
+            },
+            this);
+    }
     bool HostController::EnumerateDevices(Enumerator enumerator)
     {
         return EnumerateRootBus(enumerator);
+    }
+
+    void HostController::Initialize()
+    {
+        if (m_Address)
+        {
+            m_AccessMechanism = new ECAM(m_Address, m_Domain.BusStart);
+            return;
+        }
+
+        m_AccessMechanism = new LegacyAccessMechanism();
+        Assert(m_AccessMechanism);
     }
 
     bool HostController::EnumerateRootBus(Enumerator enumerator)
@@ -93,10 +198,15 @@ namespace PCI
         type |= Read<u8>(address,
                          std::to_underlying(RegisterOffset::eSubClassID));
 
-        if (type == ((0x06 << 8) | 0x04))
+        u8 headerType
+            = Read<u8>(address, std::to_underlying(RegisterOffset::eHeaderType))
+            & 0x7f;
+        (void)type;
+        if (headerType == 0x01)
         {
             u8 secondaryBus = Read<u8>(
                 address, std::to_underlying(RegisterOffset::eSecondaryBus));
+
             if (EnumerateBus(secondaryBus, enumerator)) return true;
         }
         return false;

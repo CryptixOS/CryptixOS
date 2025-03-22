@@ -12,6 +12,8 @@
 namespace PCI
 {
     void                  Initialize();
+    void                  InitializeIrqRoutes();
+
     class HostController* GetHostController(u32 domain);
     bool                  RegisterDriver(struct Driver& driver);
 

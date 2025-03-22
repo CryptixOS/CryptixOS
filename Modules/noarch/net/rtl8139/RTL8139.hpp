@@ -18,6 +18,8 @@ namespace RTL8139
       public:
         AdapterCard(PCI::DeviceAddress& addr);
 
+        bool Send(u8* data, usize length);
+
       private:
         Pointer                m_Base;
         Pointer                m_IoBase;
@@ -26,12 +28,19 @@ namespace RTL8139
         constexpr static usize TRANSMIT_BUFFER_SIZE = 0x600;
         Pointer                m_ReceiveBuffer;
         Pointer                m_TransmitBuffers[4];
+        usize                  m_TransmitNext = 0;
+
+        void                   HandleInterrupt() { LogInfo("HandleInterrupt"); }
 
         enum class Register
         {
             eMac0                = 0x0000,
             eMac4                = 0x0004,
             eStatus              = 0x0008,
+            eTransmitStatus0     = 0x0010,
+            eTransmitStatus1     = 0x0014,
+            eTransmitStatus2     = 0x0018,
+            eTransmitStatus3     = 0x001c,
             eTransmitBuffer0     = 0x0020,
             eTransmitBuffer1     = 0x0024,
             eTransmitBuffer2     = 0x0028,
@@ -48,10 +57,6 @@ namespace RTL8139
             eConfig1             = 0x0052,
             eMediaStatus         = 0x0058,
             eBasicModeControl    = 0x0062,
-            eICR                 = 0x00c0,
-            eIMC                 = 0x00d8,
-            eRCtl                = 0x0100,
-            eTCtl                = 0x0400,
         };
         enum class ReceiverBufferLength : u32
         {
@@ -323,20 +328,6 @@ namespace RTL8139
             Pointer regAddr = m_Base.ToHigherHalf<Pointer>().Offset<Pointer>(
                 std::to_underlying(reg));
             *regAddr.As<T>() = data;
-        }
-
-        inline u32 ReadReg(Register reg) const
-        {
-            return *m_Base.ToHigherHalf<Pointer>()
-                        .Offset<Pointer>(std::to_underlying(reg))
-                        .As<u32>();
-        }
-        inline void WriteReg(Register reg, u32 data) const
-        {
-            *m_Base.ToHigherHalf<Pointer>()
-                 .Offset<Pointer>(std::to_underlying(reg))
-                 .As<u32>()
-                = data;
         }
     };
 } // namespace RTL8139

@@ -10,6 +10,7 @@
 #include <Drivers/PCI/Access.hpp>
 #include <Drivers/PCI/Definitions.hpp>
 
+#include <Prism/Containers/Bitmap.hpp>
 #include <Prism/Core/Types.hpp>
 #include <Prism/Delegate.hpp>
 #include <Prism/Spinlock.hpp>
@@ -80,6 +81,58 @@ namespace PCI
         u8  BusStart;
         u8  BusEnd;
     };
+    struct [[gnu::packed]] MsiControl
+    {
+        u16 MsiE     : 1;
+        u16 Mmc      : 3;
+        u16 Mme      : 3;
+        u16 C64      : 1;
+        u16 PVM      : 1;
+        u16 Reserved : 6;
+    };
+    struct [[gnu::packed]] MsiAddress
+    {
+        u32 Reserved0       : 2;
+        u32 DestinationMode : 1;
+        u32 RedirectionHint : 1;
+        u32 Reserved1       : 8;
+        u32 DestinationID   : 8;
+        u32 BaseAddress     : 12;
+    };
+    struct [[gnu::packed]] MsiData
+    {
+        u32 Vector       : 8;
+        u32 DeliveryMode : 3;
+        u32 Reserved0    : 3;
+        u32 Level        : 1;
+        u32 TriggerMode  : 1;
+        u32 Reserved1    : 16;
+    };
+
+    struct [[gnu::packed]] MsiXControl
+    {
+        u16 Irqs     : 11;
+        u16 Reserved : 3;
+        u16 Mask     : 1;
+        u16 Enable   : 1;
+    };
+    struct [[gnu::packed]] MsiXAddress
+    {
+        u32 Bir    : 3;
+        u32 Offset : 29;
+    };
+    struct [[gnu::packed]] MsiXVectorCtrl
+    {
+        u32 Mask     : 8;
+        u32 Reserved : 31;
+    };
+    struct [[gnu::packed]] MsiXEntry
+    {
+        u32 AddressLow;
+        u32 AddressHigh;
+        u32 Data;
+        u32 Control;
+    };
     class Device : public ::Device
     {
       public:
@@ -95,6 +148,43 @@ namespace PCI
                 = Read<u16>(RegisterOffset::eSubsystemVendorID);
             m_ID.Class    = Read<u8>(RegisterOffset::eClassID);
             m_ID.Subclass = Read<u8>(RegisterOffset::eSubClassID);
+
+            auto capabilitiesPointer
+                = Read<u8>(RegisterOffset::eCapabilitiesPointer);
+            while (capabilitiesPointer)
+            {
+                u16 header       = ReadAt(capabilitiesPointer, 2);
+                u8  capabilityID = header & 0xff;
+                switch (capabilityID)
+                {
+                    case 0x05:
+                        m_MsiSupported = true;
+                        m_MsiOffset    = capabilitiesPointer;
+                        break;
+                    case 0x11:
+                        m_MsixSupported = true;
+                        m_MsixOffset    = capabilitiesPointer;
+                        MsiXControl control(
+                            ReadAt(capabilitiesPointer + 0x02, 2));
+                        MsiXAddress table(
+                            ReadAt(capabilitiesPointer + 0x04, 4));
+                        MsiXAddress pending(
+                            ReadAt(capabilitiesPointer + 0x08, 4));
+
+                        usize count    = control.Irqs;
+                        m_MsixMessages = count;
+                        m_MsixIrqs.Allocate(count);
+
+                        m_MsixTableBar      = table.Bir;
+                        m_MsixTableOffset   = table.Offset << 3;
+
+                        m_MsixPendingBar    = pending.Bir;
+                        m_MsixPendingOffset = pending.Offset << 3;
+                        break;
+                }
+
+                capabilitiesPointer = (header >> 8) & 0xfc;
+            }
         }
 
         void                      EnableMemorySpace();
@@ -138,11 +228,30 @@ namespace PCI
         Spinlock      m_Lock;
         DeviceAddress m_Address{};
         DeviceID      m_ID;
+        bool          m_MsiSupported  = false;
+        u8            m_MsiOffset     = 0;
+        bool          m_MsixSupported = false;
+        u8            m_MsixOffset    = 0;
+        u16           m_MsixMessages  = 0;
+        Bitmap        m_MsixIrqs;
+        u8            m_MsixTableBar;
+        u32           m_MsixTableOffset;
+        u8            m_MsixPendingBar;
+        u32           m_MsixPendingOffset;
 
         void          OnIrq(CPUContext* ctx);
 
         bool          MsiSet(u64 cpuid, u16 vector, u16 index);
         bool          MsiXSet(u64 cpuid, u16 vector, u16 index);
+
+        void          SendCommand(u16 cmd, bool flag)
+        {
+            u16 command = Read<u16>(RegisterOffset::eCommand);
+
+            if (flag) command |= cmd;
+            else command &= ~cmd;
+            Write<u16>(RegisterOffset::eCommand, command);
+        }
 
         template <std::unsigned_integral T>
             requires(sizeof(T) <= 4)

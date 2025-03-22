@@ -7,6 +7,10 @@
 #include <Arch/InterruptHandler.hpp>
 #include <Arch/InterruptManager.hpp>
 
+#ifdef CTOS_TARGET_X86_64
+    #include <Arch/x86_64/Drivers/IoApic.hpp>
+#endif
+
 #include <Drivers/PCI/Device.hpp>
 #include <Drivers/PCI/HostController.hpp>
 #include <Drivers/PCI/PCI.hpp>
@@ -96,19 +100,77 @@ namespace PCI
     {
         auto handler = InterruptManager::AllocateHandler();
         handler->Reserve();
-        // handler->SetHandler(OnIrq);
+        handler->SetHandler(
+            [callback](CPUContext*)
+            {
+                LogInfo("Hello");
+                callback.Invoke();
+            });
 
         if (MsiXSet(cpuid, handler->GetInterruptVector(), -1)) return true;
         if (MsiSet(cpuid, handler->GetInterruptVector(), -1)) return true;
 
-        // TODO(v1tr10l7): MSI and MSI-X
+        auto  pin        = Read<u8>(RegisterOffset::eInterruptPin);
+        auto* controller = GetHostController(m_Address.Domain);
+        auto  route      = controller->FindIrqRoute(m_Address.Slot, pin);
+
+        if (!route)
+        {
+            LogError("PCI::Device: Failed to find gsi route for pin: {}", pin);
+            return false;
+        }
+
+        u16 flags = 0;
+        if (!route->ActiveHigh) flags |= Bit(1);
+        if (!route->EdgeTriggered) flags |= Bit(3);
+
+        u8 vector = handler->GetInterruptVector();
+#ifdef CTOS_TARGET_X86_64
+        IoApic::SetGsiRedirect(cpuid, vector, route->Gsi, flags, true);
+        return true;
+#endif
+
         return false;
     }
 
-    bool Device::MsiSet(u64 cpuid, u16 vector, u16 index) { return false; }
-    bool Device::MsiXSet(u64 cpuid, u16 vector, u16 index) { return false; }
+    bool Device::MsiSet(u64 cpuid, u16 vector, u16 index)
+    {
+        if (!m_MsiSupported) return false;
 
-    u32  Device::ReadAt(u32 offset, i32 accessSize) const
+        if (index == u16(-1)) index = 0;
+        MsiControl control;
+        u16*       dest = reinterpret_cast<u16*>(&control);
+        *dest           = ReadAt(m_MsiOffset + 0x02, 2);
+        Assert((1 << control.Mmc) < 32);
+
+        MsiData    data;
+        MsiAddress address;
+        data.Vector           = vector;
+        data.DeliveryMode     = 0;
+
+        address.BaseAddress   = 0xfee;
+        address.DestinationID = cpuid;
+
+        dest                  = reinterpret_cast<u16*>(&address);
+        WriteAt(m_MsiOffset + 0x04, *dest, 2);
+        dest = reinterpret_cast<u16*>(&data);
+        WriteAt(m_MsiOffset + (control.C64 ? 0x0c : 0x08), *dest, 2);
+
+        control.MsiE = 1;
+        control.Mme  = 0b000;
+
+        dest         = reinterpret_cast<u16*>(&control);
+        WriteAt(m_MsiOffset + 0x02, *dest, 2);
+
+        return true;
+    }
+    bool Device::MsiXSet(u64 cpuid, u16 vector, u16 index)
+    {
+        // TODO(v1tr10l7): MsiX
+        return false;
+    }
+
+    u32 Device::ReadAt(u32 offset, i32 accessSize) const
     {
         auto* controller = GetHostController(m_Address.Domain);
         return controller->Read(m_Address, offset, accessSize);

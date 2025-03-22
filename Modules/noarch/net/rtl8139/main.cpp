@@ -6,6 +6,7 @@
  */
 #include "RTL8139.hpp"
 
+#include <Arch/CPU.hpp>
 #include <Library/Module.hpp>
 
 namespace RTL8139
@@ -71,6 +72,41 @@ namespace RTL8139
         PCI::DeviceID{PCI::DeviceID::ANY_ID, 0x8139, 0x13d1, 0xab06, 2, 0},
     };
 
+    bool AdapterCard::Send(u8* data, usize length)
+    {
+        usize bufferIndex = 0;
+        for (usize i = 0; i < 4; i++)
+        {
+            auto potentialBuffer = (m_TransmitNext + i) % 4;
+            auto status          = Read<TransmitStatus>(static_cast<Register>(
+                potentialBuffer
+                + std::to_underlying(Register::eTransmitStatus0)));
+            if (status.Own == 1)
+            {
+                bufferIndex = potentialBuffer;
+                goto skip;
+            }
+        }
+        return false;
+
+    skip:
+        auto& transmit = m_TransmitBuffers[bufferIndex];
+        m_TransmitNext = (bufferIndex + 1) % 4;
+
+        std::memcpy(transmit.As<void>(), data, length);
+        if (auto left = TRANSMIT_BUFFER_SIZE - length; left > 0)
+            std::memset(transmit.Offset<Pointer>(length).As<void*>(), 0, left);
+
+        Register transmitStatusReg = static_cast<Register>(
+            bufferIndex + std::to_underlying(Register::eTransmitStatus0));
+        auto status = Read<TransmitStatus>(transmitStatusReg);
+        status.Size = length;
+        status.Own  = 0;
+        Write<TransmitStatus>(transmitStatusReg, status);
+
+        return true;
+    }
+
     AdapterCard::AdapterCard(PCI::DeviceAddress& addr)
         : PCI::Device(addr)
     {
@@ -80,9 +116,18 @@ namespace RTL8139
         PCI::Bar bar0 = GetBar(0);
         PCI::Bar bar1 = GetBar(1);
         PCI::Bar bar2 = GetBar(2);
+        PCI::Bar bar3 = GetBar(3);
+        PCI::Bar bar4 = GetBar(4);
+        PCI::Bar bar5 = GetBar(5);
 
-        m_Base        = bar0.Address;
-        m_IoBase      = bar1.IsMMIO ? bar1.Address : bar2.Address;
+        if (bar0.IsMMIO) m_Base = bar0.Address.ToHigherHalf<Pointer>();
+        else if (bar1.IsMMIO) m_Base = bar1.Address.ToHigherHalf<Pointer>();
+        else if (bar2.IsMMIO) m_Base = bar2.Address.ToHigherHalf<Pointer>();
+        else if (bar3.IsMMIO) m_Base = bar3.Address.ToHigherHalf<Pointer>();
+        else if (bar4.IsMMIO) m_Base = bar4.Address.ToHigherHalf<Pointer>();
+        else if (bar5.IsMMIO) m_Base = bar5.Address.ToHigherHalf<Pointer>();
+        m_IoBase
+            = bar1.IsMMIO ? bar1.Address.ToHigherHalf<Pointer>() : bar2.Address;
 
         auto command  = Read<Command>(Register::eCommand);
         command.Reset = true;
@@ -178,9 +223,10 @@ namespace RTL8139
         interruptMask.SystemError   = true;
         Write<InterruptMask>(Register::eInterruptMask, interruptMask);
 
-        // if (!RegisterIrq(CPU::GetBspID(), [&] { irqHandler(); })
-        //     )
-        //     LogError("");
+        Delegate<void()> delegate;
+        delegate.BindLambda([&]() { HandleInterrupt(); });
+        if (!RegisterIrq(CPU::GetCurrent()->LapicID, delegate))
+            LogError("RTL8139: Failed to register interrupt handler");
 
         InterruptStatus ack;
         ack.Rok         = true;
@@ -194,13 +240,13 @@ namespace RTL8139
         ack.SystemError = true;
         Write<InterruptStatus>(Register::eInterruptStatus, ack);
 
+        SendCommand(Bit(10), false);
         LogInfo("RTL8139: MAC address: {}", m_MacAddress);
     }
 
     ErrorOr<void> ProbeDevice(PCI::DeviceAddress&  address,
                               const PCI::DeviceID& id)
     {
-        return {};
         LogTrace("RTL8139: Detected pci nic device");
         auto nic = new AdapterCard(address);
 

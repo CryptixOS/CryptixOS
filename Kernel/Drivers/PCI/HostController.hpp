@@ -14,6 +14,11 @@
 #include <functional>
 #include <unordered_map>
 
+#include <uacpi/resources.h>
+#include <uacpi/types.h>
+#include <uacpi/uacpi.h>
+#include <uacpi/utilities.h>
+
 namespace PCI
 {
     using Enumerator = Delegate<bool(const DeviceAddress&)>;
@@ -25,21 +30,33 @@ namespace PCI
             : m_Domain(domain)
             , m_Address(address)
         {
-            if (m_Address)
-            {
-                m_AccessMechanism = new ECAM(m_Address, m_Domain.BusStart);
-                return;
-            }
-
-            m_AccessMechanism = new LegacyAccessMechanism();
-            Assert(m_AccessMechanism);
+            Initialize();
         }
 
-        inline const Domain& GetDomain() const { return m_Domain; }
+        void InitializeIrqRoutes();
 
-        bool                 EnumerateDevices(Enumerator enumerator);
+        struct IrqRoute
+        {
+            u64  Gsi;
+            i32  Device;
+            i32  Function;
+            u8   Pin;
+            bool EdgeTriggered;
+            bool ActiveHigh;
+        };
 
-        u32 Read(const DeviceAddress& dev, u32 offset, i32 accessSize)
+        inline const Domain&   GetDomain() const { return m_Domain; }
+        inline const auto&     GetIrqRoutes() const { return s_IrqRoutes; }
+        inline const IrqRoute* FindIrqRoute(i32 device, u8 pin) const
+        {
+            for (const auto& entry : s_IrqRoutes)
+                if (entry.Device == device && entry.Pin == pin) return &entry;
+            return nullptr;
+        }
+
+        bool EnumerateDevices(Enumerator enumerator);
+
+        u32  Read(const DeviceAddress& dev, u32 offset, i32 accessSize)
         {
             Assert(m_AccessMechanism);
             return m_AccessMechanism->Read(dev, offset, accessSize);
@@ -68,10 +85,15 @@ namespace PCI
         Domain                                   m_Domain;
         AccessMechanism*                         m_AccessMechanism = nullptr;
         PM::Pointer                              m_Address;
+        uacpi_namespace_node*                    m_RootNode;
+
+        static std::vector<IrqRoute>             s_IrqRoutes;
 
         std::unordered_map<uintptr_t, uintptr_t> m_MappedBuses;
 
         uintptr_t GetAddress(const DeviceAddress& address, u64 offset);
+
+        void      Initialize();
 
         bool      EnumerateRootBus(Enumerator enumerator);
         bool      EnumerateBus(u8 bus, Enumerator enumerator);
