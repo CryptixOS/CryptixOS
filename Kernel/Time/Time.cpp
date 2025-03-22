@@ -39,9 +39,9 @@ namespace Time
         std::vector<HardwareTimer*> s_HardwareTimers;
         HardwareTimer*              s_SchedulerTimer = nullptr;
 
-        std::optional<i64>          s_BootTime       = std::nullopt;
-        timespec                    s_RealTime;
-        timespec                    s_Monotonic;
+        Timestep                    s_BootTime;
+        Timestep                    s_RealTime;
+        Timestep                    s_Monotonic;
 
         std::deque<Timer*>          s_ArmedTimers;
         Spinlock                    s_TimersLock;
@@ -68,8 +68,12 @@ namespace Time
     void Initialize()
     {
         s_BootTime = BootInfo::GetDateAtBoot();
-        DateTime dateAtBoot(s_BootTime.value());
+        DateTime dateAtBoot(s_BootTime);
         LogInfo("Time: Boot Date: {}", dateAtBoot);
+
+        auto now    = static_cast<usize>(Arch::GetEpoch());
+        s_RealTime  = now * 1'000'000'000;
+        s_Monotonic = s_RealTime;
 
         LogTrace("Time: Probing available timers...");
         Arch::ProbeTimers(s_HardwareTimers);
@@ -84,11 +88,30 @@ namespace Time
 
     HardwareTimer* GetSchedulerTimer() { return s_SchedulerTimer; }
 
-    usize          GetEpoch() { return Arch::GetEpoch(); }
-    timespec       GetReal() { return s_RealTime; }
-    timespec       GetMonotonic() { return s_Monotonic; }
+    Timestep       GetBootTime() { return s_BootTime; }
+    Timestep       GetTimeSinceBoot() { return GetRealTime() - s_BootTime; }
+    Timestep       GetRealTime() { return s_RealTime; }
+    Timestep       GetMonotonicTime() { return s_Monotonic; }
 
-    ErrorOr<void>  NanoSleep(usize ns)
+    timespec       GetReal()
+    {
+        timespec real;
+        real.tv_sec  = s_RealTime.Seconds();
+        real.tv_nsec = s_RealTime.Nanoseconds();
+
+        return real;
+    }
+    timespec GetMonotonic()
+    {
+
+        timespec mono;
+        mono.tv_sec  = s_Monotonic.Seconds();
+        mono.tv_nsec = s_Monotonic.Nanoseconds();
+
+        return mono;
+    }
+
+    ErrorOr<void> NanoSleep(usize ns)
     {
         isize    ins      = static_cast<isize>(ns);
 
@@ -119,8 +142,8 @@ namespace Time
 
     void Tick(usize ns)
     {
-        s_RealTime.tv_nsec += ns;
-        s_Monotonic.tv_nsec += ns;
+        s_RealTime += ns;
+        s_Monotonic += ns;
 
         if (s_TimersLock.TestAndAcquire())
         {
