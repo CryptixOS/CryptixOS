@@ -192,9 +192,10 @@ namespace ELF
     void Image::LoadSymbols()
     {
         ElfDebugLog("ELF: Loading symbols...");
-        Assert(m_SymbolSectionIndex.has_value());
-        Assert(m_StringSectionIndex.has_value());
-        if (m_SymbolSectionIndex.value() > m_Sections.size()) return;
+        if (!m_SymbolSectionIndex.has_value()) return;
+        // Assert(m_SymbolSectionIndex.has_value());
+        if (!m_StringSectionIndex.has_value()) return;
+        if (m_SymbolSectionIndex.value() >= m_Sections.size()) return;
 
         auto& section = m_Sections[m_SymbolSectionIndex.value()];
         if (section.Size <= 0 || section.EntrySize == 0) return;
