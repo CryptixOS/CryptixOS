@@ -218,10 +218,10 @@ namespace ACPI
 
     void  Reboot()
     {
-        // TODO(v1tr10l7): ACPI::Reboot
-        return;
+        if (!s_FADT) return;
         LogTrace("ACPI: Attempting to reboot...");
-        LogInfo("");
+
+        s_FADT->ResetReg.Write(s_FADT->ResetValue);
     }
 
 } // namespace ACPI

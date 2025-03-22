@@ -6,7 +6,12 @@
  */
 #pragma once
 
+#ifdef CTOS_TARGET_X86_64
+    #include <Arch/x86_64/IO.hpp>
+#endif
+
 #include <Common.hpp>
+#include <Memory/MMIO.hpp>
 
 #include <magic_enum/magic_enum.hpp>
 
@@ -44,7 +49,7 @@ namespace ACPI
         AddressSpace AddressSpaceID;
         u8           RegisterBitWidth;
         u8           RegisterBitOffset;
-        u8           Reserved;
+        u8           AccessSize;
         u64          Address;
 
         void         Write(u32 value)
@@ -52,7 +57,28 @@ namespace ACPI
             switch (AddressSpaceID)
             {
                 case AddressSpace::eSystemMemory:
+                    switch (AccessSize)
+                    {
+                        case 1: return MMIO::Write<u8>(Address, value);
+                        case 2: return MMIO::Write<u16>(Address, value);
+                        case 3: return MMIO::Write<u32>(Address, value);
+                        case 4: return MMIO::Write<u64>(Address, value);
+
+                        default: AssertNotReached();
+                    }
                 case AddressSpace::eSystemIO:
+#ifdef CTOS_TARGET_X86_64
+                    switch (RegisterBitWidth)
+                    {
+                        case 8: return IO::Out<u8>(Address, value);
+                        case 16: return IO::Out<u16>(Address, value);
+                        case 32: return IO::Out<u32>(Address, value);
+
+                        default: AssertNotReached();
+                    }
+#else
+                    AssertNotReached();
+#endif
                 case AddressSpace::ePciConfigurationSpace:
                 case AddressSpace::eEmbeddedController:
                 case AddressSpace::eSMBus:
@@ -64,7 +90,7 @@ namespace ACPI
                 case AddressSpace::ePlatformCommunicationChannel:
 
                 default:
-                    Panic(
+                    LogWarn(
                         "GenericAddressStructure: Writing to '{}' address "
                         "space is not implemented!",
                         magic_enum::enum_name(AddressSpaceID).data() + 1);
