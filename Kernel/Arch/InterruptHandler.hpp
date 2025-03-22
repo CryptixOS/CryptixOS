@@ -9,6 +9,7 @@
 #include <Common.hpp>
 
 #include <Arch/InterruptManager.hpp>
+#include <Prism/Delegate.hpp>
 
 #include <functional>
 #include <optional>
@@ -29,7 +30,11 @@ class InterruptHandler
         return m_Reserved = true;
     }
 
-    inline void SetHandler(InterruptRoutine handler) { m_Routine = handler; }
+    template <typename F>
+    inline void SetHandler(F handler)
+    {
+        m_Routine.BindLambda([handler](CPUContext* ctx) { handler(ctx); });
+    }
 
     inline void SetInterruptVector(u8 interruptVector)
     {
@@ -49,7 +54,7 @@ class InterruptHandler
     }
 
   private:
-    std::optional<u8> m_InterruptVector = 0;
-    InterruptRoutine  m_Routine         = nullptr;
-    bool              m_Reserved        = false;
+    std::optional<u8>           m_InterruptVector = 0;
+    Delegate<void(CPUContext*)> m_Routine         = nullptr;
+    bool                        m_Reserved        = false;
 };
