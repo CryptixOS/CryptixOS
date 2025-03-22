@@ -56,17 +56,19 @@ void kernelThread()
     Scheduler::InitializeProcFs();
 
     PCI::Initialize();
-    TTY::Initialize();
-    MemoryDevices::Initialize();
-
-    Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1", "/mnt", "echfs"));
-
     if (ACPI::IsAvailable())
     {
         ACPI::Enable();
         ACPI::LoadNameSpace();
         ACPI::EnumerateDevices();
     }
+    PCI::InitializeIrqRoutes();
+
+    TTY::Initialize();
+    MemoryDevices::Initialize();
+
+    Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1", "/mnt", "echfs"));
+
     auto kernelExecutable = BootInfo::GetExecutableFile();
     auto header   = reinterpret_cast<ELF::Header*>(kernelExecutable->address);
     auto sections = reinterpret_cast<ELF::SectionHeader*>(
