@@ -8,8 +8,8 @@
 
 #include <Memory/PMM.hpp>
 
-#include <Prism/Utility/Math.hpp>
 #include <Prism/Spinlock.hpp>
+#include <Prism/Utility/Math.hpp>
 
 enum class PageAttributes : isize
 {
@@ -172,6 +172,18 @@ namespace VirtualMemoryManager
 
     void      SaveCurrentPageMap(PageMap& out);
     void      LoadPageMap(PageMap& pageMap, bool);
+
+    Pointer   MapIoRegion(PhysAddr phys, usize size, bool write = true);
+
+    Pointer   MapIoRegion(PhysAddr phys, usize size, bool write,
+                          usize alignment = 0);
+    template <typename T>
+    inline T* MapIoRegion(PhysAddr phys, bool write = true)
+    {
+        constexpr usize alignment = alignof(T);
+        return MapIoRegion(phys, sizeof(T) + alignment, write, alignment)
+            .As<T>();
+    }
 } // namespace VirtualMemoryManager
 
 namespace VMM = VirtualMemoryManager;
