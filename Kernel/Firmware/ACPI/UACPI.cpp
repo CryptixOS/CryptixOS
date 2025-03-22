@@ -28,8 +28,8 @@
 
 #include <Time/Time.hpp>
 
-#include <Prism/Utility/Math.hpp>
 #include <Prism/Spinlock.hpp>
+#include <Prism/Utility/Math.hpp>
 
 #include <uacpi/kernel_api.h>
 
@@ -300,7 +300,7 @@ namespace uACPI
 
         uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void)
         {
-            return Time::GetEpoch() - BootInfo::GetDateAtBoot();
+            return Time::GetTimeSinceBoot();
         }
         void uacpi_kernel_stall(uacpi_u8 usec)
         {
