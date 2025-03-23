@@ -178,9 +178,9 @@ namespace VirtualMemoryManager
     Pointer   MapIoRegion(PhysAddr phys, usize size, bool write,
                           usize alignment = 0);
     template <typename T>
-    inline T* MapIoRegion(PhysAddr phys, bool write = true)
+    inline T* MapIoRegion(PhysAddr phys, bool write = true,
+                          usize alignment = alignof(T))
     {
-        constexpr usize alignment = alignof(T);
         return MapIoRegion(phys, sizeof(T) + alignment, write, alignment)
             .As<T>();
     }
