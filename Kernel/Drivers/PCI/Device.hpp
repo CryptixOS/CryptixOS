@@ -22,13 +22,17 @@ namespace PCI
 
     struct Bar
     {
-        PM::Pointer Address      = 0;
-        usize       Size         = 0;
+        Pointer   Base         = 0;
+        Pointer   Address      = 0;
+        usize     Size         = 0;
 
-        bool        IsMMIO       = false;
-        bool        DisableCache = false;
+        bool      IsMMIO       = false;
+        bool      DisableCache = false;
+        bool      Is64Bit      = false;
 
-        constexpr   operator bool() const { return Address != nullptr; }
+        Pointer   Map(usize alignment);
+
+        constexpr operator bool() const { return Address != nullptr; }
     };
 
     struct DeviceAddress
@@ -133,13 +137,11 @@ namespace PCI
         u32 Data;
         u32 Control;
     };
-    class Device : public ::Device
+    class Device
     {
       public:
-        Device(const DeviceAddress& address, DriverType major = DriverType(0),
-               DeviceType minor = DeviceType(0))
-            : ::Device(major, minor)
-            , m_Address(address)
+        Device(const DeviceAddress& address)
+            : m_Address(address)
         {
             m_ID.VendorID    = GetVendorID();
             m_ID.ID          = Read<u16>(RegisterOffset::eDeviceID);
@@ -205,24 +207,9 @@ namespace PCI
             u32 offset = index * 4 + std::to_underlying(RegisterOffset::eBar0);
             return Read<u16>(static_cast<RegisterOffset>(offset));
         }
-        Bar                      GetBar(u8 index);
+        Bar  GetBar(u8 index);
 
-        virtual std::string_view GetName() const noexcept override
-        {
-            return "No Device";
-        }
-
-        virtual isize Read(void* dest, off_t offset, usize bytes) override
-        {
-            return -1;
-        }
-        virtual isize Write(const void* src, off_t offset, usize bytes) override
-        {
-            return -1;
-        }
-        virtual i32 IoCtl(usize request, uintptr_t argp) override { return -1; }
-
-        bool        RegisterIrq(u64 cpuid, Delegate<void()> handler);
+        bool RegisterIrq(u64 cpuid, Delegate<void()> handler);
 
       protected:
         Spinlock         m_Lock;

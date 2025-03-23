@@ -16,25 +16,29 @@ namespace NVMe
     using Prism::Pointer;
 
     Queue::Queue(Pointer crAddress, u16 qid, u32 doorbellShift, u64 depth)
+        : m_ID(qid)
+        , m_Depth(depth)
     {
+        auto submitDbOffset
+            = PMM::PAGE_SIZE + (m_ID * 2) * (4 << doorbellShift);
+        auto completeDbOffset
+            = PMM::PAGE_SIZE + (m_ID * 2 + 1) * (4 << doorbellShift);
 
-        m_Submit         = new volatile Submission[depth];
-        m_SubmitDoorbell = reinterpret_cast<volatile u32*>(
-            crAddress.Offset<u64>(PMM::PAGE_SIZE)
-            + (2 * qid * (4 << doorbellShift)));
-        m_SubmitHead       = 0;
-        m_SubmitTail       = 0;
+        m_Submit = new volatile Submission[depth];
+        m_SubmitDoorbell
+            = crAddress.Offset<Pointer>(submitDbOffset).As<volatile u32>();
 
-        m_Complete         = new volatile Completion[depth];
-        m_CompleteDoorbell = reinterpret_cast<volatile u32*>(
-            crAddress.Offset<u64>(PMM::PAGE_SIZE)
-            + ((2 * qid + 1) * (4 << doorbellShift)));
+        m_SubmitHead = 0;
+        m_SubmitTail = 0;
+
+        m_Complete   = new volatile Completion[depth];
+
+        m_CompleteDoorbell
+            = crAddress.Offset<Pointer>(completeDbOffset).As<volatile u32>();
         m_CompleteVec   = 0;
         m_CompleteHead  = 0;
         m_CompletePhase = 1;
 
-        m_Depth         = depth;
-        m_ID            = qid;
         m_CmdId         = 0;
         m_PhysRegPgs    = nullptr;
     }
@@ -62,14 +66,12 @@ namespace NVMe
         status >>= 1;
         AssertFmt(!status, "NVMe: Command error: {:#x}", status);
 
-        m_CompleteHead++;
-        if (m_CompleteHead == m_Depth)
-        {
-            m_CompleteHead  = 0;
-            m_CompletePhase = !m_CompletePhase;
-        }
+        currentHead = (currentHead + 1) % m_Depth;
+        if (currentHead == 0) currentPhase = !currentPhase;
 
         *(m_CompleteDoorbell) = currentHead;
+        m_CompleteHead        = currentHead;
+        m_CompletePhase       = currentPhase;
         return status;
     }
 
@@ -80,9 +82,8 @@ namespace NVMe
         uintptr_t dest = reinterpret_cast<uintptr_t>(&m_Submit[currentTail]);
 
         std::memcpy(reinterpret_cast<u8*>(dest), cmd, sizeof(Submission));
-        currentTail++;
+        currentTail         = (currentTail + 1) % m_Depth;
 
-        if (currentTail == m_Depth) currentTail = 0;
         *(m_SubmitDoorbell) = currentTail;
         m_SubmitTail        = currentTail;
     }

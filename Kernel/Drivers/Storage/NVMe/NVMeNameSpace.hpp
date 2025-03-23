@@ -21,7 +21,7 @@ namespace NVMe
         u16 MetaSize;
         u8  DataSize;
         u8  RelativePerformance;
-    } __attribute__((packed));
+    };
     struct NameSpaceInfo
     {
         u64 TotalBlockCount;
@@ -51,7 +51,7 @@ namespace NVMe
         LBA LbaFormatUpper[16];
         u64 Unused4[24];
         u8  VendorSpecific[3712];
-    } __attribute__((packed));
+    };
 
     struct CachedBlock
     {

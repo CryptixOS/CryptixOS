@@ -4,6 +4,10 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Arch/CPU.hpp>
+#include <Arch/InterruptHandler.hpp>
+#include <Arch/InterruptManager.hpp>
+
 #include <Drivers/Storage/NVMe/NVMeController.hpp>
 #include <Drivers/Storage/NVMe/NVMeNameSpace.hpp>
 #include <Drivers/Storage/StorageDevicePartition.hpp>
@@ -56,6 +60,22 @@ namespace NVMe
 
         m_PartitionTable.Load(*this);
 
+        for (usize i = 0; i < m_IoQueue->GetDepth(); i++)
+        {
+            break;
+            auto handler = InterruptManager::AllocateHandler();
+            handler->Reserve();
+            /*
+            if (!MsiXSet(CPU::GetCurrent()->LapicID,
+                         handler->GetInterruptVector(), -1))
+            {
+                if (i == 0)
+                    LogError(
+                        "Could not install any irq handlers for io queues");
+                break;
+            }*/
+        }
+
         usize i = 1;
         for (const auto& entry : m_PartitionTable)
         {
@@ -76,6 +96,7 @@ namespace NVMe
     isize NameSpace::Read(void* dest, off_t offset, usize bytes)
     {
         ScopedLock guard(m_Lock);
+
         for (usize progress = 0; progress < bytes;)
         {
             u64 sector = (offset + progress) / m_CacheBlockSize;
@@ -163,7 +184,6 @@ namespace NVMe
                       .FromHigherHalf<u64>();
         }
         else if (shouldUsePrp)
-
             cmd.Prp2 = Pointer(dest)
                            .Offset<Pointer>(PMM::PAGE_SIZE)
                            .FromHigherHalf<u64>();
@@ -185,11 +205,14 @@ namespace NVMe
     }
     isize NameSpace::CacheBlock(u64 block)
     {
-        i32  target = 0;
+        i32 target = 0;
 
-        bool found  = false;
         for (target = 0; target < 512; target++)
-            if (!m_Cache[target].Status) found = true;
+            if (!m_Cache[target].Status)
+            {
+                m_Cache[target].Cache = new u8[m_CacheBlockSize];
+                goto write;
+            }
 
         if (m_Overwritten == 512)
         {
@@ -198,7 +221,7 @@ namespace NVMe
         }
         else target = m_Overwritten++;
 
-        if (found) m_Cache[target].Cache = new u8[m_CacheBlockSize];
+    write:
         auto lba = ReadWriteLba(m_Cache[target].Cache,
                                 (m_CacheBlockSize / m_LbaSize) * block,
                                 m_CacheBlockSize / m_LbaSize, 0);

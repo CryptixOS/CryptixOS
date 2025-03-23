@@ -96,7 +96,7 @@ namespace NVMe
             DeleteQueue           DeleteQueue;
             Abort                 Abort;
         };
-    } __attribute__((packed));
+    };
     struct Completion
     {
         u32 Result;
@@ -105,19 +105,21 @@ namespace NVMe
         u16 SubmitQueueID;
         u16 CommandID;
         u16 Status;
-    } __attribute__((packed));
+    };
 
     class NameSpace;
     class Queue
     {
       public:
         Queue() = default;
-        Queue(PM::Pointer crAddress, u16 qid, u32 doorbellShift, u64 depth);
-        Queue(PM::Pointer crAddress, NameSpace& ns, u16 qid, u32 doorbellShift,
+        Queue(Pointer crAddress, u16 qid, u32 doorbellShift, u64 depth);
+        Queue(Pointer crAddress, NameSpace& ns, u16 qid, u32 doorbellShift,
               u64 depth);
 
         inline volatile Submission* GetSubmit() const { return m_Submit; }
         inline volatile Completion* GetComplete() const { return m_Complete; }
+
+        inline usize                GetDepth() const { return m_Depth; }
 
         inline u32                  GetCommandID() const { return m_CmdId; }
         inline u64*                 GetPhysRegPages() { return m_PhysRegPgs; }
@@ -126,17 +128,17 @@ namespace NVMe
         void                        Submit(Submission* cmd);
 
       private:
+        u16                  m_ID;
+        u16                  m_Depth;
         volatile Submission* m_Submit;
         volatile Completion* m_Complete;
         volatile u32*        m_SubmitDoorbell;
         volatile u32*        m_CompleteDoorbell;
-        u16                  m_Depth;
         u16                  m_CompleteVec;
         u16                  m_SubmitHead;
         u16                  m_SubmitTail;
         u16                  m_CompleteHead;
         u8                   m_CompletePhase;
-        u16                  m_ID;
         u32                  m_CmdId;
         u64*                 m_PhysRegPgs;
     };
