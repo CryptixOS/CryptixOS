@@ -32,14 +32,21 @@ TTY::TTY(Terminal* terminal, usize minor)
     if (!s_CurrentTTY) s_CurrentTTY = this;
 
     std::memset(&m_Termios, 0, sizeof(m_Termios));
-    m_Termios.c_iflag        = TTYDEF_IFLAG;
-    m_Termios.c_oflag        = TTYDEF_OFLAG;
-    m_Termios.c_lflag        = TTYDEF_LFLAG;
-    m_Termios.c_cflag        = TTYDEF_CFLAG;
-    m_Termios.c_ispeed       = TTYDEF_SPEED;
-    m_Termios.c_ospeed       = TTYDEF_SPEED;
+    // m_Termios.c_iflag        = TTYDEF_IFLAG;
+    m_Termios.c_iflag = BRKINT | IGNPAR | ICRNL | IXON | IMAXBEL;
+    // m_Termios.c_oflag        = TTYDEF_OFLAG;
+    m_Termios.c_oflag = OPOST | ONLCR;
+    // m_Termios.c_lflag        = TTYDEF_LFLAG;
+    m_Termios.c_lflag = ISIG | ICANON | ECHO | ECHOE | ECHOK | ECHOCTL | ECHOKE;
+    // m_Termios.c_cflag        = TTYDEF_CFLAG;
+    m_Termios.c_cflag = CS8 | CREAD;
+    m_Termios.c_ispeed    = TTYDEF_SPEED;
+    m_Termios.c_ospeed    = TTYDEF_SPEED;
 
-    m_Termios.c_cc[VINTR]    = CINTR;
+    m_Termios.c_cc[VINTR] = CTRL('C');
+    m_Termios.c_cc[VEOF]  = CTRL('D');
+    m_Termios.c_cc[VSUSP] = CTRL('Z');
+    /*m_Termios.c_cc[VINTR]    = CINTR;
     m_Termios.c_cc[VQUIT]    = CQUIT;
     m_Termios.c_cc[VERASE]   = CERASE;
     m_Termios.c_cc[VKILL]    = CKILL;
@@ -55,7 +62,7 @@ TTY::TTY(Terminal* terminal, usize minor)
     m_Termios.c_cc[VDISCARD] = CDISCARD;
     m_Termios.c_cc[VWERASE]  = CWERASE;
     m_Termios.c_cc[VLNEXT]   = CLNEXT;
-    m_Termios.c_cc[VEOL2]    = CEOL2;
+    m_Termios.c_cc[VEOL2]    = CEOL2;*/
 }
 
 void TTY::PutChar(char c)
@@ -106,15 +113,14 @@ isize TTY::Read(void* buffer, off_t offset, usize bytes)
     if (IsCanonicalMode())
     {
         m_OnAddLine.Await();
-        ScopedLock         guard(m_Lock);
 
+        ScopedLock         guard(m_Lock);
         const std::string& line  = m_LineQueue.pop_front_element();
         const usize        count = std::min(bytes, line.size());
         return line.copy(reinterpret_cast<char*>(buffer), count);
     }
 
     ScopedLock guard(m_Lock);
-
     isize      nread = 0;
     char*      dest  = reinterpret_cast<char*>(buffer);
     for (; bytes > 0 && !m_InputBuffer.empty(); nread++, dest++)
@@ -143,32 +149,32 @@ isize TTY::Write(const void* src, off_t offset, usize bytes)
 
 i32 TTY::IoCtl(usize request, uintptr_t argp)
 {
+    LogInfo("Request: {:#x}", request);
     if (!argp) return_err(-1, EFAULT);
     Process* current = Process::GetCurrent();
 
-    if (!m_Terminal->GetContext()) return_err(-1, ENOTTY);
     switch (request)
     {
         case TCGETS:
         {
             std::memcpy(reinterpret_cast<void*>(argp), &m_Termios,
-                        sizeof(termios2));
+                        sizeof(m_Termios));
             break;
         }
         case TCSETS:
             std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
-                        sizeof(termios2));
+                        sizeof(m_Termios));
             break;
         case TCSETSW:
             // TODO(v1tr10l7): Drain the output buffer
             std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
-                        sizeof(termios2));
+                        sizeof(m_Termios));
             break;
         case TCSETSF:
             // TODO(v1tr10l7): Allow current output buffer to drain,
             //  and discard the input buffer
             std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
-                        sizeof(termios2));
+                        sizeof(m_Termios));
             break;
 
         case TCGETS2:
@@ -209,6 +215,7 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
 
         case TIOCGWINSZ:
         {
+            if (!m_Terminal->GetContext()) return_err(-1, EINVAL);
             winsize* windowSize = reinterpret_cast<winsize*>(argp);
 
             usize    columns, rows;
@@ -275,10 +282,10 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
 
         default:
             LogInfo("Request: {:#x}, argp: {}", request, argp);
-            return EINVAL;
+            return_err(-1, EINVAL);
     }
 
-    return no_error;
+    return 0;
 }
 
 void TTY::Initialize()
@@ -304,10 +311,12 @@ void TTY::Initialize()
 
     if (!s_TTYs.empty())
     {
-        VFS::MkNod(VFS::GetRootNode(), "/dev/tty0", 0666, s_TTYs[0]->GetID());
-        VFS::MkNod(VFS::GetRootNode(), "/dev/tty", 0666, s_TTYs[0]->GetID());
-        VFS::MkNod(VFS::GetRootNode(), "/dev/console", 0666,
+        // VFS::MkNod(VFS::GetRootNode(), "/dev/tty0", 0666,
+        // s_TTYs[0]->GetID());
+        VFS::MkNod(VFS::GetRootNode(), "/dev/tty", 0644 | S_IFCHR,
                    s_TTYs[0]->GetID());
+        // VFS::MkNod(VFS::GetRootNode(), "/dev/console", 0666,
+        //          s_TTYs[0]->GetID());
     }
 
     LogInfo("TTY: Initialized");

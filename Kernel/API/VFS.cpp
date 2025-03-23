@@ -84,6 +84,19 @@ namespace API::VFS
         if (!fd) return Error(EBADF);
         return fd->Truncate(length);
     }
+    ErrorOr<isize> SysGetCwd(char* buffer, usize size)
+    {
+        Process* process = Process::GetCurrent();
+
+        if (!buffer || size == 0) return Error(EINVAL);
+        if (!process->ValidateAddress(buffer, PROT_WRITE)) return Error(EFAULT);
+
+        std::string_view cwd = process->GetCWD();
+        if (size < cwd.length()) return Error(ERANGE);
+
+        cwd.copy(buffer, cwd.length());
+        return 0;
+    }
 
     ErrorOr<isize> SysRmDir(PathView path)
     {
@@ -131,6 +144,29 @@ namespace API::VFS
         size                           = std::min(size, symlinkTarget.size());
 
         return symlinkTarget.copy(out, size);
+    }
+    ErrorOr<isize> SysChModAt(i32 fdNum, PathView path, mode_t mode)
+    {
+        auto   process = Process::GetCurrent();
+
+        INode* parent  = process->GetRootNode();
+        if (!path.IsAbsolute())
+        {
+            if (fdNum == AT_FDCWD)
+            {
+                auto nodeOrError = ::VFS::ResolvePath(process->GetCWD());
+                if (nodeOrError) parent = nodeOrError.value();
+            }
+            else
+            {
+                // TODO(v1tr10l7): use dirFd
+            }
+        }
+
+        auto node = std::get<1>(::VFS::ResolvePath(parent, path));
+        if (!node) return Error(ENOENT);
+
+        return node->ChMod(mode);
     }
 
     ErrorOr<isize> SysUTime(PathView path, const utimbuf* out)
@@ -286,22 +322,6 @@ namespace Syscall::VFS
                 return std::errno_t(EINVAL);
         }
 
-        return 0;
-    }
-    ErrorOr<i32> SysGetCwd(Arguments& args)
-    {
-        char*    buffer  = args.Get<char*>(0);
-        usize    size    = args.Get<usize>(1);
-
-        Process* process = Process::GetCurrent();
-
-        if (!buffer || size == 0) return Error(EINVAL);
-        if (!process->ValidateAddress(buffer, PROT_READ)) return Error(EFAULT);
-
-        std::string_view cwd = process->GetCWD();
-        if (size < cwd.length()) return Error(ERANGE);
-
-        cwd.copy(buffer, cwd.length());
         return 0;
     }
     ErrorOr<i32> SysChDir(Arguments& args)

@@ -23,6 +23,7 @@ namespace API::VFS
 
     ErrorOr<isize> SysTruncate(PathView path, off_t length);
     ErrorOr<isize> SysFTruncate(i32 fdNum, off_t length);
+    ErrorOr<isize> SysGetCwd(char* buffer, usize size);
 
     ErrorOr<isize> SysRmDir(PathView path);
     ErrorOr<isize> SysReadLink(PathView path, char* out, usize size);
@@ -43,13 +44,12 @@ namespace Syscall::VFS
     ErrorOr<i32>   SysDup2(Syscall::Arguments& args);
 
     ErrorOr<i32>   SysFcntl(Syscall::Arguments& args);
-    ErrorOr<i32>   SysGetCwd(Syscall::Arguments& args);
     ErrorOr<i32>   SysChDir(Syscall::Arguments& args);
     ErrorOr<i32>   SysFChDir(Syscall::Arguments& args);
     ErrorOr<i32>   SysMkDir(Syscall::Arguments& args);
 
-    [[clang::no_sanitize("alignment")]]
-    ErrorOr<i32> SysGetDents64(Syscall::Arguments& args);
+    [[clang::no_sanitize("alignment")]] ErrorOr<i32>
+                 SysGetDents64(Syscall::Arguments& args);
     ErrorOr<i32> SysOpenAt(Syscall::Arguments& args);
     ErrorOr<i32> SysMkDirAt(Syscall::Arguments& args);
     ErrorOr<i32> SysFStatAt(Syscall::Arguments& args);

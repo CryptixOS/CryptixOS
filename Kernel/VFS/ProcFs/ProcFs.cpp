@@ -33,25 +33,52 @@ INode* ProcFs::Mount(INode* parent, INode* source, INode* target,
 
     if (m_Root) VFS::RecursiveDelete(m_Root);
     m_Root = new ProcFsINode(parent, name, this, 0755 | S_IFDIR);
+    if (m_Root) m_MountedOn = target;
 
-    ProcFsProperty* property = new ProcFsProperty(
-        []() -> std::string
+    ProcFsProperty* mounts = new ProcFsProperty(
+        [](std::string& buffer)
         {
-            std::string ret;
-
             for (const auto& mountPoint : VFS::GetMountPoints())
             {
                 std::string_view mountPath = mountPoint.first;
                 Filesystem*      fs        = mountPoint.second;
 
-                ret += std::format("{} {} {} {}\n", fs->GetDeviceName(),
-                                   mountPath, fs->GetName(),
-                                   fs->GetMountFlagsString());
+                buffer += std::format("{} {} {} {}\n", fs->GetDeviceName(),
+                                      mountPath, fs->GetName(),
+                                      fs->GetMountFlagsString());
             }
-            return ret;
         });
-    m_Root->InsertChild(new ProcFsINode(m_Root, "mounts", this, 0755, property),
+    ProcFsProperty* cmdline = new ProcFsProperty(
+        [](std::string& buffer)
+        {
+            std::string_view kernelPath = BootInfo::GetExecutableFile()->path;
+            std::string_view cmdline    = BootInfo::GetKernelCommandLine();
+
+            buffer.reserve(kernelPath.size() + cmdline.size() + 10);
+
+            buffer += BootInfo::GetExecutableFile()->path;
+            buffer += " ";
+            buffer += BootInfo::GetKernelCommandLine();
+            buffer += "\n";
+        });
+    ProcFsProperty* filesystems = new ProcFsProperty(
+        [](std::string& buffer)
+        {
+            for (auto& [physical, fs] : VFS::GetFilesystems())
+            {
+                buffer += physical ? "     " : "nodev";
+                buffer += " ";
+                buffer += fs;
+                buffer += "\n";
+            }
+        });
+    m_Root->InsertChild(new ProcFsINode(m_Root, "mounts", this, 0755, mounts),
                         "mounts");
+    m_Root->InsertChild(new ProcFsINode(m_Root, "cmdline", this, 0755, cmdline),
+                        "cmdline");
+    m_Root->InsertChild(
+        new ProcFsINode(m_Root, "filesystems", this, 0755, filesystems),
+        "filesystems");
     m_MountedOn = target;
 
     return m_Root;

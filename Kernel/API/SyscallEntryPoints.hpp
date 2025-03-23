@@ -23,6 +23,7 @@ namespace Syscall
     ErrorOr<isize> SysMMap(Arguments& args);
     ErrorOr<isize> SysIoCtl(Arguments& args);
     ErrorOr<isize> SysAccess(Arguments& args);
+    ErrorOr<isize> SysPipe(Arguments& args);
     ErrorOr<isize> SysSchedYield(Arguments& args);
     ErrorOr<isize> SysDup(Arguments& args);
     ErrorOr<isize> SysDup2(Arguments& args);
@@ -43,6 +44,7 @@ namespace Syscall
     ErrorOr<isize> SysRmDir(Arguments& args);
     ErrorOr<isize> SysCreat(Arguments& args);
     ErrorOr<isize> SysReadLink(Arguments& args);
+    ErrorOr<isize> SysChMod(Arguments& args);
     ErrorOr<isize> SysUmask(Arguments& args);
     ErrorOr<isize> SysGetTimeOfDay(Arguments& args);
     ErrorOr<isize> SysGet_eUid(Arguments& args);

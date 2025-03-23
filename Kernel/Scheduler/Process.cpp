@@ -7,11 +7,13 @@
 #include <API/Posix/sys/wait.h>
 #include <Arch/CPU.hpp>
 
+#include <Prism/Utility/Math.hpp>
+
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-#include <Prism/Utility/Math.hpp>
+#include <VFS/Fifo.hpp>
 #include <VFS/FileDescriptor.hpp>
 
 #include <cctype>
@@ -171,7 +173,19 @@ ErrorOr<i32> Process::DupFd(i32 oldFdNum, i32 newFdNum, i32 flags)
     newFd = new FileDescriptor(oldFd, flags);
     return m_FdTable.Insert(newFd, newFdNum);
 }
-i32 Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
+i32            Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
+
+ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
+{
+    auto fifo     = new Fifo();
+    auto readerFd = fifo->Open(Fifo::Direction::eRead);
+    pipeFds[0]    = m_FdTable.Insert(readerFd);
+
+    auto writerFd = fifo->Open(Fifo::Direction::eWrite);
+    pipeFds[1]    = m_FdTable.Insert(writerFd);
+
+    return 0;
+}
 
 std::vector<std::string> SplitArguments(const std::string& str)
 {

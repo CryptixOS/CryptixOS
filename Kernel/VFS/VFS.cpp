@@ -13,6 +13,7 @@
 
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/EchFs/EchFs.hpp>
+#include <VFS/Fat32Fs/Fat32Fs.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/TmpFs/TmpFs.hpp>
@@ -26,7 +27,35 @@ namespace VFS
     static Spinlock s_Lock;
     static std::unordered_map<std::string_view, Filesystem*> s_MountPoints;
 
-    INode*                                                   GetRootNode()
+    Vector<std::pair<bool, std::string_view>>&               GetFilesystems()
+    {
+        static Vector<std::pair<bool, std::string_view>> s_Filesystems = {
+            {
+                false,
+                "tmpfs",
+            },
+            {
+                false,
+                "devtmpfs",
+            },
+            {
+                false,
+                "procfs",
+            },
+            {
+                true,
+                "echfs",
+            },
+            {
+                true,
+                "fat32fs",
+            },
+        };
+
+        return s_Filesystems;
+    }
+
+    INode* GetRootNode()
     {
         /*Thread* thread = CPU::GetCurrentThread();
         if (!thread) return s_RootNode;
@@ -47,7 +76,9 @@ namespace VFS
         else if (name == "devtmpfs") fs = new DevTmpFs(flags);
         else if (name == "procfs") fs = new ProcFs(flags);
         else if (name == "echfs") fs = new EchFs(flags);
+        else if (name == "fat32fs") fs = new Fat32Fs(flags);
 
+        if (!fs) LogError("VFS: No filesystem driver found for '{}'", name);
         return fs;
     }
 
@@ -103,7 +134,7 @@ namespace VFS
         }
 
         if (flags & O_EXCL && didExist) return Error(EEXIST);
-        node = node->Reduce(followSymlinks, false);
+        node = node->Reduce(followSymlinks, true);
         if (!node) return Error(ENOENT);
 
         if (node->IsSymlink()) return Error(ELOOP);
@@ -137,7 +168,7 @@ namespace VFS
         }
 
         auto currentNode
-            = parent == s_RootNode ? s_RootNode : parent->Reduce(false);
+            = parent == s_RootNode ? s_RootNode : parent->Reduce(false, true);
         if (!currentNode->Populate()) return {nullptr, nullptr, ""};
 
         if (path == "/" || path.IsEmpty())
@@ -174,10 +205,12 @@ namespace VFS
                 continue;
             }
 
+            currentNode = currentNode->Reduce(false, true);
+
             if (currentNode->GetChildren().contains(segment))
             {
-                auto node = currentNode->GetChildren()[segment]->Reduce(
-                    true, isLast ? automount : true);
+                auto node
+                    = currentNode->GetChildren()[segment]->Reduce(true, true);
                 if (!node->Populate()) return {nullptr, nullptr, ""};
 
                 auto getReal = [](INode* node) -> INode*
@@ -261,6 +294,7 @@ namespace VFS
         if (!fs)
         {
             errno = ENODEV;
+            LogError("VFS: Failed to create '{}' filesystem", fsName);
             return false;
         }
 
@@ -268,19 +302,42 @@ namespace VFS
         if (!sourcePath.IsEmpty())
         {
             sourceNode = std::get<1>(ResolvePath(s_RootNode, sourcePath));
-            if (!sourceNode) return false;
-            if (sourceNode->IsDirectory()) return_err(false, EISDIR);
+            if (!sourceNode)
+            {
+                LogError("VFS: Failed to resolve source path -> '{}'",
+                         sourcePath.Raw());
+                return false;
+            }
+            if (sourceNode->IsDirectory())
+            {
+                LogError("VFS: Source node is a directory -> '{}'",
+                         sourcePath.Raw());
+                return_err(false, EISDIR);
+            }
         }
         auto [nparent, node, basename] = ResolvePath(parent, target);
         bool   isRoot                  = (node == GetRootNode());
         INode* mountGate               = nullptr;
 
-        if (!node) goto fail;
+        if (!node)
+        {
+            LogError("VFS: Failed to resolve target path -> '{}'",
+                     target.Raw());
+            goto fail;
+        }
 
-        if (!isRoot && !node->IsDirectory()) return_err(false, ENOTDIR);
+        if (!isRoot && !node->IsDirectory())
+        {
+            LogError("VFS: '{}' target is not a directory", target.Raw());
+            return_err(false, ENOTDIR);
+        }
 
         mountGate = fs->Mount(parent, sourceNode, node, basename, data);
-        if (!mountGate) goto fail;
+        if (!mountGate)
+        {
+            LogError("VFS: Failed to mount '{}' fs", fsName);
+            goto fail;
+        }
 
         node->mountGate = mountGate;
 

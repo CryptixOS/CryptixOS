@@ -66,6 +66,6 @@ class Filesystem
     INode*             m_MountedOn      = nullptr;
     void*              m_MountData      = nullptr;
 
-    std::atomic<ino_t> m_NextInodeIndex = 0;
+    std::atomic<ino_t> m_NextInodeIndex = 2;
     dev_t              m_DeviceID       = 0;
 };

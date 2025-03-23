@@ -29,8 +29,8 @@ const stat& ProcFsINode::GetStats()
 {
     if (m_Property)
     {
-        m_Property->String = m_Property->GenerateProperty();
-        m_Stats.st_size    = m_Property->String.length();
+        m_Property->GenerateProperty();
+        m_Stats.st_size = m_Property->String.length();
     }
     return m_Stats;
 }
@@ -51,7 +51,7 @@ isize ProcFsINode::Read(void* buffer, off_t offset, usize bytes)
                         std::min(bytes, property.length() - offset));
 
     if (offset + bytesCopied >= property.length())
-        property = m_Property->GenerateProperty();
+        m_Property->GenerateProperty();
     return bytesCopied;
 }
 isize ProcFsINode::Write(const void* buffer, off_t offset, usize bytes)

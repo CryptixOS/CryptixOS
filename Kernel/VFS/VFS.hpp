@@ -6,9 +6,10 @@
  */
 #pragma once
 
+#include <API/UnixTypes.hpp>
 #include <Common.hpp>
 
-#include <API/UnixTypes.hpp>
+#include <Prism/Containers/Vector.hpp>
 #include <Prism/Path.hpp>
 
 #include <cerrno>
@@ -22,8 +23,10 @@ namespace VFS
 {
     using PM::PathView;
 
-    INode* GetRootNode();
-    void   RecursiveDelete(INode* node);
+    Vector<std::pair<bool, std::string_view>>& GetFilesystems();
+
+    INode*                                     GetRootNode();
+    void                                       RecursiveDelete(INode* node);
 
     std::expected<FileDescriptor*, std::errno_t>
                     Open(INode* parent, PathView path, i32 flags, mode_t mode);

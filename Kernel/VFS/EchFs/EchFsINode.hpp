@@ -8,7 +8,7 @@
 
 #include <VFS/INode.hpp>
 
-struct EchFsDirectoryEntry
+struct [[gnu::packed]] EchFsDirectoryEntry
 {
     u64 DirectoryID;
     u8  ObjectType;
@@ -21,18 +21,22 @@ struct EchFsDirectoryEntry
     u64 UnixCtime;
     u64 StartingBlock;
     u64 FileSize;
-} __attribute__((packed));
+};
 
 class EchFsINode : public INode
 {
   public:
     EchFsINode(INode* parent, std::string_view name, Filesystem* fs,
                mode_t mode, EchFsDirectoryEntry directoryEntry,
-               usize directoryEntryOffset)
+               usize directoryEntryOffset, usize dirEntryCount)
         : INode(parent, name, fs)
         , m_DirectoryEntry(directoryEntry)
         , m_DirectoryEntryOffset(directoryEntryOffset)
     {
+        m_Stats.st_blocks  = dirEntryCount;
+        m_Stats.st_size    = m_Stats.st_blocks * sizeof(EchFsDirectoryEntry);
+        m_Stats.st_blksize = sizeof(EchFsDirectoryEntry);
+        m_EntryIndex       = m_NextIndex++;
         (void)m_DirectoryEntry;
     }
 
@@ -52,9 +56,13 @@ class EchFsINode : public INode
     }
     virtual ErrorOr<isize> Truncate(usize size) override { return -1; }
 
+    virtual ErrorOr<isize> ChMod(mode_t mode) override { return -1; }
+
     friend class EchFs;
 
   private:
     EchFsDirectoryEntry m_DirectoryEntry;
+    usize               m_EntryIndex;
     usize               m_DirectoryEntryOffset;
+    std::atomic<usize>  m_NextIndex = 2;
 };

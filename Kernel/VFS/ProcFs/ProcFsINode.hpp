@@ -6,23 +6,35 @@
  */
 #pragma once
 
+#include <Prism/Delegate.hpp>
+
 #include <VFS/INode.hpp>
 
 struct ProcFsProperty
 {
-    using ProcFsGenPropertyFunc            = std::string (*)();
-    ProcFsGenPropertyFunc GenerateProperty = []() -> std::string { return ""; };
-    std::string           String;
+    using ProcFsGenPropertyFunc = Delegate<void(std::string&)>;
+    Delegate<void(std::string&)> GenProp;
+    std::string                  String;
 
-    ProcFsProperty() = default;
-    ProcFsProperty(ProcFsGenPropertyFunc genProp)
-        : GenerateProperty(genProp)
+    ProcFsProperty()
     {
+        GenProp.BindLambda([](std::string&) {});
+    }
+    template <typename F>
+    ProcFsProperty(F f)
+    {
+        GenProp.BindLambda(f);
     }
 
+    inline void GenerateProperty()
+    {
+        String.clear();
+        GenProp(String);
+    }
     operator std::string&()
     {
-        if (String.empty()) String = GenerateProperty();
+        if (String.empty()) GenerateProperty();
+        String.shrink_to_fit();
         return String;
     }
 };
@@ -43,6 +55,8 @@ class ProcFsINode : public INode
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
+
+    virtual ErrorOr<isize> ChMod(mode_t mode) override { return -1; }
 
   private:
     ProcFsProperty* m_Property = nullptr;

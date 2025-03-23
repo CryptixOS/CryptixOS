@@ -160,6 +160,7 @@ namespace PCI
         m_OnIrq = callback;
         if (MsiXSet(cpuid, handler->GetInterruptVector(), -1)) return true;
         if (MsiSet(cpuid, handler->GetInterruptVector(), -1)) return true;
+#ifdef CTOS_TARGET_X86_64
 
         auto  pin        = Read<u8>(RegisterOffset::eInterruptPin);
         auto* controller = GetHostController(m_Address.Domain);
@@ -176,7 +177,6 @@ namespace PCI
         if (!route->EdgeTriggered) flags |= Bit(3);
 
         u8 vector = handler->GetInterruptVector();
-#ifdef CTOS_TARGET_X86_64
         IoApic::SetGsiRedirect(cpuid, vector, route->Gsi, flags, true);
         return true;
 #endif

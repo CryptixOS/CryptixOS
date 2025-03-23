@@ -172,6 +172,7 @@ qemu_args = [
   '-smbios', 'type=1',
   '-device', 'nvme,id=nvme-ctrl1,serial=nvme',
   '-nic', 'user,model=rtl8139',
+  
 ]
 qemu = 'qemu-system-' + arch
 

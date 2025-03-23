@@ -71,6 +71,13 @@ namespace Syscall
     }
     ErrorOr<isize> SysIoCtl(Arguments& args);
     ErrorOr<isize> SysAccess(Arguments& args);
+    ErrorOr<isize> SysPipe(Arguments& args)
+    {
+        i32*     pipeFds = args.Get<i32*>(0);
+
+        Process* current = Process::GetCurrent();
+        return current->OpenPipe(pipeFds);
+    }
     ErrorOr<isize> SysSchedYield(Arguments& args)
     {
         Scheduler::Yield();
@@ -118,7 +125,13 @@ namespace Syscall
 
         return API::SysFTruncate(fdNum, length);
     }
-    ErrorOr<isize> SysGetCwd(Arguments& args);
+    ErrorOr<isize> SysGetCwd(Arguments& args)
+    {
+        char* buffer = args.Get<char*>(0);
+        usize size   = args.Get<usize>(1);
+
+        return API::SysGetCwd(buffer, size);
+    }
     ErrorOr<isize> SysChDir(Arguments& args);
     ErrorOr<isize> SysFChDir(Arguments& args);
     ErrorOr<isize> SysMkDir(Arguments& args);
@@ -142,6 +155,14 @@ namespace Syscall
         usize       size = args.Get<usize>(2);
 
         return API::SysReadLink(path, out, size);
+    }
+    ErrorOr<isize> SysChMod(Arguments& args)
+    {
+        [[maybe_unused]] const char* path = args.Get<const char*>(0);
+        [[maybe_unused]] mode_t      mode = args.Get<mode_t>(1);
+
+        return Error(ENOSYS);
+        // return ::API::VFS::SysChModAt(AT_FDCWD, path, mode);
     }
     ErrorOr<isize> SysUmask(Arguments& args)
     {
