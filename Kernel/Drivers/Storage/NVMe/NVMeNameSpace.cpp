@@ -17,8 +17,6 @@
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/VFS.hpp>
 
-using Prism::Pointer;
-
 namespace NVMe
 {
     NameSpace::NameSpace(u32 id, Controller* controller)
@@ -110,6 +108,38 @@ namespace NVMe
 
             std::memcpy(reinterpret_cast<u8*>(dest) + progress,
                         &m_Cache[slot].Cache[off], chunk);
+            progress += chunk;
+        }
+
+        return bytes;
+    }
+    isize NameSpace::Write(const void* src, off_t offset, usize bytes)
+    {
+        ScopedLock guard(m_Lock);
+
+        for (usize progress = 0; progress < bytes;)
+        {
+            u64 sector = (offset + progress) / m_CacheBlockSize;
+            i32 slot   = FindBlock(sector);
+            if (slot == -1)
+            {
+                slot = CacheBlock(sector);
+                if (slot == -1) return -1;
+            }
+
+            u64   chunk = bytes - progress;
+            usize off   = (offset + progress) % m_CacheBlockSize;
+            if (chunk > m_CacheBlockSize - off) chunk = m_CacheBlockSize - off;
+
+            const u8* dest = reinterpret_cast<const u8*>(src) + progress;
+            std::memcpy(&m_Cache[slot].Cache[off], dest, chunk);
+            m_Cache[slot].Status = CacheReady;
+
+            i32 nwritten         = ReadWriteLba(m_Cache[slot].Cache,
+                                                (m_CacheBlockSize / m_LbaSize)
+                                                    * m_Cache[slot].Block,
+                                                m_CacheBlockSize / m_LbaSize, true);
+            if (nwritten == -1) return -1;
             progress += chunk;
         }
 

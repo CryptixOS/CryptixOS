@@ -75,10 +75,8 @@ namespace NVMe
         virtual std::string_view GetName() const noexcept override;
 
         virtual isize Read(void* dest, off_t offset, usize bytes) override;
-        virtual isize Write(const void* src, off_t offset, usize bytes) override
-        {
-            return 0;
-        }
+        virtual isize Write(const void* src, off_t offset,
+                            usize bytes) override;
 
         virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
 
