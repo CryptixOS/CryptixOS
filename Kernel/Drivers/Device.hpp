@@ -10,40 +10,24 @@
 
 #include <API/UnixTypes.hpp>
 
-constexpr dev_t makeDevice(usize major, usize minor)
+using DeviceMajor = u32;
+using DeviceMinor = u32;
+
+constexpr dev_t MakeDevice(DeviceMajor major, DeviceMinor minor)
 {
-    dev_t dev = dev_t(major & 0x00000fffU) << 8;
-    dev |= dev_t(major & 0xfffff000U) << 32;
-    dev |= dev_t(minor & 0x000000ffU);
-    dev |= dev_t(minor & 0xffffff00U) << 12;
+    dev_t dev = dev_t(major & 0x00000fffu) << 8;
+    dev |= dev_t(major & 0xfffff000u) << 32;
+    dev |= dev_t(minor & 0x000000ffu);
+    dev |= dev_t(minor & 0xffffff00u) << 12;
 
     return dev;
-}
-
-enum class DriverType
-{
-    eUndefined    = 0,
-    eMemoryDevice = 1,
-    ePTY          = 2,
-    eTTY          = 4,
-};
-enum class DeviceType
-{
-    eNull = 3,
-    eZero = 5,
-    eFull = 7,
-};
-
-constexpr dev_t makeDevice(DriverType major, DeviceType minor)
-{
-    return makeDevice(static_cast<usize>(major), static_cast<usize>(minor));
 }
 
 class Device
 {
   public:
-    Device(DriverType major, DeviceType minor)
-        : id(makeDevice(major, minor))
+    Device(DeviceMajor major, DeviceMinor minor)
+        : id(MakeDevice(major, minor))
     {
     }
 

@@ -19,7 +19,7 @@ namespace NVMe
 
     Controller::Controller(const PCI::DeviceAddress& address)
         : PCI::Device(address)
-        , ::Device(static_cast<DriverType>(241), static_cast<DeviceType>(0))
+        , ::Device(241, s_ControllerCount.load())
         , m_Index(s_ControllerCount++)
     {
         if (m_Index == 0) DevTmpFs::RegisterDevice(this);

@@ -13,7 +13,7 @@ class StorageDevice : public Device
 {
   public:
     StorageDevice(u16 major, u16 minor)
-        : Device(DriverType(major), DeviceType(minor))
+        : Device(major, minor)
     {
     }
 

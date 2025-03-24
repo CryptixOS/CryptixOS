@@ -26,7 +26,7 @@ std::vector<TTY*> TTY::s_TTYs{};
 TTY*              TTY::s_CurrentTTY = nullptr;
 
 TTY::TTY(Terminal* terminal, usize minor)
-    : Device(DriverType::eTTY, static_cast<DeviceType>(minor))
+    : Device(4, minor)
     , m_Terminal(terminal)
 {
     if (!s_CurrentTTY) s_CurrentTTY = this;

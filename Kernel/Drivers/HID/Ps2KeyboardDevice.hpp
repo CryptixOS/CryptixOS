@@ -55,7 +55,7 @@ class Ps2KeyboardDevice : public RefCounted, public Device
 
     Ps2KeyboardDevice(Ps2Controller* controller, PS2_DevicePort port,
                       ScanCodeSet scanCodeSet)
-        : Device(DriverType(69), DeviceType(69))
+        : Device(11, 0)
         , m_Controller(controller)
         , m_Port(port)
         , m_ScanCodeSet(scanCodeSet)
