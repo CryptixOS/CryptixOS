@@ -1,0 +1,56 @@
+From 6a46810288766d984f2aa2906849802b9dbb3d46 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Mon, 24 Mar 2025 04:12:49 +0100
+Subject: [PATCH 5/5] [cryptix]: add signal syscall stubs
+
+---
+ sysdeps/cryptix/meson.build        |  1 +
+ sysdeps/cryptix/sysdeps/signal.cpp | 24 ++++++++++++++++++++++++
+ 2 files changed, 25 insertions(+)
+ create mode 100644 sysdeps/cryptix/sysdeps/signal.cpp
+
+diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
+index 5f26ec59..5fc05898 100644
+--- a/sysdeps/cryptix/meson.build
++++ b/sysdeps/cryptix/meson.build
+@@ -9,6 +9,7 @@ common_sources = files(
+   'sysdeps/internal.cpp',
+   'sysdeps/memory.cpp',
+   'sysdeps/process.cpp',
++  'sysdeps/signal.cpp',
+   'sysdeps/time.cpp',
+   'sysdeps/vfs.cpp',
+ )
+diff --git a/sysdeps/cryptix/sysdeps/signal.cpp b/sysdeps/cryptix/sysdeps/signal.cpp
+new file mode 100644
+index 00000000..f272ba62
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/signal.cpp
+@@ -0,0 +1,24 @@
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++
++#include <cryptix/syscall.h>
++
++namespace mlibc
++{
++    int sys_sigaction([[maybe_unused]] int signum,
++                      [[maybe_unused]] const struct sigaction* __restrict act,
++                      [[maybe_unused]] struct sigaction* __restrict oldact)
++    {
++        // TODO(v1tr10l7): implement sys_sigaction;
++        return 0;
++    }
++
++    int sys_sigprocmask([[maybe_unused]] int             how,
++                        [[maybe_unused]] const sigset_t* set,
++                        [[maybe_unused]] sigset_t*       retrieve)
++    {
++
++        // TODO(v1tr10l7): implement sys_sigprocmask;
++        return 0;
++    }
++}; // namespace mlibc
+-- 
+2.48.1
+
