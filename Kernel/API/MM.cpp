@@ -93,8 +93,21 @@ namespace API::MM
 
 namespace Syscall::MM
 {
+    ErrorOr<intptr_t> SysMProtect(Arguments& args)
+    {
+        uintptr_t addr    = args.Get<uintptr_t>(0);
+        usize     size    = args.Get<usize>(1);
+        i32       prot    = args.Get<i32>(2);
+
+        Process*  current = Process::GetCurrent();
+        current->PageMap->MapRange(addr, addr, size,
+                                   API::MM::Prot2PageAttributes(prot));
+
+        return 0;
+    }
     ErrorOr<i32> SysMUnMap(Arguments& args)
     {
+        return 0;
         Pointer                            addr    = args.Get<uintptr_t>(0);
         usize                              length  = args.Get<usize>(1);
 

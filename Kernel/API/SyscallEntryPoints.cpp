@@ -28,7 +28,7 @@ namespace Syscall
         u8*   out   = args.Get<u8*>(1);
         usize bytes = args.Get<usize>(2);
 
-        return API::SysRead(fdNum, out, bytes);
+        return API::Read(fdNum, out, bytes);
     }
     ErrorOr<isize> SysWrite(Arguments& args)
     {
@@ -36,7 +36,7 @@ namespace Syscall
         const u8* input = args.Get<const u8*>(1);
         usize     bytes = args.Get<usize>(2);
 
-        return API::SysWrite(fdNum, input, bytes);
+        return API::Write(fdNum, input, bytes);
     }
     ErrorOr<isize> SysOpen(Arguments& args)
     {
@@ -44,13 +44,13 @@ namespace Syscall
         i32         flags = args.Get<i32>(1);
         mode_t      mode  = args.Get<mode_t>(2);
 
-        return API::SysOpen(path, flags, mode);
+        return API::Open(path, flags, mode);
     }
     ErrorOr<isize> SysClose(Arguments& args)
     {
         i32 fdNum = args.Get<i32>(0);
 
-        return API::SysClose(fdNum);
+        return API::Close(fdNum);
     }
 
     ErrorOr<isize> SysStat(Arguments& args);
@@ -116,21 +116,21 @@ namespace Syscall
         const char* path   = args.Get<const char*>(0);
         off_t       length = args.Get<off_t>(1);
 
-        return API::SysTruncate(path, length);
+        return API::Truncate(path, length);
     }
     ErrorOr<isize> SysFTruncate(Arguments& args)
     {
         i32   fdNum  = args.Get<i32>(0);
         off_t length = args.Get<off_t>(1);
 
-        return API::SysFTruncate(fdNum, length);
+        return API::FTruncate(fdNum, length);
     }
     ErrorOr<isize> SysGetCwd(Arguments& args)
     {
         char* buffer = args.Get<char*>(0);
         usize size   = args.Get<usize>(1);
 
-        return API::SysGetCwd(buffer, size);
+        return API::GetCwd(buffer, size);
     }
     ErrorOr<isize> SysChDir(Arguments& args);
     ErrorOr<isize> SysFChDir(Arguments& args);
@@ -139,14 +139,14 @@ namespace Syscall
     {
         const char* path = args.Get<const char*>(0);
 
-        return API::SysRmDir(path);
+        return API::RmDir(path);
     }
     ErrorOr<isize> SysCreat(Arguments& args)
     {
         const char* path = args.Get<const char*>(0);
         mode_t      mode = args.Get<mode_t>(1);
 
-        return API::SysOpen(path, O_CREAT | O_WRONLY | O_TRUNC, mode);
+        return API::Open(path, O_CREAT | O_WRONLY | O_TRUNC, mode);
     }
     ErrorOr<isize> SysReadLink(Arguments& args)
     {
@@ -154,7 +154,7 @@ namespace Syscall
         char*       out  = args.Get<char*>(1);
         usize       size = args.Get<usize>(2);
 
-        return API::SysReadLink(path, out, size);
+        return API::ReadLink(path, out, size);
     }
     ErrorOr<isize> SysChMod(Arguments& args)
     {
@@ -182,7 +182,7 @@ namespace Syscall
         const char*    path  = args.Get<const char*>(0);
         const utimbuf* times = args.Get<const utimbuf*>(1);
 
-        return API::SysUTime(path, times);
+        return API::UTime(path, times);
     }
     ErrorOr<isize> SysFork(Arguments& args);
     ErrorOr<isize> SysExecve(Arguments& args);

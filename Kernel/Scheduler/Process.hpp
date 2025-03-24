@@ -122,7 +122,6 @@ class Process
     void                    SendSignal(i32 signal);
 
     ErrorOr<i32>   OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
-    ErrorOr<i32>   DupFd(i32 oldFdNum, i32 newFdNum = -1, i32 flags = 0);
     i32            CloseFd(i32 fd);
     ErrorOr<isize> OpenPipe(i32* pipeFds);
     inline bool    IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }

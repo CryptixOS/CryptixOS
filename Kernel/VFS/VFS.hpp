@@ -37,19 +37,18 @@ namespace VFS
 
     std::unordered_map<std::string_view, class Filesystem*>& GetMountPoints();
 
-    bool                 MountRoot(std::string_view filesystemName);
-    bool                 Mount(INode* parent, PathView source, PathView target,
-                               std::string_view fsName, i32 flags = 0, void* data = nullptr);
-    bool                 Unmount(INode* parent, PathView path, i32 flags = 0);
+    bool         MountRoot(std::string_view filesystemName);
+    bool         Mount(INode* parent, PathView source, PathView target,
+                       std::string_view fsName, i32 flags = 0, void* data = nullptr);
+    bool         Unmount(INode* parent, PathView path, i32 flags = 0);
 
-    INode*               CreateNode(INode* parent, PathView path, mode_t mode);
-    ErrorOr<i32>         MkDir(INode* parent, mode_t mode);
-    ErrorOr<const stat*> Stat(i32 dirFd, PathView path, i32 flags);
+    INode*       CreateNode(INode* parent, PathView path, mode_t mode);
+    ErrorOr<i32> MkDir(INode* parent, mode_t mode);
 
-    INode* MkNod(INode* parent, PathView path, mode_t mode, dev_t dev);
-    INode* Symlink(INode* parent, PathView path, std::string_view target);
-    INode* Link(INode* oldParent, PathView oldPath, INode* newParent,
-                PathView newPath, i32 flags = 0);
-    bool   Unlink(INode* parent, PathView path, i32 flags = 0);
+    INode*       MkNod(INode* parent, PathView path, mode_t mode, dev_t dev);
+    INode*       Symlink(INode* parent, PathView path, std::string_view target);
+    INode*       Link(INode* oldParent, PathView oldPath, INode* newParent,
+                      PathView newPath, i32 flags = 0);
+    bool         Unlink(INode* parent, PathView path, i32 flags = 0);
 
 }; // namespace VFS

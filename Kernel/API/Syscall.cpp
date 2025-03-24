@@ -36,7 +36,9 @@ namespace Syscall
         }
         inline operator bool() { return handler.operator bool(); }
     };
-    static std::array<Syscall, 512> syscalls;
+    static std::array<Syscall, 512>      syscalls;
+
+    std::unordered_map<ID, WrapperBase*> s_Syscalls;
 
     void
     RegisterHandler(usize                                              index,
@@ -45,7 +47,6 @@ namespace Syscall
     {
         syscalls[index] = {name, handler};
     }
-
 #define ARCH_SET_GS 0x1001
 #define ARCH_SET_FS 0x1002
 #define ARCH_GET_FS 0x1003
@@ -81,9 +82,14 @@ namespace Syscall
         return 0;
     }
 
+    ErrorOr<uintptr_t> SysPanic(const char* errorMessage)
+    {
+        Panic("SYS_PANIC: {}", errorMessage);
+        return -1;
+    }
     void InstallAll()
     {
-        auto sysPanic = [](Arguments& args) -> uintptr_t
+        [[maybe_unused]] auto sysPanic = [](Arguments& args) -> uintptr_t
         {
             const char* errorMessage
                 = reinterpret_cast<const char*>(args.Args[0]);
@@ -92,23 +98,24 @@ namespace Syscall
         };
 
         Initialize();
-        RegisterSyscall(ID::eRead, SysRead);
-        RegisterSyscall(ID::eWrite, SysWrite);
-        RegisterSyscall(ID::eOpen, SysOpen);
-        RegisterSyscall(ID::eClose, SysClose);
-        RegisterSyscall(ID::eStat, VFS::SysStat);
-        RegisterSyscall(ID::eFStat, VFS::SysFStat);
-        RegisterSyscall(ID::eLStat, VFS::SysLStat);
+        RegisterSyscall2(ID::eRead, API::VFS::Read);
+        RegisterSyscall2(ID::eWrite, API::VFS::Write);
+        RegisterSyscall2(ID::eOpen, API::VFS::Open);
+        RegisterSyscall2(ID::eClose, API::VFS::Close);
+        RegisterSyscall2(ID::eStat, API::VFS::Stat);
+        RegisterSyscall2(ID::eFStat, API::VFS::FStat);
+        RegisterSyscall2(ID::eLStat, API::VFS::LStat);
         RegisterSyscall(ID::eLSeek, VFS::SysLSeek);
         RegisterSyscall(ID::eMMap, SysMMap);
+        RegisterSyscall(ID::eMProtect, MM::SysMProtect);
         RegisterSyscall(ID::eMUnMap, MM::SysMUnMap);
         RegisterSyscall(ID::eSigProcMask, Process::SysSigProcMask);
         RegisterSyscall(ID::eIoCtl, VFS::SysIoCtl);
         RegisterSyscall(ID::eAccess, VFS::SysAccess);
         RegisterSyscall(ID::ePipe, SysPipe);
         RegisterSyscall(ID::eSchedYield, SysSchedYield);
-        RegisterSyscall(ID::eDup, VFS::SysDup);
-        RegisterSyscall(ID::eDup2, VFS::SysDup2);
+        RegisterSyscall2(ID::eDup, API::VFS::Dup);
+        RegisterSyscall2(ID::eDup2, API::VFS::Dup2);
         RegisterSyscall(ID::eNanoSleep, SysNanoSleep);
         RegisterSyscall(ID::eGetPid, Process::SysGetPid);
         RegisterSyscall(ID::eExit, Process::SysExit);
@@ -148,11 +155,11 @@ namespace Syscall
         RegisterSyscall(ID::eGetDents64, VFS::SysGetDents64);
         RegisterSyscall(ID::eClockGetTime, SysClockGetTime);
         RegisterSyscall(ID::eNanoSleep, Process::SysNanoSleep);
-        RegisterSyscall(ID::ePanic, sysPanic);
+        RegisterSyscall2(ID::ePanic, SysPanic);
         RegisterSyscall(ID::eOpenAt, VFS::SysOpenAt);
         RegisterSyscall(ID::eMkDirAt, VFS::SysMkDirAt);
-        RegisterSyscall(ID::eFStatAt, VFS::SysFStatAt);
-        RegisterSyscall(ID::eDup3, VFS::SysDup3);
+        RegisterSyscall2(ID::eFStatAt, API::VFS::FStatAt);
+        RegisterSyscall2(ID::eDup3, API::VFS::Dup3);
     }
     void Handle(Arguments& args)
     {
@@ -171,7 +178,9 @@ namespace Syscall
         previousSyscall = args.Index;
 #endif
 
-        if (args.Index >= 512 || !syscalls[args.Index])
+        if (args.Index >= 512
+            || (!syscalls[args.Index]
+                && !s_Syscalls.contains(static_cast<ID>(args.Index))))
         {
             args.ReturnValue = -1;
             errno            = ENOSYS;
@@ -185,10 +194,34 @@ namespace Syscall
             return;
         }
 
-        errno    = no_error;
-        auto ret = syscalls[args.Index](args);
+        errno = no_error;
+        std::array<uintptr_t, 6> arr
+            = {args.Args[0], args.Args[1], args.Args[2],
+               args.Args[3], args.Args[4], args.Args[5]};
+        if (s_Syscalls.contains(static_cast<ID>(args.Index)))
+        {
+            auto ret = s_Syscalls[static_cast<ID>(args.Index)]->Run(arr);
 
+            if (ret) args.ReturnValue = ret.value();
+            else
+            {
+                LogError(
+                    "Syscall: '{}' caused error",
+                    magic_enum::enum_name(static_cast<ID>(args.Index)).data()
+                        + 1);
+                args.ReturnValue = -intptr_t(ret.error());
+            }
+            return;
+        }
+
+        auto ret = syscalls[args.Index](args);
         if (ret) args.ReturnValue = ret.value();
-        else args.ReturnValue = -intptr_t(ret.error());
+        else
+        {
+            LogError("Syscall: '{}' caused error",
+                     magic_enum::enum_name(static_cast<ID>(args.Index)).data()
+                         + 1);
+            args.ReturnValue = -intptr_t(ret.error());
+        }
     }
 } // namespace Syscall

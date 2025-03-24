@@ -377,38 +377,6 @@ namespace VFS
         if (newNode) newNodeParent->InsertChild(newNode, newNode->GetName());
         return newNode;
     }
-    ErrorOr<const stat*> Stat(i32 fdNum, PathView path, i32 flags)
-    {
-        if (flags & ~(AT_EMPTY_PATH | AT_NO_AUTOMOUNT | AT_SYMLINK_NOFOLLOW))
-            return Error(EINVAL);
-
-        Process*        process        = Process::GetCurrent();
-        FileDescriptor* fd             = process->GetFileHandle(fdNum);
-        bool            followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
-
-        auto cwd = std::get<1>(ResolvePath(GetRootNode(), process->GetCWD()));
-        if (!path.Raw() || !path[0])
-        {
-            if (!(flags & AT_EMPTY_PATH)) return Error(ENOENT);
-
-            if (fdNum == AT_FDCWD) return &cwd->GetStats();
-            else if (!fd) return Error(EBADF);
-
-            return &fd->GetNode()->GetStats();
-        }
-
-        INode* parent = path.IsAbsolute() ? VFS::GetRootNode() : nullptr;
-        if (fdNum == AT_FDCWD) parent = cwd;
-        else if (fd) parent = fd->GetNode();
-
-        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
-        if (!parent) return Error(EBADF);
-        INode* node
-            = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
-
-        if (!node) return Error(errno);
-        return &node->GetStats();
-    }
 
     INode* MkNod(INode* parent, PathView path, mode_t mode, dev_t dev)
     {

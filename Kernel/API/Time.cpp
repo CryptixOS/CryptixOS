@@ -26,7 +26,7 @@ namespace Syscall::Time
         if (tv)
         {
             if (!current->ValidateAddress(tv, PROT_READ | PROT_WRITE))
-                return std::errno_t(EFAULT);
+                return Error(EFAULT);
 
             time_t now = 0;
 #if CTOS_ARCH_X86_64

@@ -8,11 +8,112 @@
 
 #include <Common.hpp>
 
+#include <Prism/Path.hpp>
+#include <Prism/PathView.hpp>
+
 #include <magic_enum/magic_enum.hpp>
 #include <magic_enum/magic_enum_format.hpp>
 
+#include <concepts>
+#include <type_traits>
+
 namespace Syscall
 {
+    template <typename>
+    struct Signature;
+
+    template <typename Ret, typename... Args>
+    struct Signature<Ret(Args...)>
+    {
+        using Type          = Ret(Args...);
+        using ArgsContainer = std::tuple<Args...>;
+        using RetType       = Ret;
+    };
+
+    struct NullableString
+    {
+        const char* String;
+        explicit constexpr NullableString(const char* s)
+            : String(s)
+        {
+        }
+    };
+    inline constexpr auto FormatAs(NullableString n)
+    {
+        return n.String ?: "(null)";
+    }
+
+    template <typename T>
+    using ToFormattablePtr = typename std::conditional_t<
+        std::is_pointer_v<T>,
+        std::conditional_t<std::is_constructible_v<std::string_view, T>,
+                           NullableString, const void*>,
+        T>;
+
+    template <typename... Ts>
+    auto Ptr(const std::tuple<Ts...>& tup)
+    {
+        return std::tuple<ToFormattablePtr<Ts>...>(tup);
+    }
+
+    template <typename T>
+    constexpr auto ConvertArgument(uintptr_t value)
+    {
+        if constexpr (std::is_same_v<
+                          std::remove_cvref_t<std::remove_reference_t<T>>,
+                          Prism::PathView>)
+            return PathView(reinterpret_cast<const char*>(value));
+        else if constexpr (std::is_pointer_v<T>)
+            return reinterpret_cast<T>(value);
+        else return static_cast<T>(value);
+    }
+
+    class WrapperBase
+    {
+      public:
+        virtual ~WrapperBase() = default;
+        virtual ErrorOr<uintptr_t> Run(std::array<uintptr_t, 6> args) const = 0;
+    };
+    template <typename Func>
+    class Wrapper : public WrapperBase
+    {
+      public:
+        using Sign = Signature<std::remove_cvref_t<Func>>;
+
+        constexpr Wrapper(const char* name, Func* func)
+            : Function(func)
+            , Name(name)
+        {
+        }
+
+        ErrorOr<uintptr_t> Run(std::array<uintptr_t, 6> arr) const
+        {
+            typename Sign::ArgsContainer args;
+            usize                        i = 0;
+
+            // Convert array to actual function arguments
+            std::apply(
+                [&](auto&&... args)
+                {
+                    (std::invoke([&]<typename T>(T& arg)
+                                 { arg = ConvertArgument<T>(arr[i++]); },
+                                 args),
+                     ...);
+                },
+                args);
+
+            errno    = no_error;
+            auto ret = std::apply(Function, args);
+            if (!ret) return Error(ret.error());
+
+            return ret;
+        }
+
+      private:
+        Func*       Function;
+        const char* Name;
+    };
+
     struct Arguments
     {
         u64       Index;
@@ -39,6 +140,7 @@ namespace Syscall
         ePoll           = 7,
         eLSeek          = 8,
         eMMap           = 9,
+        eMProtect       = 10,
         eMUnMap         = 11,
         eSigProcMask    = 14,
         eIoCtl          = 16,
@@ -98,6 +200,8 @@ namespace Syscall
                          std::string                                   name);
 #define RegisterSyscall(index, handler)                                        \
     ::Syscall::RegisterHandler(std::to_underlying(index), handler, #handler)
+#define RegisterSyscall2(id, handler)                                          \
+    s_Syscalls[id] = new Wrapper<decltype(handler)>(#handler, handler);
 
     void InstallAll();
     void Handle(Arguments& args);

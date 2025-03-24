@@ -162,17 +162,6 @@ ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 
     return m_FdTable.Insert(descriptor.value());
 }
-ErrorOr<i32> Process::DupFd(i32 oldFdNum, i32 newFdNum, i32 flags)
-{
-    FileDescriptor* oldFd = GetFileHandle(oldFdNum);
-    if (!oldFd) return std::errno_t(EBADF);
-
-    FileDescriptor* newFd = GetFileHandle(newFdNum);
-    if (newFd) CloseFd(newFdNum);
-
-    newFd = new FileDescriptor(oldFd, flags);
-    return m_FdTable.Insert(newFd, newFdNum);
-}
 i32            Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
 
 ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
