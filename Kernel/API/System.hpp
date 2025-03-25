@@ -6,9 +6,10 @@
  */
 #pragma once
 
+#include <API/Posix/sys/utsname.h>
 #include <API/Syscall.hpp>
 
-namespace Syscall::System
+namespace API::System
 {
     enum class RebootCommand : isize
     {
@@ -21,6 +22,7 @@ namespace Syscall::System
         eUndefined = -1,
     };
 
-    ErrorOr<isize> SysUname(Syscall::Arguments& args);
-    ErrorOr<i32>   SysReboot(RebootCommand cmd);
-} // namespace Syscall::System
+    ErrorOr<isize>     Uname(utsname* out);
+    ErrorOr<isize>     Reboot(RebootCommand cmd);
+    ErrorOr<uintptr_t> SysPanic(const char* errorMessaage);
+} // namespace API::System

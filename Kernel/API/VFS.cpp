@@ -183,6 +183,10 @@ namespace API::VFS
 
         return symlinkTarget.copy(out, size);
     }
+    ErrorOr<isize> ChMod(const char* path, mode_t mode)
+    {
+        return FChModAt(AT_FDCWD, path, mode);
+    }
 
     ErrorOr<isize> Mount(const char* path, const char* target,
                          const char* filesystemType, usize flags,

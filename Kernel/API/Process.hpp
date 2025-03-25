@@ -6,26 +6,45 @@
  */
 #pragma once
 
+#include <API/Posix/signal.h>
 #include <API/Syscall.hpp>
 #include <API/UnixTypes.hpp>
 
+namespace API::Process
+{
+    ErrorOr<isize>  SigProcMask(i32 how, const sigset_t* newSet,
+                                sigset_t* oldSet);
+    ErrorOr<isize>  SchedYield();
+
+    ErrorOr<pid_t>  GetPid();
+    ErrorOr<mode_t> Umask(mode_t mask);
+
+    ErrorOr<uid_t>  GetUid();
+    ErrorOr<gid_t>  GetGid();
+    ErrorOr<isize>  SetUid(uid_t uid);
+    ErrorOr<isize>  SetGid(gid_t gid);
+
+    ErrorOr<uid_t>  GetEUid();
+    ErrorOr<gid_t>  GetEGid();
+
+    ErrorOr<isize>  SetPGid(pid_t pid, pid_t pgid);
+    ErrorOr<pid_t>  GetPPid();
+
+    ErrorOr<pid_t>  GetPGrp();
+    ErrorOr<pid_t>  SetSid();
+    ErrorOr<pid_t>  GetPGid();
+    ErrorOr<pid_t>  GetSid(pid_t pid);
+} // namespace API::Process
+
 namespace Syscall::Process
 {
-    ErrorOr<i32>   SysSigProcMask(Syscall::Arguments& args);
-    ErrorOr<pid_t> SysGetPid(Syscall::Arguments& args);
-
     ErrorOr<pid_t> SysFork(Syscall::Arguments& args);
     ErrorOr<i32>   SysExecve(Syscall::Arguments& args);
     ErrorOr<i32>   SysExit(Syscall::Arguments& args);
     ErrorOr<i32>   SysWait4(Syscall::Arguments& args);
     ErrorOr<i32>   SysKill(Syscall::Arguments& args);
 
-    ErrorOr<uid_t> SysGetUid(Syscall::Arguments& args);
-    ErrorOr<gid_t> SysGetGid(Syscall::Arguments& args);
-    ErrorOr<uid_t> SysGet_eUid(Syscall::Arguments& args);
-    ErrorOr<gid_t> SysGet_eGid(Syscall::Arguments& args);
     ErrorOr<pid_t> SysSet_pGid(Syscall::Arguments& args);
-    ErrorOr<pid_t> SysGet_pPid(Syscall::Arguments& args);
     ErrorOr<pid_t> SysGetPgrp(Syscall::Arguments& args);
     ErrorOr<pid_t> SysSetSid(Syscall::Arguments& args);
     ErrorOr<pid_t> SysGet_pGid(Syscall::Arguments& args);

@@ -4,26 +4,24 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <API/Posix/sys/utsname.h>
 #include <API/System.hpp>
 
 #include <Arch/Arch.hpp>
 #include <Arch/PowerManager.hpp>
 
-namespace Syscall::System
+namespace API::System
 {
-    ErrorOr<isize> SysUname(Arguments& args)
+    ErrorOr<isize> Uname(utsname* out)
     {
-        utsname* out = reinterpret_cast<utsname*>(args.Args[0]);
-        strncpy(out->sysname, "Cryptix", sizeof(out->sysname));
-        strncpy(out->nodename, "cryptix", sizeof(out->sysname));
-        strncpy(out->release, "0.0.1", sizeof(out->sysname));
-        strncpy(out->version, __DATE__ " " __TIME__, sizeof(out->sysname));
-        strncpy(out->machine, CTOS_ARCH_STRING, sizeof(out->sysname));
+        std::strncpy(out->sysname, "Cryptix", sizeof(out->sysname));
+        std::strncpy(out->nodename, "cryptix", sizeof(out->sysname));
+        std::strncpy(out->release, "0.0.1", sizeof(out->sysname));
+        std::strncpy(out->version, __DATE__ " " __TIME__, sizeof(out->sysname));
+        std::strncpy(out->machine, CTOS_ARCH_STRING, sizeof(out->sysname));
 
         return 0;
     }
-    ErrorOr<i32> SysReboot(RebootCommand cmd)
+    ErrorOr<isize> Reboot(RebootCommand cmd)
     {
         switch (cmd)
         {
@@ -35,4 +33,10 @@ namespace Syscall::System
 
         return Error(ENOSYS);
     }
-} // namespace Syscall::System
+
+    ErrorOr<uintptr_t> SysPanic(const char* errorMessage)
+    {
+        panic(std::format("SYS_PANIC: {}", errorMessage));
+        return -1;
+    }
+} // namespace API::System

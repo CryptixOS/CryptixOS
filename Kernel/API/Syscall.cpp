@@ -82,22 +82,10 @@ namespace Syscall
         return 0;
     }
 
-    ErrorOr<uintptr_t> SysPanic(const char* errorMessage)
-    {
-        Panic("SYS_PANIC: {}", errorMessage);
-        return -1;
-    }
     void InstallAll()
     {
-        [[maybe_unused]] auto sysPanic = [](Arguments& args) -> uintptr_t
-        {
-            const char* errorMessage
-                = reinterpret_cast<const char*>(args.Args[0]);
-
-            Panic("SYS_PANIC: {}", errorMessage);
-        };
-
         Initialize();
+
         RegisterSyscall2(ID::eRead, API::VFS::Read);
         RegisterSyscall2(ID::eWrite, API::VFS::Write);
         RegisterSyscall2(ID::eOpen, API::VFS::Open);
@@ -109,54 +97,54 @@ namespace Syscall
         RegisterSyscall(ID::eMMap, SysMMap);
         RegisterSyscall(ID::eMProtect, MM::SysMProtect);
         RegisterSyscall(ID::eMUnMap, MM::SysMUnMap);
-        RegisterSyscall(ID::eSigProcMask, Process::SysSigProcMask);
+        RegisterSyscall2(ID::eSigProcMask, API::Process::SigProcMask);
         RegisterSyscall(ID::eIoCtl, VFS::SysIoCtl);
         RegisterSyscall(ID::eAccess, VFS::SysAccess);
         RegisterSyscall(ID::ePipe, SysPipe);
-        RegisterSyscall(ID::eSchedYield, SysSchedYield);
+        RegisterSyscall2(ID::eSchedYield, API::Process::SchedYield);
         RegisterSyscall2(ID::eDup, API::VFS::Dup);
         RegisterSyscall2(ID::eDup2, API::VFS::Dup2);
         RegisterSyscall(ID::eNanoSleep, SysNanoSleep);
-        RegisterSyscall(ID::eGetPid, Process::SysGetPid);
+        RegisterSyscall2(ID::eGetPid, API::Process::GetPid);
         RegisterSyscall(ID::eExit, Process::SysExit);
         RegisterSyscall(ID::eWait4, Process::SysWait4);
         RegisterSyscall(ID::eKill, Process::SysKill);
-        RegisterSyscall(ID::eGetUid, Process::SysGetUid);
-        RegisterSyscall(ID::eGetGid, Process::SysGetGid);
-        RegisterSyscall(ID::eUname, System::SysUname);
+        RegisterSyscall2(ID::eGetUid, API::Process::GetUid);
+        RegisterSyscall2(ID::eGetGid, API::Process::GetGid);
+        RegisterSyscall2(ID::eUname, API::System::Uname);
         RegisterSyscall(ID::eFcntl, VFS::SysFcntl);
-        RegisterSyscall(ID::eTruncate, SysTruncate);
-        RegisterSyscall(ID::eFTruncate, SysFTruncate);
-        RegisterSyscall(ID::eGetCwd, SysGetCwd);
+        RegisterSyscall2(ID::eTruncate, API::VFS::Truncate);
+        RegisterSyscall2(ID::eFTruncate, API::VFS::FTruncate);
+        RegisterSyscall2(ID::eGetCwd, API::VFS::GetCwd);
         RegisterSyscall(ID::eChDir, VFS::SysChDir);
         RegisterSyscall(ID::eFChDir, VFS::SysFChDir);
         RegisterSyscall(ID::eMkDir, VFS::SysMkDir);
         RegisterSyscall(ID::eRmDir, SysRmDir);
         RegisterSyscall(ID::eCreat, SysCreat);
         RegisterSyscall(ID::eReadLink, SysReadLink);
-        RegisterSyscall(ID::eChMod, SysChMod);
-        RegisterSyscall(ID::eUmask, SysUmask);
+        RegisterSyscall2(ID::eChMod, API::VFS::ChMod);
+        RegisterSyscall2(ID::eUmask, API::Process::Umask);
         RegisterSyscall(ID::eGetTimeOfDay, Time::SysGetTimeOfDay);
-        RegisterSyscall(ID::eGet_eUid, Process::SysGet_eUid);
-        RegisterSyscall(ID::eGet_eGid, Process::SysGet_eGid);
+        RegisterSyscall2(ID::eGet_eUid, API::Process::GetEUid);
+        RegisterSyscall2(ID::eGet_eGid, API::Process::GetEGid);
         RegisterSyscall(ID::eSet_pGid, Process::SysSet_pGid);
-        RegisterSyscall(ID::eGet_pPid, Process::SysGet_pPid);
+        RegisterSyscall2(ID::eGet_pPid, API::Process::GetPPid);
         RegisterSyscall(ID::eGetPgrp, Process::SysGetPgrp);
         RegisterSyscall(ID::eSetSid, Process::SysSetSid);
         RegisterSyscall(ID::eGet_pGid, Process::SysGet_pGid);
         RegisterSyscall(ID::eGetSid, Process::SysGetSid);
-        RegisterSyscall(ID::eUTime, SysUTime);
+        RegisterSyscall2(ID::eUTime, API::VFS::UTime);
         RegisterSyscall(ID::eFork, Process::SysFork);
         RegisterSyscall(ID::eExecve, Process::SysExecve);
         RegisterSyscall(ID::eArchPrCtl, SysArchPrCtl);
         RegisterSyscall(ID::eSetTimeOfDay, Time::SysSetTimeOfDay);
         RegisterSyscall2(ID::eMount, API::VFS::Mount);
-        RegisterSyscall(ID::eReboot, SysReboot);
+        RegisterSyscall2(ID::eReboot, API::System::Reboot);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
         RegisterSyscall(ID::eGetDents64, VFS::SysGetDents64);
         RegisterSyscall(ID::eClockGetTime, SysClockGetTime);
         RegisterSyscall(ID::eNanoSleep, Process::SysNanoSleep);
-        RegisterSyscall2(ID::ePanic, SysPanic);
+        RegisterSyscall2(ID::ePanic, API::System::SysPanic);
         RegisterSyscall(ID::eOpenAt, VFS::SysOpenAt);
         RegisterSyscall(ID::eMkDirAt, VFS::SysMkDirAt);
         RegisterSyscall2(ID::eFStatAt, API::VFS::FStatAt);
