@@ -1,0 +1,57 @@
+From 20fa7aead644849d756e1faf8e96d87d8e5bc832 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Tue, 25 Mar 2025 01:45:29 +0100
+Subject: [PATCH] [cryptix]: remove libc-compat.h
+
+---
+ sysdeps/cryptix/include/cryptix/syscall.h |  1 +
+ sysdeps/cryptix/meson.build               |  1 -
+ sysdeps/cryptix/sysdeps/memory.cpp        | 10 +++++++---
+ 3 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
+index 93c1b784..e22d859c 100644
+--- a/sysdeps/cryptix/include/cryptix/syscall.h
++++ b/sysdeps/cryptix/include/cryptix/syscall.h
+@@ -29,6 +29,7 @@ constexpr size_t SYS_FSTAT         = 5;
+ constexpr size_t SYS_LSTAT         = 6;
+ constexpr size_t SYS_LSEEK         = 8;
+ constexpr size_t SYS_MMAP          = 9;
++constexpr size_t SYS_MPROTECT      = 10;
+ constexpr size_t SYS_MUNMAP        = 11;
+ constexpr size_t SYS_IOCTL         = 16;
+ constexpr size_t SYS_ACCESS        = 21;
+diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
+index 5fc05898..669e33ff 100644
+--- a/sysdeps/cryptix/meson.build
++++ b/sysdeps/cryptix/meson.build
+@@ -77,7 +77,6 @@ if not no_headers
+     follow_symlinks: true,
+   )
+   install_headers('include/cryptix/syscall.h', subdir: 'cryptix')
+-  install_headers('include/linux/libc-compat.h', subdir: 'linux')
+ 
+   install_headers(
+     'include/sys/reboot.h',
+diff --git a/sysdeps/cryptix/sysdeps/memory.cpp b/sysdeps/cryptix/sysdeps/memory.cpp
+index 39c72f1c..c9257ba9 100644
+--- a/sysdeps/cryptix/sysdeps/memory.cpp
++++ b/sysdeps/cryptix/sysdeps/memory.cpp
+@@ -44,7 +44,11 @@ namespace mlibc
+ 
+         return 0;
+     }
+-    STUB_RET([[gnu::weak]] int sys_vm_protect([[maybe_unused]] void*  pointer,
+-                                              [[maybe_unused]] size_t size,
+-                                              [[maybe_unused]] int    prot));
++    int sys_vm_protect(void* pointer, size_t size, int prot)
++    {
++        // auto ret = Syscall(SYS_MPROTECT, pointer, size, prot);
++        // if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
+ } // namespace mlibc
+-- 
+2.48.1
+
