@@ -67,7 +67,7 @@ void kernelThread()
     TTY::Initialize();
     MemoryDevices::Initialize();
 
-    Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1", "/mnt", "fat32fs"));
+    Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1", "/mnt", "ext2fs"));
 
     auto kernelExecutable = BootInfo::GetExecutableFile();
     auto header   = reinterpret_cast<ELF::Header*>(kernelExecutable->address);

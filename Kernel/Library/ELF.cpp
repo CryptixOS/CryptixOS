@@ -27,7 +27,8 @@ namespace ELF
     bool Image::Load(std::string_view path, PageMap* pageMap,
                      std::vector<VMM::Region>& addressSpace, uintptr_t loadBase)
     {
-        INode* file = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path));
+        INode* file
+            = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path, true));
         if (!file) return_err(false, ENOENT);
 
         isize fileSize = file->GetStats().st_size;

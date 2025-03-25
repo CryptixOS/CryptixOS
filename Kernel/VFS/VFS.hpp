@@ -32,8 +32,10 @@ namespace VFS
                     Open(INode* parent, PathView path, i32 flags, mode_t mode);
 
     ErrorOr<INode*> ResolvePath(PathView path);
+    std::tuple<INode*, INode*, std::string> ResolvePath(INode*   parent,
+                                                        PathView path);
     std::tuple<INode*, INode*, std::string>
-    ResolvePath(INode* parent, PathView path, bool automount = true);
+    ResolvePath(INode* parent, PathView path, bool followLinks);
 
     std::unordered_map<std::string_view, class Filesystem*>& GetMountPoints();
 

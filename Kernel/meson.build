@@ -71,16 +71,25 @@ srcs += files(
   'VFS/FileDescriptorTable.cpp',
   'VFS/INode.cpp',
   'VFS/VFS.cpp',
+
   'VFS/DevTmpFs/DevTmpFs.cpp',
   'VFS/DevTmpFs/DevTmpFsINode.cpp',
+
   'VFS/EchFs/EchFs.cpp',
   'VFS/EchFs/EchFsINode.cpp',
+
+  'VFS/Ext2Fs/Ext2Fs.cpp',
+  'VFS/Ext2Fs/Ext2FsINode.cpp',
+
   'VFS/Fat32Fs/Fat32Fs.cpp',
   'VFS/Fat32Fs/Fat32FsINode.cpp',
+
   'VFS/Initrd/Initrd.cpp',
   'VFS/Initrd/Ustar.cpp',
+
   'VFS/ProcFs/ProcFs.cpp',
   'VFS/ProcFs/ProcFsINode.cpp',
+
   'VFS/TmpFs/TmpFs.cpp',
   'VFS/TmpFs/TmpFsINode.cpp',
 )
