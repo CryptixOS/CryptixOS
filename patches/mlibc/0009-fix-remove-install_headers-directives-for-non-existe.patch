@@ -1,0 +1,269 @@
+From 294d2180a5ddf7ee7c2d1ab78b61346c69fb290f Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Tue, 25 Mar 2025 03:32:41 +0100
+Subject: [PATCH] [fix]: remove install_headers directives for non existent
+ files
+
+---
+ ...ptix-add-basic-time-related-syscalls.patch | 67 +++++++++++++++++++
+ 0002-cryptix-add-signal-syscall-stubs.patch   | 56 ++++++++++++++++
+ 0003-cryptix-add-SYS_MUNMAP-definition.patch  | 24 +++++++
+ 0004-cryptix-remove-libc-compat.h.patch       | 57 ++++++++++++++++
+ sysdeps/cryptix/meson.build                   |  3 -
+ 5 files changed, 204 insertions(+), 3 deletions(-)
+ create mode 100644 0001-cryptix-add-basic-time-related-syscalls.patch
+ create mode 100644 0002-cryptix-add-signal-syscall-stubs.patch
+ create mode 100644 0003-cryptix-add-SYS_MUNMAP-definition.patch
+ create mode 100644 0004-cryptix-remove-libc-compat.h.patch
+
+diff --git a/0001-cryptix-add-basic-time-related-syscalls.patch b/0001-cryptix-add-basic-time-related-syscalls.patch
+new file mode 100644
+index 00000000..83398634
+--- /dev/null
++++ b/0001-cryptix-add-basic-time-related-syscalls.patch
+@@ -0,0 +1,67 @@
++From d1db6d6064b8d129093f5a42b88084ff19b6d4d8 Mon Sep 17 00:00:00 2001
++From: V1tr10l7 <vitriol1744@gmail.com>
++Date: Mon, 24 Mar 2025 04:11:57 +0100
++Subject: [PATCH 1/5] [cryptix]: add basic time related syscalls
++
++---
++ sysdeps/cryptix/meson.build      |  1 +
++ sysdeps/cryptix/sysdeps/time.cpp | 35 ++++++++++++++++++++++++++++++++
++ 2 files changed, 36 insertions(+)
++ create mode 100644 sysdeps/cryptix/sysdeps/time.cpp
++
++diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
++index 127e33e7..5f26ec59 100644
++--- a/sysdeps/cryptix/meson.build
+++++ b/sysdeps/cryptix/meson.build
++@@ -9,6 +9,7 @@ common_sources = files(
++   'sysdeps/internal.cpp',
++   'sysdeps/memory.cpp',
++   'sysdeps/process.cpp',
+++  'sysdeps/time.cpp',
++   'sysdeps/vfs.cpp',
++ )
++ 
++diff --git a/sysdeps/cryptix/sysdeps/time.cpp b/sysdeps/cryptix/sysdeps/time.cpp
++new file mode 100644
++index 00000000..16b6c9ed
++--- /dev/null
+++++ b/sysdeps/cryptix/sysdeps/time.cpp
++@@ -0,0 +1,35 @@
+++#include <cstddef>
+++#include <stdio.h>
+++#include <stdlib.h>
+++
+++#include <cryptix/syscall.h>
+++
+++#include <execinfo.h>
+++#include <mlibc/debug.hpp>
+++#include <mlibc/posix-sysdeps.hpp>
+++
+++#include <sys/mman.h>
+++
+++namespace mlibc
+++{
+++    int sys_sleep(time_t* secs, long* nanos)
+++    {
+++        timespec duration = {.tv_sec = *secs, .tv_nsec = nanos ? *nanos : 0};
+++        timespec remaining;
+++        auto     ret = Syscall(SYS_NANOSLEEP, &duration, &remaining);
+++
+++        if (auto e = syscall_error(ret); e) return e;
+++
+++        return 0;
+++    }
+++    int sys_clock_get(int clockid, time_t* secs, long* nanos)
+++    {
+++        timespec ts;
+++        auto     ret = Syscall(SYS_CLOCK_GETTIME, clockid, &ts);
+++        if (auto e = syscall_error(ret); e) return e;
+++
+++        *secs  = ts.tv_sec;
+++        *nanos = ts.tv_nsec;
+++        return 0;
+++    }
+++}; // namespace mlibc
++-- 
++2.48.1
++
+diff --git a/0002-cryptix-add-signal-syscall-stubs.patch b/0002-cryptix-add-signal-syscall-stubs.patch
+new file mode 100644
+index 00000000..efe6c2cb
+--- /dev/null
++++ b/0002-cryptix-add-signal-syscall-stubs.patch
+@@ -0,0 +1,56 @@
++From 6a46810288766d984f2aa2906849802b9dbb3d46 Mon Sep 17 00:00:00 2001
++From: V1tr10l7 <vitriol1744@gmail.com>
++Date: Mon, 24 Mar 2025 04:12:49 +0100
++Subject: [PATCH 2/5] [cryptix]: add signal syscall stubs
++
++---
++ sysdeps/cryptix/meson.build        |  1 +
++ sysdeps/cryptix/sysdeps/signal.cpp | 24 ++++++++++++++++++++++++
++ 2 files changed, 25 insertions(+)
++ create mode 100644 sysdeps/cryptix/sysdeps/signal.cpp
++
++diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
++index 5f26ec59..5fc05898 100644
++--- a/sysdeps/cryptix/meson.build
+++++ b/sysdeps/cryptix/meson.build
++@@ -9,6 +9,7 @@ common_sources = files(
++   'sysdeps/internal.cpp',
++   'sysdeps/memory.cpp',
++   'sysdeps/process.cpp',
+++  'sysdeps/signal.cpp',
++   'sysdeps/time.cpp',
++   'sysdeps/vfs.cpp',
++ )
++diff --git a/sysdeps/cryptix/sysdeps/signal.cpp b/sysdeps/cryptix/sysdeps/signal.cpp
++new file mode 100644
++index 00000000..f272ba62
++--- /dev/null
+++++ b/sysdeps/cryptix/sysdeps/signal.cpp
++@@ -0,0 +1,24 @@
+++#include <mlibc/debug.hpp>
+++#include <mlibc/posix-sysdeps.hpp>
+++
+++#include <cryptix/syscall.h>
+++
+++namespace mlibc
+++{
+++    int sys_sigaction([[maybe_unused]] int signum,
+++                      [[maybe_unused]] const struct sigaction* __restrict act,
+++                      [[maybe_unused]] struct sigaction* __restrict oldact)
+++    {
+++        // TODO(v1tr10l7): implement sys_sigaction;
+++        return 0;
+++    }
+++
+++    int sys_sigprocmask([[maybe_unused]] int             how,
+++                        [[maybe_unused]] const sigset_t* set,
+++                        [[maybe_unused]] sigset_t*       retrieve)
+++    {
+++
+++        // TODO(v1tr10l7): implement sys_sigprocmask;
+++        return 0;
+++    }
+++}; // namespace mlibc
++-- 
++2.48.1
++
+diff --git a/0003-cryptix-add-SYS_MUNMAP-definition.patch b/0003-cryptix-add-SYS_MUNMAP-definition.patch
+new file mode 100644
+index 00000000..c8c0d709
+--- /dev/null
++++ b/0003-cryptix-add-SYS_MUNMAP-definition.patch
+@@ -0,0 +1,24 @@
++From 0715fd562ed903e05d578789bdec9622ae84e541 Mon Sep 17 00:00:00 2001
++From: V1tr10l7 <vitriol1744@gmail.com>
++Date: Mon, 24 Mar 2025 04:17:06 +0100
++Subject: [PATCH 3/5] [cryptix]: add SYS_MUNMAP definition
++
++---
++ sysdeps/cryptix/include/cryptix/syscall.h | 1 +
++ 1 file changed, 1 insertion(+)
++
++diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
++index d56f4c44..93c1b784 100644
++--- a/sysdeps/cryptix/include/cryptix/syscall.h
+++++ b/sysdeps/cryptix/include/cryptix/syscall.h
++@@ -29,6 +29,7 @@ constexpr size_t SYS_FSTAT         = 5;
++ constexpr size_t SYS_LSTAT         = 6;
++ constexpr size_t SYS_LSEEK         = 8;
++ constexpr size_t SYS_MMAP          = 9;
+++constexpr size_t SYS_MUNMAP        = 11;
++ constexpr size_t SYS_IOCTL         = 16;
++ constexpr size_t SYS_ACCESS        = 21;
++ constexpr size_t SYS_PIPE          = 22;
++-- 
++2.48.1
++
+diff --git a/0004-cryptix-remove-libc-compat.h.patch b/0004-cryptix-remove-libc-compat.h.patch
+new file mode 100644
+index 00000000..c75bb423
+--- /dev/null
++++ b/0004-cryptix-remove-libc-compat.h.patch
+@@ -0,0 +1,57 @@
++From 20fa7aead644849d756e1faf8e96d87d8e5bc832 Mon Sep 17 00:00:00 2001
++From: V1tr10l7 <vitriol1744@gmail.com>
++Date: Tue, 25 Mar 2025 01:45:29 +0100
++Subject: [PATCH 4/5] [cryptix]: remove libc-compat.h
++
++---
++ sysdeps/cryptix/include/cryptix/syscall.h |  1 +
++ sysdeps/cryptix/meson.build               |  1 -
++ sysdeps/cryptix/sysdeps/memory.cpp        | 10 +++++++---
++ 3 files changed, 8 insertions(+), 4 deletions(-)
++
++diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
++index 93c1b784..e22d859c 100644
++--- a/sysdeps/cryptix/include/cryptix/syscall.h
+++++ b/sysdeps/cryptix/include/cryptix/syscall.h
++@@ -29,6 +29,7 @@ constexpr size_t SYS_FSTAT         = 5;
++ constexpr size_t SYS_LSTAT         = 6;
++ constexpr size_t SYS_LSEEK         = 8;
++ constexpr size_t SYS_MMAP          = 9;
+++constexpr size_t SYS_MPROTECT      = 10;
++ constexpr size_t SYS_MUNMAP        = 11;
++ constexpr size_t SYS_IOCTL         = 16;
++ constexpr size_t SYS_ACCESS        = 21;
++diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
++index 5fc05898..669e33ff 100644
++--- a/sysdeps/cryptix/meson.build
+++++ b/sysdeps/cryptix/meson.build
++@@ -77,7 +77,6 @@ if not no_headers
++     follow_symlinks: true,
++   )
++   install_headers('include/cryptix/syscall.h', subdir: 'cryptix')
++-  install_headers('include/linux/libc-compat.h', subdir: 'linux')
++ 
++   install_headers(
++     'include/sys/reboot.h',
++diff --git a/sysdeps/cryptix/sysdeps/memory.cpp b/sysdeps/cryptix/sysdeps/memory.cpp
++index 39c72f1c..c9257ba9 100644
++--- a/sysdeps/cryptix/sysdeps/memory.cpp
+++++ b/sysdeps/cryptix/sysdeps/memory.cpp
++@@ -44,7 +44,11 @@ namespace mlibc
++ 
++         return 0;
++     }
++-    STUB_RET([[gnu::weak]] int sys_vm_protect([[maybe_unused]] void*  pointer,
++-                                              [[maybe_unused]] size_t size,
++-                                              [[maybe_unused]] int    prot));
+++    int sys_vm_protect(void* pointer, size_t size, int prot)
+++    {
+++        // auto ret = Syscall(SYS_MPROTECT, pointer, size, prot);
+++        // if (auto e = syscall_error(ret); e) return e;
+++
+++        return 0;
+++    }
++ } // namespace mlibc
++-- 
++2.48.1
++
+diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
+index 669e33ff..05661b87 100644
+--- a/sysdeps/cryptix/meson.build
++++ b/sysdeps/cryptix/meson.build
+@@ -82,15 +82,12 @@ if not no_headers
+     'include/sys/reboot.h',
+ 	'include/sys/mount.h',
+ 	'include/sys/sysmacros.h',
+-    'include/sys/signalfd.h',
+     'include/sys/statfs.h',
+-    'include/sys/timerfd.h',
+     'include/sys/vfs.h',
+     subdir: 'sys')
+ 
+   install_headers(
+ 	'include/mntent.h',
+-    'include/ifaddrs.h',
+   )
+     
+ endif
+-- 
+2.48.1
+
