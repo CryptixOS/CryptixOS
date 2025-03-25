@@ -121,3 +121,11 @@ ErrorOr<isize> DevTmpFsINode::Truncate(usize size)
     m_Stats.st_blocks = Math::DivRoundUp(m_Stats.st_size, m_Stats.st_blksize);
     return 0;
 }
+
+ErrorOr<void> DevTmpFsINode::ChMod(mode_t mode)
+{
+    m_Stats.st_mode &= ~0777;
+    m_Stats.st_mode |= mode & 0777;
+
+    return {};
+}

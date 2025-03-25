@@ -192,6 +192,7 @@ namespace Syscall
         eOpenAt         = 257,
         eMkDirAt        = 258,
         eFStatAt        = 262,
+        eFChModAt       = 268,
         eDup3           = 292,
     };
 

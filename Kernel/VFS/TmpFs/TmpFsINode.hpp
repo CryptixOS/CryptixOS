@@ -31,7 +31,7 @@ class TmpFsINode final : public INode
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
 
-    virtual ErrorOr<isize> ChMod(mode_t mode) override { return -1; }
+    virtual ErrorOr<void>  ChMod(mode_t mode) override;
 
   private:
     u8*   m_Data     = nullptr;

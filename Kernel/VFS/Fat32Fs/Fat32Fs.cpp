@@ -15,6 +15,8 @@
 
 #include <Time/Time.hpp>
 
+#include <cctype>
+
 constexpr const char* FAT32_IDENTIFIER_STRING       = "FAT32   ";
 constexpr usize       FAT32_FS_INFO_SIGNATURE       = 0x41615252;
 constexpr usize       FAT32_FS_INFO_OFFSET          = 484;
@@ -95,6 +97,9 @@ INode* Fat32Fs::Mount(INode* parent, INode* source, INode* target,
 
 INode* Fat32Fs::CreateNode(INode* parent, std::string_view name, mode_t mode)
 {
+    if (name.size() > 255) return_err(nullptr, ENAMETOOLONG);
+    if (!S_ISREG(mode) && !S_ISDIR(mode)) return_err(nullptr, EPERM);
+
     return new Fat32FsINode(parent, name, this, mode);
 }
 
@@ -214,7 +219,15 @@ bool Fat32Fs::Populate(INode* node)
         newNode->m_DirectoryOffset
             = reinterpret_cast<uintptr_t>(entry)
             - reinterpret_cast<uintptr_t>(directoryEntries);
-        node->InsertChild(newNode, nameBuffer);
+
+        usize nameLen = 0;
+        char* start   = nameBuffer;
+        while (*start && std::isalnum(*start++)) nameLen++;
+        std::string name;
+        name.resize(nameLen);
+        std::memcpy(name.data(), nameBuffer, nameLen);
+
+        node->InsertChild(newNode, newNode->GetName());
 
         if (S_ISDIR(mode)) newNode->m_Populated = false;
     }

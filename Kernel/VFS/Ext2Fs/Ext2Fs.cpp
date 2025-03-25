@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Prism/Containers/Bitmap.hpp>
 #include <Time/Time.hpp>
 
 #include <VFS/Ext2Fs/Ext2Fs.hpp>
@@ -154,6 +155,162 @@ bool Ext2Fs::Populate(INode* node)
     return e2node->m_Populated;
 }
 
+usize Ext2Fs::AllocateINode()
+{
+    for (usize i = 0; i < m_SuperBlock->BlockCount; i++)
+    {
+        Ext2FsBlockGroupDescriptor blockGroup;
+        ReadBlockGroupDescriptor(&blockGroup, i);
+
+        if (blockGroup.FreeINodeCount <= 0) continue;
+
+        Bitmap bitmap;
+        bitmap.Allocate(m_BlockSize);
+        m_Device->Read(bitmap.Raw(),
+                       blockGroup.INodeUsageBitmapAddress * m_BlockSize,
+                       m_BlockSize);
+
+        usize inode = 0;
+        for (usize j = 0; j < m_BlockSize; j++)
+        {
+            if (bitmap.Raw()[j] == 0xff) continue;
+
+            for (usize bit = 0; bit < 8; bit++)
+            {
+                if (!bitmap.GetIndex(bit + (j * 8)))
+                {
+                    inode
+                        = (i * m_SuperBlock->INodesPerGroup) + j * 8 + bit + 1;
+                    if ((inode > m_SuperBlock->FirstNonReservedINode
+                         && inode > 11))
+                    {
+                        bitmap.SetIndex(bit + (j * 8), true);
+                        break;
+                    }
+                }
+            }
+
+            if (inode) break;
+        }
+
+        if (!inode) continue;
+        m_Device->Write(bitmap.Raw(),
+                        blockGroup.INodeUsageBitmapAddress * m_BlockSize,
+                        m_BlockSize);
+
+        --blockGroup.FreeINodeCount;
+        --m_SuperBlock->FreeINodeCount;
+        WriteBlockGroupDescriptor(blockGroup, i);
+        m_Device->Write(m_SuperBlock, 1024, sizeof(Ext2FsSuperBlock));
+
+        return inode;
+    }
+
+    return 0;
+}
+void Ext2Fs::FreeINode(usize inode)
+{
+    --inode;
+
+    usize blockGroupIndex = inode / m_SuperBlock->INodesPerGroup;
+    Ext2FsBlockGroupDescriptor blockGroup;
+    ReadBlockGroupDescriptor(&blockGroup, blockGroupIndex);
+
+    Bitmap bitmap;
+    bitmap.Allocate(m_BlockSize);
+    m_Device->Read(bitmap.Raw(),
+                   blockGroup.INodeUsageBitmapAddress * m_BlockSize,
+                   m_BlockSize);
+
+    bitmap.SetIndex(inode % m_SuperBlock->INodesPerGroup, false);
+    m_Device->Write(bitmap.Raw(),
+                    blockGroup.INodeUsageBitmapAddress * m_BlockSize,
+                    m_BlockSize);
+
+    ++blockGroup.FreeINodeCount;
+    ++m_SuperBlock->FreeINodeCount;
+
+    WriteBlockGroupDescriptor(blockGroup, blockGroupIndex);
+    m_Device->Write(m_SuperBlock, 1024, sizeof(Ext2FsSuperBlock));
+
+    bitmap.Free();
+}
+
+usize Ext2Fs::AllocateBlock(Ext2FsINodeMeta& meta, u32 inode)
+{
+    for (usize i = 0; i < m_SuperBlock->BlockCount; i++)
+    {
+        Ext2FsBlockGroupDescriptor blockGroup;
+        ReadBlockGroupDescriptor(&blockGroup, i);
+
+        if (blockGroup.FreeBlockCount <= 0) continue;
+
+        Bitmap bitmap;
+        bitmap.Allocate(m_BlockSize);
+        m_Device->Read(bitmap.Raw(),
+                       blockGroup.BlockUsageBitmapAddress * m_BlockSize,
+                       m_BlockSize);
+
+        usize block = 0;
+        for (usize j = 0; j < m_BlockSize; j++)
+        {
+            if (bitmap.Raw()[j] == 0xff) continue;
+
+            for (usize bit = 0; bit < 8; bit++)
+            {
+                if (!bitmap.GetIndex(bit + (j * 8)))
+                {
+                    bitmap.SetIndex(bit + (j * 8), true);
+                    block = (i * m_SuperBlock->BlocksPerGroup) + j * 8 + bit;
+                    break;
+                }
+            }
+
+            if (block) break;
+        }
+
+        if (!block) continue;
+        m_Device->Write(bitmap.Raw(),
+                        blockGroup.BlockUsageBitmapAddress * m_BlockSize,
+                        m_BlockSize);
+        --m_SuperBlock->FreeBlockCount;
+        --blockGroup.FreeBlockCount;
+
+        meta.SectorCount += (m_BlockSize / m_Device->GetStats().st_blksize);
+        WriteINodeEntry(meta, i);
+        m_Device->Write(&meta, 1024, sizeof(Ext2FsSuperBlock));
+
+        bitmap.Free();
+        return block;
+    }
+
+    return 0;
+}
+void Ext2Fs::FreeBlock(usize block)
+{
+    usize blockGroupIndex = block / m_SuperBlock->BlocksPerGroup;
+    Ext2FsBlockGroupDescriptor blockGroup;
+    ReadBlockGroupDescriptor(&blockGroup, blockGroupIndex);
+
+    Bitmap bitmap;
+    bitmap.Allocate(m_BlockSize);
+    m_Device->Read(bitmap.Raw(),
+                   blockGroup.BlockUsageBitmapAddress * m_BlockSize,
+                   m_BlockSize);
+    bitmap.SetIndex(block % m_SuperBlock->BlocksPerGroup, false);
+    m_Device->Write(bitmap.Raw(),
+                    blockGroup.BlockUsageBitmapAddress * m_BlockSize,
+                    m_BlockSize);
+
+    ++blockGroup.FreeBlockCount;
+    ++m_SuperBlock->FreeBlockCount;
+
+    WriteBlockGroupDescriptor(blockGroup, blockGroupIndex);
+    m_Device->Write(m_SuperBlock, 1024, sizeof(Ext2FsSuperBlock));
+
+    bitmap.Free();
+}
+
 void Ext2Fs::ReadINodeEntry(Ext2FsINodeMeta* out, u32 index)
 {
     usize tableIndex      = (index - 1) % m_SuperBlock->INodesPerGroup;
@@ -214,6 +371,15 @@ void Ext2Fs::ReadBlockGroupDescriptor(Ext2FsBlockGroupDescriptor* out,
     m_Device->Read(out, offset + sizeof(Ext2FsBlockGroupDescriptor) * index,
                    sizeof(Ext2FsBlockGroupDescriptor));
 }
+void Ext2Fs::WriteBlockGroupDescriptor(Ext2FsBlockGroupDescriptor& in,
+                                       usize                       index)
+{
+    off_t offset = m_BlockSize >= 2048 ? m_BlockSize : m_BlockSize * 2;
+
+    m_Device->Write(&in, offset + sizeof(Ext2FsBlockGroupDescriptor) * index,
+                    sizeof(Ext2FsBlockGroupDescriptor));
+}
+
 u32 Ext2Fs::GetINodeBlock(Ext2FsINodeMeta& meta, u32 blockIndex)
 {
     u32 block      = 0;

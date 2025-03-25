@@ -123,3 +123,11 @@ ErrorOr<isize> TmpFsINode::Truncate(usize size)
 
     return 0;
 }
+
+ErrorOr<void> TmpFsINode::ChMod(mode_t mode)
+{
+    m_Stats.st_mode &= ~0777;
+    m_Stats.st_mode |= mode & 0777;
+
+    return {};
+}

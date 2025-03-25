@@ -30,7 +30,7 @@ class Fat32FsINode : public INode
     }
     virtual ErrorOr<isize> Truncate(usize size) override { return -1; }
 
-    virtual ErrorOr<isize> ChMod(mode_t mode) override { return -1; }
+    virtual ErrorOr<void>  ChMod(mode_t mode) override { return Error(ENOSYS); }
 
     friend class Fat32Fs;
 

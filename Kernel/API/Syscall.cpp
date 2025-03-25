@@ -159,6 +159,7 @@ namespace Syscall
         RegisterSyscall(ID::eOpenAt, VFS::SysOpenAt);
         RegisterSyscall(ID::eMkDirAt, VFS::SysMkDirAt);
         RegisterSyscall2(ID::eFStatAt, API::VFS::FStatAt);
+        RegisterSyscall2(ID::eFChModAt, API::VFS::FChModAt);
         RegisterSyscall2(ID::eDup3, API::VFS::Dup3);
     }
     void Handle(Arguments& args)

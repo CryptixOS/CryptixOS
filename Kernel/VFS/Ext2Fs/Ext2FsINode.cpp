@@ -51,3 +51,19 @@ isize Ext2FsINode::Read(void* buffer, off_t offset, usize bytes)
     return m_Fs->ReadINode(m_Meta, reinterpret_cast<u8*>(buffer), offset,
                            bytes);
 }
+
+ErrorOr<void> Ext2FsINode::ChMod(mode_t mode)
+{
+    ScopedLock guard(m_Lock);
+    m_Fs->ReadINodeEntry(&m_Meta, m_Stats.st_ino);
+
+    m_Meta.Permissions &= ~0777;
+    m_Meta.Permissions |= mode & 0777;
+
+    m_Fs->WriteINodeEntry(m_Meta, m_Stats.st_ino);
+
+    m_Stats.st_mode &= ~0777;
+    m_Stats.st_mode |= mode & 0777;
+
+    return {};
+}

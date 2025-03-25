@@ -183,28 +183,34 @@ namespace API::VFS
 
         return symlinkTarget.copy(out, size);
     }
-    ErrorOr<isize> ChModAt(i32 fdNum, PathView path, mode_t mode)
+    ErrorOr<isize> FChModAt(isize dirFdNum, PathView path, mode_t mode)
     {
         auto   process = Process::GetCurrent();
 
         INode* parent  = process->GetRootNode();
         if (!path.IsAbsolute())
         {
-            if (fdNum == AT_FDCWD)
+            if (dirFdNum == AT_FDCWD)
             {
                 auto nodeOrError = ::VFS::ResolvePath(process->GetCWD());
-                if (nodeOrError) parent = nodeOrError.value();
+                if (!nodeOrError) return Error(nodeOrError.error());
+                parent = nodeOrError.value();
             }
             else
             {
-                // TODO(v1tr10l7): use dirFd
+                auto fd = process->GetFileHandle(dirFdNum);
+                if (!fd) return Error(EBADF);
+
+                parent = fd->GetNode();
             }
         }
 
         auto node = std::get<1>(::VFS::ResolvePath(parent, path));
         if (!node) return Error(ENOENT);
 
-        return node->ChMod(mode);
+        auto ret = node->ChMod(mode);
+        if (!ret) return Error(ret.error());
+        return 0;
     }
 
     ErrorOr<isize> UTime(PathView path, const utimbuf* out)

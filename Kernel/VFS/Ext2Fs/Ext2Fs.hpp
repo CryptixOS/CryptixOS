@@ -39,6 +39,12 @@ class Ext2Fs : public Filesystem
     inline Ext2FsSuperBlock* GetSuperBlock() const { return m_SuperBlock; }
     inline usize             GetBlockSize() const { return m_BlockSize; }
 
+    usize                    AllocateINode();
+    void                     FreeINode(usize inode);
+
+    usize                    AllocateBlock(Ext2FsINodeMeta& meta, u32 inode);
+    void                     FreeBlock(usize block);
+
     void                     ReadINodeEntry(Ext2FsINodeMeta* out, u32 index);
     void                     WriteINodeEntry(Ext2FsINodeMeta& in, u32 index);
     isize ReadINode(Ext2FsINodeMeta& meta, u8* out, off_t offset, usize bytes);
@@ -53,5 +59,6 @@ class Ext2Fs : public Filesystem
     usize             m_BlockGroupDescriptionCount;
 
     void ReadBlockGroupDescriptor(Ext2FsBlockGroupDescriptor* out, usize index);
+    void WriteBlockGroupDescriptor(Ext2FsBlockGroupDescriptor& in, usize index);
     u32  GetINodeBlock(Ext2FsINodeMeta& meta, u32 blockIndex);
 };
