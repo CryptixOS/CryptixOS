@@ -20,7 +20,8 @@ class Ext2Fs : public Filesystem
     virtual ~Ext2Fs() = default;
 
     virtual INode* Mount(INode* parent, INode* source, INode* target,
-                         std::string_view name, void* data = nullptr) override;
+                         std::string_view name,
+                         const void*      data = nullptr) override;
     virtual INode* CreateNode(INode* parent, std::string_view name,
                               mode_t mode) override;
     virtual INode* Symlink(INode* parent, std::string_view name,

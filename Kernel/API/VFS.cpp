@@ -183,6 +183,21 @@ namespace API::VFS
 
         return symlinkTarget.copy(out, size);
     }
+
+    ErrorOr<isize> Mount(const char* path, const char* target,
+                         const char* filesystemType, usize flags,
+                         const void* data)
+    {
+        Process* current = Process::GetCurrent();
+        CtosUnused(current);
+
+        bool success = ::VFS::Mount(::VFS::GetRootNode(), path, target,
+                                    filesystemType, flags, data);
+
+        if (!success) return Error(errno);
+        return 0;
+    }
+
     ErrorOr<isize> FChModAt(isize dirFdNum, PathView path, mode_t mode)
     {
         auto   process = Process::GetCurrent();

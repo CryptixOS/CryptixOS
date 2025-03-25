@@ -24,7 +24,7 @@ constexpr usize       FAT32_REAL_FS_INFO_SIGNATURE  = 0x61417272;
 constexpr usize       FAT32_REAL_FS_INFO_SIGNATURE2 = 0xaa550000;
 
 INode* Fat32Fs::Mount(INode* parent, INode* source, INode* target,
-                      std::string_view name, void* data)
+                      std::string_view name, const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))

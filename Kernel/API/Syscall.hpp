@@ -183,6 +183,8 @@ namespace Syscall
         eUTime          = 132,
         eArchPrCtl      = 158,
         eSetTimeOfDay   = 164,
+        eMount          = 165,
+        eUMount         = 166,
         eReboot         = 169,
         eGetTid         = 186,
         eGetDents64     = 217,

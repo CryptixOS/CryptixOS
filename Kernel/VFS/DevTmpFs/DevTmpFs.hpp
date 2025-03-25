@@ -17,7 +17,8 @@ class DevTmpFs : public Filesystem
     DevTmpFs(u32 flags);
 
     virtual INode* Mount(INode* parent, INode* source, INode* target,
-                         std::string_view name, void* data = nullptr) override;
+                         std::string_view name,
+                         const void*      data = nullptr) override;
 
     virtual INode* CreateNode(INode* parent, std::string_view name,
                               mode_t mode) override;

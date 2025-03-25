@@ -299,7 +299,7 @@ namespace VFS
 
     // TODO: flags
     bool Mount(INode* parent, PathView sourcePath, PathView target,
-               std::string_view fsName, i32 flags, void* data)
+               std::string_view fsName, i32 flags, const void* data)
     {
         ScopedLock  guard(s_Lock);
 

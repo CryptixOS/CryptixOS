@@ -33,6 +33,10 @@ namespace API::VFS
     ErrorOr<isize> RmDir(PathView path);
     ErrorOr<isize> ReadLink(PathView path, char* out, usize size);
 
+    ErrorOr<isize> Mount(const char* path, const char* target,
+                         const char* filesystemType, usize flags,
+                         const void* data);
+
     ErrorOr<isize> FChModAt(isize dirFdNum, PathView path, mode_t mode);
     ErrorOr<isize> UTime(PathView path, const utimbuf* out);
     ErrorOr<isize> FStatAt(isize dirFd, const char* path, isize flags,

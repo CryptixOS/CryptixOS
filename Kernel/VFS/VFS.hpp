@@ -41,7 +41,8 @@ namespace VFS
 
     bool         MountRoot(std::string_view filesystemName);
     bool         Mount(INode* parent, PathView source, PathView target,
-                       std::string_view fsName, i32 flags = 0, void* data = nullptr);
+                       std::string_view fsName, i32 flags = 0,
+                       const void* data = nullptr);
     bool         Unmount(INode* parent, PathView path, i32 flags = 0);
 
     INode*       CreateNode(INode* parent, PathView path, mode_t mode);

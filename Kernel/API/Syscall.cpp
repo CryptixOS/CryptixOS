@@ -150,6 +150,7 @@ namespace Syscall
         RegisterSyscall(ID::eExecve, Process::SysExecve);
         RegisterSyscall(ID::eArchPrCtl, SysArchPrCtl);
         RegisterSyscall(ID::eSetTimeOfDay, Time::SysSetTimeOfDay);
+        RegisterSyscall2(ID::eMount, API::VFS::Mount);
         RegisterSyscall(ID::eReboot, SysReboot);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
         RegisterSyscall(ID::eGetDents64, VFS::SysGetDents64);

@@ -15,7 +15,7 @@ DevTmpFs::DevTmpFs(u32 flags)
 }
 
 INode* DevTmpFs::Mount(INode* parent, INode* source, INode* target,
-                       std::string_view name, void* data)
+                       std::string_view name, const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))

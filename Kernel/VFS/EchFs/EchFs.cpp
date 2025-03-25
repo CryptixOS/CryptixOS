@@ -16,7 +16,7 @@ constexpr const char* ECHFS_SIGNATURE   = "_ECH_FS_";
 constexpr usize       ROOT_DIRECTORY_ID = 0xffff'ffff'ffff'ffff;
 
 INode*                EchFs::Mount(INode* parent, INode* source, INode* target,
-                                   std::string_view name, void* data)
+                                   std::string_view name, const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))

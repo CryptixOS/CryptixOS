@@ -52,6 +52,7 @@ void kernelThread()
     VFS::CreateNode(VFS::GetRootNode(), "/dev", 0755 | S_IFDIR);
     Assert(VFS::Mount(VFS::GetRootNode(), "", "/dev", "devtmpfs"));
     VFS::CreateNode(VFS::GetRootNode(), "/mnt", 0755 | S_IFDIR);
+    VFS::CreateNode(VFS::GetRootNode(), "/mnt2", 0755 | S_IFDIR);
 
     Scheduler::InitializeProcFs();
 
@@ -68,6 +69,8 @@ void kernelThread()
     MemoryDevices::Initialize();
 
     Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1", "/mnt", "ext2fs"));
+    Assert(
+        VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p2", "/mnt2", "fat32fs"));
 
     auto kernelExecutable = BootInfo::GetExecutableFile();
     auto header   = reinterpret_cast<ELF::Header*>(kernelExecutable->address);

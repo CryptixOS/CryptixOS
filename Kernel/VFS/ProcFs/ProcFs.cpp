@@ -24,7 +24,7 @@ void ProcFs::RemoveProcess(pid_t pid)
     s_Processes.erase(pid);
 }
 INode* ProcFs::Mount(INode* parent, INode* source, INode* target,
-                     std::string_view name, void* data)
+                     std::string_view name, const void* data)
 {
     ScopedLock guard(m_Lock);
     m_MountData

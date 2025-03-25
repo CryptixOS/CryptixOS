@@ -11,7 +11,7 @@
 #include <VFS/Ext2Fs/Ext2FsINode.hpp>
 
 INode* Ext2Fs::Mount(INode* parent, INode* source, INode* target,
-                     std::string_view name, void* data)
+                     std::string_view name, const void* data)
 {
     m_Device     = source;
 
