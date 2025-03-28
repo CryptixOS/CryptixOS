@@ -1,4 +1,4 @@
-name: build-sysroot
+name: Build system root
 
 on:
   push:
