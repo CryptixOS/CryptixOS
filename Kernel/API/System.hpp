@@ -24,5 +24,5 @@ namespace API::System
 
     ErrorOr<isize>     Uname(utsname* out);
     ErrorOr<isize>     Reboot(RebootCommand cmd);
-    ErrorOr<uintptr_t> SysPanic(const char* errorMessaage);
+    ErrorOr<uintptr_t> SysPanic(const char* errorMessage);
 } // namespace API::System
