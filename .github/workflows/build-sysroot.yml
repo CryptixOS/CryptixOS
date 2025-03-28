@@ -1,4 +1,4 @@
-name: CI Meson
+name: build-sysroot
 
 on:
   push:
@@ -28,10 +28,6 @@ jobs:
           && sudo apt install build-essential qemu-system parted udev bison flex libgmp3-dev libmpc-dev libmpfr-dev
           && sudo apt install texinfo libisl-dev gperf gettext autopoint libreadline-dev help2man groff zsh
           && pipx install xbstrap 
-      - name: Create /usr/sbin/init
-        run: mkdir -p build-sysroot/system-root/usr/sbin/ && touch sysroot/usr/sbin/init
-      - name: Configure Project
-        run: ./Meta/setup.sh x86_64 release 
-          && (cd subprojects/fmt-10.2.0/ && patch -p 1 < ../../fmt-10.2.0.patch)
-          && ./Meta/build.sh release x86_64
-    
+      - name: Build sysroot
+        run: mkdir build-sysroot && pushd build-sysroot && xbstrap init .. && xbstrap install base && popd
+
