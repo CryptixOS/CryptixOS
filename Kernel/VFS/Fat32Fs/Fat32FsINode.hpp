@@ -20,10 +20,7 @@ class Fat32FsINode : public INode
                   GetChildren() override;
 
     virtual void  InsertChild(INode* node, std::string_view name) override;
-    virtual isize Read(void* buffer, off_t offset, usize bytes) override
-    {
-        return -1;
-    }
+    virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override
     {
         return -1;
@@ -35,6 +32,7 @@ class Fat32FsINode : public INode
     friend class Fat32Fs;
 
   private:
+    class Fat32Fs*     m_Fat32Fs         = nullptr;
     usize              m_Cluster         = 0;
     usize              m_DirectoryOffset = 0;
     std::atomic<usize> m_NextIndex       = 2;

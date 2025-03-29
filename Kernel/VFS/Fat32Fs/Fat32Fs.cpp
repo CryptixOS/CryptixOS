@@ -237,6 +237,40 @@ bool Fat32Fs::Populate(INode* node)
     return (f32node->m_Populated = true);
 }
 
+bool Fat32Fs::ReadBytes(u32 cluster, u8* out, off_t offset, usize bytes)
+{
+    bool end            = true;
+    cluster             = SkipCluster(cluster, offset / m_ClusterSize, end);
+
+    off_t clusterOffset = offset % m_ClusterSize;
+    if (clusterOffset > 0)
+    {
+        usize count
+            = bytes > m_ClusterSize ? m_ClusterSize - clusterOffset : bytes;
+        if (ReadWriteCluster(out, cluster, clusterOffset, count, false) == -1)
+            return false;
+
+        cluster = GetNextCluster(cluster);
+        out += count;
+        bytes -= count;
+    }
+
+    usize clustersRemaining = bytes / m_ClusterSize;
+    if (clustersRemaining
+        && ReadWriteClusters(out, cluster, clustersRemaining, &cluster, false)
+               == -1)
+        return false;
+
+    bytes -= clustersRemaining * m_ClusterSize;
+    if (bytes > 0)
+    {
+        out += clustersRemaining * m_ClusterSize;
+        if (ReadWriteCluster(out, cluster, 0, bytes, false) == -1) return false;
+    }
+
+    return true;
+}
+
 usize Fat32Fs::GetChainSize(u32 cluster)
 {
     usize count = 0;
@@ -251,6 +285,23 @@ usize Fat32Fs::GetChainSize(u32 cluster)
 u32 Fat32Fs::GetNextCluster(u32 cluster)
 {
     m_Device->Read(&cluster, m_FatOffset + cluster * 4, 4);
+    return cluster;
+}
+u32 Fat32Fs::SkipCluster(u32 cluster, usize count, bool& end)
+{
+    end = false;
+    for (usize i = 0; i < count; ++i)
+    {
+        u32 next = GetNextCluster(cluster);
+        if (IsFinalCluster(next))
+        {
+            end = true;
+            break;
+        }
+
+        cluster = next;
+    }
+
     return cluster;
 }
 

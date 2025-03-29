@@ -12,6 +12,7 @@
 Fat32FsINode::Fat32FsINode(INode* parent, std::string_view name, Filesystem* fs,
                            mode_t mode)
     : INode(parent, name, fs)
+    , m_Fat32Fs(reinterpret_cast<Fat32Fs*>(fs))
 {
     m_Stats.st_dev    = fs->GetDeviceID();
     m_Stats.st_ino    = fs->GetNextINodeIndex();
@@ -67,4 +68,24 @@ void Fat32FsINode::InsertChild(INode* node, std::string_view name)
 {
     ScopedLock guard(m_Lock);
     m_Children[name] = node;
+}
+
+isize Fat32FsINode::Read(void* buffer, off_t offset, usize bytes)
+{
+    ScopedLock guard(m_Lock);
+
+    off_t      endOffset = offset + bytes;
+    if (endOffset > m_Stats.st_size)
+    {
+        endOffset = m_Stats.st_size;
+        bytes     = offset >= endOffset ? 0 : endOffset - offset;
+    }
+
+    if (bytes == 0) return 0;
+
+    if (!m_Fat32Fs->ReadBytes(m_Cluster, reinterpret_cast<u8*>(buffer), offset,
+                              bytes))
+        return_err(-1, ENOENT);
+
+    return bytes;
 }

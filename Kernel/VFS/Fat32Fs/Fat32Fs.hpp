@@ -41,8 +41,11 @@ class Fat32Fs final : public Filesystem
     {
         return cluster >= 0xffffff8;
     }
+
+    bool  ReadBytes(u32 cluster, u8* out, off_t offset, usize bytes);
     usize GetChainSize(u32 cluster);
     u32   GetNextCluster(u32 cluster);
+    u32   SkipCluster(u32 cluster, usize count, bool& endCluster);
 
   private:
     INode*           m_Device = nullptr;
