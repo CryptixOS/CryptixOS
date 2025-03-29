@@ -27,6 +27,7 @@ srcs += files(
   'Drivers/HID/Ps2KeyboardDevice.cpp',
 
   'Drivers/PCI/Access.cpp',
+  'Drivers/PCI/Bus.cpp',
   'Drivers/PCI/Device.cpp',
   'Drivers/PCI/PCI.cpp',
   'Drivers/PCI/HostController.cpp',

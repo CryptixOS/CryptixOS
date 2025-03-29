@@ -189,10 +189,11 @@ namespace PCI
             }
         }
 
-        void                      EnableMemorySpace();
-        void                      EnableBusMastering();
+        void                        EnableMemorySpace();
+        void                        EnableBusMastering();
 
-        constexpr const DeviceID& GetDeviceID() const { return m_ID; }
+        constexpr const DeviceID&   GetDeviceID() const { return m_ID; }
+        inline const DeviceAddress& GetAddress() const { return m_Address; }
         bool          MatchID(std::span<DeviceID> idTable, DeviceID& outID);
 
         constexpr u16 GetVendorID() const
