@@ -4,17 +4,102 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/System.hpp>
+
 #include <VFS/ProcFs/ProcFs.hpp>
+#include <VFS/ProcFs/ProcFsINode.hpp>
 
 std::unordered_map<pid_t, Process*> ProcFs::s_Processes;
 
-void                                ProcFs::AddProcess(Process* process)
+struct ProcFsMountsProperty : public ProcFsProperty
+{
+  public:
+    virtual void GenerateRecord() override
+    {
+        Buffer.clear();
+        Buffer.resize(PMM::PAGE_SIZE);
+
+        for (auto it = VFS::GetMountPoints().begin();
+             it != VFS::GetMountPoints().end();)
+        {
+            auto&            mountPoint = *it;
+            std::string_view mountPath  = mountPoint.first;
+            Filesystem*      fs         = mountPoint.second;
+
+            Write("{} {} {} {}\n", fs->GetDeviceName(), mountPath,
+                  fs->GetName(), fs->GetMountFlagsString());
+            ++it;
+        }
+    }
+};
+
+struct ProcFsCmdLineProperty : public ProcFsProperty
+{
+  public:
+    virtual void GenerateRecord() override
+    {
+        Buffer.clear();
+
+        std::string_view kernelPath = BootInfo::GetExecutableFile()->path;
+        std::string_view cmdline    = BootInfo::GetKernelCommandLine();
+
+        Buffer.resize(kernelPath.size() + cmdline.size() + 10);
+        Write("{} {}\n", kernelPath, cmdline);
+    }
+};
+struct ProcFsFilesystemsProperty : public ProcFsProperty
+{
+  public:
+    virtual void GenerateRecord() override
+    {
+        Buffer.clear();
+        Buffer.resize(PMM::PAGE_SIZE);
+
+        for (auto& [physical, fs] : VFS::GetFilesystems())
+            Write("{} {}\n", physical ? "     " : "nodev", fs);
+    }
+};
+struct ProcFsVersionProperty : public ProcFsProperty
+{
+  public:
+    virtual void GenerateRecord() override
+    {
+        Buffer.clear();
+        Buffer.resize(PMM::PAGE_SIZE);
+
+        utsname uname;
+        auto    ret = API::System::Uname(&uname);
+        if (!ret) return;
+
+        Write("{} {} {}\n", uname.sysname, uname.release, uname.version);
+    }
+};
+
+static constexpr ProcFsProperty* CreateProcFsProperty(StringView name)
+{
+    if (name == "cmdline") return new ProcFsCmdLineProperty();
+    else if (name == "filesystems") return new ProcFsFilesystemsProperty();
+    else if (name == "mounts") return new ProcFsMountsProperty();
+    else if (name == "version") return new ProcFsVersionProperty();
+
+    return nullptr;
+}
+
+static ProcFsINode* CreateProcFsNode(INode* parent, StringView name,
+                                     Filesystem* filesystem)
+{
+    ProcFsProperty* property = CreateProcFsProperty(name);
+    return new ProcFsINode(parent, name, filesystem, 0755 | S_IFREG, property);
+}
+
+void ProcFs::AddProcess(Process* process)
 {
     ScopedLock guard(m_Lock);
     Assert(!s_Processes.contains(process->GetPid()));
     s_Processes[process->GetPid()] = process;
     auto  nodeName                 = std::to_string(process->GetPid());
-    auto* processNode = new ProcFsINode(m_Root, nodeName, this, 0755 | S_IFDIR);
+    auto* processNode
+        = new ProcFsINode(m_Root, nodeName.data(), this, 0755 | S_IFDIR);
 
     m_Root->InsertChild(processNode, nodeName);
 }
@@ -32,53 +117,13 @@ INode* ProcFs::Mount(INode* parent, INode* source, INode* target,
                : nullptr;
 
     if (m_Root) VFS::RecursiveDelete(m_Root);
-    m_Root = new ProcFsINode(parent, name, this, 0755 | S_IFDIR);
+    m_Root = new ProcFsINode(parent, name.data(), this, 0755 | S_IFDIR);
     if (m_Root) m_MountedOn = target;
 
-    ProcFsProperty* mounts = new ProcFsProperty(
-        [](std::string& buffer)
-        {
-            for (const auto& mountPoint : VFS::GetMountPoints())
-            {
-                std::string_view mountPath = mountPoint.first;
-                Filesystem*      fs        = mountPoint.second;
-
-                buffer += std::format("{} {} {} {}\n", fs->GetDeviceName(),
-                                      mountPath, fs->GetName(),
-                                      fs->GetMountFlagsString());
-            }
-        });
-    ProcFsProperty* cmdline = new ProcFsProperty(
-        [](std::string& buffer)
-        {
-            std::string_view kernelPath = BootInfo::GetExecutableFile()->path;
-            std::string_view cmdline    = BootInfo::GetKernelCommandLine();
-
-            buffer.reserve(kernelPath.size() + cmdline.size() + 10);
-
-            buffer += BootInfo::GetExecutableFile()->path;
-            buffer += " ";
-            buffer += BootInfo::GetKernelCommandLine();
-            buffer += "\n";
-        });
-    ProcFsProperty* filesystems = new ProcFsProperty(
-        [](std::string& buffer)
-        {
-            for (auto& [physical, fs] : VFS::GetFilesystems())
-            {
-                buffer += physical ? "     " : "nodev";
-                buffer += " ";
-                buffer += fs;
-                buffer += "\n";
-            }
-        });
-    m_Root->InsertChild(new ProcFsINode(m_Root, "mounts", this, 0755, mounts),
-                        "mounts");
-    m_Root->InsertChild(new ProcFsINode(m_Root, "cmdline", this, 0755, cmdline),
-                        "cmdline");
-    m_Root->InsertChild(
-        new ProcFsINode(m_Root, "filesystems", this, 0755, filesystems),
-        "filesystems");
+    AddChild("mounts");
+    AddChild("cmdline");
+    AddChild("filesystems");
+    AddChild("version");
     m_MountedOn = target;
 
     return m_Root;
@@ -97,3 +142,8 @@ INode* ProcFs::Link(INode* parent, std::string_view name, INode* oldNode)
     return nullptr;
 }
 bool ProcFs::Populate(INode* node) { return true; }
+
+void ProcFs::AddChild(StringView name)
+{
+    m_Root->InsertChild(CreateProcFsNode(m_Root, name, this), name.Raw());
+}

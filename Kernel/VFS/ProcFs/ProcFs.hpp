@@ -7,6 +7,7 @@
 #pragma once
 
 #include <Scheduler/Process.hpp>
+
 #include <VFS/Filesystem.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
 
@@ -43,4 +44,6 @@ class ProcFs : public Filesystem
     static std::unordered_map<pid_t, Process*>            s_Processes;
 
     std::unordered_map<std::string_view, ProcFsProperty*> m_Properties;
+
+    void AddChild(StringView name);
 };

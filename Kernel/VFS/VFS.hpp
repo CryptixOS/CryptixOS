@@ -21,8 +21,6 @@ class INode;
 class FileDescriptor;
 namespace VFS
 {
-    using PM::PathView;
-
     Vector<std::pair<bool, std::string_view>>& GetFilesystems();
 
     INode*                                     GetRootNode();
