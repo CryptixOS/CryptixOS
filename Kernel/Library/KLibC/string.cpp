@@ -12,6 +12,7 @@
 
 extern "C"
 {
+#ifndef CTOS_TARGET_X86_64
     void* memcpy(void* dest, const void* src, usize len) throw()
     {
         u8*       d = static_cast<u8*>(dest);
@@ -54,6 +55,7 @@ extern "C"
 
         return 0;
     }
+#endif
 
     void* memchr(const void* ptr, int ch, usize len)
     {
