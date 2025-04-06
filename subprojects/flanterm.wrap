@@ -1,5 +1,5 @@
 [wrap-git]
-url = https://github.com/mintsuki/flanterm
+url = https://codeberg.org/mintsuki/flanterm
 revision = trunk
 depth = 1
 patch_filename = flanterm.tar
