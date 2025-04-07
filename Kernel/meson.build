@@ -66,6 +66,7 @@ srcs += files(
   'Library/Logger.cpp',
   'Library/Module.cpp',
   'Library/Stacktrace.cpp',
+  'Library/ZLib.cpp',
 
   'VFS/Fifo.cpp',
   'VFS/FileDescriptor.cpp',
@@ -125,7 +126,7 @@ kernel_elf = executable(
   'Cryptix.elf',
   srcs,
   dependencies: [deps, mod_deps],
-  link_depends: meson.current_source_dir() / 'linker.' + arch + '.ld',
+  link_depends: [meson.current_source_dir() / 'linker.' + arch + '.ld'],
   include_directories: [include_directories, incs],
   c_args: [c_args, args],
   cpp_args: [cxx_args, args],
