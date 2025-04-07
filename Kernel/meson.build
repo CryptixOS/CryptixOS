@@ -75,6 +75,7 @@ srcs += files(
   'VFS/FileDescriptor.cpp',
   'VFS/FileDescriptorTable.cpp',
   'VFS/INode.cpp',
+  'VFS/SynthFsINode.cpp',
   'VFS/VFS.cpp',
 
   'VFS/DevTmpFs/DevTmpFs.cpp',
@@ -133,7 +134,7 @@ kernel_elf = executable(
   include_directories: [include_directories, incs],
   c_args: [c_args, args],
   cpp_args: [cxx_args, args],
-  #cpp_pch: 'Library/PrecompiledHeader.hpp',
+  cpp_pch: 'Library/PrecompiledHeader.hpp',
   link_args: [ld_args],
   install: false,
 )
