@@ -75,7 +75,7 @@ srcs += files(
   'VFS/FileDescriptor.cpp',
   'VFS/FileDescriptorTable.cpp',
   'VFS/INode.cpp',
-  'VFS/SynthFsINode.cpp',
+  #'VFS/SynthFsINode.cpp',
   'VFS/VFS.cpp',
 
   'VFS/DevTmpFs/DevTmpFs.cpp',
