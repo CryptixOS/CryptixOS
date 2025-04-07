@@ -13,7 +13,7 @@ project('CryptixOS', ['c', 'cpp'],
     'wrap_mode=forcefallback',
     'b_lundef=true',
     'b_pie=true',
-    'c_std=c23',
+    'c_std=c17',
     'cpp_std=c++23',
   ],
 )
