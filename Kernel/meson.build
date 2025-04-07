@@ -123,6 +123,27 @@ else
   error('Unknown architecture: ' + arch)
 endif
 
+git_tag = run_command('git', 'rev-parse', 'HEAD').stdout().strip()
+
+version = meson.project_version().substring(1).split('.')
+versionConf = configuration_data()
+versionConf.set('kernel_name', meson.project_name())
+versionConf.set('KERNEL_VERSION_MAJ', version[0])
+versionConf.set('KERNEL_VERSION_MIN', version[1])
+versionConf.set('KERNEL_VERSION_PAT', version[2])
+versionConf.set('git_tag', git_tag)
+versionConf.set('arch', arch)
+versionConf.set('compiler', cxx.get_id())
+versionConf.set('compiler_version', cxx.version())
+
+kernel_version_string_template = '@0@.@1@.@2@-@3@'
+versionConf.set('kernel_version_string', kernel_version_string_template.format(version[0], version[1], version[2], git_tag))
+
+configure_file(
+  input: 'Version.hpp.in', 
+  output: 'Version.hpp',
+  configuration: versionConf)
+
 subdir('Library/KLibC')
 subdir('Library/KLibC++')
 
@@ -131,7 +152,7 @@ kernel_elf = executable(
   [srcs, font],
   dependencies: [deps, mod_deps],
   link_depends: [meson.current_source_dir() / 'linker.' + arch + '.ld', font],
-  include_directories: [include_directories, incs],
+  include_directories: [include_directories, incs, include_directories('.')],
   c_args: [c_args, args],
   cpp_args: [cxx_args, args],
   cpp_pch: 'Library/PrecompiledHeader.hpp',

@@ -1,0 +1,29 @@
+/*
+ * Created by v1tr10l7 on 07.04.2025.
+ * Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
+ *
+ * SPDX-License-Identifier: GPL-3
+ */
+#pragma once
+
+#include <Prism/Core/Types.hpp>
+#include <Prism/StringView.hpp>
+
+constexpr const char* KERNEL_NAME = "@kernel_name@";
+
+#mesondefine KERNEL_VERSION_MAJ
+#mesondefine KERNEL_VERSION_MIN
+#mesondefine KERNEL_VERSION_PAT
+constexpr usize       KERNEL_VERSION_MAJOR  = KERNEL_VERSION_MAJ;
+constexpr usize       KERNEL_VERSION_MINOR  = KERNEL_VERSION_MIN;
+constexpr usize       KERNEL_VERSION_PATCH  = KERNEL_VERSION_PAT;
+constexpr const char* KERNEL_GIT_TAG        = "@git_tag@";
+
+constexpr const char* KERNEL_BUILD_DATE     = __DATE__;
+constexpr const char* KERNEL_BUILD_TIME     = __TIME__;
+
+constexpr const char* KERNEL_ARCH_STRING    = "@arch@";
+constexpr const char* KERNEL_COMPILER       = "@compiler@";
+constexpr const char* COMPILER_VERSION      = "@compiler_version@";
+
+constexpr StringView  KERNEL_VERSION_STRING = "@kernel_version_string@";

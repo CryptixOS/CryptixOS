@@ -7,11 +7,11 @@
 #include <Prism/Core/Types.hpp>
 #include <Prism/StringView.hpp>
 
-constexpr const char* KERNEL_NAME          = "Cryptix";
-constexpr usize       KERNEL_VERSION_MAJOR = 0;
-constexpr usize       KERNEL_VERSION_MINOR = 0;
-constexpr usize       KERNEL_VERSION_PATCH = 1;
-#define KERNEL_GIT_TAG "63bf33e1ab257d5857057e77aac1978249f40a01";
+constexpr const char* KERNEL_NAME          = "@kernel_name@";
+constexpr usize       KERNEL_VERSION_MAJOR = @kernel_version_major @;
+constexpr usize       KERNEL_VERSION_MINOR = @kernel_version_minor @;
+constexpr usize       KERNEL_VERSION_PATCH = @kernel_version_patch @;
+#define KERNEL_GIT_TAG "@git_tag@";
 
 #ifdef CTOS_TARGET_X86_64
 constexpr const char* KERNEL_ARCH_STRING = "x86_64";
@@ -35,4 +35,6 @@ constexpr const char* COMPILER_VERSION = "?.?.?";
 #endif
 
 constexpr StringView KERNEL_VERSION_STRING
-    = Stringify(KERNEL_VERSION_MAJOR) "." Stringify(KERNEL_VERSION_MINOR) "." Stringify(KERNEL_VERSION_PATCH)"-" KERNEL_GIT_TAG;
+    = Stringify(@kernel_version_major @) "." Stringify(
+        @kernel_version_minor
+        @) "." Stringify(@kernel_version_patch @) "-" KERNEL_GIT_TAG;
