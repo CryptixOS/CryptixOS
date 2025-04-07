@@ -398,7 +398,7 @@ namespace PNG
         }
         if (chunk.Length > (1u << 30))
         {
-            LogError("PNG: IDAT size limit, idat section is larget than 2^30");
+            LogError("PNG: IDAT size limit, idat section is larger than 2^30");
             return false;
         }
         if (static_cast<i32>(m_IdatSize + chunk.Length)
