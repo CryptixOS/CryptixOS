@@ -140,7 +140,7 @@ namespace ZLib
         Header header(stream.Read<u16>());
         if (header.CompressionMethod != CompressionMethod::eDeflate)
         {
-            LogError("ZLib: Non-Deflate compression is not suppored");
+            LogError("ZLib: Non-Deflate compression is not supported");
             return false;
         }
         if (header.DictionaryPresent)
