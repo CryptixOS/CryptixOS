@@ -135,32 +135,32 @@ class Process
     i32                    Exit(i32 code);
 
     friend struct Thread;
-    Process*                 m_Parent      = nullptr;
-    pid_t                    m_Pid         = -1;
-    std::string              m_Name        = "?";
-    PageMap*                 PageMap       = nullptr;
-    Credentials              m_Credentials = {};
-    TTY*                     m_TTY;
-    PrivilegeLevel           m_Ring = PrivilegeLevel::eUnprivileged;
-    std::optional<i32>       m_Status;
-    bool                     m_Exited     = false;
+    Process*              m_Parent      = nullptr;
+    pid_t                 m_Pid         = -1;
+    std::string           m_Name        = "?";
+    PageMap*              PageMap       = nullptr;
+    Credentials           m_Credentials = {};
+    TTY*                  m_TTY;
+    PrivilegeLevel        m_Ring = PrivilegeLevel::eUnprivileged;
+    std::optional<i32>    m_Status;
+    bool                  m_Exited     = false;
 
-    Thread*                  m_MainThread = nullptr;
-    std::atomic<tid_t>       m_NextTid    = m_Pid;
-    std::vector<Process*>    m_Children;
-    std::vector<Process*>    m_Zombies;
-    std::vector<Thread*>     m_Threads;
+    Thread*               m_MainThread = nullptr;
+    std::atomic<tid_t>    m_NextTid    = m_Pid;
+    std::vector<Process*> m_Children;
+    std::vector<Process*> m_Zombies;
+    std::vector<Thread*>  m_Threads;
 
-    INode*                   m_RootNode = VFS::GetRootNode();
-    std::string              m_CWD      = "/";
-    mode_t                   m_Umask    = 0;
+    INode*                m_RootNode = VFS::GetRootNode();
+    std::string           m_CWD      = "/";
+    mode_t                m_Umask    = 0;
 
-    FileDescriptorTable      m_FdTable;
-    std::vector<VMM::Region> m_AddressSpace{};
-    uintptr_t                m_UserStackTop = 0x70000000000;
-    usize                    m_Quantum      = 1000;
-    Spinlock                 m_Lock;
-    Event                    m_Event;
+    FileDescriptorTable   m_FdTable;
+    Vector<VMM::Region>   m_AddressSpace{};
+    uintptr_t             m_UserStackTop = 0x70000000000;
+    usize                 m_Quantum      = 1000;
+    Spinlock              m_Lock;
+    Event                 m_Event;
 
     friend class Scheduler;
     friend struct Thread;

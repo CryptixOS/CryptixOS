@@ -162,7 +162,7 @@ namespace PNG
 
         ZLib::Decompressor zlibDecompressor(m_CompressedData.Raw(), m_IdatSize);
         usize              stride
-            = Math::DivRoundUp(m_ChannelCount * m_Width * m_Depth, 8) + 1;
+            = Math::DivRoundUp(m_ChannelCount * m_Width * m_Depth + 7, 8) + 1;
         usize rawSize = stride * m_Height;
         zlibDecompressor.Decompress(rawSize);
 

@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <API/Posix/sys/resource.h>
 #include <API/Posix/sys/utsname.h>
 #include <API/Syscall.hpp>
 
@@ -23,6 +24,8 @@ namespace API::System
     };
 
     ErrorOr<isize>     Uname(utsname* out);
+    ErrorOr<isize>     GetResourceLimit(isize resource, rlimit* rlimit);
+    ErrorOr<isize>     GetResourceUsage(isize who, rusage* usage);
     ErrorOr<isize>     Reboot(RebootCommand cmd);
     ErrorOr<uintptr_t> SysPanic(const char* errorMessage);
 } // namespace API::System

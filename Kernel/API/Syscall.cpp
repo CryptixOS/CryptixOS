@@ -112,6 +112,8 @@ namespace Syscall
         RegisterSyscall2(ID::eGetUid, API::Process::GetUid);
         RegisterSyscall2(ID::eGetGid, API::Process::GetGid);
         RegisterSyscall2(ID::eUname, API::System::Uname);
+        RegisterSyscall2(ID::eGetResourceLimit, API::System::GetResourceLimit);
+        RegisterSyscall2(ID::eGetResourceUsage, API::System::GetResourceUsage);
         RegisterSyscall(ID::eFcntl, VFS::SysFcntl);
         RegisterSyscall2(ID::eTruncate, API::VFS::Truncate);
         RegisterSyscall2(ID::eFTruncate, API::VFS::FTruncate);
@@ -188,6 +190,13 @@ namespace Syscall
         std::array<uintptr_t, 6> arr
             = {args.Args[0], args.Args[1], args.Args[2],
                args.Args[3], args.Args[4], args.Args[5]};
+#define SYSCALL_LOG_ERR false
+#if SYSCALL_LOG_ERR == true
+    #define SyscallError(...) LogError(__VA_ARGS__)
+#else
+    #define SyscallError(...)
+#endif
+
         if (s_Syscalls.contains(static_cast<ID>(args.Index)))
         {
             auto ret = s_Syscalls[static_cast<ID>(args.Index)]->Run(arr);
@@ -195,7 +204,7 @@ namespace Syscall
             if (ret) args.ReturnValue = ret.value();
             else
             {
-                LogError(
+                SyscallError(
                     "Syscall: '{}' caused error",
                     magic_enum::enum_name(static_cast<ID>(args.Index)).data()
                         + 1);
@@ -208,9 +217,9 @@ namespace Syscall
         if (ret) args.ReturnValue = ret.value();
         else
         {
-            LogError("Syscall: '{}' caused error",
-                     magic_enum::enum_name(static_cast<ID>(args.Index)).data()
-                         + 1);
+            SyscallError(
+                "Syscall: '{}' caused error",
+                magic_enum::enum_name(static_cast<ID>(args.Index)).data() + 1);
             args.ReturnValue = -intptr_t(ret.error());
         }
     }

@@ -72,6 +72,7 @@ struct termios2
     speed_t  c_ispeed; /* input speed */
     speed_t  c_ospeed; /* output speed */
 };
+
 constexpr usize TCGETS2    = _IOR<'T', 0x2a, termios2>();
 constexpr usize TCSETS2    = _IOW<'T', 0x2B, termios2>();
 constexpr usize TCSETSW2   = _IOW<'T', 0x2C, termios2>();

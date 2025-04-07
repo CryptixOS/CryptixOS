@@ -495,7 +495,6 @@ namespace Syscall::VFS
         i32      flags   = static_cast<i32>(args.Args[2]);
         mode_t   mode    = static_cast<mode_t>(args.Args[3]);
 
-        LogDebug("OpenAt: {}", path.Raw());
         return current->OpenAt(dirFd, path, flags, mode);
     }
     ErrorOr<i32> SysMkDirAt(Syscall::Arguments& args)

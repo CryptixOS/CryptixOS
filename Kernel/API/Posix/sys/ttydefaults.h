@@ -11,38 +11,44 @@
 /*
  * Defaults on "first" open.
  */
-constexpr usize TTYDEF_IFLAG = BRKINT | ISTRIP | ICRNL | IMAXBEL | IXON | IXANY;
-constexpr usize TTYDEF_OFLAG = OPOST | ONLCR | XTABS;
+constexpr usize TTYDEF_IFLAG = ICRNL | IXON;
+constexpr usize TTYDEF_OFLAG = OPOST | ONLCR;
 constexpr usize TTYDEF_LFLAG
-    = ECHO | ICANON | ISIG | IEXTEN | ECHOE | ECHOK | ECHOCTL;
-constexpr usize TTYDEF_CFLAG = CREAD | CS8 | PARENB | HUPCL;
-constexpr usize TTYDEF_SPEED = B9600;
+    = ISIG | ICANON | ECHO | ECHOE | ECHOK | ECHOCTL | ECHOKE | IEXTEN;
+constexpr usize TTYDEF_CFLAG = B38400 | CS8 | CREAD | HUPCL;
+constexpr usize TTYDEF_SPEED = 38400;
+// constexpr usize TTYDEF_IFLAG = BRKINT | ISTRIP | ICRNL | IMAXBEL | IXON |
+// IXANY; constexpr usize TTYDEF_OFLAG = OPOST | ONLCR | XTABS; constexpr usize
+// TTYDEF_LFLAG
+//     = ECHO | ICANON | ISIG | IEXTEN | ECHOE | ECHOK | ECHOCTL;
+// constexpr usize TTYDEF_CFLAG = CREAD | CS8 | PARENB | HUPCL;
+// constexpr usize TTYDEF_SPEED = B9600;
 
 /*
  * Control Character Defaults
  */
 constexpr usize CTRL(u64 c) { return c & 037; }
-constexpr usize CEOF     = CTRL('D');
-constexpr usize CEOL     = 0;
-constexpr usize CERASE   = 0177;
 constexpr usize CINTR    = CTRL('C');
-constexpr usize CSTATUS  = 0;
-constexpr usize CKILL    = CTRL('U');
-constexpr usize CMIN     = 1;
 constexpr usize CQUIT    = 034;
-constexpr usize CSUSP    = CTRL('Z');
+constexpr usize CERASE   = 0177;
+constexpr usize CKILL    = CTRL('U');
+constexpr usize CEOF     = CTRL('D');
 constexpr usize CTIME    = 0;
-constexpr usize CDSUSP   = CTRL('Y');
+constexpr usize CMIN     = 1;
+constexpr usize CSWTC    = 0;
 constexpr usize CSTART   = CTRL('Q');
 constexpr usize CSTOP    = CTRL('S');
-constexpr usize CLNEXT   = CTRL('V');
+constexpr usize CSUSP    = CTRL('Z');
+constexpr usize CSTATUS  = 0;
+constexpr usize CDSUSP   = CTRL('Y');
+constexpr usize CEOL     = 0;
+constexpr usize CREPRINT = CTRL('R');
 constexpr usize CDISCARD = CTRL('O');
 constexpr usize CWERASE  = CTRL('W');
-constexpr usize CREPRINT = CTRL('R');
+constexpr usize CLNEXT   = CTRL('V');
+constexpr usize CEOL2    = CEOL;
+
 constexpr usize CEOT     = CEOF;
 constexpr usize CBRK     = CEOL;
 constexpr usize CRPRNT   = CREPRINT;
 constexpr usize CFLUSH   = CDISCARD;
-
-constexpr usize CSWTC    = 0;
-constexpr usize CEOL2    = CEOL;

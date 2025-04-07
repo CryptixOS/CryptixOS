@@ -384,8 +384,8 @@ ErrorOr<Process*> Process::Fork()
         pageMap->MapRange(range.GetVirtualBase(), physicalSpace,
                           range.GetSize(),
                           PageAttributes::eRWXU | PageAttributes::eWriteBack);
-        newProcess->m_AddressSpace.push_back(
-            {physicalSpace, range.GetVirtualBase(), range.GetSize()});
+        newProcess->m_AddressSpace.EmplaceBack(
+            physicalSpace, range.GetVirtualBase(), range.GetSize());
 
         // TODO(v1tr10l7): Free regions;
     }

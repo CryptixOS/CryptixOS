@@ -66,7 +66,7 @@ namespace API::MM
             if (!sizeOrError) return sizeOrError.error();
 
             ScopedLock guard(current->m_Lock);
-            current->m_AddressSpace.push_back({phys, virt, len, prot, fd});
+            current->m_AddressSpace.EmplaceBack(phys, virt, len, prot, fd);
 
             return virt;
         }
@@ -85,7 +85,7 @@ namespace API::MM
                                        | PageAttributes::eWriteBack);
 
         ScopedLock guard(current->m_Lock);
-        current->m_AddressSpace.push_back({phys, virt, len, prot});
+        current->m_AddressSpace.EmplaceBack(phys, virt, len, prot);
         DebugSyscall("MMAP: virt: {:#x}", virt);
         return virt;
     }
@@ -133,7 +133,7 @@ namespace Syscall::MM
             if (!errorOrBytes) return errorOrBytes.error();
         }
 
-        current->m_AddressSpace.erase(it);
+        current->m_AddressSpace.Erase(it);
 
         current->PageMap->UnmapRange(addr, length);
         usize pageCount

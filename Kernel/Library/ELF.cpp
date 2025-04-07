@@ -8,13 +8,17 @@
 #include <Library/Module.hpp>
 
 #include <Memory/PMM.hpp>
+
+#include <Prism/Containers/Array.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
 
+#include <algorithm>
 #include <cstring>
 #include <magic_enum/magic_enum.hpp>
+#include <utility>
 
 #if 0
     #define ElfDebugLog(...) LogDebug(__VA_ARGS__)
@@ -24,8 +28,70 @@
 
 namespace ELF
 {
-    bool Image::Load(std::string_view path, PageMap* pageMap,
-                     std::vector<VMM::Region>& addressSpace, uintptr_t loadBase)
+    bool Image::LoadFromMemory(u8* data, usize size)
+    {
+        ByteStream<Endian::eNative> stream(data, size);
+        LogTrace("ELF: Kernel Executable Address -> '{:#x}'",
+                 Pointer(data).Raw());
+
+        stream >> m_Header;
+        if (std::strncmp(reinterpret_cast<char*>(&m_Header.Magic), ELF::MAGIC,
+                         4)
+            != 0)
+        {
+            LogError("ELF: Invalid magic");
+            return false;
+        }
+        if (m_Header.Bitness != ELFCLASS64)
+        {
+            LogError("ELF: Only 64-bit programs are supported");
+            return false;
+        }
+        if (m_Header.Endianness != ELFDATA2LSB)
+        {
+            LogError("ELF: BigEndian programs are not supported!");
+            return false;
+        }
+        if (m_Header.HeaderVersion != VER_DEF_CURRENT)
+        {
+            LogError("ELF: Invalid header version");
+            return false;
+        }
+        if (m_Header.Abi != ELFOSABI_SYSV)
+        {
+            LogError(
+                "ELF: Header contains invalid abi ID, only SysV abi is "
+                "supported");
+            return false;
+        }
+
+        constexpr auto EXECUTABLE_TYPE_STRINGS = ToArray({
+            "Relocatable",
+            "Executable",
+            "Shared",
+            "Core",
+        });
+        LogTrace("ELF: Executable type -> '{}'",
+                 m_Header.Type < 4 ? EXECUTABLE_TYPE_STRINGS[m_Header.Type]
+                                   : "Unknown");
+        if (m_Header.InstructionSet != EM_X86_64)
+        {
+            LogError("ELF: Only x86_64 instruction set is supported");
+            return false;
+        }
+        if (m_Header.ElfVersion != VER_DEF_CURRENT)
+        {
+            LogError("ELF: Invalid ELF version");
+            return false;
+        }
+
+        if (!ParseProgramHeaders(stream) || !ParseSectionHeaders(stream))
+            return false;
+
+        return true;
+    }
+    bool Image::Load(PathView path, PageMap* pageMap,
+                     Vector<VMM::Region>& addressSpace, uintptr_t loadBase)
     {
         INode* file
             = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path, true));
@@ -59,7 +125,7 @@ namespace ELF
                     Assert(pageMap->MapRange(
                         current.VirtualAddress + loadBase, phys, size,
                         PageAttributes::eRWXU | PageAttributes::eWriteBack));
-                    addressSpace.push_back(
+                    addressSpace.PushBack(
                         {phys, current.VirtualAddress + loadBase, size});
 
                     Read(ToHigherHalfAddress<void*>(phys + misalign),
@@ -91,6 +157,7 @@ namespace ELF
             }
         }
 
+        m_AuxiliaryVector.Type       = AuxiliaryVectorType::eAtBase;
         m_AuxiliaryVector.EntryPoint = m_Header.EntryPoint + loadBase;
         m_AuxiliaryVector.ProgramHeaderEntrySize = m_Header.ProgramEntrySize;
         m_AuxiliaryVector.ProgramHeaderCount     = m_Header.ProgramEntryCount;
@@ -160,16 +227,16 @@ namespace ELF
                         static_cast<usize>(current.Type),
                         magic_enum::enum_name(current.Type));
 
-            m_ProgramHeaders.push_back(current);
+            m_ProgramHeaders.PushBack(current);
         }
 
-        m_Sections.clear();
+        m_Sections.Clear();
         SectionHeader* sections = reinterpret_cast<SectionHeader*>(
             m_Image + m_Header.SectionHeaderTableOffset);
         for (usize i = 0; i < m_Header.SectionEntryCount; i++)
 
         {
-            m_Sections.push_back(sections[i]);
+            m_Sections.PushBack(sections[i]);
 
             if (sections[i].Type
                 == std::to_underlying(SectionType::eSymbolTable))
@@ -196,7 +263,7 @@ namespace ELF
         if (!m_SymbolSectionIndex.has_value()) return;
         // Assert(m_SymbolSectionIndex.has_value());
         if (!m_StringSectionIndex.has_value()) return;
-        if (m_SymbolSectionIndex.value() >= m_Sections.size()) return;
+        if (m_SymbolSectionIndex.value() >= m_Sections.Size()) return;
 
         auto& section = m_Sections[m_SymbolSectionIndex.value()];
         if (section.Size <= 0 || section.EntrySize == 0) return;
@@ -215,9 +282,123 @@ namespace ELF
             Symbol    sym;
             sym.name    = const_cast<char*>(name.data());
             sym.address = addr;
-            m_Symbols.push_back(sym);
+            m_Symbols.PushBack(sym);
         }
 
         std::sort(m_Symbols.begin(), m_Symbols.end(), std::less<Symbol>());
+    }
+
+    bool Image::ParseProgramHeaders(ByteStream<Endian::eLittle>& stream)
+    {
+        m_ProgramHeaders.Reserve(m_Header.ProgramEntryCount);
+        for (usize i = 0; i < m_Header.ProgramEntryCount; i++)
+        {
+            ProgramHeader& phdr         = m_ProgramHeaders.EmplaceBack();
+            isize          headerOffset = m_Header.ProgramHeaderTableOffset
+                               + i * m_Header.ProgramEntrySize;
+
+            stream.Seek(headerOffset);
+            stream >> phdr;
+
+            switch (phdr.Type)
+            {
+                case HeaderType::eNone:
+                    LogTrace("ELF: Program Header[{}] -> Unused Entry", i);
+                    break;
+                case HeaderType::eLoad:
+                    LogTrace("ELF: Program Header[{}] -> Loadable Segment", i);
+                    break;
+                case HeaderType::eDynamic:
+                    LogTrace(
+                        "ELF: Program Header[{}] -> Dynamic Linking "
+                        "Information",
+                        i);
+                    break;
+                case HeaderType::eInterp:
+                    LogTrace(
+                        "ELF: Program Header[{}] -> Interpreter Information",
+                        i);
+                    break;
+                case HeaderType::eNote:
+                    LogTrace("ELF: Program Header[{}] -> Auxiliary Information",
+                             i);
+                    break;
+                case HeaderType::eProgramHeader:
+                    LogTrace("ELF: Program Header[{}] -> Program Header", i);
+                    break;
+                case HeaderType::eTLS:
+                    LogTrace(
+                        "ELF: Program Header[{}] -> Thread-Local Storage "
+                        "template",
+                        i);
+                    break;
+
+                default:
+                    LogWarn(
+                        "ELF: Unrecognized program header type at index '{}' "
+                        "-> {}",
+                        i, std::to_underlying(phdr.Type));
+                    break;
+            }
+        }
+        return true;
+    }
+    bool Image::ParseSectionHeaders(ByteStream<Endian::eLittle>& stream)
+    {
+        m_Sections.Reserve(m_Header.SectionEntryCount);
+
+        auto sectionTypeToString = [](SectionType type) -> const char*
+        {
+            switch (type)
+            {
+                case SectionType::eNull:
+                    return "Unused section header table entry";
+                case SectionType::eProgBits: return "Program Data";
+                case SectionType::eSymbolTable: return "Symbol Table";
+                case SectionType::eStringTable: return "String Table";
+                case SectionType::eRelA:
+                    return "Relocation entries with addends";
+                case SectionType::eHash: return "Symbol Hash Table";
+                case SectionType::eDynamic:
+                    return "Dynamic Linking Information";
+                case SectionType::eNote: return "Notes";
+                case SectionType::eNoBits:
+                    return "Program Space with no data(.bss)";
+                case SectionType::eRel:
+                    return "Relocation entries (no addends)";
+                case SectionType::eDynSym: return "Dynamic Linker Symbol Table";
+                case SectionType::eInitArray: return "Array of Constructors";
+                case SectionType::eFiniArray: return "Array of Destructors";
+                case SectionType::ePreInitArray:
+                    return "Array of Pre-constructors";
+                case SectionType::eGroup: return "Section Group";
+                case SectionType::eExtendedSectionIndices:
+                    return "Extended Section Indices";
+
+                default: break;
+            }
+            return "Unrecognized";
+        };
+
+        auto sections = reinterpret_cast<ELF::SectionHeader*>(
+            reinterpret_cast<u64>(stream.Raw())
+            + m_Header.SectionHeaderTableOffset);
+        auto stringTable = reinterpret_cast<char*>(
+            reinterpret_cast<u64>(stream.Raw())
+            + sections[m_Header.SectionNamesIndex].Offset);
+        for (usize i = 0; i < m_Header.SectionEntryCount; i++)
+        {
+            SectionHeader& shdr     = m_Sections.EmplaceBack();
+            u64 sectionHeaderOffset = m_Header.SectionHeaderTableOffset
+                                    + i * m_Header.SectionEntrySize;
+            stream.Seek(sectionHeaderOffset);
+            stream >> shdr;
+
+            const char* sectionName = stringTable + shdr.Name;
+            LogTrace("ELF: Section[{}] -> '{}': {}", i, sectionName,
+                     sectionTypeToString(static_cast<SectionType>(shdr.Type)));
+        }
+
+        return true;
     }
 } // namespace ELF
