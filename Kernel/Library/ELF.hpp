@@ -14,13 +14,23 @@
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Memory/ByteStream.hpp>
 #include <Prism/PathView.hpp>
-#include <Prism/elf.h>
 
 namespace ELF
 {
     constexpr const char MAGIC[] = "\177ELF";
+    enum class Bitness : u8
+    {
+        e32Bit = 0b01,
+        e64Bit = 0b10,
+    };
+    enum class Endianness : u8
+    {
+        eLittle = 0b01,
+        eBig    = 0b10,
+    };
 
-    enum class ABI
+    constexpr usize CURRENT_ELF_HEADER_VERSION = 1;
+    enum class ABI : u8
     {
         eSystemV            = 0x00,
         eHPUX               = 0x01,
@@ -41,7 +51,7 @@ namespace ELF
         eNuxiCloudAbi       = 0x11,
         eStratusTechOpenVOS = 0x12,
     };
-    enum class ObjectType
+    enum class ObjectType : u8
     {
         eUnknown     = 0x00,
         eRelocatable = 0x01,
@@ -49,7 +59,7 @@ namespace ELF
         eShared      = 0x03,
         eCore        = 0x04,
     };
-    enum class InstructionSet
+    enum class InstructionSet : u16
     {
         eUnknown              = 0x00,
         eATnT                 = 0x01,
@@ -126,25 +136,25 @@ namespace ELF
 
     struct [[gnu::packed]] Header
     {
-        u32 Magic;
-        u8  Bitness;
-        u8  Endianness;
-        u8  HeaderVersion;
-        u8  Abi;
-        u64 Padding;
-        u16 Type;
-        u16 InstructionSet;
-        u32 ElfVersion;
-        u64 EntryPoint;
-        u64 ProgramHeaderTableOffset;
-        u64 SectionHeaderTableOffset;
-        u32 Flags;
-        u16 HeaderSize;
-        u16 ProgramEntrySize;
-        u16 ProgramEntryCount;
-        u16 SectionEntrySize;
-        u16 SectionEntryCount;
-        u16 SectionNamesIndex;
+        u32            Magic;
+        Bitness        Bitness;
+        Endianness     Endianness;
+        u8             HeaderVersion;
+        ABI            Abi;
+        u64            Padding;
+        u16            Type;
+        InstructionSet InstructionSet;
+        u32            ElfVersion;
+        u64            EntryPoint;
+        u64            ProgramHeaderTableOffset;
+        u64            SectionHeaderTableOffset;
+        u32            Flags;
+        u16            HeaderSize;
+        u16            ProgramEntrySize;
+        u16            ProgramEntryCount;
+        u16            SectionEntrySize;
+        u16            SectionEntryCount;
+        u16            SectionNamesIndex;
     };
     struct [[gnu::packed]] SectionHeader
     {
@@ -170,10 +180,10 @@ namespace ELF
         eReserved               = 5,
         eProgramHeader          = 6,
         eTLS                    = 7,
-        eOsSpecificStart        = PT_LOOS,
-        eOsSpecificEnd          = PT_HIOS,
-        eProcessorSpecificStart = PT_LOPROC,
-        eProcessorSpecificEnd   = PT_HIPROC,
+        eOsSpecificStart        = 0x60000000,
+        eOsSpecificEnd          = 0x6fffffff,
+        eProcessorSpecificStart = 0x70000000,
+        eProcessorSpecificEnd   = 0x7fffffff,
     };
     enum class SectionType : u32
     {

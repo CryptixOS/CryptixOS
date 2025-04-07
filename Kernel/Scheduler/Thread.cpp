@@ -56,14 +56,13 @@ static uintptr_t prepareStack(uintptr_t _stack, uintptr_t sp,
         Math::AlignDown(reinterpret_cast<uintptr_t>(stack), 16));
     if ((argv.size() + envp.size() + 1) & 1) stack--;
 
-    /*
     constexpr usize AT_ENTRY = 9;
     constexpr usize AT_PHDR  = 3;
     constexpr usize AT_PHENT = 4;
     constexpr usize AT_PHNUM = 5;
-*/
-    *(--stack) = 0;
-    *(--stack) = 0;
+
+    *(--stack)               = 0;
+    *(--stack)               = 0;
     stack -= 2;
     stack[0] = AT_ENTRY, stack[1] = image.GetEntryPoint();
     stack -= 2;

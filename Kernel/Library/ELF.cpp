@@ -42,22 +42,22 @@ namespace ELF
             LogError("ELF: Invalid magic");
             return false;
         }
-        if (m_Header.Bitness != ELFCLASS64)
+        if (m_Header.Bitness != Bitness::e64Bit)
         {
             LogError("ELF: Only 64-bit programs are supported");
             return false;
         }
-        if (m_Header.Endianness != ELFDATA2LSB)
+        if (m_Header.Endianness != Endianness::eLittle)
         {
             LogError("ELF: BigEndian programs are not supported!");
             return false;
         }
-        if (m_Header.HeaderVersion != VER_DEF_CURRENT)
+        if (m_Header.HeaderVersion != CURRENT_ELF_HEADER_VERSION)
         {
             LogError("ELF: Invalid header version");
             return false;
         }
-        if (m_Header.Abi != ELFOSABI_SYSV)
+        if (m_Header.Abi != ABI::eSystemV)
         {
             LogError(
                 "ELF: Header contains invalid abi ID, only SysV abi is "
@@ -74,12 +74,12 @@ namespace ELF
         LogTrace("ELF: Executable type -> '{}'",
                  m_Header.Type < 4 ? EXECUTABLE_TYPE_STRINGS[m_Header.Type]
                                    : "Unknown");
-        if (m_Header.InstructionSet != EM_X86_64)
+        if (m_Header.InstructionSet != InstructionSet::eAMDx86_64)
         {
             LogError("ELF: Only x86_64 instruction set is supported");
             return false;
         }
-        if (m_Header.ElfVersion != VER_DEF_CURRENT)
+        if (m_Header.ElfVersion != CURRENT_ELF_HEADER_VERSION)
         {
             LogError("ELF: Invalid ELF version");
             return false;
