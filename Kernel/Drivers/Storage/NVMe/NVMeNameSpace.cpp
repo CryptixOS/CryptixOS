@@ -8,6 +8,7 @@
 #include <Arch/InterruptHandler.hpp>
 #include <Arch/InterruptManager.hpp>
 
+#include <Drivers/DeviceManager.hpp>
 #include <Drivers/Storage/NVMe/NVMeController.hpp>
 #include <Drivers/Storage/NVMe/NVMeNameSpace.hpp>
 #include <Drivers/Storage/StorageDevicePartition.hpp>
@@ -54,6 +55,7 @@ namespace NVMe
             = std::format("/dev/{}n{}", m_Controller->GetName(), m_ID);
         LogTrace("NVMe: Creating device at '{}'", path);
         VFS::MkNod(VFS::GetRootNode(), path, m_Stats.st_mode, GetID());
+        DeviceManager::RegisterBlockDevice(this);
         // TODO(v1tr10l7): enumerate partitions
 
         m_PartitionTable.Load(*this);
@@ -80,6 +82,7 @@ namespace NVMe
             StorageDevicePartition* partition = new StorageDevicePartition(
                 *this, entry.FirstBlock, entry.LastBlock, 292, i);
             DevTmpFs::RegisterDevice(partition);
+            DeviceManager::RegisterBlockDevice(partition);
 
             std::string_view partitionPath = std::format(
                 "/dev/{}n{}p{}", m_Controller->GetName(), m_ID, i);

@@ -13,7 +13,7 @@ project('CryptixOS', ['c', 'cpp'],
     'wrap_mode=forcefallback',
     'b_lundef=true',
     'b_pie=true',
-    'c_std=c17',
+    'c_std=c23',
     'cpp_std=c++23',
   ],
 )
@@ -46,6 +46,7 @@ warnings = [
   '-Wno-deprecated-builtins',
   '-Wno-unused-parameter',
   '-Wno-frame-address',
+  '-Wno-c23-extensions',
 ]
 
 macros = [
@@ -123,16 +124,13 @@ deps = [
       meson.project_source_root() / 'Kernel/Library/KLibC',
   ),
   dependency('demangler'),
-  dependency('flanterm'),
   dependency('fmt10'),
-  #dependency('freestnd-cxx-hdrs'),
   dependency('libstdcxx_headers'),
   dependency('limine'),
   dependency('magic_enum', default_options: [
     'test=false',
   ]),
   cmake.subproject('parallel_hashmap', options: phmap_opts).dependency('phmap'),
-  #dependency('prism'),
   dependency('smart_ptr'),
   dependency('string'),
   dependency('uacpi'),
@@ -149,6 +147,13 @@ ext_mods = [ ]
 subdir('Modules')
 
 no_ext_mods = ext_mods.length() == 0
+
+font = custom_target(
+  'font.bin',
+  input: 'Meta/fonts/font.bin',
+  output: 'font.o',
+  command: ['objcopy', '-I', 'binary', '-O', 'elf64-x86-64', '-B', 'i386', '@INPUT@', '@OUTPUT@'],
+)
 
 incs = []
 subdir('Prism/Source')
@@ -171,8 +176,11 @@ qemu_args = [
   '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
   '-smbios', 'type=1',
   '-device', 'nvme,id=nvme-ctrl1,serial=nvme',
-  '-nic', 'user,model=rtl8139',
-  
+  #'-netdev', 'tap,id=mynet0,ifname=tap0,script=no,downscript=no',
+  #'-device', 'rtl8139,netdev=mynet0',
+  '-nic', 'bridge,model=rtl8139',
+  #'-netdev', 'user,id=net0', '-device', 'rtl8139,netdev=net0',
+  #'-object', 'filter-dump,id=filter0,netdev=net0,file=packet.pcap',
 ]
 qemu = 'qemu-system-' + arch
 
@@ -243,10 +251,12 @@ echfs_image = custom_target(
 )
 
 iso_files = [
-  meson.project_source_root() / 'limine.conf',
+  meson.project_source_root() / 'Meta' / 'limine.conf',
+  meson.project_source_root() / 'Meta' / 'fonts' / 'font.bin',
+  meson.project_source_root() / 'Meta' / 'images' / 'bg2.png',
   ksyms,
   limine.get_variable('limine_binaries'),
-  meson.project_source_root() / 'qemu.dtb',
+  meson.project_source_root() / 'Meta' / 'qemu.dtb',
 ]
 
 initrd = custom_target(
@@ -265,7 +275,11 @@ initrd = custom_target(
 )
 iso = custom_target(
   'iso',
-  input: [kernel_elf, initrd, 'limine.conf'],
+  input: [
+    kernel_elf, initrd, 
+    meson.project_source_root() / 'Meta' / 'limine.conf', 
+    meson.project_source_root() / 'Meta' / 'images' / 'bg2.png', 
+    meson.project_source_root() / 'Meta' / 'fonts' / 'font.bin'],
   output: 'Cryptix.iso',
   command: [
     'mkdir',
@@ -278,6 +292,18 @@ iso = custom_target(
     'cp',
     '@INPUT1@',
     iso_dir / 'initrd.img.gz',
+    '&&',
+    'cp',
+    '@INPUT2@',
+    iso_dir / 'limine.conf',
+    '&&',
+    'cp',
+    '@INPUT3@',
+    iso_dir / 'bg2.png',
+    '&&',
+    'cp',
+    '@INPUT4@',
+    iso_dir / 'font.bin',
     '&&',
     'cp',
     iso_files,

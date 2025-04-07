@@ -5,90 +5,112 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#ifdef CTOS_TARGET_X86_64
+    #include <Arch/x86_64/Drivers/PCSpeaker.hpp>
+    #include <Arch/x86_64/IO.hpp>
+#endif
+#include <Boot/BootInfo.hpp>
+
 #include <Drivers/Serial.hpp>
 #include <Drivers/Terminal.hpp>
+#include <Drivers/VideoTerminal.hpp>
 
-#include <Boot/BootInfo.hpp>
 #include <Memory/PMM.hpp>
 
-#include <backends/fb.h>
+Vector<Terminal*> Terminal::s_Terminals = {};
+Terminal*         s_ActiveTerminal      = nullptr;
 
-#include <cstdlib>
-
-std::vector<Terminal*> Terminal::s_Terminals = {};
-Terminal*              s_ActiveTerminal      = nullptr;
-
-bool                   g_Decckm              = false;
-
-static void            DecPrivate(u64 escValCount, u32* escValues, u64 final)
+Terminal::Terminal()
 {
-    if (escValues[0] == 1)
-    {
-        if (final == 'h') g_Decckm = true;
-        else if (final == 'l') g_Decckm = false;
-    }
-}
-static void TerminalCallback(flanterm_context* term, u64 t, u64 a, u64 b, u64 c)
-{
-    LogWarn("Terminal: Unhandled event");
-    if (t == 10) DecPrivate(a, (u32*)b, c);
-}
-
-bool Terminal::Initialize(Framebuffer& framebuffer)
-{
-    m_Framebuffer = framebuffer;
-    if (!framebuffer.address) return false;
-    if (m_Initialized) return true;
-
-    auto _malloc = PMM::IsInitialized() ? malloc : nullptr;
-    auto _free   = PMM::IsInitialized() ? [](void* addr, usize) { free(addr); }
-                                        : nullptr;
-
-    // TODO(v1tr10l7): install callback to flanterm context
-    m_Context    = flanterm_fb_init(
-        _malloc, _free, reinterpret_cast<u32*>(framebuffer.address),
-        framebuffer.width, framebuffer.height, framebuffer.pitch,
-        framebuffer.red_mask_size, framebuffer.red_mask_shift,
-        framebuffer.green_mask_size, framebuffer.green_mask_shift,
-        framebuffer.blue_mask_size, framebuffer.blue_mask_shift, nullptr,
-        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0, 1,
-        0, 0, 0);
-    flanterm_set_callback(m_Context, TerminalCallback);
-
     if (!s_ActiveTerminal) s_ActiveTerminal = this;
-    return (m_Initialized = true);
 }
 
-void Terminal::Clear(u32 color)
-{
-    for (u32 ypos = 0; ypos < m_Framebuffer.height; ypos++)
-    {
-        for (u32 xpos = 0; xpos < m_Framebuffer.width; xpos++)
-        {
-            uintptr_t framebufferBase
-                = reinterpret_cast<uintptr_t>(m_Framebuffer.address);
-            u64  pitch = m_Framebuffer.pitch;
-            u8   bpp   = m_Framebuffer.bpp;
-            u32* pixel = reinterpret_cast<u32*>(framebufferBase + ypos * pitch
-                                                + (xpos * bpp / 8));
+void Terminal::Resize(const winsize& windowSize) {}
 
-            *pixel     = color;
-        }
-    }
-}
 void Terminal::PutChar(u64 c)
 {
-    if (!m_Initialized) return;
-    flanterm_write(m_Context, reinterpret_cast<char*>(&c), 1);
+    PutCharImpl(c);
+
+    Flush();
 }
-void Terminal::PrintString(std::string_view str)
+void Terminal::PutCharImpl(u64 c)
 {
+    if (!m_Initialized) return;
+
     ScopedLock guard(m_Lock);
-    for (auto c : str) PutChar(c);
+    if (c == 0x18 || c == 0x1a)
+    {
+        m_State = State::eNormal;
+        return;
+    }
+
+    if (m_State == State::eEscape)
+    {
+        OnEscapeChar(c);
+        return;
+    }
+
+    auto [x, y] = GetCursorPos();
+    switch (c)
+    {
+        case '\0': return;
+        case '\a': Bell(); return;
+        case '\b':
+            SetCursorPos(x - 1, y);
+            RawPutChar(' ');
+
+            SetCursorPos(x - 1, y);
+            return;
+        case '\t':
+            if ((x / m_TabSize + 1) >= m_Size.ws_col)
+            {
+                SetCursorPos(m_Size.ws_col - 1, y);
+                return;
+            }
+            SetCursorPos((x / m_TabSize + 1) * m_TabSize, y);
+            return;
+        case '\n':
+        case 0x0b:
+        case 0x0c:
+            if (y == m_ScrollBottomMargin - 1)
+            {
+                ScrollDown();
+                SetCursorPos(0, y);
+            }
+            else SetCursorPos(0, ++y);
+            return;
+        case '\r': SetCursorPos(0, y); return;
+        case 14: return;
+        case 15: return;
+        case '\e': /*m_State = State::eEscape;*/ return;
+        case 0x1a: m_State = State::eNormal; return;
+        case 0x7f: return;
+    }
+
+    // TODO(v1tr10l7): charset #1
+
+    if (c >= 0x20 && c <= 0x7e) return RawPutChar(c);
+    RawPutChar(0xfe);
 }
 
-Terminal*               Terminal::GetPrimary() { return s_ActiveTerminal; }
-std::vector<Terminal*>& Terminal::EnumerateTerminals()
+void Terminal::PrintString(std::string_view str)
+{
+    if (!m_Initialized) return;
+
+    for (auto c : str) PutCharImpl(c);
+}
+
+void Terminal::Bell()
+{
+#ifdef CTOS_TARGET_X86_64
+    PCSpeaker::ToneOn(1000);
+    IO::Delay(1000);
+    PCSpeaker::ToneOff();
+#endif
+}
+
+Terminal*                Terminal::GetPrimary() { return s_ActiveTerminal; }
+const Vector<Terminal*>& Terminal::EnumerateTerminals()
 {
     static bool initialized = false;
     if (initialized) return s_Terminals;
@@ -96,18 +118,120 @@ std::vector<Terminal*>& Terminal::EnumerateTerminals()
     usize         framebufferCount = 0;
     Framebuffer** framebuffers = BootInfo::GetFramebuffers(framebufferCount);
 
-    for (usize i = 0; i < framebufferCount; i++)
-    {
-        if (s_ActiveTerminal && s_ActiveTerminal->m_ID == i)
-        {
-            s_Terminals.push_back(s_ActiveTerminal);
-            continue;
-        }
+    s_ActiveTerminal           = new VideoTerminal(*framebuffers[0]);
+    s_Terminals.PushBack(s_ActiveTerminal);
 
-        s_Terminals.push_back(new Terminal(*framebuffers[i], i));
-    }
-
-    LogInfo("Terminal: Initialized {} terminals", s_Terminals.size());
+    LogInfo("Terminal: Initialized {} terminals", s_Terminals.Size());
     initialized = true;
     return s_Terminals;
+}
+
+void Terminal::OnEscapeChar(char c)
+{
+    auto [x, y] = GetCursorPos();
+
+    switch (c)
+    {
+        case '[':
+            for (usize i = 0; i < MAX_ESC_PARAMETER_COUNT; i++)
+                m_EscapeValues[i] = 0;
+            m_EscapeValueCount = 0;
+            return;
+        case ']': break;
+        case '_': break;
+        // Reset
+        case 'c':
+            Reset();
+            Clear();
+            break;
+        // Line Feed
+        case 'D':
+            if (y == m_ScrollBottomMargin - 1)
+            {
+                ScrollDown();
+                SetCursorPos(x, y);
+                ++y;
+            }
+            SetCursorPos(x, y);
+            break;
+        // New Line
+        case 'E':
+            if (y == m_ScrollBottomMargin - 1)
+            {
+                ScrollDown();
+                ++y;
+            }
+            SetCursorPos(0, y);
+            break;
+        // Set tab stop at current column
+        case 'H': break;
+        // Reverse Linefeed
+        case 'M':
+            if (y == m_ScrollTopMargin)
+            {
+                ScrollUp();
+                SetCursorPos(0, y);
+                --y;
+            }
+            SetCursorPos(0, y);
+            break;
+        // TODO(v1tr10l7): DEC private identification
+        case 'Z': break;
+        // Save current state
+        case '7': SaveState(); break;
+        // Restore saved state
+        case '8': RestoreState(); break;
+        // Start sequence selecting character set
+        case '%': break;
+        // Start sequence defining G0 character set
+        case '(':
+        // Start sequence defining G1 character set
+        case ')': break;
+    }
+
+    m_State = State::eNormal;
+}
+
+void Terminal::Reset()
+{
+    m_TabSize            = 4;
+    m_EscapeValueCount   = 0;
+    m_ScrollTopMargin    = 0;
+    m_ScrollBottomMargin = m_Size.ws_row;
+}
+bool Terminal::DecSpecialPrint(u8 c)
+{
+    switch (c)
+    {
+        case '`': RawPutChar(0x04); return true;
+        case '0': RawPutChar(0xdb); return true;
+        case '-': RawPutChar(0x18); return true;
+        case ',': RawPutChar(0x1b); return true;
+        case '.': RawPutChar(0x19); return true;
+        case 'a': RawPutChar(0xb1); return true;
+        case 'f': RawPutChar(0xf8); return true;
+        case 'g': RawPutChar(0xf1); return true;
+        case 'h': RawPutChar(0xb0); return true;
+        case 'j': RawPutChar(0xd9); return true;
+        case 'k': RawPutChar(0xbf); return true;
+        case 'l': RawPutChar(0xda); return true;
+        case 'm': RawPutChar(0xc0); return true;
+        case 'n': RawPutChar(0xc5); return true;
+        case 'q': RawPutChar(0xc4); return true;
+        case 's': RawPutChar(0x5f); return true;
+        case 't': RawPutChar(0xc3); return true;
+        case 'u': RawPutChar(0xb4); return true;
+        case 'v': RawPutChar(0xc1); return true;
+        case 'w': RawPutChar(0xc2); return true;
+        case 'x': RawPutChar(0xb3); return true;
+        case 'y': RawPutChar(0xf3); return true;
+        case 'z': RawPutChar(0xf2); return true;
+        case '~': RawPutChar(0xfa); return true;
+        case '_': RawPutChar(0xff); return true;
+        case '+': RawPutChar(0x1a); return true;
+        case '{': RawPutChar(0xe3); return true;
+        case '}': RawPutChar(0x9c); return true;
+    }
+
+    return false;
 }

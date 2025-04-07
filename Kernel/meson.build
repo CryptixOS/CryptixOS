@@ -21,8 +21,10 @@ srcs += files(
   'Boot/CommandLine.cpp',
   'Debug/Panic.cpp',
 
+  'Drivers/DeviceManager.cpp',
   'Drivers/Terminal.cpp',
   'Drivers/TTY.cpp',
+  'Drivers/VideoTerminal.cpp',
 
   'Drivers/HID/Ps2KeyboardDevice.cpp',
 
@@ -62,6 +64,7 @@ srcs += files(
 
   'Library/ELF.cpp',
   'Library/ICxxAbi.cpp',
+  'Library/Image.cpp',
   'Library/Kasan.cpp',
   'Library/Logger.cpp',
   'Library/Module.cpp',
@@ -124,13 +127,13 @@ subdir('Library/KLibC++')
 
 kernel_elf = executable(
   'Cryptix.elf',
-  srcs,
+  [srcs, font],
   dependencies: [deps, mod_deps],
-  link_depends: [meson.current_source_dir() / 'linker.' + arch + '.ld'],
+  link_depends: [meson.current_source_dir() / 'linker.' + arch + '.ld', font],
   include_directories: [include_directories, incs],
   c_args: [c_args, args],
   cpp_args: [cxx_args, args],
   #cpp_pch: 'Library/PrecompiledHeader.hpp',
-  link_args: ld_args,
+  link_args: [ld_args],
   install: false,
 )

@@ -37,7 +37,7 @@ constexpr const u8 s_Ps2ScanCodeSet1_Map[256] = {
     /* 0x19 */ 'p',
     /* 0x1A */ '[',
     /* 0x1B */ ']',
-    /* 0x1C */ '\n', // Enter
+    /* 0x1C */ '\r', // Enter
     /* 0x1D */ 0x00, // Left Ctrl
     /* 0x1E */ 'a',
     /* 0x1F */ 's',
@@ -128,7 +128,7 @@ constexpr const u8 s_Ps2ScanCodeSet1_ShiftMap[256] = {
     /* 0x19 */ 'P',
     /* 0x1A */ '{',  // Shift + [
     /* 0x1B */ '}',  // Shift + ]
-    /* 0x1C */ '\n', // Enter
+    /* 0x1C */ '\r', // Enter
     /* 0x1D */ 0x00, // Left Ctrl
     /* 0x1E */ 'A',
     /* 0x1F */ 'S',
@@ -219,7 +219,7 @@ constexpr const u8 s_Ps2ScanCodeSet1_CapsLockMap[256] = {
     /* 0x19 */ 'P',
     /* 0x1A */ '[',
     /* 0x1B */ ']',
-    /* 0x1C */ '\n', // Enter
+    /* 0x1C */ '\r', // Enter
     /* 0x1D */ 0x00, // Left Ctrl
     /* 0x1E */ 'A',
     /* 0x1F */ 'S',
@@ -310,7 +310,7 @@ constexpr const u8 s_Ps2ScanCodeSet1_ShiftCapsLockMap[256] = {
     /* 0x19 */ 'p',
     /* 0x1A */ '{',  // Shift + Caps Lock + [
     /* 0x1B */ '}',  // Shift + Caps Lock + ]
-    /* 0x1C */ '\n', // Enter
+    /* 0x1C */ '\r', // Enter
     /* 0x1D */ 0x00, // Left Ctrl
     /* 0x1E */ 'a',
     /* 0x1F */ 's',
@@ -500,7 +500,7 @@ struct Key
 
 constexpr Key PS2_Set1_Keys[] = {
     {KeyCode::eNone, 0, 0, 0, 0}, // No key
-    {KeyCode::eEscape, '\x1B', '\x1B', '\x1B', '\x1B'},
+    {KeyCode::eEscape, '\e', '\e', '\e', '\e'},
     {KeyCode::eNum1, '1', '!', '1', '!'},
     {KeyCode::eNum2, '2', '@', '2', '@'},
     {KeyCode::eNum3, '3', '#', '3', '#'},
@@ -527,7 +527,7 @@ constexpr Key PS2_Set1_Keys[] = {
     {KeyCode::eP, 'p', 'P', 'P', 'p'},
     {KeyCode::eLBracket, '[', '{', '[', '{'},
     {KeyCode::eRBracket, ']', '}', ']', '}'},
-    {KeyCode::eEnter, '\n', '\n', '\n', '\n'},
+    {KeyCode::eEnter, '\r', '\r', '\r', '\r'},
     {KeyCode::eLCtrl, 0, 0, 0, 0},
     {KeyCode::eA, 'a', 'A', 'A', 'a'},
     {KeyCode::eS, 's', 'S', 'S', 's'},

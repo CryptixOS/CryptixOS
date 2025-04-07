@@ -69,6 +69,47 @@ To run the CryptixOS you will use the ./run.sh script with either uefi or bios o
 * [veque](https://github.com/Shmoopty/veque.git) - A very fast C++17 container combining the best features of std::vector and std::deque
 
 
+## To Do
 
+### Drivers
+- [X] Kernel Module Loader
+- [X] TTY
+- [ ] PTY
+- [X] PCI
+- [X] PCIe
+- [X] NVMe
+- [ ] AHCI
+- [X] Serial
+- [X] PIT
+- [X] Local APIC Timer
+- [X] PIC
+- [X] I/O APIC
+- [X] I8042 Controller
+- [X] PS/2 Keyboard
+- [X] PC Speaker
+- [X] RTC
+- [X] HPET
+- [ ] Device Tree
+- [X] ACPI
+- [X] Rtl8139
 
+### File Systems
+- [X] DevTmpFs
+- [X] Ext2Fs
+- [X] Fat32Fs
+- [X] ProcFs
+- [X] TmpFs
+- [X] Initrd
+- [ ] SysFs
+- [ ] DevPtsFs
+- [ ] Plan9Fs
+- [ ] DevLoopFs
+- [ ] Iso9660Fs
+- [ ] EfiVarsFs
 
+### Syscall
+- [ ] Signals
+- [ ] Thread API
+- [X] VFS
+- [X] Session Management
+- [ ] Networking
