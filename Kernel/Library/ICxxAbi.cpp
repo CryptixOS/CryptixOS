@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Common.hpp"
+#include <Common.hpp>
 
 #include <cxxabi.h>
 #if CTOS_ARCH == CTOS_ARCH_X86_64

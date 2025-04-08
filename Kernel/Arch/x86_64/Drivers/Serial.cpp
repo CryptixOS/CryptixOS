@@ -7,7 +7,7 @@
 #include <Arch/x86_64/IO.hpp>
 
 #include <Drivers/Serial.hpp>
-#include <Prism/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
 #include <utility>
 
@@ -62,7 +62,8 @@ namespace Serial
     {
         ScopedLock guard(s_Lock);
         word       port = static_cast<word>(Port::eCom1);
-        while ((IO::In<byte>(port + 5) & 1) == 0);
+        while ((IO::In<byte>(port + 5) & 1) == 0)
+            ;
 
         return IO::In<byte>(port);
     }
@@ -70,7 +71,8 @@ namespace Serial
     {
         ScopedLock guard(s_Lock);
         word       port = static_cast<word>(Port::eCom1);
-        while ((IO::In<byte>(port + 5) & 0x20) == 0);
+        while ((IO::In<byte>(port + 5) & 0x20) == 0)
+            ;
 
         IO::Out<byte>(port, data);
     }

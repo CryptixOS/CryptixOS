@@ -13,7 +13,7 @@
 
 #include <Firmware/ACPI/MADT.hpp>
 
-static std::vector<IoApic> s_IoApics{};
+static Vector<IoApic> s_IoApics{};
 
 IoApic::IoApic(Pointer baseAddress, u32 gsiBase)
     : m_BaseAddressPhys(baseAddress)
@@ -57,7 +57,7 @@ void IoApic::SetRedirectionEntry(u32 gsi, u64 entry)
     Write(redirectionTableHigh, entry >> 32);
 }
 
-std::vector<IoApic>& IoApic::GetIoApics() { return s_IoApics; }
+Vector<IoApic>& IoApic::GetIoApics() { return s_IoApics; }
 
 void IoApic::SetIrqRedirect(u32 lapicID, u8 vector, u8 irq, bool status)
 {
@@ -90,7 +90,7 @@ void IoApic::SetGsiRedirect(u32 lapicID, u8 vector, u8 gsi, u16 flags,
 
 void IoApic::Initialize()
 {
-    if (!s_IoApics.empty())
+    if (!s_IoApics.Empty())
     {
         LogWarn("IoApic::Initialize: Already initialized");
         return;
@@ -121,16 +121,16 @@ void IoApic::Initialize()
         ioApic.MaskAllEntries();
         ioApic.Enable();
 
-        s_IoApics.push_back(ioApic);
+        s_IoApics.PushBack(ioApic);
     }
 
-    if (s_IoApics.empty())
+    if (s_IoApics.Empty())
     {
         LogError("IoApic: No controllers available");
         return;
     }
 
-    LogTrace("IoApic: Controllers found: {}", s_IoApics.size());
+    LogTrace("IoApic: Controllers found: {}", s_IoApics.Size());
     LogInfo("IoApic: Initialized");
 }
 

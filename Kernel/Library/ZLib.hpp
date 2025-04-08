@@ -11,7 +11,7 @@
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Core/Types.hpp>
 
-#include <Prism/Endian.hpp>
+#include <Prism/Memory/Endian.hpp>
 #include <Prism/Memory/BitStream.hpp>
 #include <Prism/Memory/Pointer.hpp>
 

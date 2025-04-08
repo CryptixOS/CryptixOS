@@ -391,11 +391,11 @@ namespace CPU
     }
     void Stac()
     {
-        if (ReadCR4() & BIT(21)) __asm__ volatile("stac" ::: "cc");
+        if (ReadCR4() & Bit(21)) __asm__ volatile("stac" ::: "cc");
     }
     void Clac()
     {
-        if (ReadCR4() & BIT(21)) __asm__ volatile("clac" ::: "cc");
+        if (ReadCR4() & Bit(21)) __asm__ volatile("clac" ::: "cc");
     }
 
     uintptr_t GetFSBase() { return ReadMSR(MSR::FS_BASE); }

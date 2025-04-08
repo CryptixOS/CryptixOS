@@ -8,7 +8,7 @@
 
 #include <Memory/PMM.hpp>
 
-#include <Prism/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 #include <Prism/Utility/Math.hpp>
 
 enum class PageAttributes : isize

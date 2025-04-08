@@ -21,7 +21,7 @@
 extern const char* s_ExceptionNames[];
 
 constexpr u32      MAX_IDT_ENTRIES     = 256;
-constexpr u32      IDT_ENTRY_PRESENT   = BIT(7);
+constexpr u32      IDT_ENTRY_PRESENT   = Bit(7);
 
 constexpr u32      GATE_TYPE_INTERRUPT = 0xe;
 constexpr u32      GATE_TYPE_TRAP      = 0xf;
@@ -56,7 +56,7 @@ struct [[gnu::packed]] IDTEntry
 [[maybe_unused]] alignas(0x10) static IDTEntry s_IdtEntries[256] = {};
 extern "C" void*        interrupt_handlers[];
 static InterruptHandler s_InterruptHandlers[256];
-static void             (*exceptionHandlers[32])(CPUContext*);
+static void (*exceptionHandlers[32])(CPUContext*);
 
 static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
 {
@@ -203,7 +203,7 @@ namespace IDT
 } // namespace IDT
 
 #pragma region exception_names
-const char*    s_ExceptionNames[] = {
+const char* s_ExceptionNames[] = {
     "Divide-by-zero",
     "Debug",
     "Non-Maskable Interrupt",

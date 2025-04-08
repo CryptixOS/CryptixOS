@@ -13,7 +13,7 @@
 #include <Drivers/TTY.hpp>
 #include <Drivers/Terminal.hpp>
 
-#include <Prism/StringView.hpp>
+#include <Prism/String/StringView.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
@@ -114,6 +114,7 @@ void    TTY::SetTermios(const termios2& termios)
 {
     LogDebug("TTY: Setting termios to ->\n{}", termios);
     m_Termios = termios;
+    m_RawBuffer.Clear();
 }
 
 isize TTY::Read(void* buffer, off_t offset, usize bytes)
@@ -128,19 +129,31 @@ isize TTY::Read(void* buffer, off_t offset, usize bytes)
         return line.copy(reinterpret_cast<char*>(buffer), count);
     }
 
-    if (m_RawBuffer.size() < bytes) m_RawEvent.Await();
-    usize count = std::min(m_RawBuffer.size(), bytes);
-    // std::string_view src(m_RawBuffer.begin(), m_RawBuffer.end());
-    char* dest  = reinterpret_cast<char*>(buffer);
+    char* dest = reinterpret_cast<char*>(buffer);
+    if (m_RawBuffer.Size() < bytes) m_RawEvent.Await();
+
+    ScopedLock guard(m_RawLock);
+    usize      count = std::min(m_RawBuffer.Size(), bytes);
+
+    isize      nread = 0;
+    while (count--)
+    {
+        auto value = m_RawBuffer.Pop();
+
+        if (value == 0x04) LogError("EOF: {:#x}", value);
+        *dest++ = value;
+        ++nread;
+    }
+
+    return nread;
 
     // isize            nread = src.copy(dest, count);
-    isize nread = 0;
     // for (; count > 0; count--) m_RawBuffer.pop_front();
-    while (count > 0 && m_RawBuffer.size())
+    while (count > 0 && m_RawBuffer.Size())
     {
         ScopedLock guard(m_RawLock);
-        u8         ch = m_RawBuffer.front();
-        m_RawBuffer.pop_front();
+        u8         ch = m_RawBuffer.Front();
+        m_RawBuffer.Pop();
         *dest++ = ch;
         ++nread;
         --count;
@@ -251,7 +264,7 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         case TIOCGWINSZ: *reinterpret_cast<winsize*>(argp) = GetSize(); break;
         case TIOCSWINSZ: return_err(-1, ENOSYS); break;
 
-        case TIOCINQ: *reinterpret_cast<u32*>(argp) = m_RawBuffer.size(); break;
+        case TIOCINQ: *reinterpret_cast<u32*>(argp) = m_RawBuffer.Size(); break;
 
         case TIOCGETD: *reinterpret_cast<u32*>(argp) = m_Termios.c_line; break;
         case TIOCSETD: m_Termios.c_line = *reinterpret_cast<u32*>(argp); break;
@@ -413,14 +426,14 @@ void TTY::EnqueueChar(u64 c)
 #if TTY_DEBUG == 1
     LogDebug("raw: {:#x}", c);
 #endif
-    m_RawBuffer.push_back(c);
+    m_RawBuffer.Push(c);
 }
 
 void TTY::FlushInput()
 {
     ScopedLock rawGuard(m_RawLock);
 
-    m_RawBuffer.clear();
+    m_RawBuffer.Clear();
 }
 void TTY::Echo(u64 c)
 {
@@ -438,9 +451,9 @@ void TTY::EraseChar()
     Assert(IsCanonicalMode());
     ScopedLock guard(m_RawLock);
 
-    if (m_RawBuffer.empty()) return;
+    if (m_RawBuffer.Empty()) return;
     usize count = 1;
-    if (IsControl(m_RawBuffer.pop_back_element())) count = 2;
+    if (IsControl(m_RawBuffer.Pop())) count = 2;
     while (count-- && m_Termios.c_lflag & (ECHO | ECHOK))
     {
         EchoRaw('\b');
@@ -450,6 +463,6 @@ void TTY::EraseChar()
 }
 void TTY::EraseWord()
 {
-    while (!m_RawBuffer.empty() && m_RawBuffer.back() != ' ') EraseChar();
-    while (!m_RawBuffer.empty() && m_RawBuffer.back() == ' ') EraseChar();
+    while (!m_RawBuffer.Empty() && m_RawBuffer.Back() != ' ') EraseChar();
+    while (!m_RawBuffer.Empty() && m_RawBuffer.Back() == ' ') EraseChar();
 }

@@ -6,6 +6,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Common.hpp>
+#include <Version.hpp>
 
 #include <API/Syscall.hpp>
 
@@ -34,8 +35,8 @@
 #include <Prism/Containers/Array.hpp>
 #include <Prism/Containers/RedBlackTree.hpp>
 #include <Prism/Delegate.hpp>
-#include <Prism/Endian.hpp>
-#include <Prism/StringView.hpp>
+#include <Prism/Memory/Endian.hpp>
+#include <Prism/String/StringView.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>

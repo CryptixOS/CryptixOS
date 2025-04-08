@@ -8,7 +8,7 @@
 #include <Debug/Assertions.hpp>
 
 #include <Library/Logger.hpp>
-#include <Prism/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
 #include <Prism/Utility/Time.hpp>
 

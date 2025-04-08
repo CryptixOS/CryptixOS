@@ -18,20 +18,19 @@ using namespace ACPI;
 
 namespace HPET
 {
-    using Prism::Pointer;
-    static std::vector<TimerBlock> s_Devices;
+    static Vector<TimerBlock> s_Devices;
 
-    struct Comparator
+    struct [[gnu::packed]] Comparator
     {
         u64       capabilities;
         u64       valueRegister;
         u64       fsbInterruptRouteRegister;
         const u64 reserved;
-    } __attribute__((packed));
+    };
 
-    inline constexpr usize HPET_ENABLE     = BIT(0);
-    inline constexpr usize HPET_LEG_RT_CNF = BIT(1);
-    struct Entry
+    inline constexpr usize HPET_ENABLE     = Bit(0);
+    inline constexpr usize HPET_LEG_RT_CNF = Bit(1);
+    struct [[gnu::packed]] Entry
     {
         const u64   capabilities;
         u64         reserved1;
@@ -42,7 +41,7 @@ namespace HPET
         u64         mainCounter;
         u64         reserved4;
         Comparator* comparators;
-    } __attribute__((packed));
+    };
 
     inline constexpr u8 GetRevision(const u64 capabilities)
     {
@@ -71,7 +70,7 @@ namespace HPET
 
     ErrorOr<TimerBlock*> TimerBlock::GetFromTable(Pointer hpetPhys)
     {
-        LogInfo("HPET: Table #{} found at {:#x}", s_Devices.size(),
+        LogInfo("HPET: Table #{} found at {:#x}", s_Devices.Size(),
                 hpetPhys.Raw<u64>());
 
         auto virt = VMM::GetKernelPageMap()->MapIoRegion<SDTs::HPET>(hpetPhys);
@@ -86,7 +85,7 @@ namespace HPET
             LogError(
                 "HPET: TimerBlock is in address space other than System "
                 "Memory, so it cannot be used ",
-                s_Devices.size());
+                s_Devices.Size());
 
             return Error(ENODEV);
         }
@@ -115,7 +114,7 @@ namespace HPET
         LogInfo("HPET: Available comparators: {}",
                 GetTimerCount(m_Entry->capabilities));
         data.vendorID   = GetVendorID(m_Entry->capabilities);
-        data.x64Capable = m_Entry->capabilities & BIT(13);
+        data.x64Capable = m_Entry->capabilities & Bit(13);
         LogInfo("HPET: PCI vendorID = {}, x64Capable: {}", data.vendorID,
                 data.x64Capable);
 
@@ -145,8 +144,7 @@ namespace HPET
     void TimerBlock::Sleep(u64 us) const
     {
         usize target = GetCounterValue() + (us * 1'000'000'000) / tickPeriod;
-        while (GetCounterValue() < target)
-            ;
+        while (GetCounterValue() < target);
     }
 
     ErrorOr<void> DetectAndSetup()
@@ -161,11 +159,11 @@ namespace HPET
             if (!hpet) return Error(hpet.error());
 
             TimerBlock* timerBlock = hpet.value();
-            s_Devices.push_back(*timerBlock);
+            s_Devices.PushBack(*timerBlock);
         }
 
         return {};
     }
 
-    const std::vector<TimerBlock>& GetDevices() { return s_Devices; }
+    const Vector<TimerBlock>& GetDevices() { return s_Devices; }
 }; // namespace HPET

@@ -12,7 +12,7 @@
 #include <Arch/x86_64/Drivers/IoApic.hpp>
 
 #include <Memory/PMM.hpp>
-#include <Prism/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>

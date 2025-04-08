@@ -7,7 +7,7 @@
 #pragma once
 
 #include <Prism/Core/Types.hpp>
-#include <Prism/StringView.hpp>
+#include <Prism/String/StringView.hpp>
 
 constexpr const char* KERNEL_NAME = "@kernel_name@";
 

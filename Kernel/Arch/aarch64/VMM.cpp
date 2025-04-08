@@ -6,7 +6,7 @@
  */
 #include <Memory/VMM.hpp>
 
-#include <Prism/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
 struct TTBR
 {

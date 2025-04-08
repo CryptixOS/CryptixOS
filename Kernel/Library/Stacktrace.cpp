@@ -107,8 +107,7 @@ namespace Stacktrace
     }
     void Print(usize maxFrames)
     {
-        auto stackFrame
-            = reinterpret_cast<StackFrame*>(CTOS_GET_FRAME_ADDRESS(0));
+        auto stackFrame = reinterpret_cast<StackFrame*>(CtosGetFrameAddress(0));
 
         for (usize i = 0; stackFrame && i < maxFrames; i++)
         {

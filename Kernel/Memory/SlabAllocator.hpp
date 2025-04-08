@@ -11,7 +11,7 @@
 
 #include <Prism/Core/Types.hpp>
 #include <Prism/Utility/Math.hpp>
-#include <Prism/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
 class SlabAllocatorBase
 {

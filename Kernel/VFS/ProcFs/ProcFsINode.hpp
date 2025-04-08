@@ -10,7 +10,7 @@
 #include <Prism/Delegate.hpp>
 
 #include <Prism/Memory/Buffer.hpp>
-#include <Prism/StringView.hpp>
+#include <Prism/String/StringView.hpp>
 
 #include <VFS/INode.hpp>
 

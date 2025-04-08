@@ -9,7 +9,9 @@
 #include <API/Posix/termios.h>
 #include <Drivers/Device.hpp>
 
-#include <Prism/Spinlock.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Library/Spinlock.hpp>
 #include <Scheduler/Event.hpp>
 
 #include <deque>
@@ -50,7 +52,8 @@ class TTY : public Device
     pid_t                    m_ControlSid = -1;
     gid_t                    m_Pgid       = 100;
 
-    std::deque<char>         m_RawBuffer;
+    CircularQueue<u8, 4096>  m_RawBuffer;
+    // std::deque<char>         m_RawBuffer;
     std::deque<std::string>  m_LineQueue;
 
     Event                    m_OnAddLine;
@@ -75,16 +78,22 @@ class TTY : public Device
 
     inline void AddLine()
     {
-        ScopedLock guard(m_RawLock);
-        m_LineQueue.emplace_back(m_RawBuffer.begin(), m_RawBuffer.end());
-        m_RawBuffer.clear();
+        ScopedLock  guard(m_RawLock);
 
+        usize       lineLength = m_RawBuffer.Size();
+        std::string line;
+        line.reserve(lineLength);
+        while (!m_RawBuffer.Empty()) line += m_RawBuffer.Pop();
+        line.shrink_to_fit();
+        m_LineQueue.push_back(line);
+
+        m_RawBuffer.Clear();
         m_OnAddLine.Trigger();
     }
     inline void KillLine()
     {
         ScopedLock guard(m_RawLock);
-        m_RawBuffer.clear();
+        m_RawBuffer.Clear();
     }
 
     void           EnqueueChar(u64 c);

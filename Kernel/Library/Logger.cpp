@@ -9,10 +9,10 @@
 #include <Drivers/VideoTerminal.hpp>
 
 #include <Library/Logger.hpp>
-#include <Prism/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
 #include <Prism/Debug/LogSink.hpp>
-#include <Prism/StringUtils.hpp>
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <cctype>

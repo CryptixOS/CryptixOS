@@ -7,7 +7,7 @@
 #pragma once
 
 #include <Prism/Core/Types.hpp>
-#include <Prism/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
 #include <deque>
 #include <span>
