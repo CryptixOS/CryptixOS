@@ -12,7 +12,7 @@
 #include <Prism/Containers/Array.hpp>
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Core/Types.hpp>
-#include <Prism/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
 #include <string_view>
 #include <unordered_map>
@@ -132,7 +132,8 @@ class Terminal
     {
         eNormal,
         eEscape,
-        eControlSequence,
+        eControlSequenceEntry,
+        eControlSequenceParams,
         eCsiExpectParameters,
         eOsCommand,
         eDecPrivate,
@@ -148,6 +149,7 @@ class Terminal
     bool                                m_CursorKeyMode    = false;
 
     void                                OnEscapeChar(char c);
+    void                                OnCsi(char c);
     bool                                DecSpecialPrint(u8 c);
 
     static Vector<Terminal*>            s_Terminals;

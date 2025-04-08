@@ -38,15 +38,15 @@ void Terminal::PutCharImpl(u64 c)
     if (!m_Initialized) return;
 
     ScopedLock guard(m_Lock);
-    if (c == 0x18 || c == 0x1a)
-    {
-        m_State = State::eNormal;
-        return;
-    }
-
     if (m_State == State::eEscape)
     {
         OnEscapeChar(c);
+        return;
+    }
+    else if (m_State == State::eControlSequenceEntry
+             || m_State == State::eControlSequenceParams)
+    {
+        OnCsi(c);
         return;
     }
 
@@ -56,6 +56,7 @@ void Terminal::PutCharImpl(u64 c)
         case '\0': return;
         case '\a': Bell(); return;
         case '\b':
+            if (x == 0) return;
             SetCursorPos(x - 1, y);
             RawPutChar(' ');
 
@@ -70,8 +71,8 @@ void Terminal::PutCharImpl(u64 c)
             SetCursorPos((x / m_TabSize + 1) * m_TabSize, y);
             return;
         case '\n':
-        case 0x0b:
-        case 0x0c:
+        case '\v':
+        case '\f':
             if (y == m_ScrollBottomMargin - 1)
             {
                 ScrollDown();
@@ -80,11 +81,16 @@ void Terminal::PutCharImpl(u64 c)
             else SetCursorPos(0, ++y);
             return;
         case '\r': SetCursorPos(0, y); return;
-        case 14: return;
-        case 15: return;
-        case '\e': /*m_State = State::eEscape;*/ return;
+        case 0x0e:
+            // Activate the G1 character set;
+            return;
+        case 0x0f:
+            // Activate the G0 character set;
+            return;
         case 0x1a: m_State = State::eNormal; return;
+        case '\e': m_State = State::eEscape; return;
         case 0x7f: return;
+        case 0x9b: m_State = State::eControlSequenceEntry; return;
     }
 
     // TODO(v1tr10l7): charset #1
@@ -136,6 +142,7 @@ void Terminal::OnEscapeChar(char c)
             for (usize i = 0; i < MAX_ESC_PARAMETER_COUNT; i++)
                 m_EscapeValues[i] = 0;
             m_EscapeValueCount = 0;
+            m_State            = State::eControlSequenceEntry;
             return;
         case ']': break;
         case '_': break;
@@ -149,7 +156,6 @@ void Terminal::OnEscapeChar(char c)
             if (y == m_ScrollBottomMargin - 1)
             {
                 ScrollDown();
-                SetCursorPos(x, y);
                 ++y;
             }
             SetCursorPos(x, y);
@@ -170,7 +176,6 @@ void Terminal::OnEscapeChar(char c)
             if (y == m_ScrollTopMargin)
             {
                 ScrollUp();
-                SetCursorPos(0, y);
                 --y;
             }
             SetCursorPos(0, y);
@@ -187,6 +192,83 @@ void Terminal::OnEscapeChar(char c)
         case '(':
         // Start sequence defining G1 character set
         case ')': break;
+    }
+
+    m_State = State::eNormal;
+}
+void Terminal::OnCsi(char c)
+{
+    if (std::isdigit(c))
+    {
+        m_State = State::eControlSequenceParams;
+
+        if (m_EscapeValueCount == MAX_ESC_PARAMETER_COUNT) return;
+        m_EscapeValues[m_EscapeValueCount] *= 10;
+        m_EscapeValues[m_EscapeValueCount] += c - '0';
+        return;
+    }
+
+    if (m_State == State::eControlSequenceParams) ++m_EscapeValueCount;
+    u32 param   = m_EscapeValueCount > 0 ? m_EscapeValues[0] : 0;
+
+    auto [x, y] = GetCursorPos();
+    switch (c)
+    {
+        case '@':
+        {
+            for (usize i = m_Size.ws_col - 1; i--;)
+            {
+                MoveCharacter(i + param, y, i, y);
+                SetCursorPos(i, y);
+                RawPutChar(' ');
+                if (i == x) break;
+            }
+            SetCursorPos(x, y);
+            break;
+        }
+        case 'A':
+        {
+            if (param > y) param = y;
+            usize origY          = y;
+            usize destY          = y - param;
+            bool  willBeScrolled = false;
+            if ((m_ScrollTopMargin >= destY && m_ScrollTopMargin <= origY)
+                || (m_ScrollBottomMargin >= destY
+                    && m_ScrollBottomMargin <= origY))
+                willBeScrolled = true;
+            if (willBeScrolled && destY < m_ScrollTopMargin)
+                destY = m_ScrollTopMargin;
+            SetCursorPos(x, destY);
+            break;
+        }
+        case 'B':
+        case 'C':
+        case 'D':
+        case 'E':
+        case 'F':
+        case 'G':
+        case 'H':
+        case 'J':
+        case 'K':
+        case 'L':
+        case 'M':
+        case 'P':
+        case 'X':
+        case 'a':
+        case 'c':
+        case 'd':
+        case 'e':
+        case 'f':
+        case 'g':
+        case 'h':
+        case 'l':
+        case 'm':
+        case 'n':
+        case 'q':
+        case 'r':
+        case 's':
+        case 'u':
+        case '`':
     }
 
     m_State = State::eNormal;
