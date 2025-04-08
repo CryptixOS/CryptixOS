@@ -5,12 +5,15 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/PowerManager.hpp>
+#include <Boot/BootInfo.hpp>
 #ifdef CTOS_TARGET_X86_64
     #include <Arch/x86_64/IO.hpp>
 #endif
 
 #include <Drivers/Terminal.hpp>
 #include <Firmware/ACPI/ACPI.hpp>
+
+#include <Memory/VMM.hpp>
 
 namespace PowerManager
 {
@@ -21,6 +24,7 @@ namespace PowerManager
         terminal->Clear();
 
         terminal->PrintString("Restarting system...\n");
+
         ACPI::Reboot();
         // TODO(v1tr10l7): UEFI Service
         Arch::Reboot();
