@@ -1,6 +1,6 @@
 # CryptixOS 
 
-<img src="./images/bash.png">
+<img src="./Meta/images/screenshot.png">
 
 ## Description
 CryptixOS is a WIP 64 bit unix-like operating system,
