@@ -8,7 +8,7 @@
 
 #include <Firmware/DeviceTree/Node.hpp>
 
-#include <Prism/Endian.hpp>
+#include <Prism/Memory/Endian.hpp>
 
 constexpr usize FDT_MAGIC = 0xd00dfeed;
 
