@@ -24,7 +24,7 @@
 
 namespace API::VFS
 {
-    ErrorOr<isize> SysRead(i32 fdNum, u8* out, usize bytes)
+    ErrorOr<isize> Read(i32 fdNum, u8* out, usize bytes)
     {
         Process* current = Process::GetCurrent();
         if (!current->ValidateWrite(out, bytes)) return Error(EFAULT);
@@ -34,7 +34,7 @@ namespace API::VFS
 
         return fd->Read(out, bytes);
     }
-    ErrorOr<isize> SysWrite(i32 fdNum, const u8* in, usize bytes)
+    ErrorOr<isize> Write(i32 fdNum, const u8* in, usize bytes)
     {
         Process* current = Process::GetCurrent();
         if (!current->ValidateRead(in, bytes)) return Error(EFAULT);
@@ -44,7 +44,7 @@ namespace API::VFS
 
         return fd->Write(in, bytes);
     }
-    ErrorOr<isize> SysOpen(PathView path, i32 flags, mode_t mode)
+    ErrorOr<isize> Open(PathView path, i32 flags, mode_t mode)
     {
         Process* current = Process::GetCurrent();
         if (!current->ValidateRead(path.Raw(), Limits::MAX_PATH_LENGTH))
@@ -53,13 +53,51 @@ namespace API::VFS
 
         return current->OpenAt(AT_FDCWD, path, flags, mode);
     }
-    ErrorOr<isize> SysClose(i32 fdNum)
+    ErrorOr<isize> Close(i32 fdNum)
     {
         Process* current = Process::GetCurrent();
         return current->CloseFd(fdNum);
     }
+    ErrorOr<isize> Stat(const char* path, stat* out)
+    {
+        return API::VFS::FStatAt(AT_FDCWD, path, 0, out);
+    }
+    ErrorOr<isize> FStat(isize fdNum, stat* out)
+    {
+        return API::VFS::FStatAt(fdNum, "", AT_EMPTY_PATH, out);
+    }
+    ErrorOr<isize> LStat(const char* path, stat* out)
+    {
+        return API::VFS::FStatAt(AT_FDCWD, path, AT_SYMLINK_NOFOLLOW, out);
+    }
 
-    ErrorOr<isize> SysTruncate(PathView path, off_t length)
+    ErrorOr<isize> Dup(isize oldFdNum)
+    {
+        Process* process = Process::GetCurrent();
+        auto*    oldFd   = process->GetFileHandle(oldFdNum);
+        if (!oldFd) return Error(EBADF);
+
+        FileDescriptor* newFd = new FileDescriptor(oldFd);
+        if (!newFd) return Error(ENOMEM);
+
+        return process->m_FdTable.Insert(newFd);
+    }
+    ErrorOr<isize> Dup2(isize oldFdNum, isize newFdNum)
+    {
+        Process* process = Process::GetCurrent();
+        auto*    oldFd   = process->GetFileHandle(oldFdNum);
+        if (!oldFd) return Error(EBADF);
+
+        auto* newFd = process->GetFileHandle(newFdNum);
+        if (newFd == oldFd) return newFdNum;
+
+        if (newFd) process->CloseFd(newFdNum);
+        newFd = new FileDescriptor(oldFd);
+
+        return process->m_FdTable.Insert(newFd, newFdNum);
+    }
+
+    ErrorOr<isize> Truncate(PathView path, off_t length)
     {
         Process* current = Process::GetCurrent();
         if (length < 0) return Error(EINVAL);
@@ -75,7 +113,7 @@ namespace API::VFS
         if (node->IsDirectory()) return Error(EISDIR);
         return node->Truncate(length);
     }
-    ErrorOr<isize> SysFTruncate(i32 fdNum, off_t length)
+    ErrorOr<isize> FTruncate(i32 fdNum, off_t length)
     {
         if (length < 0) return Error(EINVAL);
         Process*        current = Process::GetCurrent();
@@ -84,8 +122,21 @@ namespace API::VFS
         if (!fd) return Error(EBADF);
         return fd->Truncate(length);
     }
+    ErrorOr<isize> GetCwd(char* buffer, usize size)
+    {
+        Process* process = Process::GetCurrent();
 
-    ErrorOr<isize> SysRmDir(PathView path)
+        if (!buffer || size == 0) return Error(EINVAL);
+        if (!process->ValidateAddress(buffer, PROT_WRITE)) return Error(EFAULT);
+
+        std::string_view cwd = process->GetCWD();
+        if (size < cwd.length()) return Error(ERANGE);
+
+        cwd.copy(buffer, cwd.length());
+        return 0;
+    }
+
+    ErrorOr<isize> RmDir(PathView path)
     {
         Process* current = Process::GetCurrent();
         if (!current->ValidateRead(path.Raw(), Limits::MAX_PATH_LENGTH))
@@ -113,7 +164,7 @@ namespace API::VFS
         ::VFS::RecursiveDelete(node);
         return 0;
     }
-    ErrorOr<isize> SysReadLink(PathView path, char* out, usize size)
+    ErrorOr<isize> ReadLink(PathView path, char* out, usize size)
     {
         Process* current = Process::GetCurrent();
         if (!current->ValidateRead(path.Raw(), size)) return Error(EFAULT);
@@ -132,8 +183,56 @@ namespace API::VFS
 
         return symlinkTarget.copy(out, size);
     }
+    ErrorOr<isize> ChMod(const char* path, mode_t mode)
+    {
+        return FChModAt(AT_FDCWD, path, mode);
+    }
 
-    ErrorOr<isize> SysUTime(PathView path, const utimbuf* out)
+    ErrorOr<isize> Mount(const char* path, const char* target,
+                         const char* filesystemType, usize flags,
+                         const void* data)
+    {
+        Process* current = Process::GetCurrent();
+        CtosUnused(current);
+
+        bool success = ::VFS::Mount(::VFS::GetRootNode(), path, target,
+                                    filesystemType, flags, data);
+
+        if (!success) return Error(errno);
+        return 0;
+    }
+
+    ErrorOr<isize> FChModAt(isize dirFdNum, PathView path, mode_t mode)
+    {
+        auto   process = Process::GetCurrent();
+
+        INode* parent  = process->GetRootNode();
+        if (!path.IsAbsolute())
+        {
+            if (dirFdNum == AT_FDCWD)
+            {
+                auto nodeOrError = ::VFS::ResolvePath(process->GetCWD());
+                if (!nodeOrError) return Error(nodeOrError.error());
+                parent = nodeOrError.value();
+            }
+            else
+            {
+                auto fd = process->GetFileHandle(dirFdNum);
+                if (!fd) return Error(EBADF);
+
+                parent = fd->GetNode();
+            }
+        }
+
+        auto node = std::get<1>(::VFS::ResolvePath(parent, path));
+        if (!node) return Error(ENOENT);
+
+        auto ret = node->ChMod(mode);
+        if (!ret) return Error(ret.error());
+        return 0;
+    }
+
+    ErrorOr<isize> UTime(PathView path, const utimbuf* out)
     {
         ErrorOr<INode*> nodeOrError = ::VFS::ResolvePath(path);
         if (!nodeOrError) return nodeOrError.error();
@@ -145,62 +244,91 @@ namespace API::VFS
         (void)node;
         return Error(ENOSYS);
     }
+
+    ErrorOr<isize> FStatAt(isize dirFdNum, const char* path, isize flags,
+                           stat* out)
+    {
+        if (flags & ~(AT_EMPTY_PATH | AT_NO_AUTOMOUNT | AT_SYMLINK_NOFOLLOW)
+            || !out)
+            return Error(EINVAL);
+
+        Process* current = Process::GetCurrent();
+        if (path && !current->ValidateWrite(path, 4096)) return Error(EFAULT);
+        if (!PathView(path).ValidateLength()) return Error(ENAMETOOLONG);
+
+        auto* fd             = current->GetFileHandle(dirFdNum);
+        bool  followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
+
+        auto  cwd            = std::get<1>(
+            ::VFS::ResolvePath(::VFS::GetRootNode(), current->GetCWD()));
+        if (!path || *path == 0)
+        {
+            if (!(flags & AT_EMPTY_PATH)) return Error(ENOENT);
+
+            if (dirFdNum == AT_FDCWD)
+            {
+                if (!cwd) return Error(ENOENT);
+
+                *out = cwd->GetStats();
+                return 0;
+            }
+            else if (!fd) return Error(EBADF);
+
+            *out = fd->GetNode()->GetStats();
+            return 0;
+        }
+
+        auto parent
+            = PathView(path).IsAbsolute() ? ::VFS::GetRootNode() : nullptr;
+        if (!parent)
+        {
+            if (dirFdNum == AT_FDCWD) parent = cwd;
+            else if (fd)
+            {
+                parent = fd->GetNode();
+                if (!parent->IsDirectory()) return Error(ENOTDIR);
+            }
+            else return Error(EBADF);
+
+            parent = parent->Reduce(false, true);
+        }
+
+        auto node
+            = std::get<1>(::VFS::ResolvePath(parent, path, followSymlinks));
+        if (!node) return Error(errno);
+
+        *out = node->GetStats();
+        return 0;
+    }
+    ErrorOr<isize> Dup3(isize oldFdNum, isize newFdNum, isize flags)
+    {
+        if (oldFdNum == newFdNum) return Error(EINVAL);
+
+        auto* process = Process::GetCurrent();
+        auto* oldFd   = process->GetFileHandle(oldFdNum);
+        if (!oldFd) return Error(EBADF);
+
+        auto* newFd = process->GetFileHandle(newFdNum);
+        if (newFd) process->CloseFd(newFdNum);
+
+        newFd = new FileDescriptor(oldFd, flags);
+        if (!newFd) return Error(ENOMEM);
+
+        isize retFd = process->m_FdTable.Insert(newFd, newFdNum);
+        if (retFd < 0)
+        {
+            delete newFd;
+            return Error(EBADF);
+        }
+
+        return retFd;
+    }
 }; // namespace API::VFS
 
 namespace Syscall::VFS
 {
     using Syscall::Arguments;
     using namespace ::VFS;
-
-    ErrorOr<i32> SysStat(Arguments& args)
-    {
-        PathView path    = args.Get<const char*>(0);
-        stat*    out     = args.Get<stat*>(1);
-
-        Process* process = Process::GetCurrent();
-        if (!process->ValidateAddress(reinterpret_cast<uintptr_t>(path.Raw()),
-                                      PROT_READ)
-            || !process->ValidateAddress(out, PROT_READ | PROT_WRITE))
-            return Error(EFAULT);
-
-        auto stats = VFS::Stat(AT_FDCWD, path, 0);
-        if (!stats) return stats.error();
-        *out = *stats.value();
-
-        return 0;
-    }
-    ErrorOr<i32> SysFStat(Arguments& args)
-    {
-        i32      fd      = args.Get<i32>(0);
-        stat*    out     = args.Get<stat*>(1);
-
-        Process* process = Process::GetCurrent();
-        if (!process->ValidateAddress(out, PROT_READ | PROT_WRITE))
-            return Error(EFAULT);
-
-        auto stats = VFS::Stat(fd, "", AT_EMPTY_PATH);
-        if (!stats) return stats.error();
-        *out = *stats.value();
-
-        return 0;
-    }
-    ErrorOr<i32> SysLStat(Arguments& args)
-    {
-        PathView path    = args.Get<const char*>(0);
-        stat*    out     = args.Get<stat*>(1);
-
-        Process* process = Process::GetCurrent();
-        if (!process->ValidateAddress(reinterpret_cast<uintptr_t>(path.Raw()),
-                                      PROT_READ)
-            || !process->ValidateAddress(out, PROT_READ | PROT_WRITE))
-            return Error(EFAULT);
-
-        auto stats = VFS::Stat(AT_FDCWD, path, AT_SYMLINK_NOFOLLOW);
-        if (!stats) return stats.error();
-        *out = *stats.value();
-
-        return 0;
-    }
 
     ErrorOr<off_t> SysLSeek(Arguments& args)
     {
@@ -210,7 +338,7 @@ namespace Syscall::VFS
 
         Process* current = Process::GetCurrent();
         auto     fd      = current->GetFileHandle(fdNum);
-        if (!fd) return std::errno_t(ENOENT);
+        if (!fd) return Error(ENOENT);
 
         return fd->Seek(whence, offset);
     }
@@ -223,7 +351,7 @@ namespace Syscall::VFS
 
         Process* current = Process::GetCurrent();
         auto     fd      = current->GetFileHandle(fdNum);
-        if (!fd) return std::errno_t(EBADF);
+        if (!fd) return Error(EBADF);
 
         return fd->GetNode()->IoCtl(request, arg);
     }
@@ -239,23 +367,6 @@ namespace Syscall::VFS
         return 0;
     }
 
-    ErrorOr<i32> SysDup(Arguments& args)
-    {
-        i32      oldFd   = static_cast<i32>(args.Args[0]);
-
-        Process* current = Process::GetCurrent();
-
-        return current->DupFd(oldFd, -1);
-    }
-    ErrorOr<i32> SysDup2(Syscall::Arguments& args)
-    {
-        i32      oldFd   = static_cast<i32>(args.Args[0]);
-        i32      newFd   = static_cast<i32>(args.Args[1]);
-
-        Process* current = Process::GetCurrent();
-
-        return current->DupFd(oldFd, newFd);
-    }
     ErrorOr<i32> SysFcntl(Arguments& args)
     {
         i32             fdNum   = static_cast<i32>(args.Args[0]);
@@ -264,44 +375,36 @@ namespace Syscall::VFS
 
         Process*        current = Process::GetCurrent();
         FileDescriptor* fd      = current->GetFileHandle(fdNum);
-        if (!fd) return std::errno_t(EBADF);
+        if (!fd) return Error(EBADF);
 
+        bool cloExec = true;
         switch (op)
         {
-            case F_DUPFD: return current->DupFd(fdNum, arg);
-            case F_DUPFD_CLOEXEC: return current->DupFd(fdNum, arg, O_CLOEXEC);
+            case F_DUPFD: cloExec = false;
+            case F_DUPFD_CLOEXEC:
+            {
+                isize newFdNum = -1;
+                for (newFdNum = arg; current->GetFileHandle(newFdNum);
+                     newFdNum++)
+                    ;
+                return API::VFS::Dup3(fdNum, newFdNum, cloExec ? O_CLOEXEC : 0);
+            }
             case F_GETFD: return fd->GetFlags();
             case F_SETFD:
-                if (!fd) return std::errno_t(EBADF);
+                if (!fd) return Error(EBADF);
                 fd->SetFlags(arg);
                 break;
             case F_GETFL: return fd->GetDescriptionFlags();
             case F_SETFL:
-                if (arg & O_ACCMODE) return std::errno_t(EINVAL);
+                if (arg & O_ACCMODE) return Error(EINVAL);
                 fd->SetDescriptionFlags(arg);
                 break;
 
             default:
                 LogError("Syscall::VFS::SysFcntl: Unknown opcode");
-                return std::errno_t(EINVAL);
+                return Error(EINVAL);
         }
 
-        return 0;
-    }
-    ErrorOr<i32> SysGetCwd(Arguments& args)
-    {
-        char*    buffer  = args.Get<char*>(0);
-        usize    size    = args.Get<usize>(1);
-
-        Process* process = Process::GetCurrent();
-
-        if (!buffer || size == 0) return Error(EINVAL);
-        if (!process->ValidateAddress(buffer, PROT_READ)) return Error(EFAULT);
-
-        std::string_view cwd = process->GetCWD();
-        if (size < cwd.length()) return Error(ERANGE);
-
-        cwd.copy(buffer, cwd.length());
         return 0;
     }
     ErrorOr<i32> SysChDir(Arguments& args)
@@ -312,8 +415,8 @@ namespace Syscall::VFS
         INode*      cwd     = std::get<1>(
             VFS::ResolvePath(current->GetRootNode(), current->GetCWD()));
         INode* node = std::get<1>(VFS::ResolvePath(cwd, path));
-        if (!node) return std::errno_t(ENOENT);
-        if (!node->IsDirectory()) return std::errno_t(ENOTDIR);
+        if (!node) return Error(ENOENT);
+        if (!node->IsDirectory()) return Error(ENOTDIR);
 
         current->m_CWD = node->GetPath();
         return 0;
@@ -324,12 +427,12 @@ namespace Syscall::VFS
         Process*        current = Process::GetCurrent();
 
         FileDescriptor* fd      = current->GetFileHandle(fdNum);
-        if (!fd) return std::errno_t(EBADF);
+        if (!fd) return Error(EBADF);
 
         INode* node = fd->GetNode();
-        if (!node) return std::errno_t(ENOENT);
+        if (!node) return Error(ENOENT);
 
-        if (!node->IsDirectory()) return std::errno_t(ENOTDIR);
+        if (!node->IsDirectory()) return Error(ENOTDIR);
         current->m_CWD = node->GetPath();
 
         return 0;
@@ -375,10 +478,10 @@ namespace Syscall::VFS
         Process*      current   = Process::GetCurrent();
         if (!outBuffer
             || !current->ValidateAddress(outBuffer, PROT_READ | PROT_WRITE))
-            return std::errno_t(EFAULT);
+            return Error(EFAULT);
 
         FileDescriptor* fd = current->GetFileHandle(fdNum);
-        if (!fd) return std::errno_t(EBADF);
+        if (!fd) return Error(EBADF);
 
         return fd->GetDirEntries(outBuffer, count);
     }
@@ -392,7 +495,6 @@ namespace Syscall::VFS
         i32      flags   = static_cast<i32>(args.Args[2]);
         mode_t   mode    = static_cast<mode_t>(args.Args[3]);
 
-        LogDebug("OpenAt: {}", path.Raw());
         return current->OpenAt(dirFd, path, flags, mode);
     }
     ErrorOr<i32> SysMkDirAt(Syscall::Arguments& args)
@@ -434,38 +536,5 @@ namespace Syscall::VFS
         if (!node) return Error(errno);
 
         return 0;
-    }
-    ErrorOr<i32> SysFStatAt(Arguments& args)
-    {
-        i32         fdNum   = args.Get<i32>(0);
-        const char* path    = args.Get<const char*>(1);
-        i32         flags   = args.Get<i32>(2);
-        stat*       out     = args.Get<stat*>(3);
-
-        Process*    process = Process::GetCurrent();
-        if (!process->ValidateAddress(reinterpret_cast<uintptr_t>(path),
-                                      PROT_READ)
-            || !process->ValidateAddress(out, PROT_READ | PROT_WRITE))
-            return Error(EFAULT);
-
-        if (!out) return std::errno_t(EFAULT);
-        auto stats = VFS::Stat(fdNum, path, flags);
-        if (!stats) return stats.error();
-        *out = *stats.value();
-
-        return 0;
-    }
-
-    ErrorOr<i32> SysDup3(Arguments& args)
-    {
-        i32 oldFdNum = static_cast<i32>(args.Args[0]);
-        i32 newFdNum = static_cast<i32>(args.Args[1]);
-        i32 flags    = static_cast<i32>(args.Args[2]);
-
-        if (oldFdNum == newFdNum) return std::errno_t(EINVAL);
-        if ((flags & ~O_CLOEXEC) != 0) return std::errno_t(EINVAL);
-
-        Process* current = Process::GetCurrent();
-        return current->DupFd(oldFdNum, newFdNum, flags);
     }
 }; // namespace Syscall::VFS

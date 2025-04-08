@@ -25,14 +25,17 @@
 
 #include <Library/ELF.hpp>
 #include <Library/ICxxAbi.hpp>
+#include <Library/Image.hpp>
 #include <Library/Stacktrace.hpp>
 
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
+#include <Prism/Containers/Array.hpp>
 #include <Prism/Containers/RedBlackTree.hpp>
 #include <Prism/Delegate.hpp>
 #include <Prism/Endian.hpp>
+#include <Prism/StringView.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
@@ -44,29 +47,77 @@
 
 #include <magic_enum/magic_enum.hpp>
 
-void kernelThread()
+static bool loadInitProcess(PathView initPath)
+{
+    Process* kernelProcess = Scheduler::GetKernelProcess();
+    Process* userProcess   = Scheduler::CreateProcess(
+        kernelProcess, initPath.Raw(), Credentials::s_Root);
+    userProcess->PageMap = VMM::GetKernelPageMap();
+
+    std::vector<std::string_view> argv;
+    argv.push_back(initPath.Raw());
+    std::vector<std::string_view> envp;
+    envp.push_back("TERM=linux");
+
+    static ELF::Image program, ld;
+    PageMap*          pageMap = new PageMap();
+    if (!program.Load(initPath, pageMap, userProcess->m_AddressSpace))
+        return false;
+    PathView ldPath = program.GetLdPath();
+    if (!ldPath.IsEmpty()
+        && !ld.Load(ldPath, pageMap, userProcess->m_AddressSpace, 0x40000000))
+    {
+        delete pageMap;
+        return false;
+    }
+    userProcess->PageMap = pageMap;
+    uintptr_t address
+        = ldPath.IsEmpty() ? program.GetEntryPoint() : ld.GetEntryPoint();
+    if (!address)
+    {
+        delete pageMap;
+        return false;
+    }
+
+    Logger::DisableSink(LOG_SINK_TERMINAL);
+    auto userThread = userProcess->CreateThread(address, argv, envp, program,
+                                                CPU::GetCurrent()->ID);
+    Scheduler::EnqueueThread(userThread);
+
+    return true;
+}
+
+static void kernelThread()
 {
     Assert(VFS::MountRoot("tmpfs"));
     Initrd::Initialize();
 
     VFS::CreateNode(VFS::GetRootNode(), "/dev", 0755 | S_IFDIR);
     Assert(VFS::Mount(VFS::GetRootNode(), "", "/dev", "devtmpfs"));
-    VFS::CreateNode(VFS::GetRootNode(), "/mnt", 0755 | S_IFDIR);
 
     Scheduler::InitializeProcFs();
 
     PCI::Initialize();
-    TTY::Initialize();
-    MemoryDevices::Initialize();
-
-    Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1", "/mnt", "echfs"));
-
     if (ACPI::IsAvailable())
     {
         ACPI::Enable();
         ACPI::LoadNameSpace();
         ACPI::EnumerateDevices();
     }
+    PCI::InitializeIrqRoutes();
+
+    TTY::Initialize();
+    MemoryDevices::Initialize();
+
+    Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1", "/mnt/ext2",
+                      "ext2fs"));
+    Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p2", "/mnt/fat32",
+                      "fat32fs"));
+    Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p3", "/mnt/echfs",
+                      "echfs"));
+    auto size = TTY::GetCurrent()->GetSize();
+    LogTrace("TTY: size: {}:{}", size.ws_row, size.ws_col);
+
     auto kernelExecutable = BootInfo::GetExecutableFile();
     auto header   = reinterpret_cast<ELF::Header*>(kernelExecutable->address);
     auto sections = reinterpret_cast<ELF::SectionHeader*>(
@@ -76,42 +127,21 @@ void kernelThread()
         reinterpret_cast<u64>(kernelExecutable->address)
         + sections[header->SectionNamesIndex].Offset);
 
+    ELF::Image kernelImage;
+    kernelImage.LoadFromMemory(reinterpret_cast<u8*>(header),
+                               kernelExecutable->size);
+
     LogTrace("Loading kernel drivers");
     if (!ELF::Image::LoadModules(header->SectionEntryCount, sections,
                                  stringTable))
-        LogError("ELF: Could not find any builtin drivers");
+        LogWarn("ELF: Could not find any builtin drivers");
 
-    LogTrace("Loading user process...");
-    Process* kernelProcess = Scheduler::GetKernelProcess();
-    Process* userProcess   = Scheduler::CreateProcess(
-        kernelProcess, "/usr/sbin/init", Credentials::s_Root);
-    userProcess->PageMap = VMM::GetKernelPageMap();
-
-    std::vector<std::string_view> argv;
-    argv.push_back("/usr/sbin/init");
-    std::vector<std::string_view> envp;
-    envp.push_back("TERM=linux");
-
-    static ELF::Image program, ld;
-    PageMap*          pageMap = new PageMap();
-    Assert(
-        program.Load("/usr/sbin/init", pageMap, userProcess->m_AddressSpace));
-    std::string_view ldPath = program.GetLdPath();
-    if (!ldPath.empty())
-    {
-        LogTrace("Kernel: Loading ld: '{}'", ldPath);
-        Assert(
-            ld.Load(ldPath, pageMap, userProcess->m_AddressSpace, 0x40000000));
-    }
-
-    userProcess->PageMap = pageMap;
-    uintptr_t address
-        = ldPath.empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
-
-    Logger::DisableSink(LOG_SINK_TERMINAL);
-    auto userThread = userProcess->CreateThread(address, argv, envp, program,
-                                                CPU::GetCurrent()->ID);
-    Scheduler::EnqueueThread(userThread);
+    LogTrace("Loading init process...");
+    auto initPath = CommandLine::GetString("init");
+    if (!loadInitProcess(initPath.empty() ? "/usr/sbin/init" : initPath.data()))
+        Panic(
+            "Kernel: Failed to load the init process, try to specify it's path "
+            "using 'init=/path/sbin/init' boot parameter");
 
     for (;;) Arch::Halt();
 }
@@ -131,6 +161,9 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
         Logger::DisableSink(LOG_SINK_SERIAL);
     if (!CommandLine::GetBoolean("log.e9").value_or(true))
         Logger::DisableSink(LOG_SINK_E9);
+
+    if (CommandLine::GetBoolean("log.boot.terminal").value_or(true))
+        Logger::EnableSink(LOG_SINK_TERMINAL);
 
     LogInfo(
         "Boot: Kernel loaded with {}-{} -> firmware type: {}, boot time: {}s",

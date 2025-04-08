@@ -27,7 +27,8 @@ namespace ACPI
         return reinterpret_cast<T*>(GetTable(signature, index));
     }
 
-    IA32BootArchitectureFlags GetIA32BootArchitectureFlags();
+    X86BootArchitectureFlags GetX86BootArchitectureFlags();
+    usize                    GetCentury();
 
-    void                      Reboot();
+    void                     Reboot();
 } // namespace ACPI

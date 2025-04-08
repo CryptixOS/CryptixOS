@@ -7,11 +7,13 @@
 #include <API/Posix/sys/wait.h>
 #include <Arch/CPU.hpp>
 
+#include <Prism/Utility/Math.hpp>
+
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-#include <Prism/Utility/Math.hpp>
+#include <VFS/Fifo.hpp>
 #include <VFS/FileDescriptor.hpp>
 
 #include <cctype>
@@ -160,18 +162,19 @@ ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 
     return m_FdTable.Insert(descriptor.value());
 }
-ErrorOr<i32> Process::DupFd(i32 oldFdNum, i32 newFdNum, i32 flags)
+i32            Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
+
+ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
 {
-    FileDescriptor* oldFd = GetFileHandle(oldFdNum);
-    if (!oldFd) return std::errno_t(EBADF);
+    auto fifo     = new Fifo();
+    auto readerFd = fifo->Open(Fifo::Direction::eRead);
+    pipeFds[0]    = m_FdTable.Insert(readerFd);
 
-    FileDescriptor* newFd = GetFileHandle(newFdNum);
-    if (newFd) CloseFd(newFdNum);
+    auto writerFd = fifo->Open(Fifo::Direction::eWrite);
+    pipeFds[1]    = m_FdTable.Insert(writerFd);
 
-    newFd = new FileDescriptor(oldFd, flags);
-    return m_FdTable.Insert(newFd, newFdNum);
+    return 0;
 }
-i32 Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
 
 std::vector<std::string> SplitArguments(const std::string& str)
 {
@@ -381,8 +384,8 @@ ErrorOr<Process*> Process::Fork()
         pageMap->MapRange(range.GetVirtualBase(), physicalSpace,
                           range.GetSize(),
                           PageAttributes::eRWXU | PageAttributes::eWriteBack);
-        newProcess->m_AddressSpace.push_back(
-            {physicalSpace, range.GetVirtualBase(), range.GetSize()});
+        newProcess->m_AddressSpace.EmplaceBack(
+            physicalSpace, range.GetVirtualBase(), range.GetSize());
 
         // TODO(v1tr10l7): Free regions;
     }

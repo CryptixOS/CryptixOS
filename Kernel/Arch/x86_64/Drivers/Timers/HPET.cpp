@@ -11,8 +11,8 @@
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
-#include <Prism/Utility/Math.hpp>
 #include <Prism/Memory/Pointer.hpp>
+#include <Prism/Utility/Math.hpp>
 
 using namespace ACPI;
 
@@ -132,9 +132,7 @@ namespace HPET
         m_Entry->interruptStatusRegister = m_Entry->interruptStatusRegister;
 
         // TODO(v1tr10l7): Enumerate timers
-        [[maybe_unused]]
-        u32 gsiMask
-            = 0xffffffff;
+        [[maybe_unused]] u32 gsiMask     = 0xffffffff;
         for (usize i = 0; i < GetTimerCount(m_Entry->capabilities); i++)
         {
             auto& comparator = m_Entry->comparators[i];
@@ -147,7 +145,8 @@ namespace HPET
     void TimerBlock::Sleep(u64 us) const
     {
         usize target = GetCounterValue() + (us * 1'000'000'000) / tickPeriod;
-        while (GetCounterValue() < target);
+        while (GetCounterValue() < target)
+            ;
     }
 
     ErrorOr<void> DetectAndSetup()

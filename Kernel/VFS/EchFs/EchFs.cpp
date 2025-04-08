@@ -16,12 +16,13 @@ constexpr const char* ECHFS_SIGNATURE   = "_ECH_FS_";
 constexpr usize       ROOT_DIRECTORY_ID = 0xffff'ffff'ffff'ffff;
 
 INode*                EchFs::Mount(INode* parent, INode* source, INode* target,
-                                   std::string_view name, void* data)
+                                   std::string_view name, const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
                : nullptr;
 
+    LogTrace("EchFs: Mounting");
     EchFsIdentityTable* identityTable = new EchFsIdentityTable;
     if (!identityTable) return nullptr;
 
@@ -63,8 +64,19 @@ INode*                EchFs::Mount(INode* parent, INode* source, INode* target,
         offset += sizeof(EchFsDirectoryEntry);
     }
 
+    usize               count = 0;
+    EchFsDirectoryEntry entry;
+    for (;;)
+    {
+        source->Read(&entry, offset, sizeof(EchFsDirectoryEntry));
+        offset += sizeof(EchFsDirectoryEntry);
+        if (entry.DirectoryID == ECHFS_END_OF_DIRECTORY) break;
+
+        ++count;
+    }
+
     m_Root = new EchFsINode(parent, name, this, 0644 | S_IFDIR, rootDirectory,
-                            m_MainDirectoryOffset * m_BlockSize);
+                            m_MainDirectoryOffset * m_BlockSize, count);
     if (m_Root) m_MountedOn = target;
 
     delete identityTable;
@@ -93,16 +105,16 @@ bool EchFs::Populate(INode* node)
             if (depth == 0) break;
         }
 
-        mode_t type = 0;
+        [[maybe_unused]] mode_t type = 0;
         if (entry.ObjectType == 0) type = S_IFREG;
         else if (entry.ObjectType == 1)
         {
             type = S_IFDIR;
             ++depth;
         }
-        inode->m_Children[std::string(reinterpret_cast<char*>(entry.Name))]
+        /*inode->m_Children[std::string(reinterpret_cast<char*>(entry.Name))]
             = new EchFsINode(node, reinterpret_cast<char*>(entry.Name), this,
-                             0644 | type, entry, offset);
+                             0644 | type, entry, offset);*/
         offset += sizeof(EchFsDirectoryEntry);
         m_Device->Read(&entry, offset, sizeof(EchFsDirectoryEntry));
     }

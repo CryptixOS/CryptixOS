@@ -1,0 +1,161 @@
+From 68683bd9b9d3927bdeeaa6e338d321c2fccd4b53 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Tue, 25 Mar 2025 03:27:48 +0100
+Subject: [PATCH 5/5] [cryptix]: implement fchmodat syscall
+
+---
+ sysdeps/cryptix/include/cryptix/syscall.h |  4 +-
+ sysdeps/cryptix/sysdeps/vfs.cpp           | 62 ++++++++++++++---------
+ 2 files changed, 40 insertions(+), 26 deletions(-)
+
+diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
+index e22d859c..33ce555a 100644
+--- a/sysdeps/cryptix/include/cryptix/syscall.h
++++ b/sysdeps/cryptix/include/cryptix/syscall.h
+@@ -49,6 +49,7 @@ constexpr size_t SYS_CHDIR         = 80;
+ constexpr size_t SYS_FCHDIR        = 81;
+ constexpr size_t SYS_MKDIR         = 83;
+ constexpr size_t SYS_CREAT         = 85;
++constexpr size_t SYS_UMASK         = 95;
+ constexpr size_t SYS_GETUID        = 102;
+ constexpr size_t SYS_GETGID        = 104;
+ constexpr size_t SYS_GETEUID       = 107;
+@@ -61,10 +62,11 @@ constexpr size_t SYS_GETSID        = 124;
+ constexpr size_t SYS_ARCH_PRCTL    = 158;
+ constexpr size_t SYS_REBOOT        = 169;
+ constexpr size_t SYS_GETDENTS64    = 217;
++constexpr size_t SYS_CLOCK_GETTIME = 228;
+ constexpr size_t SYS_PANIC         = 255;
+ constexpr size_t SYS_OPENAT        = 257;
+ constexpr size_t SYS_FSTATAT       = 262;
+-constexpr size_t SYS_CLOCK_GETTIME = 228;
++constexpr size_t SYS_FCHMODAT      = 268;
+ 
+ #pragma endregion
+ 
+diff --git a/sysdeps/cryptix/sysdeps/vfs.cpp b/sysdeps/cryptix/sysdeps/vfs.cpp
+index 2b853f99..43be8a26 100644
+--- a/sysdeps/cryptix/sysdeps/vfs.cpp
++++ b/sysdeps/cryptix/sysdeps/vfs.cpp
+@@ -55,22 +55,14 @@ namespace mlibc
+         *bytesWritten = ret;
+         return 0;
+     }
+-    int sys_openat(int dirfd, const char* path, int flags, mode_t mode, int* fd)
++    int sys_open(const char* path, int flags, mode_t mode, int* fd)
+     {
+-        int ret = Syscall(SYS_OPENAT, dirfd, path, flags, mode);
++        auto ret = Syscall(SYS_OPENAT, AT_FDCWD, path, flags, mode);
+         if (auto e = syscall_error(ret); e) return e;
+ 
+         *fd = ret;
+         return 0;
+     }
+-    int sys_open(const char* path, int flags, mode_t mode, int* fd)
+-    {
+-        return sys_openat(AT_FDCWD, path, flags, mode, fd);
+-    }
+-    int sys_open_dir(const char* path, int* fd)
+-    {
+-        return sys_openat(AT_FDCWD, path, O_DIRECTORY, 0, fd);
+-    }
+     int sys_close(int fd)
+     {
+         auto ret = Syscall(SYS_CLOSE, fd);
+@@ -79,15 +71,6 @@ namespace mlibc
+         return 0;
+     }
+ 
+-    int sys_read_entries(int handle, void* buffer, size_t maxSize,
+-                         size_t* bytesRead)
+-    {
+-        auto ret = Syscall(SYS_GETDENTS64, handle, buffer, maxSize);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *bytesRead = ret;
+-        return 0;
+-    }
+     int sys_stat(fsfd_target fsfdt, int fd, const char* path, int flags,
+                  struct stat* statbuf)
+     {
+@@ -113,7 +96,6 @@ namespace mlibc
+ 
+         return 0;
+     }
+-
+     int sys_seek(int fd, off_t offset, int whence, off_t* newOffset)
+     {
+         auto ret = Syscall(SYS_LSEEK, fd, offset, whence);
+@@ -130,6 +112,7 @@ namespace mlibc
+         *result = ret;
+         return 0;
+     }
++
+     int sys_access(const char* path, int mode)
+     {
+         int ret = Syscall(SYS_ACCESS, path, mode);
+@@ -164,6 +147,22 @@ namespace mlibc
+         return 0;
+     }
+ 
++    int sys_uname(struct utsname* out)
++    {
++        auto ret = Syscall(SYS_UNAME, out);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_fcntl(int fd, int request, va_list args, int* result)
++    {
++        auto ret = Syscall(SYS_FCNTL, fd, request, args);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *result = ret;
++        return 0;
++    }
++
+     int sys_getcwd(char* buffer, size_t size)
+     {
+         auto ret = Syscall(SYS_GETCWD, buffer, size);
+@@ -193,20 +192,33 @@ namespace mlibc
+         return 0;
+     }
+ 
+-    int sys_uname(struct utsname* out)
++    int sys_read_entries(int fdnum, void* buffer, size_t max_size,
++                         size_t* bytes_read)
+     {
+-        auto ret = Syscall(SYS_UNAME, out);
++        auto ret = Syscall(SYS_GETDENTS64, fdnum, buffer, max_size);
+         if (auto e = syscall_error(ret); e) return e;
+ 
++        *bytes_read = ret;
+         return 0;
+     }
++    int sys_openat(int dirfd, const char* path, int flags, mode_t mode, int* fd)
++    {
++        int ret = Syscall(SYS_OPENAT, dirfd, path, flags, mode);
++        if (auto e = syscall_error(ret); e) return e;
+ 
+-    int sys_fcntl(int fd, int request, va_list args, int* result)
++        *fd = ret;
++        return 0;
++    }
++    int sys_open_dir(const char* path, int* fd)
+     {
+-        auto ret = Syscall(SYS_FCNTL, fd, request, args);
++        return sys_openat(AT_FDCWD, path, O_DIRECTORY, 0, fd);
++    }
++
++    int sys_fchmodat(int fd, const char* pathname, mode_t mode, int flags)
++    {
++        auto ret = Syscall(SYS_FCHMODAT, fd, pathname, mode, flags);
+         if (auto e = syscall_error(ret); e) return e;
+ 
+-        *result = ret;
+         return 0;
+     }
+ 
+-- 
+2.48.1
+

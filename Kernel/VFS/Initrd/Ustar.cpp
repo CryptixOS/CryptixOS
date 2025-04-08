@@ -112,7 +112,7 @@ namespace Ustar
                         current->deviceMinor, sizeof(current->deviceMinor));
 
                     VFS::MkNod(VFS::GetRootNode(), filename, mode | S_IFCHR,
-                               makeDevice(deviceMajor, deviceMinor));
+                               MakeDevice(deviceMajor, deviceMinor));
 
                     if (!node)
                         LogError(

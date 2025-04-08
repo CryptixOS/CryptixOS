@@ -209,18 +209,19 @@ namespace ACPI
         return nullptr;
     }
 
-    IA32BootArchitectureFlags GetIA32BootArchitectureFlags()
+    X86BootArchitectureFlags GetX86BootArchitectureFlags()
     {
-        return s_FADT ? s_FADT->IA32BootArchitectureFlags
-                      : IA32BootArchitectureFlags(0);
+        return s_FADT ? s_FADT->X86BootArchitectureFlags
+                      : X86BootArchitectureFlags();
     }
+    usize GetCentury() { return s_FADT ? s_FADT->Century : 0; }
 
-    void Reboot()
+    void  Reboot()
     {
-        // TODO(v1tr10l7): ACPI::Reboot
-        return;
+        if (!s_FADT) return;
         LogTrace("ACPI: Attempting to reboot...");
-        LogInfo("");
+
+        s_FADT->ResetReg.Write(s_FADT->ResetValue);
     }
 
 } // namespace ACPI

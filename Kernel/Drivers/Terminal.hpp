@@ -6,14 +6,16 @@
  */
 #pragma once
 
+#include <API/Posix/termios.h>
 #include <Boot/BootInfo.hpp>
-#include <Prism/Core/Types.hpp>
 
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/Types.hpp>
 #include <Prism/Spinlock.hpp>
 
-#include <flanterm.h>
 #include <string_view>
-#include <vector>
+#include <unordered_map>
 
 namespace AnsiColor
 {
@@ -36,35 +38,117 @@ namespace AnsiColor
     constexpr const char* BACKGROUND_WHITE   = "\u001b[47m";
 }; // namespace AnsiColor
 
-class Terminal final
+class Terminal
 {
   public:
-    Terminal() = default;
-    Terminal(Framebuffer& m_Framebuffer, usize id)
-        : m_ID(id)
+    Terminal();
+
+    virtual bool          Initialize(const Framebuffer& m_Framebuffer) = 0;
+
+    inline const winsize& GetSize() const { return m_Size; }
+
+    inline bool           GetCursorKeyMode() const { return m_CursorKeyMode; }
+    void                  Resize(const winsize& newDimensions);
+
+    virtual void          Clear(u32 color = 0xffffffff, bool move = true) = 0;
+
+    void                  PutChar(u64 c);
+    void                  PutCharImpl(u64 c);
+
+    void                  PrintString(std::string_view str);
+
+    void                  Bell();
+
+    static Terminal*      GetPrimary();
+    static const Vector<Terminal*>& EnumerateTerminals();
+
+  protected:
+    bool     m_Initialized = false;
+    winsize  m_Size;
+    usize    m_ScrollBottomMargin = 0;
+    usize    m_ScrollTopMargin    = 0;
+
+    Spinlock m_Lock;
+
+    enum class AnsiColor
     {
-        Initialize(m_Framebuffer);
-    }
+        eBlack,
+        eRed,
+        eGreen,
+        eYellow,
+        eBlue,
+        eMagenta,
+        eCyan,
+        eWhite,
 
-    bool                      Initialize(Framebuffer& m_Framebuffer);
+        eBrightBlack,
+        eBrightRed,
+        eBrightGreen,
+        eBrightYellow,
+        eBrightMagenta,
+        eBrightCyan,
+        eBrightWhite,
+    };
 
-    inline const Framebuffer& GetFramebuffer() const { return m_Framebuffer; }
-    inline const flanterm_context* GetContext() const { return m_Context; }
+    virtual void RawPutChar(u8 c) = 0;
+    virtual void MoveCharacter(usize newX, usize newY, usize oldX, usize oldY)
+        = 0;
 
-    void                           Clear(u32 color = 0xffffff);
-    void                           PutChar(u64 c);
+    virtual void                    Scroll(isize count = 1)              = 0;
+    virtual void                    ScrollDown()                         = 0;
+    virtual void                    ScrollUp()                           = 0;
 
-    void                           PrintString(std::string_view str);
+    virtual void                    Refresh()                            = 0;
+    virtual void                    Flush()                              = 0;
 
-    static Terminal*               GetPrimary();
-    static std::vector<Terminal*>& EnumerateTerminals();
+    virtual void                    ShowCursor()                         = 0;
+    virtual bool                    HideCursor()                         = 0;
+
+    virtual std::pair<usize, usize> GetCursorPos()                       = 0;
+    virtual void                    SetCursorPos(usize xpos, usize ypos) = 0;
+
+    virtual void                    SaveState()                          = 0;
+    virtual void                    RestoreState()                       = 0;
+
+    virtual void                    SwapPalette()                        = 0;
+
+    virtual void                    SetTextForeground(AnsiColor color)   = 0;
+    virtual void                    SetTextBackground(AnsiColor color)   = 0;
+
+    virtual void                    SetTextForegroundRgb(u32 color)      = 0;
+    virtual void                    SetTextBackgroundRgb(u32 color)      = 0;
+
+    virtual void                    SetTextForegroundDefault()           = 0;
+    virtual void                    SetTextBackgroundDefault()           = 0;
+
+    virtual void                    SetTextForegroundDefaultBright()     = 0;
+    virtual void                    SetTextBackgroundDefaultBright()     = 0;
+
+    void                            Reset();
+    virtual void                    Destroy() = 0;
 
   private:
-    usize                         m_ID          = 0;
-    bool                          m_Initialized = false;
-    Framebuffer                   m_Framebuffer = {};
-    flanterm_context*             m_Context     = nullptr;
-    Spinlock                      m_Lock;
+    enum class State
+    {
+        eNormal,
+        eEscape,
+        eControlSequence,
+        eCsiExpectParameters,
+        eOsCommand,
+        eDecPrivate,
+        eDecParameters,
+        eDecCursorMode,
+    } m_State;
 
-    static std::vector<Terminal*> s_Terminals;
+    constexpr static usize              MAX_ESC_PARAMETER_COUNT = 16;
+    Array<u32, MAX_ESC_PARAMETER_COUNT> m_EscapeValues;
+    usize                               m_EscapeValueCount = 0;
+    u8                                  m_TabSize          = 4;
+
+    bool                                m_CursorKeyMode    = false;
+
+    void                                OnEscapeChar(char c);
+    bool                                DecSpecialPrint(u8 c);
+
+    static Vector<Terminal*>            s_Terminals;
 };

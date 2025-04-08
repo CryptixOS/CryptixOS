@@ -6,14 +6,14 @@
  */
 
 #include <Drivers/Serial.hpp>
-#include <Drivers/Terminal.hpp>
+#include <Drivers/VideoTerminal.hpp>
 
 #include <Library/Logger.hpp>
 #include <Prism/Spinlock.hpp>
 
 #include <Prism/Debug/LogSink.hpp>
-#include <Prism/Utility/Math.hpp>
 #include <Prism/StringUtils.hpp>
+#include <Prism/Utility/Math.hpp>
 
 #include <cctype>
 #include <magic_enum/magic_enum.hpp>
@@ -35,9 +35,9 @@ namespace E9
 
 using namespace Prism;
 
-static usize    s_EnabledSinks = 0;
-static Terminal s_Terminal;
-class CoreSink  final : public LogSink
+static usize         s_EnabledSinks = 0;
+static VideoTerminal s_Terminal;
+class CoreSink       final : public LogSink
 {
   public:
     void WriteNoLock(std::string_view str) override

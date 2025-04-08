@@ -9,6 +9,8 @@
 #include <API/UnixTypes.hpp>
 
 #include <Prism/Core/Types.hpp>
+#include <Prism/Utility/Time.hpp>
+
 #include <Time/HardwareTimer.hpp>
 
 namespace Time
@@ -16,7 +18,11 @@ namespace Time
     void           Initialize();
     HardwareTimer* GetSchedulerTimer();
 
-    usize          GetEpoch();
+    Timestep       GetBootTime();
+    Timestep       GetTimeSinceBoot();
+    Timestep       GetRealTime();
+    Timestep       GetMonotonicTime();
+
     timespec       GetReal();
     timespec       GetMonotonic();
 

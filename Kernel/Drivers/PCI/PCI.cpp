@@ -54,6 +54,7 @@ namespace PCI
                     address, busStart, busEnd);
             Domain domain(i, busStart, busEnd);
             s_HostControllers[domain.ID] = new HostController(domain, address);
+            s_HostControllers[domain.ID]->Initialize();
         }
     }
     static bool EnumerateDevices(Enumerator enumerator)
@@ -70,6 +71,7 @@ namespace PCI
         {
             Domain domain(0, 0, 32);
             s_HostControllers[0] = new HostController(domain, 0);
+            s_HostControllers[0]->Initialize();
         }
 
         Enumerator enumerator;

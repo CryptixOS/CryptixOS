@@ -17,6 +17,7 @@ namespace API::MM
 
 namespace Syscall::MM
 {
-    ErrorOr<intptr_t> SysMMap(Syscall::Arguments& args);
+    ErrorOr<intptr_t> SysMMap(Arguments& args);
+    ErrorOr<intptr_t> SysMProtect(Arguments& args);
     ErrorOr<i32>      SysMUnMap(Arguments& args);
 } // namespace Syscall::MM

@@ -96,8 +96,7 @@ std::optional<usize> Event::Await(std::span<Event*> events, bool block)
 
 void Event::Trigger(Event* event, bool drop)
 {
-    bool       intState = CPU::SwapInterruptFlag(false);
-    ScopedLock guard(event->Lock);
+    bool intState = CPU::SwapInterruptFlag(false);
 
     if (event->Listeners.empty())
     {
@@ -105,6 +104,7 @@ void Event::Trigger(Event* event, bool drop)
         return;
     }
 
+    ScopedLock guard(event->Lock);
     for (const auto& listener : event->Listeners)
     {
         auto thread = listener.Thread;

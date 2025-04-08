@@ -22,6 +22,31 @@
 
 namespace PCI
 {
+    Pointer Bar::Map(usize alignment)
+    {
+        if (!IsMMIO) return 0;
+
+        if (Base.Raw() != 0) return Base;
+
+        if (VMM::GetKernelPageMap()->Virt2Phys(Address.ToHigherHalf<u64>())
+            == uintptr_t(-1))
+        {
+            usize pageSize = PMM::PAGE_SIZE;
+            auto  base     = Math::AlignDown(Address.Raw(), pageSize);
+            auto  len
+                = Math::AlignUp(Address.Offset<u64>(Size), pageSize) - base;
+
+            auto virt
+                = VMM::AllocateSpace(len, alignment ?: pageSize, !Is64Bit);
+            VMM::GetKernelPageMap()->MapRange(virt, base, len,
+                                              PageAttributes::eRW);
+            Base = virt + (Address.Raw() - base);
+        }
+        else Base = Address.ToHigherHalf<Pointer>();
+
+        return Base;
+    }
+
     void Device::EnableMemorySpace()
     {
         ScopedLock guard(m_Lock);
@@ -72,25 +97,51 @@ namespace PCI
 
         u16 offset  = 0x10 + index * sizeof(u32);
         u32 baseLow = ReadAt(offset, 4);
-        WriteAt(offset, ~0, 4);
+        WriteAt(offset, 0xffffffff, 4);
         u32 sizeLow = ReadAt(offset, 4);
         WriteAt(offset, baseLow, 4);
 
         if (baseLow & 1)
         {
-            bar.Address = baseLow & ~0b11;
-            bar.Size    = ~(sizeLow & ~0b11) + 1;
+            bar.Base    = baseLow & ~0b11;
+            bar.Address = bar.Base;
+            bar.Size    = (~(sizeLow & ~0b11) + 1) & 0xffff;
+            bar.IsMMIO  = false;
         }
         else
         {
-            i32 type     = (baseLow >> 1) & 3;
-            u32 baseHigh = ReadAt(offset + 4, 4);
+            i32       type   = (baseLow >> 1) & 3;
+            uintptr_t addr   = 0;
+            usize     length = 0;
 
-            bar.Address  = baseLow & 0xfffffff0;
-            if (type == 2) bar.Address |= ((u64)baseHigh << 32);
+            switch (type)
+            {
+                case 0x00:
+                    length = ~(sizeLow & ~0b1111) + 1;
+                    addr   = baseLow & ~0b1111;
+                    break;
+                case 0x02:
+                    auto offsetH = offset + sizeof(u32);
+                    auto barH    = ReadAt(offsetH, 4);
 
-            bar.Size   = ~(sizeLow & ~0b1111) + 1;
-            bar.IsMMIO = true;
+                    WriteAt(offsetH, 0xffffffff, 4);
+                    auto sizeHigh = ReadAt(offsetH, 4);
+                    WriteAt(offsetH, barH, 4);
+
+                    length = ~((u64(sizeHigh) << 32) | (sizeLow & ~0b1111)) + 1;
+                    addr   = (u64(barH) << 32) | (bar & ~0b1111);
+
+                    bar.Is64Bit = true;
+                    break;
+            }
+
+            bar.Base    = Pointer(0);
+            bar.Address = addr;
+            bar.Size    = length;
+            bar.IsMMIO  = true;
+
+            bar.Size    = ~(sizeLow & ~0b1111) + 1;
+            bar.IsMMIO  = true;
         }
 
         return bar;
@@ -101,14 +152,15 @@ namespace PCI
         auto handler = InterruptManager::AllocateHandler();
         handler->Reserve();
         handler->SetHandler(
-            [callback](CPUContext*)
+            [this](CPUContext*)
             {
-                LogInfo("Hello");
-                callback.Invoke();
+                if (m_OnIrq) m_OnIrq.Invoke();
             });
 
+        m_OnIrq = callback;
         if (MsiXSet(cpuid, handler->GetInterruptVector(), -1)) return true;
         if (MsiSet(cpuid, handler->GetInterruptVector(), -1)) return true;
+#ifdef CTOS_TARGET_X86_64
 
         auto  pin        = Read<u8>(RegisterOffset::eInterruptPin);
         auto* controller = GetHostController(m_Address.Domain);
@@ -125,7 +177,6 @@ namespace PCI
         if (!route->EdgeTriggered) flags |= Bit(3);
 
         u8 vector = handler->GetInterruptVector();
-#ifdef CTOS_TARGET_X86_64
         IoApic::SetGsiRedirect(cpuid, vector, route->Gsi, flags, true);
         return true;
 #endif

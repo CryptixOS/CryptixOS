@@ -112,14 +112,14 @@ Thread::Thread(Process* parent, uintptr_t pc,
     auto mapUserStack = [this]() -> std::pair<uintptr_t, uintptr_t>
     {
         uintptr_t pstack  = PMM::CallocatePages<uintptr_t>(CPU::USER_STACK_SIZE
-                                                          / PMM::PAGE_SIZE);
+                                                           / PMM::PAGE_SIZE);
         uintptr_t vustack = m_Parent->m_UserStackTop - CPU::USER_STACK_SIZE;
 
         Assert(m_Parent->PageMap->MapRange(
             vustack, pstack, CPU::USER_STACK_SIZE,
             PageAttributes::eRWXU | PageAttributes::eWriteBack));
-        m_Parent->m_AddressSpace.push_back(
-            {pstack, vustack, CPU::USER_STACK_SIZE});
+        m_Parent->m_AddressSpace.EmplaceBack(pstack, vustack,
+                                             CPU::USER_STACK_SIZE);
         m_StackVirt              = vustack;
 
         m_Parent->m_UserStackTop = vustack - PMM::PAGE_SIZE;
@@ -252,7 +252,7 @@ Thread* Thread::Fork(Process* process)
     newThread->stack = stack;
 
     Pointer kstack   = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
-                                                    / PMM::PAGE_SIZE);
+                                                      / PMM::PAGE_SIZE);
     newThread->kernelStack = kstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
         CPU::KERNEL_STACK_SIZE);
 

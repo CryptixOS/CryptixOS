@@ -14,14 +14,11 @@
 #include <atomic>
 #include <concepts>
 #include <enable_shared_from_this.hpp>
-#include <flanterm.h>
 #include <limine.h>
 #include <nostd/string.hpp>
 #include <optional>
 #include <parallel_hashmap/phmap.h>
 #include <span>
 #include <tuple>
-#include <uacpi/kernel_api.h>
-#include <uacpi/uacpi.h>
 #include <utility>
 #include <veque.hpp>

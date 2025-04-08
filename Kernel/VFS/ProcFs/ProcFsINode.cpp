@@ -4,11 +4,24 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Memory/PMM.hpp>
+
 #include <VFS/ProcFs/ProcFsINode.hpp>
 
-ProcFsINode::ProcFsINode(INode* parent, std::string_view name, Filesystem* fs,
+isize ProcFsProperty::Read(u8* outBuffer, off_t offset, usize size)
+{
+    if (static_cast<usize>(offset) >= Buffer.length()) return 0;
+
+    usize bytesCopied = Buffer.copy(reinterpret_cast<char*>(outBuffer) + offset,
+                                    std::min(size, Buffer.length() - offset));
+
+    if (offset + bytesCopied >= Buffer.length()) GenerateRecord();
+    return bytesCopied;
+}
+
+ProcFsINode::ProcFsINode(INode* parent, StringView name, Filesystem* fs,
                          mode_t mode, ProcFsProperty* property)
-    : INode(parent, name, fs)
+    : INode(parent, name.Raw(), fs)
     , m_Property(property)
 {
     Assert(!S_ISDIR(mode) || !m_Property);
@@ -29,8 +42,8 @@ const stat& ProcFsINode::GetStats()
 {
     if (m_Property)
     {
-        m_Property->String = m_Property->GenerateProperty();
-        m_Stats.st_size    = m_Property->String.length();
+        m_Property->GenerateRecord();
+        m_Stats.st_size = m_Property->Buffer.length();
     }
     return m_Stats;
 }
@@ -42,17 +55,8 @@ void ProcFsINode::InsertChild(INode* node, std::string_view name)
 }
 isize ProcFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
-    std::string& property = *m_Property;
-
-    if (static_cast<usize>(offset) >= property.length()) return 0;
-
-    usize bytesCopied
-        = property.copy(reinterpret_cast<char*>(buffer) + offset,
-                        std::min(bytes, property.length() - offset));
-
-    if (offset + bytesCopied >= property.length())
-        property = m_Property->GenerateProperty();
-    return bytesCopied;
+    u8* dest = reinterpret_cast<u8*>(buffer);
+    return m_Property->Read(dest, offset, bytes);
 }
 isize ProcFsINode::Write(const void* buffer, off_t offset, usize bytes)
 {

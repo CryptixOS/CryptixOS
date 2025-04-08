@@ -141,4 +141,17 @@ namespace VirtualMemoryManager
         if (!s_Initialized) Initialize();
         return s_KernelPageMap;
     }
+
+    Pointer MapIoRegion(PhysAddr phys, usize size, bool write, usize alignment)
+    {
+        auto           virt = AllocateSpace(size, alignment, true);
+        PageAttributes attributes
+            = PageAttributes::eRead | PageAttributes::eUncacheableStrong;
+        if (write) attributes |= PageAttributes::eWrite;
+
+        if (!s_KernelPageMap->MapRange(virt, phys, size, attributes))
+            return nullptr;
+
+        return virt;
+    }
 } // namespace VirtualMemoryManager

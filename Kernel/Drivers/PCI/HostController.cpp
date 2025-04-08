@@ -90,11 +90,13 @@ namespace PCI
                         uacpi_free_resources(resources);
                     }
 
+#if 0
                     LogInfo(
                         "PCI: Adding irq entry: {{ gsi: {}, device: {}, "
                         "function: {}, pin: {}, edge: {}, high: {} }}",
                         gsi, slot, func, entry.pin + 1, edgeTriggered,
                         activeHigh);
+#endif
                     s_IrqRoutes.emplace_back(gsi, slot, func,
                                              static_cast<u8>(entry.pin + 1),
                                              edgeTriggered, activeHigh);
@@ -113,24 +115,17 @@ namespace PCI
     void HostController::Initialize()
     {
         if (m_Address)
-        {
             m_AccessMechanism = new ECAM(m_Address, m_Domain.BusStart);
-            return;
-        }
-
-        m_AccessMechanism = new LegacyAccessMechanism();
+        else m_AccessMechanism = new LegacyAccessMechanism();
         Assert(m_AccessMechanism);
-    }
 
-    bool HostController::EnumerateRootBus(Enumerator enumerator)
-    {
         if ((Read<u8>(DeviceAddress(),
                       std::to_underlying(RegisterOffset::eHeaderType))
              & Bit(7))
             == 0)
         {
-            if (EnumerateBus(0, enumerator)) return true;
-            return false;
+            Bus* bus = new Bus(this, m_Domain.ID, 0);
+            m_RootBuses.PushBack(bus);
         }
         else
         {
@@ -140,75 +135,17 @@ namespace PCI
                               std::to_underlying(RegisterOffset::eVendorID))
                     == PCI_INVALID)
                     continue;
-                if (EnumerateBus(i, enumerator)) return true;
+
+                auto bus = new Bus(this, m_Domain.ID, i);
+                m_RootBuses.PushBack(bus);
             }
         }
-
-        return false;
     }
-    bool HostController::EnumerateBus(u8 bus, Enumerator enumerator)
+
+    bool HostController::EnumerateRootBus(Enumerator enumerator)
     {
-        for (u8 slot = 0; slot < 32; ++slot)
-            if (EnumerateSlot(bus, slot, enumerator)) return true;
-
-        return false;
-    }
-    bool HostController::EnumerateSlot(const u8 bus, const u8 slot,
-                                       Enumerator enumerator)
-    {
-        DeviceAddress address{};
-        address.Domain   = m_Domain.ID;
-        address.Bus      = bus;
-        address.Slot     = slot;
-        address.Function = 0;
-
-        u16 vendorID
-            = Read<u16>(address, std::to_underlying(RegisterOffset::eVendorID));
-        if (vendorID == PCI_INVALID) return false;
-
-        u8 headerType = Read<u8>(
-            address, std::to_underlying(RegisterOffset::eHeaderType));
-        if (!(headerType & Bit(7)))
-        {
-            if (EnumerateFunction(address, enumerator)) return true;
-        }
-        else
-        {
-            for (u8 i = 0; i < 8; ++i)
-            {
-                address.Function = i;
-                if (Read<u16>(address,
-                              std::to_underlying(RegisterOffset::eVendorID))
-                    != PCI_INVALID)
-                {
-                    if (EnumerateFunction(address, enumerator)) return true;
-                }
-            }
-        }
-
-        return false;
-    }
-    bool HostController::EnumerateFunction(const DeviceAddress& address,
-                                           Enumerator           enumerator)
-    {
-        if (enumerator(address)) return true;
-        u16 type
-            = Read<u8>(address, std::to_underlying(RegisterOffset::eClassID))
-           << 8;
-        type |= Read<u8>(address,
-                         std::to_underlying(RegisterOffset::eSubClassID));
-
-        u8 headerType
-            = Read<u8>(address, std::to_underlying(RegisterOffset::eHeaderType))
-            & 0x7f;
-        (void)type;
-        if (headerType == 0x01)
-        {
-            u8 secondaryBus = Read<u8>(
-                address, std::to_underlying(RegisterOffset::eSecondaryBus));
-
-            if (EnumerateBus(secondaryBus, enumerator)) return true;
-        }
+        for (const auto& bus : m_RootBuses)
+            if (bus->Enumerate(enumerator)) return true;
         return false;
     }
 }; // namespace PCI

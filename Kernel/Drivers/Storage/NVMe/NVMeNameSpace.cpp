@@ -4,6 +4,11 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Arch/CPU.hpp>
+#include <Arch/InterruptHandler.hpp>
+#include <Arch/InterruptManager.hpp>
+
+#include <Drivers/DeviceManager.hpp>
 #include <Drivers/Storage/NVMe/NVMeController.hpp>
 #include <Drivers/Storage/NVMe/NVMeNameSpace.hpp>
 #include <Drivers/Storage/StorageDevicePartition.hpp>
@@ -12,8 +17,6 @@
 
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/VFS.hpp>
-
-using Prism::Pointer;
 
 namespace NVMe
 {
@@ -52,9 +55,26 @@ namespace NVMe
             = std::format("/dev/{}n{}", m_Controller->GetName(), m_ID);
         LogTrace("NVMe: Creating device at '{}'", path);
         VFS::MkNod(VFS::GetRootNode(), path, m_Stats.st_mode, GetID());
+        DeviceManager::RegisterBlockDevice(this);
         // TODO(v1tr10l7): enumerate partitions
 
         m_PartitionTable.Load(*this);
+
+        for (usize i = 0; i < m_IoQueue->GetDepth(); i++)
+        {
+            break;
+            auto handler = InterruptManager::AllocateHandler();
+            handler->Reserve();
+            /*
+            if (!MsiXSet(CPU::GetCurrent()->LapicID,
+                         handler->GetInterruptVector(), -1))
+            {
+                if (i == 0)
+                    LogError(
+                        "Could not install any irq handlers for io queues");
+                break;
+            }*/
+        }
 
         usize i = 1;
         for (const auto& entry : m_PartitionTable)
@@ -62,6 +82,7 @@ namespace NVMe
             StorageDevicePartition* partition = new StorageDevicePartition(
                 *this, entry.FirstBlock, entry.LastBlock, 292, i);
             DevTmpFs::RegisterDevice(partition);
+            DeviceManager::RegisterBlockDevice(partition);
 
             std::string_view partitionPath = std::format(
                 "/dev/{}n{}p{}", m_Controller->GetName(), m_ID, i);
@@ -76,6 +97,7 @@ namespace NVMe
     isize NameSpace::Read(void* dest, off_t offset, usize bytes)
     {
         ScopedLock guard(m_Lock);
+
         for (usize progress = 0; progress < bytes;)
         {
             u64 sector = (offset + progress) / m_CacheBlockSize;
@@ -89,6 +111,38 @@ namespace NVMe
 
             std::memcpy(reinterpret_cast<u8*>(dest) + progress,
                         &m_Cache[slot].Cache[off], chunk);
+            progress += chunk;
+        }
+
+        return bytes;
+    }
+    isize NameSpace::Write(const void* src, off_t offset, usize bytes)
+    {
+        ScopedLock guard(m_Lock);
+
+        for (usize progress = 0; progress < bytes;)
+        {
+            u64 sector = (offset + progress) / m_CacheBlockSize;
+            i32 slot   = FindBlock(sector);
+            if (slot == -1)
+            {
+                slot = CacheBlock(sector);
+                if (slot == -1) return -1;
+            }
+
+            u64   chunk = bytes - progress;
+            usize off   = (offset + progress) % m_CacheBlockSize;
+            if (chunk > m_CacheBlockSize - off) chunk = m_CacheBlockSize - off;
+
+            const u8* dest = reinterpret_cast<const u8*>(src) + progress;
+            std::memcpy(&m_Cache[slot].Cache[off], dest, chunk);
+            m_Cache[slot].Status = CacheReady;
+
+            i32 nwritten         = ReadWriteLba(m_Cache[slot].Cache,
+                                                (m_CacheBlockSize / m_LbaSize)
+                                                    * m_Cache[slot].Block,
+                                                m_CacheBlockSize / m_LbaSize, true);
+            if (nwritten == -1) return -1;
             progress += chunk;
         }
 
@@ -163,7 +217,6 @@ namespace NVMe
                       .FromHigherHalf<u64>();
         }
         else if (shouldUsePrp)
-
             cmd.Prp2 = Pointer(dest)
                            .Offset<Pointer>(PMM::PAGE_SIZE)
                            .FromHigherHalf<u64>();
@@ -185,11 +238,14 @@ namespace NVMe
     }
     isize NameSpace::CacheBlock(u64 block)
     {
-        i32  target = 0;
+        i32 target = 0;
 
-        bool found  = false;
         for (target = 0; target < 512; target++)
-            if (!m_Cache[target].Status) found = true;
+            if (!m_Cache[target].Status)
+            {
+                m_Cache[target].Cache = new u8[m_CacheBlockSize];
+                goto write;
+            }
 
         if (m_Overwritten == 512)
         {
@@ -198,7 +254,7 @@ namespace NVMe
         }
         else target = m_Overwritten++;
 
-        if (found) m_Cache[target].Cache = new u8[m_CacheBlockSize];
+    write:
         auto lba = ReadWriteLba(m_Cache[target].Cache,
                                 (m_CacheBlockSize / m_LbaSize) * block,
                                 m_CacheBlockSize / m_LbaSize, 0);

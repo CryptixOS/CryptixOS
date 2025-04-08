@@ -4,7 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <API/Posix/signal.h>
 #include <API/Posix/sys/mman.h>
 #include <API/Posix/sys/wait.h>
 #include <API/Process.hpp>
@@ -15,38 +14,31 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-namespace API::Proc
+namespace API::Process
 {
-}
-
-namespace Syscall::Process
-{
-    ErrorOr<i32> SysSigProcMask(Arguments& args)
+    ErrorOr<isize> SigProcMask(i32 how, const sigset_t* newSet,
+                               sigset_t* oldSet)
     {
-        i32             how         = args.Get<i32>(0);
-        const sigset_t* set         = args.Get<const sigset_t*>(1);
-        sigset_t*       oldSet      = args.Get<sigset_t*>(2);
-
-        auto            process     = ::Process::GetCurrent();
-        Thread*         thread      = Thread::GetCurrent();
-        sigset_t        currentMask = thread->GetSignalMask();
+        auto     process     = ::Process::GetCurrent();
+        Thread*  thread      = Thread::GetCurrent();
+        sigset_t currentMask = thread->GetSignalMask();
 
         if (oldSet)
         {
-            if (!process->ValidateAddress(oldSet, PROT_READ | PROT_WRITE))
+            if (!process->ValidateWrite(oldSet, sizeof(sigset_t)))
                 return Error(EFAULT);
             *oldSet = currentMask;
         }
 
-        if (!set) return 0;
-        if (!process->ValidateAddress(set, PROT_READ | PROT_WRITE))
+        if (!newSet) return 0;
+        if (!process->ValidateRead(newSet, sizeof(sigset_t)))
             return Error(EFAULT);
 
         switch (how)
         {
-            case SIG_BLOCK: currentMask &= ~(*set); break;
-            case SIG_UNBLOCK: currentMask |= *set; break;
-            case SIG_SETMASK: currentMask = *set; break;
+            case SIG_BLOCK: currentMask &= ~(*newSet); break;
+            case SIG_UNBLOCK: currentMask |= *newSet; break;
+            case SIG_SETMASK: currentMask = *newSet; break;
 
             default: return Error(EINVAL);
         }
@@ -54,14 +46,66 @@ namespace Syscall::Process
         thread->SetSignalMask(currentMask);
         return 0;
     }
-    ErrorOr<pid_t> SysGetPid(Arguments& args)
+    ErrorOr<isize> SchedYield()
     {
-        class Process* current = ::Process::GetCurrent();
-        Assert(current);
-
-        return current->m_Pid;
+        Scheduler::Yield();
+        return 0;
     }
 
+    ErrorOr<pid_t> GetPid()
+    {
+        auto process = ::Process::GetCurrent();
+        return process->GetPid();
+    }
+    ErrorOr<mode_t> Umask(mode_t mask)
+    {
+        auto process = ::Process::GetCurrent();
+        return process->Umask(mask);
+    }
+    ErrorOr<uid_t> GetUid()
+    {
+        auto process = ::Process::GetCurrent();
+        return process->GetCredentials().uid;
+    }
+    ErrorOr<gid_t> GetGid()
+    {
+        auto process = ::Process::GetCurrent();
+        return process->GetCredentials().gid;
+    }
+    ErrorOr<isize> SetUid(uid_t uid)
+    {
+        // auto process = ::Process::GetCurrent();
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> SetGid(gid_t gid)
+    {
+        // auto process = ::Process::GetCurrent();
+        return Error(ENOSYS);
+    }
+    ErrorOr<uid_t> GetEUid()
+    {
+        auto process = ::Process::GetCurrent();
+        return process->GetCredentials().euid;
+    }
+    ErrorOr<gid_t> GetEGid()
+    {
+        auto process = ::Process::GetCurrent();
+        return process->GetCredentials().egid;
+    }
+    ErrorOr<isize> SetPGid(pid_t pid, pid_t pgid);
+    ErrorOr<pid_t> GetPPid()
+    {
+        auto process = ::Process::GetCurrent();
+        return process->GetParentPid();
+    }
+    ErrorOr<pid_t> GetPGrp();
+    ErrorOr<pid_t> SetSid();
+    ErrorOr<pid_t> GetPGid();
+    ErrorOr<pid_t> GetSid(pid_t pid);
+} // namespace API::Process
+
+namespace Syscall::Process
+{
     ErrorOr<pid_t> SysFork(Arguments&)
     {
         class Process* process = ::Process::GetCurrent();
@@ -128,35 +172,6 @@ namespace Syscall::Process
         return Error(ENOSYS);
     }
 
-    ErrorOr<uid_t> SysGetUid(Arguments&)
-    {
-        class Process* current = ::Process::GetCurrent();
-        Assert(current);
-
-        return current->GetCredentials().uid;
-    }
-    ErrorOr<gid_t> SysGetGid(Arguments&)
-    {
-        class Process* current = ::Process::GetCurrent();
-        Assert(current);
-
-        return current->GetCredentials().gid;
-    }
-
-    ErrorOr<uid_t> SysGet_eUid(Arguments&)
-    {
-        class Process* current = ::Process::GetCurrent();
-        Assert(current);
-
-        return current->GetCredentials().euid;
-    }
-    ErrorOr<gid_t> SysGet_eGid(Arguments&)
-    {
-        class Process* current = ::Process::GetCurrent();
-        Assert(current);
-
-        return current->GetCredentials().egid;
-    }
     ErrorOr<pid_t> SysSet_pGid(Syscall::Arguments& args)
     {
         const pid_t    pid     = static_cast<pid_t>(args.Args[0]);
@@ -186,13 +201,6 @@ namespace Syscall::Process
         return 0;
     }
 
-    ErrorOr<pid_t> SysGet_pPid(Arguments&)
-    {
-        class Process* current = ::Process::GetCurrent();
-        Assert(current);
-
-        return current->GetParentPid();
-    }
     ErrorOr<pid_t> SysGetPgrp(Syscall::Arguments& args)
     {
         args.Args[0] = 0;

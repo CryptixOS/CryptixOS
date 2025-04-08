@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <Drivers/PCI/Bus.hpp>
 #include <Drivers/PCI/Device.hpp>
 #include <Drivers/PCI/PCI.hpp>
 
@@ -30,9 +31,9 @@ namespace PCI
             : m_Domain(domain)
             , m_Address(address)
         {
-            Initialize();
         }
 
+        void Initialize();
         void InitializeIrqRoutes();
 
         struct IrqRoute
@@ -84,7 +85,9 @@ namespace PCI
       private:
         Domain                                   m_Domain;
         AccessMechanism*                         m_AccessMechanism = nullptr;
-        PM::Pointer                              m_Address;
+        Vector<Bus*>                             m_RootBuses;
+
+        Pointer                                  m_Address;
         uacpi_namespace_node*                    m_RootNode;
 
         static std::vector<IrqRoute>             s_IrqRoutes;
@@ -93,12 +96,6 @@ namespace PCI
 
         uintptr_t GetAddress(const DeviceAddress& address, u64 offset);
 
-        void      Initialize();
-
         bool      EnumerateRootBus(Enumerator enumerator);
-        bool      EnumerateBus(u8 bus, Enumerator enumerator);
-        bool EnumerateSlot(const u8 bus, const u8 slot, Enumerator enumerator);
-        bool EnumerateFunction(const DeviceAddress& address,
-                               Enumerator           enumerator);
     };
 }; // namespace PCI

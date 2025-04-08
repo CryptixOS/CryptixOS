@@ -12,7 +12,7 @@
 
 namespace RTC
 {
-    constexpr u8 BcdToBin(u8 value) { return (value >> 4) * 10 + (value & 15); }
+    constexpr u8 BcdToBin(u8 bcd) { return (bcd & 0x0f) + ((bcd >> 4) * 10); }
 
     u8           GetCentury();
     u8           GetYear();

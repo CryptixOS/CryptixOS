@@ -21,7 +21,7 @@ namespace NVMe
         u16 MetaSize;
         u8  DataSize;
         u8  RelativePerformance;
-    } __attribute__((packed));
+    };
     struct NameSpaceInfo
     {
         u64 TotalBlockCount;
@@ -51,7 +51,7 @@ namespace NVMe
         LBA LbaFormatUpper[16];
         u64 Unused4[24];
         u8  VendorSpecific[3712];
-    } __attribute__((packed));
+    };
 
     struct CachedBlock
     {
@@ -75,10 +75,8 @@ namespace NVMe
         virtual std::string_view GetName() const noexcept override;
 
         virtual isize Read(void* dest, off_t offset, usize bytes) override;
-        virtual isize Write(const void* src, off_t offset, usize bytes) override
-        {
-            return 0;
-        }
+        virtual isize Write(const void* src, off_t offset,
+                            usize bytes) override;
 
         virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
 

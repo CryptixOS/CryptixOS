@@ -18,16 +18,12 @@ namespace NVMe
     std::atomic<usize> Controller::s_ControllerCount = 0;
 
     Controller::Controller(const PCI::DeviceAddress& address)
-        : PCI::Device(address, static_cast<DriverType>(241),
-                      static_cast<DeviceType>(0))
+        : PCI::Device(address)
+        , ::Device(241, s_ControllerCount.load())
         , m_Index(s_ControllerCount++)
     {
         if (m_Index == 0) DevTmpFs::RegisterDevice(this);
-
         m_Name += std::to_string(m_Index);
-        // VFS::MkNod(VFS::GetRootNode(), std::format("/dev/{}", GetName()),
-        // 0666,
-        //          GetID());
 
         LogTrace("NVMe{}: Initializing...", m_Index);
         if (!Initialize())
@@ -51,66 +47,46 @@ namespace NVMe
             return false;
         }
 
+        m_CrAddress = bar.Map(0);
         LogInfo("NVMe{}: bar0 = {{ Base: {:#x}, Size: {:#x}, IsMMIO: {} }}",
                 m_Index, bar.Address.Raw<u64>(), bar.Size, bar.IsMMIO);
 
-        usize bar1  = PCI::Device::Read<u32>(PCI::RegisterOffset::eBar1);
-
-        m_CrAddress = (bar.Address.Raw<u64>() & -8ull) | bar1 << 32;
-        m_Register  = m_CrAddress.As<volatile ControllerRegister>();
+        m_Register = m_CrAddress.As<volatile ControllerRegister>();
 
         AssertMsg(bar.IsMMIO, "PCI bar is not memory mapped!");
         Assert((ReadAt(0x10, 4) & 0b111) == 0b100);
 
-        uintptr_t addr
-            = Math::AlignDown(m_CrAddress.Raw<u64>(), PMM::PAGE_SIZE);
-        usize len = Math::AlignUp(bar.Size, PMM::PAGE_SIZE);
-        Assert(VMM::GetKernelPageMap()->MapRange(addr, addr, len,
-                                                 PageAttributes::eRW));
-
-        LogTrace("NVMe: Successfully mapped bar0");
-
         auto nullOrError = Disable();
         if (!nullOrError) return nullOrError.error();
 
-        m_DoorbellStride = (m_Register->Capabilities >> 32) & 0xf;
-        m_QueueSlots     = std::min(m_Register->Capabilities & 0xffff,
-                                    (m_Register->Capabilities >> 16) & 0xffff);
+        m_DoorbellStride = m_Register->Capabilities.DoorbellStride;
+        m_QueueSlots     = m_Register->Capabilities.MaxQueueSize;
         u32 queueId      = 0;
-
-        LogTrace("NVMe: Creating admin queue...");
-
-        u64 doorbell = u64(m_CrAddress.Offset<u64>(PMM::PAGE_SIZE)
-                           + ((2 * id) * (4 << m_DoorbellStride)));
-        VMM::GetKernelPageMap()->MapRange(
-            doorbell, doorbell, PMM::PAGE_SIZE * 4, PageAttributes::eRW);
 
         m_AdminQueue
             = new Queue(m_CrAddress, queueId, m_DoorbellStride, m_QueueSlots);
-
-        u32 aqa = m_QueueSlots - 1;
-        aqa |= aqa << 16;
-        aqa |= aqa << 16;
-        m_Register->AdminQueueAttributes = aqa;
-        auto cc                          = m_Register->Configuration;
-        cc                               = (6 << 16) | (4 << 20) | (1 << 0);
+        // TODO(v1tr10l7): Set Msi-X irq
 
         volatile uintptr_t asq
             = reinterpret_cast<volatile uintptr_t>(m_AdminQueue->GetSubmit());
         volatile uintptr_t acq
             = reinterpret_cast<volatile uintptr_t>(m_AdminQueue->GetComplete());
 
+        m_Register->AdminQueueAttributes.SubmitQueueSize   = m_QueueSlots - 1;
+        m_Register->AdminQueueAttributes.CompleteQueueSize = m_QueueSlots - 1;
+
         m_Register->AdminSubmissionQueue
             = IsHigherHalfAddress(asq) ? asq - BootInfo::GetHHDMOffset() : asq;
         m_Register->AdminCompletionQueue
             = IsHigherHalfAddress(acq) ? acq - BootInfo::GetHHDMOffset() : acq;
-        m_Register->Configuration = cc;
 
-        while (true)
+        m_Register->Configuration.IoSubmitQueueEntrySize   = 6;
+        m_Register->Configuration.IoCompleteQueueEntrySize = 4;
+        m_Register->Configuration.Enable                   = true;
+
+        if (!Enable())
         {
-            volatile u32 status = m_Register->Status;
-            if (status & Bit(0)) break;
-            LogWarn("NVMe: Failed to CreateNode Admin Queues!");
+            LogError("NVMe: Failed to enable the controller");
             return false;
         }
 
@@ -119,11 +95,6 @@ namespace NVMe
                   "NVMe{}: Failed to identify the controller", m_Index);
 
         usize namespaceCount = info->NamespaceCount;
-        LogInfo("NVMe: NameSpace Count: {}", namespaceCount);
-        LogInfo("Submission Entry size: {:#x}, {:#x}",
-                info->SubmissionQueueEntrySize, sizeof(Submission));
-        LogInfo("Completion Entry size: {:#x}, {:#x}",
-                info->CompletionQueueEntrySize, sizeof(Completion));
         delete info;
 
         LogInfo("NVMe: Controller #{} initialized successfully", m_Index);
@@ -136,29 +107,25 @@ namespace NVMe
 
     ErrorOr<void> Controller::Disable()
     {
-        auto cc = m_Register->Configuration;
-        if (cc & Bit(0))
-        {
-            cc &= ~Bit(0);
-            m_Register->Configuration = cc;
-        }
+        m_Register->Configuration.Enable = false;
 
-        return WaitReady();
+        return WaitReady(false);
     }
     ErrorOr<void> Controller::Enable()
     {
-        auto cc = m_Register->Configuration;
-        if (!(cc & Bit(0)))
-        {
-            cc |= Bit(0);
-            m_Register->Configuration = cc;
-        }
+        m_Register->Configuration.Enable = true;
 
-        return WaitReady();
+        return WaitReady(true);
     }
-    ErrorOr<void> Controller::WaitReady()
+    ErrorOr<void> Controller::WaitReady(bool waitOn)
     {
-        while (m_Register->Status & Bit(0)) Arch::Pause();
+        for (;;)
+        {
+            volatile bool status = m_Register->Status & Bit(0);
+            if (status == waitOn) break;
+
+            Arch::Pause();
+        }
         return {};
     }
 
@@ -199,10 +166,7 @@ namespace NVMe
 
     i32 Controller::Identify(ControllerInfo* info)
     {
-        LogDebug("sizeof(Submission) = {}", sizeof(Submission));
-        LogDebug("sizeof(Completion) = {}", sizeof(Completion));
-
-        u64        len   = sizeof(ControllerInfo);
+        i64        len   = sizeof(ControllerInfo);
         Submission cmd   = {};
         cmd.OpCode       = OpCode::ADMIN_IDENTIFY;
         cmd.NameSpaceID  = 0;
@@ -218,11 +182,10 @@ namespace NVMe
             cmd.Prp2 = addr;
         }
 
-#define NVME_CAPMPSMIN(cap) (((cap) >> 48) & 0xf)
         u16 status = m_AdminQueue->AwaitSubmit(&cmd);
         if (status) return -1;
 
-        usize shift     = 12 + NVME_CAPMPSMIN(m_Register->Capabilities);
+        usize shift     = 12 + m_Register->Capabilities.MinMemoryPageSize;
         m_MaxTransShift = 20;
         if (info->MaxDataTransferSize)
             m_MaxTransShift = shift + info->MaxDataTransferSize;
@@ -262,7 +225,7 @@ namespace NVMe
         cmd.OpCode         = OpCode::ADMIN_SETFT;
         cmd.Prp1           = 0;
         cmd.Features.Fid   = 0x07;
-        cmd.Features.Dword = (count - 1) | ((count - 1) << 14);
+        cmd.Features.Dword = (count - 1) | ((count - 1) << 16);
         u16 status         = m_AdminQueue->AwaitSubmit(&cmd);
         if (status) return -1;
 

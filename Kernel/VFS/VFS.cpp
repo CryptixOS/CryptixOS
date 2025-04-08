@@ -13,6 +13,8 @@
 
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/EchFs/EchFs.hpp>
+#include <VFS/Ext2Fs/Ext2Fs.hpp>
+#include <VFS/Fat32Fs/Fat32Fs.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/TmpFs/TmpFs.hpp>
@@ -26,7 +28,39 @@ namespace VFS
     static Spinlock s_Lock;
     static std::unordered_map<std::string_view, Filesystem*> s_MountPoints;
 
-    INode*                                                   GetRootNode()
+    Vector<std::pair<bool, std::string_view>>&               GetFilesystems()
+    {
+        static Vector<std::pair<bool, std::string_view>> s_Filesystems = {
+            {
+                false,
+                "tmpfs",
+            },
+            {
+                false,
+                "devtmpfs",
+            },
+            {
+                false,
+                "procfs",
+            },
+            {
+                true,
+                "echfs",
+            },
+            {
+                true,
+                "fat32fs",
+            },
+            {
+                true,
+                "ext2fs",
+            },
+        };
+
+        return s_Filesystems;
+    }
+
+    INode* GetRootNode()
     {
         /*Thread* thread = CPU::GetCurrentThread();
         if (!thread) return s_RootNode;
@@ -47,7 +81,10 @@ namespace VFS
         else if (name == "devtmpfs") fs = new DevTmpFs(flags);
         else if (name == "procfs") fs = new ProcFs(flags);
         else if (name == "echfs") fs = new EchFs(flags);
+        else if (name == "fat32fs") fs = new Fat32Fs(flags);
+        else if (name == "ext2fs") fs = new Ext2Fs(flags);
 
+        if (!fs) LogError("VFS: No filesystem driver found for '{}'", name);
         return fs;
     }
 
@@ -103,7 +140,7 @@ namespace VFS
         }
 
         if (flags & O_EXCL && didExist) return Error(EEXIST);
-        node = node->Reduce(followSymlinks, false);
+        node = node->Reduce(followSymlinks, true);
         if (!node) return Error(ENOENT);
 
         if (node->IsSymlink()) return Error(ELOOP);
@@ -125,19 +162,18 @@ namespace VFS
 
         return node;
     }
-    std::tuple<INode*, INode*, std::string>
-    ResolvePath(INode* parent, PathView path, bool automount)
+    std::tuple<INode*, INode*, std::string> ResolvePath(INode*   parent,
+                                                        PathView path)
     {
         if (!parent || path.IsAbsolute()) parent = GetRootNode();
         if (path.IsEmpty())
-
         {
             errno = ENOENT;
             return {nullptr, nullptr, ""};
         }
 
-        auto currentNode
-            = parent == s_RootNode ? s_RootNode : parent->Reduce(false);
+        auto currentNode = parent;
+        if (parent != s_RootNode) parent = parent->Reduce(false, true);
         if (!currentNode->Populate()) return {nullptr, nullptr, ""};
 
         if (path == "/" || path.IsEmpty())
@@ -164,32 +200,34 @@ namespace VFS
             bool previousDir = segment == "..";
             bool currentDir  = segment == ".";
 
+            currentNode      = currentNode->Reduce(false, true);
+
             if (currentDir || previousDir)
             {
                 if (previousDir) currentNode = getParent();
 
                 if (isLast)
-                    return {getParent(), currentNode, currentNode->GetName()};
+                    return {getParent(), currentNode->Reduce(false, true),
+                            currentNode->GetName()};
 
                 continue;
             }
 
             if (currentNode->GetChildren().contains(segment))
             {
-                auto node = currentNode->GetChildren()[segment]->Reduce(
-                    true, isLast ? automount : true);
-                if (!node->Populate()) return {nullptr, nullptr, ""};
-
-                auto getReal = [](INode* node) -> INode*
-                {
-                    if (node->IsFilesystemRoot())
-                        return node->GetFilesystem()->GetMountedOn();
-                    return node;
-                };
+                auto node = currentNode->GetChildren()[segment];
+                if (!node->Reduce(false, true)->Populate())
+                    return {nullptr, nullptr, ""};
 
                 if (isLast)
-                    return {currentNode, getReal(node), node->GetName()};
-
+                {
+                    if (path[path.GetSize() - 1] == '/' && !node->IsDirectory())
+                    {
+                        errno = ENOTDIR;
+                        return {currentNode, nullptr, ""};
+                    }
+                    return {currentNode, node, node->GetName()};
+                }
                 currentNode = node;
 
                 if (currentNode->IsSymlink())
@@ -216,6 +254,14 @@ namespace VFS
 
         errno = ENOENT;
         return {nullptr, nullptr, ""};
+    }
+    std::tuple<INode*, INode*, std::string>
+    ResolvePath(INode* parent, PathView path, bool followLinks)
+    {
+        auto [p, n, b] = ResolvePath(parent, path);
+        if (followLinks && n) n = n->Reduce(true);
+
+        return {p, n, b};
     }
 
     std::unordered_map<std::string_view, class Filesystem*>& GetMountPoints()
@@ -253,7 +299,7 @@ namespace VFS
 
     // TODO: flags
     bool Mount(INode* parent, PathView sourcePath, PathView target,
-               std::string_view fsName, i32 flags, void* data)
+               std::string_view fsName, i32 flags, const void* data)
     {
         ScopedLock  guard(s_Lock);
 
@@ -261,6 +307,7 @@ namespace VFS
         if (!fs)
         {
             errno = ENODEV;
+            LogError("VFS: Failed to create '{}' filesystem", fsName);
             return false;
         }
 
@@ -268,19 +315,42 @@ namespace VFS
         if (!sourcePath.IsEmpty())
         {
             sourceNode = std::get<1>(ResolvePath(s_RootNode, sourcePath));
-            if (!sourceNode) return false;
-            if (sourceNode->IsDirectory()) return_err(false, EISDIR);
+            if (!sourceNode)
+            {
+                LogError("VFS: Failed to resolve source path -> '{}'",
+                         sourcePath.Raw());
+                return false;
+            }
+            if (sourceNode->IsDirectory())
+            {
+                LogError("VFS: Source node is a directory -> '{}'",
+                         sourcePath.Raw());
+                return_err(false, EISDIR);
+            }
         }
         auto [nparent, node, basename] = ResolvePath(parent, target);
         bool   isRoot                  = (node == GetRootNode());
         INode* mountGate               = nullptr;
 
-        if (!node) goto fail;
+        if (!node)
+        {
+            LogError("VFS: Failed to resolve target path -> '{}'",
+                     target.Raw());
+            goto fail;
+        }
 
-        if (!isRoot && !node->IsDirectory()) return_err(false, ENOTDIR);
+        if (!isRoot && !node->IsDirectory())
+        {
+            LogError("VFS: '{}' target is not a directory", target.Raw());
+            return_err(false, ENOTDIR);
+        }
 
         mountGate = fs->Mount(parent, sourceNode, node, basename, data);
-        if (!mountGate) goto fail;
+        if (!mountGate)
+        {
+            LogError("VFS: Failed to mount '{}' fs", fsName);
+            goto fail;
+        }
 
         node->mountGate = mountGate;
 
@@ -319,38 +389,6 @@ namespace VFS
                                                              newNodeName, mode);
         if (newNode) newNodeParent->InsertChild(newNode, newNode->GetName());
         return newNode;
-    }
-    ErrorOr<const stat*> Stat(i32 fdNum, PathView path, i32 flags)
-    {
-        if (flags & ~(AT_EMPTY_PATH | AT_NO_AUTOMOUNT | AT_SYMLINK_NOFOLLOW))
-            return Error(EINVAL);
-
-        Process*        process        = Process::GetCurrent();
-        FileDescriptor* fd             = process->GetFileHandle(fdNum);
-        bool            followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
-
-        auto cwd = std::get<1>(ResolvePath(GetRootNode(), process->GetCWD()));
-        if (!path.Raw() || !path[0])
-        {
-            if (!(flags & AT_EMPTY_PATH)) return Error(ENOENT);
-
-            if (fdNum == AT_FDCWD) return &cwd->GetStats();
-            else if (!fd) return Error(EBADF);
-
-            return &fd->GetNode()->GetStats();
-        }
-
-        INode* parent = path.IsAbsolute() ? VFS::GetRootNode() : nullptr;
-        if (fdNum == AT_FDCWD) parent = cwd;
-        else if (fd) parent = fd->GetNode();
-
-        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
-        if (!parent) return Error(EBADF);
-        INode* node
-            = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
-
-        if (!node) return Error(errno);
-        return &node->GetStats();
     }
 
     INode* MkNod(INode* parent, PathView path, mode_t mode, dev_t dev)

@@ -35,7 +35,7 @@ class Filesystem
     }
 
     virtual INode* Mount(INode* parent, INode* source, INode* target,
-                         std::string_view name, void* data = nullptr)
+                         std::string_view name, const void* data = nullptr)
         = 0;
     virtual INode* CreateNode(INode* parent, std::string_view name, mode_t mode)
         = 0;
@@ -66,6 +66,6 @@ class Filesystem
     INode*             m_MountedOn      = nullptr;
     void*              m_MountData      = nullptr;
 
-    std::atomic<ino_t> m_NextInodeIndex = 0;
+    std::atomic<ino_t> m_NextInodeIndex = 2;
     dev_t              m_DeviceID       = 0;
 };

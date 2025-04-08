@@ -21,4 +21,8 @@ namespace Serial
     {
         for (auto c : str) Write(c);
     }
+    inline void Write(u8* data, usize size)
+    {
+        while (size-- > 0) Write(*data);
+    }
 }; // namespace Serial

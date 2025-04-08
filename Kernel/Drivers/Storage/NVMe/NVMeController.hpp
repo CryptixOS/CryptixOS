@@ -99,22 +99,62 @@ namespace NVMe
         return result;
     }
 
-    struct ControllerRegister
+    struct [[gnu::packed]] ControllerCapabilities
     {
-        u64 Capabilities;
-        u32 Version;
-        u32 InterruptMaskSet;
-        u32 InterruptMaskClear;
-        u32 Configuration;
-        u32 Reserved;
-        u32 Status;
-        u32 Reserved2;
-        u32 AdminQueueAttributes;
-        u64 AdminSubmissionQueue;
-        u64 AdminCompletionQueue;
-    } __attribute__((packed));
+        u64  MaxQueueSize                  : 16;
+        bool ContiguousQueuesRequired      : 1;
+        u64  ArbitrationMechanismSupported : 2;
+        u64  Reserved                      : 5;
+        u64  Timeout                       : 8;
+        u64  DoorbellStride                : 4;
+        bool SubsystemReset                : 1;
+        u8   CommandSets                   : 8;
+        u64  BootPartition                 : 1;
+        u64  PowerScope                    : 2;
+        u64  MinMemoryPageSize             : 4;
+        u64  MaxMemoryPageSize             : 4;
+        u64  PersistentMemoryRegion        : 1;
+        u64  MemoryBuffer                  : 1;
+        bool SubsystemShutdown             : 1;
+        u64  ReadyModes                    : 2;
+        u64  Reserved1                     : 3;
+    };
+    struct [[gnu::packed]] ControllerConfiguration
+    {
+        bool Enable                   : 1;
+        u8   Reserved0                : 3;
+        u8   CommandSet               : 3;
+        u8   MemoryPageSize           : 4;
+        u8   ArbitrationMechanism     : 3;
+        u8   ShutdownNotification     : 2;
+        u8   IoSubmitQueueEntrySize   : 4;
+        u8   IoCompleteQueueEntrySize : 4;
+        u8   Crime                    : 1;
+        u8   Reserved1                : 7;
+    };
+    struct [[gnu::packed]] AdminQueuettributes
+    {
+        u32 SubmitQueueSize   : 12;
+        u32 Reserved0         : 4;
+        u32 CompleteQueueSize : 12;
+        u32 Reserved1         : 4;
+    };
+    struct [[gnu::packed]] ControllerRegister
+    {
+        ControllerCapabilities  Capabilities;
+        u32                     Version;
+        u32                     InterruptMaskSet;
+        u32                     InterruptMaskClear;
+        ControllerConfiguration Configuration;
+        u32                     Reserved;
+        u32                     Status;
+        u32                     Reserved2;
+        AdminQueuettributes     AdminQueueAttributes;
+        u64                     AdminSubmissionQueue;
+        u64                     AdminCompletionQueue;
+    };
 
-    class Controller : public PCI::Device
+    class Controller : public PCI::Device, public Device
     {
       public:
         Controller(const PCI::DeviceAddress& address);
@@ -126,7 +166,7 @@ namespace NVMe
 
         ErrorOr<void> Disable();
         ErrorOr<void> Enable();
-        ErrorOr<void> WaitReady();
+        ErrorOr<void> WaitReady(bool waitOn);
 
         inline Queue* GetAdminQueue() const { return m_AdminQueue; }
         inline usize  GetMaxTransShift() const { return m_MaxTransShift; }

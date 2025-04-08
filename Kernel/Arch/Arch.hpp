@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <API/Posix/time.h>
 #include <Prism/Core/Types.hpp>
 
 #include <vector>
@@ -27,6 +28,6 @@ namespace Arch
     void                           PowerOff();
     void                           Reboot();
 
-    void  ProbeTimers(std::vector<HardwareTimer*>& timers);
-    usize GetEpoch();
+    void   ProbeTimers(std::vector<HardwareTimer*>& timers);
+    time_t GetEpoch();
 }; // namespace Arch

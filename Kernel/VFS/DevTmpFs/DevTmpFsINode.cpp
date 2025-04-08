@@ -5,10 +5,11 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Prism/Utility/Math.hpp>
-#include <Time/Time.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <VFS/DevTmpFs/DevTmpFsINode.hpp>
+
+#include <Time/Time.hpp>
 
 #include <cstdlib>
 
@@ -119,4 +120,12 @@ ErrorOr<isize> DevTmpFsINode::Truncate(usize size)
     m_Stats.st_size   = static_cast<off_t>(size);
     m_Stats.st_blocks = Math::DivRoundUp(m_Stats.st_size, m_Stats.st_blksize);
     return 0;
+}
+
+ErrorOr<void> DevTmpFsINode::ChMod(mode_t mode)
+{
+    m_Stats.st_mode &= ~0777;
+    m_Stats.st_mode |= mode & 0777;
+
+    return {};
 }

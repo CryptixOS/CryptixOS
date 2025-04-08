@@ -15,6 +15,7 @@
 #include <functional>
 #include <iterator>
 #include <cassert>
+#include <cctype>
 
 namespace std
 {
@@ -480,7 +481,11 @@ namespace std
         size_t operator()(string_view str) const noexcept
         {
             uint64_t hash = 0x811c9dc5;
-            for (char c : str) { hash = (hash * 0x01000193) ^ c; }
+            for (char c : str) 
+            { 
+                if (!std::isalnum(c)) break;
+                hash = (hash * 0x01000193) ^ c; 
+            }
             return hash;
         }
     };

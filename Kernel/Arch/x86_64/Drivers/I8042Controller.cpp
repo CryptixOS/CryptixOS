@@ -343,8 +343,8 @@ bool I8042Controller::QuerySupport()
         return false;
     }
 
-    ACPI::IA32BootArchitectureFlags ia32Flags = fadt->IA32BootArchitectureFlags;
-    if (!(ia32Flags & ACPI::IA32BootArchitectureFlags::e8042))
+    auto x86Flags = fadt->X86BootArchitectureFlags;
+    if (!x86Flags.I8042Available)
     {
         LogError(
             "I8042: Failed to query for controller support, "

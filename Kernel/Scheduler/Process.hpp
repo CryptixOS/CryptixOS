@@ -121,10 +121,10 @@ class Process
     static void             SendGroupSignal(pid_t pgid, i32 signal);
     void                    SendSignal(i32 signal);
 
-    ErrorOr<i32> OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
-    ErrorOr<i32> DupFd(i32 oldFdNum, i32 newFdNum = -1, i32 flags = 0);
-    i32          CloseFd(i32 fd);
-    inline bool  IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
+    ErrorOr<i32>   OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
+    i32            CloseFd(i32 fd);
+    ErrorOr<isize> OpenPipe(i32* pipeFds);
+    inline bool    IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
     inline FileDescriptor* GetFileHandle(i32 fd) { return m_FdTable.GetFd(fd); }
 
     ErrorOr<pid_t>         WaitPid(pid_t pid, i32* wstatus, i32 flags,
@@ -135,32 +135,32 @@ class Process
     i32                    Exit(i32 code);
 
     friend struct Thread;
-    Process*                 m_Parent      = nullptr;
-    pid_t                    m_Pid         = -1;
-    std::string              m_Name        = "?";
-    PageMap*                 PageMap       = nullptr;
-    Credentials              m_Credentials = {};
-    TTY*                     m_TTY;
-    PrivilegeLevel           m_Ring = PrivilegeLevel::eUnprivileged;
-    std::optional<i32>       m_Status;
-    bool                     m_Exited     = false;
+    Process*              m_Parent      = nullptr;
+    pid_t                 m_Pid         = -1;
+    std::string           m_Name        = "?";
+    PageMap*              PageMap       = nullptr;
+    Credentials           m_Credentials = {};
+    TTY*                  m_TTY;
+    PrivilegeLevel        m_Ring = PrivilegeLevel::eUnprivileged;
+    std::optional<i32>    m_Status;
+    bool                  m_Exited     = false;
 
-    Thread*                  m_MainThread = nullptr;
-    std::atomic<tid_t>       m_NextTid    = m_Pid;
-    std::vector<Process*>    m_Children;
-    std::vector<Process*>    m_Zombies;
-    std::vector<Thread*>     m_Threads;
+    Thread*               m_MainThread = nullptr;
+    std::atomic<tid_t>    m_NextTid    = m_Pid;
+    std::vector<Process*> m_Children;
+    std::vector<Process*> m_Zombies;
+    std::vector<Thread*>  m_Threads;
 
-    INode*                   m_RootNode = VFS::GetRootNode();
-    std::string              m_CWD      = "/";
-    mode_t                   m_Umask    = 0;
+    INode*                m_RootNode = VFS::GetRootNode();
+    std::string           m_CWD      = "/";
+    mode_t                m_Umask    = 0;
 
-    FileDescriptorTable      m_FdTable;
-    std::vector<VMM::Region> m_AddressSpace{};
-    uintptr_t                m_UserStackTop = 0x70000000000;
-    usize                    m_Quantum      = 1000;
-    Spinlock                 m_Lock;
-    Event                    m_Event;
+    FileDescriptorTable   m_FdTable;
+    Vector<VMM::Region>   m_AddressSpace{};
+    uintptr_t             m_UserStackTop = 0x70000000000;
+    usize                 m_Quantum      = 1000;
+    Spinlock              m_Lock;
+    Event                 m_Event;
 
     friend class Scheduler;
     friend struct Thread;

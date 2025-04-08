@@ -13,7 +13,7 @@ class StorageDevicePartition : public Device
   public:
     StorageDevicePartition(StorageDevice& device, u64 firstBlock, u64 lastBlock,
                            u16 majorID, u16 minorID)
-        : Device(DriverType{majorID}, DeviceType{minorID})
+        : Device(majorID, minorID)
         , m_Device(device)
         , m_FirstBlock(firstBlock)
         , m_LastBlock(lastBlock)

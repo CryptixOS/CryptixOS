@@ -66,7 +66,7 @@ namespace API::MM
             if (!sizeOrError) return sizeOrError.error();
 
             ScopedLock guard(current->m_Lock);
-            current->m_AddressSpace.push_back({phys, virt, len, prot, fd});
+            current->m_AddressSpace.EmplaceBack(phys, virt, len, prot, fd);
 
             return virt;
         }
@@ -85,7 +85,7 @@ namespace API::MM
                                        | PageAttributes::eWriteBack);
 
         ScopedLock guard(current->m_Lock);
-        current->m_AddressSpace.push_back({phys, virt, len, prot});
+        current->m_AddressSpace.EmplaceBack(phys, virt, len, prot);
         DebugSyscall("MMAP: virt: {:#x}", virt);
         return virt;
     }
@@ -93,8 +93,21 @@ namespace API::MM
 
 namespace Syscall::MM
 {
+    ErrorOr<intptr_t> SysMProtect(Arguments& args)
+    {
+        uintptr_t addr    = args.Get<uintptr_t>(0);
+        usize     size    = args.Get<usize>(1);
+        i32       prot    = args.Get<i32>(2);
+
+        Process*  current = Process::GetCurrent();
+        current->PageMap->MapRange(addr, addr, size,
+                                   API::MM::Prot2PageAttributes(prot));
+
+        return 0;
+    }
     ErrorOr<i32> SysMUnMap(Arguments& args)
     {
+        return 0;
         Pointer                            addr    = args.Get<uintptr_t>(0);
         usize                              length  = args.Get<usize>(1);
 
@@ -120,7 +133,7 @@ namespace Syscall::MM
             if (!errorOrBytes) return errorOrBytes.error();
         }
 
-        current->m_AddressSpace.erase(it);
+        current->m_AddressSpace.Erase(it);
 
         current->PageMap->UnmapRange(addr, length);
         usize pageCount

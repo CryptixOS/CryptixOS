@@ -36,6 +36,8 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
     virtual i32   IoCtl(usize request, usize arg) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
 
+    virtual ErrorOr<void>  ChMod(mode_t mode) override;
+
   private:
     Device* m_Device   = nullptr;
     u8*     m_Data     = nullptr;

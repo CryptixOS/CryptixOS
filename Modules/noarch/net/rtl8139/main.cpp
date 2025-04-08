@@ -225,8 +225,10 @@ namespace RTL8139
 
         Delegate<void()> delegate;
         delegate.BindLambda([&]() { HandleInterrupt(); });
+#ifdef CTOS_TARGET_X86_64
         if (!RegisterIrq(CPU::GetCurrent()->LapicID, delegate))
             LogError("RTL8139: Failed to register interrupt handler");
+#endif
 
         InterruptStatus ack;
         ack.Rok         = true;

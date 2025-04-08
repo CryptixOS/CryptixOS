@@ -22,9 +22,13 @@ class TTY : public Device
 
     inline static TTY*       GetCurrent() { return s_CurrentTTY; }
 
-    void                     PutChar(char c);
+    bool                     GetCursorKeyMode() const;
+    void                     SendBuffer(const char* string, usize bytes = 1);
 
     virtual std::string_view GetName() const noexcept override { return "tty"; }
+    winsize                  GetSize() const;
+
+    void                     SetTermios(const termios2& termios);
 
     virtual isize Read(void* dest, off_t offset, usize bytes) override;
     virtual isize Write(const void* src, off_t offset, usize bytes) override;
@@ -37,51 +41,63 @@ class TTY : public Device
     static std::vector<TTY*> s_TTYs;
     static TTY*              s_CurrentTTY;
 
-    Spinlock                 m_Lock;
+    Spinlock                 m_RawLock;
+    Spinlock                 m_OutputLock;
 
     Terminal*                m_Terminal = nullptr;
     termios2                 m_Termios;
 
     pid_t                    m_ControlSid = -1;
     gid_t                    m_Pgid       = 100;
-    std::deque<char>         m_InputBuffer;
-    std::deque<std::string>  m_LineQueue;
-    Event                    m_OnAddLine;
 
-    void                     SendSignal(i32 signal);
+    std::deque<char>         m_RawBuffer;
+    std::deque<std::string>  m_LineQueue;
+
+    Event                    m_OnAddLine;
+    Event                    m_RawEvent;
+
+    enum class State
+    {
+        eNormal          = 0,
+        eEscapeSequence  = 1,
+        eControlSequence = 2,
+        eDecPrivate      = 4,
+    };
+    State       m_State = State::eNormal;
+
+    void        SendSignal(i32 signal);
 
     inline bool IsCanonicalMode() const { return m_Termios.c_lflag & ICANON; }
     inline bool SignalsEnabled() const { return m_Termios.c_lflag & ISIG; }
 
+    bool        OnCanonChar(char c);
+    bool        OnEscapeChar(char c);
+
     inline void AddLine()
     {
-        ScopedLock guard(m_Lock);
-        m_LineQueue.emplace_back(m_InputBuffer.begin(), m_InputBuffer.end());
-        m_InputBuffer.clear();
+        ScopedLock guard(m_RawLock);
+        m_LineQueue.emplace_back(m_RawBuffer.begin(), m_RawBuffer.end());
+        m_RawBuffer.clear();
 
         m_OnAddLine.Trigger();
     }
     inline void KillLine()
     {
-        while (!m_LineQueue.empty()) EraseChar();
+        ScopedLock guard(m_RawLock);
+        m_RawBuffer.clear();
     }
 
     void           EnqueueChar(u64 c);
+    void           EnqueueRawChar(u64 c);
+    void           EnqueueCanonChar(u64 c);
+
+    void           FlushInput();
+
     void           Echo(u64 c);
+    void           EchoRaw(u64 c);
+
     void           EraseChar();
     void           EraseWord();
 
     constexpr bool IsControl(char c) const { return c < ' ' || c == 0x7f; }
-
-    inline void    Output(char c) const
-    {
-        if (c == '\n' && m_Termios.c_oflag & ONLCR)
-        {
-            LogMessage("\n\r");
-            return;
-        }
-        if (c == '\r' && m_Termios.c_oflag & ONLRET) return;
-
-        LogMessage("{}", c);
-    }
 };

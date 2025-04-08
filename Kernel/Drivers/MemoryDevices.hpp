@@ -20,7 +20,7 @@ namespace MemoryDevices
     {
       public:
         Null()
-            : Device(DriverType::eMemoryDevice, DeviceType::eNull)
+            : Device(1, 0)
         {
         }
 
@@ -45,7 +45,7 @@ namespace MemoryDevices
     {
       public:
         Zero()
-            : Device(DriverType::eMemoryDevice, DeviceType::eZero)
+            : Device(1, 5)
         {
         }
 
@@ -72,7 +72,7 @@ namespace MemoryDevices
     {
       public:
         Full()
-            : Device(DriverType::eMemoryDevice, DeviceType::eFull)
+            : Device(1, 7)
         {
         }
 

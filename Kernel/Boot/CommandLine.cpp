@@ -86,4 +86,11 @@ namespace CommandLine
 
         return std::nullopt;
     }
+    std::string_view GetString(std::string_view key)
+    {
+        auto it = s_OptionMap.find(key);
+        if (it != s_OptionMap.end()) return it->second;
+
+        return "";
+    }
 }; // namespace CommandLine

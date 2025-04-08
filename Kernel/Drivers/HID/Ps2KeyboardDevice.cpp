@@ -22,6 +22,16 @@ constexpr usize SCANCODE_ALT_LEFT_PRESS    = 0x38;
 constexpr usize SCANCODE_ALT_LEFT_REL      = 0xb8;
 constexpr usize SCANCODE_CAPSLOCK_TOGGLE   = 0x3a;
 constexpr usize SCANCODE_NUMLOCK           = 0x45;
+constexpr usize SCANCODE_ENTER             = 0x1c;
+constexpr usize SCANCODE_UP_ARROW          = 0x48;
+constexpr usize SCANCODE_DOWN_ARROW        = 0x50;
+constexpr usize SCANCODE_LEFT_ARROW        = 0x4b;
+constexpr usize SCANCODE_RIGHT_ARROW       = 0x4d;
+constexpr usize SCANCODE_HOME_PRESS        = 0x47;
+constexpr usize SCANCODE_END_PRESS         = 0x4f;
+constexpr usize SCANCODE_PAGE_UP_PRESS     = 0x49;
+constexpr usize SCANCODE_PAGE_DOWN_PRESS   = 0x51;
+constexpr usize SCANCODE_DELETE_PRESS      = 0x53;
 
 void            Ps2KeyboardDevice::Initialize()
 {
@@ -62,7 +72,10 @@ void Ps2KeyboardDevice::HandleScanCodeSet1Key(u8 raw)
 
     if (m_ExtraScanCode)
     {
-        m_ExtraScanCode = false;
+        m_ExtraScanCode    = false;
+        auto tty           = TTY::GetCurrent();
+        bool cursorKeyMode = tty ? tty->GetCursorKeyMode() : false;
+
         switch (raw)
         {
             case SCANCODE_CTRL_PRESS:
@@ -70,17 +83,25 @@ void Ps2KeyboardDevice::HandleScanCodeSet1Key(u8 raw)
                 if (pressed) m_Modifiers |= KeyModifier::eControl;
                 else m_Modifiers &= ~KeyModifier::eControl;
                 return;
-            case 0x1c: Emit("\n", 1); return;
+            case SCANCODE_ENTER: Emit("\n", 1); return;
             case 0x35: Emit("/", 1); return;
-            case 0x48: Emit("\e[A", 3); return;
-            case 0x4b: Emit("\e[D", 3); return;
-            case 0x50: Emit("\e[B", 3); return;
-            case 0x4d: Emit("\e[C", 3); return;
-            case 0x47: Emit("\e[1~", 4); return;
-            case 0x4f: Emit("\e[4~", 4); return;
-            case 0x49: Emit("\e[5~", 4); return;
-            case 0x51: Emit("\e[6~", 4); return;
-            case 0x53: Emit("\e[3~", 4); return;
+            case SCANCODE_UP_ARROW:
+                Emit(cursorKeyMode ? "\eOA" : "\e[A", 3);
+                return;
+            case SCANCODE_LEFT_ARROW:
+                Emit(cursorKeyMode ? "\eOD" : "\e[D", 3);
+                return;
+            case SCANCODE_DOWN_ARROW:
+                Emit(cursorKeyMode ? "\eOB" : "\e[B", 3);
+                return;
+            case SCANCODE_RIGHT_ARROW:
+                Emit(cursorKeyMode ? "\eOC" : "\e[C", 3);
+                return;
+            case SCANCODE_HOME_PRESS: Emit("\e[1~", 4); return;
+            case SCANCODE_END_PRESS: Emit("\e[4~", 4); return;
+            case SCANCODE_PAGE_UP_PRESS: Emit("\e[5~", 4); return;
+            case SCANCODE_PAGE_DOWN_PRESS: Emit("\e[6~", 4); return;
+            case SCANCODE_DELETE_PRESS: Emit("\0177", 1); return;
         }
     }
 
@@ -138,9 +159,6 @@ void Ps2KeyboardDevice::Emit(const char* str, usize count)
 {
     TTY* current = TTY::GetCurrent();
     if (!current) return;
-    for (usize i = 0; i < count; i++)
-    {
-        char c = str[i];
-        current->PutChar(c);
-    }
+
+    current->SendBuffer(str, count);
 }

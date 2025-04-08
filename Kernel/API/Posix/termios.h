@@ -206,3 +206,64 @@ struct winsize
 };
 
 #include <API/Posix/asm/termbits.h>
+
+template <>
+struct fmt::formatter<termios2> : fmt::formatter<std::string>
+{
+    template <typename FormatContext>
+    auto format(const termios2& termios, FormatContext& ctx) const
+    {
+        tcflag_t    iflag          = termios.c_iflag;
+        tcflag_t    oflag          = termios.c_oflag;
+        tcflag_t    cflag          = termios.c_cflag;
+        tcflag_t    lflag          = termios.c_lflag;
+        const auto& cc             = termios.c_cc;
+
+        auto        iflagFormatted = fmt::format(
+            "IFLAG = {{ IGNBRK: {}, BRKINT: {}, IGNPAR: {}, PARMRK: {}, "
+                   "INPCK: "
+                   "{}, "
+                   "ISTRIP: {}, INLCR: {}, IGNCR: {}, ICRNL: {}, IUCLC: {}, "
+                   "IXON: {}, IXANY: {}, IXOFF: {}, IMAXBEL: {}, IUTF: {} }}",
+            iflag & IGNBRK, iflag & BRKINT, iflag & IGNPAR, iflag & PARMRK,
+            iflag & INPCK, iflag & ISTRIP, iflag & INLCR, iflag & IGNCR,
+            iflag & ICRNL, iflag & IUCLC, iflag & IXON, iflag & IXANY,
+            iflag & IXOFF, iflag & IMAXBEL, iflag & IUTF8);
+        ;
+
+        auto oflagFormatted = fmt::format(
+            "OFLAG = {{ OPOST: {}, OLCUC: {}, ONLCR: {}, OCRNL: {}, ONOCR: {}, "
+            "ONLRET: {}, OFILL: {}, OFDEL: {}, XTABS: {} }}",
+            oflag & OPOST, oflag & OLCUC, oflag & ONLCR, oflag & OCRNL,
+            oflag & ONOCR, oflag & ONLRET, oflag & OFILL, oflag & OFDEL,
+            oflag & XTABS);
+
+        auto cflagFormatted = fmt::format(
+            "CFLAG = {{ CSTOPB: {}, CREAD: {}, PARENB: {}, PARODD: {}, HUPCL: "
+            "{}, "
+            "CLOCAL: {} }}",
+            cflag & CSTOPB, cflag & CREAD, cflag & PARENB, cflag & PARODD,
+            cflag & HUPCL, cflag & CLOCAL);
+        auto lflagFormatted = fmt::format(
+            "LFLAG = {{ ISIG: {}, ICANON: {}, ECHO: {}, ECHOE: {}, ECHOK: {}, "
+            "ECHONL: {}, NOFLSH: {}, TOSTOP: {}, ECHOCTL: {}, ECHOPRT: {}, "
+            "ECHOKE: "
+            "{}, IEXTEN: {} }}",
+            lflag & ISIG, lflag & ICANON, lflag & ECHO, lflag & ECHOE,
+            lflag & ECHOK, lflag & ECHONL, lflag & NOFLSH, lflag & TOSTOP,
+            lflag & ECHOCTL, lflag & ECHOPRT, lflag & ECHOKE, lflag & IEXTEN);
+        auto ccFormatted = fmt::format(
+            "CC = {{ VINTR: {}, VQUIT: {}, VERASE: {}, VKILL: {}, VEOF: {}, "
+            "VTIME: {}, VMIN: {}, VSWTC: {}, VSTART: {}, VSTOP: {}, VSUSP: {}, "
+            "VEOL: {}, VREPRINT: {}, VDISCARD: {}, VWERASE: {}, VLNEXT: {}, "
+            "VEOL2: {} }}",
+            cc[VINTR], cc[VQUIT], cc[VERASE], cc[VKILL], cc[VEOF], cc[VTIME],
+            cc[VMIN], cc[VSWTC], cc[VSTART], cc[VSTOP], cc[VSUSP], cc[VEOL],
+            cc[VREPRINT], cc[VDISCARD], cc[VWERASE], cc[VLNEXT], cc[VEOL2]);
+
+        return fmt::formatter<std::string>::format(
+            fmt::format("{}\n{}\n{}\n{}\n{}", iflagFormatted, oflagFormatted,
+                        cflagFormatted, lflagFormatted, ccFormatted),
+            ctx);
+    }
+};

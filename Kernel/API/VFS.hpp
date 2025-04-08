@@ -14,45 +14,51 @@
 
 namespace API::VFS
 {
-    using Prism::PathView;
+    ErrorOr<isize> Read(i32 fdNum, u8* out, usize bytes);
+    ErrorOr<isize> Write(i32 fdNum, const u8* in, usize bytes);
+    ErrorOr<isize> Open(PathView path, i32 flags, mode_t mode);
+    ErrorOr<isize> Close(i32 fdNum);
 
-    ErrorOr<isize> SysRead(i32 fdNum, u8* out, usize bytes);
-    ErrorOr<isize> SysWrite(i32 fdNum, const u8* in, usize bytes);
-    ErrorOr<isize> SysOpen(PathView path, i32 flags, mode_t mode);
-    ErrorOr<isize> SysClose(i32 fdNum);
+    ErrorOr<isize> Stat(const char* path, stat* out);
+    ErrorOr<isize> FStat(isize fdNum, stat* out);
+    ErrorOr<isize> LStat(const char* path, stat* out);
 
-    ErrorOr<isize> SysTruncate(PathView path, off_t length);
-    ErrorOr<isize> SysFTruncate(i32 fdNum, off_t length);
+    ErrorOr<isize> Dup(isize oldFdNum);
+    ErrorOr<isize> Dup2(isize oldFdNum, isize newFdNum);
 
-    ErrorOr<isize> SysRmDir(PathView path);
-    ErrorOr<isize> SysReadLink(PathView path, char* out, usize size);
+    ErrorOr<isize> Truncate(PathView path, off_t length);
+    ErrorOr<isize> FTruncate(i32 fdNum, off_t length);
+    ErrorOr<isize> GetCwd(char* buffer, usize size);
 
-    ErrorOr<isize> SysUTime(PathView path, const utimbuf* out);
+    ErrorOr<isize> RmDir(PathView path);
+    ErrorOr<isize> ReadLink(PathView path, char* out, usize size);
+    ErrorOr<isize> ChMod(const char* path, mode_t mode);
+
+    ErrorOr<isize> Mount(const char* path, const char* target,
+                         const char* filesystemType, usize flags,
+                         const void* data);
+
+    ErrorOr<isize> FChModAt(isize dirFdNum, PathView path, mode_t mode);
+    ErrorOr<isize> UTime(PathView path, const utimbuf* out);
+    ErrorOr<isize> FStatAt(isize dirFd, const char* path, isize flags,
+                           stat* out);
+    ErrorOr<isize> Dup3(isize oldFdNum, isize newFdNum, isize flags);
 } // namespace API::VFS
 namespace Syscall::VFS
 {
-    ErrorOr<i32>   SysStat(Syscall::Arguments& args);
-    ErrorOr<i32>   SysFStat(Syscall::Arguments& args);
-    ErrorOr<i32>   SysLStat(Syscall::Arguments& args);
-
     ErrorOr<off_t> SysLSeek(Syscall::Arguments& args);
     ErrorOr<i32>   SysIoCtl(Syscall::Arguments& args);
 
     ErrorOr<i32>   SysAccess(Syscall::Arguments& args);
-    ErrorOr<i32>   SysDup(Syscall::Arguments& args);
-    ErrorOr<i32>   SysDup2(Syscall::Arguments& args);
 
     ErrorOr<i32>   SysFcntl(Syscall::Arguments& args);
-    ErrorOr<i32>   SysGetCwd(Syscall::Arguments& args);
     ErrorOr<i32>   SysChDir(Syscall::Arguments& args);
     ErrorOr<i32>   SysFChDir(Syscall::Arguments& args);
     ErrorOr<i32>   SysMkDir(Syscall::Arguments& args);
 
-    [[clang::no_sanitize("alignment")]]
-    ErrorOr<i32> SysGetDents64(Syscall::Arguments& args);
+    [[clang::no_sanitize("alignment")]] ErrorOr<i32>
+                 SysGetDents64(Syscall::Arguments& args);
     ErrorOr<i32> SysOpenAt(Syscall::Arguments& args);
     ErrorOr<i32> SysMkDirAt(Syscall::Arguments& args);
     ErrorOr<i32> SysFStatAt(Syscall::Arguments& args);
-
-    ErrorOr<i32> SysDup3(Syscall::Arguments& args);
 } // namespace Syscall::VFS

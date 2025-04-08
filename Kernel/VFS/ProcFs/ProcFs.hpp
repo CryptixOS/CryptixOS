@@ -7,6 +7,7 @@
 #pragma once
 
 #include <Scheduler/Process.hpp>
+
 #include <VFS/Filesystem.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
 
@@ -29,7 +30,8 @@ class ProcFs : public Filesystem
     }
 
     virtual INode* Mount(INode* parent, INode* source, INode* target,
-                         std::string_view name, void* data = nullptr) override;
+                         std::string_view name,
+                         const void*      data = nullptr) override;
     virtual INode* CreateNode(INode* parent, std::string_view name,
                               mode_t mode) override;
     virtual INode* Symlink(INode* parent, std::string_view name,
@@ -42,4 +44,6 @@ class ProcFs : public Filesystem
     static std::unordered_map<pid_t, Process*>            s_Processes;
 
     std::unordered_map<std::string_view, ProcFsProperty*> m_Properties;
+
+    void AddChild(StringView name);
 };

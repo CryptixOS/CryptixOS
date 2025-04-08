@@ -14,6 +14,7 @@ srcs += files(
   'Syscall.cpp',
   'VMM.cpp',
   'idt.S',
+  'memory.S',
   'syscall.S',
 
   'Drivers/I8042Controller.cpp',

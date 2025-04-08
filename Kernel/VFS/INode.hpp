@@ -40,6 +40,7 @@ class INode
     virtual const stat& GetStats() { return m_Stats; }
     virtual std::unordered_map<std::string_view, INode*>& GetChildren()
     {
+        if (!m_Populated) Populate();
         return m_Children;
     }
     inline const std::string& GetName() { return m_Name; }
@@ -68,7 +69,10 @@ class INode
     virtual isize Read(void* buffer, off_t offset, usize bytes)        = 0;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) = 0;
     virtual i32   IoCtl(usize request, usize arg) { return_err(-1, ENODEV); }
-    virtual ErrorOr<isize> Truncate(usize size) = 0;
+    virtual ErrorOr<isize> Truncate(usize size) { return Error(ENOSYS); }
+
+    virtual ErrorOr<void>  ChMod(mode_t mode) { return Error(ENOSYS); }
+
     inline bool            Populate()
     {
         return (!m_Populated && IsDirectory()) ? m_Filesystem->Populate(this)
