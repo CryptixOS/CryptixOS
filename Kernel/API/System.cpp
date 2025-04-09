@@ -4,20 +4,31 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Version.hpp>
+
 #include <API/System.hpp>
 
 #include <Arch/Arch.hpp>
 #include <Arch/PowerManager.hpp>
 
+#include <Prism/String/String.hpp>
+#include <Scheduler/Process.hpp>
+
 namespace API::System
 {
     ErrorOr<isize> Uname(utsname* out)
     {
-        std::strncpy(out->sysname, "Cryptix", sizeof(out->sysname));
-        std::strncpy(out->nodename, "cryptix", sizeof(out->sysname));
-        std::strncpy(out->release, "0.0.1", sizeof(out->sysname));
-        std::strncpy(out->version, __DATE__ " " __TIME__, sizeof(out->sysname));
-        std::strncpy(out->machine, CTOS_ARCH_STRING, sizeof(out->sysname));
+        auto process = Process::GetCurrent();
+        if (!process->ValidateWrite(out)) return Error(EFAULT);
+
+        Kernel::NAME.Copy(out->sysname, sizeof(out->sysname));
+        std::strncpy(out->nodename, "cryptix", sizeof(out->nodename));
+        Kernel::VERSION_STRING.Copy(out->release, sizeof(out->release));
+
+        auto version = Kernel::BUILD_DATE + " ";
+        version += Kernel::BUILD_TIME;
+        version.Copy(out->version, sizeof(out->version));
+        Kernel::ARCH_STRING.Copy(out->machine, sizeof(out->machine));
 
         return 0;
     }

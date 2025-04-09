@@ -11,17 +11,16 @@
 #include <API/Posix/signal.h>
 
 #include <Drivers/TTY.hpp>
+#include <Library/ELF.hpp>
 
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
 
-#include <Library/ELF.hpp>
 #include <Scheduler/Event.hpp>
 
 #include <VFS/FileDescriptorTable.hpp>
 #include <VFS/VFS.hpp>
 
-#include <expected>
 #include <vector>
 
 enum class PrivilegeLevel
@@ -57,19 +56,29 @@ class Process
     static Process* CreateKernelProcess();
     static Process* CreateIdleProcess();
 
-    Thread* CreateThread(uintptr_t rip, bool isUser = true, i64 runOn = -1);
-    Thread* CreateThread(uintptr_t rip, std::vector<std::string_view>& argv,
-                         std::vector<std::string_view>& envp,
-                         ELF::Image& program, i64 runOn = -1);
+    Thread*     CreateThread(uintptr_t rip, bool isUser = true, i64 runOn = -1);
+    Thread*     CreateThread(uintptr_t rip, std::vector<std::string_view>& argv,
+                             std::vector<std::string_view>& envp,
+                             ELF::Image& program, i64 runOn = -1);
 
-    bool    ValidateAddress(const Pointer address, i32 accessMode);
-    bool    ValidateRead(const Pointer address, usize size)
+    bool        ValidateAddress(const Pointer address, i32 accessMode) const;
+    inline bool ValidateRead(const Pointer address, usize size) const
     {
         return ValidateAddress(address, 0);
     }
-    bool ValidateWrite(const Pointer address, usize size)
+    inline bool ValidateWrite(const Pointer address, usize size) const
     {
         return ValidateAddress(address, 0);
+    }
+    template <typename T>
+    inline bool ValidateRead(const T* address) const
+    {
+        return ValidateRead(address, sizeof(T));
+    }
+    template <typename T>
+    inline bool ValidateWrite(const T* address) const
+    {
+        return ValidateWrite(address, sizeof(T));
     }
 
     inline pid_t GetParentPid() const

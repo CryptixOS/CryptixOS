@@ -115,7 +115,7 @@ Thread* Process::CreateThread(uintptr_t                      rip,
     return thread;
 }
 
-bool Process::ValidateAddress(Pointer address, i32 accessMode)
+bool Process::ValidateAddress(Pointer address, i32 accessMode) const
 {
     // TODO(v1tr10l7): Validate access mode
     for (const auto& region : m_AddressSpace)
