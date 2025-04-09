@@ -9,13 +9,13 @@
 #include <API/Posix/termios.h>
 #include <Boot/BootInfo.hpp>
 
+#include <Library/Color.hpp>
+#include <Library/Spinlock.hpp>
+
 #include <Prism/Containers/Array.hpp>
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Core/Types.hpp>
-#include <Library/Spinlock.hpp>
-
-#include <string_view>
-#include <unordered_map>
+#include <Prism/String/StringView.hpp>
 
 namespace AnsiColor
 {
@@ -55,7 +55,7 @@ class Terminal
     void                  PutChar(u64 c);
     void                  PutCharImpl(u64 c);
 
-    void                  PrintString(std::string_view str);
+    void                  PrintString(StringView str);
 
     void                  Bell();
 
@@ -72,22 +72,25 @@ class Terminal
 
     enum class AnsiColor
     {
-        eBlack,
-        eRed,
-        eGreen,
-        eYellow,
-        eBlue,
-        eMagenta,
-        eCyan,
-        eWhite,
+        eBlack         = 0x00,
+        eRed           = 0x01,
+        eGreen         = 0x02,
+        eYellow        = 0x03,
+        eBlue          = 0x04,
+        eMagenta       = 0x05,
+        eCyan          = 0x06,
+        eWhite         = 0x07,
+        eDefault       = 0x09,
 
-        eBrightBlack,
-        eBrightRed,
-        eBrightGreen,
-        eBrightYellow,
-        eBrightMagenta,
-        eBrightCyan,
-        eBrightWhite,
+        eBrightBlack   = 0x0a,
+        eBrightRed     = 0x0b,
+        eBrightGreen   = 0x0c,
+        eBrightYellow  = 0x0d,
+        eBrightBlue    = 0x0e,
+        eBrightMagenta = 0x0f,
+        eBrightCyan    = 0x10,
+        eBrightWhite   = 0x11,
+        eDefaultBright = 0x13,
     };
 
     virtual void RawPutChar(u8 c) = 0;
@@ -115,14 +118,8 @@ class Terminal
     virtual void                    SetTextForeground(AnsiColor color)   = 0;
     virtual void                    SetTextBackground(AnsiColor color)   = 0;
 
-    virtual void                    SetTextForegroundRgb(u32 color)      = 0;
-    virtual void                    SetTextBackgroundRgb(u32 color)      = 0;
-
-    virtual void                    SetTextForegroundDefault()           = 0;
-    virtual void                    SetTextBackgroundDefault()           = 0;
-
-    virtual void                    SetTextForegroundDefaultBright()     = 0;
-    virtual void                    SetTextBackgroundDefaultBright()     = 0;
+    virtual void                    SetTextForegroundRgb(Color color)    = 0;
+    virtual void                    SetTextBackgroundRgb(Color color)    = 0;
 
     void                            Reset();
     virtual void                    Destroy() = 0;
@@ -151,6 +148,8 @@ class Terminal
     void                                OnEscapeChar(char c);
     void                                OnCsi(char c);
     bool                                DecSpecialPrint(u8 c);
+
+    void                                SGR(u64 parameter);
 
     static Vector<Terminal*>            s_Terminals;
 };

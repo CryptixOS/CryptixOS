@@ -35,16 +35,20 @@ namespace E9
 
 using namespace Prism;
 
-static usize         s_EnabledSinks = 0;
-static VideoTerminal s_Terminal;
-class CoreSink       final : public LogSink
+static usize   s_EnabledSinks = 0;
+class CoreSink final : public LogSink
 {
   public:
     void WriteNoLock(std::string_view str) override
     {
         if (s_EnabledSinks & LOG_SINK_E9) E9::PrintString(str);
         if (s_EnabledSinks & LOG_SINK_SERIAL) Serial::Write(str);
-        if (s_EnabledSinks & LOG_SINK_TERMINAL) s_Terminal.PrintString(str);
+        if (s_EnabledSinks & LOG_SINK_TERMINAL)
+        {
+            auto terminal = Terminal::GetPrimary();
+            if (!terminal) return;
+            terminal->PrintString(str.data());
+        }
     }
 };
 CoreSink g_CoreSink;
@@ -132,8 +136,7 @@ namespace Logger
                 char* start  = const_cast<char*>(fmt);
                 usize length = 0;
 
-                for (; std::isdigit(*fmt); length++, fmt++)
-                    ;
+                for (; std::isdigit(*fmt); length++, fmt++);
 
                 return ToNumber<isize>(start, length);
             };
@@ -250,8 +253,9 @@ namespace Logger
 
     CTOS_NO_KASAN void EnableSink(usize output)
     {
-        if (output == LOG_SINK_TERMINAL)
-            s_Terminal.Initialize(*BootInfo::GetPrimaryFramebuffer());
+        auto terminal = Terminal::GetPrimary();
+        if (output == LOG_SINK_TERMINAL && terminal)
+            terminal->Initialize(*BootInfo::GetPrimaryFramebuffer());
 
         s_EnabledSinks |= output;
     }
@@ -304,6 +308,6 @@ namespace Logger
         if (printNewline) LogChar('\n');
     }
 
-    Terminal& GetTerminal() { return s_Terminal; }
+    Terminal& GetTerminal() { return *Terminal::GetPrimary(); }
     void      Unlock() { s_Lock.Release(); }
 } // namespace Logger

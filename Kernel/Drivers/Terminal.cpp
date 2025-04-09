@@ -16,6 +16,7 @@
 #include <Drivers/VideoTerminal.hpp>
 
 #include <Memory/PMM.hpp>
+#include <Prism/String/StringUtils.hpp>
 
 Vector<Terminal*> Terminal::s_Terminals = {};
 Terminal*         s_ActiveTerminal      = nullptr;
@@ -99,11 +100,12 @@ void Terminal::PutCharImpl(u64 c)
     RawPutChar(0xfe);
 }
 
-void Terminal::PrintString(std::string_view str)
+void Terminal::PrintString(StringView str)
 {
     if (!m_Initialized) return;
 
     for (auto c : str) PutCharImpl(c);
+    Flush();
 }
 
 void Terminal::Bell()
@@ -208,7 +210,19 @@ void Terminal::OnCsi(char c)
         return;
     }
 
-    if (m_State == State::eControlSequenceParams) ++m_EscapeValueCount;
+    if (m_State == State::eControlSequenceParams)
+    {
+        ++m_EscapeValueCount;
+        m_State = State::eControlSequenceEntry;
+        if (c == ';') return;
+    }
+    else if (c == ';')
+    {
+        if (m_EscapeValueCount == MAX_ESC_PARAMETER_COUNT) return;
+        m_EscapeValues[m_EscapeValueCount] = 0;
+        ++m_EscapeValueCount;
+        return;
+    }
     u32 param   = m_EscapeValueCount > 0 ? m_EscapeValues[0] : 0;
 
     auto [x, y] = GetCursorPos();
@@ -262,7 +276,7 @@ void Terminal::OnCsi(char c)
         case 'g':
         case 'h':
         case 'l':
-        case 'm':
+        case 'm': SGR(param); break;
         case 'n':
         case 'q':
         case 'r':
@@ -285,35 +299,114 @@ bool Terminal::DecSpecialPrint(u8 c)
 {
     switch (c)
     {
-        case '`': RawPutChar(0x04); return true;
-        case '0': RawPutChar(0xdb); return true;
-        case '-': RawPutChar(0x18); return true;
-        case ',': RawPutChar(0x1b); return true;
-        case '.': RawPutChar(0x19); return true;
-        case 'a': RawPutChar(0xb1); return true;
-        case 'f': RawPutChar(0xf8); return true;
-        case 'g': RawPutChar(0xf1); return true;
-        case 'h': RawPutChar(0xb0); return true;
-        case 'j': RawPutChar(0xd9); return true;
-        case 'k': RawPutChar(0xbf); return true;
-        case 'l': RawPutChar(0xda); return true;
-        case 'm': RawPutChar(0xc0); return true;
-        case 'n': RawPutChar(0xc5); return true;
-        case 'q': RawPutChar(0xc4); return true;
-        case 's': RawPutChar(0x5f); return true;
-        case 't': RawPutChar(0xc3); return true;
-        case 'u': RawPutChar(0xb4); return true;
-        case 'v': RawPutChar(0xc1); return true;
-        case 'w': RawPutChar(0xc2); return true;
-        case 'x': RawPutChar(0xb3); return true;
-        case 'y': RawPutChar(0xf3); return true;
-        case 'z': RawPutChar(0xf2); return true;
-        case '~': RawPutChar(0xfa); return true;
-        case '_': RawPutChar(0xff); return true;
-        case '+': RawPutChar(0x1a); return true;
-        case '{': RawPutChar(0xe3); return true;
-        case '}': RawPutChar(0x9c); return true;
+        case '`': RawPutChar(0x04); break;
+        case '0': RawPutChar(0xdb); break;
+        case '-': RawPutChar(0x18); break;
+        case ',': RawPutChar(0x1b); break;
+        case '.': RawPutChar(0x19); break;
+        case 'a': RawPutChar(0xb1); break;
+        case 'f': RawPutChar(0xf8); break;
+        case 'g': RawPutChar(0xf1); break;
+        case 'h': RawPutChar(0xb0); break;
+        case 'j': RawPutChar(0xd9); break;
+        case 'k': RawPutChar(0xbf); break;
+        case 'l': RawPutChar(0xda); break;
+        case 'm': RawPutChar(0xc0); break;
+        case 'n': RawPutChar(0xc5); break;
+        case 'q': RawPutChar(0xc4); break;
+        case 's': RawPutChar(0x5f); break;
+        case 't': RawPutChar(0xc3); break;
+        case 'u': RawPutChar(0xb4); break;
+        case 'v': RawPutChar(0xc1); break;
+        case 'w': RawPutChar(0xc2); break;
+        case 'x': RawPutChar(0xb3); break;
+        case 'y': RawPutChar(0xf3); break;
+        case 'z': RawPutChar(0xf2); break;
+        case '~': RawPutChar(0xfa); break;
+        case '_': RawPutChar(0xff); break;
+        case '+': RawPutChar(0x1a); break;
+        case '{': RawPutChar(0xe3); break;
+        case '}': RawPutChar(0x9c); break;
+
+        default: return false;
     }
 
-    return false;
+    return true;
+}
+
+void Terminal::SGR(u64 parameter)
+{
+    AnsiColor color
+        = static_cast<AnsiColor>((parameter % 10) + (parameter >= 90 ? 10 : 0));
+
+    // TODO(v1tr10l7): SGR attributes -> bold, half-bright, italic, underscore,
+    // blink, reverse video, reset selected mapping, select null mapping,
+    // underline, normal intensity
+    switch (parameter)
+    {
+        // Reset all attributes to their defaults
+        case 0:
+            SetTextForeground(AnsiColor::eDefault);
+            SetTextBackground(AnsiColor::eDefault);
+            break;
+        // set bold
+        case 1: break;
+        // set half-bright
+        case 2: break;
+        // set set italic
+        case 3: break;
+        // set underscore
+        case 4: break;
+        // set blink
+        case 5: break;
+        // set reverse video
+        case 7: break;
+        // reset selected mapping, display control flag, and toggle meta flag
+        case 10: break;
+        // select null mapping, set display control flag, reset toggle meta flag
+        case 11: break;
+        // select null mapping, set display control flag, set toggle meta flag
+        case 12: break;
+        // set underline
+        case 21: break;
+        // set normal intensity
+        case 22: break;
+        // italic off
+        case 23: break;
+        // underline off
+        case 24: break;
+        // blink off
+        case 25: break;
+        // reverse video off
+        case 27: break;
+        // set text foreground color
+        case 30 ... 37:
+        // set default text foreground color
+        case 39:
+        // set bright text foreground color
+        case 90 ... 97: SetTextForeground(color); break;
+        // set 256/24-bit text foreground color
+        case 38:
+        // set 256/24-bit text background color
+        case 48:
+        {
+            if (m_EscapeValueCount < 4) break;
+            auto  r = m_EscapeValues[1];
+            auto  g = m_EscapeValues[2];
+            auto  b = m_EscapeValues[3];
+            Color rgb(r, g, b);
+
+            if (parameter == 38) SetTextForegroundRgb(rgb);
+            else if (parameter == 48) SetTextBackgroundRgb(rgb);
+            break;
+        }
+        // set text background color
+        case 40 ... 47:
+        // set default text background color
+        case 49:
+        // set bright text background color
+        case 100 ... 107: SetTextBackground(color); break;
+
+        default: break;
+    }
 }

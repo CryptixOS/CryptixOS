@@ -166,11 +166,11 @@ isize TTY::Write(const void* src, off_t offset, usize bytes)
     const char*           s = reinterpret_cast<const char*>(src);
     static constexpr char MLIBC_LOG_SIGNATURE[] = "[mlibc]: ";
 
-    std::string_view      str(s, bytes);
+    StringView            str(s, bytes);
 
-    if (str.starts_with(MLIBC_LOG_SIGNATURE))
+    if (str.StartsWith(MLIBC_LOG_SIGNATURE))
     {
-        std::string_view errorMessage(s + sizeof(MLIBC_LOG_SIGNATURE) - 1 - 1);
+        StringView errorMessage(s + sizeof(MLIBC_LOG_SIGNATURE) - 1 - 1);
         LogMessage("[{}mlibc{}]: {} ", AnsiColor::FOREGROUND_MAGENTA,
                    AnsiColor::FOREGROUND_WHITE, errorMessage);
 
@@ -179,25 +179,7 @@ isize TTY::Write(const void* src, off_t offset, usize bytes)
 
     ScopedLock guard(m_OutputLock);
 
-#if 0
-    bool       escape = false;
-    Logger::Log(LogLevel::eNone, "Sequence: '", false);
-#endif
-
-    for (usize i = 0; i < str.size(); i++)
-    {
-        char* c = const_cast<char*>(&str[i]);
-#if 0
-        Logger::Log(LogLevel::eNone,
-                    std::isprint(*c) ? std::format("{:c} ", *c)
-                                     : std::format("{:#x} ", *c),
-                    false);
-#endif
-        EchoRaw(*c);
-    }
-#if 0
-    Logger::Log(LogLevel::eNone, "\b'\n", true);
-#endif
+    m_Terminal->PrintString(str);
     return bytes;
 }
 
