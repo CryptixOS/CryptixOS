@@ -14,7 +14,7 @@ declare_options:
 imports:
   - file: host-recipes/core-tools.yml
 
-  - file: recipes/games.yml
+  #- file: recipes/games.yml
   - file: recipes/misc.yml
   - file: recipes/misc-apps.yml
   - file: recipes/net-utils.yml
