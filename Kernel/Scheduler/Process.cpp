@@ -115,12 +115,20 @@ Thread* Process::CreateThread(uintptr_t                      rip,
     return thread;
 }
 
-bool Process::ValidateAddress(Pointer address, i32 accessMode) const
+bool Process::ValidateAddress(Pointer address, i32 accessMode, usize size)
 {
     // TODO(v1tr10l7): Validate access mode
     for (const auto& region : m_AddressSpace)
+    {
         if (region.Contains(address)) return true;
+        if (!region.Contains(address) || !region.Contains(address.Offset(size)))
+            continue;
 
+        if (accessMode & PROT_READ && !region.IsReadable()) return false;
+        if (accessMode & PROT_WRITE && !region.IsWriteable()) return false;
+        if (accessMode & PROT_EXEC && !region.IsExecutable()) return false;
+        return true;
+    }
     return false;
 }
 
@@ -149,7 +157,8 @@ void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
     INode* parent = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), m_CWD));
-    if (path.IsAbsolute()) parent = VFS::GetRootNode();
+    if (CPU::AsUser([path]() -> bool { return path.IsAbsolute(); }))
+        parent = VFS::GetRootNode();
     else if (dirFd != AT_FDCWD)
     {
         auto* descriptor = GetFileHandle(dirFd);
@@ -157,7 +166,9 @@ ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
         parent = descriptor->GetNode();
     }
 
-    auto descriptor = VFS::Open(parent, path, flags, mode);
+    auto descriptor
+        = CPU::AsUser([&]() -> ErrorOr<FileDescriptor*>
+                      { return VFS::Open(parent, path, flags, mode); });
     if (!descriptor) return Error(descriptor.error());
 
     return m_FdTable.Insert(descriptor.value());
@@ -211,9 +222,10 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
     m_Name = path;
     Arch::VMM::DestroyPageMap(PageMap);
     delete PageMap;
-    PageMap     = new class PageMap();
+    PageMap = new class PageMap();
 
-    auto nodeOr = VFS::ResolvePath(path);
+    auto nodeOr
+        = CPU::AsUser([path]() -> auto { return VFS::ResolvePath(path); });
     if (!nodeOr) return nodeOr.error();
 
     std::string shellPath;
@@ -248,7 +260,10 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
 
     std::vector<std::string>      args = SplitArguments(shellPath);
     std::vector<std::string_view> argvArr;
-    for (auto& arg : args) argvArr.push_back(arg);
+    {
+        CPU::UserMemoryProtectionGuard guard;
+        for (auto& arg : args) argvArr.push_back(arg);
+    }
     if (!shellPath.empty()) argvArr.push_back(path);
 
     static ELF::Image program, ld;
@@ -271,13 +286,19 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
     uintptr_t address
         = ldPath.empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
 
-    for (char** arg = argv; *arg; arg++) argvArr.push_back(*arg);
+    {
+        CPU::UserMemoryProtectionGuard guard;
+        for (char** arg = argv; *arg; arg++) argvArr.push_back(*arg);
 
-    for (usize i = 0; auto& arg : args)
-        LogDebug("Process::Exec: argv[{}] = '{}'", i++, arg);
+        for (usize i = 0; auto& arg : args)
+            LogDebug("Process::Exec: argv[{}] = '{}'", i++, arg);
+    }
 
     std::vector<std::string_view> envpArr;
-    for (char** env = envp; *env; env++) envpArr.push_back(*env);
+    {
+        CPU::UserMemoryProtectionGuard guard;
+        for (char** env = envp; *env; env++) envpArr.push_back(*env);
+    }
 
     auto thread = CreateThread(address, argvArr, envpArr, program,
                                CPU::GetCurrent()->ID);
@@ -348,7 +369,10 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
             && WIFCONTINUED(which->GetStatus().value_or(0)))
             continue;
 
-        if (wstatus) *wstatus = W_EXITCODE(which->GetStatus().value_or(0), 0);
+        if (wstatus)
+            CPU::AsUser(
+                [wstatus, &which]()
+                { *wstatus = W_EXITCODE(which->GetStatus().value_or(0), 0); });
 
         return which->GetPid();
     }

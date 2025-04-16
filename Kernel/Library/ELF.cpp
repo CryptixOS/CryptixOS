@@ -10,6 +10,7 @@
 #include <Memory/PMM.hpp>
 
 #include <Prism/Containers/Array.hpp>
+#include <Prism/String/StringView.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <VFS/INode.hpp>
@@ -185,11 +186,9 @@ namespace ELF
                                 std::strlen(MODULE_SECTION))
                        == 0)
             {
-                std::string_view modName
+                StringView modName
                     = stringTable + section->Name + strlen(MODULE_SECTION) + 1;
 
-                LogInfo("Mod: {}", stringTable + section->Name);
-                LogInfo("Mod: {}", modName);
                 for (auto offset = section->Address;
                      offset < section->Address + section->Size;
                      offset += sizeof(Module))

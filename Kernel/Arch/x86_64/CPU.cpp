@@ -130,10 +130,11 @@ namespace CPU
             SetGSBase(cpu->extra_argument);
         }
 
-        // TODO(v1tr10l7): Enable SMEP, SMAP, UMIP
         EnablePAT();
-        // EnableSMEP();
-        // EnableSMAP();
+        EnableSMEP();
+        EnableSMAP();
+        EnableUMIP();
+
         InitializeFPU();
 
         // Setup syscalls
@@ -566,4 +567,7 @@ namespace CPU
         ID id(7, 0);
         if (id.rcx & CPU_FEAT_ECX_UMIP) WriteCR4(ReadCR4() | CR4::UMIP);
     }
+
+    UserMemoryProtectionGuard::UserMemoryProtectionGuard() { Stac(); }
+    UserMemoryProtectionGuard::~UserMemoryProtectionGuard() { Clac(); }
 }; // namespace CPU

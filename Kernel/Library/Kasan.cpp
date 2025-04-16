@@ -6,6 +6,8 @@
  */
 #include <Common.hpp>
 
+#include <Boot/BootInfo.hpp>
+
 #include <Debug/Assertions.hpp>
 #include <Debug/Panic.hpp>
 
@@ -34,10 +36,11 @@ namespace Kasan
 
     void           Initialize(Pointer shadowBase)
     {
-        s_ShadowBase = shadowBase;
-        s_ShadowOffset
-            = s_ShadowBase - (BootInfo::GetHHDMOffset() >> SHADOW_SCALE_OFFSET);
-        s_Initialized = true;
+        Pointer hhdmOffset = BootInfo::GetHHDMOffset();
+
+        s_ShadowBase       = shadowBase;
+        s_ShadowOffset     = s_ShadowBase - (hhdmOffset >> SHADOW_SCALE_OFFSET);
+        s_Initialized      = true;
     }
 
     static void PrintViolation(Pointer address, usize size,
@@ -63,7 +66,7 @@ namespace Kasan
         if (!s_Initialized) [[unlikely]]
             return;
 
-        Assert((address % SHADOW_SCALE) == 0);
+        Assert((address.Raw() % SHADOW_SCALE) == 0);
         Assert((size % SHADOW_SCALE) == 0);
 
         auto* shadow     = va_to_shadow(address);
@@ -76,7 +79,7 @@ namespace Kasan
         if (!s_Initialized) [[unlikely]]
             return;
 
-        Assert((address % SHADOW_SCALE) == 0);
+        Assert((address.Raw() % SHADOW_SCALE) == 0);
         Assert((totalSize % SHADOW_SCALE) == 0);
 
         auto* shadow          = va_to_shadow(address);

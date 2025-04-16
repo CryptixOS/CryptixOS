@@ -11,6 +11,7 @@ srcs += files(
   'Syscall.cpp',
   'VMM.cpp',
   'interrupts.S',
+  'memory.S',
 
   'Drivers/Serial.cpp'
 )

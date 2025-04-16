@@ -47,17 +47,19 @@ namespace Syscall
     {
         syscalls[index] = {name, handler};
     }
-#define ARCH_SET_GS 0x1001
-#define ARCH_SET_FS 0x1002
-#define ARCH_GET_FS 0x1003
-#define ARCH_GET_GS 0x1004
+
+    constexpr usize  ARCH_SET_GS = 0x1001;
+    constexpr usize  ARCH_SET_FS = 0x1002;
+    constexpr usize  ARCH_GET_FS = 0x1003;
+    constexpr usize  ARCH_GET_GS = 0x1004;
     static uintptr_t SysArchPrCtl(Arguments& args)
     {
 #ifdef CTOS_TARGET_X86_64
-        auto      thread = CPU::GetCurrentThread();
-        i32       op     = args.Args[0];
-        uintptr_t addr   = args.Args[1];
+        auto                           thread = CPU::GetCurrentThread();
+        i32                            op     = args.Args[0];
+        uintptr_t                      addr   = args.Args[1];
 
+        CPU::UserMemoryProtectionGuard guard;
         switch (op)
         {
             case ARCH_SET_GS:

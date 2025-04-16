@@ -6,9 +6,11 @@
  */
 #pragma once
 
-#include <Memory/PMM.hpp>
-
 #include <Library/Spinlock.hpp>
+
+#include <Memory/PMM.hpp>
+#include <Memory/PageFault.hpp>
+
 #include <Prism/Utility/Math.hpp>
 
 enum class PageAttributes : isize
@@ -108,7 +110,7 @@ inline static constexpr T FromHigherHalfAddress(U addr)
 class PageMap;
 namespace Arch::VMM
 {
-    extern uintptr_t      defaultPteFlags;
+    extern uintptr_t      g_DefaultPteFlags;
 
     extern void           Initialize();
 
@@ -161,22 +163,22 @@ class PageTableEntry final
 
 namespace VirtualMemoryManager
 {
-    void      Initialize();
+    void     Initialize();
 
-    usize     GetHigherHalfOffset();
+    usize    GetHigherHalfOffset();
 
-    uintptr_t AllocateSpace(usize increment = 0, usize alignment = 0,
-                            bool lowerHalf = false);
+    Pointer  AllocateSpace(usize increment = 0, usize alignment = 0,
+                           bool lowerHalf = false);
 
-    PageMap*  GetKernelPageMap();
+    PageMap* GetKernelPageMap();
+    void     HandlePageFault(const PageFaultInfo& info);
 
-    void      SaveCurrentPageMap(PageMap& out);
-    void      LoadPageMap(PageMap& pageMap, bool);
+    void     SaveCurrentPageMap(PageMap& out);
+    void     LoadPageMap(PageMap& pageMap, bool);
 
-    Pointer   MapIoRegion(PhysAddr phys, usize size, bool write = true);
-
-    Pointer   MapIoRegion(PhysAddr phys, usize size, bool write,
-                          usize alignment = 0);
+    Pointer  MapIoRegion(PhysAddr phys, usize size, bool write = true);
+    Pointer  MapIoRegion(PhysAddr phys, usize size, bool write,
+                         usize alignment = 0);
     template <typename T>
     inline T* MapIoRegion(PhysAddr phys, bool write = true,
                           usize alignment = alignof(T))

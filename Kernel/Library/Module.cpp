@@ -8,26 +8,34 @@
 #include <Library/Logger.hpp>
 #include <Library/Module.hpp>
 
+#include <Memory/VMM.hpp>
+
 #include <magic_enum/magic_enum.hpp>
-#include <unordered_map>
 
-static std::unordered_map<std::string_view, Module*> list;
+static std::unordered_map<StringView, Module*> s_Modules;
 
-bool AddModule(Module* drv, std::string_view name)
+std::unordered_map<StringView, Module*>& GetModules() { return s_Modules; }
+
+bool                                     AddModule(Module* drv, StringView name)
 {
-    if (list.contains(name))
+    if (s_Modules.contains(name))
     {
         LogError("Module: '{}' already exists, aborting...", name);
         return false;
     }
 
-    list[name] = drv;
+    s_Modules[name] = drv;
+    /*
+    VMM::GetKernelPageMap()->MapRange(Pointer(drv->Initialize),
+                                      Pointer(drv->Initialize).FromHigherHalf(),
+                                      0x1000 * 10, PageAttributes::eRWX);
+    */
     drv->Initialize();
     return true;
 }
 bool LoadModule(Module* drv)
 {
-    std::string_view name(drv->Name);
+    StringView name(drv->Name);
 
     LogInfo("Module: Successfully loaded '{}'", name);
     return AddModule(drv, name);

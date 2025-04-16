@@ -27,6 +27,8 @@ namespace API::Process
         {
             if (!process->ValidateWrite(oldSet, sizeof(sigset_t)))
                 return Error(EFAULT);
+
+            CPU::UserMemoryProtectionGuard guard;
             *oldSet = currentMask;
         }
 
@@ -34,6 +36,7 @@ namespace API::Process
         if (!process->ValidateRead(newSet, sizeof(sigset_t)))
             return Error(EFAULT);
 
+        CPU::UserMemoryProtectionGuard guard;
         switch (how)
         {
             case SIG_BLOCK: currentMask &= ~(*newSet); break;
@@ -124,7 +127,8 @@ namespace Syscall::Process
 
         CPU::SetInterruptFlag(false);
 
-        return ::Process::GetCurrent()->Exec(path, argv, envp);
+        return ::Process::GetCurrent()->Exec(
+            CPU::AsUser([path]() -> std::string { return path; }), argv, envp);
     }
     ErrorOr<i32> SysExit(Arguments& args)
     {

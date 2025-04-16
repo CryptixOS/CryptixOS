@@ -6,29 +6,31 @@
  */
 #include <Boot/CommandLine.hpp>
 
+#include <Library/Logger.hpp>
+#include <Prism/String/String.hpp>
+
 #include <cctype>
 #include <unordered_map>
 
 namespace CommandLine
 {
-    static std::string_view s_KernelCommandLine = "";
-    static std::unordered_map<std::string, std::string> s_OptionMap;
+    static StringView                         s_KernelCommandLine = "";
+    static std::unordered_map<String, String> s_OptionMap;
 
-    // Function to parse command-line arguments from a string_view
-    void ParseArguments(std::string_view args)
+    void                                      ParseArguments(StringView args)
     {
-        std::unordered_map<std::string, std::string>& result = s_OptionMap;
-        usize                                         pos    = 0;
+        std::unordered_map<String, String>& result = s_OptionMap;
+        usize                               pos    = 0;
 
-        while (pos < args.size())
+        while (pos < args.Size())
         {
             // Skip leading whitespace
-            while (pos < args.size()
+            while (pos < args.Size()
                    && std::isspace(static_cast<unsigned char>(args[pos])))
                 ++pos;
 
             // Ensure there's an argument to process
-            if (pos >= args.size()) break;
+            if (pos >= args.Size()) break;
 
             // Check if the argument starts with '-'
             if (args[pos] == '-')
@@ -37,30 +39,32 @@ namespace CommandLine
                 usize start = pos;
 
                 // Find the end of the argument
-                while (pos < args.size()
+                while (pos < args.Size()
                        && !std::isspace(static_cast<unsigned char>(args[pos])))
                     ++pos;
 
                 // Extract the argument substring
-                std::string_view arg          = args.substr(start, pos - start);
+                auto  arg          = args.Substr(start, pos - start);
 
                 // Find the '=' delimiter
-                usize            delimiterPos = arg.find('=');
-                if (delimiterPos != std::string_view::npos)
+                usize delimiterPos = arg.Find('=');
+                if (delimiterPos != StringView::NPos)
                 {
                     // Argument has a key=value format
-                    std::string key = std::string(arg.substr(0, delimiterPos));
-                    std::string value
-                        = std::string(arg.substr(delimiterPos + 1));
+                    auto key    = arg.Substr(0, delimiterPos);
+                    auto value  = arg.Substr(delimiterPos + 1);
                     result[key] = value;
+
+                    continue;
                 }
-                else
-                    // Argument is a flag without a value
-                    result[std::string(arg)] = "";
+
+                // Argument is a flag without a value
+                result[arg] = "";
+                continue;
             }
-            else
-                // Handle cases where arguments do not start with '-'
-                ++pos;
+
+            // Handle cases where arguments do not start with '-'
+            ++pos;
         }
 
         LogTrace("CommandLine: Finished parsing the arguments");
@@ -78,15 +82,16 @@ namespace CommandLine
             LogInfo("CommandLine: {} -> {}", arg, value);
     }
 
-    std::optional<bool> GetBoolean(std::string_view key)
+    using namespace Prism::StringViewLiterals;
+    std::optional<bool> GetBoolean(StringView key)
     {
         auto it = s_OptionMap.find(key);
         if (it != s_OptionMap.end())
-            return it->second == "true" || it->second == "1";
+            return it->second == "true"_sv || it->second == "1"_sv;
 
         return std::nullopt;
     }
-    std::string_view GetString(std::string_view key)
+    StringView GetString(StringView key)
     {
         auto it = s_OptionMap.find(key);
         if (it != s_OptionMap.end()) return it->second;

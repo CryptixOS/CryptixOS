@@ -11,11 +11,12 @@
 #include <API/Posix/signal.h>
 
 #include <Drivers/TTY.hpp>
-#include <Library/ELF.hpp>
 
+#include <Memory/AddressSpace.hpp>
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
 
+#include <Library/ELF.hpp>
 #include <Scheduler/Event.hpp>
 
 #include <VFS/FileDescriptorTable.hpp>
@@ -56,27 +57,30 @@ class Process
     static Process* CreateKernelProcess();
     static Process* CreateIdleProcess();
 
-    Thread*     CreateThread(uintptr_t rip, bool isUser = true, i64 runOn = -1);
-    Thread*     CreateThread(uintptr_t rip, std::vector<std::string_view>& argv,
-                             std::vector<std::string_view>& envp,
-                             ELF::Image& program, i64 runOn = -1);
+    Thread* CreateThread(uintptr_t rip, bool isUser = true, i64 runOn = -1);
+    Thread* CreateThread(uintptr_t rip, std::vector<std::string_view>& argv,
+                         std::vector<std::string_view>& envp,
+                         ELF::Image& program, i64 runOn = -1);
 
-    bool        ValidateAddress(const Pointer address, i32 accessMode) const;
-    inline bool ValidateRead(const Pointer address, usize size) const
+    bool    ValidateAddress(const Pointer address, i32 accessMode, usize size);
+    inline bool ValidateRead(const Pointer address, usize size)
     {
-        return ValidateAddress(address, 0);
+        return ValidateAddress(address, PROT_READ, size);
     }
-    inline bool ValidateWrite(const Pointer address, usize size) const
+    inline bool ValidateWrite(const Pointer address, usize size)
     {
-        return ValidateAddress(address, 0);
+        return ValidateAddress(address, PROT_WRITE, size);
     }
+
     template <typename T>
-    inline bool ValidateRead(const T* address) const
+        requires(!std::is_pointer_v<T>)
+    inline bool ValidateRead(const T* address)
     {
         return ValidateRead(address, sizeof(T));
     }
     template <typename T>
-    inline bool ValidateWrite(const T* address) const
+        requires(!std::is_pointer_v<T>)
+    inline bool ValidateWrite(const T* address)
     {
         return ValidateWrite(address, sizeof(T));
     }
@@ -95,6 +99,7 @@ class Process
     inline std::optional<i32> GetStatus() const { return m_Status; }
 
     inline Thread*            GetMainThread() { return m_MainThread; }
+    inline AddressSpace&      GetAddressSpace() { return m_VirtualRegions; }
 
     inline pid_t              GetSid() const { return m_Credentials.sid; }
     inline pid_t              GetPGid() const { return m_Credentials.pgid; }
@@ -166,6 +171,8 @@ class Process
 
     FileDescriptorTable   m_FdTable;
     Vector<VMM::Region>   m_AddressSpace{};
+    AddressSpace          m_VirtualRegions;
+
     uintptr_t             m_UserStackTop = 0x70000000000;
     usize                 m_Quantum      = 1000;
     Spinlock              m_Lock;

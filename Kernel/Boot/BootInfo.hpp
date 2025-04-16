@@ -8,6 +8,7 @@
 
 #include <Prism/Core/Types.hpp>
 #include <Prism/Memory/Pointer.hpp>
+#include <Prism/String/StringView.hpp>
 
 #include <limine.h>
 
@@ -43,7 +44,7 @@ namespace BootInfo
 {
     const char*                         GetBootloaderName();
     const char*                         GetBootloaderVersion();
-    std::string_view                    GetKernelCommandLine();
+    StringView                          GetKernelCommandLine();
     FirmwareType                        GetFirmwareType();
     u64                                 GetHHDMOffset();
     Framebuffer**                       GetFramebuffers(usize& outCount);

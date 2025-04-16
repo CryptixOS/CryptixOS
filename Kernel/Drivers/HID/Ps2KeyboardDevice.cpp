@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Boot/CommandLine.hpp>
 #include <Drivers/HID/PS2Scancodes.hpp>
 
 #include <Drivers/HID/Ps2KeyboardDevice.hpp>
@@ -75,6 +76,8 @@ void Ps2KeyboardDevice::HandleScanCodeSet1Key(u8 raw)
         m_ExtraScanCode    = false;
         auto tty           = TTY::GetCurrent();
         bool cursorKeyMode = tty ? tty->GetCursorKeyMode() : false;
+        bool disableArrowKeys
+            = CommandLine::GetBoolean("disableArrowKeys").value_or(false);
 
         switch (raw)
         {
@@ -86,15 +89,19 @@ void Ps2KeyboardDevice::HandleScanCodeSet1Key(u8 raw)
             case SCANCODE_ENTER: Emit("\n", 1); return;
             case 0x35: Emit("/", 1); return;
             case SCANCODE_UP_ARROW:
+                if (disableArrowKeys) return;
                 Emit(cursorKeyMode ? "\eOA" : "\e[A", 3);
                 return;
             case SCANCODE_LEFT_ARROW:
+                if (disableArrowKeys) return;
                 Emit(cursorKeyMode ? "\eOD" : "\e[D", 3);
                 return;
             case SCANCODE_DOWN_ARROW:
+                if (disableArrowKeys) return;
                 Emit(cursorKeyMode ? "\eOB" : "\e[B", 3);
                 return;
             case SCANCODE_RIGHT_ARROW:
+                if (disableArrowKeys) return;
                 Emit(cursorKeyMode ? "\eOC" : "\e[C", 3);
                 return;
             case SCANCODE_HOME_PRESS: Emit("\e[1~", 4); return;

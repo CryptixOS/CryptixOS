@@ -103,10 +103,10 @@ struct [[gnu::packed]] Ext2FsINodeMeta
         return static_cast<usize>(SizeLow)
              | (static_cast<usize>(SizeHigh) << 32);
     }
-    inline void SetSize(usize sizeLow, usize sizeHigh)
+    inline void SetSize(usize size)
     {
-        SizeLow  = sizeLow;
-        SizeHigh = sizeHigh >> 32;
+        SizeLow  = size;
+        SizeHigh = size >> 32;
     }
 };
 

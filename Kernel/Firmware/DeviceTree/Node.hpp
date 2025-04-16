@@ -6,8 +6,10 @@
  */
 #pragma once
 
+#include <Library/Logger.hpp>
 #include <Prism/Memory/Endian.hpp>
 
+#include <format>
 #include <string_view>
 #include <unordered_map>
 

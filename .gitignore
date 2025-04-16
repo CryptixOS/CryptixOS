@@ -11,7 +11,5 @@ build-sysroot/
 sysroot/
 sources
 *.objdump
-image.hdd
-ext2.img
-fat32.img
-qemu.dts
+*.img
+*.log

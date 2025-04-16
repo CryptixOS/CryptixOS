@@ -78,3 +78,18 @@ constexpr usize CPU_FEAT_EDX_HTT           = Bit(28);
 constexpr usize CPU_FEAT_EDX_TM            = Bit(29);
 constexpr usize CPU_FEAT_EDX_IA64          = Bit(30);
 constexpr usize CPU_FEAT_EDX_PBE           = Bit(31);
+
+constexpr usize CPU_FEAT_SYSCALL           = Bit(43);
+constexpr usize CPU_FEAT_MP                = Bit(44);
+constexpr usize CPU_FEAT_NX                = Bit(45);
+constexpr usize CPU_FEAT_MMXEXT            = Bit(46);
+constexpr usize CPU_FEAT_FXSR_OPT          = Bit(47);
+constexpr usize CPU_FEAT_GBPAGES           = Bit(48);
+constexpr usize CPU_FEAT_RDTSCP            = Bit(49);
+constexpr usize CPU_FEAT_LM                = Bit(50);
+constexpr usize CPU_FEAT_3DNOWEXT          = Bit(51);
+constexpr usize CPU_FEAT_3DNOW             = Bit(52);
+
+constexpr usize CPU_FEAT_RECOVERY          = 64;
+constexpr usize CPU_FEAT_LONGRUN           = 65;
+constexpr usize CPU_FEAT_LRTI              = 66;

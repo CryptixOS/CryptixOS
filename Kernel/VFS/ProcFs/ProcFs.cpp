@@ -6,14 +6,50 @@
  */
 #include <API/System.hpp>
 
+#include <Drivers/DeviceManager.hpp>
+#include <Library/Module.hpp>
+
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
 
 std::unordered_map<pid_t, Process*> ProcFs::s_Processes;
 
+struct ProcFsCmdLineProperty : public ProcFsProperty
+{
+    virtual void GenerateRecord() override
+    {
+        Buffer.clear();
+
+        StringView kernelPath = BootInfo::GetExecutableFile()->path;
+        StringView cmdline    = BootInfo::GetKernelCommandLine();
+
+        Buffer.resize(kernelPath.Size() + cmdline.Size() + 10);
+        Write("{} {}\n", kernelPath, cmdline);
+    }
+};
+struct ProcFsFilesystemsProperty : public ProcFsProperty
+{
+    virtual void GenerateRecord() override
+    {
+        Buffer.clear();
+        Buffer.resize(PMM::PAGE_SIZE);
+
+        for (auto& [physical, fs] : VFS::GetFilesystems())
+            Write("{} {}\n", physical ? "     " : "nodev", fs);
+    }
+};
+struct ProcFsModulesProperty : public ProcFsProperty
+{
+    virtual void GenerateRecord() override
+    {
+        Buffer.clear();
+        Buffer.resize(PMM::PAGE_SIZE);
+
+        for (auto& [name, module] : GetModules()) Write("{}\n", name);
+    }
+};
 struct ProcFsMountsProperty : public ProcFsProperty
 {
-  public:
     virtual void GenerateRecord() override
     {
         Buffer.clear();
@@ -32,31 +68,24 @@ struct ProcFsMountsProperty : public ProcFsProperty
         }
     }
 };
-
-struct ProcFsCmdLineProperty : public ProcFsProperty
+struct ProcFsPartitionsProperty : public ProcFsProperty
 {
-  public:
-    virtual void GenerateRecord() override
-    {
-        Buffer.clear();
-
-        std::string_view kernelPath = BootInfo::GetExecutableFile()->path;
-        std::string_view cmdline    = BootInfo::GetKernelCommandLine();
-
-        Buffer.resize(kernelPath.size() + cmdline.size() + 10);
-        Write("{} {}\n", kernelPath, cmdline);
-    }
-};
-struct ProcFsFilesystemsProperty : public ProcFsProperty
-{
-  public:
     virtual void GenerateRecord() override
     {
         Buffer.clear();
         Buffer.resize(PMM::PAGE_SIZE);
 
-        for (auto& [physical, fs] : VFS::GetFilesystems())
-            Write("{} {}\n", physical ? "     " : "nodev", fs);
+        Write("major\tminor\t#blocks\tname\n");
+        for (auto& partition : DeviceManager::GetBlockDevices())
+        {
+            u16         major      = partition->GetID();
+            u16         minor      = partition->GetID();
+            const stat& stats      = partition->GetStats();
+            u64         blockCount = stats.st_blocks;
+            StringView  name       = partition->GetName().data();
+
+            Write("{}\t{}\t{}\t{}\n", major, minor, blockCount, name);
+        }
     }
 };
 struct ProcFsVersionProperty : public ProcFsProperty
@@ -79,7 +108,9 @@ static constexpr ProcFsProperty* CreateProcFsProperty(StringView name)
 {
     if (name == "cmdline") return new ProcFsCmdLineProperty();
     else if (name == "filesystems") return new ProcFsFilesystemsProperty();
+    else if (name == "modules") return new ProcFsModulesProperty();
     else if (name == "mounts") return new ProcFsMountsProperty();
+    else if (name == "partitions") return new ProcFsPartitionsProperty();
     else if (name == "version") return new ProcFsVersionProperty();
 
     return nullptr;
@@ -120,9 +151,11 @@ INode* ProcFs::Mount(INode* parent, INode* source, INode* target,
     m_Root = new ProcFsINode(parent, name.data(), this, 0755 | S_IFDIR);
     if (m_Root) m_MountedOn = target;
 
-    AddChild("mounts");
     AddChild("cmdline");
     AddChild("filesystems");
+    AddChild("modules");
+    AddChild("mounts");
+    AddChild("partitions");
     AddChild("version");
     m_MountedOn = target;
 

@@ -143,13 +143,42 @@ class Terminal
     usize                               m_EscapeValueCount = 0;
     u8                                  m_TabSize          = 4;
 
+    bool                                m_DecPrivate       = false;
     bool                                m_CursorKeyMode    = false;
 
     void                                OnEscapeChar(char c);
     void                                OnCsi(char c);
     bool                                DecSpecialPrint(u8 c);
 
+    // ECMA-48 CSI sequences
+    void                                ICH(u64 count = 1);
+    void                                CUU(u64 count = 1);
+    void                                CUD(u64 count = 1);
+    void                                CUF(u64 count = 1);
+    void                                CUB(u64 count = 1);
+    void                                CNL(u64 count = 1);
+    void                                CPL(u64 count = 1);
+    void                                CHA(u64 count = 1);
+    void                                CUP(u64 count = 1);
+    void                                ED(u64 parameter);
+    void                                EL(u64 parameter);
+    void                                IL(u64 parameter);
+    void                                DL(u64 parameter);
+    void                                DCH(u64 parameter);
+    void                                ECH(u64 parameter);
+    void                                HPR(u64 parameter);
+    void                                DA(u64 parameter);
+    void                                VPA(u64 parameter);
+    void                                VPR(u64 parameter);
+    void                                HVP(u64 parameter);
+    void                                TBC(u64 parameter);
+    void                                SM(u64 parameter);
+    void                                RM(u64 parameter);
     void                                SGR(u64 parameter);
+    void                                DSR(u64 parameter);
+    void                                DECLL(u64 parameter);
+    void                                DECSTBM(u64 parameter);
+    void                                HPA(u64 parameter);
 
     static Vector<Terminal*>            s_Terminals;
 };

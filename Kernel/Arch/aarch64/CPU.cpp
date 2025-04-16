@@ -51,4 +51,7 @@ namespace CPU
 
     void HaltAll() {}
     void WakeUp(usize, bool) {}
+
+    UserMemoryProtectionGuard::UserMemoryProtectionGuard() {}
+    UserMemoryProtectionGuard::~UserMemoryProtectionGuard() {}
 } // namespace CPU

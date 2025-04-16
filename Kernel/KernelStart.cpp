@@ -139,7 +139,7 @@ static void kernelThread()
 
     LogTrace("Loading init process...");
     auto initPath = CommandLine::GetString("init");
-    if (!loadInitProcess(initPath.empty() ? "/usr/sbin/init" : initPath.data()))
+    if (!loadInitProcess(initPath.Empty() ? "/usr/sbin/init" : initPath))
         Panic(
             "Kernel: Failed to load the init process, try to specify it's path "
             "using 'init=/path/sbin/init' boot parameter");
@@ -150,6 +150,10 @@ static void kernelThread()
 extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
 {
     InterruptManager::InstallExceptions();
+#define CTOS_GDB_ATTACHED 0
+#if CTOS_GDB_ATTACHED == 1
+    __asm__ volatile("1: jmp 1b");
+#endif
 
     Assert(PMM::Initialize());
     icxxabi::Initialize();

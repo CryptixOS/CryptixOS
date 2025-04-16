@@ -21,6 +21,7 @@ namespace API::System
         auto process = Process::GetCurrent();
         if (!process->ValidateWrite(out)) return Error(EFAULT);
 
+        CPU::UserMemoryProtectionGuard guard;
         Kernel::NAME.Copy(out->sysname, sizeof(out->sysname));
         std::strncpy(out->nodename, "cryptix", sizeof(out->nodename));
         Kernel::VERSION_STRING.Copy(out->release, sizeof(out->release));
@@ -35,6 +36,8 @@ namespace API::System
     ErrorOr<isize> GetResourceLimit(isize resource, rlimit* rlimit)
     {
         // TODO(v1tr10l7): Set proper limits
+        CPU::UserMemoryProtectionGuard guard;
+
         rlimit->rlim_cur = INT64_MAX;
         rlimit->rlim_max = INT64_MAX;
         return 0;
@@ -95,6 +98,8 @@ namespace API::System
 
     ErrorOr<uintptr_t> SysPanic(const char* errorMessage)
     {
+        CPU::UserMemoryProtectionGuard guard;
+
         panic(std::format("SYS_PANIC: {}", errorMessage));
         return -1;
     }

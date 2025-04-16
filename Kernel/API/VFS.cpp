@@ -32,6 +32,7 @@ namespace API::VFS
         FileDescriptor* fd = current->GetFileHandle(fdNum);
         if (!fd) return Error(EBADF);
 
+        CPU::UserMemoryProtectionGuard guard;
         return fd->Read(out, bytes);
     }
     ErrorOr<isize> Write(i32 fdNum, const u8* in, usize bytes)
@@ -42,6 +43,7 @@ namespace API::VFS
         FileDescriptor* fd = current->GetFileHandle(fdNum);
         if (!fd) return Error(EBADF);
 
+        CPU::UserMemoryProtectionGuard guard;
         return fd->Write(in, bytes);
     }
     ErrorOr<isize> Open(PathView path, i32 flags, mode_t mode)
@@ -127,11 +129,12 @@ namespace API::VFS
         Process* process = Process::GetCurrent();
 
         if (!buffer || size == 0) return Error(EINVAL);
-        if (!process->ValidateAddress(buffer, PROT_WRITE)) return Error(EFAULT);
+        if (!process->ValidateWrite(buffer, size)) return Error(EFAULT);
 
         std::string_view cwd = process->GetCWD();
         if (size < cwd.length()) return Error(ERANGE);
 
+        CPU::UserMemoryProtectionGuard guard;
         cwd.copy(buffer, cwd.length());
         return 0;
     }
@@ -253,7 +256,9 @@ namespace API::VFS
             return Error(EINVAL);
 
         Process* current = Process::GetCurrent();
-        if (path && !current->ValidateWrite(path, 4096)) return Error(EFAULT);
+        if (path && !current->ValidateRead(path)) return Error(EFAULT);
+
+        CPU::UserMemoryProtectionGuard guard;
         if (!PathView(path).ValidateLength()) return Error(ENAMETOOLONG);
 
         auto* fd             = current->GetFileHandle(dirFdNum);
@@ -261,7 +266,7 @@ namespace API::VFS
 
         auto  cwd            = std::get<1>(
             ::VFS::ResolvePath(::VFS::GetRootNode(), current->GetCWD()));
-        if (!path || *path == 0)
+        if (!path || !*path)
         {
             if (!(flags & AT_EMPTY_PATH)) return Error(ENOENT);
 
@@ -353,6 +358,7 @@ namespace Syscall::VFS
         auto     fd      = current->GetFileHandle(fdNum);
         if (!fd) return Error(EBADF);
 
+        CPU::UserMemoryProtectionGuard guard;
         return fd->GetNode()->IoCtl(request, arg);
     }
     ErrorOr<i32> SysAccess(Arguments& args)
@@ -361,8 +367,12 @@ namespace Syscall::VFS
         i32         mode = static_cast<i32>(args.Args[1]);
         (void)mode;
 
-        INode* node = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path));
-        if (!node) return -1;
+        INode* node = CPU::AsUser(
+            [path]() -> INode*
+            {
+                return std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path));
+            });
+        if (!node) return Error(EPERM);
 
         return 0;
     }
@@ -385,8 +395,7 @@ namespace Syscall::VFS
             {
                 isize newFdNum = -1;
                 for (newFdNum = arg; current->GetFileHandle(newFdNum);
-                     newFdNum++)
-                    ;
+                     newFdNum++);
                 return API::VFS::Dup3(fdNum, newFdNum, cloExec ? O_CLOEXEC : 0);
             }
             case F_GETFD: return fd->GetFlags();
@@ -414,7 +423,11 @@ namespace Syscall::VFS
 
         INode*      cwd     = std::get<1>(
             VFS::ResolvePath(current->GetRootNode(), current->GetCWD()));
-        INode* node = std::get<1>(VFS::ResolvePath(cwd, path));
+        INode* node = nullptr;
+        {
+            CPU::UserMemoryProtectionGuard guard;
+            std::get<1>(VFS::ResolvePath(cwd, path));
+        }
         if (!node) return Error(ENOENT);
         if (!node->IsDirectory()) return Error(ENOTDIR);
 
@@ -445,8 +458,8 @@ namespace Syscall::VFS
         // TODO(v1tr10l7): validate whether user has appropriate permissions
         Process* current = Process::GetCurrent();
 
-        if (!current->ValidateAddress(reinterpret_cast<uintptr_t>(path.Raw()),
-                                      PROT_READ))
+        if (!current->ValidateRead(reinterpret_cast<uintptr_t>(path.Raw()),
+                                   Limits::MAX_PATH_LENGTH))
             return Error(EFAULT);
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
@@ -477,12 +490,13 @@ namespace Syscall::VFS
 
         Process*      current   = Process::GetCurrent();
         if (!outBuffer
-            || !current->ValidateAddress(outBuffer, PROT_READ | PROT_WRITE))
+            || !current->ValidateRead(outBuffer, Limits::MAX_PATH_LENGTH))
             return Error(EFAULT);
 
         FileDescriptor* fd = current->GetFileHandle(fdNum);
         if (!fd) return Error(EBADF);
 
+        CPU::UserMemoryProtectionGuard guard;
         return fd->GetDirEntries(outBuffer, count);
     }
 
@@ -491,9 +505,11 @@ namespace Syscall::VFS
         Process* current = Process::GetCurrent();
 
         i32      dirFd   = static_cast<i32>(args.Args[0]);
-        PathView path    = reinterpret_cast<const char*>(args.Args[1]);
-        i32      flags   = static_cast<i32>(args.Args[2]);
-        mode_t   mode    = static_cast<mode_t>(args.Args[3]);
+        PathView path;
+        CPU::AsUser([&path, &args]()
+                    { path = reinterpret_cast<const char*>(args.Args[1]); });
+        i32    flags = static_cast<i32>(args.Args[2]);
+        mode_t mode  = static_cast<mode_t>(args.Args[3]);
 
         return current->OpenAt(dirFd, path, flags, mode);
     }
@@ -504,8 +520,8 @@ namespace Syscall::VFS
         mode_t   mode    = args.Get<mode_t>(2);
 
         Process* process = Process::GetCurrent();
-        if (!process->ValidateAddress(reinterpret_cast<uintptr_t>(path.Raw()),
-                                      PROT_READ))
+        if (!process->ValidateRead(reinterpret_cast<uintptr_t>(path.Raw()),
+                                   Limits::MAX_PATH_LENGTH))
             return Error(EFAULT);
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 

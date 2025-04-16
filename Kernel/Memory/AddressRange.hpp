@@ -14,8 +14,7 @@ class AddressRange final
   public:
     AddressRange() = default;
 
-    template <typename T>
-    AddressRange(T address, usize size)
+    AddressRange(Pointer address, usize size)
         : m_Base(address)
         , m_Size(size)
     {
@@ -33,6 +32,6 @@ class AddressRange final
     }
 
   private:
-    PM::Pointer m_Base = 0;
-    usize       m_Size = 0;
+    Pointer m_Base = 0;
+    usize   m_Size = 0;
 };

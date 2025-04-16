@@ -1,6 +1,5 @@
 /*
  * Created by v1tr10l7 on 21.03.2025.
- *
  * Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
  *
  * SPDX-License-Identifier: GPL-3
@@ -19,7 +18,9 @@ class [[gnu::packed]] MacAddress
     MacAddress() = default;
     MacAddress(const std::array<u8, 6> segments) { m_Segments = segments; }
 
-    constexpr u8 operator[](const usize index) const
+    constexpr u8* Raw() { return m_Segments.data(); }
+
+    constexpr u8  operator[](const usize index) const
     {
         Assert(index < m_Segments.size());
         return m_Segments[index];

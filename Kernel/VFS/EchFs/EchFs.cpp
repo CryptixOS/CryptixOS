@@ -64,19 +64,8 @@ INode*                EchFs::Mount(INode* parent, INode* source, INode* target,
         offset += sizeof(EchFsDirectoryEntry);
     }
 
-    usize               count = 0;
-    EchFsDirectoryEntry entry;
-    for (;;)
-    {
-        source->Read(&entry, offset, sizeof(EchFsDirectoryEntry));
-        offset += sizeof(EchFsDirectoryEntry);
-        if (entry.DirectoryID == ECHFS_END_OF_DIRECTORY) break;
-
-        ++count;
-    }
-
     m_Root = new EchFsINode(parent, name, this, 0644 | S_IFDIR, rootDirectory,
-                            m_MainDirectoryOffset * m_BlockSize, count);
+                            m_MainDirectoryOffset * m_BlockSize);
     if (m_Root) m_MountedOn = target;
 
     delete identityTable;
@@ -112,9 +101,10 @@ bool EchFs::Populate(INode* node)
             type = S_IFDIR;
             ++depth;
         }
-        /*inode->m_Children[std::string(reinterpret_cast<char*>(entry.Name))]
-            = new EchFsINode(node, reinterpret_cast<char*>(entry.Name), this,
-                             0644 | type, entry, offset);*/
+
+        auto newNode = new EchFsINode(node, reinterpret_cast<char*>(entry.Name),
+                                      this, 0644 | type, entry, offset);
+        inode->InsertChild(newNode, newNode->GetName());
         offset += sizeof(EchFsDirectoryEntry);
         m_Device->Read(&entry, offset, sizeof(EchFsDirectoryEntry));
     }

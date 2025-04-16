@@ -1,4 +1,46 @@
 packages:
+  - name: gdbm
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: Standard GNU database libraries
+      description: This package contains the GNU Database Manager. It is a library of database functions that uses extensible hashing and works like the standard UNIX dbm. The library provides primitives for storing key/data pairs, searching and retrieving the data by its key and deleting a key along with its data.
+      spdx: 'GPL-3.0-only'
+      website: 'https://www.gnu.org/software/gdbm/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['sys-libs']
+    source:
+      subdir: sources
+      git: 'https://git.savannah.gnu.org/git/gdbm.git'
+      tag: 'v1.25'
+      version: '1.25'
+      tools_required:
+        - host-autoconf-v2.71
+        - host-automake-v1.16
+        - host-libtool
+      regenerate:
+        - args: ['./bootstrap']
+    tools_required:
+      - host-autoconf-v2.71
+      - host-automake-v1.16
+      - system-gcc
+    pkgs_required:
+      - mlibc
+    revision: 1
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--disable-nls'
+        - '--disable-static'
+        - '--enable-libgdbm-compat'
+        - '--without-readline'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
   - name: libiconv
     architecture: '@OPTION:arch@'
     metadata:
@@ -153,6 +195,47 @@ packages:
       - args: ['rm', 'usr/include/linux/libc-compat.h']
       - args: ['cp', '-Tr', 'usr/include', '@THIS_COLLECT_DIR@/usr/include']
 
+  - name: libpipeline
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: A pipeline manipulation library
+      description: This package provides a library for manipulating pipelines of subprocesses in a flexible and convenient way.
+      spdx: 'GPL-3.0-only'
+      website: 'https://libpipeline.nongnu.org/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['dev-libs']
+    source:
+      subdir: sources
+      git: 'https://gitlab.com/cjwatson/libpipeline.git'
+      tag: '1.5.8'
+      version: '1.5.8'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-pkg-config
+        - host-libtool
+      regenerate:
+        - args: ['./bootstrap']
+          isolate_network: false
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@THIS_SOURCE_DIR@/build-aux/']
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+    revision: 1
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
   - name: mlibc-headers
     architecture: '@OPTION:arch@'
     from_source: mlibc
@@ -264,6 +347,33 @@ packages:
           rm -vf                     @THIS_COLLECT_DIR@/usr/lib/libcursesw.so
           echo "INPUT(-lncursesw)" > @THIS_COLLECT_DIR@/usr/lib/libcursesw.so
           ln -sfv libncurses.so      @THIS_COLLECT_DIR@/usr/lib/libcurses.so
+
+  - name: prism 
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      version: '0.1'
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - base-files
+      - mlibc
+    configure: 
+      - args:
+        - 'meson'
+        - 'setup'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/@OPTION:arch-triple@-target.cross-file'
+        - '--prefix=/usr'
+        - '--libdir=/lib'
+        - '--buildtype=debugoptimized'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: false
 
   - name: readline
     architecture: '@OPTION:arch@'

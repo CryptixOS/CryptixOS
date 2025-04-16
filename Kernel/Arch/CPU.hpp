@@ -43,4 +43,26 @@ namespace CPU
 
     void    HaltAll();
     void    WakeUp(usize id, bool everyone);
+
+    // NOTE(v1tr10l7): allows accessing usermode memory from ring0
+    struct UserMemoryProtectionGuard
+    {
+        UserMemoryProtectionGuard();
+        ~UserMemoryProtectionGuard();
+    };
+
+    template <typename F, typename... Args>
+        requires(!std::same_as<std::invoke_result_t<F, Args...>, void>)
+    inline decltype(auto) AsUser(F&& f, Args&&... args)
+    {
+        UserMemoryProtectionGuard guard;
+
+        return f(std::forward<Args>(args)...);
+    }
+    template <typename F, typename... Args>
+    inline static void AsUser(F&& f, Args&&... args)
+    {
+        UserMemoryProtectionGuard guard;
+        f(std::forward<Args>(args)...);
+    }
 }; // namespace CPU

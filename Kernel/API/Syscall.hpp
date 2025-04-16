@@ -8,6 +8,8 @@
 
 #include <Common.hpp>
 
+#include <Arch/CPU.hpp>
+
 #include <Prism/Path.hpp>
 #include <Prism/PathView.hpp>
 
@@ -62,7 +64,9 @@ namespace Syscall
         if constexpr (std::is_same_v<
                           std::remove_cvref_t<std::remove_reference_t<T>>,
                           Prism::PathView>)
-            return PathView(reinterpret_cast<const char*>(value));
+            return CPU::AsUser(
+                [value]() -> PathView
+                { return PathView(reinterpret_cast<const char*>(value)); });
         else if constexpr (std::is_pointer_v<T>)
             return reinterpret_cast<T>(value);
         else return static_cast<T>(value);
@@ -92,16 +96,19 @@ namespace Syscall
             usize                        i = 0;
 
             // Convert array to actual function arguments
-            std::apply(
-                [&](auto&&... args)
-                {
-                    (std::invoke([&]<typename T>(T& arg)
-                                 { arg = ConvertArgument<T>(arr[i++]); },
-                                 args),
-                     ...);
-                },
-                args);
 
+            {
+                CPU::UserMemoryProtectionGuard guard;
+                std::apply(
+                    [&](auto&&... args)
+                    {
+                        (std::invoke([&]<typename T>(T& arg)
+                                     { arg = ConvertArgument<T>(arr[i++]); },
+                                     args),
+                         ...);
+                    },
+                    args);
+            }
             errno    = no_error;
             auto ret = std::apply(Function, args);
             if (!ret) return Error(ret.error());

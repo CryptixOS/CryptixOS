@@ -9,9 +9,9 @@
 #include <API/Posix/termios.h>
 #include <Drivers/Device.hpp>
 
+#include <Library/Spinlock.hpp>
 #include <Prism/Containers/CircularQueue.hpp>
 #include <Prism/Memory/Buffer.hpp>
-#include <Library/Spinlock.hpp>
 #include <Scheduler/Event.hpp>
 
 #include <deque>
@@ -30,6 +30,7 @@ class TTY : public Device
     virtual std::string_view GetName() const noexcept override { return "tty"; }
     winsize                  GetSize() const;
 
+    const termios2&          GetTermios() const { return m_Termios; }
     void                     SetTermios(const termios2& termios);
 
     virtual isize Read(void* dest, off_t offset, usize bytes) override;

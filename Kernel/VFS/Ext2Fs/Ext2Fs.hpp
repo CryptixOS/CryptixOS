@@ -43,12 +43,20 @@ class Ext2Fs : public Filesystem
     usize                    AllocateINode();
     void                     FreeINode(usize inode);
 
-    usize                    AllocateBlock(Ext2FsINodeMeta& meta, u32 inode);
-    void                     FreeBlock(usize block);
+    isize SetINodeBlock(Ext2FsINodeMeta& meta, u32 inode, u32 iblock,
+                        u32 dblock);
+    void  AssignINodeBlocks(Ext2FsINodeMeta& meta, u32 inode, usize start,
+                            usize blocks);
+    isize GrowINode(Ext2FsINodeMeta& meta, u32 inode, usize start, usize count);
 
-    void                     ReadINodeEntry(Ext2FsINodeMeta* out, u32 index);
-    void                     WriteINodeEntry(Ext2FsINodeMeta& in, u32 index);
+    usize AllocateBlock(Ext2FsINodeMeta& meta, u32 inode);
+    void  FreeBlock(usize block);
+
+    void  ReadINodeEntry(Ext2FsINodeMeta* out, u32 index);
+    void  WriteINodeEntry(Ext2FsINodeMeta& in, u32 index);
     isize ReadINode(Ext2FsINodeMeta& meta, u8* out, off_t offset, usize bytes);
+    isize WriteINode(Ext2FsINodeMeta& meta, u8* in, u32 inode, off_t offset,
+                     usize count);
 
   private:
     INode*            m_Device = nullptr;

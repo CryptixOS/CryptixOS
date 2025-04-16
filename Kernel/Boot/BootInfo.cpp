@@ -13,8 +13,6 @@
 
 #include <cstring>
 
-using Prism::Pointer;
-
 #define LIMINE_REQUEST                                                         \
     __attribute__((used, section(".limine_requests"))) volatile
 
@@ -216,9 +214,9 @@ namespace BootInfo
         VerifyExistenceOrRet(s_BootloaderInfoRequest);
         return s_BootloaderInfoRequest.response->version;
     }
-    std::string_view GetKernelCommandLine()
+    StringView GetKernelCommandLine()
     {
-        VerifyExistenceOrRet(s_ExecutableCmdlineRequest);
+        VerifyExistenceOrRetValue(s_ExecutableCmdlineRequest, "");
         return s_ExecutableCmdlineRequest.response->cmdline;
     }
     FirmwareType GetFirmwareType()

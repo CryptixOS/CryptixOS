@@ -14,6 +14,7 @@
 #include <Arch/InterruptHandler.hpp>
 
 #include <Firmware/ACPI/MADT.hpp>
+#include <Memory/PageFault.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
@@ -86,27 +87,47 @@ static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
     Arch::Halt();
 }
 
-// TODO(v1tr10l7): properly handle breakpoints and page faults
-static void breakpoint(CPUContext* ctx) { EarlyPanic("Breakpoint"); }
+// TODO(v1tr10l7): properly handle breakpoints
+static void            breakpoint(CPUContext* ctx) { EarlyPanic("Breakpoint"); }
+
+constexpr usize        PAGE_FAULT_PRESENT           = Bit(0);
+constexpr usize        PAGE_FAULT_WRITE             = Bit(1);
+constexpr usize        PAGE_FAULT_USER              = Bit(2);
+constexpr usize        PAGE_FAULT_RESERVED_WRITE    = Bit(3);
+constexpr usize        PAGE_FAULT_INSTRUCTION_FETCH = Bit(4);
+constexpr usize        PAGE_FAULT_PROTECTION_KEY    = Bit(5);
+constexpr usize        PAGE_FAULT_SHADOW_STACK      = Bit(6);
+constexpr usize        PAGE_FAULT_SGX               = Bit(7);
+
+inline PageFaultReason pageFaultReason(u64 errorCode)
+{
+    PageFaultReason reason;
+    if (!(errorCode & PAGE_FAULT_PRESENT))
+        reason |= PageFaultReason::eNotPresent;
+    if (errorCode & PAGE_FAULT_WRITE) reason |= PageFaultReason::eWrite;
+    if (errorCode & PAGE_FAULT_USER) reason |= PageFaultReason::eUser;
+    if (errorCode & PAGE_FAULT_RESERVED_WRITE)
+        reason |= PageFaultReason::eReservedWrite;
+    if (errorCode & PAGE_FAULT_INSTRUCTION_FETCH)
+        reason |= PageFaultReason::eInstructionFetch;
+    if (errorCode & PAGE_FAULT_PROTECTION_KEY)
+        reason |= PageFaultReason::eProtectionKey;
+    if (errorCode & PAGE_FAULT_SHADOW_STACK)
+        reason |= PageFaultReason::eShadowStack;
+    if (errorCode & PAGE_FAULT_SGX)
+        reason |= PageFaultReason::eSoftwareGuardExtension;
+
+    return reason;
+}
+
 static void pageFault(CPUContext* ctx)
 {
-    CPU::DumpRegisters(ctx);
-    EarlyPanic(
-        "Captured exception[%#zx] on cpu %zu: '%s'\n\rPresent: %d\n Write: "
-        "%d\n, USER: %d\n, ReservedWrite: "
-        "%d\n, InstructionFetch: %d\n, ProtectionKey: %d\n, ShadowStack: %d\n, "
-        "SoftwareGuardExtensions: %d\n"
-        "\nerrorCode: %#zb\n\rrip: "
-        "%#p\nCR2: %#zx",
-        ctx->interruptVector, 0, s_ExceptionNames[ctx->interruptVector],
-        (ctx->errorCode & Bit(0)) != 0, (ctx->errorCode & Bit(1)) != 0,
-        (ctx->errorCode & Bit(2)) != 0, (ctx->errorCode & Bit(3)) != 0,
-        (ctx->errorCode & Bit(4)) != 0, (ctx->errorCode & Bit(5)) != 0,
-        (ctx->errorCode & Bit(6)) != 0, (ctx->errorCode & Bit(7)) != 0,
-        ctx->errorCode, ctx->rip, CPU::ReadCR2());
+    Pointer       faultAddress = CPU::ReadCR2();
+    auto          errorCode    = ctx->errorCode;
+    auto          faultReason  = pageFaultReason(errorCode);
 
-    for (;;) Arch::Halt();
-    raiseException(ctx);
+    PageFaultInfo faultInfo(faultAddress, faultReason, ctx);
+    VMM::HandlePageFault(faultInfo);
 }
 
 [[noreturn]] static void unhandledInterrupt(CPUContext* context)

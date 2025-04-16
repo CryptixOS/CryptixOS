@@ -12,6 +12,7 @@
 #include <Boot/BootInfo.hpp>
 
 #include <Drivers/Serial.hpp>
+#include <Drivers/TTY.hpp>
 #include <Drivers/Terminal.hpp>
 #include <Drivers/VideoTerminal.hpp>
 
@@ -240,6 +241,7 @@ void Terminal::OnCsi(char c)
             SetCursorPos(x, y);
             break;
         }
+        case '?': m_DecPrivate = true; return;
         case 'A':
         {
             if (param > y) param = y;
@@ -255,15 +257,25 @@ void Terminal::OnCsi(char c)
             SetCursorPos(x, destY);
             break;
         }
-        case 'B':
+        case 'B': break;
         case 'C':
+        {
+            if (param + x > m_Size.ws_col - 1) param = m_Size.ws_col - 1 - x;
+            SetCursorPos(x + param, y);
+            break;
+        }
         case 'D':
+        {
+            if (param > x) param = x;
+            SetCursorPos(x - param, y);
+            break;
+        }
         case 'E':
         case 'F':
         case 'G':
         case 'H':
-        case 'J':
-        case 'K':
+        case 'J': ED(param); break;
+        case 'K': EL(param); break;
         case 'L':
         case 'M':
         case 'P':
@@ -273,19 +285,45 @@ void Terminal::OnCsi(char c)
         case 'd':
         case 'e':
         case 'f':
-        case 'g':
+        case 'g': break;
         case 'h':
         case 'l':
+            if (m_DecPrivate) m_CursorKeyMode = c == 'h';
+            break;
         case 'm': SGR(param); break;
         case 'n':
+        {
+            TTY* tty = TTY::GetCurrent();
+            if (!tty) break;
+
+            StringView response = "";
+            if (param == 5) response = "\e[0n";
+            else if (param == 6)
+                response = std::format("\e[{};{}", x, y).data();
+
+            auto& termios    = const_cast<termios2&>(tty->GetTermios());
+            auto  oldTermios = termios;
+            m_Lock.Release();
+            termios.c_lflag &= ~(ECHO | ECHOE | ECHOKE | ECHOK | ECHONL);
+            tty->SendBuffer(response.Raw(), response.Size());
+            m_Lock.Acquire();
+            termios = oldTermios;
+            break;
+        }
         case 'q':
         case 'r':
         case 's':
         case 'u':
-        case '`':
+        case '`': break;
+        case ']':
+            LogWarn(
+                "Terminal: Linux Console Private CSI Sequences are currently "
+                "not implemented");
+            break;
     }
 
-    m_State = State::eNormal;
+    m_State      = State::eNormal;
+    m_DecPrivate = false;
 }
 
 void Terminal::Reset()
@@ -334,6 +372,42 @@ bool Terminal::DecSpecialPrint(u8 c)
     return true;
 }
 
+void Terminal::ED(u64 parameter)
+{
+    auto [currentX, currentY] = GetCursorPos();
+    if (parameter == 1)
+    {
+        SetCursorPos(0, currentY);
+        for (usize x = 0; x < currentX; x++) RawPutChar(' ');
+    }
+    else if (parameter == 2)
+    {
+        Clear(0, false);
+        SetCursorPos(0, 0);
+    }
+    else if (parameter == 3)
+    {
+        Clear(0, false);
+        SetCursorPos(0, 0);
+    }
+}
+void Terminal::EL(u64 parameter)
+{
+    auto [x, y]  = GetCursorPos();
+    usize startX = x;
+    usize endX   = m_Size.ws_col;
+    if (parameter == 1)
+    {
+        startX = 0;
+        endX   = x;
+    }
+    else if (parameter == 2) startX = 0;
+
+    SetCursorPos(startX, y);
+
+    for (usize x = startX; x < endX; x++) RawPutChar(' ');
+    if (parameter != 1) SetCursorPos(x, y);
+}
 void Terminal::SGR(u64 parameter)
 {
     AnsiColor color

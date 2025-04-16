@@ -28,12 +28,11 @@ class EchFsINode : public INode
   public:
     EchFsINode(INode* parent, std::string_view name, Filesystem* fs,
                mode_t mode, EchFsDirectoryEntry directoryEntry,
-               usize directoryEntryOffset, usize dirEntryCount)
+               usize directoryEntryOffset)
         : INode(parent, name, fs)
         , m_DirectoryEntry(directoryEntry)
         , m_DirectoryEntryOffset(directoryEntryOffset)
     {
-        m_Stats.st_blocks  = dirEntryCount;
         m_Stats.st_size    = m_Stats.st_blocks * sizeof(EchFsDirectoryEntry);
         m_Stats.st_blksize = sizeof(EchFsDirectoryEntry);
         m_EntryIndex       = m_NextIndex++;

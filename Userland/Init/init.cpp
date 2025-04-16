@@ -32,7 +32,6 @@ int main()
             char* const argv[] = {(char*)path, NULL};
             chdir(getenv("HOME"));
             execvp(path, argv);
-            return EXIT_FAILURE;
         }
 
         int status;

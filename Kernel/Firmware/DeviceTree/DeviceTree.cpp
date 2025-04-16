@@ -9,11 +9,10 @@
 #include <Firmware/DeviceTree/DeviceTree.hpp>
 #include <Library/Logger.hpp>
 
+#include <Prism/Containers/Vector.hpp>
 #include <Prism/Debug/Assertions.hpp>
 
 #include <stdint.h>
-#include <stdio.h>
-#include <string.h>
 
 // FDT token definitions
 #define FDT_BEGIN_NODE 0x1
@@ -24,8 +23,12 @@
 
 namespace DeviceTree
 {
+    static Node*                     s_RootNode = nullptr;
     // Function to convert big-endian to host-endian
-    static uint32_t fdt32_to_cpu(uint32_t x) { return __builtin_bswap32(x); }
+    [[maybe_unused]] static uint32_t fdt32_to_cpu(uint32_t x)
+    {
+        return __builtin_bswap32(x);
+    }
 
     // Function to align offset to 4 bytes
     static uint32_t fdt_align_offset(uint32_t offset)
@@ -47,6 +50,9 @@ namespace DeviceTree
         char* strings_block = (char*)header + header->StringBlockOffset.Load();
         uint32_t             offset = 0;
         [[maybe_unused]] int depth  = 0;
+        Vector<Node*>        stack;
+
+        Node*                root = nullptr;
 
         while (offset < header->StructureBlockLength.Load())
         {
@@ -59,25 +65,32 @@ namespace DeviceTree
             {
                 case FDT_BEGIN_NODE:
                 {
-                    const char* name = struct_block + offset;
+                    std::string_view name = struct_block + offset;
                     Logger::Logf(LogLevel::eTrace, "Node: %s\n", name);
-                    offset += strlen(name) + 1;
+                    offset += name.length() + 1;
                     offset = fdt_align_offset(offset);
                     depth++;
+
+                    auto* newNode = new Node(!root ? "/" : name);
+                    if (!stack.Empty()) stack.Back()->InsertNode(name, newNode);
+                    else root = newNode;
+
+                    stack.PushBack(newNode);
                     break;
                 }
-                case FDT_END_NODE: depth--; break;
+                case FDT_END_NODE: stack.PopBack(); break;
                 case FDT_PROP:
                 {
-                    Property*   prop      = (Property*)(struct_block + offset);
-                    u32         propLen   = prop->m_Length.Load();
-                    const char* prop_name = fdt_get_string(
+                    Property*        prop = (Property*)(struct_block + offset);
+                    u32              propLen   = prop->m_Length.Load();
+                    std::string_view prop_name = fdt_get_string(
                         strings_block, prop->m_NameOffset.Load());
-                    u8* propData = (u8*)(prop + 1);
+                    // u8* propData = (u8*)(prop + 1);
 
                     Logger::Logf(LogLevel::eTrace, "Property: %s (Length: %u)",
                                  prop_name, propLen);
 
+                    /*
                     if (propLen == 4)
                     {
                         u32 value
@@ -95,16 +108,21 @@ namespace DeviceTree
                                         std::format("{:02x}", propData[i]),
                                         false);
                         Logger::Print("\n");
-                    }
+                    }*/
 
                     offset += sizeof(Property) + prop->m_Length.Load();
-                    offset = fdt_align_offset(offset);
+                    offset           = fdt_align_offset(offset);
+
+                    auto newProperty = new Property;
+                    if (!stack.Empty())
+                        stack.Back()->InsertProperty(prop_name, newProperty);
+                    else delete newProperty;
                     break;
                 }
                 case FDT_NOP:
                     // No operation; skip
                     break;
-                case FDT_END: return true;
+                case FDT_END: s_RootNode = root; return true;
                 default:
                     Logger::Logf(LogLevel::eTrace, "Unknown token: 0x%x\n",
                                  token);
@@ -112,6 +130,7 @@ namespace DeviceTree
             }
         }
 
+        s_RootNode = root;
         return true;
     }
     bool ParseFDT(FDT_Header* header);
@@ -135,6 +154,10 @@ namespace DeviceTree
             return false;
         }
 
-        return ParseFDT(header);
+        auto success = ParseFDT(header);
+        LogInfo("FDT: Finished parsing");
+        if (success) s_RootNode->Print();
+
+        return success;
     }
 } // namespace DeviceTree

@@ -83,6 +83,12 @@ sources:
        - args: ['cp',
            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
            '@THIS_SOURCE_DIR@/build-aux/']
+  - name: gnuconfig
+    subdir: 'sources'
+    git: 'https://git.savannah.gnu.org/git/config.git'
+    branch: 'master'
+    commit: '63acb96f92473ceb5e21d873d7c0aee266b3d6d3'
+    version: '20230121'
 
 
   - name: llvm

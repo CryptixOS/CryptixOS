@@ -8,9 +8,12 @@
 #pragma once
 
 #include <Prism/Core/Types.hpp>
+#include <Prism/String/StringView.hpp>
 
 #include <uacpi/resources.h>
 #include <uacpi/utilities.h>
+
+#include <unordered_map>
 
 #define CONCAT(a, b)       CONCAT_INNER(a, b)
 #define CONCAT_INNER(a, b) a##b
@@ -22,11 +25,12 @@ struct [[gnu::packed, gnu::aligned(8)]] Module
     bool        Initialized;
     bool        Failed;
 
-    bool        (*Initialize)();
-    void        (*Terminate)();
+    bool (*Initialize)();
+    void (*Terminate)();
 };
 
-bool LoadModule(Module* drv);
+std::unordered_map<StringView, Module*>& GetModules();
+bool                                     LoadModule(Module* drv);
 
 #define MODULE_SECTION      ".modules"
 #define MODULE_DATA_SECTION ".modules.data"

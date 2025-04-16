@@ -23,16 +23,16 @@ constexpr usize                  PTE_GLOBAL     = Bit(8);
 constexpr usize                  PTE_PATLG      = Bit(12);
 constexpr usize                  PTE_NOEXEC     = Bit(63ull);
 
-struct PageTable
+struct [[gnu::packed]] PageTable
 {
     PageTableEntry entries[512];
-} __attribute__((packed));
-static bool gib1Pages = false;
+};
+static bool s_1GibPages = false;
 
 namespace Arch::VMM
 {
     constexpr uintptr_t PTE_ADDRESS_MASK = 0x000ffffffffff000;
-    uintptr_t defaultPteFlags   = PTE_PRESENT | PTE_WRITEABLE | PTE_USER_SUPER;
+    uintptr_t g_DefaultPteFlags = PTE_PRESENT | PTE_WRITEABLE | PTE_USER_SUPER;
 
     // 4KiB
     constexpr usize PAGE_SIZE   = 0x1000;
@@ -61,7 +61,7 @@ namespace Arch::VMM
     {
         // TODO(v1tr10l7): Check support for 1gib pages
 
-        gib1Pages = true;
+        s_1GibPages = true;
     }
 
     void* AllocatePageTable() { return new PageTable; }
@@ -118,7 +118,7 @@ namespace Arch::VMM
         else if (attribs & PageAttributes::eUncacheable)
             pteFlags |= patbit | PTE_PCD | PTE_PWT;
 
-        return pteFlags | PTE_USER_SUPER;
+        return pteFlags;
     }
 
     uintptr_t GetAddressMask() { return PTE_ADDRESS_MASK; }
@@ -150,7 +150,7 @@ PageTableEntry* PageMap::Virt2Pte(PageTable* topLevel, uintptr_t virt,
     PageTable* pml4
         = BootInfo::GetPagingMode() == LIMINE_PAGING_MODE_X86_64_5LVL
             ? static_cast<PageTable*>(
-                GetNextLevel(topLevel->entries[pml5Entry], allocate))
+                  GetNextLevel(topLevel->entries[pml5Entry], allocate))
             : topLevel;
     if (!pml4) return nullptr;
 
@@ -191,7 +191,7 @@ bool PageMap::InternalMap(uintptr_t virt, uintptr_t phys, PageAttributes flags)
 {
 
     auto pageSize = GetPageSize(flags);
-    if (pageSize == LLPAGE_SIZE && !gib1Pages)
+    if (pageSize == LLPAGE_SIZE && !s_1GibPages)
     {
         flags &= ~PageAttributes::eLLPage;
         flags |= PageAttributes::eLPage;
@@ -210,7 +210,7 @@ bool PageMap::InternalMap(uintptr_t virt, uintptr_t phys, PageAttributes flags)
 
     pmlEntry->Clear();
     pmlEntry->SetAddress(phys);
-    pmlEntry->SetFlags(ToNativeFlags(flags) | PTE_USER_SUPER, true);
+    pmlEntry->SetFlags(ToNativeFlags(flags), true);
     return true;
 }
 
@@ -232,7 +232,7 @@ bool PageMap::InternalUnmap(uintptr_t virt, PageAttributes flags)
     };
 
     auto pageSize = GetPageSize(flags);
-    if (pageSize == LLPAGE_SIZE && !gib1Pages)
+    if (pageSize == LLPAGE_SIZE && !s_1GibPages)
     {
         flags &= ~PageAttributes::eLLPage;
         flags |= PageAttributes::eLPage;

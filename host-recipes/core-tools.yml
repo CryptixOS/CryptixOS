@@ -94,6 +94,23 @@ tools:
     install:
       - args: ['make', 'install']
 
+  - name: host-autoconf-v2.71
+    architecture: noarch
+    source:
+      name: autoconf-v2.71
+      subdir: 'sources'
+      url: 'https://ftp.gnu.org/gnu/autoconf/autoconf-2.71.tar.xz'
+      format: 'tar.xz'
+      checksum: blake2b:7fd4b98b4cfff10720e8da6ee91045637991643b50fcb3e47a0ecfcc01600f7b7b36fd1c0a5f08b68a418f1bdbd8d5a98de1008157595dd37cc3a31facb61416
+      extract_path: 'autoconf-2.71'
+      version: '2.71'
+    configure:
+      - args: ['@THIS_SOURCE_DIR@/configure', '--prefix=@PREFIX@']
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
   - name: host-automake-v1.11
     architecture: noarch
     source:
@@ -142,6 +159,35 @@ tools:
       - args: ['make', 'install']
       # Stop aclocal from complaining.
       - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.15', '@PREFIX@/share/aclocal']
+  - name: host-automake-v1.16
+    architecture: noarch
+    source:
+      name: automake-v1.16
+      subdir: 'sources'
+      git: 'https://git.savannah.gnu.org/git/automake.git'
+      tag: 'v1.16.5'
+      version: '1.16.5'
+      sources_required: ['gnuconfig']
+      tools_required:
+       - host-autoconf-v2.71
+      regenerate:
+       - args: ['cp', '@SOURCE_ROOT@/sources/gnuconfig/config.sub', '@THIS_SOURCE_DIR@/lib/']
+       - args: ['cp', '@SOURCE_ROOT@/sources/gnuconfig/config.guess', '@THIS_SOURCE_DIR@/lib/']
+       - args: ['./bootstrap']
+    tools_required:
+      - host-autoconf-v2.71
+    revision: 2
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+        - 'MAKEINFO=/bin/true'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+      # Stop aclocal from complaining.
+      - args: ['ln', '-sf', '@PREFIX@/share/aclocal-1.16', '@PREFIX@/share/aclocal']
 
   - name: host-bison
     architecture: noarch
@@ -158,6 +204,40 @@ tools:
       - args: ['make', '-j@PARALLELISM@']
     install:
       - args: ['make', 'install']
+
+  - name: host-cargo
+    stability_level: 'broken' # Rust updates?
+    architecture: noarch
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/rust-lang/cargo.git'
+      tag: '0.73.1'
+      version: '0.73.1'
+    tools_required:
+      - tool: host-rust
+        recursive: true
+      - tool: system-gcc # GCC is used for linking
+        recursive: true
+    sources_required:
+      # This cargo runs on the host, so we don't actually need any patches here. We just
+      # add the sources used by cargo so that the dependency resolver doesn't complain.
+      - rust-patched-libs
+      # Cargo requires cargo to build, so we download a binary that we can use temporarily
+      - host-bootstrap-cargo
+    compile:
+      - args:
+        - '@THIS_SOURCE_DIR@/../host-bootstrap-cargo/cargo/bin/cargo'
+        - 'install'
+        - '--target'
+        - 'x86_64-unknown-linux-gnu'
+        - '--target-dir'
+        - '@THIS_BUILD_DIR@'
+        - '--path'
+        - '@THIS_SOURCE_DIR@'
+        - '-j@PARALLELISM@'
+        - '--root'
+        - '@PREFIX@'
+        isolate_network: false
 
   - name: host-cmake
     architecture: noarch
@@ -207,6 +287,18 @@ tools:
         - 'CFLAGS=-Wno-implicit-function-declaration'
     compile:
       - args: 'make'
+    install:
+      - args: ['make', 'install']
+
+  - name: host-libffi
+    architecture: '@OPTION:arch@'
+    from_source: libffi
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
     install:
       - args: ['make', 'install']
 
@@ -267,7 +359,7 @@ tools:
 
         - '@THIS_SOURCE_DIR@/llvm'
     compile:
-      - args: ['ninja']
+      - args: ['ninja', '-j5']
       # Build on a single CPU to prevent OOM on smaller systems.
       #- args: ['ninja', '-j1']
     install:
@@ -294,6 +386,70 @@ tools:
       - args: ['make', '-j@PARALLELISM@']
     install:
       - args: ['make', 'install']
+
+  - name: host-python
+    labels: [aarch64, riscv64]
+    architecture: noarch
+    from_source: python
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
+  - name: host-rust
+    stability_level: 'broken' # LLVM Bumped?
+    architecture: noarch
+    from_source: rust
+    sources_required:
+      - rust-patched-libs
+    tools_required:
+      - host-llvm-toolchain
+      - host-python
+      - host-libffi
+    revision: 2
+    compile:
+      - args: |
+            cat << EOF > config.toml
+            change-id = 102579
+
+            [llvm]
+            targets = "X86"
+            download-ci-llvm = false
+
+            [build]
+            target = ["x86_64-unknown-cryptix-mlibc", "x86_64-unknown-linux-gnu"]
+            build-dir = "@THIS_BUILD_DIR@"
+            docs = false
+
+            [install]
+            prefix = "@PREFIX@"
+            sysconfdir = "etc"
+
+            [rust]
+            codegen-tests = false
+            deny-warnings = false
+
+            [target.x86_64-unknown-linux-gnu]
+            llvm-config = "@BUILD_ROOT@/tools/host-llvm-toolchain/bin/llvm-config"
+
+            [target.x86_64-unknown-cryptix-mlibc]
+            llvm-config = "@BUILD_ROOT@/tools/host-llvm-toolchain/bin/llvm-config"
+            EOF
+      - args: ['python3', '@THIS_SOURCE_DIR@/x.py', 'build', '--stage', '2', '-j', '@PARALLELISM@']
+        cargo_home: false
+        environ:
+          CARGO_HOME: '@THIS_BUILD_DIR@/cargo-home'
+        isolate_network: false
+    install:
+      - args: ['python3', '@THIS_SOURCE_DIR@/x.py', 'install', '-j', '@PARALLELISM@']
+        cargo_home: false
+        environ:
+          CARGO_HOME: '@THIS_BUILD_DIR@/cargo-home'
+        isolate_network: false
 
   - name: system-gcc
     architecture: '@OPTION:arch@'

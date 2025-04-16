@@ -36,8 +36,9 @@ static uintptr_t prepareStack(uintptr_t _stack, uintptr_t sp,
                               std::vector<std::string_view> envp,
                               ELF::Image&                   image)
 {
-    auto stack = reinterpret_cast<uintptr_t*>(_stack);
+    auto                           stack = reinterpret_cast<uintptr_t*>(_stack);
 
+    CPU::UserMemoryProtectionGuard guard;
     for (auto env : envp)
     {
         stack = reinterpret_cast<uintptr_t*>(reinterpret_cast<char*>(stack)

@@ -7,13 +7,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <cryptix/reboot.hpp>
+#include <cryptix/syscall.h>
 #include <linux/reboot.h>
 #include <sys/reboot.h>
 
+using namespace cryptix;
 int main()
 {
     printf("The system will reboot...\n");
-    reboot(LINUX_REBOOT_CMD_RESTART);
+    auto ret = Syscall(SYS_REBOOT, RebootCmd::eRestart);
+    // reboot(LINUX_REBOOT_CMD_RESTART);
 
     return EXIT_FAILURE;
 }

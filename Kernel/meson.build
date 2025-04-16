@@ -49,6 +49,7 @@ srcs += files(
 
   'Firmware/SMBIOS/SMBIOS.cpp',
 
+  'Memory/AddressSpace.cpp',
   'Memory/KernelHeap.cpp',
   'Memory/PMM.cpp',
   'Memory/VMM.cpp',

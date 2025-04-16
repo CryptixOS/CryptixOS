@@ -9,12 +9,10 @@
 #include <atomic>
 #include <system_error>
 
-#define _HandleError(error_code, error_message) Panic(error_message);
-#include <Common.hpp>
-
 namespace Arch
 {
     void Pause();
+    [[noreturn]] void panic(const char*);
 }
 
 namespace std
@@ -141,27 +139,17 @@ namespace std
 
         void lock()
         {
-            if (!_mutex)
-                _HandleError(std::errc::operation_not_permitted,
-                             "std::unique_lock::lock() - no associated mutex!");
-            if (owns_lock())
-                _HandleError(
-                    std::errc::resource_deadlock_would_occur,
-                    "std::unique_lock::lock() - mutex already locked!");
+            assert(_mutex);
+            assert (!owns_lock());
+
             _mutex->lock();
             _locked = true;
         }
 
         bool try_lock()
         {
-            if (!_mutex)
-                _HandleError(
-                    std::errc::operation_not_permitted,
-                    "std::unique_lock::try_lock() - no associated mutex!");
-            if (owns_lock())
-                _HandleError(
-                    std::errc::resource_deadlock_would_occur,
-                    "std::unique_lock::try_lock() - mutex already locked!");
+            assert(_mutex);
+            assert (!owns_lock());
 
             auto _locked = _mutex->try_lock();
             return _locked;
@@ -176,14 +164,8 @@ namespace std
         //            timeout_time);
         void unlock()
         {
-            if (!_mutex)
-                _HandleError(
-                    std::errc::operation_not_permitted,
-                    "std::unique_lock::unlock() - no associated mutex!");
-            if (!owns_lock())
-                _HandleError(
-                    std::errc::operation_not_permitted,
-                    "std::unique_lock::unlock() - mutex already unlocked!");
+            assert(_mutex);
+            assert (owns_lock());
 
             _mutex->unlock();
             _locked = false;
