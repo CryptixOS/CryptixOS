@@ -79,6 +79,11 @@ namespace Syscall
 
             default: return_err(-1, EINVAL);
         }
+#else
+        CtosUnused(ARCH_SET_GS);
+        CtosUnused(ARCH_SET_FS);
+        CtosUnused(ARCH_GET_FS);
+        CtosUnused(ARCH_GET_GS);
 #endif
 
         return 0;
@@ -96,9 +101,9 @@ namespace Syscall
         RegisterSyscall2(ID::eFStat, API::VFS::FStat);
         RegisterSyscall2(ID::eLStat, API::VFS::LStat);
         RegisterSyscall(ID::eLSeek, VFS::SysLSeek);
-        RegisterSyscall(ID::eMMap, SysMMap);
-        RegisterSyscall(ID::eMProtect, MM::SysMProtect);
-        RegisterSyscall(ID::eMUnMap, MM::SysMUnMap);
+        RegisterSyscall2(ID::eMMap, API::MM::MMap);
+        RegisterSyscall2(ID::eMProtect, API::MM::MProtect);
+        RegisterSyscall2(ID::eMUnMap, API::MM::MUnMap);
         RegisterSyscall2(ID::eSigProcMask, API::Process::SigProcMask);
         RegisterSyscall(ID::eIoCtl, VFS::SysIoCtl);
         RegisterSyscall(ID::eAccess, VFS::SysAccess);
