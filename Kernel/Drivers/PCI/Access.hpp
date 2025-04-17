@@ -6,7 +6,10 @@
  */
 #pragma once
 
+#include <Common.hpp>
+
 #include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Assertions.hpp>
 #include <Prism/Memory/Pointer.hpp>
 
 #include <unordered_map>
