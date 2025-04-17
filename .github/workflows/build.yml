@@ -31,7 +31,7 @@ jobs:
       - name: Create /usr/sbin/init
         run: mkdir -p build-sysroot/system-root/usr/sbin/ && touch sysroot/usr/sbin/init
       - name: Configure Project
-        run: ./Meta/setup.sh x86_64 {{matrix.build-configuration}} 
+        run: ./Meta/setup.sh x86_64 ${{ matrix.build-configuration }} 
           && (cd subprojects/fmt-10.2.0/ && patch -p 1 < ../../Meta/fmt-10.2.0.patch)
-          && ./Meta/build.sh {{matrix.build-configuration}} x86_64
+          && ./Meta/build.sh ${{ matrix.build-configuration }} x86_64
     
