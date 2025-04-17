@@ -116,21 +116,6 @@ namespace API::MM
 namespace Syscall::MM
 {
     ErrorOr<intptr_t> SysMProtect(Arguments& args) { return 0; }
-    ErrorOr<i32>      SysMUnMap(Arguments& args)
-    {
-        return 0;
-        Pointer    addr    = args.Get<uintptr_t>(0);
-        usize      length  = args.Get<usize>(1);
-
-        Process*   current = Process::GetCurrent();
-        ScopedLock guard(current->m_Lock);
-
-        Pointer    phys = 0;
-
-        usize      pageCount
-            = Math::AlignUp(length, PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
-        PMM::FreePages(phys.ToHigherHalf<uintptr_t>(), pageCount);
-        return 0;
-    }
+    ErrorOr<i32>      SysMUnMap(Arguments& args) { return 0; }
 
 }; // namespace Syscall::MM
