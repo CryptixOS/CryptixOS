@@ -1,5 +1,6 @@
 # CryptixOS 
 
+<img src="./Meta/images/logo.svg">
 <img src="./Meta/images/screenshot.png">
 
 ## Description
