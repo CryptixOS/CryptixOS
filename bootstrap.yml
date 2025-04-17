@@ -38,7 +38,7 @@ packages:
       - coreutils
       - file
       - init
-      - iputils
+      #- iputils
       - mlibc
       - which
       - shell-apps
