@@ -201,5 +201,5 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
     Syscall::InstallAll();
     Scheduler::PrepareAP(true);
 
-    std::unreachable();
+    AssertNotReached();
 }
