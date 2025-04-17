@@ -24,7 +24,7 @@ imports:
   - file: recipes/text-editors.yml
 
   - file: source-recipes/core.yml
-  - file: source-recipes/rust-libs.yml
+  #- file: source-recipes/rust-libs.yml
 
 packages:
   - name: base
