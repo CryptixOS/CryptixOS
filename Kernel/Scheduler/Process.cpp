@@ -118,15 +118,16 @@ Thread* Process::CreateThread(uintptr_t                      rip,
 bool Process::ValidateAddress(Pointer address, i32 accessMode, usize size)
 {
     // TODO(v1tr10l7): Validate access mode
-    for (const auto& region : m_AddressSpace)
+    for (const auto& region : m_VirtualRegions)
     {
-        if (region.Contains(address)) return true;
-        if (!region.Contains(address) || !region.Contains(address.Offset(size)))
+        if (region->Contains(address)) return true;
+        if (!region->Contains(address)
+            || !region->Contains(address.Offset(size)))
             continue;
 
-        if (accessMode & PROT_READ && !region.IsReadable()) return false;
-        if (accessMode & PROT_WRITE && !region.IsWriteable()) return false;
-        if (accessMode & PROT_EXEC && !region.IsExecutable()) return false;
+        if (accessMode & PROT_READ && !region->IsReadable()) return false;
+        if (accessMode & PROT_WRITE && !region->IsWriteable()) return false;
+        if (accessMode & PROT_EXEC && !region->IsExecutable()) return false;
         return true;
     }
     return false;
@@ -268,12 +269,12 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
 
     static ELF::Image program, ld;
     if (!program.Load(shellPath.empty() ? path : argvArr[0], PageMap,
-                      m_AddressSpace))
+                      m_VirtualRegions))
         return Error(ENOEXEC);
 
     std::string_view ldPath = program.GetLdPath();
     if (!ldPath.empty())
-        Assert(ld.Load(ldPath, PageMap, m_AddressSpace, 0x40000000));
+        Assert(ld.Load(ldPath, PageMap, m_VirtualRegions, 0x40000000));
     Thread* currentThread = CPU::GetCurrentThread();
     currentThread->SetState(ThreadState::eExited);
 
@@ -394,22 +395,28 @@ ErrorOr<Process*> Process::Fork()
     newProcess->m_Umask = m_Umask;
     m_Children.push_back(newProcess);
 
-    for (auto& range : m_AddressSpace)
+    for (const auto& range : m_VirtualRegions)
     {
         usize pageCount
-            = Math::AlignUp(range.GetSize(), PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
+            = Math::AlignUp(range->GetSize(), PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
 
         uintptr_t physicalSpace = PMM::CallocatePages<uintptr_t>(pageCount);
         Assert(physicalSpace);
 
         std::memcpy(Pointer(physicalSpace).ToHigherHalf<void*>(),
-                    range.GetPhysicalBase().ToHigherHalf<void*>(),
-                    range.GetSize());
-        pageMap->MapRange(range.GetVirtualBase(), physicalSpace,
-                          range.GetSize(),
+                    range->GetPhysicalBase().ToHigherHalf<void*>(),
+                    range->GetSize());
+        pageMap->MapRange(range->GetVirtualBase(), physicalSpace,
+                          range->GetSize(),
                           PageAttributes::eRWXU | PageAttributes::eWriteBack);
-        newProcess->m_AddressSpace.EmplaceBack(
-            physicalSpace, range.GetVirtualBase(), range.GetSize());
+
+        auto newRegion = range;
+        newRegion->SetPhysicalBase(physicalSpace);
+        ScopedLock guard(m_Parent->m_Lock);
+        newProcess->m_VirtualRegions.Insert(range->GetVirtualBase(), newRegion);
+
+        // newProcess->m_VirtualRegions.AllocateRegion(range->GetVirtualBase(),
+        //                                             range->GetSize());
 
         // TODO(v1tr10l7): Free regions;
     }

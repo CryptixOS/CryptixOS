@@ -12,6 +12,8 @@
 #include <Memory/AddressRange.hpp>
 
 class FileDescriptor;
+enum class PageAttributes : isize;
+
 namespace VirtualMemoryManager
 {
     enum class Access : u8
@@ -20,6 +22,7 @@ namespace VirtualMemoryManager
         eRead             = 0x01,
         eWrite            = 0x02,
         eExecute          = 0x04,
+        eUser             = 0x08,
         eReadOnly         = eRead,
         eReadWrite        = eRead | eWrite,
         eReadWriteExecute = eReadWrite | eExecute,
@@ -78,6 +81,8 @@ namespace VirtualMemoryManager
 
         inline usize GetSize() const { return m_VirtualRange.GetSize(); }
         inline FileDescriptor* GetFileDescriptor() const { return m_Fd; }
+
+        PageAttributes         GetPageAttributes() const;
 
         inline void SetPhysicalBase(Pointer phys) { m_PhysicalBase = phys; }
         inline void SetProt(Access access, i32 prot)

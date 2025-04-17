@@ -170,7 +170,6 @@ class Process
     mode_t                m_Umask    = 0;
 
     FileDescriptorTable   m_FdTable;
-    Vector<VMM::Region>   m_AddressSpace{};
     AddressSpace          m_VirtualRegions;
 
     uintptr_t             m_UserStackTop = 0x70000000000;

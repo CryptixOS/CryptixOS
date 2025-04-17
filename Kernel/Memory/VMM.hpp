@@ -10,6 +10,7 @@
 
 #include <Memory/PMM.hpp>
 #include <Memory/PageFault.hpp>
+#include <Memory/Region.hpp>
 
 #include <Prism/Utility/Math.hpp>
 
@@ -296,6 +297,15 @@ class PageMap
             }
         }
         return true;
+    }
+    bool MapRegion(const Region* region)
+    {
+        const auto           virt  = region->GetVirtualBase();
+        const auto           phys  = region->GetPhysicalBase();
+        const usize          size  = region->GetSize();
+
+        const PageAttributes flags = region->GetPageAttributes();
+        return MapRange(virt, phys, size, flags);
     }
 
     bool UnmapRange(uintptr_t virt, usize size,

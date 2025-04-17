@@ -5,15 +5,15 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Scheduler/Thread.hpp>
-
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptGuard.hpp>
 
 #include <Memory/PMM.hpp>
 
 #include <Prism/Utility/Math.hpp>
+
 #include <Scheduler/Process.hpp>
+#include <Scheduler/Thread.hpp>
 
 Thread::Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn)
     : runningOn(runOn)
@@ -119,8 +119,10 @@ Thread::Thread(Process* parent, uintptr_t pc,
         Assert(m_Parent->PageMap->MapRange(
             vustack, pstack, CPU::USER_STACK_SIZE,
             PageAttributes::eRWXU | PageAttributes::eWriteBack));
-        m_Parent->m_AddressSpace.EmplaceBack(pstack, vustack,
-                                             CPU::USER_STACK_SIZE);
+
+        auto       region = new Region(pstack, vustack, CPU::USER_STACK_SIZE);
+        ScopedLock guard(m_Parent->m_Lock);
+        m_Parent->m_VirtualRegions.Insert(region->GetVirtualBase(), region);
         m_StackVirt              = vustack;
 
         m_Parent->m_UserStackTop = vustack - PMM::PAGE_SIZE;

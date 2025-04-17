@@ -13,6 +13,7 @@
 #include <Memory/VMM.hpp>
 
 #include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Containers/Vector.hpp>
 #include <Prism/Memory/Pointer.hpp>
 
 class AddressSpace
@@ -21,17 +22,31 @@ class AddressSpace
     AddressSpace();
     ~AddressSpace();
 
-    ErrorOr<Region*> AllocateRegion(Pointer requestedAddress, usize size);
+    bool            IsAvailable(Pointer base, usize length) const;
 
-    inline PageMap*  GetPageMap() const { return m_PageMap; }
+    void            Insert(Pointer, Region* region);
+    void            Erase(Pointer);
+
+    Region*         AllocateRegion(Pointer requestedAddress, usize size);
+    Region*         AllocateFixed(Pointer requestedAddress, usize size);
+
+    auto            begin() { return m_Regions.begin(); }
+    auto            end() { return m_Regions.end(); }
+
+    // auto             begin() { return m_RegionTree.begin(); }
+    // auto             end() { return m_RegionTree.end(); }
+
+    inline PageMap* GetPageMap() const { return m_PageMap; }
+
+    PageMap*        m_PageMap = nullptr;
+    // RedBlackTree<uintptr_t, Region*> m_RegionTree;
+    Vector<Region*> m_Regions;
 
   private:
-    PageMap*                         m_PageMap = nullptr;
-    RedBlackTree<uintptr_t, Region*> m_RegionTree;
+    Spinlock                 m_Lock;
+    constexpr static Pointer USERSPACE_VIRT_BASE{0x100000zu};
 
-    constexpr static Pointer         USERSPACE_VIRT_BASE{0x100000zu};
-
-    AddressRange                     m_TotalRange
+    AddressRange             m_TotalRange
         = {USERSPACE_VIRT_BASE,
            BootInfo::GetHHDMOffset() - USERSPACE_VIRT_BASE.Raw() - 0x1000000zu};
 };

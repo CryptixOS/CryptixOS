@@ -92,7 +92,7 @@ namespace ELF
         return true;
     }
     bool Image::Load(PathView path, PageMap* pageMap,
-                     Vector<VMM::Region>& addressSpace, uintptr_t loadBase)
+                     AddressSpace& addressSpace, uintptr_t loadBase)
     {
         INode* file
             = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path, true));
@@ -126,8 +126,10 @@ namespace ELF
                     Assert(pageMap->MapRange(
                         current.VirtualAddress + loadBase, phys, size,
                         PageAttributes::eRWXU | PageAttributes::eWriteBack));
-                    addressSpace.PushBack(
-                        {phys, current.VirtualAddress + loadBase, size});
+
+                    auto region = new Region(
+                        phys, current.VirtualAddress + loadBase, size);
+                    addressSpace.Insert(region->GetVirtualBase(), region);
 
                     Read(ToHigherHalfAddress<void*>(phys + misalign),
                          current.Offset, current.SegmentSizeInFile);
@@ -186,7 +188,7 @@ namespace ELF
                                 std::strlen(MODULE_SECTION))
                        == 0)
             {
-                StringView modName
+                [[maybe_unused]] StringView modName
                     = stringTable + section->Name + strlen(MODULE_SECTION) + 1;
 
                 for (auto offset = section->Address;

@@ -8,6 +8,7 @@
 
 #include <Library/Stacktrace.hpp>
 
+#include <Memory/AddressSpace.hpp>
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
 
@@ -272,10 +273,10 @@ namespace ELF
     class Image
     {
       public:
-        bool        LoadFromMemory(u8* data, usize size);
-        bool        Load(PathView path, PageMap* pageMap,
-                         Vector<VMM::Region>& addressSpace, uintptr_t loadBase = 0);
-        bool        Load(Pointer image, usize size);
+        bool LoadFromMemory(u8* data, usize size);
+        bool Load(PathView path, PageMap* pageMap, AddressSpace& addressSpace,
+                  uintptr_t loadBase = 0);
+        bool Load(Pointer image, usize size);
 
         static bool LoadModules(const u64 sectionCount, SectionHeader* sections,
                                 char* stringTable);

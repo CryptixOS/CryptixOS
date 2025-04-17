@@ -52,6 +52,7 @@ srcs += files(
   'Memory/AddressSpace.cpp',
   'Memory/KernelHeap.cpp',
   'Memory/PMM.cpp',
+  'Memory/Region.cpp',
   'Memory/VMM.cpp',
 
   'Network/NetworkAdapter.cpp',
