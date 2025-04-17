@@ -17,7 +17,7 @@ imports:
   #- file: recipes/games.yml
   - file: recipes/misc.yml
   - file: recipes/misc-apps.yml
-  - file: recipes/net-utils.yml
+  #- file: recipes/net-utils.yml
   - file: recipes/shell-apps.yml
   - file: recipes/sys-apps.yml
   - file: recipes/sys-libs.yml
