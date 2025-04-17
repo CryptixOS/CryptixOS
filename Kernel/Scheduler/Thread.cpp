@@ -112,33 +112,38 @@ Thread::Thread(Process* parent, uintptr_t pc,
 
     auto mapUserStack = [this]() -> std::pair<uintptr_t, uintptr_t>
     {
-        uintptr_t pstack  = PMM::CallocatePages<uintptr_t>(CPU::USER_STACK_SIZE
-                                                           / PMM::PAGE_SIZE);
-        uintptr_t vustack = m_Parent->m_UserStackTop - CPU::USER_STACK_SIZE;
+        Pointer pstack  = PMM::CallocatePages<uintptr_t>(CPU::USER_STACK_SIZE
+                                                         / PMM::PAGE_SIZE);
+        Pointer vustack = m_Parent->m_UserStackTop - CPU::USER_STACK_SIZE;
 
         Assert(m_Parent->PageMap->MapRange(
             vustack, pstack, CPU::USER_STACK_SIZE,
             PageAttributes::eRWXU | PageAttributes::eWriteBack));
 
-        auto       region = new Region(pstack, vustack, CPU::USER_STACK_SIZE);
-        ScopedLock guard(m_Parent->m_Lock);
-        m_Parent->m_VirtualRegions.Insert(region->GetVirtualBase(), region);
-        m_StackVirt              = vustack;
+        using VirtualMemoryManager::Access;
+        auto newRegion = new Region(pstack, vustack, CPU::USER_STACK_SIZE);
+        newRegion->SetProt(Access::eReadWriteExecute | Access::eUser,
+                           PROT_READ | PROT_WRITE | PROT_EXEC);
+        m_Parent->m_AddressSpace.Insert(vustack, newRegion);
 
-        m_Parent->m_UserStackTop = vustack - PMM::PAGE_SIZE;
+        m_StackVirt              = vustack;
+        m_Parent->m_UserStackTop = vustack.Raw() - PMM::PAGE_SIZE;
 
         m_Stacks.push_back(std::make_pair(pstack, CPU::USER_STACK_SIZE));
-        return {ToHigherHalfAddress<uintptr_t>(pstack) + CPU::USER_STACK_SIZE,
-                vustack + CPU::USER_STACK_SIZE};
+        return {pstack.ToHigherHalf<Pointer>().Offset(CPU::USER_STACK_SIZE),
+                vustack.Offset(CPU::USER_STACK_SIZE)};
+
+        auto region = m_Parent->GetAddressSpace().AllocateFixed(
+            vustack, CPU::USER_STACK_SIZE);
+        region->SetPhysicalBase(pstack);
+        region->SetProt(Access::eReadWriteExecute | Access::eUser,
+                        PROT_READ | PROT_WRITE | PROT_EXEC);
+        m_Parent->PageMap->MapRegion(region);
     };
 
     auto [vstack, vustack] = mapUserStack();
 
-    // argv.push_back("/usr/sbin/init");
-    // envp.push_back("TERM=linux");
-
     this->stack            = prepareStack(vstack, vustack, argv, envp, program);
-
     CPU::PrepareThread(this, pc, 0);
 }
 

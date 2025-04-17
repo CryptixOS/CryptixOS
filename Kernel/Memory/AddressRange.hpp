@@ -20,15 +20,14 @@ class AddressRange final
     {
     }
 
-    inline PM::Pointer GetBase() const { return m_Base; }
-    inline usize       GetSize() const { return m_Size; }
+    inline Pointer GetBase() const { return m_Base; }
+    inline usize   GetSize() const { return m_Size; }
 
-    inline             operator bool() { return m_Base.operator bool(); }
+    inline         operator bool() { return m_Base.operator bool(); }
 
-    inline bool        Contains(PM::Pointer address) const
+    inline bool    Contains(Pointer address) const
     {
-        return address >= m_Base
-            && address < m_Base.Offset<PM::Pointer>(m_Size);
+        return address >= m_Base && address < m_Base.Offset<Pointer>(m_Size);
     }
 
   private:

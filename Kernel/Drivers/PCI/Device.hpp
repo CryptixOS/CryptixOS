@@ -10,10 +10,10 @@
 #include <Drivers/PCI/Access.hpp>
 #include <Drivers/PCI/Definitions.hpp>
 
+#include <Library/Spinlock.hpp>
 #include <Prism/Containers/Bitmap.hpp>
 #include <Prism/Core/Types.hpp>
 #include <Prism/Delegate.hpp>
-#include <Library/Spinlock.hpp>
 
 #include <span>
 
@@ -201,9 +201,9 @@ namespace PCI
             return Read<u16>(RegisterOffset::eVendorID);
         }
 
-        usize              GetInterruptLine();
+        usize          GetInterruptLine();
 
-        inline PM::Pointer GetBarAddress(u8 index) const
+        inline Pointer GetBarAddress(u8 index) const
         {
             u32 offset = index * 4 + std::to_underlying(RegisterOffset::eBar0);
             return Read<u16>(static_cast<RegisterOffset>(offset));
@@ -262,10 +262,10 @@ namespace PCI
         std::span<DeviceID> MatchIDs;
 
         using ProbeFn
-            = ErrorOr<void>   (*)(DeviceAddress& address, const DeviceID& id);
+            = ErrorOr<void> (*)(DeviceAddress& address, const DeviceID& id);
         using RemoveFn = void (*)(Device& device);
 
-        ProbeFn               Probe;
-        RemoveFn              Remove;
+        ProbeFn  Probe;
+        RemoveFn Remove;
     };
 }; // namespace PCI

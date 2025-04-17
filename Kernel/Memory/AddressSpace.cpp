@@ -9,48 +9,47 @@
 AddressSpace::AddressSpace() {}
 AddressSpace::~AddressSpace()
 {
-    for (const auto& region : m_Regions) delete region;
+    for (const auto& [base, region] : m_Regions) delete region;
+    m_Regions.clear();
+
     // for (const auto& [base, region] : m_RegionTree) delete region;
-    m_Regions.Clear();
     // m_RegionTree.Clear();
 }
 
 bool AddressSpace::IsAvailable(Pointer base, usize length) const
 {
-    for (const auto* region : *const_cast<AddressSpace*>(this))
+    return true;
+    for (const auto& [base, region] : *const_cast<AddressSpace*>(this))
     {
         auto range = region->GetVirtualRange();
-        if (range.Contains(base) || range.Contains(base.Offset(length - 1)))
+        if (range.Contains(base) /*|| range.Contains(base.Offset(length - 1))*/)
             return false;
     }
 
     return true;
 }
-void AddressSpace::Insert(Pointer, Region* region)
+void AddressSpace::Insert(Pointer base, Region* region)
 {
-    m_Regions.PushBack(region);
+    m_Regions[base.Raw()] = region;
 }
 void AddressSpace::Erase(Pointer base)
 {
     ScopedLock guard(m_Lock);
-    auto       it = begin();
-    for (it = begin(); it != end(); it++)
-        if ((*it)->GetVirtualBase() == base) break;
+    auto       it = m_Regions.find(base.Raw());
 
-    if (it != end())
+    if (it != m_Regions.end())
     {
-        delete *it;
-        m_Regions.Erase(it);
+        delete it->second;
+        m_Regions.erase(it);
     }
 }
 
-Region* AddressSpace::AllocateRegion(Pointer requestedAddress, usize size)
+Region* AddressSpace::AllocateRegion(usize size)
 {
     ScopedLock guard(m_Lock);
 
-    if (requestedAddress == nullptr)
-        requestedAddress = VMM::AllocateSpace(size, 0);
-    auto region = new Region(0, requestedAddress, size);
+    auto       virt   = VMM::AllocateSpace(size, 0, true);
+    auto       region = new Region(0, virt, size);
 
     Insert(region->GetVirtualBase(), region);
     return region;
@@ -92,16 +91,20 @@ Region* AddressSpace::AllocateRegion(Pointer requestedAddress, usize size)
         m_RegionTree.Insert(newRegion->GetVirtualBase().Raw(), newRegion);
     return newRegion;*/
 }
-Region* AddressSpace::AllocateFixed(Pointer requestedAddress, usize size)
+Region* AddressSpace::AllocateFixed(Pointer virt, usize size)
 {
     ScopedLock guard(m_Lock);
-
-    auto       virt = Math::AlignUp(requestedAddress, PMM::PAGE_SIZE);
-    size            = Math::AlignUp(size, PMM::PAGE_SIZE);
+    size = Math::AlignUp(size, PMM::PAGE_SIZE);
 
     if (!IsAvailable(virt, size)) return nullptr;
 
     auto region = new Region(0, virt, size);
     Insert(region->GetVirtualBase(), region);
     return region;
+}
+
+void AddressSpace::Clear()
+{
+    for (const auto& [_, region] : *this) delete region;
+    m_Regions.clear();
 }

@@ -426,7 +426,7 @@ namespace Syscall::VFS
         INode* node = nullptr;
         {
             CPU::UserMemoryProtectionGuard guard;
-            std::get<1>(VFS::ResolvePath(cwd, path));
+            node = std::get<1>(VFS::ResolvePath(cwd, path));
         }
         if (!node) return Error(ENOENT);
         if (!node->IsDirectory()) return Error(ENOTDIR);

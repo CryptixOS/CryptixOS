@@ -118,7 +118,7 @@ Thread* Process::CreateThread(uintptr_t                      rip,
 bool Process::ValidateAddress(Pointer address, i32 accessMode, usize size)
 {
     // TODO(v1tr10l7): Validate access mode
-    for (const auto& region : m_VirtualRegions)
+    for (const auto& [base, region] : m_AddressSpace)
     {
         if (region->Contains(address)) return true;
         if (!region->Contains(address)
@@ -269,12 +269,12 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
 
     static ELF::Image program, ld;
     if (!program.Load(shellPath.empty() ? path : argvArr[0], PageMap,
-                      m_VirtualRegions))
+                      m_AddressSpace))
         return Error(ENOEXEC);
 
     std::string_view ldPath = program.GetLdPath();
     if (!ldPath.empty())
-        Assert(ld.Load(ldPath, PageMap, m_VirtualRegions, 0x40000000));
+        Assert(ld.Load(ldPath, PageMap, m_AddressSpace, 0x40000000));
     Thread* currentThread = CPU::GetCurrentThread();
     currentThread->SetState(ThreadState::eExited);
 
@@ -395,7 +395,8 @@ ErrorOr<Process*> Process::Fork()
     newProcess->m_Umask = m_Umask;
     m_Children.push_back(newProcess);
 
-    for (const auto& range : m_VirtualRegions)
+    newProcess->m_AddressSpace.Clear();
+    for (const auto& [base, range] : m_AddressSpace)
     {
         usize pageCount
             = Math::AlignUp(range->GetSize(), PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
@@ -410,15 +411,22 @@ ErrorOr<Process*> Process::Fork()
                           range->GetSize(),
                           PageAttributes::eRWXU | PageAttributes::eWriteBack);
 
-        auto newRegion = range;
+        auto newRegion = new Region(physicalSpace, range->GetVirtualBase(),
+                                    range->GetSize());
+        newRegion->SetProt(range->GetAccess(), range->GetProt());
+        newProcess->m_AddressSpace.Insert(range->GetVirtualBase().Raw(),
+                                          newRegion);
+        continue;
+        // auto newRegion = newProcess->m_AddressSpace.AllocateFixed(
+        //     range->GetVirtualBase(), range->GetSize());
+        // if (!newRegion)
+        //    newRegion
+        //        = newProcess->m_AddressSpace.AllocateRegion(range->GetSize());
         newRegion->SetPhysicalBase(physicalSpace);
-        ScopedLock guard(m_Parent->m_Lock);
-        newProcess->m_VirtualRegions.Insert(range->GetVirtualBase(), newRegion);
+        newRegion->SetProt(range->GetAccess(), range->GetProt());
 
-        // newProcess->m_VirtualRegions.AllocateRegion(range->GetVirtualBase(),
-        //                                             range->GetSize());
-
-        // TODO(v1tr10l7): Free regions;
+        // pageMap->MapRegion(newRegion);
+        //  TODO(v1tr10l7): Free regions;
     }
 
     newProcess->m_NextTid.store(m_NextTid);

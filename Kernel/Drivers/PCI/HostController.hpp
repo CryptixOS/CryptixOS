@@ -27,7 +27,7 @@ namespace PCI
     class HostController
     {
       public:
-        HostController(const Domain& domain, PM::Pointer address)
+        HostController(const Domain& domain, Pointer address)
             : m_Domain(domain)
             , m_Address(address)
         {

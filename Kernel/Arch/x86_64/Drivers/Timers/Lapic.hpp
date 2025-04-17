@@ -9,7 +9,7 @@
 #include <Prism/Core/Singleton.hpp>
 #include <Time/HardwareTimer.hpp>
 
-class Lapic : public HardwareTimer, public PM::Singleton<Lapic>
+class Lapic : public HardwareTimer, public Singleton<Lapic>
 {
   public:
     enum class Mode : u8

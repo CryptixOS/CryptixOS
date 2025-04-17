@@ -4,9 +4,10 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Arch/PowerManager.hpp>
 #include <Boot/CommandLine.hpp>
-#include <Drivers/HID/PS2Scancodes.hpp>
 
+#include <Drivers/HID/PS2Scancodes.hpp>
 #include <Drivers/HID/Ps2KeyboardDevice.hpp>
 #include <Drivers/TTY.hpp>
 
@@ -158,6 +159,10 @@ void Ps2KeyboardDevice::HandleScanCodeSet1Key(u8 raw)
     if (m_Modifiers & KeyModifier::eControl) c = std::toupper(c) - 0x40;
 
     if (!pressed) return;
+
+    if (m_Modifiers & KeyModifier::eShift && m_Modifiers & KeyModifier::eAlt
+        && c == '\r')
+        PowerManager::Reboot();
     Emit(&c, 1);
 }
 void Ps2KeyboardDevice::HandleScanCodeSet2Key(u8 raw) {}

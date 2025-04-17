@@ -129,6 +129,11 @@ namespace ELF
 
                     auto region = new Region(
                         phys, current.VirtualAddress + loadBase, size);
+
+                    using VirtualMemoryManager::Access;
+                    region->SetProt(Access::eReadWriteExecute | Access::eUser,
+                                    PROT_READ | PROT_WRITE | PROT_EXEC);
+
                     addressSpace.Insert(region->GetVirtualBase(), region);
 
                     Read(ToHigherHalfAddress<void*>(phys + misalign),

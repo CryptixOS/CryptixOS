@@ -193,7 +193,7 @@ namespace NVMe
         std::string m_Name                               = "nvme";
         usize       m_Index                              = 0;
         ControllerRegister volatile* volatile m_Register = nullptr;
-        PM::Pointer                         m_CrAddress;
+        Pointer                             m_CrAddress;
 
         u64                                 m_QueueSlots     = 0;
         u64                                 m_DoorbellStride = 0;

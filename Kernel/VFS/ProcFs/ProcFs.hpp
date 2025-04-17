@@ -21,6 +21,7 @@ class ProcFs : public Filesystem
     {
     }
 
+    static Process*          GetProcess(pid_t pid);
     void                     AddProcess(Process* process);
     void                     RemoveProcess(pid_t pid);
 

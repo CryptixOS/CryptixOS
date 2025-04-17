@@ -82,6 +82,8 @@ namespace VirtualMemoryManager
         inline usize GetSize() const { return m_VirtualRange.GetSize(); }
         inline FileDescriptor* GetFileDescriptor() const { return m_Fd; }
 
+        inline Access          GetAccess() const { return m_Access; }
+        inline i32             GetProt() const { return m_Flags; }
         PageAttributes         GetPageAttributes() const;
 
         inline void SetPhysicalBase(Pointer phys) { m_PhysicalBase = phys; }

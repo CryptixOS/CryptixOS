@@ -16,21 +16,21 @@
 namespace MMIO
 {
     template <std::unsigned_integral T>
-    inline static T Read(PM::Pointer address)
+    inline static T Read(Pointer address)
     {
         volatile T* reg = address.As<volatile T>();
 
         return *reg;
     }
     template <std::unsigned_integral T>
-    inline static void Write(PM::Pointer address, T value)
+    inline static void Write(Pointer address, T value)
     {
         volatile T* reg = address.As<volatile T>();
 
         *reg            = value;
     }
 
-    inline static usize Read(PM::Pointer address, u8 accessSize)
+    inline static usize Read(Pointer address, u8 accessSize)
     {
         switch (accessSize)
         {

@@ -15,7 +15,7 @@ namespace HPET
     class TimerBlock
     {
       public:
-        static ErrorOr<TimerBlock*> GetFromTable(PM::Pointer hpetPhys);
+        static ErrorOr<TimerBlock*> GetFromTable(Pointer hpetPhys);
 
         TimerBlock() = default;
         TimerBlock(Table* hpet);

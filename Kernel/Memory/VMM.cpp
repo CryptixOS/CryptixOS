@@ -167,7 +167,8 @@ namespace VirtualMemoryManager
         if (process && !kernelFault)
         {
             auto tty = process->GetTTY();
-            LogError("{}: Segmentation Fault(core dumped)", process->GetName());
+            LogError("{}: Segmentation Fault(core dumped)\n{}",
+                     process->GetName(), message);
             Stacktrace::Print();
 
             if (tty) tty->Write(message.data(), 0, message.size());

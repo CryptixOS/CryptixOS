@@ -62,11 +62,12 @@ static bool loadInitProcess(PathView initPath)
 
     static ELF::Image program, ld;
     PageMap*          pageMap = new PageMap();
-    if (!program.Load(initPath, pageMap, userProcess->m_VirtualRegions))
+    if (!program.Load(initPath, pageMap, userProcess->GetAddressSpace()))
         return false;
     PathView ldPath = program.GetLdPath();
     if (!ldPath.IsEmpty()
-        && !ld.Load(ldPath, pageMap, userProcess->m_VirtualRegions, 0x40000000))
+        && !ld.Load(ldPath, pageMap, userProcess->GetAddressSpace(),
+                    0x40000000))
     {
         delete pageMap;
         return false;

@@ -9,6 +9,7 @@
 
 PageAttributes Region::GetPageAttributes() const
 {
+    return PageAttributes::eRWXU | PageAttributes::eWriteBack;
     PageAttributes flags = PageAttributes::eWriteBack;
 
     if (m_Access & Access::eRead) flags |= PageAttributes::eRead;

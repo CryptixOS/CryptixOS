@@ -99,7 +99,7 @@ class Process
     inline std::optional<i32> GetStatus() const { return m_Status; }
 
     inline Thread*            GetMainThread() { return m_MainThread; }
-    inline AddressSpace&      GetAddressSpace() { return m_VirtualRegions; }
+    inline AddressSpace&      GetAddressSpace() { return m_AddressSpace; }
 
     inline pid_t              GetSid() const { return m_Credentials.sid; }
     inline pid_t              GetPGid() const { return m_Credentials.pgid; }
@@ -170,7 +170,7 @@ class Process
     mode_t                m_Umask    = 0;
 
     FileDescriptorTable   m_FdTable;
-    AddressSpace          m_VirtualRegions;
+    AddressSpace          m_AddressSpace;
 
     uintptr_t             m_UserStackTop = 0x70000000000;
     usize                 m_Quantum      = 1000;

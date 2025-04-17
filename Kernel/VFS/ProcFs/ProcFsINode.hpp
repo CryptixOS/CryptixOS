@@ -14,10 +14,12 @@
 
 #include <VFS/INode.hpp>
 
+class ProcFsINode;
 struct ProcFsProperty
 {
     using ProcFsGenPropertyFunc = Delegate<void(std::string&)>;
     Delegate<void(ProcFsProperty&)> GenProp;
+    ProcFsINode*                    m_Parent = nullptr;
     std::string                     Buffer;
     usize                           Offset = 0;
 

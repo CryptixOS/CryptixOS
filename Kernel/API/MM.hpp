@@ -11,13 +11,8 @@
 
 namespace API::MM
 {
-    ErrorOr<intptr_t> SysMMap(PM::Pointer addr, usize len, i32 prot, i32 flags,
-                              i32 fdNum, off_t offset);
-}
-
-namespace Syscall::MM
-{
-    ErrorOr<intptr_t> SysMMap(Arguments& args);
-    ErrorOr<intptr_t> SysMProtect(Arguments& args);
-    ErrorOr<i32>      SysMUnMap(Arguments& args);
-} // namespace Syscall::MM
+    ErrorOr<intptr_t> MMap(Pointer addr, usize len, i32 prot, i32 flags,
+                           i32 fdNum, off_t offset);
+    ErrorOr<isize>    MProtect(Pointer virt, usize length, i32 prot);
+    ErrorOr<isize>    MUnMap(Pointer virt, usize length);
+} // namespace API::MM

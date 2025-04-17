@@ -245,12 +245,12 @@ class PageMap
                                   PageAttributes flags = static_cast<PageAttributes>(0));
 
     template <typename T>
-    inline ErrorOr<T*> MapIoRegion(PM::Pointer phys)
+    inline ErrorOr<T*> MapIoRegion(Pointer phys)
     {
-        usize       length = Math::AlignUp(sizeof(T), PMM::PAGE_SIZE);
+        usize   length = Math::AlignUp(sizeof(T), PMM::PAGE_SIZE);
 
-        PM::Pointer virt   = VMM::AllocateSpace(length, alignof(u64), true);
-        phys               = Math::AlignDown(phys, PMM::PAGE_SIZE);
+        Pointer virt   = VMM::AllocateSpace(length, alignof(u64), true);
+        phys           = Math::AlignDown(phys, PMM::PAGE_SIZE);
 
         if (MapRange(virt, phys, length,
                      PageAttributes::eRW | PageAttributes::eUncacheableStrong))
@@ -298,14 +298,24 @@ class PageMap
         }
         return true;
     }
-    bool MapRegion(const Region* region)
+    bool MapRegion(const Region* region, const usize pageSize = PMM::PAGE_SIZE)
     {
-        const auto           virt  = region->GetVirtualBase();
-        const auto           phys  = region->GetPhysicalBase();
-        const usize          size  = region->GetSize();
+        const auto           virt = region->GetVirtualBase();
+        const auto           phys = region->GetPhysicalBase();
+        const usize          size = region->GetSize();
 
-        const PageAttributes flags = region->GetPageAttributes();
+        const PageAttributes flags
+            = region->GetPageAttributes() | GetPageSizeFlags(pageSize);
         return MapRange(virt, phys, size, flags);
+    }
+    bool RemapRegion(const Region* region, Pointer newVirt = 0)
+    {
+        Pointer              oldVirt = region->GetVirtualBase();
+        const usize          size    = region->GetSize();
+        const PageAttributes flags   = region->GetPageAttributes();
+
+        if (!newVirt) newVirt = region->GetVirtualBase();
+        return RemapRange(oldVirt, newVirt, size, flags);
     }
 
     bool UnmapRange(uintptr_t virt, usize size,
