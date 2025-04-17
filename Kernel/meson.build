@@ -151,9 +151,9 @@ subdir('Library/KLibC++')
 
 kernel_elf = executable(
   'Cryptix.elf',
-  [srcs, font],
+  srcs,
   dependencies: [deps, mod_deps],
-  link_depends: [meson.current_source_dir() / 'linker.' + arch + '.ld', font],
+  link_depends: [meson.current_source_dir() / 'linker.' + arch + '.ld'],
   include_directories: [include_directories, incs, include_directories('.')],
   c_args: [c_args, args],
   cpp_args: [cxx_args, args],

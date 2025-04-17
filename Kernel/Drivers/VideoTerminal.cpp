@@ -5,20 +5,15 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Drivers/VideoTerminal.hpp>
+#include <Embed/Font.hpp>
 
 #include <Library/Logger.hpp>
 
 #include <magic_enum/magic_enum.hpp>
 
-constexpr usize MAX_FONT_GLYPHS    = 256;
-constexpr Color DEFAULT_BACKGROUND = 0xa0'00'00'00;
-constexpr Color DEFAULT_BACKDROP   = 0x00'00'00'00;
-extern "C"
-{
-    extern u8    _binary____Meta_fonts_font_bin_start[];
-    extern u8    _binary____Meta_fonts_font_bin_end[];
-    extern usize _binary____Meta_fonts_font_bin_size;
-}
+constexpr usize MAX_FONT_GLYPHS     = 256;
+constexpr Color DEFAULT_BACKGROUND  = 0xa0'00'00'00;
+constexpr Color DEFAULT_BACKDROP    = 0x00'00'00'00;
 
 constexpr usize BUILTIN_FONT_WIDTH  = 8;
 constexpr usize BUILTIN_FONT_HEIGHT = 16;
@@ -28,21 +23,20 @@ bool            VideoTerminal::Initialize(const limine_framebuffer& framebuffer)
     if (!framebuffer.address) return false;
     else if (m_Initialized) return true;
 
-    m_Framebuffer = {.Address        = framebuffer.address,
-                     .Width          = framebuffer.width,
-                     .Height         = framebuffer.height,
-                     .Pitch          = framebuffer.pitch,
-                     .BitsPerPixel   = framebuffer.bpp,
-                     .RedMaskSize    = framebuffer.red_mask_size,
-                     .RedMaskShift   = framebuffer.red_mask_shift,
-                     .GreenMaskSize  = framebuffer.green_mask_size,
-                     .GreenMaskShift = framebuffer.green_mask_shift,
-                     .BlueMaskSize   = framebuffer.blue_mask_size,
-                     .BlueMaskShift  = framebuffer.blue_mask_shift};
+    m_Framebuffer    = {.Address        = framebuffer.address,
+                        .Width          = framebuffer.width,
+                        .Height         = framebuffer.height,
+                        .Pitch          = framebuffer.pitch,
+                        .BitsPerPixel   = framebuffer.bpp,
+                        .RedMaskSize    = framebuffer.red_mask_size,
+                        .RedMaskShift   = framebuffer.red_mask_shift,
+                        .GreenMaskSize  = framebuffer.green_mask_size,
+                        .GreenMaskShift = framebuffer.green_mask_shift,
+                        .BlueMaskSize   = framebuffer.blue_mask_size,
+                        .BlueMaskShift  = framebuffer.blue_mask_shift};
 
-    auto fontAddress
-        = reinterpret_cast<uintptr_t>(&_binary____Meta_fonts_font_bin_start);
-    auto fontModule = BootInfo::FindModule("font");
+    auto fontAddress = reinterpret_cast<uintptr_t>(&Meta_fonts_font_bin);
+    auto fontModule  = BootInfo::FindModule("font");
     if (fontModule)
         fontAddress = reinterpret_cast<uintptr_t>(fontModule->address);
 

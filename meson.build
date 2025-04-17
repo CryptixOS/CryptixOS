@@ -148,13 +148,6 @@ subdir('Modules')
 
 no_ext_mods = ext_mods.length() == 0
 
-font = custom_target(
-  'font.bin',
-  input: 'Meta/fonts/font.bin',
-  output: 'font.o',
-  command: ['objcopy', '-I', 'binary', '-O', 'elf64-x86-64', '-B', 'i386', '@INPUT@', '@OUTPUT@'],
-)
-
 incs = []
 subdir('Prism/Source')
 subdir('Kernel')
@@ -176,9 +169,10 @@ qemu_args = [
   '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
   '-smbios', 'type=1',
   '-device', 'nvme,id=nvme-ctrl1,serial=nvme',
+  '-nic', 'user,model=rtl8139',
   #'-netdev', 'tap,id=mynet0,ifname=tap0,script=no,downscript=no',
   #'-device', 'rtl8139,netdev=mynet0',
-  '-nic', 'bridge,model=rtl8139',
+  #'-nic', 'bridge,model=rtl8139',
   #'-netdev', 'user,id=net0', '-device', 'rtl8139,netdev=net0',
   #'-object', 'filter-dump,id=filter0,netdev=net0,file=packet.pcap',
 ]
