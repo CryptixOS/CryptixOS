@@ -1,6 +1,6 @@
 # CryptixOS 
 
-<img src="./Meta/images/logo.jpg">
+<img src="./Meta/images/logo.jpg" width="10%" height="10%">
 <img src="./Meta/images/screenshot.png">
 
 ## Description
