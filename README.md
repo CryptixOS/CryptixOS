@@ -1,7 +1,7 @@
 # CryptixOS 
 
 <p align="center">
-  <img src="./Meta/images/logo.jpg" width="10%" height="10%">
+  <img src="./Meta/images/logo.jpg" width="50%" height="50%">
 </p>
 
 ## Screenshots
