@@ -22,7 +22,7 @@ namespace E9
 {
     CTOS_NO_KASAN static void PrintChar(u8 c)
     {
-#if CTOS_ARCH == CTOS_ARCH_X86_64
+#ifdef CTOS_TARGET_X86_64
         __asm__ volatile("outb %0, %1" : : "a"(c), "d"(u16(0xe9)));
 #endif
     }
