@@ -4,9 +4,11 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Memory/VMM.hpp>
+#include <Debug/Assertions.hpp>
+#include <Debug/Panic.hpp>
 
 #include <Library/Spinlock.hpp>
+#include <Memory/VMM.hpp>
 
 struct TTBR
 {
