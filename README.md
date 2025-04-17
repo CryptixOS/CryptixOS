@@ -4,12 +4,12 @@
   <img src="./Meta/images/logo.jpg" width="50%" height="50%">
 </p>
 
-## Screenshots
-<img src="./Meta/images/screenshot.png">
-
 ## Description
 CryptixOS is a WIP 64 bit unix-like operating system,
 it uses limine boot protocol to boot and mlibc as the c library implementation
+
+## Screenshots
+<img src="./Meta/images/screenshot.png">
 
 ## Supported architectures
 
