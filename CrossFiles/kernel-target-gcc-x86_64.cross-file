@@ -7,6 +7,7 @@ ar = 'x86_64-none-elf-ar'
 strip = 'x86_64-none-elf-nm'
 pkg-config = 'pkg-config'
 cmake = 'cmake'
+nasm = 'fasm'
 
 [built-in options]
 c_args = ['-target', 'x86_64-none-elf']
