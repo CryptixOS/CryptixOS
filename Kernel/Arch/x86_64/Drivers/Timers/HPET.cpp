@@ -95,10 +95,8 @@ namespace HPET
 
     TimerBlock::TimerBlock(SDTs::HPET* table)
     {
-        auto virt = VMM::GetKernelPageMap()->MapIoRegion<Entry>(
-            table->EventTimerBlock.Address);
-        Assert(virt);
-        m_Entry = virt.value();
+        m_Entry = VMM::MapIoRegion<Entry>(table->EventTimerBlock.Address, true);
+        Assert(m_Entry);
 
         if (!m_Entry) LogError("HPET: Timer entry address is invalid");
         LogInfo("HPET: Found device at {:#x}",

@@ -63,9 +63,9 @@ void IoApic::SetIrqRedirect(u32 lapicID, u8 vector, u8 irq, bool status)
 {
     for (const auto& iso : MADT::GetIsoEntries())
     {
-        if (iso->IrqSource != irq) continue;
+        if (iso.IrqSource != irq) continue;
 
-        SetGsiRedirect(lapicID, vector, iso->Gsi, iso->Flags, status);
+        SetGsiRedirect(lapicID, vector, iso.Gsi, iso.Flags, status);
         return;
     }
 
@@ -95,7 +95,7 @@ void IoApic::Initialize()
         LogWarn("IoApic::Initialize: Already initialized");
         return;
     }
-    if (MADT::GetIoApicEntries().empty())
+    if (MADT::GetIoApicEntries().Empty())
     {
         LogError("IoApic: Not Available!");
         return;
@@ -108,14 +108,14 @@ void IoApic::Initialize()
     LogTrace("IoApic: Enumerating controllers...");
     for (usize i = 0; const auto& entry : MADT::GetIoApicEntries())
     {
-        IoApic ioApic(entry->Address, entry->GsiBase);
+        IoApic ioApic(entry.Address, entry.GsiBase);
         u8     version       = ioApic.Read(IoApicRegister::eVersion);
         u8     arbitrationID = ioApic.Read(IoApicRegister::eArbitrationID);
 
         LogInfo(
             "IoApic[{}]: Controller found: {{ BaseAddress: {:#x}, ID: {}, "
             "GsiBase: {}, Version: {}, ArbitrationID: {} }}",
-            i++, entry->Address, entry->ApicID, entry->GsiBase, version,
+            i++, entry.Address, entry.ApicID, entry.GsiBase, version,
             arbitrationID);
 
         ioApic.MaskAllEntries();

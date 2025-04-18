@@ -44,7 +44,11 @@ namespace ACPI
         struct [[gnu::packed]] RSDT
         {
             SDTHeader Header;
-            u64       Sdts[];
+            union
+            {
+                u32 Sdts32[];
+                u64 Sdts64[];
+            };
         };
 
         bool  s_XsdtAvailable = false;
@@ -62,11 +66,10 @@ namespace ACPI
         }
         Pointer GetTablePointer(u8 index)
         {
-            if (s_XsdtAvailable)
-                return Pointer(s_Rsdt->Sdts[index]).ToHigherHalf();
+            Pointer tableAddress = s_XsdtAvailable ? s_Rsdt->Sdts64[index]
+                                                   : s_Rsdt->Sdts32[index];
 
-            const u32* ptr = reinterpret_cast<u32*>(s_Rsdt->Sdts);
-            return Pointer(ptr[index]).ToHigherHalf();
+            return tableAddress.ToHigherHalf();
         }
         void DetectACPIEntries()
         {

@@ -11,13 +11,20 @@ namespace MADT
     using Prism::Pointer;
     namespace
     {
-        struct MADT
+        struct [[gnu::packed]] MADT
         {
             ACPI::SDTHeader Header;
             u32             LapicAddress;
             u32             Flags;
-            u8              Entries[];
-        } __attribute__((packed));
+            union
+            {
+                u8            Entries[];
+                LapicEntry    LapicEntries[];
+                IoApicEntry   IoApicEntries[];
+                IsoEntry      IsoEntries[];
+                LapicNmiEntry LapicNmiEntries[];
+            };
+        };
 
         constexpr const char* MADT_SIGNATURE = "APIC";
 
@@ -37,12 +44,12 @@ namespace MADT
             eGicMsiFrame             = 0x0d,
         };
 
-        static MADT*                s_MADT;
+        static MADT*          s_MADT;
 
-        std::vector<LapicEntry*>    s_LapicEntries;
-        std::vector<IoApicEntry*>   s_IoApicEntries;
-        std::vector<IsoEntry*>      s_IsoEntries;
-        std::vector<LapicNmiEntry*> s_LapicNmiEntries;
+        Vector<LapicEntry>    s_LapicEntries;
+        Vector<IoApicEntry>   s_IoApicEntries;
+        Vector<IsoEntry>      s_IsoEntries;
+        Vector<LapicNmiEntry> s_LapicNmiEntries;
     } // namespace
 
     void Initialize()
@@ -53,7 +60,8 @@ namespace MADT
         for (usize off = 0; s_MADT->Header.Length - sizeof(MADT) - off >= 2;)
 
         {
-            Header*   header    = Pointer(s_MADT->Entries + off).As<Header>();
+            Pointer   entry     = &s_MADT->Entries[off];
+            Header*   header    = entry.ToHigherHalf();
 
             EntryType entryType = static_cast<EntryType>(header->ID);
             LogTrace("MADT: Found '{}' entry",
@@ -62,21 +70,30 @@ namespace MADT
             switch (static_cast<EntryType>(header->ID))
             {
                 case EntryType::eProcessorLapic:
-                    s_LapicEntries.push_back(
-                        reinterpret_cast<LapicEntry*>(header));
+                {
+                    auto& lapicEntry = s_LapicEntries.EmplaceBack();
+                    std::memcpy(&lapicEntry, header, sizeof(LapicEntry));
                     break;
+                }
                 case EntryType::eIoApic:
-                    s_IoApicEntries.push_back(
-                        reinterpret_cast<IoApicEntry*>(header));
+                {
+                    auto& ioapicEntry = s_IoApicEntries.EmplaceBack();
+                    std::memcpy(&ioapicEntry, header, sizeof(IoApicEntry));
                     break;
+                }
                 case EntryType::eInterruptSourceOverride:
-                    s_IsoEntries.push_back(reinterpret_cast<IsoEntry*>(header));
+                {
+                    auto& isoEntry = s_IsoEntries.EmplaceBack();
+                    std::memcpy(&isoEntry, header, sizeof(IsoEntry));
                     break;
+                }
                 case EntryType::eNmiSource: break;
                 case EntryType::eLapicNmi:
-                    s_LapicNmiEntries.push_back(
-                        reinterpret_cast<LapicNmiEntry*>(header));
+                {
+                    auto& lapicNmiEntry = s_LapicNmiEntries.EmplaceBack();
+                    std::memcpy(&lapicNmiEntry, header, sizeof(LapicNmiEntry));
                     break;
+                }
                 case EntryType::eLapicAddressOverride: break;
                 case EntryType::eProcessorLocalX2Apic: break;
                 case EntryType::eGicCpuInterface: break;
@@ -95,13 +112,10 @@ namespace MADT
         LogInfo("MADT: Initialized");
     }
 
-    bool                         LegacyPIC() { return s_MADT->Flags & 0x01; }
+    bool                   LegacyPIC() { return s_MADT->Flags & 0x01; }
 
-    std::vector<LapicEntry*>&    GetLapicEntries() { return s_LapicEntries; }
-    std::vector<IoApicEntry*>&   GetIoApicEntries() { return s_IoApicEntries; }
-    std::vector<IsoEntry*>&      GetIsoEntries() { return s_IsoEntries; }
-    std::vector<LapicNmiEntry*>& GetLapicNmiEntries()
-    {
-        return s_LapicNmiEntries;
-    }
+    Vector<LapicEntry>&    GetLapicEntries() { return s_LapicEntries; }
+    Vector<IoApicEntry>&   GetIoApicEntries() { return s_IoApicEntries; }
+    Vector<IsoEntry>&      GetIsoEntries() { return s_IsoEntries; }
+    Vector<LapicNmiEntry>& GetLapicNmiEntries() { return s_LapicNmiEntries; }
 } // namespace MADT
