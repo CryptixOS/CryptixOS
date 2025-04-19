@@ -11,4 +11,4 @@ srcs += files(
   'stdio.cpp',
   'stdlib.cpp',
   'string.cpp')
-include_directories += [include_directories('.')]
+incs += [include_directories('.')]

@@ -144,13 +144,14 @@ endforeach
 
 mod_deps = [ ]
 ext_mods = [ ]
+incs = [include_directories('Kernel'), include_directories('Kernel/Library/KLibC'), include_directories('Kernel/Library/KLibC++')]
+subdir('Prism/Source')
+subdir('Kernel')
+
 subdir('Modules')
 
 no_ext_mods = ext_mods.length() == 0
 
-incs = []
-subdir('Prism/Source')
-subdir('Kernel')
 # ==============================================================================
 ### Qemu args
 qemu_args = [
@@ -324,13 +325,13 @@ iso = custom_target(
 
 run_bios = custom_target(
   'run_bios',
-  input: iso,
+  input: [iso, echfs_image],
   output: 'run_bios',
-  command: [qemu, qemu_args, '-cdrom', '@INPUT@'],
+  command: [qemu, qemu_args, '-cdrom', '@INPUT0@', '-drive', 'format=raw,file=@INPUT1@,if=none,id=nvm1', '-device', 'nvme-ns,drive=nvm1,nsid=2,bus=nvme-ctrl1'],
   build_by_default: true,
   console: true,
   install: false,
-  depends: [iso],
+  depends: [iso, echfs_image],
 )
 
 ovmf_binaries = subproject('ovmf_binaries')
@@ -359,6 +360,15 @@ run_uefi_gdb = custom_target(
   input: iso,
   output: 'run_uefi_gdb',
   command: [qemu, qemu_args, '-s', '-S', '-cdrom', '@INPUT@'],
+  console: true,
+  install: false,
+  depends: iso,
+)
+run_bochs = custom_target(
+  'run_bochs',
+  input: iso,
+  output: 'run_bochs',
+  command: ['bochs', '-q', '-f', meson.project_source_root() / '.bochsrc'],
   console: true,
   install: false,
   depends: iso,
