@@ -90,7 +90,7 @@ namespace PCI
         Pointer                                  m_Address;
         uacpi_namespace_node*                    m_RootNode;
 
-        static std::vector<IrqRoute>             s_IrqRoutes;
+        static Vector<IrqRoute>                  s_IrqRoutes;
 
         std::unordered_map<uintptr_t, uintptr_t> m_MappedBuses;
 

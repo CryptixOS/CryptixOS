@@ -11,6 +11,7 @@
 
 #include <Firmware/ACPI/MCFG.hpp>
 #include <Library/Logger.hpp>
+#include <Prism/String/String.hpp>
 
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
@@ -22,8 +23,80 @@
 namespace PCI
 {
     static std::unordered_map<u32, HostController*> s_HostControllers;
+    struct Vendor
+    {
+        String                          Name;
+        std::unordered_map<u16, String> DeviceIDs;
+    };
 
-    static void                                     DetectControllers()
+    std::unordered_map<u16, Vendor> s_VendorIDs;
+    static u8                       ParseHexDigit(u8 digit)
+    {
+        if (std::isdigit(digit)) return digit - '0';
+        assert(std::isxdigit(digit));
+
+        return digit - 'a' + 0xa;
+    }
+    template <typename T>
+    static T ParseHex(StringView string, usize count)
+    {
+        assert(string.Size() >= count);
+
+        T value = 0;
+        for (const auto c : string.Substr(0, count))
+            value = (value << 4) + ParseHexDigit(c);
+
+        return value;
+    }
+    void ParseVendorID(StringView line)
+    {
+        if (line.Size() < 5) return;
+        auto nameStart
+            = std::find_if(line.begin() + 4, line.end(),
+                           [](char c) -> bool { return std::isalpha(c); });
+
+        u16        id       = ParseHex<u16>(line, 4);
+        auto&      vendor   = s_VendorIDs[id];
+        usize      nameSize = reinterpret_cast<usize>(nameStart = line.begin());
+        StringView name(nameStart, nameSize);
+        vendor.Name = name;
+
+        LogTrace("PCI: VendorID: {:#x} => '{}'", id, name);
+    }
+    void InitializeDatabase()
+    {
+        PathView path = "/usr/share/hwdata/pci.ids";
+        INode*   file = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path));
+        if (!file)
+        {
+            LogError("PCI: Failed to open pciids database");
+            return;
+        }
+
+        usize fileSize = file->GetStats().st_size;
+        assert(fileSize > 0);
+
+        Vector<u8> buffer;
+        buffer.Resize(fileSize);
+        file->Read(buffer.Raw(), 0, fileSize);
+        StringView fileData((char*)buffer.Raw(), buffer.Size());
+
+        usize      currentPos = 0;
+        usize      newLinePos = StringView::NPos;
+        using namespace Prism::StringViewLiterals;
+        while ((newLinePos = fileData.FindFirstOf("\n"_sv, currentPos))
+                   != fileData.NPos
+               && currentPos < fileData.Size())
+        {
+            usize      lineLength  = newLinePos - currentPos;
+            StringView currentLine = fileData.Substr(currentPos, lineLength);
+            currentPos             = newLinePos + 1;
+
+            if (std::isxdigit(currentLine[0])) ParseVendorID(currentLine);
+        }
+    }
+
+    static void DetectControllers()
     {
         const MCFG* mcfg       = ACPI::GetTable<MCFG>(MCFG_SIGNATURE);
         usize       entryCount = 0;
@@ -115,6 +188,7 @@ namespace PCI
             });
 
         EnumerateDevices(enumerator);
+        // InitializeDatabase();
     }
 
     void InitializeIrqRoutes()
