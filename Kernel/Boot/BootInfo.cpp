@@ -146,12 +146,7 @@ namespace
 
 } // namespace
 
-namespace
-{
-    FirmwareType     s_FirmwareType      = FirmwareType::eUndefined;
-    MemoryMapEntry** memoryMap           = nullptr;
-    u64              memoryMapEntryCount = 0;
-} // namespace
+static FirmwareType s_FirmwareType = FirmwareType::eUndefined;
 
 extern "C" CTOS_NO_KASAN [[noreturn]] void kernelStart();
 
@@ -181,10 +176,6 @@ namespace BootInfo
         if (!s_MemmapRequest.response
             || s_MemmapRequest.response->entry_count == 0)
             Panic("Boot: Failed to acquire limine memory map entries");
-
-        memoryMap = reinterpret_cast<MemoryMapEntry**>(
-            s_MemmapRequest.response->entries);
-        memoryMapEntryCount = s_MemmapRequest.response->entry_count;
 
         switch (s_FirmwareTypeRequest.response->firmware_type)
         {
@@ -259,8 +250,8 @@ namespace BootInfo
         VerifyExistenceOrRet(s_MemmapRequest)
 
             entryCount
-            = memoryMapEntryCount;
-        return memoryMap;
+            = s_MemmapRequest.response->entry_count;
+        return s_MemmapRequest.response->entries;
     }
     limine_file* GetExecutableFile()
     {
