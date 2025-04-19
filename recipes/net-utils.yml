@@ -1,0 +1,58 @@
+packages:
+  - name: iputils
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: network utilities
+      description: The iputils package is set of small useful utilities for Linux networking.
+      spdx: 'GPL-2.0-or-later'
+      website: 'https://github.com/iputils/iputils'
+      maintainer: "no92 <leo@managarm.org>"
+      categories: ['dev-libs']
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/iputils/iputils.git'
+      tag: '20240905'
+      version: '20240905'
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+    revision: 1
+    configure:
+      - args:
+          - 'meson'
+          - 'setup'
+          - '--cross-file'
+          - '@SOURCE_ROOT@/CrossFiles/@OPTION:arch-triple@-target.cross-file'
+          - '--prefix=/usr'
+          - '--libdir=lib'
+          - '--buildtype=debugoptimized'
+          - '-DBUILD_HTML_MANS=false'
+          - '-DUSE_CAP=false'
+          - '-DUSE_GETTEXT=false'
+          - '-DSKIP_TESTS=true'
+          - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+
+  - name: portscanner
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/vitriol1744/portscanner.git'
+      branch: 'master'
+    tools_required:
+      - host-automake-v1.15
+      - system-gcc
+    pkgs_required:
+      - mlibc
+    build:
+      - args: ['make', '-C', '@THIS_SOURCE_DIR@', 'CXX=@OPTION:arch-triple@-g++', 'SYSROOT=@SYSROOT_DIR@']
+      - args: ['make', '-C', '@THIS_SOURCE_DIR@',  'install', 'SYSROOT=@SYSROOT_DIR@']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+    
