@@ -380,4 +380,5 @@ build = custom_target(
   command: 'true',
   install: false,
   depends: iso,
+  required: false,
 )
