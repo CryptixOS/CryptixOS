@@ -1,6 +1,5 @@
 /*
  * Created by v1tr10l7 on 16.11.2024.
- *
  * Copyright (c) 2024-2024, Szymon Zemke <v1tr10l7@proton.me>
  *
  * SPDX-License-Identifier: GPL-3
@@ -15,6 +14,7 @@
 
 #include <Boot/CommandLine.hpp>
 
+#include <Drivers/FramebufferDevice.hpp>
 #include <Drivers/MemoryDevices.hpp>
 #include <Drivers/PCI/PCI.hpp>
 #include <Drivers/Serial.hpp>
@@ -27,6 +27,7 @@
 #include <Library/ELF.hpp>
 #include <Library/ICxxAbi.hpp>
 #include <Library/Image.hpp>
+#include <Library/Module.hpp>
 #include <Library/Stacktrace.hpp>
 
 #include <Memory/PMM.hpp>
@@ -108,17 +109,14 @@ static void kernelThread()
     }
     PCI::InitializeIrqRoutes();
 
+    if (!FramebufferDevice::Initialize())
+        LogError("kernel: Failed to initialize fbdev");
     TTY::Initialize();
     MemoryDevices::Initialize();
 
-    Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1", "/mnt/ext2",
-                      "ext2fs"));
-    Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p2", "/mnt/fat32",
-                      "fat32fs"));
-    Assert(VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p3", "/mnt/echfs",
-                      "echfs"));
-    auto size = TTY::GetCurrent()->GetSize();
-    LogTrace("TTY: size: {}:{}", size.ws_row, size.ws_col);
+    VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1", "/mnt/ext2", "ext2fs");
+    VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p2", "/mnt/fat32", "fat32fs");
+    VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p3", "/mnt/echfs", "echfs");
 
     auto kernelExecutable = BootInfo::GetExecutableFile();
     auto header   = reinterpret_cast<ELF::Header*>(kernelExecutable->address);
@@ -137,6 +135,7 @@ static void kernelThread()
     if (!ELF::Image::LoadModules(header->SectionEntryCount, sections,
                                  stringTable))
         LogWarn("ELF: Could not find any builtin drivers");
+    if (!Module::Load()) LogWarn("Module: Failed to find any modules");
 
     LogTrace("Loading init process...");
     auto initPath = CommandLine::GetString("init");

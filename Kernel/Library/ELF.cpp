@@ -31,6 +31,10 @@ namespace ELF
 {
     bool Image::LoadFromMemory(u8* data, usize size)
     {
+        // TODO(v1tr10l7): Should we allocate our own buffer?
+        m_Image.Resize(size + 100);
+        std::memcpy(m_Image.Raw(), data, size);
+
         ByteStream<Endian::eNative> stream(data, size);
         LogTrace("ELF: Kernel Executable Address -> '{:#x}'",
                  Pointer(data).Raw());
@@ -99,9 +103,10 @@ namespace ELF
         if (!file) return_err(false, ENOENT);
 
         isize fileSize = file->GetStats().st_size;
-        m_Image        = new u8[fileSize];
+        // m_Image        = new u8[fileSize];
+        m_Image.Resize(fileSize + 100);
 
-        if (file->Read(m_Image, 0, fileSize) != fileSize || !Parse())
+        if (file->Read(m_Image.Raw(), 0, fileSize) != fileSize || !Parse())
             return false;
 
         LoadSymbols();
@@ -156,8 +161,7 @@ namespace ELF
                     Read(path, current.Offset, current.SegmentSizeInFile);
                     path[current.SegmentSizeInFile] = 0;
 
-                    m_LdPath
-                        = std::string_view(path, current.SegmentSizeInFile);
+                    m_LdPath = StringView(path, current.SegmentSizeInFile);
                     break;
                 }
 
@@ -174,7 +178,8 @@ namespace ELF
     }
     bool Image::Load(Pointer image, usize size)
     {
-        m_Image = image.As<u8>();
+        m_Image.Resize(size * 2);
+        std::memcpy(m_Image.Raw(), image.As<u8>(), size);
         if (!Parse()) return false;
 
         LoadSymbols();
@@ -238,7 +243,7 @@ namespace ELF
 
         m_Sections.Clear();
         SectionHeader* sections = reinterpret_cast<SectionHeader*>(
-            m_Image + m_Header.SectionHeaderTableOffset);
+            m_Image.Raw() + m_Header.SectionHeaderTableOffset);
         for (usize i = 0; i < m_Header.SectionEntryCount; i++)
 
         {
@@ -248,7 +253,7 @@ namespace ELF
                 == std::to_underlying(SectionType::eSymbolTable))
             {
                 ElfDebugLog("ELF: Found symbol section at: {}", i);
-                m_SymbolSectionIndex = i;
+                m_SymbolSection = sections + i;
             }
             else if (sections[i].Type
                          == std::to_underlying(SectionType::eStringTable)
@@ -256,29 +261,24 @@ namespace ELF
 
             {
                 ElfDebugLog("ELF: Found string section at: {}", i);
-                m_StringSectionIndex = i;
+                m_StringSection = sections + i;
             }
         }
 
-        // stringSectionIndex = header.sectionNamesIndex;
         return true;
     }
     void Image::LoadSymbols()
     {
         ElfDebugLog("ELF: Loading symbols...");
-        if (!m_SymbolSectionIndex.has_value()) return;
-        // Assert(m_SymbolSectionIndex.has_value());
-        if (!m_StringSectionIndex.has_value()) return;
-        if (m_SymbolSectionIndex.value() >= m_Sections.Size()) return;
+        if (!m_SymbolSection || !m_StringSection) return;
 
-        auto& section = m_Sections[m_SymbolSectionIndex.value()];
-        if (section.Size <= 0 || section.EntrySize == 0) return;
+        const Sym* symtab
+            = reinterpret_cast<Sym*>(m_Image.Raw() + m_SymbolSection->Offset);
+        m_StringTable
+            = reinterpret_cast<u8*>(m_Image.Raw() + m_SymbolSection->Offset);
+        char* strtab     = reinterpret_cast<char*>(m_StringTable);
 
-        const Sym* symtab = reinterpret_cast<Sym*>(m_Image + section.Offset);
-        m_StringTable     = reinterpret_cast<u8*>(m_Image + section.Offset);
-        char* strtab      = reinterpret_cast<char*>(m_StringTable);
-
-        usize entryCount  = section.Size / section.EntrySize;
+        usize entryCount = m_SymbolSection->Size / m_SymbolSection->EntrySize;
         for (usize i = 0; i < entryCount; i++)
         {
             auto name = std::string_view(&strtab[symtab[i].Name]);
@@ -309,31 +309,32 @@ namespace ELF
             switch (phdr.Type)
             {
                 case HeaderType::eNone:
-                    LogTrace("ELF: Program Header[{}] -> Unused Entry", i);
+                    ElfDebugLog("ELF: Program Header[{}] -> Unused Entry", i);
                     break;
                 case HeaderType::eLoad:
-                    LogTrace("ELF: Program Header[{}] -> Loadable Segment", i);
+                    ElfDebugLog("ELF: Program Header[{}] -> Loadable Segment",
+                                i);
                     break;
                 case HeaderType::eDynamic:
-                    LogTrace(
+                    ElfDebugLog(
                         "ELF: Program Header[{}] -> Dynamic Linking "
                         "Information",
                         i);
                     break;
                 case HeaderType::eInterp:
-                    LogTrace(
+                    ElfDebugLog(
                         "ELF: Program Header[{}] -> Interpreter Information",
                         i);
                     break;
                 case HeaderType::eNote:
-                    LogTrace("ELF: Program Header[{}] -> Auxiliary Information",
-                             i);
+                    ElfDebugLog(
+                        "ELF: Program Header[{}] -> Auxiliary Information", i);
                     break;
                 case HeaderType::eProgramHeader:
-                    LogTrace("ELF: Program Header[{}] -> Program Header", i);
+                    ElfDebugLog("ELF: Program Header[{}] -> Program Header", i);
                     break;
                 case HeaderType::eTLS:
-                    LogTrace(
+                    ElfDebugLog(
                         "ELF: Program Header[{}] -> Thread-Local Storage "
                         "template",
                         i);
@@ -353,7 +354,8 @@ namespace ELF
     {
         m_Sections.Reserve(m_Header.SectionEntryCount);
 
-        auto sectionTypeToString = [](SectionType type) -> const char*
+        CTOS_UNUSED auto sectionTypeToString
+            = [](SectionType type) -> const char*
         {
             switch (type)
             {
@@ -400,9 +402,10 @@ namespace ELF
             stream.Seek(sectionHeaderOffset);
             stream >> shdr;
 
-            const char* sectionName = stringTable + shdr.Name;
-            LogTrace("ELF: Section[{}] -> '{}': {}", i, sectionName,
-                     sectionTypeToString(static_cast<SectionType>(shdr.Type)));
+            CTOS_UNUSED const char* sectionName = stringTable + shdr.Name;
+            ElfDebugLog(
+                "ELF: Section[{}] -> '{}': {}", i, sectionName,
+                sectionTypeToString(static_cast<SectionType>(shdr.Type)));
         }
 
         return true;

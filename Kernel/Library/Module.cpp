@@ -5,18 +5,47 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Library/ELF.hpp>
 #include <Library/Logger.hpp>
 #include <Library/Module.hpp>
 
 #include <Memory/VMM.hpp>
+#include <VFS/INode.hpp>
+#include <VFS/VFS.hpp>
 
 #include <magic_enum/magic_enum.hpp>
 
 static std::unordered_map<StringView, Module*> s_Modules;
+static Vector<ELF::Image*>                     s_LoadedModules;
 
 std::unordered_map<StringView, Module*>& GetModules() { return s_Modules; }
 
-bool                                     AddModule(Module* drv, StringView name)
+static void                              LoadModuleFromFile(INode* node)
+{
+    LogTrace("Module: Loading '{}'...", node->GetPath());
+    Vector<u8> elf;
+    elf.Resize(node->GetStats().st_size);
+    node->Read(elf.Raw(), 0, node->GetStats().st_size);
+
+    ELF::Image* image = new ELF::Image();
+    if (!image->LoadFromMemory(elf.Raw(), elf.Size()))
+    {
+        LogError("Module: Failed to load '{}'", node->GetPath());
+        return;
+    }
+    s_LoadedModules.PushBack(image);
+}
+bool Module::Load()
+{
+    INode* moduleDirectory
+        = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), "/lib/modules/"));
+    for (const auto& [name, child] : moduleDirectory->GetChildren())
+        LoadModuleFromFile(child);
+
+    return true;
+}
+
+bool AddModule(Module* drv, StringView name)
 {
     if (s_Modules.contains(name))
     {
@@ -25,11 +54,6 @@ bool                                     AddModule(Module* drv, StringView name)
     }
 
     s_Modules[name] = drv;
-    /*
-    VMM::GetKernelPageMap()->MapRange(Pointer(drv->Initialize),
-                                      Pointer(drv->Initialize).FromHigherHalf(),
-                                      0x1000 * 10, PageAttributes::eRWX);
-    */
     drv->Initialize();
     return true;
 }

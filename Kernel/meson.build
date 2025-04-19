@@ -22,6 +22,7 @@ srcs += files(
   'Debug/Panic.cpp',
 
   'Drivers/DeviceManager.cpp',
+  'Drivers/FramebufferDevice.cpp',
   'Drivers/Terminal.cpp',
   'Drivers/TTY.cpp',
   'Drivers/VideoTerminal.cpp',
@@ -115,6 +116,7 @@ ld_args = [
 ]
 
 args = []
+objs = []
 if arch == 'x86_64'
   cxx_args += ['-DCTOS_ARCH=CTOS_ARCH_X86_64', '-DCTOS_TARGET_X86_64']
   subdir('Arch/x86_64')
@@ -151,7 +153,7 @@ subdir('Library/KLibC++')
 
 kernel_elf = executable(
   'Cryptix.elf',
-  srcs,
+  [srcs, objs],
   dependencies: [deps, mod_deps],
   link_depends: [meson.current_source_dir() / 'linker.' + arch + '.ld'],
   include_directories: [include_directories, incs, include_directories('.')],

@@ -12,7 +12,9 @@
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
 
+#include <Prism/Containers/DoublyLinkedList.hpp>
 #include <Prism/Containers/Vector.hpp>
+#include <Prism/Memory/Buffer.hpp>
 #include <Prism/Memory/ByteStream.hpp>
 #include <Prism/PathView.hpp>
 
@@ -299,21 +301,22 @@ namespace ELF
         }
 
         inline const Vector<Symbol>& GetSymbols() const { return m_Symbols; }
-        inline std::string_view      GetLdPath() const { return m_LdPath; }
+        inline StringView            GetLdPath() const { return m_LdPath; }
 
       private:
-        u8*                   m_Image = nullptr;
+        Buffer                m_Image;
+
         Header                m_Header;
         Vector<ProgramHeader> m_ProgramHeaders;
         Vector<SectionHeader> m_Sections;
         AuxiliaryVector       m_AuxiliaryVector;
 
-        std::optional<u64>    m_StringSectionIndex;
-        std::optional<u64>    m_SymbolSectionIndex;
-        u8*                   m_StringTable = nullptr;
+        SectionHeader*        m_SymbolSection = nullptr;
+        SectionHeader*        m_StringSection = nullptr;
+        u8*                   m_StringTable   = nullptr;
 
         Vector<Symbol>        m_Symbols;
-        std::string_view      m_LdPath;
+        StringView            m_LdPath;
 
         bool                  Parse();
         void                  LoadSymbols();
@@ -324,7 +327,7 @@ namespace ELF
         template <typename T>
         void Read(T* buffer, isize offset, isize count = sizeof(T))
         {
-            std::memcpy(buffer, m_Image + offset, count);
+            std::memcpy(buffer, m_Image.Raw() + offset, count);
         }
     };
 }; // namespace ELF

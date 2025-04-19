@@ -27,11 +27,11 @@ class Device
 {
   public:
     Device(DeviceMajor major, DeviceMinor minor)
-        : id(MakeDevice(major, minor))
+        : m_ID(MakeDevice(major, minor))
     {
     }
 
-    inline dev_t             GetID() const noexcept { return id; }
+    inline dev_t             GetID() const noexcept { return m_ID; }
     virtual std::string_view GetName() const noexcept = 0;
 
     virtual const stat&      GetStats() { return m_Stats; }
@@ -42,6 +42,6 @@ class Device
     virtual i32   IoCtl(usize request, uintptr_t argp)                   = 0;
 
   protected:
-    dev_t id;
+    dev_t m_ID;
     stat  m_Stats;
 };

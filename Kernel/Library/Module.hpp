@@ -27,6 +27,8 @@ struct [[gnu::packed, gnu::aligned(8)]] Module
 
     bool (*Initialize)();
     void (*Terminate)();
+
+    static bool Load();
 };
 
 std::unordered_map<StringView, Module*>& GetModules();
