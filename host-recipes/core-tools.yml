@@ -505,4 +505,41 @@ tools:
         compile:
           - args: ['make', '-j@PARALLELISM@', 'all-target-libstdc++-v3']
         install:
-            - args: ['make', 'install-target-libstdc++-v3']
+          - args: ['make', 'install-target-libstdc++-v3']
+
+packages:
+  - name: libstdc++
+    architecture: '@OPTION:arch@'
+    from_source: gcc
+    tools_required:
+      - system-gcc
+      - tool: cross-binutils
+        recursive: true
+    pkgs_required:
+    - mlibc-headers
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--target=@OPTION:arch-triple@'
+        - '--with-sysroot=@SYSROOT_DIR@'
+        - '--enable-languages=c,c++'
+        - '--disable-multilib'
+        - '--enable-initfini-array'
+        - '--enable-libstdcxx-filesystem-ts'
+        - '--enable-libsupcxx'
+        # -g blows up GCC's binary size.
+        - 'CFLAGS=-O2'
+        - 'CXXFLAGS=-O2'
+      - args:
+        - '@THIS_SOURCE_DIR@/libstdc++-v3/configure'
+        - '--target=@OPTION:arch-triple@'
+        - '--with-sysroot=@SYSROOT_DIR@'
+        - '--disable-multilib'
+        - '--enable-libstdcxx-filesystem-ts'
+    build:
+      # GCC complains if the include directory is non-existent.
+      - args: ['make', '-j@PARALLELISM@', '-C', 'include']
+      - args: ['make', '-j@PARALLELISM@', '-C', 'libsupc++']
+    install:
+      - args: ['make', 'install', '-C', 'include']
+      - args: ['make', 'install', '-C', 'libsupc++']
