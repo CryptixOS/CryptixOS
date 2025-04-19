@@ -220,27 +220,17 @@ void Terminal::OnCsi(char c)
     else if (c == ';')
     {
         if (m_EscapeValueCount == MAX_ESC_PARAMETER_COUNT) return;
-        m_EscapeValues[m_EscapeValueCount] = 0;
+        m_EscapeValues[m_EscapeValueCount] = 1;
+
         ++m_EscapeValueCount;
         return;
     }
-    u32 param   = m_EscapeValueCount > 0 ? m_EscapeValues[0] : 0;
+    u32 param   = m_EscapeValues[0];
 
     auto [x, y] = GetCursorPos();
     switch (c)
     {
-        case '@':
-        {
-            for (usize i = m_Size.ws_col - 1; i--;)
-            {
-                MoveCharacter(i + param, y, i, y);
-                SetCursorPos(i, y);
-                RawPutChar(' ');
-                if (i == x) break;
-            }
-            SetCursorPos(x, y);
-            break;
-        }
+        case '@': ICH(param); break;
         case '?': m_DecPrivate = true; return;
         case 'A':
         {
@@ -272,8 +262,10 @@ void Terminal::OnCsi(char c)
         }
         case 'E':
         case 'F':
-        case 'G':
-        case 'H':
+            LogWarn("Terminal: Sequence 'ESC[{:c}' is not implemented yet", c);
+            break;
+        case 'G': CHA(param); break;
+        case 'H': CUP(); break;
         case 'J': ED(param); break;
         case 'K': EL(param); break;
         case 'L':
@@ -281,14 +273,34 @@ void Terminal::OnCsi(char c)
         case 'P':
         case 'X':
         case 'a':
+            LogWarn("Terminal: Sequence 'ESC[{:c}' is not implemented yet", c);
         case 'c':
-        case 'd':
+        {
+            TTY* tty = TTY::GetCurrent();
+            if (!tty) break;
+
+            StringView response   = "\e[?6c";
+
+            auto&      termios    = const_cast<termios2&>(tty->GetTermios());
+            auto       oldTermios = termios;
+            m_Lock.Release();
+            termios.c_lflag &= ~(ECHO | ECHOE | ECHOKE | ECHOK | ECHONL);
+            tty->SendBuffer(response.Raw(), response.Size() + 1);
+            m_Lock.Acquire();
+            termios = oldTermios;
+            break;
+        }
+        case 'd': VPA(param); break;
         case 'e':
         case 'f':
-        case 'g': break;
+        case 'g':
+            LogWarn("Terminal: Sequence 'ESC[{:c}' is not implemented yet", c);
+            break;
         case 'h':
         case 'l':
-            if (m_DecPrivate) m_CursorKeyMode = c == 'h';
+            if (m_DecPrivate && m_EscapeValueCount > 0
+                && m_EscapeValues[0] == 1)
+                m_CursorKeyMode = c == 'h';
             break;
         case 'm': SGR(param); break;
         case 'n':
@@ -314,7 +326,9 @@ void Terminal::OnCsi(char c)
         case 'r':
         case 's':
         case 'u':
-        case '`': break;
+        case '`':
+            LogWarn("Terminal: Sequence 'ESC[{:c}' is not implemented yet", c);
+            break;
         case ']':
             LogWarn(
                 "Terminal: Linux Console Private CSI Sequences are currently "
@@ -372,20 +386,57 @@ bool Terminal::DecSpecialPrint(u8 c)
     return true;
 }
 
+void Terminal::ICH(u64 count)
+{
+    auto [x, y] = GetCursorPos();
+    for (isize i = m_Size.ws_col - 1; i >= static_cast<isize>(x); i--)
+    {
+        MoveCharacter(i + count, y, i, y);
+        SetCursorPos(i, y);
+        RawPutChar(' ');
+    }
+    SetCursorPos(x, y);
+}
+
+void Terminal::CHA(u64 column)
+{
+    --column;
+    if (column >= m_Size.ws_col) column = m_Size.ws_col - 1;
+
+    auto y = GetCursorPos().second;
+    SetCursorPos(column, y);
+}
+void Terminal::CUP()
+{
+    usize x = m_EscapeValues[1];
+    usize y = m_EscapeValues[0];
+
+    if (x > 0) --x;
+    if (x >= m_Size.ws_col) x = m_Size.ws_col - 1;
+
+    if (y > 0) --y;
+    if (y >= m_Size.ws_row) y = m_Size.ws_row - 1;
+
+    SetCursorPos(x, y);
+}
+
 void Terminal::ED(u64 parameter)
 {
-    auto [currentX, currentY] = GetCursorPos();
+    auto [startX, startY] = GetCursorPos();
+    if (m_EscapeValueCount == 0)
+    {
+        usize displaySize = m_Size.ws_col * m_Size.ws_row;
+        usize currentPos  = startY * m_Size.ws_row + startX;
+
+        for (usize i = currentPos; i < displaySize; i++) RawPutChar(' ');
+        SetCursorPos(startX, startY);
+    }
     if (parameter == 1)
     {
-        SetCursorPos(0, currentY);
-        for (usize x = 0; x < currentX; x++) RawPutChar(' ');
+        SetCursorPos(0, startY);
+        for (usize x = 0; x < startX; x++) RawPutChar(' ');
     }
-    else if (parameter == 2)
-    {
-        Clear(0, false);
-        SetCursorPos(0, 0);
-    }
-    else if (parameter == 3)
+    else if (parameter == 2 || parameter == 3)
     {
         Clear(0, false);
         SetCursorPos(0, 0);
@@ -407,6 +458,14 @@ void Terminal::EL(u64 parameter)
 
     for (usize x = startX; x < endX; x++) RawPutChar(' ');
     if (parameter != 1) SetCursorPos(x, y);
+}
+void Terminal::VPA(u64 row)
+{
+    --row;
+    if (row >= m_Size.ws_row) row = m_Size.ws_row - 1;
+
+    auto x = GetCursorPos().first;
+    SetCursorPos(x, row);
 }
 void Terminal::SGR(u64 parameter)
 {

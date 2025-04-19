@@ -158,8 +158,8 @@ class Terminal
     void                                CUB(u64 count = 1);
     void                                CNL(u64 count = 1);
     void                                CPL(u64 count = 1);
-    void                                CHA(u64 count = 1);
-    void                                CUP(u64 count = 1);
+    void                                CHA(u64 column = 1);
+    void                                CUP();
     void                                ED(u64 parameter);
     void                                EL(u64 parameter);
     void                                IL(u64 parameter);
@@ -168,7 +168,7 @@ class Terminal
     void                                ECH(u64 parameter);
     void                                HPR(u64 parameter);
     void                                DA(u64 parameter);
-    void                                VPA(u64 parameter);
+    void                                VPA(u64 row);
     void                                VPR(u64 parameter);
     void                                HVP(u64 parameter);
     void                                TBC(u64 parameter);
