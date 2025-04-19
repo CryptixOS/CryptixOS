@@ -65,4 +65,8 @@ namespace CPU
         UserMemoryProtectionGuard guard;
         f(std::forward<Args>(args)...);
     }
+
+    bool DuringSyscall();
+    void OnSyscallEnter(usize index);
+    void OnSyscallLeave();
 }; // namespace CPU

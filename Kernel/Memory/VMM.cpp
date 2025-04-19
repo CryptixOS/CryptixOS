@@ -4,6 +4,9 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Syscall.hpp>
+#include <Arch/CPU.hpp>
+
 #include <Boot/BootInfo.hpp>
 
 #include <Memory/PMM.hpp>
@@ -159,9 +162,17 @@ namespace VirtualMemoryManager
             message += "\t- SGX violation\n";
 
         bool kernelFault = !(reason & PageFaultReason::eUser);
-        message
-            += std::format("In {} space\n", kernelFault ? "User" : "Kernel");
+        message += std::format("In {} space", kernelFault ? "User" : "Kernel");
 
+        if (CPU::DuringSyscall())
+        {
+            usize      syscallID   = CPU::GetCurrent()->LastSyscallID;
+            StringView syscallName = Syscall::GetName(syscallID);
+            message += std::format(", and during syscall({}) => {}", syscallID,
+                                   syscallName);
+        }
+
+        message += '\n';
         auto process = Process::GetCurrent();
 
         if (process && !kernelFault)

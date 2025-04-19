@@ -19,9 +19,6 @@
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
-#include <errno.h>
-#include <vector>
-
 struct Thread;
 namespace CPU
 {
@@ -108,6 +105,10 @@ namespace CPU
         FPUSaveFunc      FpuSave        = nullptr;
         FPURestoreFunc   FpuRestore     = nullptr;
 
+        Spinlock*        Lock;
+        bool             DuringSyscall = false;
+        usize            LastSyscallID = usize(-1);
+
         errno_t          Error;
         Thread*          Idle;
         Thread*          CurrentThread;
@@ -126,39 +127,39 @@ namespace CPU
         u64  rax, rbx, rcx, rdx;
     };
 
-    void              Halt();
-    void              HaltAll();
-    void              WakeUp(usize id, bool everyone);
+    void         Halt();
+    void         HaltAll();
+    void         WakeUp(usize id, bool everyone);
 
-    void              WriteXCR(u64 reg, u64 value);
-    u64               ReadCR0();
-    u64               ReadCR2();
-    void              WriteCR0(u64 value);
-    u64               ReadCR4();
-    void              WriteCR4(u64 value);
+    void         WriteXCR(u64 reg, u64 value);
+    u64          ReadCR0();
+    u64          ReadCR2();
+    void         WriteCR0(u64 value);
+    u64          ReadCR4();
+    void         WriteCR4(u64 value);
 
-    u64               ReadMSR(u32 msr);
-    void              WriteMSR(u32 msr, u64 value);
+    u64          ReadMSR(u32 msr);
+    void         WriteMSR(u32 msr, u64 value);
 
-    uintptr_t         GetFSBase();
-    uintptr_t         GetGSBase();
-    uintptr_t         GetKernelGSBase();
+    uintptr_t    GetFSBase();
+    uintptr_t    GetGSBase();
+    uintptr_t    GetKernelGSBase();
 
-    void              SetFSBase(uintptr_t address);
-    void              SetGSBase(uintptr_t address);
-    void              SetKernelGSBase(uintptr_t address);
+    void         SetFSBase(uintptr_t address);
+    void         SetGSBase(uintptr_t address);
+    void         SetKernelGSBase(uintptr_t address);
 
-    std::vector<CPU>& GetCPUs();
-    u64               GetOnlineCPUsCount();
-    u64               GetBspId();
-    CPU&              GetBsp();
+    Vector<CPU>& GetCPUs();
+    u64          GetOnlineCPUsCount();
+    u64          GetBspId();
+    CPU&         GetBsp();
 
-    u64               GetCurrentID();
-    void              Reschedule(TimeStep interval);
+    u64          GetCurrentID();
+    void         Reschedule(TimeStep interval);
 
-    bool              EnableSSE();
-    void              EnablePAT();
-    void              EnableSMEP();
-    void              EnableSMAP();
-    void              EnableUMIP();
+    bool         EnableSSE();
+    void         EnablePAT();
+    void         EnableSMEP();
+    void         EnableSMAP();
+    void         EnableUMIP();
 }; // namespace CPU

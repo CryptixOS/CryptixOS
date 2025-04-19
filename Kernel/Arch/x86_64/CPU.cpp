@@ -47,10 +47,10 @@ namespace CPU
             __asm__ volatile("fxrstor (%0)" : : "r"(ctx) : "memory");
         }
 
-        std::vector<CPU> s_CPUs;
-        CPU*             s_BSP             = nullptr;
-        u64              s_BspLapicId      = 0;
-        usize            s_OnlineCPUsCount = 1;
+        Vector<CPU> s_CPUs;
+        CPU*        s_BSP             = nullptr;
+        u64         s_BspLapicId      = 0;
+        usize       s_OnlineCPUsCount = 1;
     } // namespace
 
     extern "C" __attribute__((noreturn)) void syscall_entry();
@@ -167,7 +167,7 @@ namespace CPU
         limine_mp_response* smp      = BootInfo::GetSMP_Response();
         usize               cpuCount = smp->cpu_count;
 
-        s_CPUs.resize(cpuCount);
+        s_CPUs.Resize(cpuCount);
         s_BspLapicId = smp->bsp_lapic_id;
 
         LogTrace("BSP: Initializing...");
@@ -180,6 +180,7 @@ namespace CPU
             smpInfo->extra_argument = Pointer(&s_CPUs[i]);
             s_CPUs[i].LapicID       = smpInfo->lapic_id;
             s_CPUs[i].ID            = i;
+            s_CPUs[i].Lock          = new Spinlock;
 
             CPU* current = reinterpret_cast<CPU*>(smpInfo->extra_argument);
             s_BSP        = current;
@@ -236,6 +237,7 @@ namespace CPU
             cpu->extra_argument = reinterpret_cast<uintptr_t>(&s_CPUs[i]);
             s_CPUs[i].LapicID   = cpu->lapic_id;
             s_CPUs[i].ID        = i;
+            s_CPUs[i].Lock      = new Spinlock;
 
             cpu->goto_address   = apEntryPoint;
             while (!s_CPUs[i].IsOnline) Arch::Pause();
@@ -410,13 +412,13 @@ namespace CPU
         WriteMSR(MSR::KERNEL_GS_BASE, address);
     }
 
-    std::vector<CPU>& GetCPUs() { return s_CPUs; }
+    Vector<CPU>& GetCPUs() { return s_CPUs; }
 
-    u64               GetOnlineCPUsCount() { return s_OnlineCPUsCount; }
-    u64               GetBspId() { return s_BspLapicId; }
-    CPU&              GetBsp() { return *s_BSP; }
+    u64          GetOnlineCPUsCount() { return s_OnlineCPUsCount; }
+    u64          GetBspId() { return s_BspLapicId; }
+    CPU&         GetBsp() { return *s_BSP; }
 
-    u64               GetCurrentID()
+    u64          GetCurrentID()
     {
         return GetOnlineCPUsCount() > 1 ? GetCurrent()->ID : s_BspLapicId;
     }
@@ -570,4 +572,27 @@ namespace CPU
 
     UserMemoryProtectionGuard::UserMemoryProtectionGuard() { Stac(); }
     UserMemoryProtectionGuard::~UserMemoryProtectionGuard() { Clac(); }
+
+    bool DuringSyscall()
+    {
+        auto       cpu = GetCurrent();
+        ScopedLock guard(*cpu->Lock);
+
+        return cpu->DuringSyscall;
+    }
+    void OnSyscallEnter(usize index)
+    {
+        auto       cpu = GetCurrent();
+        ScopedLock guard(*cpu->Lock);
+
+        cpu->DuringSyscall = true;
+        cpu->LastSyscallID = index;
+    }
+    void OnSyscallLeave()
+    {
+        auto       cpu = GetCurrent();
+        ScopedLock guard(*cpu->Lock);
+
+        cpu->DuringSyscall = false;
+    }
 }; // namespace CPU

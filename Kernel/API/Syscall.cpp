@@ -40,6 +40,11 @@ namespace Syscall
 
     std::unordered_map<ID, WrapperBase*> s_Syscalls;
 
+    StringView                           GetName(usize index)
+    {
+        auto id = static_cast<ID>(index);
+        return magic_enum::enum_name(id).data();
+    }
     void
     RegisterHandler(usize                                              index,
                     std::function<ErrorOr<uintptr_t>(Arguments& args)> handler,
@@ -162,6 +167,7 @@ namespace Syscall
     }
     void Handle(Arguments& args)
     {
+        CPU::OnSyscallEnter(args.Index);
 #define LOG_SYSCALLS false
 #if LOG_SYSCALLS == true
         static isize previousSyscall = -1;
@@ -229,5 +235,6 @@ namespace Syscall
                 magic_enum::enum_name(static_cast<ID>(args.Index)).data() + 1);
             args.ReturnValue = -intptr_t(ret.error());
         }
+        CPU::OnSyscallLeave();
     }
 } // namespace Syscall

@@ -54,4 +54,8 @@ namespace CPU
 
     UserMemoryProtectionGuard::UserMemoryProtectionGuard() {}
     UserMemoryProtectionGuard::~UserMemoryProtectionGuard() {}
+
+    bool DuringSyscall() { return false; }
+    void OnSyscallEnter(usize index) {}
+    void OnSyscallLeave() {}
 } // namespace CPU
