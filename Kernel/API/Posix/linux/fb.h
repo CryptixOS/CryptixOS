@@ -57,7 +57,7 @@ constexpr usize FB_AUX_TEXT_MDA              = 0;
 constexpr usize FB_AUX_TEXT_CGA              = 1;
 /* S3 MMIO fasttext */
 constexpr usize FB_AUX_TEXT_S3_MMIO          = 2;
-/* MGA Millenium I: text, attr, 14 reserved bytes */
+/* MGA Millennium I: text, attr, 14 reserved bytes */
 constexpr usize FB_AUX_TEXT_MGA_STEP16       = 3;
 /* other MGAs:      text, attr,  6 reserved bytes */
 constexpr usize FB_AUX_TEXT_MGA_STEP8        = 4;
@@ -130,13 +130,13 @@ constexpr usize FB_ACCEL_SUN_LEO             = 13;
 constexpr usize FB_ACCEL_IMS_TWINTURBO       = 14;
 /* 3Dlabs Permedia 2		*/
 constexpr usize FB_ACCEL_3DLABS_PERMEDIA2    = 15;
-/* Matrox MGA2064W (Millenium)	*/
+/* Matrox MGA2064W (Millennium)	*/
 constexpr usize FB_ACCEL_MATROX_MGA2064W     = 16;
 /* Matrox MGA1064SG (Mystique)	*/
 constexpr usize FB_ACCEL_MATROX_MGA1064SG    = 17;
-/* Matrox MGA2164W (Millenium II) */
+/* Matrox MGA2164W (Millennium II) */
 constexpr usize FB_ACCEL_MATROX_MGA2164W     = 18;
-/* Matrox MGA2164W (Millenium II) */
+/* Matrox MGA2164W (Millennium II) */
 constexpr usize FB_ACCEL_MATROX_MGA2164W_AGP = 19;
 /* Matrox G100 (Productiva G100) */
 constexpr usize FB_ACCEL_MATROX_MGAG100      = 20;
@@ -519,7 +519,7 @@ constexpr usize FB_VBLANK_HAVE_VCOUNT = 0x020;
 constexpr usize FB_VBLANK_HAVE_HCOUNT = 0x040;
 /* currently in a vsync */
 constexpr usize FB_VBLANK_VSYNCING    = 0x080;
-/* verical syncs can be detected */
+/* vertical syncs can be detected */
 constexpr usize FB_VBLANK_HAVE_VSYNC  = 0x100;
 
 struct fb_vblank
