@@ -1,0 +1,258 @@
+From 0669ff13067ccfccba5823d371eb479ba5da2d17 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Thu, 17 Apr 2025 17:53:42 +0200
+Subject: [PATCH] [cryptix]: implement mount, umount, getrlimit and getrusage
+ syscalls, and enable linux, and glibc options
+
+---
+ meson.build                               |  7 ++-
+ sysdeps/cryptix/entry/entry.cpp           | 21 +++++++++
+ sysdeps/cryptix/generic/mntent.cpp        | 23 ----------
+ sysdeps/cryptix/include/cryptix/syscall.h |  4 ++
+ sysdeps/cryptix/meson.build               | 18 ++++----
+ sysdeps/cryptix/sysdeps/system.cpp        | 55 +++++++++++++++++++++++
+ sysdeps/cryptix/sysdeps/vfs.cpp           |  8 ++++
+ 7 files changed, 104 insertions(+), 32 deletions(-)
+ create mode 100644 sysdeps/cryptix/sysdeps/system.cpp
+
+diff --git a/meson.build b/meson.build
+index d068d192..4c7fd006 100644
+--- a/meson.build
++++ b/meson.build
+@@ -240,7 +240,12 @@ elif host_machine.system() == 'lyre'
+ 	libc_include_dirs += include_directories('sysdeps/lyre/include')
+ 	subdir('sysdeps/lyre')
+ elif host_machine.system() == 'cryptix'
+-    disable_linux_option = true
++    disable_linux_option = false
++    disable_glibc_option = false
++    disable_posix_option = false
++    disable_ansi_option = false
++    disable_libgcc_dependency = false
++    debug_allocator = true
+     rtld_include_dirs += include_directories('sysdeps/cryptix/include')
+     libc_include_dirs += include_directories('sysdeps/cryptix/include')
+     subdir('sysdeps/cryptix')
+diff --git a/sysdeps/cryptix/entry/entry.cpp b/sysdeps/cryptix/entry/entry.cpp
+index 216181fb..72b7f3e0 100644
+--- a/sysdeps/cryptix/entry/entry.cpp
++++ b/sysdeps/cryptix/entry/entry.cpp
+@@ -10,6 +10,27 @@
+ // defined by the POSIX library
+ void                          __mlibc_initLocale();
+ 
++extern "C"
++{
++    unsigned int __mlibc_dev_major(unsigned long long int __dev)
++    {
++        return ((__dev >> 8) & 0xfff) | ((unsigned int)(__dev >> 32) & ~0xfff);
++    }
++
++    unsigned int __mlibc_dev_minor(unsigned long long int __dev)
++    {
++        return (__dev & 0xff) | ((unsigned int)(__dev >> 12) & ~0xff);
++    }
++
++    unsigned long long int __mlibc_dev_makedev(unsigned int __major,
++                                               unsigned int __minor)
++    {
++        return ((__minor & 0xff) | ((__major & 0xfff) << 8)
++                | (((unsigned long long int)(__minor & ~0xff)) << 12)
++                | (((unsigned long long int)(__major & ~0xfff)) << 32));
++    }
++}
++
+ extern "C" uintptr_t*         __dlapi_entrystack();
+ extern "C" void               __dlapi_enter(uintptr_t*);
+ 
+diff --git a/sysdeps/cryptix/generic/mntent.cpp b/sysdeps/cryptix/generic/mntent.cpp
+index dcb05e9d..51bdceb8 100644
+--- a/sysdeps/cryptix/generic/mntent.cpp
++++ b/sysdeps/cryptix/generic/mntent.cpp
+@@ -7,33 +7,10 @@
+ 
+ namespace
+ {
+-
+     char*  internal_buf;
+     size_t internal_bufsize;
+-
+ } // namespace
+ 
+-extern "C"
+-{
+-    unsigned int __mlibc_dev_major(unsigned long long int __dev)
+-    {
+-        return ((__dev >> 8) & 0xfff) | ((unsigned int)(__dev >> 32) & ~0xfff);
+-    }
+-
+-    unsigned int __mlibc_dev_minor(unsigned long long int __dev)
+-    {
+-        return (__dev & 0xff) | ((unsigned int)(__dev >> 12) & ~0xff);
+-    }
+-
+-    unsigned long long int __mlibc_dev_makedev(unsigned int __major,
+-                                               unsigned int __minor)
+-    {
+-        return ((__minor & 0xff) | ((__major & 0xfff) << 8)
+-                | (((unsigned long long int)(__minor & ~0xff)) << 12)
+-                | (((unsigned long long int)(__major & ~0xfff)) << 32));
+-    }
+-}
+-
+ #define SENTINEL (char*)&internal_buf
+ 
+ FILE* setmntent(const char* name, const char* mode)
+diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
+index 33ce555a..f8eeb036 100644
+--- a/sysdeps/cryptix/include/cryptix/syscall.h
++++ b/sysdeps/cryptix/include/cryptix/syscall.h
+@@ -50,6 +50,8 @@ constexpr size_t SYS_FCHDIR        = 81;
+ constexpr size_t SYS_MKDIR         = 83;
+ constexpr size_t SYS_CREAT         = 85;
+ constexpr size_t SYS_UMASK         = 95;
++constexpr size_t SYS_GETRLIMIT     = 97;
++constexpr size_t SYS_GETRUSAGE     = 98;
+ constexpr size_t SYS_GETUID        = 102;
+ constexpr size_t SYS_GETGID        = 104;
+ constexpr size_t SYS_GETEUID       = 107;
+@@ -60,6 +62,8 @@ constexpr size_t SYS_SETSID        = 112;
+ constexpr size_t SYS_GETPGID       = 121;
+ constexpr size_t SYS_GETSID        = 124;
+ constexpr size_t SYS_ARCH_PRCTL    = 158;
++constexpr size_t SYS_MOUNT         = 165;
++constexpr size_t SYS_UMOUNT        = 166;
+ constexpr size_t SYS_REBOOT        = 169;
+ constexpr size_t SYS_GETDENTS64    = 217;
+ constexpr size_t SYS_CLOCK_GETTIME = 228;
+diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
+index 05661b87..8dc0f578 100644
+--- a/sysdeps/cryptix/meson.build
++++ b/sysdeps/cryptix/meson.build
+@@ -1,8 +1,9 @@
+ sysdep_supported_options = {
+-#  'posix': true,
+-#  'linux': false,
+-#  'glibc': true,
+-#  'bsd': false,
++  'posix': true,
++  'linux': true,
++  'glibc': true,
++  'bsd': true,
++  'ansi': true,
+ }
+ 
+ common_sources = files(
+@@ -10,6 +11,7 @@ common_sources = files(
+   'sysdeps/memory.cpp',
+   'sysdeps/process.cpp',
+   'sysdeps/signal.cpp',
++  'sysdeps/system.cpp',
+   'sysdeps/time.cpp',
+   'sysdeps/vfs.cpp',
+ )
+@@ -18,9 +20,9 @@ rtld_dso_sources += common_sources
+ libc_sources += files(
+   'entry/entry.cpp',
+ 
+-  'generic/mntent.cpp',
+-  'generic/mount.cpp',
+-  'generic/reboot.cpp',
++  #'generic/mntent.cpp',
++  #'generic/mount.cpp',
++  #'generic/reboot.cpp',
+ )
+ libc_sources += common_sources
+ 
+@@ -76,7 +78,7 @@ if not no_headers
+     subdir: 'abi-bits',
+     follow_symlinks: true,
+   )
+-  install_headers('include/cryptix/syscall.h', subdir: 'cryptix')
++  install_headers('include/cryptix/syscall.h', 'include/cryptix/reboot.hpp', subdir: 'cryptix')
+ 
+   install_headers(
+     'include/sys/reboot.h',
+diff --git a/sysdeps/cryptix/sysdeps/system.cpp b/sysdeps/cryptix/sysdeps/system.cpp
+new file mode 100644
+index 00000000..e49ec356
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/system.cpp
+@@ -0,0 +1,55 @@
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++
++#include <cryptix/syscall.h>
++
++#include <bits/ensure.h>
++#include <cryptix/reboot.hpp>
++#include <errno.h>
++#include <sys/reboot.h>
++
++using namespace cryptix;
++
++RebootCmd cryptix_reboot_cmd(unsigned int what)
++{
++    switch (what)
++    {
++        case 0x01234567: return RebootCmd::eRestart;
++        case 0xCDEF0123: return RebootCmd::eHalt;
++        case 0x4321FEDC: return RebootCmd::ePowerOff;
++        case 0xA1B2C3D4: return RebootCmd::eRestart2;
++        case 0xD000FCE2: return RebootCmd::eSuspend;
++        case 0x45584543: return RebootCmd::eKexec;
++
++        default: break;
++    }
++
++    return RebootCmd::eUndefined;
++}
++
++namespace mlibc
++{
++    int sys_getrlimit(int resource, struct rlimit* rlim)
++    {
++        auto ret = Syscall(SYS_GETRLIMIT, resource, rlim);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_getrusage(int who, struct rusage* usage)
++    {
++        auto ret = Syscall(SYS_GETRUSAGE, who, usage);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_reboot(int what)
++    {
++        auto cmd = cryptix_reboot_cmd(what);
++
++        auto ret = Syscall(SYS_REBOOT, cmd);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++}; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/vfs.cpp b/sysdeps/cryptix/sysdeps/vfs.cpp
+index 43be8a26..af2df149 100644
+--- a/sysdeps/cryptix/sysdeps/vfs.cpp
++++ b/sysdeps/cryptix/sysdeps/vfs.cpp
+@@ -191,6 +191,14 @@ namespace mlibc
+ 
+         return 0;
+     }
++    int sys_mount(const char* source, const char* target, const char* fs_name,
++                  unsigned long flags, const void* data)
++    {
++        auto ret = Syscall(SYS_MOUNT, source, target, fs_name, flags, data);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return ret;
++    }
+ 
+     int sys_read_entries(int fdnum, void* buffer, size_t max_size,
+                          size_t* bytes_read)
+-- 
+2.49.0
+
