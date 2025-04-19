@@ -272,8 +272,8 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
                       m_AddressSpace))
         return Error(ENOEXEC);
 
-    std::string_view ldPath = program.GetLdPath();
-    if (!ldPath.empty())
+    auto ldPath = program.GetLdPath();
+    if (!ldPath.Empty())
         Assert(ld.Load(ldPath, PageMap, m_AddressSpace, 0x40000000));
     Thread* currentThread = CPU::GetCurrentThread();
     currentThread->SetState(ThreadState::eExited);
@@ -285,7 +285,7 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
     }
 
     uintptr_t address
-        = ldPath.empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
+        = ldPath.Empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
 
     {
         CPU::UserMemoryProtectionGuard guard;
