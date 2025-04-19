@@ -17,9 +17,10 @@ int main()
         return EXIT_FAILURE;
     }
 
+    puts("\e[2JWelcome to CryptixOS!\n");
     for (;;)
     {
-        printf("Welcome to CryptixOS!");
+        puts("init: launching shell...\n");
 
         int pid = fork();
         if (pid == -1)
@@ -29,13 +30,21 @@ int main()
         }
         else if (pid == 0)
         {
-            char* const argv[] = {(char*)path, NULL};
+            char* const argv[] = {(char*)path, "-i", NULL};
             chdir(getenv("HOME"));
             execvp(path, argv);
         }
 
         int status;
-        waitpid(pid, &status, 0);
+    continue_waiting:
+        if (waitpid(pid, &status, 0) == pid)
+        {
+            bool exited = WIFEXITED(status);
+            if (!exited) goto continue_waiting;
+
+            printf("init: child %d died with exit code %d\n", pid,
+                   WEXITSTATUS(status));
+        }
     }
 
     return EXIT_SUCCESS;
