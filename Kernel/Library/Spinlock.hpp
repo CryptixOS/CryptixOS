@@ -43,12 +43,14 @@ class Spinlock
     }
     CTOS_ALWAYS_INLINE bool TestAndAcquire()
     {
+#ifdef CTOS_TARGET_X86_64
+        return CompareExchange<LockState>(&m_Lock, LockState::eUnlocked,
+                                          LockState::eLocked);
+#endif
         LockState expected = LockState::eUnlocked;
         return AtomicCompareExchange(&m_Lock, &expected, LockState::eLocked,
                                      false, MemoryOrder::eAtomicAcquire,
                                      MemoryOrder::eAtomicRelaxed);
-        return CompareExchange<LockState>(&m_Lock, LockState::eUnlocked,
-                                          LockState::eLocked);
     }
 
     void Acquire(bool disableInterrupts = false);
