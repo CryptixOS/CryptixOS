@@ -276,6 +276,7 @@ void Terminal::OnCsi(char c)
             LogWarn("Terminal: Sequence 'ESC[{:c}' is not implemented yet", c);
         case 'c':
         {
+            break;
             TTY* tty = TTY::GetCurrent();
             if (!tty) break;
 

@@ -35,7 +35,7 @@ namespace VFS
     std::tuple<INode*, INode*, std::string>
     ResolvePath(INode* parent, PathView path, bool followLinks);
 
-    std::unordered_map<std::string_view, class Filesystem*>& GetMountPoints();
+    std::unordered_map<StringView, class Filesystem*>& GetMountPoints();
 
     bool         MountRoot(std::string_view filesystemName);
     bool         Mount(INode* parent, PathView source, PathView target,

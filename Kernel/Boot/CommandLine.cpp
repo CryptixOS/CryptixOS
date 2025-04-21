@@ -51,15 +51,15 @@ namespace CommandLine
                 if (delimiterPos != StringView::NPos)
                 {
                     // Argument has a key=value format
-                    auto key    = arg.Substr(0, delimiterPos);
-                    auto value  = arg.Substr(delimiterPos + 1);
-                    result[key] = value;
+                    String key(arg.Substr(0, delimiterPos));
+                    auto   value = arg.Substr(delimiterPos + 1);
+                    result[key]  = String(value);
 
                     continue;
                 }
 
                 // Argument is a flag without a value
-                result[arg] = "";
+                result[String(arg)] = String("");
                 continue;
             }
 
@@ -85,7 +85,7 @@ namespace CommandLine
     using namespace Prism::StringViewLiterals;
     std::optional<bool> GetBoolean(StringView key)
     {
-        auto it = s_OptionMap.find(key);
+        auto it = s_OptionMap.find(String(key));
         if (it != s_OptionMap.end())
             return it->second == "true"_sv || it->second == "1"_sv;
 
@@ -93,7 +93,7 @@ namespace CommandLine
     }
     StringView GetString(StringView key)
     {
-        auto it = s_OptionMap.find(key);
+        auto it = s_OptionMap.find(String(key));
         if (it != s_OptionMap.end()) return it->second;
 
         return "";

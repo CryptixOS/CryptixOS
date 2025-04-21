@@ -13,6 +13,7 @@
 #include <Memory/VMM.hpp>
 
 #include <Prism/Containers/DoublyLinkedList.hpp>
+#include <Prism/Containers/Span.hpp>
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Memory/Buffer.hpp>
 #include <Prism/Memory/ByteStream.hpp>
@@ -276,6 +277,8 @@ namespace ELF
     {
       public:
         bool LoadFromMemory(u8* data, usize size);
+        bool ResolveSymbols(Span<Sym*> symbolTable);
+
         bool Load(PathView path, PageMap* pageMap, AddressSpace& addressSpace,
                   uintptr_t loadBase = 0);
         bool Load(Pointer image, usize size);

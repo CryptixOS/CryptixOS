@@ -71,9 +71,13 @@ class INode
     virtual i32   IoCtl(usize request, usize arg) { return_err(-1, ENODEV); }
     virtual ErrorOr<isize> Truncate(usize size) { return Error(ENOSYS); }
 
-    virtual ErrorOr<void>  ChMod(mode_t mode) { return Error(ENOSYS); }
+    virtual ErrorOr<isize> CheckPermissions(mode_t mask)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<void> ChMod(mode_t mode) { return Error(ENOSYS); }
 
-    inline bool            Populate()
+    inline bool           Populate()
     {
         return (!m_Populated && IsDirectory()) ? m_Filesystem->Populate(this)
                                                : true;

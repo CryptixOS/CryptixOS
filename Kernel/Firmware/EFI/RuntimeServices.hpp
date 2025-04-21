@@ -84,7 +84,7 @@ namespace EFI
         Uint64 NumberOfMemoryRanges;
     };
 
-    using MemoryDescriptor = void;
+    struct MemoryDescriptor;
 
     using GetTimeFn = Status (*)(Time* time, TimeCapabilities* capabilities);
     using SetTimeFn = Status (*)(Time* time);

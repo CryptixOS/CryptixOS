@@ -71,6 +71,7 @@ srcs += files(
   'Library/Kasan.cpp',
   'Library/Logger.cpp',
   'Library/Module.cpp',
+  'Library/Spinlock.cpp',
   'Library/Stacktrace.cpp',
   'Library/ZLib.cpp',
 

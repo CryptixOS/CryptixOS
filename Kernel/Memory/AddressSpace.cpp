@@ -6,20 +6,22 @@
  */
 #include <Memory/AddressSpace.hpp>
 
-AddressSpace::AddressSpace() {}
+AddressSpace::AddressSpace()
+{
+    auto memoryTop = PMM::GetMemoryTop();
+    auto base      = Pointer(Math::AlignUp(memoryTop, 1_gib));
+    m_TotalRange   = {base.Offset(4_gib), BootInfo::GetHHDMOffset()};
+}
 AddressSpace::~AddressSpace()
 {
-    for (const auto& [base, region] : m_Regions) delete region;
-    m_Regions.clear();
-
-    // for (const auto& [base, region] : m_RegionTree) delete region;
-    // m_RegionTree.Clear();
+    for (auto [base, region] : m_RegionTree) delete region;
+    m_RegionTree.Clear();
 }
 
 bool AddressSpace::IsAvailable(Pointer base, usize length) const
 {
     return true;
-    for (const auto& [base, region] : *const_cast<AddressSpace*>(this))
+    for (auto& [base, region] : *const_cast<AddressSpace*>(this))
     {
         auto range = region->GetVirtualRange();
         if (range.Contains(base) /*|| range.Contains(base.Offset(length - 1))*/)
@@ -30,66 +32,42 @@ bool AddressSpace::IsAvailable(Pointer base, usize length) const
 }
 void AddressSpace::Insert(Pointer base, Region* region)
 {
-    m_Regions[base.Raw()] = region;
+    m_RegionTree[base.Raw()] = region;
 }
 void AddressSpace::Erase(Pointer base)
 {
     ScopedLock guard(m_Lock);
-    auto       it = m_Regions.find(base.Raw());
+    auto       it = m_RegionTree.Find(base.Raw());
 
-    if (it != m_Regions.end())
+    if (it != m_RegionTree.end())
     {
-        delete it->second;
-        m_Regions.erase(it);
+        delete it->Value;
+        m_RegionTree.Erase(it->Key);
     }
 }
 
 Region* AddressSpace::AllocateRegion(usize size)
 {
     ScopedLock guard(m_Lock);
+    usize      alignment     = sizeof(void*);
 
-    auto       virt   = VMM::AllocateSpace(size, 0, true);
-    auto       region = new Region(0, virt, size);
+    Pointer    currentRegion = m_TotalRange.GetBase();
+    Pointer    regionStart;
+    usize      regionSize;
+    Pointer    regionEnd;
 
-    Insert(region->GetVirtualBase(), region);
+    do {
+        regionStart = Math::AlignUp(currentRegion, alignment);
+        regionSize  = (regionStart - currentRegion).Offset(size);
+        currentRegion += regionSize;
+        regionEnd = regionStart.Offset(regionSize);
+    } while (m_RegionTree.Contains(regionStart.Raw())
+             || m_RegionTree.Contains(regionEnd.Raw()));
+
+    auto region = new Region(0, regionStart, regionEnd - regionStart);
+
+    Insert(region->GetVirtualBase().Raw(), region);
     return region;
-
-    /*
-    auto virt = requestedAddress;
-    if (virt.Raw() == 0) virt = m_TotalRange.GetBase();
-
-    virt              = Math::AlignDown(virt, PMM::PAGE_SIZE);
-    size              = Math::AlignUp(size, PMM::PAGE_SIZE);
-
-    Region* newRegion = nullptr;
-    for (const auto& [base, region] : m_RegionTree)
-    {
-        if (virt == region->GetVirtualBase())
-        {
-            virt = region->End();
-            continue;
-        }
-
-        auto range = AddressRange(virt, region->GetVirtualBase() - virt);
-        if (range.GetSize() < size)
-        {
-            virt = region->End();
-            continue;
-        }
-
-        newRegion = new Region(0, virt, size);
-        break;
-    }
-
-    if (!newRegion && !m_RegionTree.Contains(virt))
-    {
-        auto range = AddressRange(virt, size);
-        newRegion  = new Region(0, range.GetBase(), range.GetSize());
-    }
-
-    if (newRegion)
-        m_RegionTree.Insert(newRegion->GetVirtualBase().Raw(), newRegion);
-    return newRegion;*/
 }
 Region* AddressSpace::AllocateFixed(Pointer virt, usize size)
 {
@@ -103,8 +81,16 @@ Region* AddressSpace::AllocateFixed(Pointer virt, usize size)
     return region;
 }
 
+Region* AddressSpace::Find(Pointer virt)
+{
+    auto it = m_RegionTree.Find(virt);
+    if (!it) return nullptr;
+
+    return it->Value;
+}
+
 void AddressSpace::Clear()
 {
     for (const auto& [_, region] : *this) delete region;
-    m_Regions.clear();
+    m_RegionTree.Clear();
 }

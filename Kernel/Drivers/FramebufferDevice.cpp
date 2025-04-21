@@ -68,7 +68,7 @@ FramebufferDevice::FramebufferDevice(limine_framebuffer* framebuffer)
 
     DevTmpFs::RegisterDevice(this);
 
-    std::string_view path = std::format("/dev/{}", GetName());
+    StringView path = std::format("/dev/{}", GetName()).data();
     VFS::MkNod(VFS::GetRootNode(), path, 0666, GetID());
 }
 

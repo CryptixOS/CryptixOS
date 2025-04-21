@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include "nostd/string.hpp"
 #include <API/Limits.hpp>
 #include <Arch/CPU.hpp>
 
@@ -24,11 +25,11 @@
 
 namespace VFS
 {
-    static INode*   s_RootNode = nullptr;
-    static Spinlock s_Lock;
-    static std::unordered_map<std::string_view, Filesystem*> s_MountPoints;
+    static INode*                                      s_RootNode = nullptr;
+    static Spinlock                                    s_Lock;
+    static std::unordered_map<StringView, Filesystem*> s_MountPoints;
 
-    Vector<std::pair<bool, std::string_view>>&               GetFilesystems()
+    Vector<std::pair<bool, std::string_view>>&         GetFilesystems()
     {
         static Vector<std::pair<bool, std::string_view>> s_Filesystems = {
             {
@@ -192,10 +193,10 @@ namespace VFS
 
         auto segments = path.SplitPath();
 
-        for (usize i = 0; i < segments.size(); i++)
+        for (usize i = 0; i < segments.Size(); i++)
         {
             auto segment     = segments[i];
-            bool isLast      = i == (segments.size() - 1);
+            bool isLast      = i == (segments.Size() - 1);
 
             bool previousDir = segment == "..";
             bool currentDir  = segment == ".";
@@ -246,8 +247,7 @@ namespace VFS
 
             errno = ENOENT;
             if (isLast)
-                return {
-                    currentNode, nullptr, {segment.data(), segment.length()}};
+                return {currentNode, nullptr, {segment.data(), segment.size()}};
 
             break;
         }
@@ -264,7 +264,7 @@ namespace VFS
         return {p, n, b};
     }
 
-    std::unordered_map<std::string_view, class Filesystem*>& GetMountPoints()
+    std::unordered_map<StringView, class Filesystem*>& GetMountPoints()
     {
         return s_MountPoints;
     }
@@ -361,7 +361,7 @@ namespace VFS
             LogTrace("VFS: Mounted  '{}' on '{}' with Filesystem '{}'",
                      sourcePath.Raw(), target.Raw(), fsName.data());
 
-        s_MountPoints[target] = fs;
+        s_MountPoints[target.Raw()] = fs;
         return true;
     fail:
         if (node) delete node;
@@ -380,11 +380,12 @@ namespace VFS
     {
         ScopedLock guard(s_Lock);
 
+        // LogInfo("Creating path: {}", path);
         auto [newNodeParent, newNode, newNodeName] = ResolvePath(parent, path);
+        // LogInfo("Creating node: {}", name);
         if (newNode) return_err(nullptr, EEXIST);
 
         if (!newNodeParent) return nullptr;
-
         newNode = newNodeParent->GetFilesystem()->CreateNode(newNodeParent,
                                                              newNodeName, mode);
         if (newNode) newNodeParent->InsertChild(newNode, newNode->GetName());

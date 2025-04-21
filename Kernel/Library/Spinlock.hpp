@@ -6,106 +6,72 @@
  */
 #pragma once
 
-#if PRISM_TARGET_CRYPTIX == 1
-    #include <Arch/Arch.hpp>
-    #include <Debug/Panic.hpp>
+#include <Arch/Arch.hpp>
+#include <Arch/x86_64/Atomic.hpp>
+#include <Debug/Panic.hpp>
 
 namespace CPU
 {
     bool SwapInterruptFlag(bool);
     void SetInterruptFlag(bool);
 } // namespace CPU
-#else
-namespace CPU bool SwapInterruptFlag(bool)
-{
-    assert(!"Can't change interrupt flag in userland");
-}
-void SetInterruptFlag(bool)
-{
-    assert(!"Can't change interrupt flag in userland");
-}
-}
-; // namespace CPU
-#endif
 
 #include <Prism/Core/Platform.hpp>
 #include <Prism/Core/Types.hpp>
 #include <Prism/Debug/Assertions.hpp>
+#include <Prism/Utility/Atomic.hpp>
 
-namespace Prism
-{
 #ifdef PRISM_ARCH_X86_64
-    inline void Pause() { __asm__ volatile("pause"); }
+inline void Pause() { __asm__ volatile("pause"); }
 #elifdef PRISM_ARCH_AARCH64
-    inline void Pause() { __asm__ volatile("isb" ::: "memory"); }
+inline void Pause() { __asm__ volatile("isb" ::: "memory"); }
 #endif
 
-    class Spinlock
+class Spinlock
+{
+    enum class LockState : u32
     {
-      public:
-        inline bool Test() { return !m_Lock.load(); }
-        inline bool TestAndAcquire()
-        {
-            return !m_Lock.exchange(true, std::memory_order_acquire);
-        }
-
-        inline void Acquire(bool disableInterrupts = false)
-        {
-            if (disableInterrupts)
-                m_SavedInterruptState = CPU::SwapInterruptFlag(false);
-            volatile usize deadLockCounter = 0;
-            for (;;)
-            {
-                if (TestAndAcquire()) break;
-
-                while (m_Lock.load(std::memory_order_relaxed))
-                {
-                    deadLockCounter += 1;
-                    if (deadLockCounter >= 100000000) goto deadlock;
-
-                    Pause();
-                }
-            }
-
-            m_LastAcquirer = __builtin_return_address(0);
-            return;
-
-        deadlock:
-            PrismPanic("DEADLOCK");
-        }
-        inline void Release(bool restoreInterrupts = false)
-        {
-            m_LastAcquirer = nullptr;
-            m_Lock.store(false, std::memory_order_release);
-
-            if (restoreInterrupts) CPU::SetInterruptFlag(m_SavedInterruptState);
-            m_SavedInterruptState = false;
-        }
-
-      private:
-        std::atomic_bool m_Lock                = false;
-        void*            m_LastAcquirer        = nullptr;
-        bool             m_SavedInterruptState = false;
+        eUnlocked = 0,
+        eLocked   = 1,
     };
 
-    class ScopedLock final
+  public:
+    CTOS_ALWAYS_INLINE bool Test()
     {
-      public:
-        ScopedLock(Spinlock& lock, bool disableInterrupts = false)
-            : m_Lock(lock)
-            , m_RestoreInterrupts(disableInterrupts)
-        {
-            lock.Acquire(disableInterrupts);
-        }
-        ~ScopedLock() { m_Lock.Release(m_RestoreInterrupts); }
+        return AtomicLoad(m_Lock, MemoryOrder::eAtomicRelaxed)
+            == LockState::eUnlocked;
+    }
+    CTOS_ALWAYS_INLINE bool TestAndAcquire()
+    {
+        LockState expected = LockState::eUnlocked;
+        return AtomicCompareExchange(&m_Lock, &expected, LockState::eLocked,
+                                     false, MemoryOrder::eAtomicAcquire,
+                                     MemoryOrder::eAtomicRelaxed);
+        return CompareExchange<LockState>(&m_Lock, LockState::eUnlocked,
+                                          LockState::eLocked);
+    }
 
-      private:
-        Spinlock& m_Lock;
-        bool      m_RestoreInterrupts = false;
-    };
-}; // namespace Prism
+    void Acquire(bool disableInterrupts = false);
+    void Release(bool restoreInterrupts = false);
 
-#if PRISM_TARGET_CRYPTIX == 1
-using Prism::ScopedLock;
-using Prism::Spinlock;
-#endif
+  private:
+    LockState m_Lock                = LockState::eUnlocked;
+    void*     m_LastAcquirer        = nullptr;
+    bool      m_SavedInterruptState = false;
+};
+
+class ScopedLock final
+{
+  public:
+    ScopedLock(Spinlock& lock, bool disableInterrupts = false)
+        : m_Lock(lock)
+        , m_RestoreInterrupts(disableInterrupts)
+    {
+        lock.Acquire(disableInterrupts);
+    }
+    ~ScopedLock() { m_Lock.Release(m_RestoreInterrupts); }
+
+  private:
+    Spinlock& m_Lock;
+    bool      m_RestoreInterrupts = false;
+};

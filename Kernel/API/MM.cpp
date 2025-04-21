@@ -21,6 +21,18 @@
 
 namespace API::MM
 {
+    using VirtualMemoryManager::Access;
+    static Access Prot2AccessFlags(isize prot)
+    {
+        Access access = Access::eUser;
+
+        if (prot & PROT_READ) access |= Access::eRead;
+        if (prot & PROT_WRITE) access |= Access::eWrite;
+        if (prot & PROT_EXEC) access |= Access::eExecute;
+
+        return access;
+    }
+
     ErrorOr<intptr_t> MMap(Pointer addr, usize length, i32 prot, i32 flags,
                            i32 fdNum, off_t offset)
     {
@@ -127,33 +139,22 @@ namespace API::MM
     }
     ErrorOr<isize> MProtect(Pointer virt, usize length, i32 prot)
     {
-        // TODO(v1tr10l7): Check for possible memory violation attempts
-        PageAttributes flags = PageAttributes::eUser;
-        using VirtualMemoryManager::Access;
-        Access access = Access::eUser;
+        if (virt & ~PMM::PAGE_SIZE) return Error(EINVAL);
+        length = Math::AlignUp(length, PMM::PAGE_SIZE);
+        if (length == 0) return Error(EINVAL);
 
-        if (prot & PROT_READ)
-        {
-            flags |= PageAttributes::eRead;
-            access |= Access::eRead;
-        }
-        if (prot & PROT_WRITE)
-        {
-            flags |= PageAttributes::eWrite;
-            access |= Access::eWrite;
-        }
-        if (prot & PROT_EXEC)
-        {
-            flags |= PageAttributes::eExecutable;
-            access |= Access::eExecute;
-        }
+        auto regionEnd = virt.Offset<Pointer>(length);
+        if (regionEnd < virt) return Error(EINVAL);
+        else if (virt == regionEnd) return 0;
+        if (prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC)) return Error(EINVAL);
 
         auto  process      = Process::GetCurrent();
         auto& addressSpace = process->GetAddressSpace();
-        if (!addressSpace.Contains(virt.Raw())) return Error(EINVAL);
+        auto  region       = addressSpace.Find(virt);
+        if (!region) return Error(EFAULT);
 
-        auto region = addressSpace[virt.Raw()];
-        region->SetProt(access, prot);
+        auto accessFlags = Prot2AccessFlags(prot);
+        region->SetProt(accessFlags, prot);
 
         process->PageMap->RemapRegion(region);
         return 0;

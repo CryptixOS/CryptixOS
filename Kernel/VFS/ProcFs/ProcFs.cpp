@@ -10,6 +10,8 @@
 #include <Library/Module.hpp>
 #include <Prism/String/StringUtils.hpp>
 
+#include <Time/Time.hpp>
+
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
 
@@ -56,17 +58,9 @@ struct ProcFsMountsProperty : public ProcFsProperty
         Buffer.clear();
         Buffer.resize(PMM::PAGE_SIZE);
 
-        for (auto it = VFS::GetMountPoints().begin();
-             it != VFS::GetMountPoints().end();)
-        {
-            auto&            mountPoint = *it;
-            std::string_view mountPath  = mountPoint.first;
-            Filesystem*      fs         = mountPoint.second;
-
+        for (const auto& [mountPath, fs] : VFS::GetMountPoints())
             Write("{} {} {} {}\n", fs->GetDeviceName(), mountPath,
                   fs->GetName(), fs->GetMountFlagsString());
-            ++it;
-        }
     }
 };
 struct ProcFsPartitionsProperty : public ProcFsProperty
@@ -87,6 +81,17 @@ struct ProcFsPartitionsProperty : public ProcFsProperty
 
             Write("{}\t{}\t{}\t{}\n", major, minor, blockCount, name);
         }
+    }
+};
+struct ProcFsUptimeProperty : public ProcFsProperty
+{
+    virtual void GenerateRecord() override
+    {
+        Buffer.clear();
+        Buffer.resize(PMM::PAGE_SIZE);
+
+        auto uptime = Time::GetReal();
+        Write("{} {}\n", uptime.tv_sec, uptime.tv_nsec);
     }
 };
 struct ProcFsVersionProperty : public ProcFsProperty
@@ -125,10 +130,9 @@ struct ProcFsStatusProperty : public ProcFsProperty
 {
     virtual void GenerateRecord() override
     {
-        auto  pidString = m_Parent->GetName();
-        pid_t pid
-            = StringUtils::ToNumber<pid_t>(pidString.data(), pidString.size());
-        auto process = ProcFs::GetProcess(pid);
+        StringView pidString = m_Parent->GetName().data();
+        pid_t      pid       = StringUtils::ToNumber<pid_t>(pidString, 10);
+        auto       process   = ProcFs::GetProcess(pid);
         if (!process) return;
 
         Write("Name: {}\n", process->GetName());
@@ -142,6 +146,7 @@ static constexpr ProcFsProperty* CreateProcFsProperty(StringView name)
     else if (name == "modules") return new ProcFsModulesProperty();
     else if (name == "mounts") return new ProcFsMountsProperty();
     else if (name == "partitions") return new ProcFsPartitionsProperty();
+    else if (name == "uptime") return new ProcFsUptimeProperty();
     else if (name == "version") return new ProcFsVersionProperty();
     else if (name == "vm_regions") return new ProcFsMemoryRegionsProperty;
 
@@ -204,6 +209,7 @@ INode* ProcFs::Mount(INode* parent, INode* source, INode* target,
     AddChild("modules");
     AddChild("mounts");
     AddChild("partitions");
+    AddChild("uptime");
     AddChild("version");
     AddChild("vm_regions");
 

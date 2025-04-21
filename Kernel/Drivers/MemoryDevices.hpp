@@ -110,7 +110,7 @@ namespace MemoryDevices
             std::string path = "/dev/";
             path += device->GetName();
 
-            VFS::MkNod(VFS::GetRootNode(), path, 0666, device->GetID());
+            VFS::MkNod(VFS::GetRootNode(), path.data(), 0666, device->GetID());
         }
     }
 }; // namespace MemoryDevices

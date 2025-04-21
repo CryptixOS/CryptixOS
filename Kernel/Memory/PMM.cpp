@@ -90,7 +90,6 @@ namespace PhysicalMemoryManager
         usize s_BitmapSize = Math::AlignUp(s_BitmapEntryCount / 8, PAGE_SIZE);
         s_BitmapEntryCount = s_BitmapSize * 8;
 
-        EarlyLogDebug("PMM: Allocating memory region for bitmap...");
         [[maybe_unused]]
         auto entryTypeToString
             = [](u64 type)
@@ -127,13 +126,6 @@ namespace PhysicalMemoryManager
             if (currentEntry->type != LIMINE_MEMMAP_USABLE
                 || currentEntry->length <= s_BitmapSize)
                 continue;
-
-            EarlyLogDebug(
-                "PMM: Allocating entry at %#p, with size: %zu, for %zu "
-                "bitmapEntries",
-                entryBase.Raw(), s_BitmapSize, s_BitmapEntryCount);
-            EarlyLogDebug("PMM: HHDM address of entry: %#p",
-                          entryBase.ToHigherHalf());
             s_Bitmap.Initialize(entryBase.ToHigherHalf(), s_BitmapSize, 0xff);
 
             currentEntry->base += s_BitmapSize;
@@ -143,10 +135,7 @@ namespace PhysicalMemoryManager
             break;
         }
 
-        EarlyLogInfo("E");
         Assert(s_Bitmap.GetSize() != 0);
-
-        EarlyLogDebug("PMM: Marking usable regions...");
         for (usize i = 0; i < entryCount; i++)
         {
             MemoryMapEntry* currentEntry = memoryMap[i];

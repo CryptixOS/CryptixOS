@@ -6,6 +6,8 @@
  */
 #pragma once
 
+#include <API/Posix/signal.h>
+#include <API/Posix/sys/select.h>
 #include <API/Posix/utime.h>
 #include <API/Syscall.hpp>
 #include <API/UnixTypes.hpp>
@@ -39,6 +41,9 @@ namespace API::VFS
                          const void* data);
 
     ErrorOr<isize> FChModAt(isize dirFdNum, PathView path, mode_t mode);
+    ErrorOr<isize> PSelect6(isize fdCount, fd_set* readFds, fd_set* writeFds,
+                            fd_set* exceptFds, const timeval* timeout,
+                            const sigset_t* sigmask);
     ErrorOr<isize> UTime(PathView path, const utimbuf* out);
     ErrorOr<isize> FStatAt(isize dirFd, const char* path, isize flags,
                            stat* out);

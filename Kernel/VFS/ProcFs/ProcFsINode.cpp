@@ -56,7 +56,8 @@ void ProcFsINode::InsertChild(INode* node, std::string_view name)
 isize ProcFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
     u8* dest = reinterpret_cast<u8*>(buffer);
-    return m_Property->Read(dest, offset, bytes);
+
+    return m_Property ? m_Property->Read(dest, offset, bytes) : -1;
 }
 isize ProcFsINode::Write(const void* buffer, off_t offset, usize bytes)
 {

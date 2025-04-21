@@ -17,6 +17,8 @@
 #include <Memory/VMM.hpp>
 
 #include <Library/ELF.hpp>
+#include <Prism/String/String.hpp>
+
 #include <Scheduler/Event.hpp>
 
 #include <VFS/FileDescriptorTable.hpp>
@@ -127,13 +129,13 @@ class Process
         return false;
     }
 
-    inline INode*           GetRootNode() const { return m_RootNode; }
-    inline std::string_view GetCWD() const { return m_CWD; }
-    inline mode_t           GetUmask() const { return m_Umask; }
-    mode_t                  Umask(mode_t mask);
+    inline INode*     GetRootNode() const { return m_RootNode; }
+    inline StringView GetCWD() const { return m_CWD; }
+    inline mode_t     GetUmask() const { return m_Umask; }
+    mode_t            Umask(mode_t mask);
 
-    static void             SendGroupSignal(pid_t pgid, i32 signal);
-    void                    SendSignal(i32 signal);
+    static void       SendGroupSignal(pid_t pgid, i32 signal);
+    void              SendSignal(i32 signal);
 
     ErrorOr<i32>   OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
     i32            CloseFd(i32 fd);
@@ -166,7 +168,7 @@ class Process
     std::vector<Thread*>  m_Threads;
 
     INode*                m_RootNode = VFS::GetRootNode();
-    std::string           m_CWD      = "/";
+    String                m_CWD      = "/";
     mode_t                m_Umask    = 0;
 
     FileDescriptorTable   m_FdTable;

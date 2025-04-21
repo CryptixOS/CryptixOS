@@ -32,7 +32,7 @@ namespace NVMe
             return;
         }
 
-        std::string_view path = std::format("/dev/{}", GetName());
+        StringView path = std::format("/dev/{}", GetName()).data();
         VFS::MkNod(VFS::GetRootNode(), path, 0666, GetID());
     }
 
@@ -41,6 +41,12 @@ namespace NVMe
         EnableMemorySpace();
         EnableBusMastering();
         PCI::Bar bar = GetBar(0);
+        LogInfo(
+            "NVMe{}: bar0 = {{ Base: {:#x}, Address: {:#x}, Size: {:#x}, "
+            "IsMMIO: {} }}",
+            m_Index, bar.Base.Raw<u64>(), bar.Address.Raw<u64>(), bar.Size,
+            bar.IsMMIO);
+
         if (!bar)
         {
             LogError("NVMe: Failed to acquire BAR0!");
@@ -48,10 +54,8 @@ namespace NVMe
         }
 
         m_CrAddress = bar.Map(0);
-        LogInfo("NVMe{}: bar0 = {{ Base: {:#x}, Size: {:#x}, IsMMIO: {} }}",
-                m_Index, bar.Address.Raw<u64>(), bar.Size, bar.IsMMIO);
 
-        m_Register = m_CrAddress.As<volatile ControllerRegister>();
+        m_Register  = m_CrAddress.As<volatile ControllerRegister>();
 
         AssertMsg(bar.IsMMIO, "PCI bar is not memory mapped!");
         Assert((ReadAt(0x10, 4) & 0b111) == 0b100);

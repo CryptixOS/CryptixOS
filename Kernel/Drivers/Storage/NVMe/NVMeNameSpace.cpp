@@ -51,8 +51,8 @@ namespace NVMe
 
         DevTmpFs::RegisterDevice(this);
 
-        std::string_view path
-            = std::format("/dev/{}n{}", m_Controller->GetName(), m_ID);
+        StringView path
+            = std::format("/dev/{}n{}", m_Controller->GetName(), m_ID).data();
         LogTrace("NVMe: Creating device at '{}'", path);
         VFS::MkNod(VFS::GetRootNode(), path, m_Stats.st_mode, GetID());
         DeviceManager::RegisterBlockDevice(this);
@@ -84,8 +84,9 @@ namespace NVMe
             DevTmpFs::RegisterDevice(partition);
             DeviceManager::RegisterBlockDevice(partition);
 
-            std::string_view partitionPath = std::format(
-                "/dev/{}n{}p{}", m_Controller->GetName(), m_ID, i);
+            StringView partitionPath
+                = std::format("/dev/{}n{}p{}", m_Controller->GetName(), m_ID, i)
+                      .data();
             VFS::MkNod(VFS::GetRootNode(), partitionPath, m_Stats.st_mode,
                        partition->GetID());
 

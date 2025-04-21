@@ -16,8 +16,6 @@
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Memory/Pointer.hpp>
 
-#include <unordered_map>
-
 class AddressSpace
 {
   public:
@@ -32,22 +30,22 @@ class AddressSpace
     Region*        AllocateRegion(usize size);
     Region*        AllocateFixed(Pointer requestedAddress, usize size);
 
+    Region*        Find(Pointer virt);
     constexpr bool Contains(Pointer virt) const
     {
-        return m_Regions.contains(virt);
+        return m_RegionTree.Contains(virt);
     }
 
-    inline Region*  operator[](Pointer virt) { return m_Regions[virt.Raw()]; }
-    void            Clear();
+    inline Region* operator[](Pointer virt) { return m_RegionTree[virt.Raw()]; }
+    void           Clear();
 
-    auto            begin() { return m_Regions.begin(); }
-    auto            end() { return m_Regions.end(); }
+    auto           begin() { return m_RegionTree.begin(); }
+    auto           end() { return m_RegionTree.end(); }
 
-    inline PageMap* GetPageMap() const { return m_PageMap; }
+    inline PageMap*                  GetPageMap() const { return m_PageMap; }
 
-    PageMap*        m_PageMap = nullptr;
-    [[maybe_unused]] RedBlackTree<uintptr_t, Region*> m_RegionTree;
-    std::unordered_map<uintptr_t, Region*>            m_Regions;
+    PageMap*                         m_PageMap = nullptr;
+    RedBlackTree<uintptr_t, Region*> m_RegionTree;
 
   private:
     Spinlock                 m_Lock;

@@ -204,6 +204,7 @@ namespace Syscall
         eMkDirAt          = 258,
         eFStatAt          = 262,
         eFChModAt         = 268,
+        ePSelect6         = 270,
         eDup3             = 292,
     };
 

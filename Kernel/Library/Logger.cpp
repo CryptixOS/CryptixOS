@@ -136,21 +136,22 @@ namespace Logger
                 char* start  = const_cast<char*>(fmt);
                 usize length = 0;
 
-                for (; std::isdigit(*fmt); length++, fmt++);
+                for (; StringUtils::IsDigit(*fmt); length++, fmt++);
+                StringView numberString(start, length);
 
-                return ToNumber<isize>(start, length);
+                return ToNumber<isize>(numberString, 10);
             };
 
             isize width     = 0;
             isize precision = 1000;
             if (fmt != precisionStart)
             {
-                if (std::isdigit(*fmt)) width = parseNumber(fmt);
+                if (StringUtils::IsDigit(*fmt)) width = parseNumber(fmt);
                 else if (*fmt == '*') width = va_arg(args, i32);
             }
             if (*fmt == '*' && fmt == precisionStart)
                 precision = va_arg(args, i32);
-            else if (std::isdigit(*fmt) && fmt == precisionStart)
+            else if (StringUtils::IsDigit(*fmt) && fmt == precisionStart)
                 precision = parseNumber(fmt);
 
             enum class ArgLength

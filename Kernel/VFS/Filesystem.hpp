@@ -60,12 +60,17 @@ class Filesystem
   protected:
     Spinlock           m_Lock;
 
-    std::string        m_Name;
+    std::string        m_Name           = "NoFs";
+    dev_t              m_DeviceID       = -1;
+    usize              m_BlockSize      = 512;
+    usize              m_BytesLimit     = 0;
     u32                m_Flags          = 0;
+
+    INode*             m_SourceDevice   = nullptr;
     INode*             m_Root           = nullptr;
+
     INode*             m_MountedOn      = nullptr;
     void*              m_MountData      = nullptr;
 
     std::atomic<ino_t> m_NextInodeIndex = 2;
-    dev_t              m_DeviceID       = 0;
 };

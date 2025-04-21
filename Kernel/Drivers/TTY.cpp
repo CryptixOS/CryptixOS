@@ -171,7 +171,7 @@ isize TTY::Write(const void* src, off_t offset, usize bytes)
     if (str.StartsWith(MLIBC_LOG_SIGNATURE))
     {
         StringView errorMessage(s + sizeof(MLIBC_LOG_SIGNATURE) - 1 - 1);
-        LogMessage("[{}mlibc{}]: {} ", AnsiColor::FOREGROUND_MAGENTA,
+        LogMessage("[{}mlibc{}]: {}", AnsiColor::FOREGROUND_MAGENTA,
                    AnsiColor::FOREGROUND_WHITE, errorMessage);
 
         return bytes;
@@ -315,7 +315,7 @@ void TTY::Initialize()
 
         std::string path = "/dev/tty";
         path += std::to_string(minor);
-        VFS::MkNod(VFS::GetRootNode(), path, 0666, tty->GetID());
+        VFS::MkNod(VFS::GetRootNode(), path.data(), 0666, tty->GetID());
         minor++;
     }
 
@@ -326,7 +326,7 @@ void TTY::Initialize()
         s_TTYs.push_back(tty);
         DevTmpFs::RegisterDevice(tty);
 
-        std::string path = "/dev/tty";
+        StringView path = "/dev/tty";
         VFS::MkNod(VFS::GetRootNode(), path, 0666, tty->GetID());
     }
     if (!s_TTYs.empty())
@@ -435,7 +435,7 @@ void TTY::EraseChar()
 
     if (m_RawBuffer.Empty()) return;
     usize count = 1;
-    if (IsControl(m_RawBuffer.Pop())) count = 2;
+    if (IsControl(m_RawBuffer.PopFront())) count = 2;
     while (count-- && m_Termios.c_lflag & (ECHO | ECHOK))
     {
         EchoRaw('\b');

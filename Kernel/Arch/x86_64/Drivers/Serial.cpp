@@ -62,8 +62,7 @@ namespace Serial
     {
         ScopedLock guard(s_Lock);
         word       port = static_cast<word>(Port::eCom1);
-        while ((IO::In<byte>(port + 5) & 1) == 0)
-            ;
+        while ((IO::In<byte>(port + 5) & 1) == 0);
 
         return IO::In<byte>(port);
     }
@@ -71,10 +70,14 @@ namespace Serial
     {
         ScopedLock guard(s_Lock);
         word       port = static_cast<word>(Port::eCom1);
-        while ((IO::In<byte>(port + 5) & 0x20) == 0)
-            ;
+        while ((IO::In<byte>(port + 5) & 0x20) == 0);
 
         IO::Out<byte>(port, data);
     }
-
+    void Write2(byte data)
+    {
+        ScopedLock guard(s_Lock);
+        word       port = std::to_underlying(Port::eCom1);
+        IO::Out<byte>(port, data);
+    }
 }; // namespace Serial

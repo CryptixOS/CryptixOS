@@ -46,9 +46,9 @@ Process::Process(Process* parent, std::string_view name,
     , m_Credentials(creds)
     , m_Ring(PrivilegeLevel::eUnprivileged)
     , m_NextTid(m_Pid)
+    , m_CWD("/")
 
 {
-    m_CWD = "/";
     m_FdTable.OpenStdioStreams();
 }
 
@@ -157,7 +157,8 @@ void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
 ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
-    INode* parent = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), m_CWD));
+    INode* parent
+        = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), m_CWD.Raw()));
     if (CPU::AsUser([path]() -> bool { return path.IsAbsolute(); }))
         parent = VFS::GetRootNode();
     else if (dirFd != AT_FDCWD)
@@ -223,10 +224,10 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
     m_Name = path;
     Arch::VMM::DestroyPageMap(PageMap);
     delete PageMap;
-    PageMap = new class PageMap();
+    PageMap     = new class PageMap();
 
-    auto nodeOr
-        = CPU::AsUser([path]() -> auto { return VFS::ResolvePath(path); });
+    auto nodeOr = CPU::AsUser([path]() -> auto
+                              { return VFS::ResolvePath(path.data()); });
     if (!nodeOr) return nodeOr.error();
 
     std::string shellPath;
@@ -268,8 +269,8 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
     if (!shellPath.empty()) argvArr.push_back(path);
 
     static ELF::Image program, ld;
-    if (!program.Load(shellPath.empty() ? path : argvArr[0], PageMap,
-                      m_AddressSpace))
+    if (!program.Load(shellPath.empty() ? path.data() : argvArr[0].data(),
+                      PageMap, m_AddressSpace))
         return Error(ENOEXEC);
 
     auto ldPath = program.GetLdPath();

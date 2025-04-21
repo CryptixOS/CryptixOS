@@ -95,6 +95,56 @@ namespace ELF
 
         return true;
     }
+    bool Image::ResolveSymbols(Span<Sym*> symTab)
+    {
+        constexpr usize SHN_UNDEF    = 0;
+        constexpr usize SHN_LOPROC   = 0xff00;
+
+        auto            lookupSymbol = [&symTab](char* name) -> u64
+        {
+            (void)symTab;
+            return 0;
+        };
+
+        for (const auto& section : m_Sections)
+        {
+            auto type = static_cast<SectionType>(section.Type);
+            if (type != SectionType::eSymbolTable) continue;
+
+            auto stringTableHeader
+                = Pointer(m_Image.Raw() + m_Header.SectionHeaderTableOffset
+                          + m_Header.SectionEntrySize * section.Link)
+                      .As<SectionHeader>();
+            char* symbolNames
+                = reinterpret_cast<char*>(stringTableHeader->Address);
+            Sym* symbolTable = reinterpret_cast<Sym*>(section.Address);
+
+            for (usize sym = 0; sym < section.Size / sizeof(Sym); ++sym)
+            {
+
+                if (symbolTable[sym].SectionIndex > 0
+                    && symbolTable[sym].SectionIndex < SHN_LOPROC)
+                {
+                    SectionHeader* shdr = Pointer(
+                        m_Image.Raw() + m_Header.SectionHeaderTableOffset
+                        + m_Header.SectionEntrySize
+                              * symbolTable[sym].SectionIndex);
+                    symbolTable[sym].Value += shdr->Address;
+                }
+                else if (symbolTable[sym].SectionIndex == SHN_UNDEF)
+                    symbolTable[sym].Value
+                        = lookupSymbol(symbolNames + symbolTable[sym].Name);
+
+                // TODO(v1tr10l7): module data
+                if (symbolTable[sym].Name
+                    && !strcmp(symbolNames + symbolTable[sym].Name, "metadata"))
+                    ;
+            }
+        }
+
+        return true;
+    }
+
     bool Image::Load(PathView path, PageMap* pageMap,
                      AddressSpace& addressSpace, uintptr_t loadBase)
     {
@@ -270,7 +320,12 @@ namespace ELF
     void Image::LoadSymbols()
     {
         ElfDebugLog("ELF: Loading symbols...");
-        if (!m_SymbolSection || !m_StringSection) return;
+        if (!m_SymbolSection || m_SymbolSection->Size == 0
+            || m_SymbolSection->EntrySize == 0)
+            return;
+        if (!m_StringSection || m_StringSection->Size == 0
+            || m_StringSection->EntrySize == 0)
+            return;
 
         const Sym* symtab
             = reinterpret_cast<Sym*>(m_Image.Raw() + m_SymbolSection->Offset);
@@ -281,12 +336,12 @@ namespace ELF
         usize entryCount = m_SymbolSection->Size / m_SymbolSection->EntrySize;
         for (usize i = 0; i < entryCount; i++)
         {
-            auto name = std::string_view(&strtab[symtab[i].Name]);
-            if (symtab[i].SectionIndex == 0x00 || name.empty()) continue;
+            auto name = StringView(&strtab[symtab[i].Name]);
+            if (symtab[i].SectionIndex == 0x00 || name.Empty()) continue;
 
             uintptr_t addr = symtab[i].Value;
             Symbol    sym;
-            sym.name    = const_cast<char*>(name.data());
+            sym.name    = const_cast<char*>(name.Raw());
             sym.address = addr;
             m_Symbols.PushBack(sym);
         }

@@ -100,6 +100,6 @@ sources:
   - name: mlibc
     subdir: 'sources'
     git: 'https://github.com/managarm/mlibc.git'
-    branch: 'release-5.0'
+    branch: 'v6.x'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'

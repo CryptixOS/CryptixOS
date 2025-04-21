@@ -72,6 +72,18 @@ namespace API::VFS
     {
         return API::VFS::FStatAt(AT_FDCWD, path, AT_SYMLINK_NOFOLLOW, out);
     }
+    ErrorOr<i32> Access(const char* path, mode_t mode)
+    {
+        if (mode != (mode & S_IRWXO)) return Error(EINVAL);
+        auto process = Process::GetCurrent();
+        if (!process->ValidateRead(path, 4096)) return Error(EFAULT);
+
+        auto inode
+            = std::get<1>(::VFS::ResolvePath(::VFS::GetRootNode(), path));
+        if (!inode) return Error(errno);
+
+        return inode->CheckPermissions(mode);
+    }
 
     ErrorOr<isize> Dup(isize oldFdNum)
     {
@@ -131,11 +143,11 @@ namespace API::VFS
         if (!buffer || size == 0) return Error(EINVAL);
         if (!process->ValidateWrite(buffer, size)) return Error(EFAULT);
 
-        std::string_view cwd = process->GetCWD();
-        if (size < cwd.length()) return Error(ERANGE);
+        StringView cwd = process->GetCWD();
+        if (size < cwd.Size()) return Error(ERANGE);
 
         CPU::UserMemoryProtectionGuard guard;
-        cwd.copy(buffer, cwd.length());
+        cwd.Copy(buffer, cwd.Size());
         return 0;
     }
 
@@ -146,7 +158,7 @@ namespace API::VFS
             return Error(EFAULT);
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
-        std::string_view lastComponent = path.GetLastComponent();
+        StringView lastComponent = path.GetLastComponent().data();
         if (lastComponent == ".") return Error(EINVAL);
         if (lastComponent == "..") return Error(ENOTEMPTY);
 
@@ -181,10 +193,10 @@ namespace API::VFS
         INode* node = nodeOrError.value();
         if (!node->IsSymlink()) return Error(EINVAL);
 
-        std::string_view symlinkTarget = node->GetTarget();
-        size                           = std::min(size, symlinkTarget.size());
+        StringView symlinkTarget = node->GetTarget().data();
+        size                     = std::min(size, symlinkTarget.Size());
 
-        return symlinkTarget.copy(out, size);
+        return symlinkTarget.Copy(out, size);
     }
     ErrorOr<isize> ChMod(const char* path, mode_t mode)
     {
@@ -233,6 +245,34 @@ namespace API::VFS
         auto ret = node->ChMod(mode);
         if (!ret) return Error(ret.error());
         return 0;
+    }
+    ErrorOr<isize> PSelect6(isize fdCount, fd_set* readFds, fd_set* writeFds,
+                            fd_set* exceptFds, const timeval* timeout,
+                            const sigset_t* sigmask)
+    {
+        auto                   current = Process::GetCurrent();
+
+        [[maybe_unused]] isize i, j, max;
+        return -1;
+        usize set = 0;
+        for (isize i = 0; i < FD_SETSIZE; i++)
+        {
+            j = i << 5;
+            if (j >= fdCount) break;
+
+            set = readFds->fds_bits[i] | writeFds->fds_bits[i]
+                | exceptFds->fds_bits[i];
+            for (; set; j++, set >>= 1)
+            {
+                if (j >= fdCount) goto end_check;
+                if (!(set & Bit(0))) continue;
+
+                auto fd = current->GetFileHandle(j);
+                if (!fd) return Error(EBADF);
+                max = j;
+            }
+        }
+    end_check:
     }
 
     ErrorOr<isize> UTime(PathView path, const utimbuf* out)
@@ -431,7 +471,8 @@ namespace Syscall::VFS
         if (!node) return Error(ENOENT);
         if (!node->IsDirectory()) return Error(ENOTDIR);
 
-        current->m_CWD = node->GetPath();
+        current->m_CWD
+            = StringView{node->GetPath().data(), node->GetPath().size()};
         return 0;
     }
     ErrorOr<i32> SysFChDir(Arguments& args)
@@ -446,7 +487,7 @@ namespace Syscall::VFS
         if (!node) return Error(ENOENT);
 
         if (!node->IsDirectory()) return Error(ENOTDIR);
-        current->m_CWD = node->GetPath();
+        current->m_CWD = StringView(node->GetPath().data());
 
         return 0;
     }

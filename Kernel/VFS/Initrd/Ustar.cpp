@@ -32,8 +32,8 @@ namespace Ustar
 {
     bool Validate(uintptr_t address)
     {
-        return strncmp(reinterpret_cast<FileHeader*>(address)->signature, MAGIC,
-                       MAGIC_LENGTH - 1)
+        return std::strncmp(reinterpret_cast<FileHeader*>(address)->signature,
+                            MAGIC.Raw(), MAGIC_LENGTH - 1)
             == 0;
     }
 
@@ -51,12 +51,13 @@ namespace Ustar
             return reinterpret_cast<FileHeader*>(nextFile);
         };
 
-        while (strncmp(current->signature, MAGIC, MAGIC_LENGTH - 1) == 0)
+        while (std::strncmp(current->signature, MAGIC.Raw(), MAGIC_LENGTH - 1)
+               == 0)
         {
-            std::string_view filename(current->filename);
-            std::string_view linkName(current->linkName);
+            PathView filename(current->filename);
+            PathView linkName(current->linkName);
 
-            mode_t           mode
+            mode_t   mode
                 = parseOctNumber<mode_t>(current->mode, sizeof(current->mode));
             usize size = parseOctNumber<usize>(current->fileSize,
                                                sizeof(current->fileSize));
@@ -78,7 +79,7 @@ namespace Ustar
                         LogError(
                             "USTAR: Failed to create regular file!, path: "
                             "'{}'",
-                            filename.data());
+                            filename);
                     else if (node->Write(
                                  reinterpret_cast<u8*>(
                                      reinterpret_cast<uintptr_t>(current)
@@ -88,21 +89,21 @@ namespace Ustar
                         LogError(
                             "USTAR: Could not write to regular file! path: "
                             "'{}'",
-                            filename.data());
+                            filename);
                     break;
                 case FILE_TYPE_HARD_LINK:
                     LogError("USTAR: Loading hard links is not implemented.");
                     break;
                     LogError("USTAR: Failed to create hardlink: '{}' -> '{}'",
-                             filename.data(), linkName.data());
+                             filename, linkName);
                     break;
                 case FILE_TYPE_SYMLINK:
-                    node = VFS::Symlink(VFS::GetRootNode(), filename.data(),
-                                        linkName.data());
+                    node = VFS::Symlink(VFS::GetRootNode(), filename,
+                                        linkName.Raw());
                     if (!node)
                         LogError(
                             "USTAR: Failed to create Symlink: '{}' -> '{}'",
-                            filename.data(), linkName.data());
+                            filename, linkName);
                     break;
                 case FILE_TYPE_CHARACTER_DEVICE:
                 {
@@ -128,7 +129,7 @@ namespace Ustar
                     if (!node)
                         LogError(
                             "USTAR: Failed to create a directory! path: '{}'",
-                            filename.data());
+                            filename);
                     break;
                 case FILE_TYPE_FIFO: ToDo(); break;
                 default: break;

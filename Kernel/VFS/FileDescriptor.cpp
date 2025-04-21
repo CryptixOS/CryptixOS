@@ -201,8 +201,8 @@ bool FileDescriptor::GenerateDirEntries()
     for (const auto [name, child] : node->GetChildren()) dirEntries.Push(child);
 
     // . && ..
-    std::string_view cwdPath = Process::GetCurrent()->GetCWD();
-    auto cwd = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), cwdPath));
+    StringView cwdPath = Process::GetCurrent()->GetCWD();
+    auto       cwd = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), cwdPath));
     if (!cwd) return true;
 
     dirEntries.Push(cwd, ".");

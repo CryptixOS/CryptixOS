@@ -9,13 +9,13 @@ modules = [
 ]
 
 args += [
-  '-march=x86_64',
+  #'-march=x86_64',
   '-msoft-float',
   '-mno-mmx',
   '-mno-sse',
   '-mno-sse2',
   '-mno-red-zone',
-  '-mc-model=large',
+  '-mcmodel=large',
 ]
 
 foreach name : modules

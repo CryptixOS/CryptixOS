@@ -80,6 +80,10 @@ void Ps2KeyboardDevice::HandleScanCodeSet1Key(u8 raw)
         bool disableArrowKeys
             = CommandLine::GetBoolean("disableArrowKeys").value_or(false);
 
+        char cursorSequence[3];
+        cursorSequence[0] = '\e';
+        cursorSequence[1] = cursorKeyMode ? 'O' : '[';
+
         switch (raw)
         {
             case SCANCODE_CTRL_PRESS:
@@ -91,19 +95,23 @@ void Ps2KeyboardDevice::HandleScanCodeSet1Key(u8 raw)
             case 0x35: Emit("/", 1); return;
             case SCANCODE_UP_ARROW:
                 if (disableArrowKeys) return;
-                Emit(cursorKeyMode ? "\eOA" : "\e[A", 3);
+                cursorSequence[2] = 'A';
+                Emit(cursorSequence, 3);
                 return;
             case SCANCODE_LEFT_ARROW:
                 if (disableArrowKeys) return;
-                Emit(cursorKeyMode ? "\eOD" : "\e[D", 3);
+                cursorSequence[2] = 'D';
+                Emit(cursorSequence, 3);
                 return;
             case SCANCODE_DOWN_ARROW:
                 if (disableArrowKeys) return;
-                Emit(cursorKeyMode ? "\eOB" : "\e[B", 3);
+                cursorSequence[2] = 'B';
+                Emit(cursorSequence, 3);
                 return;
             case SCANCODE_RIGHT_ARROW:
                 if (disableArrowKeys) return;
-                Emit(cursorKeyMode ? "\eOC" : "\e[C", 3);
+                cursorSequence[2] = 'C';
+                Emit(cursorSequence, 3);
                 return;
             case SCANCODE_HOME_PRESS: Emit("\e[1~", 4); return;
             case SCANCODE_END_PRESS: Emit("\e[4~", 4); return;
