@@ -128,7 +128,6 @@ namespace API::MM
         region->SetProt(access, prot);
         pageMap->MapRegion(region, pageSize);
 
-        error = errorCode.value_or(no_error);
         return region->GetVirtualBase().Raw();
 
     free_region:
