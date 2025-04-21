@@ -29,9 +29,9 @@ namespace VFS
     static Spinlock                                    s_Lock;
     static std::unordered_map<StringView, Filesystem*> s_MountPoints;
 
-    Vector<std::pair<bool, std::string_view>>&         GetFilesystems()
+    Vector<std::pair<bool, StringView>>&               GetFilesystems()
     {
-        static Vector<std::pair<bool, std::string_view>> s_Filesystems = {
+        static Vector<std::pair<bool, StringView>> s_Filesystems = {
             {
                 false,
                 "tmpfs",

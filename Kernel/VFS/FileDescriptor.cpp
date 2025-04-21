@@ -17,9 +17,10 @@
 void DirectoryEntries::Push(INode* node, std::string_view name)
 {
     if (name.empty()) name = node->GetName();
-    node            = node->Reduce(false);
+    node = node->Reduce(false);
 
-    auto  reclen    = Math::AlignUp(DIRENT_LENGTH + name.length() + 1, 8);
+    auto reclen
+        = Math::AlignUp(DIRENT_LENGTH + name.length() + 1, alignof(dirent));
 
     auto* entry     = reinterpret_cast<dirent*>(malloc(reclen));
     entry->d_ino    = node->GetStats().st_ino;
@@ -27,11 +28,33 @@ void DirectoryEntries::Push(INode* node, std::string_view name)
     entry->d_reclen = reclen;
     entry->d_type   = IF2DT(node->GetStats().st_mode);
 
-    name.copy(entry->d_name, name.length());
+    name.copy(entry->d_name, name.length() + 1);
     reinterpret_cast<char*>(entry->d_name)[name.length()] = 0;
 
+    LogInfo(
+        "Entry: {{ d_ino: {}, d_off: {}, d_reclen: {:#x}, d_type: {}, d_name: "
+        "{} }}",
+        entry->d_ino, entry->d_off, entry->d_reclen, entry->d_type,
+        entry->d_name);
     Entries.push_back(entry);
     Size += entry->d_reclen;
+}
+usize DirectoryEntries::CopyAndPop(u8* out, usize capacity)
+{
+    if (Entries.empty()) return 0;
+
+    auto  entry     = Entries.front();
+    usize entrySize = entry->d_reclen;
+    if (capacity < entrySize) return 0;
+
+    Entries.pop_front();
+    if (!entry || !(char*)entry->d_name) return 0;
+
+    LogInfo("Copying directory entry: {}", entry->d_name);
+    std::memcpy(out, entry, entry->d_reclen);
+    delete entry;
+
+    return entrySize;
 }
 
 FileDescriptor::FileDescriptor(INode* node, i32 flags, FileAccessMode accMode)
@@ -167,7 +190,7 @@ FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
 
     usize length = 0;
     for (const auto& entry : dirEntries) length += entry->d_reclen;
-    length = std::min(maxSize, length);
+    length = std::min(maxSize, length) - sizeof(dirent);
 
     if (dirEntries.Front()->d_reclen > maxSize) return Error(EINVAL);
 
@@ -179,8 +202,13 @@ FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
 
     while (offset < length)
     {
-        bytes = offset;
-        offset += dirEntries.CopyAndPop(reinterpret_cast<u8*>(out) + offset);
+        bytes        = offset;
+
+        usize copied = dirEntries.CopyAndPop(
+            reinterpret_cast<u8*>(out) + offset, length - offset);
+
+        if (copied == 0) break;
+        offset += copied;
     }
 
     if (dirEntries.IsEmpty()) dirEntries.ShouldRegenerate = true;
@@ -198,7 +226,11 @@ bool FileDescriptor::GenerateDirEntries()
     dirEntries.Clear();
 
     node = m_Description->Node->Reduce(true, true);
-    for (const auto [name, child] : node->GetChildren()) dirEntries.Push(child);
+    for (const auto [name, child] : node->GetChildren())
+    {
+        if (name.empty()) continue;
+        dirEntries.Push(child);
+    }
 
     // . && ..
     StringView cwdPath = Process::GetCurrent()->GetCWD();

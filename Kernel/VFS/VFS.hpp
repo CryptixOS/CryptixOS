@@ -21,10 +21,10 @@ class INode;
 class FileDescriptor;
 namespace VFS
 {
-    Vector<std::pair<bool, std::string_view>>& GetFilesystems();
+    Vector<std::pair<bool, StringView>>& GetFilesystems();
 
-    INode*                                     GetRootNode();
-    void                                       RecursiveDelete(INode* node);
+    INode*                               GetRootNode();
+    void                                 RecursiveDelete(INode* node);
 
     std::expected<FileDescriptor*, std::errno_t>
                     Open(INode* parent, PathView path, i32 flags, mode_t mode);

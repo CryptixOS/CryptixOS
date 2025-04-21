@@ -55,21 +55,10 @@ struct DirectoryEntries
     inline void Clear() { Entries.clear(); }
     void        Push(INode* node, std::string_view = "");
 
-    usize       CopyAndPop(u8* out)
-    {
-        if (Entries.empty()) return 0;
+    usize       CopyAndPop(u8* out, usize capacity);
 
-        auto  entry     = Entries.pop_front_element();
-        usize entrySize = entry->d_reclen;
-
-        std::memcpy(out, entry, entry->d_reclen);
-        delete entry;
-
-        return entrySize;
-    }
-
-    auto begin() { return Entries.begin(); }
-    auto end() { return Entries.end(); }
+    auto        begin() { return Entries.begin(); }
+    auto        end() { return Entries.end(); }
 };
 struct FileDescription
 {
