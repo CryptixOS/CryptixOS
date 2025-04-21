@@ -38,10 +38,11 @@ packages:
       - coreutils
       - file
       - init
-      - iputils
+      #- iputils
       - mlibc
       - which
       - shell-apps
+      - sys-apps
       - misc-apps
       - text-editors
     configure: []

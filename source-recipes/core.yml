@@ -90,7 +90,6 @@ sources:
     commit: '63acb96f92473ceb5e21d873d7c0aee266b3d6d3'
     version: '20230121'
 
-
   - name: llvm
     subdir: 'sources'
     git: 'https://github.com/llvm/llvm-project'
@@ -103,3 +102,16 @@ sources:
     branch: 'v6.x'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
+
+  - name: util-linux
+    subdir: 'sources'
+    git: 'https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git'
+    tag: 'v2.36.2'
+    version: '2.36.2'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-pkg-config
+      - host-libtool
+    regenerate:
+      - args: ['./autogen.sh']

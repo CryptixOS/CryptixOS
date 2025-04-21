@@ -1,0 +1,150 @@
+sources:
+  - name: rust-libc
+    subdir: 'sources'
+    git: 'https://github.com/rust-lang/libc.git'
+    tag: '0.2.153'
+    version: '0.2.153'
+
+  - name: rust-num-cpus
+    subdir: 'sources'
+    git: 'https://github.com/seanmonstar/num_cpus.git'
+    tag: 'v1.15.0'
+    version: '1.15.0'
+
+  - name: rust-users
+    subdir: 'sources'
+    git: 'https://github.com/ogham/rust-users.git'
+    tag: 'v0.11.0'
+    version: '0.11.0'
+
+  - name: rust-backtrace
+    subdir: 'sources'
+    git: 'https://github.com/rust-lang/backtrace-rs.git'
+    tag: '0.3.69'
+    version: '0.3.69'
+
+  - name: rust-calloop
+    subdir: 'sources'
+    git: 'https://github.com/Smithay/calloop.git'
+    tag: 'v0.10.0'
+    version: '0.10.0'
+
+  - name: rust-getrandom
+    subdir: 'sources'
+    git: 'https://github.com/rust-random/getrandom.git'
+    tag: 'v0.2.9'
+    version: '0.2.9'
+
+  - name: rust-libloading
+    subdir: 'sources'
+    git: 'https://github.com/nagisa/rust_libloading.git'
+    tag: '0.7.4'
+    version: '0.7.4'
+
+  - name: rust-mio-0.6
+    subdir: 'sources'
+    git: 'https://github.com/tokio-rs/mio.git'
+    tag: 'v0.6.23'
+    version: '0.6.23'
+
+  - name: rust-mio-0.8
+    subdir: 'sources'
+    git: 'https://github.com/tokio-rs/mio.git'
+    tag: 'v0.8.3'
+    version: '0.8.3'
+
+  - name: rust-nix
+    subdir: 'sources'
+    git: 'https://github.com/nix-rust/nix.git'
+    tag: 'v0.24.3'
+    version: '0.24.3'
+
+  - name: rust-winit
+    subdir: 'sources'
+    git: 'https://github.com/rust-windowing/winit.git'
+    tag: 'v0.27.5'
+    version: '0.27.5'
+
+  - name: rust-glutin
+    subdir: 'sources'
+    git: 'https://github.com/rust-windowing/glutin.git'
+    tag: 'v0.29.1'
+    version: '0.29.1'
+
+  - name: rust-shared-library
+    subdir: 'sources'
+    git: 'https://github.com/tomaka/shared_library.git'
+    commit: 'f09e038246a559650c8505b3b3831b820d1a5689'
+    branch: 'master'
+    version: '0.1.9'
+
+  - name: rust-patched-libs
+    subdir: 'sources'
+    sources_required:
+      - name: rust-backtrace
+        recursive: true
+      - name: rust-calloop
+        recursive: true
+      - name: rust-getrandom
+        recursive: true
+      - name: rust-libc
+        recursive: true
+      - name: rust-libloading
+        recursive: true
+      - name: rust-mio-0.6
+        recursive: true
+      - name: rust-mio-0.8
+        recursive: true
+      - name: rust-nix
+        recursive: true
+      - name: rust-num-cpus
+        recursive: true
+      - name: rust-users
+        recursive: true
+      - name: rust-winit
+        recursive: true
+      - name: rust-glutin
+        recursive: true
+      - name: rust-shared-library
+        recursive: true
+
+  - name: host-bootstrap-cargo
+    subdir: 'sources'
+    url: 'https://static.rust-lang.org/dist/cargo-1.75.0-x86_64-unknown-linux-gnu.tar.xz'
+    format: 'tar.xz'
+    checksum: blake2b:cc2c5ffab3396b462415dfb0f275b2cb121a145284d065474e95ecdb49ce4cc6d20cf59c6eb317bdf4d26a80491ed0ed7c369960182155da42459169fffa0844
+    extract_path: 'cargo-1.75.0-x86_64-unknown-linux-gnu'
+    version: '1.75.0'
+
+  - name: rust
+    subdir: 'sources'
+    git: 'https://github.com/rust-lang/rust.git'
+    tag: '1.77.1'
+    version: '1.77.1'
+  - name: python
+    subdir: 'sources'
+    git: 'https://github.com/python/cpython.git'
+    tag: 'v3.10.12'
+    version: '3.10.12'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-libtool
+      - host-pkg-config
+      - host-autoconf-archive
+    regenerate:
+      - args: ['autoreconf', '-f', '-i']
+  - name: libffi
+    subdir: 'sources'
+    git: 'https://github.com/libffi/libffi.git'
+    tag: 'v3.4.4'
+    version: '3.4.4'
+    tools_required:
+      - host-autoconf-v2.71
+      - host-automake-v1.11
+      - host-libtool
+    regenerate:
+      - args: ['./autogen.sh']
+      - args: ['cp',
+          '@BUILD_ROOT@/tools/host-automake-v1.11/share/automake-1.11/config.sub',
+          '@THIS_SOURCE_DIR@/']
