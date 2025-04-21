@@ -34,13 +34,8 @@ packages:
       version: '1.0'
     pkgs_required:
       - base-files
-      - cryptix-utils
-      - coreutils
-      - file
       - init
-      #- iputils
       - mlibc
-      - which
       - shell-apps
       - sys-apps
       - misc-apps

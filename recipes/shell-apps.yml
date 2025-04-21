@@ -53,6 +53,37 @@ packages:
       - dash
     configure: []
     build: []
+
+  - name: awsh 
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      version: '0.1'
+    tools_required:
+      - system-gcc
+      - host-pkg-config
+      - virtual: pkgconfig-for-target
+        triple: "@OPTION:arch-triple@"
+    pkgs_required:
+      - base-files
+      - mlibc
+      - prism
+    configure: 
+      - args:
+        - 'meson'
+        - 'setup'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/@OPTION:arch-triple@-target.cross-file'
+        - '--prefix=/usr'
+        - '--libdir=/lib'
+        - '--buildtype=debugoptimized'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
     
   - name: bash
     architecture: '@OPTION:arch@'
