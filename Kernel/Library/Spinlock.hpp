@@ -38,7 +38,7 @@ class Spinlock
   public:
     CTOS_ALWAYS_INLINE bool Test()
     {
-        return AtomicLoad(m_Lock, MemoryOrder::eAtomicRelaxed)
+        return AtomicLoad<LockState>(m_Lock, MemoryOrder::eAtomicRelaxed)
             == LockState::eUnlocked;
     }
     CTOS_ALWAYS_INLINE bool TestAndAcquire()
@@ -48,9 +48,9 @@ class Spinlock
                                           LockState::eLocked);
 #endif
         LockState expected = LockState::eUnlocked;
-        return AtomicCompareExchange(&m_Lock, &expected, LockState::eLocked,
-                                     false, MemoryOrder::eAtomicAcquire,
-                                     MemoryOrder::eAtomicRelaxed);
+        return AtomicCompareExchange<LockState>(
+            &m_Lock, &expected, LockState::eLocked, false,
+            MemoryOrder::eAtomicAcquire, MemoryOrder::eAtomicRelaxed);
     }
 
     void Acquire(bool disableInterrupts = false);
