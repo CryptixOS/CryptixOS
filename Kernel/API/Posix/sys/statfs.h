@@ -23,7 +23,7 @@ struct statfs
     fsblkcnt_t f_blocks;
     // Free blocks in filesystem
     fsblkcnt_t f_bfree;
-    // Free blocks available to unpriveleged user
+    // Free blocks available to unprivileged user
     fsblkcnt_t f_bavail;
 
     // Total inodes in filesystem
