@@ -27,7 +27,7 @@ class AddressSpace
     void           Insert(Pointer, Region* region);
     void           Erase(Pointer);
 
-    Region*        AllocateRegion(usize size);
+    Region*        AllocateRegion(usize size, usize alignment = 0);
     Region*        AllocateFixed(Pointer requestedAddress, usize size);
 
     Region*        Find(Pointer virt);

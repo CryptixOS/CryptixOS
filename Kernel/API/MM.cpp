@@ -38,6 +38,7 @@ namespace API::MM
     {
         Process*               current   = Process::GetCurrent();
         std::optional<errno_t> errorCode = std::nullopt;
+        i32                    error     = no_error;
 
         using VirtualMemoryManager::Access;
         Access access = Access::eUser;
@@ -117,7 +118,7 @@ namespace API::MM
         if (flags & MAP_FIXED)
             region = addressSpace.AllocateFixed(addr, length);
         else if (flags & MAP_ANONYMOUS)
-            region = addressSpace.AllocateRegion(length);
+            region = addressSpace.AllocateRegion(length, pageSize);
 
         // TODO(v1tr10l7): sharring mappings
         if (flags & MAP_SHARED)
@@ -128,6 +129,7 @@ namespace API::MM
         region->SetProt(access, prot);
         pageMap->MapRegion(region, pageSize);
 
+        error = errorCode.value_or(no_error);
         return region->GetVirtualBase().Raw();
 
     free_region:

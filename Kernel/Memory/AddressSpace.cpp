@@ -46,15 +46,15 @@ void AddressSpace::Erase(Pointer base)
     }
 }
 
-Region* AddressSpace::AllocateRegion(usize size)
+Region* AddressSpace::AllocateRegion(usize size, usize alignment)
 {
     ScopedLock guard(m_Lock);
-    usize      alignment     = sizeof(void*);
+    if (alignment == 0) alignment = sizeof(void*);
 
-    Pointer    currentRegion = m_TotalRange.GetBase();
-    Pointer    regionStart;
-    usize      regionSize;
-    Pointer    regionEnd;
+    Pointer currentRegion = m_TotalRange.GetBase();
+    Pointer regionStart;
+    usize   regionSize;
+    Pointer regionEnd;
 
     do {
         regionStart = Math::AlignUp(currentRegion, alignment);
