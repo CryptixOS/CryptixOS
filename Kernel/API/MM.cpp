@@ -38,7 +38,6 @@ namespace API::MM
     {
         Process*               current   = Process::GetCurrent();
         std::optional<errno_t> errorCode = std::nullopt;
-        i32                    error     = no_error;
 
         using VirtualMemoryManager::Access;
         Access access = Access::eUser;
