@@ -11,8 +11,8 @@
 #include <Arch/InterruptManager.hpp>
 #include <Arch/x86_64/Drivers/IoApic.hpp>
 
-#include <Memory/PMM.hpp>
 #include <Library/Spinlock.hpp>
+#include <Memory/PMM.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
@@ -26,7 +26,14 @@
 u8 g_ScheduleVector = 48;
 namespace
 {
-    Spinlock                            s_Lock{};
+    Spinlock s_Lock{};
+    bool     s_SchedulerEnabled = false;
+
+    struct CPULocalData
+    {
+        std::atomic<bool> PreemptionEnabled;
+    };
+    CPULocalData*                       s_CPULocalData;
 
     Process*                            s_KernelProcess = nullptr;
     Spinlock                            s_ProcessListLock;
@@ -103,9 +110,15 @@ ThreadQueue s_BlockedQueue;
 
 void        Scheduler::Initialize()
 {
+    u64 cpuCount    = CPU::GetOnlineCPUsCount();
+    s_CPULocalData  = new CPULocalData[cpuCount];
     s_KernelProcess = Process::CreateKernelProcess();
 
     Time::Initialize();
+
+    for (usize i = 0; i < cpuCount; i++)
+        s_CPULocalData[i].PreemptionEnabled.store(true);
+    s_SchedulerEnabled = true;
     Time::GetSchedulerTimer()->SetCallback<Tick>();
 
     LogInfo("Scheduler: Kernel process created");
@@ -137,6 +150,32 @@ void Scheduler::PrepareAP(bool start)
         for (;;) Arch::Halt();
     }
 };
+
+bool Scheduler::IsPreemptionEnabled()
+{
+    if (!s_SchedulerEnabled) return false;
+
+    u64 cpuID = CPU::GetCurrentID();
+    return s_CPULocalData[cpuID].PreemptionEnabled.load(
+        std::memory_order_relaxed);
+}
+
+void Scheduler::EnablePreemption()
+{
+    if (!s_SchedulerEnabled) return;
+
+    u64 cpuID = CPU::GetCurrentID();
+    s_CPULocalData[cpuID].PreemptionEnabled.store(true,
+                                                  std::memory_order_release);
+}
+void Scheduler::DisablePreemption()
+{
+    if (!s_SchedulerEnabled) return;
+
+    u64 cpuID = CPU::GetCurrentID();
+    s_CPULocalData[cpuID].PreemptionEnabled.store(false,
+                                                  std::memory_order_acquire);
+}
 
 void Scheduler::Block(Thread* thread)
 {
@@ -328,11 +367,16 @@ void Scheduler::SwitchContext(Thread* newThread, CPUContext* oldContext)
 
 void Scheduler::Tick(CPUContext* ctx)
 {
-    auto newThread = PickReadyThread();
+    Thread* newThread = CPU::GetCurrentThread();
+    if (!newThread) newThread = CPU::GetCurrent()->Idle;
+    if (!IsPreemptionEnabled()) goto reschedule;
+
+    newThread = PickReadyThread();
     SwitchContext(newThread, ctx);
 
     if (newThread != CPU::GetCurrent()->Idle)
         newThread->SetState(ThreadState::eRunning);
 
+reschedule:
     CPU::Reschedule(newThread->GetParent()->m_Quantum * 1_ms);
 }
