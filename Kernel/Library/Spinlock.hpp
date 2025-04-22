@@ -8,10 +8,10 @@
 
 #include <Arch/Arch.hpp>
 
-#ifdef PRISM_ARCH_X86_64
+#ifdef CTOS_TARGET_X86_64
     #include <Arch/x86_64/Atomic.hpp>
 inline void Pause() { __asm__ volatile("pause"); }
-#elifdef PRISM_ARCH_AARCH64
+#elifdef CTOS_TARGET_AARCH64
 inline void Pause() { __asm__ volatile("isb" ::: "memory"); }
 #endif
 
