@@ -13,8 +13,8 @@
 class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
 {
   public:
-    DevTmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
-                  mode_t mode, Device* device = nullptr);
+    DevTmpFsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode,
+                  Device* device = nullptr);
     virtual ~DevTmpFsINode()
     {
         if (m_Capacity > 0) delete m_Data;
@@ -25,7 +25,7 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
         return m_Device ? m_Device->GetStats() : m_Stats;
     }
 
-    virtual void InsertChild(INode* node, std::string_view name) override
+    virtual void InsertChild(INode* node, StringView name) override
     {
         ScopedLock guard(m_Lock);
         m_Children[name] = node;

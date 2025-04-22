@@ -53,7 +53,7 @@ struct DirectoryEntries
     inline bool IsEmpty() const { return Entries.empty(); }
 
     inline void Clear() { Entries.clear(); }
-    void        Push(INode* node, std::string_view = "");
+    void        Push(INode* node, StringView = "");
 
     usize       CopyAndPop(u8* out, usize capacity);
 

@@ -15,7 +15,7 @@ DevTmpFs::DevTmpFs(u32 flags)
 }
 
 INode* DevTmpFs::Mount(INode* parent, INode* source, INode* target,
-                       std::string_view name, const void* data)
+                       StringView name, const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
@@ -28,33 +28,31 @@ INode* DevTmpFs::Mount(INode* parent, INode* source, INode* target,
     return m_Root;
 }
 
-INode* DevTmpFs::CreateNode(INode* parent, std::string_view name, mode_t mode)
+INode* DevTmpFs::CreateNode(INode* parent, StringView name, mode_t mode)
 {
-    return new DevTmpFsINode(parent, name, this, mode);
+    return new DevTmpFsINode(parent, name.Raw(), this, mode);
 }
 
-INode* DevTmpFs::Symlink(INode* parent, std::string_view name,
-                         std::string_view target)
-{
-    ToDo();
-
-    return nullptr;
-}
-INode* DevTmpFs::Link(INode* parent, std::string_view name, INode* oldNode)
+INode* DevTmpFs::Symlink(INode* parent, StringView name, StringView target)
 {
     ToDo();
 
     return nullptr;
 }
+INode* DevTmpFs::Link(INode* parent, StringView name, INode* oldNode)
+{
+    ToDo();
 
-INode* DevTmpFs::MkNod(INode* parent, std::string_view name, mode_t mode,
-                       dev_t dev)
+    return nullptr;
+}
+
+INode* DevTmpFs::MkNod(INode* parent, StringView name, mode_t mode, dev_t dev)
 {
     auto it = s_Devices.find(dev);
     if (it == s_Devices.end()) return_err(nullptr, EEXIST);
     Device* device = it->second;
 
-    return new DevTmpFsINode(parent, name, this, mode, device);
+    return new DevTmpFsINode(parent, name.Raw(), this, mode, device);
 }
 
 void DevTmpFs::RegisterDevice(Device* device)

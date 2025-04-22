@@ -17,19 +17,18 @@ class DevTmpFs : public Filesystem
     DevTmpFs(u32 flags);
 
     virtual INode* Mount(INode* parent, INode* source, INode* target,
-                         std::string_view name,
-                         const void*      data = nullptr) override;
+                         StringView name, const void* data = nullptr) override;
 
-    virtual INode* CreateNode(INode* parent, std::string_view name,
+    virtual INode* CreateNode(INode* parent, StringView name,
                               mode_t mode) override;
 
-    virtual INode* Symlink(INode* parent, std::string_view name,
-                           std::string_view target) override;
-    virtual INode* Link(INode* parent, std::string_view name,
+    virtual INode* Symlink(INode* parent, StringView name,
+                           StringView target) override;
+    virtual INode* Link(INode* parent, StringView name,
                         INode* oldNode) override;
     virtual bool   Populate(INode* node) override { return true; }
 
-    virtual INode* MkNod(INode* parent, std::string_view path, mode_t mode,
+    virtual INode* MkNod(INode* parent, StringView path, mode_t mode,
                          dev_t dev) override;
 
     static void    RegisterDevice(Device* device);

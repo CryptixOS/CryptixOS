@@ -172,7 +172,7 @@ namespace API::VFS
         if (!node->IsDirectory()) return Error(ENOTDIR);
         for (const auto& child : node->GetChildren())
         {
-            std::string_view name = child.second->GetName();
+            StringView name = child.second->GetName();
             if (name != "." && name != "..") return Error(ENOTEMPTY);
         }
 

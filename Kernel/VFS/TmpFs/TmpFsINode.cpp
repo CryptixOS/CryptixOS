@@ -13,7 +13,7 @@
 #include <VFS/TmpFs/TmpFs.hpp>
 #include <VFS/TmpFs/TmpFsINode.hpp>
 
-TmpFsINode::TmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
+TmpFsINode::TmpFsINode(INode* parent, StringView name, Filesystem* fs,
                        mode_t mode)
     : INode(parent, name, fs)
 {

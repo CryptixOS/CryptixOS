@@ -11,7 +11,7 @@
 #include <VFS/Ext2Fs/Ext2FsINode.hpp>
 
 INode* Ext2Fs::Mount(INode* parent, INode* source, INode* target,
-                     std::string_view name, const void* data)
+                     StringView name, const void* data)
 {
     m_Device     = source;
 
@@ -42,7 +42,7 @@ INode* Ext2Fs::Mount(INode* parent, INode* source, INode* target,
     m_SuperBlock->LastMountTime = Time::GetReal().tv_sec;
     m_Device->Write(m_SuperBlock, 1024, sizeof(Ext2FsSuperBlock));
 
-    auto* root = new Ext2FsINode(parent, name, this, 0644 | S_IFDIR);
+    auto* root = new Ext2FsINode(parent, name.Raw(), this, 0644 | S_IFDIR);
     ReadINodeEntry(&root->m_Meta, 2);
 
     root->m_Stats.st_ino   = 2;
@@ -64,7 +64,7 @@ INode* Ext2Fs::Mount(INode* parent, INode* source, INode* target,
     return (m_Root = root);
 }
 
-INode* Ext2Fs::CreateNode(INode* parent, std::string_view name, mode_t mode)
+INode* Ext2Fs::CreateNode(INode* parent, StringView name, mode_t mode)
 {
     return nullptr;
 }

@@ -73,8 +73,8 @@ class ProcFsINode : public INode
 
     virtual const stat& GetStats() override;
 
-    virtual void  InsertChild(INode* node, std::string_view name) override;
-    virtual isize Read(void* buffer, off_t offset, usize bytes) override;
+    virtual void        InsertChild(INode* node, StringView name) override;
+    virtual isize       Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
 

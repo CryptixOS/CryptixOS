@@ -7,7 +7,7 @@
 #include <VFS/EchFs/EchFs.hpp>
 #include <VFS/EchFs/EchFsINode.hpp>
 
-EchFsINode::EchFsINode(INode* parent, std::string_view name, Filesystem* fs,
+EchFsINode::EchFsINode(INode* parent, StringView name, Filesystem* fs,
                        mode_t mode, EchFsDirectoryEntry directoryEntry,
                        usize directoryEntryOffset)
     : INode(parent, name, fs)
@@ -21,13 +21,13 @@ EchFsINode::EchFsINode(INode* parent, std::string_view name, Filesystem* fs,
     m_NativeFs         = reinterpret_cast<EchFs*>(fs);
 }
 
-std::unordered_map<std::string_view, INode*>& EchFsINode::GetChildren()
+std::unordered_map<StringView, INode*>& EchFsINode::GetChildren()
 {
     reinterpret_cast<EchFs*>(m_Filesystem)->Populate(this);
     return m_Children;
 }
 
-void EchFsINode::InsertChild(INode* node, std::string_view name)
+void EchFsINode::InsertChild(INode* node, StringView name)
 {
     ScopedLock guard(m_Lock);
     m_Children[name] = node;

@@ -10,7 +10,7 @@
 
 #include <Time/Time.hpp>
 
-Ext2FsINode::Ext2FsINode(INode* parent, std::string_view name, Ext2Fs* fs,
+Ext2FsINode::Ext2FsINode(INode* parent, StringView name, Ext2Fs* fs,
                          mode_t mode)
     : INode(parent, name, fs)
     , m_Fs(fs)
@@ -31,7 +31,7 @@ Ext2FsINode::Ext2FsINode(INode* parent, std::string_view name, Ext2Fs* fs,
     m_Stats.st_mtim    = Time::GetReal();
 }
 
-void Ext2FsINode::InsertChild(INode* node, std::string_view name)
+void Ext2FsINode::InsertChild(INode* node, StringView name)
 {
     ScopedLock guard(m_Lock);
     m_Children[name] = node;

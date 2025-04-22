@@ -25,11 +25,11 @@ class INode
     std::string target;
     INode*      mountGate;
 
-    INode(std::string_view name)
+    INode(StringView name)
         : m_Name(name)
     {
     }
-    INode(INode* parent, std::string_view name, Filesystem* fs);
+    INode(INode* parent, StringView name, Filesystem* fs);
     virtual ~INode() {}
 
     INode*      Reduce(bool symlinks, bool automount = true, usize cnt = 0);
@@ -38,16 +38,16 @@ class INode
 
     inline Filesystem*  GetFilesystem() { return m_Filesystem; }
     virtual const stat& GetStats() { return m_Stats; }
-    virtual std::unordered_map<std::string_view, INode*>& GetChildren()
+    virtual std::unordered_map<StringView, INode*>& GetChildren()
     {
         if (!m_Populated) Populate();
         return m_Children;
     }
-    inline const std::string& GetName() { return m_Name; }
-    inline INode*             GetParent() { return m_Parent; }
-    mode_t                    GetMode() const;
+    inline StringView GetName() { return m_Name; }
+    inline INode*     GetParent() { return m_Parent; }
+    mode_t            GetMode() const;
 
-    inline bool               IsFilesystemRoot() const
+    inline bool       IsFilesystemRoot() const
     {
         return m_Filesystem->GetMountedOn()
             && this == m_Filesystem->GetMountedOn()->mountGate;
@@ -65,7 +65,7 @@ class INode
     bool          ValidatePermissions(const Credentials& creds, u32 acc);
     void          UpdateATime();
 
-    virtual void  InsertChild(INode* node, std::string_view name)      = 0;
+    virtual void  InsertChild(INode* node, StringView name)            = 0;
     virtual isize Read(void* buffer, off_t offset, usize bytes)        = 0;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) = 0;
     virtual i32   IoCtl(usize request, usize arg) { return_err(-1, ENODEV); }
@@ -84,12 +84,12 @@ class INode
     }
 
   protected:
-    INode*                                       m_Parent;
-    std::string                                  m_Name;
-    Spinlock                                     m_Lock;
+    INode*                                 m_Parent;
+    String                                 m_Name;
+    Spinlock                               m_Lock;
 
-    Filesystem*                                  m_Filesystem;
-    std::unordered_map<std::string_view, INode*> m_Children;
-    stat                                         m_Stats;
-    bool                                         m_Populated = false;
+    Filesystem*                            m_Filesystem;
+    std::unordered_map<StringView, INode*> m_Children;
+    stat                                   m_Stats;
+    bool                                   m_Populated = false;
 };

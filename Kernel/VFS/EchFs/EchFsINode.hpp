@@ -13,22 +13,19 @@ class EchFs;
 class EchFsINode : public INode
 {
   public:
-    EchFsINode(INode* parent, std::string_view name, Filesystem* fs,
-               mode_t mode, EchFsDirectoryEntry directoryEntry,
-               usize directoryEntryOffset);
+    EchFsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode,
+               EchFsDirectoryEntry directoryEntry, usize directoryEntryOffset);
 
-    EchFsINode(INode* parent, std::string_view name, Filesystem* fs,
-               mode_t mode)
+    EchFsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode)
         : EchFsINode(parent, name, fs, mode, {}, 0)
     {
     }
 
     virtual ~EchFsINode() {}
 
-    virtual std::unordered_map<std::string_view, INode*>&
-                  GetChildren() override;
+    virtual std::unordered_map<StringView, INode*>& GetChildren() override;
 
-    virtual void  InsertChild(INode* node, std::string_view name) override;
+    virtual void  InsertChild(INode* node, StringView name) override;
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override
     {

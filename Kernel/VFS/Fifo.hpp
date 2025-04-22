@@ -24,7 +24,7 @@ class Fifo : public INode
 
     FileDescriptor* Open(Direction direction);
 
-    virtual void    InsertChild(INode*, std::string_view) override
+    virtual void    InsertChild(INode*, StringView) override
     {
         AssertNotReached();
     }

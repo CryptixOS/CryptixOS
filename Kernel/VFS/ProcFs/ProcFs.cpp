@@ -130,7 +130,7 @@ struct ProcFsStatusProperty : public ProcFsProperty
 {
     virtual void GenerateRecord() override
     {
-        StringView pidString = m_Parent->GetName().data();
+        StringView pidString = m_Parent->GetName();
         pid_t      pid       = StringUtils::ToNumber<pid_t>(pidString, 10);
         auto       process   = ProcFs::GetProcess(pid);
         if (!process) return;
@@ -193,7 +193,7 @@ void ProcFs::RemoveProcess(pid_t pid)
     s_Processes.erase(pid);
 }
 INode* ProcFs::Mount(INode* parent, INode* source, INode* target,
-                     std::string_view name, const void* data)
+                     StringView name, const void* data)
 {
     ScopedLock guard(m_Lock);
     m_MountData
@@ -201,7 +201,7 @@ INode* ProcFs::Mount(INode* parent, INode* source, INode* target,
                : nullptr;
 
     if (m_Root) VFS::RecursiveDelete(m_Root);
-    m_Root = new ProcFsINode(parent, name.data(), this, 0755 | S_IFDIR);
+    m_Root = new ProcFsINode(parent, name, this, 0755 | S_IFDIR);
     if (m_Root) m_MountedOn = target;
 
     AddChild("cmdline");
@@ -217,16 +217,15 @@ INode* ProcFs::Mount(INode* parent, INode* source, INode* target,
 
     return m_Root;
 }
-INode* ProcFs::CreateNode(INode* parent, std::string_view name, mode_t mode)
+INode* ProcFs::CreateNode(INode* parent, StringView name, mode_t mode)
 {
     return nullptr;
 }
-INode* ProcFs::Symlink(INode* parent, std::string_view name,
-                       std::string_view target)
+INode* ProcFs::Symlink(INode* parent, StringView name, StringView target)
 {
     return nullptr;
 }
-INode* ProcFs::Link(INode* parent, std::string_view name, INode* oldNode)
+INode* ProcFs::Link(INode* parent, StringView name, INode* oldNode)
 {
     return nullptr;
 }

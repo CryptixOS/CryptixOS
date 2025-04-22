@@ -19,7 +19,7 @@ TmpFs::TmpFs(u32 flags)
 }
 
 INode* TmpFs::Mount(INode* parent, INode* source, INode* target,
-                    std::string_view name, const void* data)
+                    StringView name, const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
@@ -32,7 +32,7 @@ INode* TmpFs::Mount(INode* parent, INode* source, INode* target,
     if (m_Root) m_MountedOn = target;
     return m_Root;
 }
-INode* TmpFs::CreateNode(INode* parent, std::string_view name, mode_t mode)
+INode* TmpFs::CreateNode(INode* parent, StringView name, mode_t mode)
 {
     if (m_NextInodeIndex >= m_MaxInodeCount
         || (S_ISREG(mode) && m_Size + TmpFsINode::GetDefaultSize() > m_MaxSize))
@@ -42,21 +42,20 @@ INode* TmpFs::CreateNode(INode* parent, std::string_view name, mode_t mode)
         return nullptr;
     }
 
-    return new TmpFsINode(parent, name, this, mode);
+    return new TmpFsINode(parent, name.Raw(), this, mode);
 }
 
-INode* TmpFs::Symlink(INode* parent, std::string_view name,
-                      std::string_view target)
+INode* TmpFs::Symlink(INode* parent, StringView name, StringView target)
 {
     if (m_NextInodeIndex >= m_MaxInodeCount) return_err(nullptr, ENOSPC);
 
-    auto node    = new TmpFsINode(parent, name, this, 0777 | S_IFLNK);
-    node->target = target;
+    auto node    = new TmpFsINode(parent, name.Raw(), this, 0777 | S_IFLNK);
+    node->target = target.Raw();
 
     return node;
 }
 
-INode* TmpFs::Link(INode* parent, std::string_view name, INode* oldNode)
+INode* TmpFs::Link(INode* parent, StringView name, INode* oldNode)
 {
     if (oldNode->IsDirectory())
     {
@@ -64,6 +63,6 @@ INode* TmpFs::Link(INode* parent, std::string_view name, INode* oldNode)
         return nullptr;
     }
 
-    return new TmpFsINode(parent, name, this,
+    return new TmpFsINode(parent, name.Raw(), this,
                           (oldNode->GetStats().st_mode & ~S_IFMT));
 }

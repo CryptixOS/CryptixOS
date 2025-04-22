@@ -26,7 +26,7 @@ EchFs::~EchFs()
 }
 
 INode* EchFs::Mount(INode* parent, INode* source, INode* target,
-                    std::string_view name, const void* data)
+                    StringView name, const void* data)
 {
     if (!source) return nullptr;
 
@@ -58,9 +58,7 @@ INode* EchFs::Mount(INode* parent, INode* source, INode* target,
     uuid[0]             = m_IdentityTable->UUID[0];
     uuid[1]             = m_IdentityTable->UUID[1];
 
-#if ECHFS_DEBUG == 1
-    Log::Debug("EchFs: IdentityTable =>");
-#endif
+    EchFsDebug("EchFs", "", "IdentityTable =>");
     EchFsDebug("Signature", "", signature);
     EchFsDebug("TotalBlockCount", ":#x", totalBlockCount);
     EchFsDebug("MainDirectoryLength", ":#x", mainDirectoryLength);
@@ -130,7 +128,7 @@ fail_free_id_table:
     return nullptr;
 }
 
-INode* EchFs::CreateNode(INode* parent, std::string_view name, mode_t mode)
+INode* EchFs::CreateNode(INode* parent, StringView name, mode_t mode)
 {
     return nullptr;
 }
@@ -183,7 +181,7 @@ bool EchFs::Populate(INode* node)
         child->m_Stats.st_atim = Time::GetReal();
         child->m_Stats.st_mtim = Time::GetReal();
 
-        inode->InsertChild(child, child->GetName());
+        inode->InsertChild(child, name);
     }
 
     return (inode->m_Populated = true);

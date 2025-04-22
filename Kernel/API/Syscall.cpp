@@ -168,7 +168,9 @@ namespace Syscall
     }
     void Handle(Arguments& args)
     {
-        CPU::OnSyscallEnter(args.Index);
+        CPU::OnSyscallEnter(args.Index == std::to_underlying(ID::ePanic)
+                                ? CPU::GetCurrent()->LastSyscallID
+                                : args.Index);
 #define LOG_SYSCALLS false
 #if LOG_SYSCALLS == true
         static isize previousSyscall = -1;

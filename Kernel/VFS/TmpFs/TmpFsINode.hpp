@@ -12,8 +12,7 @@
 class TmpFsINode final : public INode
 {
   public:
-    TmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
-               mode_t mode);
+    TmpFsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode);
 
     virtual ~TmpFsINode()
     {
@@ -22,7 +21,7 @@ class TmpFsINode final : public INode
 
     inline static constexpr usize GetDefaultSize() { return 0x1000; }
 
-    virtual void InsertChild(INode* node, std::string_view name) override
+    virtual void InsertChild(INode* node, StringView name) override
     {
         ScopedLock guard(m_Lock);
         m_Children[name] = node;

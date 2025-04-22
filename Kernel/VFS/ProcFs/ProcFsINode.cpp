@@ -21,7 +21,7 @@ isize ProcFsProperty::Read(u8* outBuffer, off_t offset, usize size)
 
 ProcFsINode::ProcFsINode(INode* parent, StringView name, Filesystem* fs,
                          mode_t mode, ProcFsProperty* property)
-    : INode(parent, name.Raw(), fs)
+    : INode(parent, name, fs)
     , m_Property(property)
 {
     Assert(!S_ISDIR(mode) || !m_Property);
@@ -48,7 +48,7 @@ const stat& ProcFsINode::GetStats()
     return m_Stats;
 }
 
-void ProcFsINode::InsertChild(INode* node, std::string_view name)
+void ProcFsINode::InsertChild(INode* node, StringView name)
 {
     ScopedLock guard(m_Lock);
     m_Children[name] = node;

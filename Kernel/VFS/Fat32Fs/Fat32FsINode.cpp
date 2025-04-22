@@ -9,7 +9,7 @@
 
 #include <Time/Time.hpp>
 
-Fat32FsINode::Fat32FsINode(INode* parent, std::string_view name, Filesystem* fs,
+Fat32FsINode::Fat32FsINode(INode* parent, StringView name, Filesystem* fs,
                            mode_t mode)
     : INode(parent, name, fs)
     , m_Fat32Fs(reinterpret_cast<Fat32Fs*>(fs))
@@ -59,12 +59,12 @@ Fat32FsINode::Fat32FsINode(INode* parent, std::string_view name, Filesystem* fs,
     }
 }
 
-std::unordered_map<std::string_view, INode*>& Fat32FsINode::GetChildren()
+std::unordered_map<StringView, INode*>& Fat32FsINode::GetChildren()
 {
     if (!m_Populated) Populate();
     return m_Children;
 }
-void Fat32FsINode::InsertChild(INode* node, std::string_view name)
+void Fat32FsINode::InsertChild(INode* node, StringView name)
 {
     ScopedLock guard(m_Lock);
     m_Children[name] = node;

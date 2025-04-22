@@ -14,13 +14,13 @@
 #include <Prism/Utility/Math.hpp>
 #include <VFS/FileDescriptor.hpp>
 
-void DirectoryEntries::Push(INode* node, std::string_view name)
+void DirectoryEntries::Push(INode* node, StringView name)
 {
-    if (name.empty()) name = node->GetName();
+    if (name.Empty()) name = node->GetName();
     node = node->Reduce(false);
 
     auto reclen
-        = Math::AlignUp(DIRENT_LENGTH + name.length() + 1, alignof(dirent));
+        = Math::AlignUp(DIRENT_LENGTH + name.Size() + 1, alignof(dirent));
 
     auto* entry     = reinterpret_cast<dirent*>(malloc(reclen));
     entry->d_ino    = node->GetStats().st_ino;
@@ -28,14 +28,9 @@ void DirectoryEntries::Push(INode* node, std::string_view name)
     entry->d_reclen = reclen;
     entry->d_type   = IF2DT(node->GetStats().st_mode);
 
-    name.copy(entry->d_name, name.length() + 1);
-    reinterpret_cast<char*>(entry->d_name)[name.length()] = 0;
+    name.Copy(entry->d_name, name.Size() + 1);
+    reinterpret_cast<char*>(entry->d_name)[name.Size()] = 0;
 
-    LogInfo(
-        "Entry: {{ d_ino: {}, d_off: {}, d_reclen: {:#x}, d_type: {}, d_name: "
-        "{} }}",
-        entry->d_ino, entry->d_off, entry->d_reclen, entry->d_type,
-        entry->d_name);
     Entries.push_back(entry);
     Size += entry->d_reclen;
 }
@@ -50,7 +45,6 @@ usize DirectoryEntries::CopyAndPop(u8* out, usize capacity)
     Entries.pop_front();
     if (!entry || !(char*)entry->d_name) return 0;
 
-    LogInfo("Copying directory entry: {}", entry->d_name);
     std::memcpy(out, entry, entry->d_reclen);
     delete entry;
 
@@ -228,7 +222,7 @@ bool FileDescriptor::GenerateDirEntries()
     node = m_Description->Node->Reduce(true, true);
     for (const auto [name, child] : node->GetChildren())
     {
-        if (name.empty()) continue;
+        if (name.Empty()) continue;
         dirEntries.Push(child);
     }
 

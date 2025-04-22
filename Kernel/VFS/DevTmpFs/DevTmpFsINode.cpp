@@ -13,8 +13,8 @@
 
 #include <cstdlib>
 
-DevTmpFsINode::DevTmpFsINode(INode* parent, std::string_view name,
-                             Filesystem* fs, mode_t mode, Device* device)
+DevTmpFsINode::DevTmpFsINode(INode* parent, StringView name, Filesystem* fs,
+                             mode_t mode, Device* device)
     : INode(parent, name, fs)
 {
     m_Device           = device;

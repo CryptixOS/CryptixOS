@@ -19,13 +19,12 @@ class TmpFs : public Filesystem
     inline usize   GetMaxSize() const { return m_MaxSize; }
 
     virtual INode* Mount(INode* parent, INode* source, INode* target,
-                         std::string_view name,
-                         const void*      data = nullptr) override;
-    virtual INode* CreateNode(INode* parent, std::string_view name,
+                         StringView name, const void* data = nullptr) override;
+    virtual INode* CreateNode(INode* parent, StringView name,
                               mode_t mode) override;
-    virtual INode* Symlink(INode* parent, std::string_view name,
-                           std::string_view target) override;
-    virtual INode* Link(INode* parent, std::string_view name,
+    virtual INode* Symlink(INode* parent, StringView name,
+                           StringView target) override;
+    virtual INode* Link(INode* parent, StringView name,
                         INode* oldNode) override;
     virtual bool   Populate(INode* node) override { return true; }
 

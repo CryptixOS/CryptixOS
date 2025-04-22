@@ -209,14 +209,17 @@ namespace VFS
 
                 if (isLast)
                     return {getParent(), currentNode->Reduce(false, true),
-                            currentNode->GetName()};
+                            std::string(currentNode->GetName().Raw(),
+                                        currentNode->GetName().Size())};
 
                 continue;
             }
 
-            if (currentNode->GetChildren().contains(segment))
+            if (currentNode->GetChildren().contains(
+                    StringView(segment.data(), segment.size())))
             {
-                auto node = currentNode->GetChildren()[segment];
+                auto node = currentNode->GetChildren()[StringView(
+                    segment.data(), segment.size())];
                 if (!node->Reduce(false, true)->Populate())
                     return {nullptr, nullptr, ""};
 
@@ -227,7 +230,9 @@ namespace VFS
                         errno = ENOTDIR;
                         return {currentNode, nullptr, ""};
                     }
-                    return {currentNode, node, node->GetName()};
+                    return {currentNode, node,
+                            std::string(node->GetName().Raw(),
+                                        node->GetName().Size())};
                 }
                 currentNode = node;
 
@@ -269,9 +274,9 @@ namespace VFS
         return s_MountPoints;
     }
 
-    bool MountRoot(std::string_view filesystemName)
+    bool MountRoot(StringView filesystemName)
     {
-        auto fs = CreateFilesystem(filesystemName, 0);
+        auto fs = CreateFilesystem(filesystemName.Raw(), 0);
         if (!fs)
         {
             LogError("VFS: Failed to create filesystem: '{}'", filesystemName);
@@ -287,11 +292,10 @@ namespace VFS
         s_RootNode = fs->Mount(nullptr, nullptr, nullptr, "/", nullptr);
 
         if (s_RootNode)
-            LogInfo("VFS: Mounted Filesystem '{}' on '/'",
-                    filesystemName.data());
+            LogInfo("VFS: Mounted Filesystem '{}' on '/'", filesystemName);
         else
             LogError("VFS: Failed to mount filesystem '{}' on '/'",
-                     filesystemName.data());
+                     filesystemName);
 
         s_MountPoints["/"] = s_RootNode->GetFilesystem();
         return s_RootNode != nullptr;
@@ -299,11 +303,11 @@ namespace VFS
 
     // TODO: flags
     bool Mount(INode* parent, PathView sourcePath, PathView target,
-               std::string_view fsName, i32 flags, const void* data)
+               StringView fsName, i32 flags, const void* data)
     {
         ScopedLock  guard(s_Lock);
 
-        Filesystem* fs = CreateFilesystem(fsName, flags);
+        Filesystem* fs = CreateFilesystem(fsName.Raw(), flags);
         if (!fs)
         {
             errno = ENODEV;
@@ -318,34 +322,32 @@ namespace VFS
             if (!sourceNode)
             {
                 LogError("VFS: Failed to resolve source path -> '{}'",
-                         sourcePath.Raw());
+                         sourcePath);
                 return false;
             }
             if (sourceNode->IsDirectory())
             {
-                LogError("VFS: Source node is a directory -> '{}'",
-                         sourcePath.Raw());
+                LogError("VFS: Source node is a directory -> '{}'", sourcePath);
                 return_err(false, EISDIR);
             }
         }
-        auto [nparent, node, basename] = ResolvePath(parent, target);
+        auto [nparent, node, baseName] = ResolvePath(parent, target);
         bool   isRoot                  = (node == GetRootNode());
         INode* mountGate               = nullptr;
 
         if (!node)
         {
-            LogError("VFS: Failed to resolve target path -> '{}'",
-                     target.Raw());
+            LogError("VFS: Failed to resolve target path -> '{}'", target);
             goto fail;
         }
 
         if (!isRoot && !node->IsDirectory())
         {
-            LogError("VFS: '{}' target is not a directory", target.Raw());
+            LogError("VFS: '{}' target is not a directory", target);
             return_err(false, ENOTDIR);
         }
 
-        mountGate = fs->Mount(parent, sourceNode, node, basename, data);
+        mountGate = fs->Mount(parent, sourceNode, node, baseName.data(), data);
         if (!mountGate)
         {
             LogError("VFS: Failed to mount '{}' fs", fsName);
@@ -355,11 +357,10 @@ namespace VFS
         node->mountGate = mountGate;
 
         if (sourcePath.IsEmpty())
-            LogTrace("VFS: Mounted Filesystem '{}' on '{}'", fsName.data(),
-                     target.Raw());
+            LogTrace("VFS: Mounted Filesystem '{}' on '{}'", fsName, target);
         else
             LogTrace("VFS: Mounted  '{}' on '{}' with Filesystem '{}'",
-                     sourcePath.Raw(), target.Raw(), fsName.data());
+                     sourcePath, target, fsName);
 
         s_MountPoints[target.Raw()] = fs;
         return true;
@@ -380,14 +381,13 @@ namespace VFS
     {
         ScopedLock guard(s_Lock);
 
-        // LogInfo("Creating path: {}", path);
         auto [newNodeParent, newNode, newNodeName] = ResolvePath(parent, path);
-        // LogInfo("Creating node: {}", name);
         if (newNode) return_err(nullptr, EEXIST);
 
         if (!newNodeParent) return nullptr;
-        newNode = newNodeParent->GetFilesystem()->CreateNode(newNodeParent,
-                                                             newNodeName, mode);
+        newNode = newNodeParent->GetFilesystem()->CreateNode(
+            newNodeParent, StringView(newNodeName.data(), newNodeName.size()),
+            mode);
         if (newNode) newNodeParent->InsertChild(newNode, newNode->GetName());
         return newNode;
     }
@@ -400,14 +400,15 @@ namespace VFS
         if (node) return_err(nullptr, EEXIST);
 
         if (!nparent) return nullptr;
-        node = nparent->GetFilesystem()->MkNod(nparent, newNodeName, mode, dev);
+        node = nparent->GetFilesystem()->MkNod(nparent, newNodeName.data(),
+                                               mode, dev);
 
         if (node) nparent->InsertChild(node, node->GetName());
 
         return node;
     }
 
-    INode* Symlink(INode* parent, PathView path, std::string_view target)
+    INode* Symlink(INode* parent, PathView path, StringView target)
     {
         ScopedLock guard(s_Lock);
 
@@ -415,8 +416,8 @@ namespace VFS
         if (newNode) return_err(nullptr, EEXIST);
         if (!newNodeParent) return_err(nullptr, ENOENT);
 
-        newNode = newNodeParent->GetFilesystem()->Symlink(newNodeParent,
-                                                          newNodeName, target);
+        newNode = newNodeParent->GetFilesystem()->Symlink(
+            newNodeParent, newNodeName.data(), target);
         if (newNode) newNodeParent->InsertChild(newNode, newNode->GetName());
         return newNode;
     }

@@ -24,7 +24,7 @@ constexpr usize       FAT32_REAL_FS_INFO_SIGNATURE  = 0x61417272;
 constexpr usize       FAT32_REAL_FS_INFO_SIGNATURE2 = 0xaa550000;
 
 INode* Fat32Fs::Mount(INode* parent, INode* source, INode* target,
-                      std::string_view name, const void* data)
+                      StringView name, const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
@@ -79,7 +79,7 @@ INode* Fat32Fs::Mount(INode* parent, INode* source, INode* target,
 
     UpdateFsInfo();
 
-    m_Root     = CreateNode(parent, name, 0644 | S_IFDIR);
+    m_Root     = CreateNode(parent, name.Raw(), 0644 | S_IFDIR);
     m_RootNode = reinterpret_cast<Fat32FsINode*>(m_Root);
 
     m_RootNode->m_Stats.st_blocks
@@ -95,12 +95,12 @@ INode* Fat32Fs::Mount(INode* parent, INode* source, INode* target,
     return m_RootNode;
 }
 
-INode* Fat32Fs::CreateNode(INode* parent, std::string_view name, mode_t mode)
+INode* Fat32Fs::CreateNode(INode* parent, StringView name, mode_t mode)
 {
-    if (name.size() > 255) return_err(nullptr, ENAMETOOLONG);
+    if (name.Size() > 255) return_err(nullptr, ENAMETOOLONG);
     if (!S_ISREG(mode) && !S_ISDIR(mode)) return_err(nullptr, EPERM);
 
-    return new Fat32FsINode(parent, name, this, mode);
+    return new Fat32FsINode(parent, name.Raw(), this, mode);
 }
 
 bool Fat32Fs::Populate(INode* node)

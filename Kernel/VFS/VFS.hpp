@@ -11,6 +11,7 @@
 
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Path.hpp>
+#include <Prism/String/StringView.hpp>
 
 #include <cerrno>
 #include <expected>
@@ -37,19 +38,19 @@ namespace VFS
 
     std::unordered_map<StringView, class Filesystem*>& GetMountPoints();
 
-    bool         MountRoot(std::string_view filesystemName);
+    bool         MountRoot(StringView filesystemName);
     bool         Mount(INode* parent, PathView source, PathView target,
-                       std::string_view fsName, i32 flags = 0,
-                       const void* data = nullptr);
+                       StringView fsName, i32 flags = 0, const void* data = nullptr);
     bool         Unmount(INode* parent, PathView path, i32 flags = 0);
 
     INode*       CreateNode(INode* parent, PathView path, mode_t mode);
     ErrorOr<i32> MkDir(INode* parent, mode_t mode);
 
     INode*       MkNod(INode* parent, PathView path, mode_t mode, dev_t dev);
-    INode*       Symlink(INode* parent, PathView path, std::string_view target);
+    INode*       Symlink(INode* parent, PathView path, StringView target);
     INode*       Link(INode* oldParent, PathView oldPath, INode* newParent,
                       PathView newPath, i32 flags = 0);
+
     bool         Unlink(INode* parent, PathView path, i32 flags = 0);
 
 }; // namespace VFS

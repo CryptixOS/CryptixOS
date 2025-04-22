@@ -12,7 +12,7 @@
 #include <VFS/FileDescriptor.hpp>
 #include <VFS/INode.hpp>
 
-INode::INode(INode* parent, std::string_view name, Filesystem* fs)
+INode::INode(INode* parent, StringView name, Filesystem* fs)
     : m_Parent(parent)
     , m_Name(name)
     , m_Filesystem(fs)
@@ -43,7 +43,9 @@ std::string INode::GetPath()
 
     while (current && current != root)
     {
-        ret.insert(0, "/" + current->m_Name);
+        ret.insert(
+            0,
+            "/" + std::string(current->m_Name.Raw(), current->m_Name.Size()));
         current = current->m_Parent;
     }
 

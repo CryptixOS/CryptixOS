@@ -4,15 +4,17 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Version.hpp>
-
 #include <API/System.hpp>
 
 #include <Arch/Arch.hpp>
 #include <Arch/PowerManager.hpp>
 
+#include <Drivers/Terminal.hpp>
+
 #include <Prism/String/String.hpp>
 #include <Scheduler/Process.hpp>
+
+#include <Version.hpp>
 
 namespace API::System
 {
@@ -100,7 +102,33 @@ namespace API::System
     {
         CPU::UserMemoryProtectionGuard guard;
 
-        panic(std::format("SYS_PANIC: {}", errorMessage));
+        EarlyLogMessage(AnsiColor::FOREGROUND_MAGENTA);
+        EarlyLogMessage("SystemMemoryStatistics");
+        EarlyLogMessage(AnsiColor::FOREGROUND_WHITE);
+        EarlyLogMessage(": =>\n");
+
+        EarlyLogMessage(AnsiColor::FOREGROUND_MAGENTA);
+        EarlyLogMessage("TotalMemory");
+        EarlyLogMessage(AnsiColor::FOREGROUND_WHITE);
+        EarlyLogMessage(": %#p\n", PMM::GetTotalMemory());
+
+        EarlyLogMessage(AnsiColor::FOREGROUND_MAGENTA);
+        EarlyLogMessage("FreeMemory");
+        EarlyLogMessage(AnsiColor::FOREGROUND_WHITE);
+        EarlyLogMessage(": %#p\n", PMM::GetFreeMemory());
+
+        EarlyLogMessage(AnsiColor::FOREGROUND_MAGENTA);
+        EarlyLogMessage("UsedMemory");
+        EarlyLogMessage(AnsiColor::FOREGROUND_WHITE);
+        EarlyLogMessage(": %#p\n", PMM::GetUsedMemory());
+
+        usize lastSyscall = CPU::GetCurrent()->LastSyscallID;
+        auto  syscallName = Syscall::GetName(lastSyscall);
+        panic(
+            std::format("SYS_PANIC: {}\nLast called syscall: "
+                        "{}\n",
+                        errorMessage, syscallName));
+
         return -1;
     }
 } // namespace API::System

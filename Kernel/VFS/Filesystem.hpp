@@ -9,46 +9,41 @@
 #include <API/UnixTypes.hpp>
 #include <Library/Spinlock.hpp>
 
+#include <Prism/String/String.hpp>
+
 #include <atomic>
 
 class INode;
 class Filesystem
 {
   public:
-    Filesystem(std::string_view name, u32 flags)
+    Filesystem(StringView name, u32 flags)
         : m_Name(name)
         , m_Flags(flags)
     {
     }
     virtual ~Filesystem() = default;
 
-    inline std::string_view  GetName() const { return m_Name; }
-    inline INode*            GetMountedOn() { return m_MountedOn; }
-    inline INode*            GetRootNode() { return m_Root; }
-    inline ino_t             GetNextINodeIndex() { return m_NextInodeIndex++; }
-    inline dev_t             GetDeviceID() const { return m_DeviceID; }
+    inline StringView  GetName() const { return m_Name; }
+    inline INode*      GetMountedOn() { return m_MountedOn; }
+    inline INode*      GetRootNode() { return m_Root; }
+    inline ino_t       GetNextINodeIndex() { return m_NextInodeIndex++; }
+    inline dev_t       GetDeviceID() const { return m_DeviceID; }
 
-    virtual std::string_view GetDeviceName() const { return m_Name; }
-    virtual std::string_view GetMountFlagsString() const
-    {
-        return "rw,noatime";
-    }
+    virtual StringView GetDeviceName() const { return m_Name; }
+    virtual StringView GetMountFlagsString() const { return "rw,noatime"; }
 
-    virtual INode* Mount(INode* parent, INode* source, INode* target,
-                         std::string_view name, const void* data = nullptr)
+    virtual INode*     Mount(INode* parent, INode* source, INode* target,
+                             StringView name, const void* data = nullptr)
         = 0;
-    virtual INode* CreateNode(INode* parent, std::string_view name, mode_t mode)
-        = 0;
-    virtual INode* Symlink(INode* parent, std::string_view name,
-                           std::string_view target)
+    virtual INode* CreateNode(INode* parent, StringView name, mode_t mode) = 0;
+    virtual INode* Symlink(INode* parent, StringView name, StringView target)
         = 0;
 
-    virtual INode* Link(INode* parent, std::string_view name, INode* oldNode)
-        = 0;
-    virtual bool   Populate(INode* node) = 0;
+    virtual INode* Link(INode* parent, StringView name, INode* oldNode) = 0;
+    virtual bool   Populate(INode* node)                                = 0;
 
-    virtual INode* MkNod(INode* parent, std::string_view path, mode_t mode,
-                         dev_t dev)
+    virtual INode* MkNod(INode* parent, StringView path, mode_t mode, dev_t dev)
     {
         return nullptr;
     }
@@ -60,7 +55,7 @@ class Filesystem
   protected:
     Spinlock           m_Lock;
 
-    std::string        m_Name           = "NoFs";
+    String             m_Name           = "NoFs";
     dev_t              m_DeviceID       = -1;
     usize              m_BlockSize      = 512;
     usize              m_BytesLimit     = 0;

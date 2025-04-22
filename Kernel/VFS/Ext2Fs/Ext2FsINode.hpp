@@ -12,12 +12,11 @@
 class Ext2FsINode : public INode
 {
   public:
-    Ext2FsINode(INode* parent, std::string_view name, class Ext2Fs* fs,
-                mode_t mode);
+    Ext2FsINode(INode* parent, StringView name, class Ext2Fs* fs, mode_t mode);
 
     virtual ~Ext2FsINode() {}
 
-    virtual void  InsertChild(INode* node, std::string_view name) override;
+    virtual void  InsertChild(INode* node, StringView name) override;
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override
     {
