@@ -6,6 +6,8 @@
  */
 #pragma once
 
+#include <Common.hpp>
+
 #include <Arch/Arch.hpp>
 
 #ifdef CTOS_TARGET_X86_64
