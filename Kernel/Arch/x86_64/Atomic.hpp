@@ -6,9 +6,10 @@
  */
 #pragma once
 
+#include <Common.hpp>
+
 #include <Arch/x86_64/Types.hpp>
 
-#define CTOS_ALWAYS_INLINE [[gnu::always_inline]]
 template <typename T>
 CTOS_ALWAYS_INLINE bool CompareExchange(volatile T* ptr, T oldValue, T newValue)
 {

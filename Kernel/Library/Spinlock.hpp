@@ -7,7 +7,14 @@
 #pragma once
 
 #include <Arch/Arch.hpp>
-#include <Arch/x86_64/Atomic.hpp>
+
+#ifdef PRISM_ARCH_X86_64
+    #include <Arch/x86_64/Atomic.hpp>
+inline void Pause() { __asm__ volatile("pause"); }
+#elifdef PRISM_ARCH_AARCH64
+inline void Pause() { __asm__ volatile("isb" ::: "memory"); }
+#endif
+
 #include <Debug/Panic.hpp>
 
 namespace CPU
@@ -20,12 +27,6 @@ namespace CPU
 #include <Prism/Core/Types.hpp>
 #include <Prism/Debug/Assertions.hpp>
 #include <Prism/Utility/Atomic.hpp>
-
-#ifdef PRISM_ARCH_X86_64
-inline void Pause() { __asm__ volatile("pause"); }
-#elifdef PRISM_ARCH_AARCH64
-inline void Pause() { __asm__ volatile("isb" ::: "memory"); }
-#endif
 
 class Spinlock
 {

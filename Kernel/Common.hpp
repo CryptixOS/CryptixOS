@@ -16,7 +16,9 @@
 #include <format>
 #include <string_view>
 
+#define CTOS_ALWAYS_INLINE     [[gnu::always_inline]]
 #define CTOS_UNUSED            [[maybe_unused]]
+
 #define CtosUnused(var)        ((void)var)
 #define CtosGetFrameAddress(n) __builtin_frame_address(n)
 
