@@ -24,5 +24,8 @@ namespace CPU
 
         Thread*   Idle;
         Thread*   CurrentThread;
+
+        bool      DuringSyscall = false;
+        usize     LastSyscallID = usize(-1);
     };
 }; // namespace CPU
