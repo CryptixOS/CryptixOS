@@ -4,7 +4,8 @@ extend-ignore-identifiers-re = [
     "AttributeID.*Supress.*",
     "IST", "ist", "WHT", "unexpect",
     "implict", "ba", "EXTA",
-    "Paeth", "isue",
+    "Paeth", "isue", "childs",
+    "fillin", "ful", "Nd",
 ]
 
 [default.extend-identifiers]
