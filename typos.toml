@@ -5,7 +5,7 @@ extend-ignore-identifiers-re = [
     "IST", "ist", "WHT", "unexpect",
     "implict", "ba", "EXTA",
     "Paeth", "isue", "childs",
-    "fillin", "ful", "Nd",
+    "fillin", "ful", "Nd", "onl",
 ]
 
 [default.extend-identifiers]
