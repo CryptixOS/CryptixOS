@@ -157,7 +157,6 @@ no_ext_mods = ext_mods.length() == 0
 qemu_args = [
   '-cpu', 'max',
   '-net', 'none',
-  '-serial', 'stdio',
   '-d', 'int,guest_errors',
   '-smp', '4',
   '-d', 'cpu_reset',
@@ -183,7 +182,8 @@ if arch == 'x86_64'
   qemu_args += [
     '-M', 'q35,smm=off',
     '-device', 'isa-debug-exit',
-    '-debugcon', 'file:' + meson.project_source_root() / 'debug.log',
+    '-debugcon', 'stdio',
+    '-serial', 'file:' + meson.project_source_root() / 'debug.log',
     '-enable-kvm',
     '-machine', 'pcspk-audiodev=audio',
     '-cpu', 'host',
@@ -206,6 +206,7 @@ elif arch == 'aarch64'
     #'-dtb', meson.project_source_root() / 'qemu.dtb',
     '-cpu', 'max',
     '-device', 'ramfb',
+    '-serial', 'stdio',
   ]
   ovmf_id = 'AA64'
   xorriso_args = [
