@@ -41,9 +41,9 @@ class ProcFs : public Filesystem
     virtual bool   Populate(INode* node) override;
 
   private:
-    static std::unordered_map<pid_t, Process*>            s_Processes;
+    static std::unordered_map<pid_t, Process*>      s_Processes;
 
-    std::unordered_map<std::string_view, ProcFsProperty*> m_Properties;
+    std::unordered_map<StringView, ProcFsProperty*> m_Properties;
 
-    void AddChild(StringView name);
+    void                                            AddChild(StringView name);
 };

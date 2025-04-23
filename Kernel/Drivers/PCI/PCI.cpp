@@ -161,8 +161,8 @@ namespace PCI
                 u8 subclassID = controller->Read<u8>(
                     addr, std::to_underlying(RegisterOffset::eSubClassID));
 
-                std::string_view vendorName = magic_enum::enum_name(vendorID);
-                if (vendorName.empty()) vendorName = "Unrecognized";
+                StringView vendorName = magic_enum::enum_name(vendorID).data();
+                if (vendorName.Empty()) vendorName = "Unrecognized"_sv;
 
                 LogInfo(
                     "PCI: {:#x}:{:#x}:{:#x}, ID: {:#x}:{:#x}:{:#x}:{:#x} - {}",

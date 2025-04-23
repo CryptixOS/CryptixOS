@@ -8,6 +8,7 @@
 
 #include <Prism/Core/Types.hpp>
 #include <Prism/Delegate.hpp>
+#include <Prism/String/StringView.hpp>
 
 #include <Time/TimeStep.hpp>
 
@@ -20,10 +21,10 @@ enum class TimerMode
 class HardwareTimer
 {
   public:
-    HardwareTimer()                                 = default;
-    virtual ~HardwareTimer()                        = default;
+    HardwareTimer()                           = default;
+    virtual ~HardwareTimer()                  = default;
 
-    virtual std::string_view GetModelString() const = 0;
+    virtual StringView GetModelString() const = 0;
 
     using OnTickCallback = Delegate<void(struct CPUContext*)>;
 

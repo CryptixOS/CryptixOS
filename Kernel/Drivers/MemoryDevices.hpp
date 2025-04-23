@@ -24,12 +24,9 @@ namespace MemoryDevices
         {
         }
 
-        virtual std::string_view GetName() const noexcept override
-        {
-            return "null";
-        }
+        virtual StringView GetName() const noexcept override { return "null"; }
 
-        virtual isize Read(void* dest, off_t offset, usize bytes) override
+        virtual isize      Read(void* dest, off_t offset, usize bytes) override
         {
             return EOF;
         }
@@ -49,12 +46,9 @@ namespace MemoryDevices
         {
         }
 
-        virtual std::string_view GetName() const noexcept override
-        {
-            return "zero";
-        }
+        virtual StringView GetName() const noexcept override { return "zero"; }
 
-        virtual isize Read(void* dest, off_t offset, usize bytes) override
+        virtual isize      Read(void* dest, off_t offset, usize bytes) override
         {
             std::memset(dest, 0, bytes);
 
@@ -76,12 +70,9 @@ namespace MemoryDevices
         {
         }
 
-        virtual std::string_view GetName() const noexcept override
-        {
-            return "full";
-        }
+        virtual StringView GetName() const noexcept override { return "full"; }
 
-        virtual isize Read(void* dest, off_t offset, usize bytes) override
+        virtual isize      Read(void* dest, off_t offset, usize bytes) override
         {
             std::memset(dest, 0, bytes);
 
@@ -107,8 +98,7 @@ namespace MemoryDevices
         for (auto device : devices)
         {
             DevTmpFs::RegisterDevice(device);
-            std::string path = "/dev/";
-            path += device->GetName();
+            auto path = std::format("/dev/{}", device->GetName());
 
             VFS::MkNod(VFS::GetRootNode(), path.data(), 0666, device->GetID());
         }

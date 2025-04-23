@@ -10,6 +10,8 @@
 #include <Drivers/Storage/NVMe/NVMeNameSpace.hpp>
 #include <Drivers/Storage/NVMe/NVMeQueue.hpp>
 
+#include <Prism/String/String.hpp>
+
 #include <atomic>
 #include <utility>
 
@@ -173,12 +175,9 @@ namespace NVMe
 
         bool          CreateIoQueues(NameSpace& ns, Queue*& queues, u32 id);
 
-        virtual std::string_view GetName() const noexcept override
-        {
-            return m_Name;
-        }
+        virtual StringView GetName() const noexcept override { return m_Name; }
 
-        virtual isize Read(void* dest, off_t offset, usize bytes) override
+        virtual isize      Read(void* dest, off_t offset, usize bytes) override
         {
             return 0;
         }
@@ -190,8 +189,8 @@ namespace NVMe
         virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
 
       private:
-        std::string m_Name                               = "nvme";
-        usize       m_Index                              = 0;
+        String m_Name                                    = "nvme"_s;
+        usize  m_Index                                   = 0;
         ControllerRegister volatile* volatile m_Register = nullptr;
         Pointer                             m_CrAddress;
 

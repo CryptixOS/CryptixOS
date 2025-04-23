@@ -31,15 +31,15 @@ class Device
     {
     }
 
-    inline dev_t             GetID() const noexcept { return m_ID; }
-    virtual std::string_view GetName() const noexcept = 0;
+    inline dev_t        GetID() const noexcept { return m_ID; }
+    virtual StringView  GetName() const noexcept = 0;
 
-    virtual const stat&      GetStats() { return m_Stats; }
+    virtual const stat& GetStats() { return m_Stats; }
 
-    virtual isize            Read(void* dest, off_t offset, usize bytes) = 0;
-    virtual isize Write(const void* src, off_t offset, usize bytes)      = 0;
+    virtual isize       Read(void* dest, off_t offset, usize bytes)       = 0;
+    virtual isize       Write(const void* src, off_t offset, usize bytes) = 0;
 
-    virtual i32   IoCtl(usize request, uintptr_t argp)                   = 0;
+    virtual i32         IoCtl(usize request, uintptr_t argp)              = 0;
 
   protected:
     dev_t m_ID;

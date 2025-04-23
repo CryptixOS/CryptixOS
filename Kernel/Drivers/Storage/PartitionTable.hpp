@@ -6,9 +6,8 @@
  */
 #pragma once
 
+#include <Prism/Containers/Vector.hpp>
 #include <Prism/Core/Types.hpp>
-
-#include <vector>
 
 class PartitionTable
 {
@@ -36,11 +35,11 @@ class PartitionTable
     auto end() { return m_Entries.end(); }
 
   private:
-    StorageDevice*     m_Device;
-    std::vector<Entry> m_Entries;
+    StorageDevice* m_Device;
+    Vector<Entry>  m_Entries;
 
-    bool               IsProtective(struct MasterBootRecord* mbr);
+    bool           IsProtective(struct MasterBootRecord* mbr);
 
-    bool               ParseMBR(MasterBootRecord* mbr);
-    bool               ParseGPT();
+    bool           ParseMBR(MasterBootRecord* mbr);
+    bool           ParseGPT();
 };

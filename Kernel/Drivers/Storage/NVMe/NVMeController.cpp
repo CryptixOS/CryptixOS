@@ -9,7 +9,9 @@
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
+
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/VFS.hpp>
 
@@ -23,7 +25,7 @@ namespace NVMe
         , m_Index(s_ControllerCount++)
     {
         if (m_Index == 0) DevTmpFs::RegisterDevice(this);
-        m_Name += std::to_string(m_Index);
+        m_Name += StringUtils::ToString(m_Index);
 
         LogTrace("NVMe{}: Initializing...", m_Index);
         if (!Initialize())
@@ -32,7 +34,7 @@ namespace NVMe
             return;
         }
 
-        StringView path = std::format("/dev/{}", GetName()).data();
+        StringView path = fmt::format("/dev/{}", GetName()).data();
         VFS::MkNod(VFS::GetRootNode(), path, 0666, GetID());
     }
 

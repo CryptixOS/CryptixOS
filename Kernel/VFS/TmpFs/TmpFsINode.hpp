@@ -35,4 +35,6 @@ class TmpFsINode final : public INode
   private:
     u8*   m_Data     = nullptr;
     usize m_Capacity = 0;
+
+    friend class TmpFs;
 };

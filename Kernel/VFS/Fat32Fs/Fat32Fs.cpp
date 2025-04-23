@@ -79,7 +79,7 @@ INode* Fat32Fs::Mount(INode* parent, INode* source, INode* target,
 
     UpdateFsInfo();
 
-    m_Root     = CreateNode(parent, name.Raw(), 0644 | S_IFDIR);
+    m_Root     = CreateNode(parent, name, 0644 | S_IFDIR);
     m_RootNode = reinterpret_cast<Fat32FsINode*>(m_Root);
 
     m_RootNode->m_Stats.st_blocks
@@ -100,24 +100,19 @@ INode* Fat32Fs::CreateNode(INode* parent, StringView name, mode_t mode)
     if (name.Size() > 255) return_err(nullptr, ENAMETOOLONG);
     if (!S_ISREG(mode) && !S_ISDIR(mode)) return_err(nullptr, EPERM);
 
-    return new Fat32FsINode(parent, name.Raw(), this, mode);
+    return new Fat32FsINode(parent, name, this, mode);
 }
 
 bool Fat32Fs::Populate(INode* node)
 {
-    char* nameBuffer = new char[256];
-    if (!nameBuffer)
-    {
-        delete[] nameBuffer;
-        return false;
-    }
+    String nameBuffer;
+    nameBuffer.Resize(256);
 
     Fat32DirectoryEntry* directoryEntries
         = reinterpret_cast<Fat32DirectoryEntry*>(
             new u8[node->GetStats().st_size]);
     if (!directoryEntries)
     {
-        delete[] nameBuffer;
         delete[] directoryEntries;
         return false;
     }
@@ -132,7 +127,6 @@ bool Fat32Fs::Populate(INode* node)
         == -1)
     {
         LogError("Fat32::Populate: Failed to read/write clusters");
-        delete[] nameBuffer;
         delete[] directoryEntries;
         return false;
     }
@@ -160,12 +154,11 @@ bool Fat32Fs::Populate(INode* node)
             else if (lfn->Checksum != checksum)
             {
                 LogError("Fat32: Bad lfn checksum. Aborting populate");
-                delete[] nameBuffer;
                 delete[] directoryEntries;
                 return false;
             }
 
-            CopyLfnToString(lfn, nameBuffer + (lfn->Order - 1) * 13);
+            CopyLfnToString(lfn, nameBuffer.Raw() + (lfn->Order - 1) * 13);
             continue;
         }
         if (entry->Attributes & Fat32Attribute::eVolumeID) continue;
@@ -175,19 +168,19 @@ bool Fat32Fs::Populate(INode* node)
             usize nameSize = 8 - CountSpacePadding(entry->Name, 8);
             usize extSize  = 3 - CountSpacePadding(entry->Name + 8, 3);
             if (nameSize)
-                std::strncpy(nameBuffer, reinterpret_cast<char*>(entry->Name),
-                             nameSize);
+                std::strncpy(nameBuffer.Raw(),
+                             reinterpret_cast<char*>(entry->Name), nameSize);
             if (extSize)
             {
                 nameBuffer[nameSize] = '.';
-                std::strncpy(nameBuffer + nameSize + 1,
+                std::strncpy(nameBuffer.Raw() + nameSize + 1,
                              reinterpret_cast<char*>(entry->Name) + 8, extSize);
             }
         }
 
         isLfn = false;
-        if (std::strcmp(nameBuffer, ".") == 0
-            || std::strcmp(nameBuffer, "..") == 0)
+        if (std::strcmp(nameBuffer.Raw(), ".") == 0
+            || std::strcmp(nameBuffer.Raw(), "..") == 0)
             continue;
 
         u16 mode = 0644
@@ -202,7 +195,6 @@ bool Fat32Fs::Populate(INode* node)
         if (!newNode)
         {
             LogError("Fat32::Populate: Failed to create new node");
-            delete[] nameBuffer;
             delete[] directoryEntries;
             return false;
         }
@@ -221,18 +213,17 @@ bool Fat32Fs::Populate(INode* node)
             - reinterpret_cast<uintptr_t>(directoryEntries);
 
         usize nameLen = 0;
-        char* start   = nameBuffer;
+        char* start   = nameBuffer.Raw();
         while (*start && std::isalnum(*start++)) nameLen++;
-        std::string name;
-        name.resize(nameLen);
-        std::memcpy(name.data(), nameBuffer, nameLen);
+        String name;
+        name.Resize(nameLen);
 
+        nameBuffer.Copy(name.Raw(), nameLen);
         node->InsertChild(newNode, newNode->GetName());
 
         if (S_ISDIR(mode)) newNode->m_Populated = false;
     }
 
-    delete[] nameBuffer;
     delete[] directoryEntries;
     return (f32node->m_Populated = true);
 }

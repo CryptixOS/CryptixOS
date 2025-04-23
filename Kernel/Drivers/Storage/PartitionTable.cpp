@@ -46,7 +46,7 @@ bool PartitionTable::ParseMBR(MasterBootRecord* mbr)
 
         LogInfo("Entry[{}]: {{ firstBlock: {}, lastBlock: {}, type: {} }}", i,
                 firstBlock, lastBlock, type);
-        m_Entries.push_back({firstBlock, lastBlock, type});
+        m_Entries.PushBack({firstBlock, lastBlock, type});
     }
 
     return false;

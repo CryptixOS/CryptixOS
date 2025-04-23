@@ -21,8 +21,6 @@
 #include <Scheduler/Event.hpp>
 
 #include <deque>
-#include <errno.h>
-#include <vector>
 
 enum class ThreadState
 {
@@ -40,11 +38,10 @@ class Process;
 struct Thread
 {
     Thread() = default;
-    Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn = -1);
-    Thread(Process* parent, uintptr_t pc, std::vector<std::string_view>& arg,
-           std::vector<std::string_view>& envp, ELF::Image& program,
-           i64 runOn = -1);
-    Thread(Process* parent, uintptr_t pc, bool user = true);
+    Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn = -1);
+    Thread(Process* parent, Pointer pc, Vector<StringView>& arg,
+           Vector<StringView>& envp, ELF::Image& program, i64 runOn = -1);
+    Thread(Process* parent, Pointer pc, bool user = true);
     ~Thread();
 
     static Thread*     GetCurrent();
@@ -90,11 +87,11 @@ struct Thread
     bool        DispatchSignal(u8 signal);
 
 #ifdef CTOS_TARGET_X86_64
-    inline uintptr_t GetFsBase() const { return m_FsBase; }
-    inline uintptr_t GetGsBase() const { return m_GsBase; }
+    inline Pointer GetFsBase() const { return m_FsBase; }
+    inline Pointer GetGsBase() const { return m_GsBase; }
 
-    inline void      SetFsBase(uintptr_t fs) { m_FsBase = fs; }
-    inline void      SetGsBase(uintptr_t gs) { m_GsBase = gs; }
+    inline void    SetFsBase(Pointer fs) { m_FsBase = fs; }
+    inline void    SetGsBase(Pointer gs) { m_GsBase = gs; }
 #endif
 
     inline Event&              GetEvent() { return m_Event; }
@@ -107,13 +104,13 @@ struct Thread
     //////////////////////
     usize                      runningOn;
     Thread*                    self;
-    uintptr_t                  stack;
+    Pointer                    stack;
 
-    uintptr_t                  kernelStack;
-    uintptr_t                  pageFaultStack;
+    Pointer                    kernelStack;
+    Pointer                    pageFaultStack;
 
     usize                      fpuStoragePageCount;
-    uintptr_t                  fpuStorage;
+    Pointer                    fpuStorage;
     //////////////////////
 
     Spinlock                   m_Lock;
@@ -121,21 +118,21 @@ struct Thread
     ThreadState                m_State = ThreadState::eIdle;
     errno_t                    m_ErrorCode;
     Process*                   m_Parent;
-    uintptr_t                  m_StackVirt;
+    Pointer                    m_StackVirt;
 
     CPUContext                 ctx;
     CPUContext                 SavedContext;
     Spinlock                   YieldAwaitLock;
 
   private:
-    std::vector<std::pair<uintptr_t, usize>> m_Stacks;
-    bool                                     m_IsUser = false;
+    Vector<Region> m_Stacks;
+    bool           m_IsUser = false;
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
-    uintptr_t m_GsBase;
-    uintptr_t m_FsBase;
+    Pointer m_GsBase;
+    Pointer m_FsBase;
 #elif CTOS_ARCH == CTOS_ARCH_AARCH64
-    uintptr_t m_El0Base;
+    Pointer m_El0Base;
 #endif
 
     bool               m_IsEnqueued     = false;

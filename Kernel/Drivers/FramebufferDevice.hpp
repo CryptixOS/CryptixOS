@@ -16,11 +16,12 @@ class FramebufferDevice : public Device
   public:
     FramebufferDevice(limine_framebuffer* framebuffer);
 
-    static bool              Initialize();
+    static bool        Initialize();
 
-    virtual std::string_view GetName() const noexcept override
+    virtual StringView GetName() const noexcept override
     {
-        return std::format("fbdev{}", m_ID);
+        auto name = fmt::format("fbdev{}", m_ID);
+        return StringView(name.data(), name.size());
     }
 
     virtual isize Read(void* dest, off_t offset, usize bytes) override;

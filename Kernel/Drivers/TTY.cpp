@@ -23,11 +23,10 @@
 #include <VFS/VFS.hpp>
 
 #include <algorithm>
-#include <cctype>
 #include <magic_enum/magic_enum.hpp>
 
-std::vector<TTY*> TTY::s_TTYs{};
-TTY*              TTY::s_CurrentTTY = nullptr;
+Vector<TTY*> TTY::s_TTYs{};
+TTY*         TTY::s_CurrentTTY = nullptr;
 
 TTY::TTY(Terminal* terminal, usize minor)
     : Device(4, minor)
@@ -178,7 +177,6 @@ isize TTY::Write(const void* src, off_t offset, usize bytes)
     }
 
     ScopedLock guard(m_OutputLock);
-
     m_Terminal->PrintString(str);
     return bytes;
 }
@@ -310,26 +308,25 @@ void TTY::Initialize()
         LogTrace("TTY: Creating device /dev/tty{}...", minor);
 
         auto tty = new TTY(terminal, minor);
-        s_TTYs.push_back(tty);
+        s_TTYs.PushBack(tty);
         DevTmpFs::RegisterDevice(tty);
 
-        std::string path = "/dev/tty";
-        path += std::to_string(minor);
+        auto path = fmt::format("/dev/tty{}", tty->GetID());
         VFS::MkNod(VFS::GetRootNode(), path.data(), 0666, tty->GetID());
         minor++;
     }
 
-    if (s_TTYs.empty())
+    if (s_TTYs.Empty())
     {
         LogTrace("TTY: Creating device /dev/tty...");
         auto tty = new TTY(Terminal::GetPrimary(), 0);
-        s_TTYs.push_back(tty);
+        s_TTYs.PushBack(tty);
         DevTmpFs::RegisterDevice(tty);
 
         StringView path = "/dev/tty";
         VFS::MkNod(VFS::GetRootNode(), path, 0666, tty->GetID());
     }
-    if (!s_TTYs.empty())
+    if (!s_TTYs.Empty())
         VFS::MkNod(VFS::GetRootNode(), "/dev/tty", 0644 | S_IFCHR,
                    s_TTYs[0]->GetID());
 

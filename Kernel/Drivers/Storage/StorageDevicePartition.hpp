@@ -20,7 +20,7 @@ class StorageDevicePartition : public Device
     {
     }
 
-    virtual std::string_view GetName() const noexcept override
+    virtual StringView GetName() const noexcept override
     {
         return m_Device.GetName();
     }

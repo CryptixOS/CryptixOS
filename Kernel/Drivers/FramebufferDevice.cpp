@@ -68,7 +68,7 @@ FramebufferDevice::FramebufferDevice(limine_framebuffer* framebuffer)
 
     DevTmpFs::RegisterDevice(this);
 
-    StringView path = std::format("/dev/{}", GetName()).data();
+    StringView path = fmt::format("/dev/{}", GetName()).data();
     VFS::MkNod(VFS::GetRootNode(), path, 0666, GetID());
 }
 
@@ -135,7 +135,7 @@ bool FramebufferDevice::Initialize()
     FramebufferDevice* primary = new FramebufferDevice(framebuffers[0]);
     s_PrimaryFramebuffer       = primary;
 
-    auto path                  = std::format("/dev/{}", primary->GetName());
+    auto path                  = fmt::format("/dev/{}", primary->GetName());
     LogTrace("FbDev: Successfully created framebuffer device at '{}'", path);
 
     return true;

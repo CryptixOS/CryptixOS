@@ -75,7 +75,7 @@ namespace VFS
         return s_RootNode;
     }
 
-    static Filesystem* CreateFilesystem(std::string_view name, u32 flags)
+    static Filesystem* CreateFilesystem(StringView name, u32 flags)
     {
         Filesystem* fs = nullptr;
         if (name == "tmpfs") fs = new TmpFs(flags);
@@ -231,8 +231,8 @@ namespace VFS
                         return {currentNode, nullptr, ""};
                     }
                     return {currentNode, node,
-                            std::string(node->GetName().Raw(),
-                                        node->GetName().Size())};
+                            std::string(currentNode->GetName().Raw(),
+                                        currentNode->GetName().Size())};
                 }
                 currentNode = node;
 
@@ -276,7 +276,7 @@ namespace VFS
 
     bool MountRoot(StringView filesystemName)
     {
-        auto fs = CreateFilesystem(filesystemName.Raw(), 0);
+        auto fs = CreateFilesystem(filesystemName, 0);
         if (!fs)
         {
             LogError("VFS: Failed to create filesystem: '{}'", filesystemName);
@@ -307,7 +307,7 @@ namespace VFS
     {
         ScopedLock  guard(s_Lock);
 
-        Filesystem* fs = CreateFilesystem(fsName.Raw(), flags);
+        Filesystem* fs = CreateFilesystem(fsName, flags);
         if (!fs)
         {
             errno = ENODEV;
@@ -362,7 +362,7 @@ namespace VFS
             LogTrace("VFS: Mounted  '{}' on '{}' with Filesystem '{}'",
                      sourcePath, target, fsName);
 
-        s_MountPoints[target.Raw()] = fs;
+        s_MountPoints[target] = fs;
         return true;
     fail:
         if (node) delete node;
@@ -400,8 +400,9 @@ namespace VFS
         if (node) return_err(nullptr, EEXIST);
 
         if (!nparent) return nullptr;
-        node = nparent->GetFilesystem()->MkNod(nparent, newNodeName.data(),
-                                               mode, dev);
+        node = nparent->GetFilesystem()->MkNod(
+            nparent, StringView(newNodeName.data(), newNodeName.size()), mode,
+            dev);
 
         if (node) nparent->InsertChild(node, node->GetName());
 
@@ -417,7 +418,8 @@ namespace VFS
         if (!newNodeParent) return_err(nullptr, ENOENT);
 
         newNode = newNodeParent->GetFilesystem()->Symlink(
-            newNodeParent, newNodeName.data(), target);
+            newNodeParent, StringView(newNodeName.data(), newNodeName.size()),
+            target);
         if (newNode) newNodeParent->InsertChild(newNode, newNode->GetName());
         return newNode;
     }

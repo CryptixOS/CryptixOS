@@ -124,10 +124,10 @@ namespace API::System
 
         usize lastSyscall = CPU::GetCurrent()->LastSyscallID;
         auto  syscallName = Syscall::GetName(lastSyscall);
-        panic(
-            std::format("SYS_PANIC: {}\nLast called syscall: "
-                        "{}\n",
-                        errorMessage, syscallName));
+        panic(std::format("SYS_PANIC: {}\nLast called syscall: "
+                          "{}\n",
+                          errorMessage, syscallName)
+                  .data());
 
         return -1;
     }

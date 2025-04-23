@@ -13,10 +13,10 @@
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
+#include <Prism/String/String.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <demangler/Demangle.h>
-#include <vector>
 
 namespace Stacktrace
 {
@@ -24,15 +24,15 @@ namespace Stacktrace
     {
         struct StackFrame
         {
-            StackFrame* rbp;
-            uintptr_t   rip;
+            StackFrame* Base;
+            Pointer     InstructionPointer;
         };
 
-        std::vector<Symbol> symbols;
-        uintptr_t           lowestKernelSymbolAddress  = 0xffffffff;
-        uintptr_t           highestKernelSymbolAddress = 0x00000000;
+        Vector<Symbol> s_Symbols;
+        Pointer        s_LowestKernelSymbolAddress  = 0xffffffff;
+        Pointer        s_HighestKernelSymbolAddress = 0x00000000;
 
-        u64                 ParseHexDigit(char digit)
+        u64            ParseHexDigit(char digit)
         {
             if (digit >= '0' && digit <= '9') return digit - '0';
             Assert(digit >= 'a' && digit <= 'f');
@@ -40,16 +40,16 @@ namespace Stacktrace
             return (digit - 'a') + 0xa;
         }
 
-        const Symbol* GetSymbol(uintptr_t address)
+        const Symbol* GetSymbol(Pointer address)
         {
-            if (address < lowestKernelSymbolAddress
-                || address > highestKernelSymbolAddress)
+            if (address < s_LowestKernelSymbolAddress
+                || address > s_HighestKernelSymbolAddress)
                 return nullptr;
             const Symbol* ret = nullptr;
 
-            for (const auto& symbol : symbols)
+            for (const auto& symbol : s_Symbols)
             {
-                if ((&symbol + 1) == symbols.end()) break;
+                if ((&symbol + 1) == s_Symbols.end()) break;
                 if (address < (&symbol + 1)->address)
                 {
                     ret = &symbol;
@@ -63,19 +63,20 @@ namespace Stacktrace
 
     bool Initialize()
     {
-        LogTrace("Stacktrace: Loading kernel symbols...");
+        LogTrace("Stacktrace: Loading kernel s_Symbols...");
         limine_file* file = BootInfo::FindModule("ksyms");
         if (!file || !file->address) return false;
 
-        auto*     current     = reinterpret_cast<char*>(file->address);
-        char*     startOfName = nullptr;
+        Pointer fileStart   = file->address;
+        Pointer fileEnd     = fileStart.Offset(file->size);
+        char*   current     = fileStart.As<char>();
+        char*   startOfName = nullptr;
 
-        uintptr_t address     = 0;
-        while ((const u8*)current
-               < reinterpret_cast<u8*>(file->address) + file->size)
+        Pointer address     = 0;
+        while (current < fileEnd.As<char>())
         {
             for (usize i = 0; i < sizeof(void*) * 2; ++i)
-                address = (address << 4) | ParseHexDigit(*(current++));
+                address = (address.Raw() << 4) | ParseHexDigit(*(current++));
             current += 3;
 
             startOfName = current;
@@ -88,20 +89,19 @@ namespace Stacktrace
 
             ksym.address = address;
             ksym.name    = startOfName;
-            symbols.push_back(ksym);
+            s_Symbols.PushBack(ksym);
 
             *current = '\0';
-            if (ksym.address < lowestKernelSymbolAddress)
-                lowestKernelSymbolAddress = ksym.address;
-            if (ksym.address > highestKernelSymbolAddress)
-                highestKernelSymbolAddress = ksym.address;
+            if (ksym.address < s_LowestKernelSymbolAddress)
+                s_LowestKernelSymbolAddress = ksym.address;
+            if (ksym.address > s_HighestKernelSymbolAddress)
+                s_HighestKernelSymbolAddress = ksym.address;
 
             ++current;
         }
 
-        PMM::FreePages(FromHigherHalfAddress<uintptr_t>(file->address),
-                       Math::AlignUp(file->size, PMM::PAGE_SIZE)
-                           / PMM::PAGE_SIZE);
+        u64 filePageCount = Math::DivRoundUp(file->size, PMM::PAGE_SIZE);
+        PMM::FreePages(fileStart.FromHigherHalf(), filePageCount);
         LogInfo("Stacktrace: kernel symbols loaded");
         return true;
     }
@@ -111,15 +111,15 @@ namespace Stacktrace
 
         for (usize i = 0; stackFrame && i < maxFrames; i++)
         {
-            u64 rip = stackFrame->rip;
-            if (rip == 0) break;
-            stackFrame           = stackFrame->rbp;
+            auto rip = stackFrame->InstructionPointer;
+            if (!rip.IsHigherHalf()) break;
+
+            stackFrame           = stackFrame->Base;
             const Symbol* symbol = GetSymbol(rip);
 
-            std::string   demangledName
-                = symbol ? llvm::demangle(symbol->name) : "??";
+            auto demangledName   = symbol ? llvm::demangle(symbol->name) : "??";
             LogMessage("[\u001b[33mStacktrace\u001b[0m]: {}. {} <{:#x}>\n",
-                       i + 1, demangledName, rip);
+                       i + 1, demangledName, rip.Raw());
         }
     }
 }; // namespace Stacktrace

@@ -12,11 +12,11 @@
 
 #include <Prism/Path.hpp>
 #include <Prism/PathView.hpp>
+#include <Prism/TypeTraits.hpp>
 
 #include <magic_enum/magic_enum.hpp>
 #include <magic_enum/magic_enum_format.hpp>
 
-#include <concepts>
 #include <type_traits>
 
 namespace Syscall
@@ -46,11 +46,11 @@ namespace Syscall
     }
 
     template <typename T>
-    using ToFormattablePtr = typename std::conditional_t<
-        std::is_pointer_v<T>,
-        std::conditional_t<std::is_constructible_v<std::string_view, T>,
-                           NullableString, const void*>,
-        T>;
+    using ToFormattablePtr
+        = Conditional<std::is_pointer_v<T>,
+                      Conditional<std::is_constructible_v<StringView, T>,
+                                  NullableString, const void*>,
+                      T>;
 
     template <typename... Ts>
     auto Ptr(const std::tuple<Ts...>& tup)
@@ -61,9 +61,8 @@ namespace Syscall
     template <typename T>
     constexpr auto ConvertArgument(uintptr_t value)
     {
-        if constexpr (std::is_same_v<
-                          std::remove_cvref_t<std::remove_reference_t<T>>,
-                          Prism::PathView>)
+        if constexpr (IsSameV<std::remove_cvref_t<std::remove_reference_t<T>>,
+                              Prism::PathView>)
             return CPU::AsUser(
                 [value]() -> PathView
                 { return PathView(reinterpret_cast<const char*>(value)); });

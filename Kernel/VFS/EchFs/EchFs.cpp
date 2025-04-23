@@ -164,7 +164,7 @@ bool EchFs::Populate(INode* node)
         if (entry.ParentID != inodeDirectoryID) continue;
 
         EchFsINode* child
-            = new EchFsINode(inode, name.Raw(), this, mode, entry, offset);
+            = new EchFsINode(inode, name, this, mode, entry, offset);
         child->m_Stats.st_dev     = GetDeviceID();
         child->m_Stats.st_ino     = 2;
         child->m_Stats.st_mode    = mode;

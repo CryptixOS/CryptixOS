@@ -77,7 +77,7 @@ struct ProcFsPartitionsProperty : public ProcFsProperty
             u16         minor      = partition->GetID();
             const stat& stats      = partition->GetStats();
             u64         blockCount = stats.st_blocks;
-            StringView  name       = partition->GetName().data();
+            StringView  name       = partition->GetName();
 
             Write("{}\t{}\t{}\t{}\n", major, minor, blockCount, name);
         }
@@ -233,5 +233,5 @@ bool ProcFs::Populate(INode* node) { return true; }
 
 void ProcFs::AddChild(StringView name)
 {
-    m_Root->InsertChild(CreateProcFsNode(m_Root, name, this), name.Raw());
+    m_Root->InsertChild(CreateProcFsNode(m_Root, name, this), name);
 }

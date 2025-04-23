@@ -142,7 +142,7 @@ namespace VirtualMemoryManager
     void HandlePageFault(const PageFaultInfo& info)
     {
         auto message
-            = std::format("Page Fault occurred at '{:#x}'\nCaused by:\n",
+            = fmt::format("Page Fault occurred at '{:#x}'\nCaused by:\n",
                           info.VirtualAddress().Raw());
         auto reason = info.Reason();
 
@@ -162,13 +162,13 @@ namespace VirtualMemoryManager
             message += "\t- SGX violation\n";
 
         bool kernelFault = !(reason & PageFaultReason::eUser);
-        message += std::format("In {} space", kernelFault ? "User" : "Kernel");
+        message += fmt::format("In {} space", kernelFault ? "User" : "Kernel");
 
         if (CPU::DuringSyscall())
         {
             usize      syscallID   = CPU::GetCurrent()->LastSyscallID;
             StringView syscallName = Syscall::GetName(syscallID);
-            message += std::format(", and during syscall({}) => {}", syscallID,
+            message += fmt::format(", and during syscall({}) => {}", syscallID,
                                    syscallName);
         }
 
@@ -187,7 +187,7 @@ namespace VirtualMemoryManager
             return;
         }
 
-        panic(message);
+        earlyPanic(message.data());
     }
 
     Pointer MapIoRegion(PhysAddr phys, usize size, bool write, usize alignment)

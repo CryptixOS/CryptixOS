@@ -15,25 +15,24 @@
 #include <Scheduler/Event.hpp>
 
 #include <deque>
-#include <vector>
 
 class TTY : public Device
 {
   public:
     TTY(Terminal* terminal, usize minor);
 
-    inline static TTY*       GetCurrent() { return s_CurrentTTY; }
+    inline static TTY* GetCurrent() { return s_CurrentTTY; }
 
-    bool                     GetCursorKeyMode() const;
-    void                     SendBuffer(const char* string, usize bytes = 1);
+    bool               GetCursorKeyMode() const;
+    void               SendBuffer(const char* string, usize bytes = 1);
 
-    virtual std::string_view GetName() const noexcept override { return "tty"; }
-    winsize                  GetSize() const;
+    virtual StringView GetName() const noexcept override { return "tty"_sv; }
+    winsize            GetSize() const;
 
-    const termios2&          GetTermios() const { return m_Termios; }
-    void                     SetTermios(const termios2& termios);
+    const termios2&    GetTermios() const { return m_Termios; }
+    void               SetTermios(const termios2& termios);
 
-    virtual isize Read(void* dest, off_t offset, usize bytes) override;
+    virtual isize      Read(void* dest, off_t offset, usize bytes) override;
     virtual isize Write(const void* src, off_t offset, usize bytes) override;
 
     virtual i32   IoCtl(usize request, uintptr_t argp) override;
@@ -41,24 +40,24 @@ class TTY : public Device
     static void   Initialize();
 
   private:
-    static std::vector<TTY*> s_TTYs;
-    static TTY*              s_CurrentTTY;
+    static Vector<TTY*>     s_TTYs;
+    static TTY*             s_CurrentTTY;
 
-    Spinlock                 m_RawLock;
-    Spinlock                 m_OutputLock;
+    Spinlock                m_RawLock;
+    Spinlock                m_OutputLock;
 
-    Terminal*                m_Terminal = nullptr;
-    termios2                 m_Termios;
+    Terminal*               m_Terminal = nullptr;
+    termios2                m_Termios;
 
-    pid_t                    m_ControlSid = -1;
-    gid_t                    m_Pgid       = 100;
+    pid_t                   m_ControlSid = -1;
+    gid_t                   m_Pgid       = 100;
 
-    CircularQueue<u8, 4096>  m_RawBuffer;
+    CircularQueue<u8, 4096> m_RawBuffer;
     // std::deque<char>         m_RawBuffer;
-    std::deque<std::string>  m_LineQueue;
+    std::deque<std::string> m_LineQueue;
 
-    Event                    m_OnAddLine;
-    Event                    m_RawEvent;
+    Event                   m_OnAddLine;
+    Event                   m_RawEvent;
 
     enum class State
     {

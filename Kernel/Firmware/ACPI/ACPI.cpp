@@ -99,12 +99,12 @@ namespace ACPI
         using namespace std::literals;
 
         LogTrace("ACPI: Initializing...");
-        constexpr std::string_view RSDP_SIGNATURE = "RSD PTR"sv;
-        auto                       rsdpPointer    = BootInfo::GetRSDPAddress();
+        constexpr StringView RSDP_SIGNATURE = "RSD PTR"_sv;
+        auto                 rsdpPointer    = BootInfo::GetRSDPAddress();
         if (!rsdpPointer) return false;
 
         RSDP* rsdp = rsdpPointer.ToHigherHalf<Pointer>().As<RSDP>();
-        if (RSDP_SIGNATURE.compare(0, 7, rsdp->Signature) == 0)
+        if (RSDP_SIGNATURE.Compare(0, 7, rsdp->Signature) == 0)
         {
             LogError("ACPI: Invalid RSDP signature!");
             return false;

@@ -19,21 +19,21 @@ class Lapic : public HardwareTimer, public Singleton<Lapic>
         eTscDeadline = 2,
     };
 
-    void             Initialize();
+    void          Initialize();
 
-    static bool      IsInitialized() { return s_Initialized; }
+    static bool   IsInitialized() { return s_Initialized; }
 
-    std::string_view GetModelString() const override { return "Local APIC"; }
+    StringView    GetModelString() const override { return "Local APIC"_sv; }
 
-    void             SendIpi(u32 flags, u32 id);
-    void             SendEOI();
+    void          SendIpi(u32 flags, u32 id);
+    void          SendEOI();
 
-    static void      PanicIpi();
+    static void   PanicIpi();
 
-    ErrorOr<void>    Start(TimerMode mode, TimeStep interval) override;
-    void             Stop() override;
+    ErrorOr<void> Start(TimerMode mode, TimeStep interval) override;
+    void          Stop() override;
 
-    ErrorOr<void>    SetFrequency(usize frequency) override
+    ErrorOr<void> SetFrequency(usize frequency) override
     {
         (void)frequency;
         return {};

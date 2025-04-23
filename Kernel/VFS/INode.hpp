@@ -22,8 +22,7 @@ struct Credentials;
 class INode
 {
   public:
-    std::string target;
-    INode*      mountGate;
+    INode* mountGate;
 
     INode(StringView name)
         : m_Name(name)
@@ -34,7 +33,7 @@ class INode
 
     INode*      Reduce(bool symlinks, bool automount = true, usize cnt = 0);
     std::string GetPath();
-    std::string_view    GetTarget() const { return target; }
+    StringView  GetTarget() const { return m_Target; }
 
     inline Filesystem*  GetFilesystem() { return m_Filesystem; }
     virtual const stat& GetStats() { return m_Stats; }
@@ -86,6 +85,7 @@ class INode
   protected:
     INode*                                 m_Parent;
     String                                 m_Name;
+    String                                 m_Target;
     Spinlock                               m_Lock;
 
     Filesystem*                            m_Filesystem;

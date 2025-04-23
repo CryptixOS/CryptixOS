@@ -44,10 +44,10 @@ void HaltAndCatchFire(CPUContext* context)
 }
 
 CTOS_NO_KASAN [[noreturn]]
-void panic(std::string_view msg)
+void panic(StringView msg)
 {
     enterPanicMode();
-    EarlyLogError("Error Message: %s\n", msg.data());
+    EarlyLogError("Error Message: %s\n", msg.Raw());
 
     Stacktrace::Print(16);
     EarlyLogFatal("CPU[%d]: Halted", CPU::GetCurrentID());

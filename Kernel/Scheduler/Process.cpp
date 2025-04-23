@@ -16,8 +16,6 @@
 #include <VFS/Fifo.hpp>
 #include <VFS/FileDescriptor.hpp>
 
-#include <cctype>
-
 inline usize AllocatePid()
 {
     static Spinlock lock;
@@ -38,11 +36,10 @@ Credentials Credentials::s_Root = {
     .pgid = 0,
 };
 
-Process::Process(Process* parent, std::string_view name,
-                 const Credentials& creds)
+Process::Process(Process* parent, StringView name, const Credentials& creds)
     : m_Parent(parent)
     , m_Pid(AllocatePid())
-    , m_Name(name)
+    , m_Name(name.Raw())
     , m_Credentials(creds)
     , m_Ring(PrivilegeLevel::eUnprivileged)
     , m_NextTid(m_Pid)
@@ -92,26 +89,25 @@ Process* Process::CreateIdleProcess()
     return idle;
 }
 
-Thread* Process::CreateThread(uintptr_t rip, bool isUser, i64 runOn)
+Thread* Process::CreateThread(Pointer rip, bool isUser, i64 runOn)
 {
     auto thread      = new Thread(this, rip, 0, runOn);
     thread->m_IsUser = isUser;
 
-    if (m_Threads.empty()) m_MainThread = thread;
+    if (m_Threads.Empty()) m_MainThread = thread;
 
-    m_Threads.push_back(thread);
+    m_Threads.PushBack(thread);
     return thread;
 }
-Thread* Process::CreateThread(uintptr_t                      rip,
-                              std::vector<std::string_view>& argv,
-                              std::vector<std::string_view>& envp,
-                              ELF::Image& program, i64 runOn)
+Thread* Process::CreateThread(Pointer rip, Vector<StringView>& argv,
+                              Vector<StringView>& envp, ELF::Image& program,
+                              i64 runOn)
 {
     auto thread = new Thread(this, rip, argv, envp, program, runOn);
 
-    if (m_Threads.empty()) m_MainThread = thread;
+    if (m_Threads.Empty()) m_MainThread = thread;
 
-    m_Threads.push_back(thread);
+    m_Threads.PushBack(thread);
     return thread;
 }
 
@@ -189,13 +185,13 @@ ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
     return 0;
 }
 
-std::vector<std::string> SplitArguments(const std::string& str)
+Vector<std::string> SplitArguments(const std::string& str)
 {
-    std::vector<std::string> segments;
-    usize                    start     = str[0] == ' ' ? 1 : 0;
-    usize                    end       = start;
+    Vector<std::string> segments;
+    usize               start     = str[0] == ' ' ? 1 : 0;
+    usize               end       = start;
 
-    auto                     findSlash = [str](usize pos) -> usize
+    auto                findSlash = [str](usize pos) -> usize
     {
         usize current = pos;
         while (str[current] != ' ' && current < str.size()) current++;
@@ -206,28 +202,28 @@ std::vector<std::string> SplitArguments(const std::string& str)
     while ((end = findSlash(start)) != std::string::npos)
     {
         std::string segment = str.substr(start, end - start);
-        if (start != end) segments.push_back(segment);
+        if (start != end) segments.PushBack(segment);
 
         start = end + 1;
     }
 
     // handle last segment
-    if (start < str.length()) segments.push_back(str.substr(start));
+    if (start < str.length()) segments.PushBack(str.substr(start));
     return segments;
 }
 
-ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
+ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 {
     m_FdTable.Clear();
     m_FdTable.OpenStdioStreams();
 
-    m_Name = path;
+    m_Name = path.Raw();
     Arch::VMM::DestroyPageMap(PageMap);
     delete PageMap;
     PageMap     = new class PageMap();
 
     auto nodeOr = CPU::AsUser([path]() -> auto
-                              { return VFS::ResolvePath(path.data()); });
+                              { return VFS::ResolvePath(path.Raw()); });
     if (!nodeOr) return nodeOr.error();
 
     std::string shellPath;
@@ -260,16 +256,16 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
         EarlyLogInfo("Shell: %s", shellPath.data());
     }
 
-    std::vector<std::string>      args = SplitArguments(shellPath);
-    std::vector<std::string_view> argvArr;
+    Vector<std::string> args = SplitArguments(shellPath);
+    Vector<StringView>  argvArr;
     {
         CPU::UserMemoryProtectionGuard guard;
-        for (auto& arg : args) argvArr.push_back(arg);
+        for (auto& arg : args) argvArr.EmplaceBack(arg.data(), arg.size());
     }
-    if (!shellPath.empty()) argvArr.push_back(path);
+    if (!shellPath.empty()) argvArr.PushBack(path);
 
     static ELF::Image program, ld;
-    if (!program.Load(shellPath.empty() ? path.data() : argvArr[0].data(),
+    if (!program.Load(shellPath.empty() ? path.Raw() : argvArr[0].Raw(),
                       PageMap, m_AddressSpace))
         return Error(ENOEXEC);
 
@@ -290,16 +286,16 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
 
     {
         CPU::UserMemoryProtectionGuard guard;
-        for (char** arg = argv; *arg; arg++) argvArr.push_back(*arg);
+        for (char** arg = argv; *arg; arg++) argvArr.PushBack(*arg);
 
         for (usize i = 0; auto& arg : args)
             LogDebug("Process::Exec: argv[{}] = '{}'", i++, arg);
     }
 
-    std::vector<std::string_view> envpArr;
+    Vector<StringView> envpArr;
     {
         CPU::UserMemoryProtectionGuard guard;
-        for (char** env = envp; *env; env++) envpArr.push_back(*env);
+        for (char** env = envp; *env; env++) envpArr.PushBack(*env);
     }
 
     auto thread = CreateThread(address, argvArr, envpArr, program,
@@ -312,9 +308,9 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
 ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
                                 rusage* rusage)
 {
-    Process*              process = Process::GetCurrent();
-    std::vector<Process*> procs;
-    if (m_Children.empty()) return Error(ECHILD);
+    Process*         process = Process::GetCurrent();
+    Vector<Process*> procs;
+    if (m_Children.Empty()) return Error(ECHILD);
 
     if (pid < -1)
     {
@@ -326,7 +322,7 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
                                    return false;
                                });
         if (it == m_Children.end()) return Error(ECHILD);
-        procs.push_back(*it);
+        procs.PushBack(*it);
     }
     else if (pid == -1) procs = process->m_Children;
     else if (pid == 0)
@@ -340,7 +336,7 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
                                });
 
         if (it == m_Children.end()) return Error(ECHILD);
-        procs.push_back(*it);
+        procs.PushBack(*it);
     }
     else if (pid > 0)
     {
@@ -352,11 +348,11 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
                                });
 
         if (it == m_Children.end()) return Error(ECHILD);
-        procs.push_back(*it);
+        procs.PushBack(*it);
     }
 
-    std::vector<Event*> events;
-    for (auto& proc : procs) events.push_back(&proc->m_Event);
+    Vector<Event*> events;
+    for (auto& proc : procs) events.PushBack(&proc->m_Event);
 
     bool block = !(flags & WNOHANG);
     for (;;)
@@ -385,7 +381,8 @@ ErrorOr<Process*> Process::Fork()
     Thread* currentThread = CPU::GetCurrentThread();
     Assert(currentThread && currentThread->m_Parent == this);
 
-    Process* newProcess = Scheduler::CreateProcess(this, m_Name, m_Credentials);
+    Process* newProcess
+        = Scheduler::CreateProcess(this, m_Name.data(), m_Credentials);
 
     // TODO(v1tr10l7): implement PageMap::Fork;
     class PageMap* pageMap = new class PageMap();
@@ -394,7 +391,7 @@ ErrorOr<Process*> Process::Fork()
     newProcess->PageMap = pageMap;
     newProcess->m_CWD   = m_CWD;
     newProcess->m_Umask = m_Umask;
-    m_Children.push_back(newProcess);
+    m_Children.PushBack(newProcess);
 
     newProcess->m_AddressSpace.Clear();
     for (const auto& [base, range] : m_AddressSpace)
@@ -465,16 +462,16 @@ i32 Process::Exit(i32 code)
         for (auto& child : m_Children)
         {
             child->m_Parent = subreaper;
-            subreaper->m_Children.push_back(child);
+            subreaper->m_Children.PushBack(child);
         }
     }
 
     for (auto& zombie : m_Zombies)
     {
         zombie->m_Parent = m_Parent;
-        m_Parent->m_Zombies.push_back(zombie);
+        m_Parent->m_Zombies.PushBack(zombie);
     }
-    m_Zombies.clear();
+    m_Zombies.Clear();
 
     delete PageMap;
     m_Status = W_EXITCODE(code, 0);

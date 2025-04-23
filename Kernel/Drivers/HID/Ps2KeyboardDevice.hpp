@@ -64,11 +64,11 @@ class Ps2KeyboardDevice : public RefCounted, public Device
     }
     virtual ~Ps2KeyboardDevice() = default;
 
-    void                     Initialize();
+    void               Initialize();
 
-    virtual std::string_view GetName() const noexcept override
+    virtual StringView GetName() const noexcept override
     {
-        return "PS/2 Keyboard";
+        return "PS/2 Keyboard"_sv;
     }
 
     virtual isize Read(void* dest, off_t offset, usize bytes) override

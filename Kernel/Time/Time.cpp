@@ -36,15 +36,15 @@ namespace Time
 
     namespace
     {
-        std::vector<HardwareTimer*> s_HardwareTimers;
-        HardwareTimer*              s_SchedulerTimer = nullptr;
+        Vector<HardwareTimer*> s_HardwareTimers;
+        HardwareTimer*         s_SchedulerTimer = nullptr;
 
-        Timestep                    s_BootTime;
-        Timestep                    s_RealTime;
-        Timestep                    s_Monotonic;
+        Timestep               s_BootTime;
+        Timestep               s_RealTime;
+        Timestep               s_Monotonic;
 
-        std::deque<Timer*>          s_ArmedTimers;
-        Spinlock                    s_TimersLock;
+        std::deque<Timer*>     s_ArmedTimers;
+        Spinlock               s_TimersLock;
     } // namespace
 
     void Timer::Arm()
@@ -77,13 +77,13 @@ namespace Time
 
         LogTrace("Time: Probing available timers...");
         Arch::ProbeTimers(s_HardwareTimers);
-        Assert(s_HardwareTimers.size() > 0);
+        Assert(s_HardwareTimers.Size() > 0);
 
-        LogInfo("Time: Detected {} timers", s_HardwareTimers.size());
+        LogInfo("Time: Detected {} timers", s_HardwareTimers.Size());
         for (usize i = 0; auto& timer : s_HardwareTimers)
             LogInfo("Time: Timer[{}] = '{}'", i++, timer->GetModelString());
 
-        s_SchedulerTimer = s_HardwareTimers.front();
+        s_SchedulerTimer = s_HardwareTimers.Front();
     }
 
     HardwareTimer* GetSchedulerTimer() { return s_SchedulerTimer; }

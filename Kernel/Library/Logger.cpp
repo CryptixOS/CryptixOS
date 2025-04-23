@@ -27,7 +27,7 @@ namespace E9
 #endif
     }
 
-    CTOS_NO_KASAN static void PrintString(std::string_view str)
+    CTOS_NO_KASAN static void PrintString(StringView str)
     {
         for (auto c : str) PrintChar(c);
     }
@@ -39,7 +39,7 @@ static usize   s_EnabledSinks = 0;
 class CoreSink final : public LogSink
 {
   public:
-    void WriteNoLock(std::string_view str) override
+    void WriteNoLock(StringView str) override
     {
         if (s_EnabledSinks & LOG_SINK_E9) E9::PrintString(str);
         if (s_EnabledSinks & LOG_SINK_SERIAL) Serial::Write(str);
@@ -47,7 +47,7 @@ class CoreSink final : public LogSink
         {
             auto terminal = Terminal::GetPrimary();
             if (!terminal) return;
-            terminal->PrintString(str.data());
+            terminal->PrintString(str);
         }
     }
 };
@@ -263,7 +263,7 @@ namespace Logger
     CTOS_NO_KASAN void DisableSink(usize output) { s_EnabledSinks &= ~output; }
 
     void LogChar(u64 c) { Print(reinterpret_cast<const char*>(&c)); }
-    void Print(std::string_view string) { g_CoreSink.WriteNoLock(string); }
+    void Print(StringView string) { g_CoreSink.WriteNoLock(string); }
     i32  Printv(const char* format, va_list* args)
     {
         Logv(LogLevel::eNone, format, *args);
@@ -271,7 +271,7 @@ namespace Logger
         return 0;
     }
 
-    CTOS_NO_KASAN void Log(LogLevel logLevel, std::string_view string,
+    CTOS_NO_KASAN void Log(LogLevel logLevel, StringView string,
                            bool printNewline)
     {
         ScopedLock guard(s_Lock, true);

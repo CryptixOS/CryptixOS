@@ -32,7 +32,7 @@ class Scheduler
 
     static Process* GetKernelProcess();
 
-    static Process* CreateProcess(Process* parent, std::string_view name,
+    static Process* CreateProcess(Process* parent, StringView name,
                                   const Credentials& creds);
     static void     RemoveProcess(pid_t pid);
 

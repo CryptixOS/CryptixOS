@@ -6,9 +6,8 @@
  */
 #pragma once
 
-#include "Prism/Core/Types.hpp"
-
-#include <string_view>
+#include <Prism/Core/Types.hpp>
+#include <Prism/String/StringView.hpp>
 
 namespace Serial
 {
@@ -17,7 +16,7 @@ namespace Serial
     u8                 Read();
     void               Write(u8 data);
 
-    inline static void Write(std::string_view str)
+    inline static void Write(StringView str)
     {
         for (auto c : str) Write(c);
     }

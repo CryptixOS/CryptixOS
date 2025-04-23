@@ -312,7 +312,7 @@ void Terminal::OnCsi(char c)
             StringView response = "";
             if (param == 5) response = "\e[0n";
             else if (param == 6)
-                response = std::format("\e[{};{}", x, y).data();
+                response = fmt::format("\e[{};{}", x, y).data();
 
             auto& termios    = const_cast<termios2&>(tty->GetTermios());
             auto  oldTermios = termios;

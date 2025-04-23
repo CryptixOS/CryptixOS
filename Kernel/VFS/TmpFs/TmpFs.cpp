@@ -42,15 +42,15 @@ INode* TmpFs::CreateNode(INode* parent, StringView name, mode_t mode)
         return nullptr;
     }
 
-    return new TmpFsINode(parent, name.Raw(), this, mode);
+    return new TmpFsINode(parent, name, this, mode);
 }
 
 INode* TmpFs::Symlink(INode* parent, StringView name, StringView target)
 {
     if (m_NextInodeIndex >= m_MaxInodeCount) return_err(nullptr, ENOSPC);
 
-    auto node    = new TmpFsINode(parent, name.Raw(), this, 0777 | S_IFLNK);
-    node->target = target.Raw();
+    auto node      = new TmpFsINode(parent, name, this, 0777 | S_IFLNK);
+    node->m_Target = target;
 
     return node;
 }
@@ -63,6 +63,6 @@ INode* TmpFs::Link(INode* parent, StringView name, INode* oldNode)
         return nullptr;
     }
 
-    return new TmpFsINode(parent, name.Raw(), this,
+    return new TmpFsINode(parent, name, this,
                           (oldNode->GetStats().st_mode & ~S_IFMT));
 }

@@ -237,7 +237,7 @@ void Scheduler::Yield(bool saveCtx)
 
 Process* Scheduler::GetKernelProcess() { return s_KernelProcess; }
 
-Process* Scheduler::CreateProcess(Process* parent, std::string_view name,
+Process* Scheduler::CreateProcess(Process* parent, StringView name,
                                   const Credentials& creds)
 {
     auto       proc = new Process(parent, name, creds);

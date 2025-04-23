@@ -30,7 +30,7 @@ INode* DevTmpFs::Mount(INode* parent, INode* source, INode* target,
 
 INode* DevTmpFs::CreateNode(INode* parent, StringView name, mode_t mode)
 {
-    return new DevTmpFsINode(parent, name.Raw(), this, mode);
+    return new DevTmpFsINode(parent, name, this, mode);
 }
 
 INode* DevTmpFs::Symlink(INode* parent, StringView name, StringView target)
@@ -52,7 +52,7 @@ INode* DevTmpFs::MkNod(INode* parent, StringView name, mode_t mode, dev_t dev)
     if (it == s_Devices.end()) return_err(nullptr, EEXIST);
     Device* device = it->second;
 
-    return new DevTmpFsINode(parent, name.Raw(), this, mode, device);
+    return new DevTmpFsINode(parent, name, this, mode, device);
 }
 
 void DevTmpFs::RegisterDevice(Device* device)

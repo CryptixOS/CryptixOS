@@ -13,9 +13,6 @@
 #include <Library/Stacktrace.hpp>
 #include <Prism/Core/Types.hpp>
 
-#include <format>
-#include <string_view>
-
 #define CTOS_ALWAYS_INLINE     [[gnu::always_inline]]
 #define CTOS_UNUSED            [[maybe_unused]]
 

@@ -11,7 +11,7 @@
 
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Path.hpp>
-#include <Prism/String/StringView.hpp>
+#include <Prism/String/String.hpp>
 
 #include <cerrno>
 #include <expected>

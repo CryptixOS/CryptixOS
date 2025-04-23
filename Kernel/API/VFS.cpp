@@ -193,7 +193,7 @@ namespace API::VFS
         INode* node = nodeOrError.value();
         if (!node->IsSymlink()) return Error(EINVAL);
 
-        StringView symlinkTarget = node->GetTarget().data();
+        StringView symlinkTarget = node->GetTarget();
         size                     = std::min(size, symlinkTarget.Size());
 
         return symlinkTarget.Copy(out, size);
