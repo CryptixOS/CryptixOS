@@ -141,7 +141,7 @@ class Terminal
     constexpr static usize              MAX_ESC_PARAMETER_COUNT = 16;
     Array<u32, MAX_ESC_PARAMETER_COUNT> m_EscapeValues;
     usize                               m_EscapeValueCount = 0;
-    u8                                  m_TabSize          = 4;
+    u8                                  m_TabSize          = 8;
 
     bool                                m_DecPrivate       = false;
     bool                                m_CursorKeyMode    = false;

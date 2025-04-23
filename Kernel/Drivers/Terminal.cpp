@@ -343,7 +343,7 @@ void Terminal::OnCsi(char c)
 
 void Terminal::Reset()
 {
-    m_TabSize            = 4;
+    m_TabSize            = 8;
     m_EscapeValueCount   = 0;
     m_ScrollTopMargin    = 0;
     m_ScrollBottomMargin = m_Size.ws_row;
