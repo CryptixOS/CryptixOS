@@ -44,7 +44,24 @@ struct Thread
     Thread(Process* parent, Pointer pc, bool user = true);
     ~Thread();
 
+    static Thread*     Current();
     static Thread*     GetCurrent();
+
+    void               SetRunningOn(isize runningOn);
+
+    Pointer            GetStack() const;
+    void               SetStack(Pointer stack);
+
+    Pointer            GetPageFaultStack() const;
+    Pointer            GetKernelStack() const;
+
+    void               SetPageFaultStack(Pointer pfstack);
+    void               SetKernelStack(Pointer kstack);
+
+    Pointer            GetFpuStorage() const;
+    usize              GetFpuStoragePageCount() const;
+
+    void               SetFpuStorage(Pointer fpuStorage, usize pageCount);
 
     inline tid_t       GetTid() const { return m_Tid; }
     inline ThreadState GetState() const { return m_State; }
@@ -100,29 +117,31 @@ struct Thread
 
     inline void                SetWhich(usize which) { m_Which = which; }
 
+  private:
     // DON'T MOVE
     //////////////////////
-    usize                      runningOn;
-    Thread*                    self;
-    Pointer                    stack;
+    isize       m_RunningOn = -1;
+    Thread*     m_Self      = this;
+    Pointer     m_Stack;
 
-    Pointer                    kernelStack;
-    Pointer                    pageFaultStack;
+    Pointer     m_KernelStack;
+    Pointer     m_PageFaultStack;
 
-    usize                      fpuStoragePageCount;
-    Pointer                    fpuStorage;
+    usize       m_FpuStoragePageCount;
+    Pointer     m_FpuStorage;
     //////////////////////
 
-    Spinlock                   m_Lock;
-    tid_t                      m_Tid;
-    ThreadState                m_State = ThreadState::eIdle;
-    errno_t                    m_ErrorCode;
-    Process*                   m_Parent;
-    Pointer                    m_StackVirt;
+    Spinlock    m_Lock;
+    tid_t       m_Tid;
+    ThreadState m_State = ThreadState::eIdle;
+    errno_t     m_ErrorCode;
+    Process*    m_Parent;
+    Pointer     m_StackVirt;
 
-    CPUContext                 ctx;
-    CPUContext                 SavedContext;
-    Spinlock                   YieldAwaitLock;
+  public:
+    CPUContext Context;
+    CPUContext SavedContext;
+    Spinlock   YieldAwaitLock;
 
   private:
     Vector<Region> m_Stacks;

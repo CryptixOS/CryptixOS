@@ -401,13 +401,13 @@ namespace CPU
         if (ReadCR4() & Bit(21)) __asm__ volatile("clac" ::: "cc");
     }
 
-    uintptr_t GetFSBase() { return ReadMSR(MSR::FS_BASE); }
-    uintptr_t GetGSBase() { return ReadMSR(MSR::GS_BASE); }
-    uintptr_t GetKernelGSBase() { return ReadMSR(MSR::KERNEL_GS_BASE); }
+    Pointer GetFSBase() { return ReadMSR(MSR::FS_BASE); }
+    Pointer GetGSBase() { return ReadMSR(MSR::GS_BASE); }
+    Pointer GetKernelGSBase() { return ReadMSR(MSR::KERNEL_GS_BASE); }
 
-    void      SetFSBase(uintptr_t address) { WriteMSR(MSR::FS_BASE, address); }
-    void      SetGSBase(uintptr_t address) { WriteMSR(MSR::GS_BASE, address); }
-    void      SetKernelGSBase(uintptr_t address)
+    void    SetFSBase(Pointer address) { WriteMSR(MSR::FS_BASE, address); }
+    void    SetGSBase(Pointer address) { WriteMSR(MSR::GS_BASE, address); }
+    void    SetKernelGSBase(Pointer address)
     {
         WriteMSR(MSR::KERNEL_GS_BASE, address);
     }
@@ -429,6 +429,7 @@ namespace CPU
 
         return &s_CPUs[id];
     }
+    CPU*    Current() { return GetCurrent(); }
     Thread* GetCurrentThread()
     {
         Thread* currentThread;
@@ -437,70 +438,73 @@ namespace CPU
         return currentThread;
     }
 
-    void PrepareThread(Thread* thread, uintptr_t pc, uintptr_t arg)
+    void PrepareThread(Thread* thread, Pointer pc, Pointer arg)
     {
-        CPU* current       = GetCurrent();
-        thread->ctx.rflags = 0x202;
-        thread->ctx.rip    = pc;
-        thread->ctx.rdi    = arg;
+        CPU* current           = GetCurrent();
+        thread->Context.rflags = 0x202;
+        thread->Context.rip    = pc;
+        thread->Context.rdi    = arg;
 
-        uintptr_t kernelStack
+        Pointer kernelStack
             = PMM::AllocatePages<uintptr_t>(KERNEL_STACK_SIZE / PMM::PAGE_SIZE);
-        thread->kernelStack
-            = ToHigherHalfAddress<uintptr_t>(kernelStack) + KERNEL_STACK_SIZE;
-        current->KernelStack = thread->kernelStack;
 
-        uintptr_t pfStack
+        current->KernelStack
+            = kernelStack.Offset<Pointer>(KERNEL_STACK_SIZE).ToHigherHalf();
+        thread->SetKernelStack(current->KernelStack);
+
+        Pointer pfStack
             = PMM::AllocatePages<uintptr_t>(KERNEL_STACK_SIZE / PMM::PAGE_SIZE);
-        thread->pageFaultStack
-            = ToHigherHalfAddress<uintptr_t>(pfStack) + KERNEL_STACK_SIZE;
+        thread->SetPageFaultStack(
+            pfStack.Offset<Pointer>(KERNEL_STACK_SIZE).ToHigherHalf());
 
-        usize fpuPageCount = thread->fpuStoragePageCount
+        usize fpuPageCount
             = Math::DivRoundUp(current->FpuStorageSize, PMM::PAGE_SIZE);
-        thread->fpuStorage
-            = ToHigherHalfAddress<uintptr_t>(PMM::CallocatePages(fpuPageCount));
 
-        thread->SetGsBase(reinterpret_cast<uintptr_t>(thread));
+        Pointer fpuStoragePhys = PMM::CallocatePages(fpuPageCount);
+        thread->SetFpuStorage(fpuStoragePhys.ToHigherHalf(), fpuPageCount);
+
+        thread->SetGsBase(thread);
         if (thread->IsUser())
         {
-            thread->ctx.cs = GDT::USERLAND_CODE_SELECTOR | 0x03;
-            thread->ctx.ss = GDT::USERLAND_DATA_SELECTOR | 0x03;
-            thread->ctx.ds = thread->ctx.es = thread->ctx.ss;
+            thread->Context.cs = GDT::USERLAND_CODE_SELECTOR | 0x03;
+            thread->Context.ss = GDT::USERLAND_DATA_SELECTOR | 0x03;
+            thread->Context.ds = thread->Context.es = thread->Context.ss;
 
-            thread->ctx.rsp                 = thread->stack;
-            current->FpuRestore(thread->fpuStorage);
+            thread->Context.rsp                     = thread->GetStack();
+            current->FpuRestore(thread->GetFpuStorage());
 
             u16 defaultFcw = 0b1100111111;
             __asm__ volatile("fldcw %0" ::"m"(defaultFcw) : "memory");
             u32 defaultMxCsr = 0b1111110000000;
             asm volatile("ldmxcsr %0" ::"m"(defaultMxCsr) : "memory");
 
-            current->FpuSave(thread->fpuStorage);
+            current->FpuSave(thread->GetFpuStorage());
         }
         else
         {
-            thread->ctx.cs = GDT::KERNEL_CODE_SELECTOR;
-            thread->ctx.ss = GDT::KERNEL_DATA_SELECTOR;
-            thread->ctx.ds = thread->ctx.es = thread->ctx.ss;
+            thread->Context.cs = GDT::KERNEL_CODE_SELECTOR;
+            thread->Context.ss = GDT::KERNEL_DATA_SELECTOR;
+            thread->Context.ds = thread->Context.es = thread->Context.ss;
 
-            thread->ctx.rsp = thread->stack = thread->kernelStack;
+            thread->Context.rsp                     = thread->GetKernelStack();
+            thread->SetStack(thread->GetKernelStack());
         }
     }
     void SaveThread(Thread* thread, CPUContext* ctx)
     {
-        thread->ctx = *ctx;
+        thread->Context = *ctx;
 
         thread->SetGsBase(GetKernelGSBase());
         thread->SetFsBase(GetFSBase());
 
-        GetCurrent()->FpuSave(thread->fpuStorage);
+        GetCurrent()->FpuSave(thread->GetFpuStorage());
     }
     void LoadThread(Thread* thread, CPUContext* ctx)
     {
-        thread->runningOn        = GetCurrent()->ID;
+        thread->SetRunningOn(GetCurrent()->ID);
 
-        GetCurrent()->TSS.ist[1] = thread->pageFaultStack;
-        GetCurrent()->FpuRestore(thread->fpuStorage);
+        GetCurrent()->TSS.ist[1] = thread->GetPageFaultStack();
+        GetCurrent()->FpuRestore(thread->GetFpuStorage());
 
         thread->GetParent()->PageMap->Load();
 
@@ -508,7 +512,7 @@ namespace CPU
         SetKernelGSBase(thread->GetGsBase());
         SetFSBase(thread->GetFsBase());
 
-        *ctx = thread->ctx;
+        *ctx = thread->Context;
     }
     void Reschedule(TimeStep interval)
     {

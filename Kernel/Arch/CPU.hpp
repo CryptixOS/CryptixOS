@@ -30,11 +30,12 @@ namespace CPU
     u64             GetOnlineCPUsCount();
 
     struct CPU;
+    CPU*    Current();
     CPU*    GetCurrent();
     u64     GetCurrentID();
     Thread* GetCurrentThread();
 
-    void    PrepareThread(Thread* thread, uintptr_t pc, uintptr_t arg = 0);
+    void    PrepareThread(Thread* thread, Pointer pc, Pointer arg = 0);
 
     void    SaveThread(Thread* thread, CPUContext* ctx);
     void    LoadThread(Thread* thread, CPUContext* ctx);

@@ -55,6 +55,12 @@ Process* Process::GetCurrent()
 
     return currentThread ? currentThread->m_Parent : nullptr;
 }
+Process* Process::Current()
+{
+    Thread* currentThread = CPU::GetCurrentThread();
+
+    return currentThread ? currentThread->m_Parent : nullptr;
+}
 Process* Process::CreateKernelProcess()
 {
     Process* kernelProcess = Scheduler::GetKernelProcess();

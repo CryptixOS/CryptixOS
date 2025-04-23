@@ -141,13 +141,13 @@ namespace CPU
     u64          ReadMSR(u32 msr);
     void         WriteMSR(u32 msr, u64 value);
 
-    uintptr_t    GetFSBase();
-    uintptr_t    GetGSBase();
-    uintptr_t    GetKernelGSBase();
+    Pointer      GetFSBase();
+    Pointer      GetGSBase();
+    Pointer      GetKernelGSBase();
 
-    void         SetFSBase(uintptr_t address);
-    void         SetGSBase(uintptr_t address);
-    void         SetKernelGSBase(uintptr_t address);
+    void         SetFSBase(Pointer address);
+    void         SetGSBase(Pointer address);
+    void         SetKernelGSBase(Pointer address);
 
     Vector<CPU>& GetCPUs();
     u64          GetOnlineCPUsCount();

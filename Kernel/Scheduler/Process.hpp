@@ -54,6 +54,7 @@ class Process
     Process(Process* parent, StringView name, const Credentials& creds);
 
     static Process* GetCurrent();
+    static Process* Current();
     static Process* CreateKernelProcess();
     static Process* CreateIdleProcess();
 
@@ -169,7 +170,7 @@ class Process
     FileDescriptorTable m_FdTable;
     AddressSpace        m_AddressSpace;
 
-    uintptr_t           m_UserStackTop = 0x70000000000;
+    Pointer             m_UserStackTop = 0x70000000000u;
     usize               m_Quantum      = 1000;
     Spinlock            m_Lock;
     Event               m_Event;

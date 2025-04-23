@@ -24,6 +24,7 @@ namespace CPU
     usize GetOnlineCPUsCount() { return 1; }
 
     struct CPU;
+    CPU*    Current() { return nullptr; }
     CPU*    GetCurrent() { return nullptr; }
     u64     GetCurrentID() { return 0; }
     Thread* GetCurrentThread() { return nullptr; }
