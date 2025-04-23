@@ -111,7 +111,7 @@ namespace EFI
     using GetNextHighMonotonicCountFn = Status (*)(Uint32* HighCount);
 
     using ResetSystemFn
-        = EFIAPI Status (*)(ResetType ResetType, Status ResetStatus,
+        = EFIAPI Status (*)(ResetType ResetType, Size ResetStatus,
                             Size DataSize, Char16* ResetData);
 
     using UpdateCapsuleFn

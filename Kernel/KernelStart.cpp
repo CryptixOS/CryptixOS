@@ -49,6 +49,11 @@
 
 #include <magic_enum/magic_enum.hpp>
 
+namespace EFI
+{
+    bool Initialize();
+};
+
 static bool loadInitProcess(PathView initPath)
 {
     Process* kernelProcess = Scheduler::GetKernelProcess();
@@ -163,8 +168,8 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
 
     VMM::Initialize();
     Serial::Initialize();
-    if (CommandLine::GetBoolean("log.serial").value_or(true))
-        Logger::EnableSink(LOG_SINK_SERIAL);
+    if (!CommandLine::GetBoolean("log.serial").value_or(false))
+        Logger::DisableSink(LOG_SINK_SERIAL);
     if (!CommandLine::GetBoolean("log.e9").value_or(true))
         Logger::DisableSink(LOG_SINK_E9);
 
@@ -189,6 +194,8 @@ extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
     ACPI::LoadTables();
     Arch::Initialize();
 
+    if (!EFI::Initialize())
+        LogError("EFI: Failed to initialize efi runtime services...");
     SMBIOS::Initialize();
 
     Scheduler::Initialize();

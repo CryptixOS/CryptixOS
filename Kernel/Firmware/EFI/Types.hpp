@@ -8,10 +8,20 @@
 
 #include <Prism/Core/Types.hpp>
 
-#define EFIAPI __attribute__((ms_abi))
+#define EFIAPI __attribute__((__ms_abi__))
+#define EFI_IN
+#define EFI_OUT
+#define EFI_OPTIONAL
+#define EFI_CONST
 
 namespace EFI
 {
+    template <typename T, usize Alignment>
+    struct AlignedType
+    {
+        alignas(Alignment) T Value;
+    };
+
     using Boolean           = bool;
     constexpr Boolean False = false;
     constexpr Boolean True  = true;
@@ -28,19 +38,19 @@ namespace EFI
     using Uint64            = u64;
     using Int128            = __int128_t;
     using Uint128           = __uint128_t;
-    using Char8             = char8_t;
-    using Char16            = char16_t;
+    using Char8             = unsigned char;
+    using Char16            = u16;
     using Void              = void;
     using Guid              = Uint128;
-    using Status            = Size;
-    using Handle            = Void*;
-    using Event             = Void*;
-    using Lba               = Uint64;
-    using Tpl               = Size;
-    using MacAddress        = Uint32;
-    using Ipv4Address       = Uint32;
-    using Ipv6Address       = Uint128;
-    using IpAddress         = Uint128;
+    enum class Status : usize;
+    using Handle      = Void*;
+    using Event       = Void*;
+    using Lba         = Uint64;
+    using Tpl         = Size;
+    using MacAddress  = Uint32;
+    using Ipv4Address = Uint32;
+    using Ipv6Address = Uint128;
+    using IpAddress   = AlignedType<Uint128, 4>;
 }; // namespace EFI
 
 struct TableHeader

@@ -48,6 +48,8 @@ srcs += files(
 
   'Firmware/DeviceTree/DeviceTree.cpp',
 
+  'Firmware/EFI/Initialize.cpp',
+
   'Firmware/SMBIOS/SMBIOS.cpp',
 
   'Memory/AddressSpace.cpp',
