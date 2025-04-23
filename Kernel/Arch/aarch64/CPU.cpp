@@ -31,7 +31,7 @@ namespace CPU
 
     bool    SwapInterruptFlag(bool) { return false; }
 
-    void    PrepareThread(Thread* thread, uintptr_t pc, uintptr_t)
+    void    PrepareThread(Thread* thread, Pointer pc, Pointer)
     {
         (void)thread;
         (void)pc;
