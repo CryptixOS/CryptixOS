@@ -177,6 +177,13 @@ namespace VirtualMemoryManager
     void     SaveCurrentPageMap(PageMap& out);
     void     LoadPageMap(PageMap& pageMap, bool);
 
+    bool     MapKernelRegion(Pointer virt, Pointer phys, usize pageCount = 1,
+                             PageAttributes attributes
+                             = PageAttributes::eWriteBack | PageAttributes::eRW);
+    bool     MapKernelRange(Pointer virt, Pointer phys, usize size,
+                            PageAttributes attributes
+                            = PageAttributes::eWriteBack | PageAttributes::eRW);
+
     Pointer  MapIoRegion(PhysAddr phys, usize size, bool write = true);
     Pointer  MapIoRegion(PhysAddr phys, usize size, bool write,
                          usize alignment = 0);

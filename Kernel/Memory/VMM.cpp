@@ -190,6 +190,20 @@ namespace VirtualMemoryManager
         earlyPanic(message.data());
     }
 
+    bool MapKernelRegion(Pointer virt, Pointer phys, usize pageCount,
+                         PageAttributes attributes)
+    {
+        return MapKernelRange(virt, phys, pageCount * PMM::PAGE_SIZE,
+                              attributes);
+    }
+    bool MapKernelRange(Pointer virt, Pointer phys, usize size,
+                        PageAttributes attributes)
+    {
+        if (!s_KernelPageMap) return false;
+
+        return s_KernelPageMap->MapRange(virt, phys, size, attributes);
+    }
+
     Pointer MapIoRegion(PhysAddr phys, usize size, bool write, usize alignment)
     {
         auto           virt = AllocateSpace(size, alignment, true);
