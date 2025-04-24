@@ -4,7 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "nostd/string.hpp"
 #include <API/Limits.hpp>
 #include <Arch/CPU.hpp>
 
@@ -34,27 +33,27 @@ namespace VFS
         static Vector<std::pair<bool, StringView>> s_Filesystems = {
             {
                 false,
-                "tmpfs",
+                "tmpfs"_sv,
             },
             {
                 false,
-                "devtmpfs",
+                "devtmpfs"_sv,
             },
             {
                 false,
-                "procfs",
+                "procfs"_sv,
             },
             {
                 true,
-                "echfs",
+                "echfs"_sv,
             },
             {
                 true,
-                "fat32fs",
+                "fat32fs"_sv,
             },
             {
                 true,
-                "ext2fs",
+                "ext2fs"_sv,
             },
         };
 
@@ -100,13 +99,16 @@ namespace VFS
         delete node;
     }
 
-    std::expected<FileDescriptor*, std::errno_t>
-    Open(INode* parent, PathView path, i32 flags, mode_t mode)
+    ErrorOr<FileDescriptor*> Open(INode* parent, PathView path, i32 flags,
+                                  mode_t mode)
     {
         Process* current        = Process::GetCurrent();
         bool     followSymlinks = !(flags & O_NOFOLLOW);
         auto     acc            = flags & O_ACCMODE;
         mode &= ~(S_IRWXU | S_IRWXG | S_IRWXO | S_ISVTX | S_ISUID | S_ISGID);
+
+        // if (flags & ~VALID_OPEN_FLAGS || flags & (O_CREAT | O_DIRECTORY))
+        //     return Error(EINVAL);
 
         bool           didExist = true;
 
@@ -122,8 +124,18 @@ namespace VFS
             default: return Error(EINVAL);
         }
 
-        if (flags & O_TMPFILE && !(accMode & FileAccessMode::eWrite))
-            return Error(EINVAL);
+        if (flags & O_TMPFILE)
+        {
+            if (!(flags & O_DIRECTORY)) return Error(EINVAL);
+            if (!(accMode & FileAccessMode::eWrite)) return Error(EINVAL);
+            return Error(ENOSYS);
+        }
+        if (flags & O_PATH)
+        {
+            if (flags & ~(O_DIRECTORY | O_NOFOLLOW | O_PATH | O_CLOEXEC))
+                return Error(EINVAL);
+            accMode = FileAccessMode::eNone;
+        }
 
         INode* node
             = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
@@ -163,22 +175,21 @@ namespace VFS
 
         return node;
     }
-    std::tuple<INode*, INode*, std::string> ResolvePath(INode*   parent,
-                                                        PathView path)
+    std::tuple<INode*, INode*, Path> ResolvePath(INode* parent, PathView path)
     {
-        if (!parent || path.IsAbsolute()) parent = GetRootNode();
-        if (path.IsEmpty())
+        if (!parent || path.Absolute()) parent = GetRootNode();
+        if (path.Empty())
         {
             errno = ENOENT;
-            return {nullptr, nullptr, ""};
+            return {nullptr, nullptr, ""_sv};
         }
 
         auto currentNode = parent;
         if (parent != s_RootNode) parent = parent->Reduce(false, true);
-        if (!currentNode->Populate()) return {nullptr, nullptr, ""};
+        if (!currentNode->Populate()) return {nullptr, nullptr, ""_sv};
 
-        if (path == "/" || path.IsEmpty())
-            return {currentNode, currentNode, "/"};
+        if (path == "/"_sv || path.Empty())
+            return {currentNode, currentNode, "/"_sv};
 
         auto getParent = [&currentNode]
         {
@@ -195,11 +206,11 @@ namespace VFS
 
         for (usize i = 0; i < segments.Size(); i++)
         {
-            auto segment     = segments[i];
+            auto segment     = String(segments[i].data(), segments[i].size());
             bool isLast      = i == (segments.Size() - 1);
 
-            bool previousDir = segment == "..";
-            bool currentDir  = segment == ".";
+            bool previousDir = segment == ".."_sv;
+            bool currentDir  = segment == "."_sv;
 
             currentNode      = currentNode->Reduce(false, true);
 
@@ -209,59 +220,53 @@ namespace VFS
 
                 if (isLast)
                     return {getParent(), currentNode->Reduce(false, true),
-                            std::string(currentNode->GetName().Raw(),
-                                        currentNode->GetName().Size())};
+                            currentNode->GetName()};
 
                 continue;
             }
 
-            if (currentNode->GetChildren().contains(
-                    StringView(segment.data(), segment.size())))
+            if (currentNode->GetChildren().contains(segment))
             {
-                auto node = currentNode->GetChildren()[StringView(
-                    segment.data(), segment.size())];
+                auto node = currentNode->GetChildren()[segment];
                 if (!node->Reduce(false, true)->Populate())
-                    return {nullptr, nullptr, ""};
+                    return {nullptr, nullptr, ""_sv};
 
                 if (isLast)
                 {
-                    if (path[path.GetSize() - 1] == '/' && !node->IsDirectory())
+                    if (path[path.Size() - 1] == '/' && !node->IsDirectory())
                     {
                         errno = ENOTDIR;
-                        return {currentNode, nullptr, ""};
+                        return {currentNode, nullptr, ""_sv};
                     }
-                    return {currentNode, node,
-                            std::string(currentNode->GetName().Raw(),
-                                        currentNode->GetName().Size())};
+                    return {currentNode, node, currentNode->GetName()};
                 }
                 currentNode = node;
 
                 if (currentNode->IsSymlink())
                 {
                     currentNode = currentNode->Reduce(true);
-                    if (!currentNode) return {nullptr, nullptr, ""};
+                    if (!currentNode) return {nullptr, nullptr, ""_sv};
                 }
                 if (!currentNode->IsDirectory())
                 {
                     errno = ENOTDIR;
-                    return {nullptr, nullptr, ""};
+                    return {nullptr, nullptr, ""_sv};
                 }
 
                 continue;
             }
 
             errno = ENOENT;
-            if (isLast)
-                return {currentNode, nullptr, {segment.data(), segment.size()}};
+            if (isLast) return {currentNode, nullptr, Path(segment)};
 
             break;
         }
 
         errno = ENOENT;
-        return {nullptr, nullptr, ""};
+        return {nullptr, nullptr, ""_sv};
     }
-    std::tuple<INode*, INode*, std::string>
-    ResolvePath(INode* parent, PathView path, bool followLinks)
+    std::tuple<INode*, INode*, Path> ResolvePath(INode* parent, PathView path,
+                                                 bool followLinks)
     {
         auto [p, n, b] = ResolvePath(parent, path);
         if (followLinks && n) n = n->Reduce(true);
@@ -316,7 +321,7 @@ namespace VFS
         }
 
         INode* sourceNode = nullptr;
-        if (!sourcePath.IsEmpty())
+        if (!sourcePath.Empty())
         {
             sourceNode = std::get<1>(ResolvePath(s_RootNode, sourcePath));
             if (!sourceNode)
@@ -347,7 +352,7 @@ namespace VFS
             return_err(false, ENOTDIR);
         }
 
-        mountGate = fs->Mount(parent, sourceNode, node, baseName.data(), data);
+        mountGate = fs->Mount(parent, sourceNode, node, baseName, data);
         if (!mountGate)
         {
             LogError("VFS: Failed to mount '{}' fs", fsName);
@@ -356,7 +361,7 @@ namespace VFS
 
         node->mountGate = mountGate;
 
-        if (sourcePath.IsEmpty())
+        if (sourcePath.Empty())
             LogTrace("VFS: Mounted Filesystem '{}' on '{}'", fsName, target);
         else
             LogTrace("VFS: Mounted  '{}' on '{}' with Filesystem '{}'",
@@ -386,8 +391,7 @@ namespace VFS
 
         if (!newNodeParent) return nullptr;
         newNode = newNodeParent->GetFilesystem()->CreateNode(
-            newNodeParent, StringView(newNodeName.data(), newNodeName.size()),
-            mode);
+            newNodeParent, StringView(newNodeName.View().Raw()), mode);
         if (newNode) newNodeParent->InsertChild(newNode, newNode->GetName());
         return newNode;
     }
@@ -400,9 +404,7 @@ namespace VFS
         if (node) return_err(nullptr, EEXIST);
 
         if (!nparent) return nullptr;
-        node = nparent->GetFilesystem()->MkNod(
-            nparent, StringView(newNodeName.data(), newNodeName.size()), mode,
-            dev);
+        node = nparent->GetFilesystem()->MkNod(nparent, newNodeName, mode, dev);
 
         if (node) nparent->InsertChild(node, node->GetName());
 
@@ -417,9 +419,8 @@ namespace VFS
         if (newNode) return_err(nullptr, EEXIST);
         if (!newNodeParent) return_err(nullptr, ENOENT);
 
-        newNode = newNodeParent->GetFilesystem()->Symlink(
-            newNodeParent, StringView(newNodeName.data(), newNodeName.size()),
-            target);
+        newNode = newNodeParent->GetFilesystem()->Symlink(newNodeParent,
+                                                          newNodeName, target);
         if (newNode) newNodeParent->InsertChild(newNode, newNode->GetName());
         return newNode;
     }

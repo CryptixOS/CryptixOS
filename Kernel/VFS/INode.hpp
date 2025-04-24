@@ -31,9 +31,9 @@ class INode
     INode(INode* parent, StringView name, Filesystem* fs);
     virtual ~INode() {}
 
-    INode*      Reduce(bool symlinks, bool automount = true, usize cnt = 0);
-    std::string GetPath();
-    StringView  GetTarget() const { return m_Target; }
+    INode*     Reduce(bool symlinks, bool automount = true, usize cnt = 0);
+    Path       GetPath();
+    StringView GetTarget() const { return m_Target; }
 
     inline Filesystem*  GetFilesystem() { return m_Filesystem; }
     virtual const stat& GetStats() { return m_Stats; }

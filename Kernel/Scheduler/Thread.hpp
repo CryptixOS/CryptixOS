@@ -118,8 +118,7 @@ struct Thread
     inline void                SetWhich(usize which) { m_Which = which; }
 
   private:
-    // DON'T MOVE
-    //////////////////////
+    ///// DON'T MOVE /////
     isize       m_RunningOn = -1;
     Thread*     m_Self      = this;
     Pointer     m_Stack;
@@ -129,7 +128,7 @@ struct Thread
 
     usize       m_FpuStoragePageCount;
     Pointer     m_FpuStorage;
-    //////////////////////
+    ///// ^^^^^^^^^^ /////
 
     Spinlock    m_Lock;
     tid_t       m_Tid;

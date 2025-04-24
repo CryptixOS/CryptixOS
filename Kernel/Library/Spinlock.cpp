@@ -21,8 +21,7 @@ void Spinlock::Acquire(bool disableInterrupts)
             break;
         }
 
-        while (AtomicLoad<LockState>(m_Lock, MemoryOrder::eAtomicRelaxed)
-               == LockState::eLocked)
+        while (m_Lock.Load(MemoryOrder::eAtomicRelaxed) == LockState::eLocked)
         {
             deadLockCounter += 1;
             if (deadLockCounter >= 100000000) goto deadlock;
@@ -41,8 +40,7 @@ deadlock:
 void Spinlock::Release(bool restoreInterrupts)
 {
     m_LastAcquirer = nullptr;
-    AtomicStore<LockState>(m_Lock, LockState::eUnlocked,
-                           MemoryOrder::eAtomicRelease);
+    m_Lock.Store(LockState::eUnlocked, MemoryOrder::eAtomicRelease);
 
     // Scheduler::EnablePreemption();
     if (restoreInterrupts) CPU::SetInterruptFlag(m_SavedInterruptState);

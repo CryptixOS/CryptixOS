@@ -13,6 +13,10 @@
 #include <Library/Stacktrace.hpp>
 #include <Prism/Core/Types.hpp>
 
+#define KERNEL_INIT_CODE_SECTION_NAME ".kernel_init"
+#define KERNEL_INIT_CODE                                                       \
+    [[gnu::section(KERNEL_INIT_CODE_SECTION_NAME), gnu::used]]
+
 #define CTOS_ALWAYS_INLINE     [[gnu::always_inline]]
 #define CTOS_UNUSED            [[maybe_unused]]
 

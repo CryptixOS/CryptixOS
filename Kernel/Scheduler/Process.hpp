@@ -95,7 +95,7 @@ class Process
     }
     inline Process*           GetParent() const { return m_Parent; }
     inline pid_t              GetPid() const { return m_Pid; }
-    inline StringView         GetName() const { return m_Name.data(); }
+    inline StringView         GetName() const { return m_Name; }
     inline const Credentials& GetCredentials() const { return m_Credentials; }
     inline std::optional<i32> GetStatus() const { return m_Status; }
 
@@ -149,7 +149,7 @@ class Process
     friend struct Thread;
     Process*            m_Parent      = nullptr;
     pid_t               m_Pid         = -1;
-    std::string         m_Name        = "?";
+    String              m_Name        = "?";
     PageMap*            PageMap       = nullptr;
     Credentials         m_Credentials = {};
     TTY*                m_TTY;
@@ -158,7 +158,7 @@ class Process
     bool                m_Exited     = false;
 
     Thread*             m_MainThread = nullptr;
-    std::atomic<tid_t>  m_NextTid    = m_Pid;
+    Atomic<tid_t>       m_NextTid    = m_Pid;
     Vector<Process*>    m_Children;
     Vector<Process*>    m_Zombies;
     Vector<Thread*>     m_Threads;

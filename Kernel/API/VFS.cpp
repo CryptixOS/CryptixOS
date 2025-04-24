@@ -158,9 +158,9 @@ namespace API::VFS
             return Error(EFAULT);
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
-        StringView lastComponent = path.GetLastComponent().data();
-        if (lastComponent == ".") return Error(EINVAL);
-        if (lastComponent == "..") return Error(ENOTEMPTY);
+        StringView lastComponent = path.GetLastComponent();
+        if (lastComponent == "."_sv) return Error(EINVAL);
+        if (lastComponent == ".."_sv) return Error(ENOTEMPTY);
 
         ErrorOr<INode*> nodeOrError = ::VFS::ResolvePath(path);
         if (!nodeOrError) return nodeOrError.error();
@@ -173,7 +173,7 @@ namespace API::VFS
         for (const auto& child : node->GetChildren())
         {
             StringView name = child.second->GetName();
-            if (name != "." && name != "..") return Error(ENOTEMPTY);
+            if (name != "."_sv && name != ".."_sv) return Error(ENOTEMPTY);
         }
 
         ::VFS::RecursiveDelete(node);
@@ -222,7 +222,7 @@ namespace API::VFS
         auto   process = Process::GetCurrent();
 
         INode* parent  = process->GetRootNode();
-        if (!path.IsAbsolute())
+        if (!path.Absolute())
         {
             if (dirFdNum == AT_FDCWD)
             {
@@ -324,7 +324,7 @@ namespace API::VFS
         }
 
         auto parent
-            = PathView(path).IsAbsolute() ? ::VFS::GetRootNode() : nullptr;
+            = PathView(path).Absolute() ? ::VFS::GetRootNode() : nullptr;
         if (!parent)
         {
             if (dirFdNum == AT_FDCWD) parent = cwd;
@@ -471,8 +471,7 @@ namespace Syscall::VFS
         if (!node) return Error(ENOENT);
         if (!node->IsDirectory()) return Error(ENOTDIR);
 
-        current->m_CWD
-            = StringView{node->GetPath().data(), node->GetPath().size()};
+        current->m_CWD = node->GetPath().View();
         return 0;
     }
     ErrorOr<i32> SysFChDir(Arguments& args)
@@ -487,7 +486,7 @@ namespace Syscall::VFS
         if (!node) return Error(ENOENT);
 
         if (!node->IsDirectory()) return Error(ENOTDIR);
-        current->m_CWD = StringView(node->GetPath().data());
+        current->m_CWD = node->GetPath().View();
 
         return 0;
     }
@@ -504,7 +503,7 @@ namespace Syscall::VFS
             return Error(EFAULT);
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
-        INode* parent        = path.IsAbsolute()
+        INode* parent        = path.Absolute()
                                  ? current->GetRootNode()
                                  : std::get<1>(VFS::ResolvePath(VFS::GetRootNode(),
                                                                 current->GetCWD()));
@@ -569,7 +568,7 @@ namespace Syscall::VFS
         INode*          parent = nullptr;
         FileDescriptor* fd     = process->GetFileHandle(dirFd);
 
-        if (!path.IsAbsolute())
+        if (!path.Absolute())
         {
             if (dirFd != AT_FDCWD && !fd) return Error(EBADF);
 

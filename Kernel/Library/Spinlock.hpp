@@ -41,28 +41,23 @@ class Spinlock
   public:
     CTOS_ALWAYS_INLINE bool Test()
     {
-        return AtomicLoad<LockState>(m_Lock, MemoryOrder::eAtomicRelaxed)
-            == LockState::eUnlocked;
+        return m_Lock.Load(MemoryOrder::eAtomicRelaxed) == LockState::eUnlocked;
     }
     CTOS_ALWAYS_INLINE bool TestAndAcquire()
     {
-#ifdef CTOS_TARGET_X86_64
-        return CompareExchange<LockState>(&m_Lock, LockState::eUnlocked,
-                                          LockState::eLocked);
-#endif
         LockState expected = LockState::eUnlocked;
-        return AtomicCompareExchange<LockState>(
-            &m_Lock, &expected, LockState::eLocked, false,
-            MemoryOrder::eAtomicAcquire, MemoryOrder::eAtomicRelaxed);
+        return m_Lock.CompareExchange(expected, LockState::eLocked, false,
+                                      MemoryOrder::eAtomicAcquire,
+                                      MemoryOrder::eAtomicRelaxed);
     }
 
     void Acquire(bool disableInterrupts = false);
     void Release(bool restoreInterrupts = false);
 
   private:
-    LockState m_Lock                = LockState::eUnlocked;
-    void*     m_LastAcquirer        = nullptr;
-    bool      m_SavedInterruptState = false;
+    Atomic<LockState> m_Lock                = LockState::eUnlocked;
+    void*             m_LastAcquirer        = nullptr;
+    bool              m_SavedInterruptState = false;
 };
 
 class ScopedLock final

@@ -324,6 +324,15 @@ iso = custom_target(
   depends: [kernel_elf, initrd, echfs_image],
 )
 
+acpi_dir = meson.project_source_root() / 'firmware' / 'acpi-tables'
+acpi_files = []
+foreach f : run_command('find', acpi_dir, '-name', '*.dat').stdout().split()
+  acpi_files += files(f)
+endforeach
+foreach table : acpi_files 
+  qemu_args += ['-acpitable', 'file='+table.full_path()]
+endforeach
+
 run_bios = custom_target(
   'run_bios',
   input: [iso, echfs_image],

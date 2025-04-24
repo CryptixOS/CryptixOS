@@ -13,3 +13,4 @@ sources
 *.objdump
 *.img
 *.log
+Meta/firmware/*

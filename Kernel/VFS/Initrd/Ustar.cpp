@@ -32,7 +32,7 @@ namespace Ustar
 {
     bool Validate(uintptr_t address)
     {
-        return std::strncmp(reinterpret_cast<FileHeader*>(address)->signature,
+        return std::strncmp(reinterpret_cast<FileHeader*>(address)->Signature,
                             MAGIC.Raw(), MAGIC_LENGTH - 1)
             == 0;
     }
@@ -51,16 +51,16 @@ namespace Ustar
             return reinterpret_cast<FileHeader*>(nextFile);
         };
 
-        while (std::strncmp(current->signature, MAGIC.Raw(), MAGIC_LENGTH - 1)
+        while (std::strncmp(current->Signature, MAGIC.Raw(), MAGIC_LENGTH - 1)
                == 0)
         {
-            PathView filename(current->filename);
-            PathView linkName(current->linkName);
+            Path   filename(current->FileName);
+            Path   linkName(current->LinkName);
 
-            mode_t   mode
-                = parseOctNumber<mode_t>(current->mode, sizeof(current->mode));
-            usize size = parseOctNumber<usize>(current->fileSize,
-                                               sizeof(current->fileSize));
+            mode_t mode
+                = parseOctNumber<mode_t>(current->Mode, sizeof(current->Mode));
+            usize size = parseOctNumber<usize>(current->FileSize,
+                                               sizeof(current->FileSize));
 
             if (filename == "./")
             {
@@ -69,7 +69,7 @@ namespace Ustar
             }
 
             INode* node = nullptr;
-            switch (current->type)
+            switch (current->Type)
             {
                 case FILE_TYPE_NORMAL:
                 case FILE_TYPE_NORMAL_:
@@ -98,8 +98,7 @@ namespace Ustar
                              filename, linkName);
                     break;
                 case FILE_TYPE_SYMLINK:
-                    node = VFS::Symlink(VFS::GetRootNode(), filename,
-                                        linkName.Raw());
+                    node = VFS::Symlink(VFS::GetRootNode(), filename, linkName);
                     if (!node)
                         LogError(
                             "USTAR: Failed to create Symlink: '{}' -> '{}'",
@@ -108,9 +107,9 @@ namespace Ustar
                 case FILE_TYPE_CHARACTER_DEVICE:
                 {
                     u32 deviceMajor = parseOctNumber<u32>(
-                        current->deviceMajor, sizeof(current->deviceMajor));
+                        current->DeviceMajor, sizeof(current->DeviceMajor));
                     u32 deviceMinor = parseOctNumber<u32>(
-                        current->deviceMinor, sizeof(current->deviceMinor));
+                        current->DeviceMinor, sizeof(current->DeviceMinor));
 
                     VFS::MkNod(VFS::GetRootNode(), filename, mode | S_IFCHR,
                                MakeDevice(deviceMajor, deviceMinor));

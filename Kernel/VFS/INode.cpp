@@ -34,7 +34,7 @@ INode::INode(INode* parent, StringView name, Filesystem* fs)
     m_Stats.st_gid = process->m_Credentials.egid;
 }
 
-std::string INode::GetPath()
+Path INode::GetPath()
 {
     std::string ret("");
 
@@ -50,7 +50,7 @@ std::string INode::GetPath()
     }
 
     if (ret.empty()) ret += "/";
-    return ret;
+    return Path(ret.data());
 }
 
 mode_t INode::GetMode() const { return m_Stats.st_mode & ~S_IFMT; }

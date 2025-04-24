@@ -65,7 +65,10 @@ namespace Syscall
                               Prism::PathView>)
             return CPU::AsUser(
                 [value]() -> PathView
-                { return PathView(reinterpret_cast<const char*>(value)); });
+                {
+                    return PathView(
+                        StringView(reinterpret_cast<const char*>(value)));
+                });
         else if constexpr (std::is_pointer_v<T>)
             return reinterpret_cast<T>(value);
         else return static_cast<T>(value);

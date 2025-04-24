@@ -13,8 +13,6 @@
 #include <Prism/Path.hpp>
 #include <Prism/String/String.hpp>
 
-#include <cerrno>
-#include <expected>
 #include <unordered_map>
 
 class INode;
@@ -27,14 +25,13 @@ namespace VFS
     INode*                               GetRootNode();
     void                                 RecursiveDelete(INode* node);
 
-    std::expected<FileDescriptor*, std::errno_t>
-                    Open(INode* parent, PathView path, i32 flags, mode_t mode);
+    ErrorOr<FileDescriptor*> Open(INode* parent, PathView path, i32 flags,
+                                  mode_t mode);
 
-    ErrorOr<INode*> ResolvePath(PathView path);
-    std::tuple<INode*, INode*, std::string> ResolvePath(INode*   parent,
-                                                        PathView path);
-    std::tuple<INode*, INode*, std::string>
-    ResolvePath(INode* parent, PathView path, bool followLinks);
+    ErrorOr<INode*>          ResolvePath(PathView path);
+    std::tuple<INode*, INode*, Path> ResolvePath(INode* parent, PathView path);
+    std::tuple<INode*, INode*, Path> ResolvePath(INode* parent, PathView path,
+                                                 bool followLinks);
 
     std::unordered_map<StringView, class Filesystem*>& GetMountPoints();
 

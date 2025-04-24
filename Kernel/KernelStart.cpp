@@ -54,15 +54,15 @@ namespace EFI
     bool Initialize();
 };
 
-static bool loadInitProcess(PathView initPath)
+static bool loadInitProcess(Path initPath)
 {
     Process* kernelProcess = Scheduler::GetKernelProcess();
-    Process* userProcess   = Scheduler::CreateProcess(
-        kernelProcess, initPath.Raw(), Credentials::s_Root);
-    userProcess->PageMap = VMM::GetKernelPageMap();
+    Process* userProcess   = Scheduler::CreateProcess(kernelProcess, initPath,
+                                                      Credentials::s_Root);
+    userProcess->PageMap   = VMM::GetKernelPageMap();
 
     Vector<StringView> argv;
-    argv.PushBack(initPath.Raw());
+    argv.PushBack(initPath);
     Vector<StringView> envp;
     envp.PushBack("TERM=linux");
 
@@ -71,7 +71,7 @@ static bool loadInitProcess(PathView initPath)
     if (!program.Load(initPath, pageMap, userProcess->GetAddressSpace()))
         return false;
     PathView ldPath = program.GetLdPath();
-    if (!ldPath.IsEmpty()
+    if (!ldPath.Empty()
         && !ld.Load(ldPath, pageMap, userProcess->GetAddressSpace(),
                     0x40000000))
     {
@@ -80,7 +80,7 @@ static bool loadInitProcess(PathView initPath)
     }
     userProcess->PageMap = pageMap;
     auto address
-        = ldPath.IsEmpty() ? program.GetEntryPoint() : ld.GetEntryPoint();
+        = ldPath.Empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
     if (!address)
     {
         delete pageMap;
@@ -119,9 +119,12 @@ static void kernelThread()
     TTY::Initialize();
     MemoryDevices::Initialize();
 
-    VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1", "/mnt/ext2", "ext2fs");
-    VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p2", "/mnt/fat32", "fat32fs");
-    VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p3", "/mnt/echfs", "echfs");
+    VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1"_sv, "/mnt/ext2"_sv,
+               "ext2fs"_sv);
+    VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p2"_sv, "/mnt/fat32"_sv,
+               "fat32fs"_sv);
+    VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv,
+               "echfs"_sv);
 
     auto    kernelExecutable = BootInfo::GetExecutableFile();
     Pointer imageAddress     = kernelExecutable->address;
@@ -155,7 +158,8 @@ static void kernelThread()
     for (;;) Arch::Halt();
 }
 
-extern "C" __attribute__((no_sanitize("address"))) void kernelStart()
+extern "C" KERNEL_INIT_CODE __attribute__((no_sanitize("address"))) void
+kernelStart()
 {
     InterruptManager::InstallExceptions();
 #define CTOS_GDB_ATTACHED 0

@@ -13,7 +13,7 @@
 #include <VFS/EchFs/EchFs.hpp>
 #include <VFS/EchFs/EchFsINode.hpp>
 
-constexpr const char* ECHFS_SIGNATURE = "_ECH_FS_";
+constexpr StringView ECHFS_SIGNATURE = "_ECH_FS_"_sv;
 
 EchFs::~EchFs()
 {

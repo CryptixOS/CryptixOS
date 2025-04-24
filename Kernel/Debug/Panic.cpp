@@ -16,7 +16,7 @@ CTOS_NO_KASAN void dumpProcessInfo()
     Process* currentProcess = Process::GetCurrent();
     if (!currentProcess) return;
 
-    EarlyLogInfo("Process: %s", currentProcess->m_Name.data());
+    EarlyLogInfo("Process: %s", currentProcess->m_Name.Raw());
 }
 
 inline static void enterPanicMode()

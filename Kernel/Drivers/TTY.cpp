@@ -323,11 +323,11 @@ void TTY::Initialize()
         s_TTYs.PushBack(tty);
         DevTmpFs::RegisterDevice(tty);
 
-        StringView path = "/dev/tty";
+        StringView path = "/dev/tty"_sv;
         VFS::MkNod(VFS::GetRootNode(), path, 0666, tty->GetID());
     }
     if (!s_TTYs.Empty())
-        VFS::MkNod(VFS::GetRootNode(), "/dev/tty", 0644 | S_IFCHR,
+        VFS::MkNod(VFS::GetRootNode(), "/dev/tty"_sv, 0644 | S_IFCHR,
                    s_TTYs[0]->GetID());
 
     LogInfo("TTY: Initialized");

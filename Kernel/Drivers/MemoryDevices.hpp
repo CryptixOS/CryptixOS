@@ -98,9 +98,10 @@ namespace MemoryDevices
         for (auto device : devices)
         {
             DevTmpFs::RegisterDevice(device);
-            auto path = std::format("/dev/{}", device->GetName());
+            Path path(fmt::format("/dev/{}", device->GetName()).data());
 
-            VFS::MkNod(VFS::GetRootNode(), path.data(), 0666, device->GetID());
+            VFS::MkNod(VFS::GetRootNode(), PathView(path.View()), 0666,
+                       device->GetID());
         }
     }
 }; // namespace MemoryDevices

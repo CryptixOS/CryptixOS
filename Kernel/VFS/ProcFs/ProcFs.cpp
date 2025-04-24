@@ -141,14 +141,14 @@ struct ProcFsStatusProperty : public ProcFsProperty
 
 static constexpr ProcFsProperty* CreateProcFsProperty(StringView name)
 {
-    if (name == "cmdline") return new ProcFsCmdLineProperty();
-    else if (name == "filesystems") return new ProcFsFilesystemsProperty();
-    else if (name == "modules") return new ProcFsModulesProperty();
-    else if (name == "mounts") return new ProcFsMountsProperty();
-    else if (name == "partitions") return new ProcFsPartitionsProperty();
-    else if (name == "uptime") return new ProcFsUptimeProperty();
-    else if (name == "version") return new ProcFsVersionProperty();
-    else if (name == "vm_regions") return new ProcFsMemoryRegionsProperty;
+    if (name == "cmdline"_sv) return new ProcFsCmdLineProperty();
+    else if (name == "filesystems"_sv) return new ProcFsFilesystemsProperty();
+    else if (name == "modules"_sv) return new ProcFsModulesProperty();
+    else if (name == "mounts"_sv) return new ProcFsMountsProperty();
+    else if (name == "partitions"_sv) return new ProcFsPartitionsProperty();
+    else if (name == "uptime"_sv) return new ProcFsUptimeProperty();
+    else if (name == "version"_sv) return new ProcFsVersionProperty();
+    else if (name == "vm_regions"_sv) return new ProcFsMemoryRegionsProperty;
 
     return nullptr;
 }

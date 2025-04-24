@@ -8,32 +8,43 @@
 
 #include <Prism/Core/Types.hpp>
 
-constexpr usize O_RDONLY            = 0x0000;
-constexpr usize O_WRONLY            = 0x0001;
-constexpr usize O_RDWR              = 0x0002;
+constexpr usize O_RDONLY    = 0x0000;
+constexpr usize O_WRONLY    = 0x0001;
+constexpr usize O_RDWR      = 0x0002;
 
-constexpr usize O_CREAT             = 0x0100;
-constexpr usize O_EXCL              = 0x0200;
-constexpr usize O_NOCTTY            = 0x0400;
-constexpr usize O_TRUNC             = 0x1000;
-constexpr usize O_APPEND            = 0x2000;
-constexpr usize O_NONBLOCK          = 0x4000;
-constexpr usize O_DSYNC             = 010000;
-constexpr usize O_ASYNC             = 020000;
-constexpr usize O_DIRECT            = 040000;
-constexpr usize O_LARGEFILE         = 0100000;
-constexpr usize O_DIRECTORY         = 0200000;
-constexpr usize O_NOFOLLOW          = 0400000;
-constexpr usize O_NOATIME           = 01000000;
-constexpr usize O_CLOEXEC           = 02000000;
-constexpr usize O_SYNC              = 04010000;
-constexpr usize O_RSYNC             = 04010000;
-constexpr usize O_PATH              = 010000000;
-constexpr usize O_TMPFILE           = 020000000;
-constexpr usize O_EXEC              = O_PATH;
-constexpr usize O_SEARCH            = O_PATH;
+constexpr usize O_CREAT     = 0x0100;
+constexpr usize O_EXCL      = 0x0200;
+constexpr usize O_NOCTTY    = 0x0400;
+constexpr usize O_TRUNC     = 0x1000;
+constexpr usize O_APPEND    = 0x2000;
+constexpr usize O_NONBLOCK  = 0x4000;
+constexpr usize O_NDELAY    = O_NONBLOCK;
+constexpr usize O_DSYNC     = 010000;
+constexpr usize O_ASYNC     = 020000;
+constexpr usize O_DIRECT    = 040000;
+constexpr usize O_LARGEFILE = 0100000;
+constexpr usize O_DIRECTORY = 0200000;
+constexpr usize O_NOFOLLOW  = 0400000;
+constexpr usize O_NOATIME   = 01000000;
+constexpr usize O_CLOEXEC   = 02000000;
+constexpr usize O_SYNC      = 04010000;
+constexpr usize O_RSYNC     = 04010000;
+constexpr usize O_PATH      = 010000000;
+constexpr usize O_TMPFILE   = 020000000;
+constexpr usize O_EXEC      = O_PATH;
+constexpr usize O_SEARCH    = O_PATH;
+constexpr usize FASYNC      = 00020000;
 
-constexpr usize O_ACCMODE           = O_PATH | 03;
+constexpr usize O_ACCMODE   = O_PATH | 03;
+
+constexpr usize __O_SYNC    = 020000000;
+constexpr usize __O_TMPFILE = 0100000000;
+
+constexpr usize VALID_OPEN_FLAGS
+    = O_RDONLY | O_WRONLY | O_RDWR | O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC
+    | O_APPEND | O_NDELAY | O_NONBLOCK | __O_SYNC | O_DSYNC | FASYNC | O_DIRECT
+    | O_LARGEFILE | O_DIRECTORY | O_NOFOLLOW | O_NOATIME | O_CLOEXEC | O_PATH
+    | __O_TMPFILE;
 
 constexpr usize F_DUPFD             = 0;
 constexpr usize F_GETFD             = 1;

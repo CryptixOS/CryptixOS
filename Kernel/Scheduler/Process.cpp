@@ -7,6 +7,7 @@
 #include <API/Posix/sys/wait.h>
 #include <Arch/CPU.hpp>
 
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <Scheduler/Process.hpp>
@@ -68,7 +69,7 @@ Process* Process::CreateKernelProcess()
 
     kernelProcess                = new Process;
     kernelProcess->m_Pid         = 0;
-    kernelProcess->m_Name        = "TheOverlord";
+    kernelProcess->m_Name        = "TheOverlord"_s;
     kernelProcess->PageMap       = VMM::GetKernelPageMap();
     kernelProcess->m_Credentials = Credentials::s_Root;
     kernelProcess->m_Ring        = PrivilegeLevel::ePrivileged;
@@ -84,12 +85,12 @@ Process* Process::CreateIdleProcess()
 {
     static std::atomic<pid_t> idlePids(-1);
 
-    std::string               name = "Idle Process for CPU: ";
-    name += std::to_string(CPU::GetCurrentID());
+    Process*                  idle = new Process;
 
-    Process* idle = new Process;
-    idle->m_Pid   = idlePids--;
-    idle->m_Name  = name;
+    idle->m_Pid                    = idlePids--;
+    idle->m_Name                   = "Idle Process for CPU: "_s;
+    idle->m_Name += StringUtils::ToString(CPU::GetCurrentID());
+
     idle->PageMap = VMM::GetKernelPageMap();
 
     return idle;
@@ -161,7 +162,7 @@ ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
     INode* parent
         = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), m_CWD.Raw()));
-    if (CPU::AsUser([path]() -> bool { return path.IsAbsolute(); }))
+    if (CPU::AsUser([path]() -> bool { return path.Absolute(); }))
         parent = VFS::GetRootNode();
     else if (dirFd != AT_FDCWD)
     {
@@ -191,30 +192,35 @@ ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
     return 0;
 }
 
-Vector<std::string> SplitArguments(const std::string& str)
+Vector<String> SplitArguments(const String& str)
 {
-    Vector<std::string> segments;
-    usize               start     = str[0] == ' ' ? 1 : 0;
-    usize               end       = start;
+    Vector<String> segments;
+    String         path(str.Raw(), str.Size());
 
-    auto                findSlash = [str](usize pos) -> usize
+    if (str.Empty()) return {""};
+    usize start     = str[0] == ' ' ? 1 : 0;
+    usize end       = start;
+
+    auto  findSlash = [&str, &path](usize pos) -> usize
     {
         usize current = pos;
-        while (str[current] != ' ' && current < str.size()) current++;
+        while (current < path.Size() && str[current] != ' ') current++;
 
-        return current == str.size() ? std::string::npos : current;
+        return current == path.Size() ? String::NPos : current;
     };
 
-    while ((end = findSlash(start)) != std::string::npos)
+    while ((end = findSlash(start)) < path.Size())
     {
-        std::string segment = str.substr(start, end - start);
+        usize      segmentLength = end - start;
+        StringView segment(path.Raw() + start, segmentLength);
         if (start != end) segments.PushBack(segment);
 
         start = end + 1;
     }
 
     // handle last segment
-    if (start < str.length()) segments.PushBack(str.substr(start));
+    if (start < path.Size())
+        segments.EmplaceBack(path.Raw() + start, path.Size() - start);
     return segments;
 }
 
@@ -223,30 +229,33 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
     m_FdTable.Clear();
     m_FdTable.OpenStdioStreams();
 
-    m_Name = path.Raw();
+    m_Name = path;
     Arch::VMM::DestroyPageMap(PageMap);
     delete PageMap;
-    PageMap     = new class PageMap();
+    PageMap = new class PageMap();
 
+    /*
     auto nodeOr = CPU::AsUser([path]() -> auto
                               { return VFS::ResolvePath(path.Raw()); });
     if (!nodeOr) return nodeOr.error();
 
-    std::string shellPath;
+    String shellPath;
     char        shebang[2];
     nodeOr.value()->Read(shebang, 0, 2);
+    bool containsShebang = false;
     if (shebang[0] == '#' && shebang[1] == '!')
     {
-        std::string buffer;
-        buffer.resize(20);
+        containsShebang = true;
+        String buffer;
+        buffer.Resize(20);
         usize offset = 0;
         usize index  = 0;
-        nodeOr.value()->Read(buffer.data(), offset + 2, 20);
+        nodeOr.value()->Read(buffer.Raw(), offset + 2, 20);
         for (;;)
         {
-            if (index >= buffer.size())
+            if (index >= buffer.Size())
             {
-                nodeOr.value()->Read(buffer.data(), offset + 2, 20);
+                nodeOr.value()->Read(buffer.Raw(), offset + 2, 20);
                 index = 0;
             }
 
@@ -255,24 +264,35 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
             ++offset;
         }
 
-        shellPath.resize(offset + 1);
-        nodeOr.value()->Read(shellPath.data(), 2, offset);
+        shellPath.Resize(offset + 1);
+        nodeOr.value()->Read(shellPath.Raw(), 2, offset);
 
         shellPath[offset] = 0;
-        EarlyLogInfo("Shell: %s", shellPath.data());
+        EarlyLogInfo("Shell: %s", shellPath.Raw());
     }
 
-    Vector<std::string> args = SplitArguments(shellPath);
-    Vector<StringView>  argvArr;
+    shellPath.ShrinkToFit();
+    EarlyLogInfo("ShellPath: %s", shellPath.Raw() ?: "<NULL>");
+    EarlyLogInfo("Path: %s", path.Raw() ?: "<NULL>");
+    StringView     shPath = String(shellPath.Raw(), shellPath.Size());
+
+    Vector<String> args   = SplitArguments(
+        containsShebang && !shellPath.empty() ? shPath : StringView(path));
+    */
+    Vector<StringView> argvArr;
     {
         CPU::UserMemoryProtectionGuard guard;
-        for (auto& arg : args) argvArr.EmplaceBack(arg.data(), arg.size());
+        // for (auto& arg : args) argvArr.EmplaceBack(arg.Raw(), arg.Size());
     }
-    if (!shellPath.empty()) argvArr.PushBack(path);
+    // if (!shellPath.Empty()) argvArr.PushBack(path);
 
     static ELF::Image program, ld;
-    if (!program.Load(shellPath.empty() ? path.Raw() : argvArr[0].Raw(),
-                      PageMap, m_AddressSpace))
+    // if (!program.Load(shellPath.Empty() || !containsShebang ? path.Raw()
+    // : argvArr[0].Raw(),
+    // PageMap, m_AddressSpace))
+    // return Error(ENOEXEC);
+
+    if (!program.Load(path.Raw(), PageMap, m_AddressSpace))
         return Error(ENOEXEC);
 
     auto ldPath = program.GetLdPath();
@@ -294,8 +314,8 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
         CPU::UserMemoryProtectionGuard guard;
         for (char** arg = argv; *arg; arg++) argvArr.PushBack(*arg);
 
-        for (usize i = 0; auto& arg : args)
-            LogDebug("Process::Exec: argv[{}] = '{}'", i++, arg);
+        // for (usize i = 0; auto& arg : args)
+        //     LogDebug("Process::Exec: argv[{}] = '{}'", i++, arg);
     }
 
     Vector<StringView> envpArr;
@@ -387,8 +407,7 @@ ErrorOr<Process*> Process::Fork()
     Thread* currentThread = CPU::GetCurrentThread();
     Assert(currentThread && currentThread->m_Parent == this);
 
-    Process* newProcess
-        = Scheduler::CreateProcess(this, m_Name.data(), m_Credentials);
+    Process* newProcess = Scheduler::CreateProcess(this, m_Name, m_Credentials);
 
     // TODO(v1tr10l7): implement PageMap::Fork;
     class PageMap* pageMap = new class PageMap();
@@ -433,7 +452,7 @@ ErrorOr<Process*> Process::Fork()
         //  TODO(v1tr10l7): Free regions;
     }
 
-    newProcess->m_NextTid.store(m_NextTid);
+    newProcess->m_NextTid.Store(m_NextTid.Load());
     for (const auto& [i, fd] : m_FdTable)
     {
         FileDescriptor* newFd = new FileDescriptor(fd);
