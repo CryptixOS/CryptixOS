@@ -17,10 +17,10 @@
 class ProcFsINode;
 struct ProcFsProperty
 {
-    using ProcFsGenPropertyFunc = Delegate<void(std::string&)>;
+    using ProcFsGenPropertyFunc = Delegate<void(String&)>;
     Delegate<void(ProcFsProperty&)> GenProp;
     ProcFsINode*                    m_Parent = nullptr;
-    std::string                     Buffer;
+    String                          Buffer;
     usize                           Offset = 0;
 
     Spinlock                        Lock;
@@ -34,9 +34,9 @@ struct ProcFsProperty
     template <typename... Args>
     void Write(fmt::format_string<Args...> format, Args&&... args)
     {
-        if (Offset >= Buffer.size()) Offset = 0;
+        if (Offset >= Buffer.Size()) Offset = 0;
         auto result
-            = fmt::format_to_n(Buffer.data() + Offset, Buffer.size() - Offset,
+            = fmt::format_to_n(Buffer.Raw() + Offset, Buffer.Size() - Offset,
                                format, std::forward<Args>(args)...);
         Offset += result.size;
     }
@@ -50,13 +50,13 @@ struct ProcFsProperty
 
     virtual void GenerateRecord()
     {
-        Buffer.clear();
+        Buffer.Clear();
         GenProp(*this);
     }
-    operator std::string&()
+    operator String&()
     {
-        if (Buffer.empty()) GenerateRecord();
-        Buffer.shrink_to_fit();
+        if (Buffer.Empty()) GenerateRecord();
+        Buffer.ShrinkToFit();
         return Buffer;
     }
 };

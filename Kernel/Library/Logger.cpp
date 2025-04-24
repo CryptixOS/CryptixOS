@@ -71,11 +71,13 @@ namespace Logger
                   bool plusSign = false, bool spaceIfNoSign = false,
                   bool zeroPadding = false, usize lengthSpecifier = 0)
         {
-            char   buf[64];
-            T      value   = va_arg(args, T);
-            char*  str     = ToString(value, buf, base);
-            size_t len     = strlen(str);
-            char   padding = zeroPadding ? '0' : ' ';
+            char       buf[64];
+            T          value    = va_arg(args, T);
+            StringView strStart = ToString(value, buf, base);
+            char*      str      = const_cast<char*>(strStart.Raw());
+
+            size_t     len      = strlen(str);
+            char       padding  = zeroPadding ? '0' : ' ';
             if (plusSign && lengthSpecifier > 0) lengthSpecifier--;
             if (!justifyLeft)
             {

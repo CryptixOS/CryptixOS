@@ -180,6 +180,10 @@ namespace ACPI
             LogError("ACPI: Failed to initialize namespace");
             return;
         }
+
+        // status = uacpi_finalize_gpe_initialization();
+        // if (uacpi_unlikely_error(status))
+        //     LogError("ACPI: Failed to finalize gpe initialization!");
     }
     void EnumerateDevices()
     {

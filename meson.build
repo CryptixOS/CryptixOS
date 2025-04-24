@@ -22,7 +22,6 @@ if not meson.get_compiler('cpp').has_argument('-std=gnu++23')
   error('C++23 support is needed. Please install clang 17 or higher.')
 endif
 
-
 c = meson.get_compiler('c')
 cxx = meson.get_compiler('cpp')
 ld = cxx.get_linker_id()
@@ -324,7 +323,7 @@ iso = custom_target(
   depends: [kernel_elf, initrd, echfs_image],
 )
 
-acpi_dir = meson.project_source_root() / 'firmware' / 'acpi-tables'
+acpi_dir = meson.project_source_root() / 'Meta' / 'firmware' / 'acpi-tables'
 acpi_files = []
 foreach f : run_command('find', acpi_dir, '-name', '*.dat').stdout().split()
   acpi_files += files(f)

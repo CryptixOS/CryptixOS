@@ -6,6 +6,8 @@
  */
 #include <Arch/CPU.hpp>
 
+#include <Prism/String/StringBuilder.hpp>
+
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 
@@ -36,21 +38,21 @@ INode::INode(INode* parent, StringView name, Filesystem* fs)
 
 Path INode::GetPath()
 {
-    std::string ret("");
+    StringBuilder pathBuilder;
 
-    auto        current = this;
-    auto        root    = VFS::GetRootNode();
+    auto          current = this;
+    auto          root    = VFS::GetRootNode();
 
     while (current && current != root)
     {
-        ret.insert(
-            0,
-            "/" + std::string(current->m_Name.Raw(), current->m_Name.Size()));
+        auto segment = "/"_s;
+        segment += current->m_Name;
+        pathBuilder.Insert(segment);
+
         current = current->m_Parent;
     }
 
-    if (ret.empty()) ret += "/";
-    return Path(ret.data());
+    return pathBuilder.Empty() ? "/"_s : pathBuilder.ToString();
 }
 
 mode_t INode::GetMode() const { return m_Stats.st_mode & ~S_IFMT; }

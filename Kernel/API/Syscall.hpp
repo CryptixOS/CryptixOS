@@ -213,7 +213,7 @@ namespace Syscall
     StringView GetName(usize index);
     void       RegisterHandler(usize                                         index,
                                std::function<ErrorOr<uintptr_t>(Arguments&)> handler,
-                               std::string                                   name);
+                               String                                        name);
 #define RegisterSyscall(index, handler)                                        \
     ::Syscall::RegisterHandler(std::to_underlying(index), handler, #handler)
 #define RegisterSyscall2(id, handler)                                          \

@@ -10,12 +10,12 @@
 
 isize ProcFsProperty::Read(u8* outBuffer, off_t offset, usize size)
 {
-    if (static_cast<usize>(offset) >= Buffer.length()) return 0;
+    if (static_cast<usize>(offset) >= Buffer.Size()) return 0;
 
-    usize bytesCopied = Buffer.copy(reinterpret_cast<char*>(outBuffer) + offset,
-                                    std::min(size, Buffer.length() - offset));
+    usize bytesCopied = Buffer.Copy(reinterpret_cast<char*>(outBuffer) + offset,
+                                    std::min(size, Buffer.Size() - offset));
 
-    if (offset + bytesCopied >= Buffer.length()) GenerateRecord();
+    if (offset + bytesCopied >= Buffer.Size()) GenerateRecord();
     return bytesCopied;
 }
 
@@ -43,7 +43,7 @@ const stat& ProcFsINode::GetStats()
     if (m_Property)
     {
         m_Property->GenerateRecord();
-        m_Stats.st_size = m_Property->Buffer.length();
+        m_Stats.st_size = m_Property->Buffer.Size();
     }
     return m_Stats;
 }

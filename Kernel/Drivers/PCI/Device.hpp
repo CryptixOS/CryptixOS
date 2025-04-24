@@ -14,6 +14,7 @@
 #include <Prism/Containers/Bitmap.hpp>
 #include <Prism/Core/Types.hpp>
 #include <Prism/Delegate.hpp>
+#include <Prism/String/String.hpp>
 
 #include <span>
 
@@ -258,7 +259,7 @@ namespace PCI
     };
     struct Driver
     {
-        std::string         Name;
+        String              Name;
         std::span<DeviceID> MatchIDs;
 
         using ProbeFn

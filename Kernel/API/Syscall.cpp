@@ -25,18 +25,18 @@ namespace Syscall
 
     struct Syscall
     {
-        std::string                                   name;
-        std::function<ErrorOr<uintptr_t>(Arguments&)> handler;
+        String                                        Name;
+        std::function<ErrorOr<uintptr_t>(Arguments&)> Handler;
 
         inline ErrorOr<uintptr_t> operator()(Arguments& args)
         {
-            if (handler.operator bool()) return handler(args);
+            if (Handler.operator bool()) return Handler(args);
 
             return 0;
         }
-        inline operator bool() { return handler.operator bool(); }
+        inline operator bool() { return Handler.operator bool(); }
     };
-    static std::array<Syscall, 512>      syscalls;
+    static Array<Syscall, 512>           syscalls;
 
     std::unordered_map<ID, WrapperBase*> s_Syscalls;
 
@@ -48,7 +48,7 @@ namespace Syscall
     void
     RegisterHandler(usize                                              index,
                     std::function<ErrorOr<uintptr_t>(Arguments& args)> handler,
-                    std::string                                        name)
+                    String                                             name)
     {
         syscalls[index] = {name, handler};
     }

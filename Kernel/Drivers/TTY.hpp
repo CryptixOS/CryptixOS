@@ -12,6 +12,8 @@
 #include <Library/Spinlock.hpp>
 #include <Prism/Containers/CircularQueue.hpp>
 #include <Prism/Memory/Buffer.hpp>
+#include <Prism/String/String.hpp>
+
 #include <Scheduler/Event.hpp>
 
 #include <deque>
@@ -54,7 +56,7 @@ class TTY : public Device
 
     CircularQueue<u8, 4096> m_RawBuffer;
     // std::deque<char>         m_RawBuffer;
-    std::deque<std::string> m_LineQueue;
+    std::deque<String>      m_LineQueue;
 
     Event                   m_OnAddLine;
     Event                   m_RawEvent;
@@ -78,13 +80,13 @@ class TTY : public Device
 
     inline void AddLine()
     {
-        ScopedLock  guard(m_RawLock);
+        ScopedLock guard(m_RawLock);
 
-        usize       lineLength = m_RawBuffer.Size();
-        std::string line;
-        line.reserve(lineLength);
+        usize      lineLength = m_RawBuffer.Size();
+        String     line;
+        line.Reserve(lineLength);
         while (!m_RawBuffer.Empty()) line += m_RawBuffer.Pop();
-        line.shrink_to_fit();
+        line.ShrinkToFit();
         m_LineQueue.push_back(line);
 
         m_RawBuffer.Clear();

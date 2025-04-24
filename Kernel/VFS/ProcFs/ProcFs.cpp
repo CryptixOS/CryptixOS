@@ -21,12 +21,12 @@ struct ProcFsCmdLineProperty : public ProcFsProperty
 {
     virtual void GenerateRecord() override
     {
-        Buffer.clear();
+        Buffer.Clear();
 
         StringView kernelPath = BootInfo::GetExecutableFile()->path;
         StringView cmdline    = BootInfo::GetKernelCommandLine();
 
-        Buffer.resize(kernelPath.Size() + cmdline.Size() + 10);
+        Buffer.Resize(kernelPath.Size() + cmdline.Size() + 10);
         Write("{} {}\n", kernelPath, cmdline);
     }
 };
@@ -34,8 +34,8 @@ struct ProcFsFilesystemsProperty : public ProcFsProperty
 {
     virtual void GenerateRecord() override
     {
-        Buffer.clear();
-        Buffer.resize(PMM::PAGE_SIZE);
+        Buffer.Clear();
+        Buffer.Resize(PMM::PAGE_SIZE);
 
         for (auto& [physical, fs] : VFS::GetFilesystems())
             Write("{} {}\n", physical ? "     " : "nodev", fs);
@@ -45,8 +45,8 @@ struct ProcFsModulesProperty : public ProcFsProperty
 {
     virtual void GenerateRecord() override
     {
-        Buffer.clear();
-        Buffer.resize(PMM::PAGE_SIZE);
+        Buffer.Clear();
+        Buffer.Resize(PMM::PAGE_SIZE);
 
         for (auto& [name, module] : GetModules()) Write("{}\n", name);
     }
@@ -55,8 +55,8 @@ struct ProcFsMountsProperty : public ProcFsProperty
 {
     virtual void GenerateRecord() override
     {
-        Buffer.clear();
-        Buffer.resize(PMM::PAGE_SIZE);
+        Buffer.Clear();
+        Buffer.Resize(PMM::PAGE_SIZE);
 
         for (const auto& [mountPath, fs] : VFS::GetMountPoints())
             Write("{} {} {} {}\n", fs->GetDeviceName(), mountPath,
@@ -67,8 +67,8 @@ struct ProcFsPartitionsProperty : public ProcFsProperty
 {
     virtual void GenerateRecord() override
     {
-        Buffer.clear();
-        Buffer.resize(PMM::PAGE_SIZE);
+        Buffer.Clear();
+        Buffer.Resize(PMM::PAGE_SIZE);
 
         Write("major\tminor\t#blocks\tname\n");
         for (auto& partition : DeviceManager::GetBlockDevices())
@@ -87,8 +87,8 @@ struct ProcFsUptimeProperty : public ProcFsProperty
 {
     virtual void GenerateRecord() override
     {
-        Buffer.clear();
-        Buffer.resize(PMM::PAGE_SIZE);
+        Buffer.Clear();
+        Buffer.Resize(PMM::PAGE_SIZE);
 
         auto uptime = Time::GetReal();
         Write("{} {}\n", uptime.tv_sec, uptime.tv_nsec);
@@ -98,8 +98,8 @@ struct ProcFsVersionProperty : public ProcFsProperty
 {
     virtual void GenerateRecord() override
     {
-        Buffer.clear();
-        Buffer.resize(PMM::PAGE_SIZE);
+        Buffer.Clear();
+        Buffer.Resize(PMM::PAGE_SIZE);
 
         utsname uname;
         auto    ret = API::System::Uname(&uname);
@@ -113,8 +113,8 @@ struct ProcFsMemoryRegionsProperty : public ProcFsProperty
 {
     virtual void GenerateRecord() override
     {
-        Buffer.clear();
-        Buffer.resize(PMM::PAGE_SIZE);
+        Buffer.Clear();
+        Buffer.Resize(PMM::PAGE_SIZE);
 
         auto process = Process::GetCurrent();
 
