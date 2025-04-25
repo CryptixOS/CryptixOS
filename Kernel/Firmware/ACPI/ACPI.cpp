@@ -8,6 +8,7 @@
 #include <Firmware/ACPI/MADT.hpp>
 
 #include <Boot/BootInfo.hpp>
+#include <Memory/ScopedMapping.hpp>
 #include <Memory/VMM.hpp>
 
 #include <uacpi/event.h>
@@ -91,6 +92,24 @@ namespace ACPI
                 LogTrace("  -{}", acpiSignature);
             }
         }
+        void InitializeFADT(Pointer fadtAddress)
+        {
+            ScopedMapping<FADT> fadt(fadtAddress,
+                                     PageAttributes::eRW
+                                         | PageAttributes::eUncacheableStrong);
+
+            if (fadt->Header.Revision <= 2)
+            {
+                fadt->PreferredPmProfile = 0;
+                fadt->PStateControl      = 0;
+                fadt->CStateControl      = 0;
+                fadt->X86BootArchitectureFlags
+                    = static_cast<X86BootArchitectureFlags>(0);
+            }
+            if (!fadt->X_Dsdt) fadt->X_Dsdt = fadt->DSDT;
+            LogTrace("ACPI: Found DSDT table");
+        }
+
     } // namespace
 
     bool IsAvailable() { return BootInfo::GetRSDPAddress().operator bool(); }
@@ -123,6 +142,7 @@ namespace ACPI
 
         MADT::Initialize();
         s_FADT = GetTable<FADT>("FACP");
+        InitializeFADT(Pointer(s_FADT).FromHigherHalf());
 
         LogInfo("ACPI: Loaded static tables");
         return true;
