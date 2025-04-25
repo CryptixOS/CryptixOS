@@ -5,7 +5,8 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 modules = [
-  'ps2'
+  'ps2',
+  'pcspk'
 ]
 
 args += [

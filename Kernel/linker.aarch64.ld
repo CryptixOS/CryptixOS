@@ -20,7 +20,7 @@ PHDRS
 
 SECTIONS
 {
-    . = 0;
+    . = 0xffffffff80000000;
 
     limine_start_addr = .;
     .limine_requests : {

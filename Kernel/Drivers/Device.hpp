@@ -9,6 +9,7 @@
 #include <Common.hpp>
 
 #include <API/UnixTypes.hpp>
+#include <Prism/Utility/Atomic.hpp>
 
 using DeviceMajor = u32;
 using DeviceMinor = u32;
@@ -30,6 +31,10 @@ class Device
         : m_ID(MakeDevice(major, minor))
     {
     }
+    Device(DeviceMajor major)
+        : Device(major, AllocateMinor())
+    {
+    }
 
     inline dev_t        GetID() const noexcept { return m_ID; }
     virtual StringView  GetName() const noexcept = 0;
@@ -44,4 +49,13 @@ class Device
   protected:
     dev_t m_ID;
     stat  m_Stats;
+
+  private:
+    constexpr static DeviceMinor AllocateMinor()
+    {
+        // TODO(v1tr10l7): Allocate minor numbers per major
+        static Atomic<DeviceMinor> s_Base = 1000;
+
+        return s_Base++;
+    }
 };

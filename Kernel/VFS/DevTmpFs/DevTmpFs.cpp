@@ -55,9 +55,12 @@ INode* DevTmpFs::MkNod(INode* parent, StringView name, mode_t mode, dev_t dev)
     return new DevTmpFsINode(parent, name, this, mode, device);
 }
 
-void DevTmpFs::RegisterDevice(Device* device)
+bool DevTmpFs::RegisterDevice(Device* device)
 {
     Assert(device);
 
+    if (s_Devices.contains(device->GetID())) return false;
+
     s_Devices[device->GetID()] = device;
+    return true;
 }

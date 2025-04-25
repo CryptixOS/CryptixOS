@@ -145,10 +145,10 @@ mod_deps = [ ]
 ext_mods = [ ]
 incs = [include_directories('Kernel'), include_directories('Kernel/Library/KLibC'), include_directories('Kernel/Library/KLibC++')]
 subdir('Prism/Source')
-subdir('Kernel')
 
 subdir('Modules')
 
+subdir('Kernel')
 no_ext_mods = ext_mods.length() == 0
 
 # ==============================================================================
@@ -201,11 +201,13 @@ if arch == 'x86_64'
 
 elif arch == 'aarch64'
   qemu_args += [
-    '-M', 'virt,acpi=off', 
-    #'-dtb', meson.project_source_root() / 'qemu.dtb',
+    '-M', 'virt', 
+    #'-dtb', meson.project_source_root() / 'Meta' / 'qemu.dtb',
     '-cpu', 'max',
     '-device', 'ramfb',
     '-serial', 'stdio',
+    #'-usb', '-device', 'usb-host,hostbus=2,hostaddr=1',
+    #'-device', 'usb-kbd',
   ]
   ovmf_id = 'AA64'
   xorriso_args = [
@@ -328,9 +330,12 @@ acpi_files = []
 foreach f : run_command('find', acpi_dir, '-name', '*.dat').stdout().split()
   acpi_files += files(f)
 endforeach
+
+if arch == 'x86_64'
 foreach table : acpi_files 
   qemu_args += ['-acpitable', 'file='+table.full_path()]
 endforeach
+endif
 
 run_bios = custom_target(
   'run_bios',

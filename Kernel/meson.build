@@ -23,6 +23,7 @@ srcs += files(
 
   'Drivers/DeviceManager.cpp',
   'Drivers/FramebufferDevice.cpp',
+  'Drivers/GenericDriver.cpp',
   'Drivers/Terminal.cpp',
   'Drivers/TTY.cpp',
   'Drivers/VideoTerminal.cpp',

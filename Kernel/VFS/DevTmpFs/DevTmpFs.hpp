@@ -31,7 +31,7 @@ class DevTmpFs : public Filesystem
     virtual INode* MkNod(INode* parent, StringView path, mode_t mode,
                          dev_t dev) override;
 
-    static void    RegisterDevice(Device* device);
+    static bool    RegisterDevice(Device* device);
 
   private:
     static std::unordered_map<dev_t, Device*> s_Devices;
