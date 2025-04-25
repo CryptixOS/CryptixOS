@@ -51,7 +51,7 @@ class Device
     stat  m_Stats;
 
   private:
-    constexpr static DeviceMinor AllocateMinor()
+    static DeviceMinor AllocateMinor()
     {
         // TODO(v1tr10l7): Allocate minor numbers per major
         static Atomic<DeviceMinor> s_Base = 1000;
