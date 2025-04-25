@@ -48,6 +48,7 @@ srcs += files(
   'Firmware/ACPI/UACPI.cpp',
 
   'Firmware/DeviceTree/DeviceTree.cpp',
+  'Firmware/DeviceTree/Node.cpp',
 
   'Firmware/EFI/Initialize.cpp',
 
