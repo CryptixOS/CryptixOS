@@ -61,7 +61,6 @@ namespace VirtualMemoryManager
         Assert(s_KernelPageMap->MapRange(GetHigherHalfOffset(), 0, 4_gib,
                                          PageAttributes::eRW | flags
                                              | PageAttributes::eWriteBack));
-
         usize entryCount    = 0;
         auto  memoryEntries = BootInfo::GetMemoryMap(entryCount);
         for (usize i = 0; i < entryCount; i++)
@@ -202,6 +201,10 @@ namespace VirtualMemoryManager
         if (!s_KernelPageMap) return false;
 
         return s_KernelPageMap->MapRange(virt, phys, size, attributes);
+    }
+    bool UnmapKernelRange(Pointer virt, usize size, PageAttributes flags)
+    {
+        return s_KernelPageMap->UnmapRange(virt, size, flags);
     }
 
     Pointer MapIoRegion(PhysAddr phys, usize size, bool write, usize alignment)

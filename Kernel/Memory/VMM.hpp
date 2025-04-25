@@ -180,9 +180,14 @@ namespace VirtualMemoryManager
     bool     MapKernelRegion(Pointer virt, Pointer phys, usize pageCount = 1,
                              PageAttributes attributes
                              = PageAttributes::eWriteBack | PageAttributes::eRW);
+
     bool     MapKernelRange(Pointer virt, Pointer phys, usize size,
                             PageAttributes attributes
                             = PageAttributes::eWriteBack | PageAttributes::eRW);
+
+    bool     UnmapKernelRange(Pointer virt, usize size,
+                              PageAttributes flags
+                              = static_cast<PageAttributes>(0));
 
     Pointer  MapIoRegion(PhysAddr phys, usize size, bool write = true);
     Pointer  MapIoRegion(PhysAddr phys, usize size, bool write,
