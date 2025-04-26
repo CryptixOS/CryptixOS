@@ -12,7 +12,7 @@ parted -s $OUT_IMAGE mklabel msdos
 parted -s $OUT_IMAGE mkpart primary ext2 2048s 64MiB
 parted -s $OUT_IMAGE mkpart primary fat32 64MiB 92MiB
 parted -s $OUT_IMAGE mkpart primary fat32 92MiB 128MiB
-echfs-utils -m -p2 $OUT_IMAGE format 512
+# echfs-utils -m -p2 $OUT_IMAGE format 512
 
 sudo losetup -fP --show $OUT_IMAGE
 sudo mkfs.ext2 /dev/loop0p1
@@ -26,7 +26,7 @@ sudo mount /dev/loop0p2
 sudo cp -r ../Kernel ../BaseFiles /mnt
 sudo umount /mnt
 
-python ../Meta/import_files.py
+# python ../Meta/import_files.py
 
 sudo losetup -d /dev/loop0
 

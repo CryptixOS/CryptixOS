@@ -99,7 +99,7 @@ namespace DeviceTree
 
         if (!header)
 #ifdef CTOS_TARGET_AARCH64
-            AssertMsg(header, "AARCH64: Cannot boot without FDT header");
+            AssertMsg(header, "DeviceTree: Cannot boot without FDT header");
 #else
             return false;
 #endif
@@ -107,14 +107,16 @@ namespace DeviceTree
         auto magic = header->Magic;
         if (magic.Load() != FDT_MAGIC)
         {
-            LogError("FDT: Invalid magic: {:#x}", magic.Load());
+            LogError("DeviceTree: FDT has an invalid magic: {:#x}",
+                     magic.Load());
             return false;
         }
 
         auto success = ParseFDT(header);
-        LogInfo("FDT: Finished parsing");
-        if (success) s_RootNode->Print();
+        if (!success) return false;
 
+        s_RootNode->Print();
+        LogInfo("DeviceTree: FDT parsed successfully");
         return success;
     }
 } // namespace DeviceTree

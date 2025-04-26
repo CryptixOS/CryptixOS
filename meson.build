@@ -55,7 +55,7 @@ macros = [
     '-DFMT_USE_DOUBLE=0',
     '-DFMT_USE_FLOAT=0',
     '-DFMT_USE_FLOAT128=0',
-    '-DFMT_USE_EXCEPTIONS=0',
+    '-DFMT_EXCEPTIONS=0',
     '-DLIMINE_API_REVISION=3',
     '-DMAGIC_ENUM_NO_STREAMS=1',
     '-DMAGIC_ENUM_RANGE_MAX=0x8a00',
@@ -169,6 +169,14 @@ qemu_args = [
   '-smbios', 'type=1',
   '-device', 'nvme,id=nvme-ctrl1,serial=nvme',
   '-nic', 'user,model=rtl8139',
+  #'-device', 'virtio-serial-pci,max_ports=2',
+  #'-device', 'virtconsole,chardev=vcon,name=vcon0',
+  #'-chardev', 'socket,id=vcon,ipv4=on,host=localhost,port=443,server,telnet=on,wait=off',
+  #'-device', 'virtio-rng-pci',
+  #'-device', 'virtio-keyboard',
+  #'-device', 'virtio-tablet',
+  '-vga', 'std',
+  #'-device', 'virtio-serial,max_ports=2',
   #'-netdev', 'tap,id=mynet0,ifname=tap0,script=no,downscript=no',
   #'-device', 'rtl8139,netdev=mynet0',
   #'-nic', 'bridge,model=rtl8139',
@@ -179,7 +187,7 @@ qemu = 'qemu-system-' + arch
 
 if arch == 'x86_64'
   qemu_args += [
-    '-M', 'q35,smm=off',
+    '-M', 'q35',
     '-device', 'isa-debug-exit',
     '-debugcon', 'stdio',
     '-serial', 'file:' + meson.project_source_root() / 'debug.log',
@@ -202,12 +210,12 @@ if arch == 'x86_64'
 elif arch == 'aarch64'
   qemu_args += [
     '-M', 'virt', 
-    #'-dtb', meson.project_source_root() / 'Meta' / 'qemu.dtb',
-    '-cpu', 'max',
+    '-cpu', 'cortex-a72',
     '-device', 'ramfb',
+    '-device', 'qemu-xhci',
+    '-device', 'usb-kbd',
+    '-device', 'usb-mouse',
     '-serial', 'stdio',
-    #'-usb', '-device', 'usb-host,hostbus=2,hostaddr=1',
-    #'-device', 'usb-kbd',
   ]
   ovmf_id = 'AA64'
   xorriso_args = [

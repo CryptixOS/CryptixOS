@@ -2,8 +2,8 @@
 set -e  # Exit immediately if a command exits with a non-zero status
 
 # Set build type and target architecture, with defaults
-BUILD_TYPE=${1:-release}
-TARGET_ARCH=${2:-x86_64}
+TARGET_ARCH=${1:-x86_64}
+BUILD_TYPE=${2:-release}
 
 . Meta/log.sh
 

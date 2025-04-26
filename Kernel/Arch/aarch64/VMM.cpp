@@ -10,10 +10,10 @@
 #include <Library/Spinlock.hpp>
 #include <Memory/VMM.hpp>
 
-struct TTBR
+struct [[gnu::packed]] TTBR
 {
     PageTableEntry entries[512]{};
-} __attribute__((packed));
+};
 
 struct PageTable
 {

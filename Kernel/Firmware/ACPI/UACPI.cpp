@@ -39,7 +39,7 @@ namespace uACPI
     {
         uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr* outRsdp)
         {
-            uacpi_phys_addr rsdp = BootInfo::GetRSDPAddress();
+            uacpi_phys_addr rsdp = BootInfo::GetRSDPAddress().FromHigherHalf();
 
             if (rsdp)
             {

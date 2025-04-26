@@ -39,12 +39,11 @@ namespace PowerManager
             = BootInfo::GetEfiSystemTable().As<EFI::SystemTable>();
 
         Assert(systemTable);
-        systemTable
-            = VMM::MapIoRegion<EFI::SystemTable>(Pointer(systemTable), true);
-
-        auto runtimeServices = VMM::MapIoRegion<EFI::RuntimeServices>(
-            Pointer(systemTable->RuntimeServices), true);
-        runtimeServices->ResetSystem(EFI::ResetType::eShutdown, 0, 0, nullptr);
+        CTOS_UNUSED auto runtimeServices
+            = VMM::MapIoRegion<EFI::RuntimeServices>(
+                Pointer(systemTable->RuntimeServices), true);
+        // runtimeServices->ResetSystem(EFI::ResetType::eShutdown, 0, 0,
+        // nullptr);
 
         // TODO(v1tr10l7): UEFI Service
         print(

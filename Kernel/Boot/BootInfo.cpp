@@ -19,7 +19,7 @@
 namespace
 {
     __attribute__((
-        used, section(".limine_requests"))) volatile LIMINE_BASE_REVISION(3);
+        used, section(".limine_requests"))) volatile LIMINE_BASE_REVISION(2);
 } // namespace
 
 namespace BootInfo
@@ -162,7 +162,13 @@ namespace BootInfo
         (void)s_EntryPointRequest.response;
 
         Logger::EnableSink(LOG_SINK_E9);
-#if CTOS_ARCH == CTOS_ARCH_X86_64
+#if defined(CTOS_TARGET_X86_64) && defined(__aarch64__)
+    #error "target is aarch64 and CTOS_TARGET_X86_64 is defined"
+#elif defined(__aarch64__) && !defined(CTOS_TARGET_AARCH64)
+    #error "target is aarch64 and CTOS_TARGET_AARCH64 is not defined"
+#endif
+
+#if defined(CTOS_TARGET_X86_64) && !defined(CTOS_TARGET_AARCH64)
         Logger::EnableSink(LOG_SINK_SERIAL);
 #endif
 
@@ -171,7 +177,7 @@ namespace BootInfo
         if (!s_FramebufferRequest.response
             || s_FramebufferRequest.response->framebuffer_count < 1)
             EarlyPanic("Boot: Failed to acquire the framebuffer!");
-        // Logger::EnableSink(LOG_SINK_TERMINAL);
+        Logger::EnableSink(LOG_SINK_TERMINAL);
 
         if (!s_MemmapRequest.response
             || s_MemmapRequest.response->entry_count == 0)
