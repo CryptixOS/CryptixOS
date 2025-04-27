@@ -12,6 +12,7 @@ extend-ignore-identifiers-re = [
 [files]
 extend-exclude = [
     "patches/*", "Prism/*",
+    "Meta/*.patch",
 ]
 
 [default.extend-identifiers]
