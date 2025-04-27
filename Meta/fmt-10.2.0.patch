@@ -2244,7 +2244,7 @@ diff --color -Naur fmt-old/include/fmt/chrono.h fmt-10.2.0/include/fmt/chrono.h
 -#endif  // FMT_CHRONO_H_
 diff --color -Naur fmt-old/include/fmt/color.h fmt-10.2.0/include/fmt/color.h
 --- fmt-old/include/fmt/color.h	2024-01-01 20:10:16.000000000 +0100
-+++ fmt-10.2.0/include/fmt/color.h	2025-04-27 04:36:45.153515519 +0200
++++ fmt-10.2.0/include/fmt/color.h	2025-04-27 20:23:34.916895895 +0200
 @@ -155,7 +155,7 @@
    white_smoke = 0xF5F5F5,              // rgb(245,245,245)
    yellow = 0xFFFF00,                   // rgb(255,255,0)
@@ -2314,7 +2314,7 @@ diff --color -Naur fmt-old/include/fmt/color.h fmt-10.2.0/include/fmt/color.h
    Formats arguments and returns the result as a string using ANSI
 diff --color -Naur fmt-old/include/fmt/compile.h fmt-10.2.0/include/fmt/compile.h
 --- fmt-old/include/fmt/compile.h	2024-01-01 20:10:16.000000000 +0100
-+++ fmt-10.2.0/include/fmt/compile.h	2025-04-27 04:37:19.960089029 +0200
++++ fmt-10.2.0/include/fmt/compile.h	2025-04-27 20:23:34.917149486 +0200
 @@ -510,7 +510,6 @@
  void print(std::FILE* f, const S& format_str, const Args&... args) {
    memory_buffer buffer;
@@ -2325,7 +2325,7 @@ diff --color -Naur fmt-old/include/fmt/compile.h fmt-10.2.0/include/fmt/compile.
  template <typename S, typename... Args,
 diff --color -Naur fmt-old/include/fmt/core.h fmt-10.2.0/include/fmt/core.h
 --- fmt-old/include/fmt/core.h	2024-01-01 20:10:16.000000000 +0100
-+++ fmt-10.2.0/include/fmt/core.h	2025-04-27 18:20:05.566782340 +0200
++++ fmt-10.2.0/include/fmt/core.h	2025-04-27 20:23:34.917434957 +0200
 @@ -9,7 +9,6 @@
  #define FMT_CORE_H_
  
@@ -3028,7 +3028,7 @@ diff --color -Naur fmt-old/include/fmt/core.h fmt-10.2.0/include/fmt/core.h
  #ifdef FMT_HEADER_ONLY
 diff --color -Naur fmt-old/include/fmt/format.h fmt-10.2.0/include/fmt/format.h
 --- fmt-old/include/fmt/format.h	2024-01-01 20:10:16.000000000 +0100
-+++ fmt-10.2.0/include/fmt/format.h	2025-04-27 19:17:15.939770889 +0200
++++ fmt-10.2.0/include/fmt/format.h	2025-04-27 20:23:34.918120807 +0200
 @@ -39,8 +39,6 @@
  #include <initializer_list>  // std::initializer_list
  #include <limits>            // std::numeric_limits
@@ -4722,7 +4722,7 @@ diff --color -Naur fmt-old/include/fmt/format.h fmt-10.2.0/include/fmt/format.h
  #endif  // FMT_FORMAT_H_
 diff --color -Naur fmt-old/include/fmt/format-inl.h fmt-10.2.0/include/fmt/format-inl.h
 --- fmt-old/include/fmt/format-inl.h	2024-01-01 20:10:16.000000000 +0100
-+++ fmt-10.2.0/include/fmt/format-inl.h	2025-04-27 18:21:15.643128089 +0200
++++ fmt-10.2.0/include/fmt/format-inl.h	2025-04-27 20:23:34.919414600 +0200
 @@ -8,19 +8,7 @@
  #ifndef FMT_FORMAT_INL_H_
  #define FMT_FORMAT_INL_H_
@@ -8876,7 +8876,7 @@ diff --color -Naur fmt-old/include/fmt/std.h fmt-10.2.0/include/fmt/std.h
 -#endif  // FMT_STD_H_
 diff --color -Naur fmt-old/include/fmt/xchar.h fmt-10.2.0/include/fmt/xchar.h
 --- fmt-old/include/fmt/xchar.h	2024-01-01 20:10:16.000000000 +0100
-+++ fmt-10.2.0/include/fmt/xchar.h	2025-04-27 18:17:30.805771227 +0200
++++ fmt-10.2.0/include/fmt/xchar.h	2025-04-27 20:23:34.920679057 +0200
 @@ -12,31 +12,12 @@
  
  #include "format.h"
@@ -8909,27 +8909,8 @@ diff --color -Naur fmt-old/include/fmt/xchar.h fmt-10.2.0/include/fmt/xchar.h
  FMT_BEGIN_EXPORT
  
  using wstring_view = basic_string_view<wchar_t>;
-diff --color -Naur fmt-old/meson.build fmt-10.2.0/meson.build
---- fmt-old/meson.build	1970-01-01 01:00:00.000000000 +0100
-+++ fmt-10.2.0/meson.build	2025-03-09 15:32:20.000000000 +0100
-@@ -0,0 +1,15 @@
-+project('fmt', 'cpp', license: 'BSD', default_options: ['cpp_std=c++14'])
-+
-+args = [
-+    '-DFMT_STATIC_THOUSANDS_SEPARATOR=1',
-+    '-DFMT_USE_LONG_DOUBLE=0',
-+    '-DFMT_USE_DOUBLE=0',
-+    '-DFMT_USE_FLOAT=0',
-+    '-DFMT_HEADER_ONLY',
-+]
-+
-+fmt_dep = declare_dependency(compile_args : args, include_directories : include_directories('include'))
-+
-+if meson.version().version_compare('>=0.54.0')
-+    meson.override_dependency('fmt', fmt_dep)
-+endif
 diff --color -Naur fmt-old/.meson-subproject-wrap-hash.txt fmt-10.2.0/.meson-subproject-wrap-hash.txt
 --- fmt-old/.meson-subproject-wrap-hash.txt	1970-01-01 01:00:00.000000000 +0100
-+++ fmt-10.2.0/.meson-subproject-wrap-hash.txt	2025-04-27 02:45:15.788928815 +0200
++++ fmt-10.2.0/.meson-subproject-wrap-hash.txt	2025-04-27 20:23:34.920983635 +0200
 @@ -0,0 +1 @@
 +638de195c6aaef146c2e5cc245b61ed726776973300d710d43aa3f340724e25e
