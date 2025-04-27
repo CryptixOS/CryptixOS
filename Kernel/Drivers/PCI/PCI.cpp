@@ -12,6 +12,7 @@
 #include <Firmware/ACPI/MCFG.hpp>
 #include <Library/Logger.hpp>
 #include <Prism/String/String.hpp>
+#include <Prism/String/StringUtils.hpp>
 
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
@@ -30,38 +31,26 @@ namespace PCI
     };
 
     std::unordered_map<u16, Vendor> s_VendorIDs;
-    static u8                       ParseHexDigit(u8 digit)
+
+    void                            ParseVendorID(StringView line)
     {
-        if (std::isdigit(digit)) return digit - '0';
-        assert(std::isxdigit(digit));
+        if (line.Size() < 4) return;
+        for (usize i = 0; i < 4; i++)
+            if (!IsHexDigit(line[i])) return;
 
-        return digit - 'a' + 0xa;
-    }
-    template <typename T>
-    static T ParseHex(StringView string, usize count)
-    {
-        assert(string.Size() >= count);
+        usize nameStartPos = 4;
+        while (nameStartPos < line.Size() && !std::isalpha(line[nameStartPos]))
+            ++nameStartPos;
+        if (nameStartPos >= line.Size()) return;
 
-        T value = 0;
-        for (const auto c : string.Substr(0, count))
-            value = (value << 4) + ParseHexDigit(c);
-
-        return value;
-    }
-    void ParseVendorID(StringView line)
-    {
-        if (line.Size() < 5) return;
-        auto nameStart
-            = std::find_if(line.begin() + 4, line.end(),
-                           [](char c) -> bool { return std::isalpha(c); });
-
-        u16        id       = ParseHex<u16>(line, 4);
+        u16        id       = StringUtils::ToNumber<u16>(line.Substr(0, 4), 16);
         auto&      vendor   = s_VendorIDs[id];
-        usize      nameSize = reinterpret_cast<usize>(nameStart = line.begin());
-        StringView name(nameStart, nameSize);
-        vendor.Name = name;
+        usize      nameSize = line.Size() - nameStartPos;
+        StringView name(line.Raw() + nameStartPos, nameSize);
+        if (line.Empty()) return;
 
-        LogTrace("PCI: VendorID: {:#x} => '{}'", id, name);
+        vendor.Name     = name;
+        s_VendorIDs[id] = vendor;
     }
     void InitializeDatabase()
     {
@@ -76,23 +65,22 @@ namespace PCI
         usize fileSize = file->GetStats().st_size;
         assert(fileSize > 0);
 
-        Vector<u8> buffer;
+        String buffer;
         buffer.Resize(fileSize);
-        file->Read(buffer.Raw(), 0, fileSize);
-        StringView fileData((char*)buffer.Raw(), buffer.Size());
+        fileSize         = file->Read(buffer.Raw(), 0, fileSize);
 
-        usize      currentPos = 0;
-        usize      newLinePos = StringView::NPos;
-        using namespace Prism::StringViewLiterals;
-        while ((newLinePos = fileData.FindFirstOf("\n"_sv, currentPos))
-                   != fileData.NPos
-               && currentPos < fileData.Size())
+        usize currentPos = 0;
+        usize newLinePos = String::NPos;
+        while ((newLinePos = buffer.FindFirstOf("\n", currentPos))
+                   < buffer.Size()
+               && currentPos < buffer.Size())
         {
-            usize      lineLength  = newLinePos - currentPos;
-            StringView currentLine = fileData.Substr(currentPos, lineLength);
-            currentPos             = newLinePos + 1;
+            usize  lineLength = newLinePos - currentPos;
+            String line       = buffer.Substr(currentPos, lineLength);
+            currentPos        = buffer.FindFirstNotOf("\n\r", newLinePos);
+            if (line.Empty()) continue;
 
-            if (std::isxdigit(currentLine[0])) ParseVendorID(currentLine);
+            ParseVendorID(line);
         }
     }
 
@@ -152,17 +140,19 @@ namespace PCI
             [](const DeviceAddress& addr) -> bool
             {
                 HostController* controller = s_HostControllers[addr.Domain];
-                VendorID vendorID = static_cast<VendorID>(controller->Read<u16>(
-                    addr, std::to_underlying(RegisterOffset::eVendorID)));
-                u16      deviceID = controller->Read<u16>(
+                u16             vendorID   = controller->Read<u16>(
+                    addr, std::to_underlying(RegisterOffset::eVendorID));
+                u16 deviceID = controller->Read<u16>(
                     addr, std::to_underlying(RegisterOffset::eDeviceID));
                 u8 classID = controller->Read<u8>(
                     addr, std::to_underlying(RegisterOffset::eClassID));
                 u8 subclassID = controller->Read<u8>(
                     addr, std::to_underlying(RegisterOffset::eSubClassID));
 
-                StringView vendorName = magic_enum::enum_name(vendorID).data();
-                if (vendorName.Empty()) vendorName = "Unrecognized"_sv;
+                auto       vendor     = s_VendorIDs.find(vendorID);
+                StringView vendorName = vendor != s_VendorIDs.end()
+                                          ? vendor->second.Name.View()
+                                          : "Unrecognized"_sv;
 
                 LogInfo(
                     "PCI: {:#x}:{:#x}:{:#x}, ID: {:#x}:{:#x}:{:#x}:{:#x} - {}",
@@ -187,8 +177,8 @@ namespace PCI
                 return false;
             });
 
+        InitializeDatabase();
         EnumerateDevices(enumerator);
-        // InitializeDatabase();
     }
 
     void InitializeIrqRoutes()

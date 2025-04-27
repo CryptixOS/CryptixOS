@@ -6,6 +6,8 @@
  */
 #pragma once
 
+#include <Drivers/Storage/MasterBootRecord.hpp>
+
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Core/Types.hpp>
 
@@ -41,5 +43,6 @@ class PartitionTable
     bool           IsProtective(struct MasterBootRecord* mbr);
 
     bool           ParseMBR(MasterBootRecord* mbr);
+    bool           ParseEBR(MasterBootRecord& ebr, usize offset = 0);
     bool           ParseGPT();
 };
