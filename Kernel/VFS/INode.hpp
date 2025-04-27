@@ -37,6 +37,14 @@ class INode
 
     inline Filesystem*  GetFilesystem() { return m_Filesystem; }
     virtual const stat& GetStats() { return m_Stats; }
+
+    virtual INode*      Lookup(const String& name)
+    {
+        auto child = GetChildren().find(name);
+        if (child != GetChildren().end()) return child->second;
+
+        return nullptr;
+    }
     virtual std::unordered_map<StringView, INode*>& GetChildren()
     {
         if (!m_Populated) Populate();

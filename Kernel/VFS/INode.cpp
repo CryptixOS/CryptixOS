@@ -84,8 +84,8 @@ INode* INode::Reduce(bool symlinks, bool automount, usize cnt)
     {
         if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
 
-        auto nextNode = std::get<1>(
-            VFS::ResolvePath(m_Parent, m_Target.Raw(), automount));
+        auto nextNode
+            = VFS::ResolvePath(m_Parent, m_Target.Raw(), automount).Node;
         if (!nextNode) return_err(nullptr, ENOENT);
 
         return nextNode->Reduce(symlinks, automount, ++cnt);

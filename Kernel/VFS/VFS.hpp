@@ -25,13 +25,19 @@ namespace VFS
     INode*                               GetRootNode();
     void                                 RecursiveDelete(INode* node);
 
+    struct PathResolution
+    {
+        INode* Parent   = nullptr;
+        INode* Node     = nullptr;
+        Path   BaseName = ""_s;
+    };
+
     ErrorOr<FileDescriptor*> Open(INode* parent, PathView path, i32 flags,
                                   mode_t mode);
 
     ErrorOr<INode*>          ResolvePath(PathView path);
-    std::tuple<INode*, INode*, Path> ResolvePath(INode* parent, PathView path);
-    std::tuple<INode*, INode*, Path> ResolvePath(INode* parent, PathView path,
-                                                 bool followLinks);
+    PathResolution           ResolvePath(INode* parent, PathView path);
+    PathResolution ResolvePath(INode* parent, PathView path, bool followLinks);
 
     std::unordered_map<StringView, class Filesystem*>& GetMountPoints();
 

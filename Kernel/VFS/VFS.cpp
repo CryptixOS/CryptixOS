@@ -137,8 +137,7 @@ namespace VFS
             accMode = FileAccessMode::eNone;
         }
 
-        INode* node
-            = std::get<1>(VFS::ResolvePath(parent, path, followSymlinks));
+        INode* node = VFS::ResolvePath(parent, path, followSymlinks).Node;
         if (!node)
         {
             didExist = false;
@@ -151,8 +150,8 @@ namespace VFS
 
             if (!node) return Error(ENOENT);
         }
+        else if (flags & O_EXCL) return Error(EEXIST);
 
-        if (flags & O_EXCL && didExist) return Error(EEXIST);
         node = node->Reduce(followSymlinks, true);
         if (!node) return Error(ENOENT);
 
@@ -170,12 +169,12 @@ namespace VFS
 
     ErrorOr<INode*> ResolvePath(PathView path)
     {
-        INode* node = std::get<1>(ResolvePath(s_RootNode, path));
+        INode* node = ResolvePath(s_RootNode, path).Node;
         if (!node) return Error(errno);
 
         return node;
     }
-    std::tuple<INode*, INode*, Path> ResolvePath(INode* parent, PathView path)
+    PathResolution ResolvePath(INode* parent, PathView path)
     {
         if (!parent || path.Absolute()) parent = GetRootNode();
         if (path.Empty())
@@ -202,11 +201,11 @@ namespace VFS
             return currentNode->GetParent();
         };
 
-        auto segments = path.SplitPath();
+        auto segments = StringView(path).Split('/');
 
         for (usize i = 0; i < segments.Size(); i++)
         {
-            auto segment     = String(segments[i].data(), segments[i].size());
+            auto segment     = String(segments[i].Raw());
             bool isLast      = i == (segments.Size() - 1);
 
             bool previousDir = segment == ".."_sv;
@@ -225,9 +224,9 @@ namespace VFS
                 continue;
             }
 
-            if (currentNode->GetChildren().contains(segment))
+            if (currentNode->Lookup(segment))
             {
-                auto node = currentNode->GetChildren()[segment];
+                auto node = currentNode->Lookup(segment);
                 if (!node->Reduce(false, true)->Populate())
                     return {nullptr, nullptr, ""_sv};
 
@@ -265,8 +264,7 @@ namespace VFS
         errno = ENOENT;
         return {nullptr, nullptr, ""_sv};
     }
-    std::tuple<INode*, INode*, Path> ResolvePath(INode* parent, PathView path,
-                                                 bool followLinks)
+    PathResolution ResolvePath(INode* parent, PathView path, bool followLinks)
     {
         auto [p, n, b] = ResolvePath(parent, path);
         if (followLinks && n) n = n->Reduce(true);
@@ -323,7 +321,7 @@ namespace VFS
         INode* sourceNode = nullptr;
         if (!sourcePath.Empty())
         {
-            sourceNode = std::get<1>(ResolvePath(s_RootNode, sourcePath));
+            sourceNode = ResolvePath(s_RootNode, sourcePath).Node;
             if (!sourceNode)
             {
                 LogError("VFS: Failed to resolve source path -> '{}'",

@@ -55,7 +55,7 @@ namespace PCI
     void InitializeDatabase()
     {
         PathView path = "/usr/share/hwdata/pci.ids";
-        INode*   file = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path));
+        INode*   file = VFS::ResolvePath(VFS::GetRootNode(), path).Node;
         if (!file)
         {
             LogError("PCI: Failed to open pciids database");

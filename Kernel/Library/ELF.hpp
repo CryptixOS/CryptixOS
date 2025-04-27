@@ -19,6 +19,8 @@
 #include <Prism/Memory/ByteStream.hpp>
 #include <Prism/PathView.hpp>
 
+#include <unordered_map>
+
 namespace ELF
 {
     constexpr const char MAGIC[] = "\177ELF";
@@ -307,22 +309,23 @@ namespace ELF
         inline StringView            GetLdPath() const { return m_LdPath; }
 
       private:
-        Buffer                m_Image;
+        Buffer                                  m_Image;
 
-        Header                m_Header;
-        Vector<ProgramHeader> m_ProgramHeaders;
-        Vector<SectionHeader> m_Sections;
-        AuxiliaryVector       m_AuxiliaryVector;
+        Header                                  m_Header;
+        Vector<ProgramHeader>                   m_ProgramHeaders;
+        Vector<SectionHeader>                   m_Sections;
+        AuxiliaryVector                         m_AuxiliaryVector;
 
-        SectionHeader*        m_SymbolSection = nullptr;
-        SectionHeader*        m_StringSection = nullptr;
-        u8*                   m_StringTable   = nullptr;
+        SectionHeader*                          m_SymbolSection = nullptr;
+        SectionHeader*                          m_StringSection = nullptr;
+        u8*                                     m_StringTable   = nullptr;
 
-        Vector<Symbol>        m_Symbols;
-        StringView            m_LdPath;
+        Vector<Symbol>                          m_Symbols;
+        std::unordered_map<StringView, Pointer> m_SymbolTable;
+        StringView                              m_LdPath;
 
-        bool                  Parse();
-        void                  LoadSymbols();
+        bool                                    Parse();
+        void                                    LoadSymbols();
 
         bool ParseProgramHeaders(ByteStream<Endian::eLittle>& stream);
         bool ParseSectionHeaders(ByteStream<Endian::eLittle>& stream);

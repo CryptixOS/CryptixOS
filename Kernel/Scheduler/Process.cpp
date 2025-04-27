@@ -160,8 +160,7 @@ void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
 ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
-    INode* parent
-        = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), m_CWD.Raw()));
+    INode* parent = VFS::ResolvePath(VFS::GetRootNode(), m_CWD.Raw()).Node;
     if (CPU::AsUser([path]() -> bool { return path.Absolute(); }))
         parent = VFS::GetRootNode();
     else if (dirFd != AT_FDCWD)

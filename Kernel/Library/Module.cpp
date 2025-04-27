@@ -38,7 +38,9 @@ static void                              LoadModuleFromFile(INode* node)
 bool Module::Load()
 {
     INode* moduleDirectory
-        = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), "/lib/modules/"));
+        = VFS::ResolvePath(VFS::GetRootNode(), "/lib/modules/").Node;
+    if (!moduleDirectory) return false;
+
     for (const auto& [name, child] : moduleDirectory->GetChildren())
         LoadModuleFromFile(child);
 

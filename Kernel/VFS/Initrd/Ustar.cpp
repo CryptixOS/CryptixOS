@@ -54,10 +54,10 @@ namespace Ustar
         while (std::strncmp(current->Signature, MAGIC.Raw(), MAGIC_LENGTH - 1)
                == 0)
         {
-            Path   filename(current->FileName);
-            Path   linkName(current->LinkName);
+            PathView filename(current->FileName);
+            PathView linkName(current->LinkName);
 
-            mode_t mode
+            mode_t   mode
                 = parseOctNumber<mode_t>(current->Mode, sizeof(current->Mode));
             usize size = parseOctNumber<usize>(current->FileSize,
                                                sizeof(current->FileSize));
@@ -98,7 +98,8 @@ namespace Ustar
                              filename, linkName);
                     break;
                 case FILE_TYPE_SYMLINK:
-                    node = VFS::Symlink(VFS::GetRootNode(), filename, linkName);
+                    node = VFS::Symlink(VFS::GetRootNode(), filename,
+                                        linkName.Raw());
                     if (!node)
                         LogError(
                             "USTAR: Failed to create Symlink: '{}' -> '{}'",

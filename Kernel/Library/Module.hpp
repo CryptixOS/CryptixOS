@@ -34,8 +34,8 @@ struct [[gnu::packed, gnu::aligned(8)]] Module
 std::unordered_map<StringView, Module*>& GetModules();
 bool                                     LoadModule(Module* drv);
 
-#define MODULE_SECTION      ".modules"
-#define MODULE_DATA_SECTION ".modules.data"
+#define MODULE_SECTION      ".module_init"
+#define MODULE_DATA_SECTION ".module_init.data"
 
 #define MODULE_INIT(name, init)                                                \
     extern "C" [[gnu::section(MODULE_SECTION), gnu::used]] const Module        \

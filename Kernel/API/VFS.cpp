@@ -78,8 +78,7 @@ namespace API::VFS
         auto process = Process::GetCurrent();
         if (!process->ValidateRead(path, 4096)) return Error(EFAULT);
 
-        auto inode
-            = std::get<1>(::VFS::ResolvePath(::VFS::GetRootNode(), path));
+        auto inode = ::VFS::ResolvePath(::VFS::GetRootNode(), path).Node;
         if (!inode) return Error(errno);
 
         return inode->CheckPermissions(mode);
@@ -239,7 +238,7 @@ namespace API::VFS
             }
         }
 
-        auto node = std::get<1>(::VFS::ResolvePath(parent, path));
+        auto node = ::VFS::ResolvePath(parent, path).Node;
         if (!node) return Error(ENOENT);
 
         auto ret = node->ChMod(mode);
@@ -304,8 +303,8 @@ namespace API::VFS
         auto* fd             = current->GetFileHandle(dirFdNum);
         bool  followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
 
-        auto  cwd            = std::get<1>(
-            ::VFS::ResolvePath(::VFS::GetRootNode(), current->GetCWD()));
+        auto  cwd
+            = ::VFS::ResolvePath(::VFS::GetRootNode(), current->GetCWD()).Node;
         if (!path || !*path)
         {
             if (!(flags & AT_EMPTY_PATH)) return Error(ENOENT);
@@ -338,8 +337,7 @@ namespace API::VFS
             parent = parent->Reduce(false, true);
         }
 
-        auto node
-            = std::get<1>(::VFS::ResolvePath(parent, path, followSymlinks));
+        auto node = ::VFS::ResolvePath(parent, path, followSymlinks).Node;
         if (!node) return Error(errno);
 
         *out = node->GetStats();
@@ -409,9 +407,7 @@ namespace Syscall::VFS
 
         INode* node = CPU::AsUser(
             [path]() -> INode*
-            {
-                return std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), path));
-            });
+            { return VFS::ResolvePath(VFS::GetRootNode(), path).Node; });
         if (!node) return Error(EPERM);
 
         return 0;
@@ -461,12 +457,12 @@ namespace Syscall::VFS
         const char* path    = reinterpret_cast<const char*>(args.Args[0]);
         Process*    current = Process::GetCurrent();
 
-        INode*      cwd     = std::get<1>(
-            VFS::ResolvePath(current->GetRootNode(), current->GetCWD()));
+        INode*      cwd
+            = VFS::ResolvePath(current->GetRootNode(), current->GetCWD()).Node;
         INode* node = nullptr;
         {
             CPU::UserMemoryProtectionGuard guard;
-            node = std::get<1>(VFS::ResolvePath(cwd, path));
+            node = VFS::ResolvePath(cwd, path).Node;
         }
         if (!node) return Error(ENOENT);
         if (!node->IsDirectory()) return Error(ENOTDIR);
@@ -503,10 +499,10 @@ namespace Syscall::VFS
             return Error(EFAULT);
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
-        INode* parent        = path.Absolute()
-                                 ? current->GetRootNode()
-                                 : std::get<1>(VFS::ResolvePath(VFS::GetRootNode(),
-                                                                current->GetCWD()));
+        INode* parent
+            = path.Absolute()
+                ? current->GetRootNode()
+                : VFS::ResolvePath(VFS::GetRootNode(), current->GetCWD()).Node;
         auto [_, node, name] = VFS::ResolvePath(parent, path);
 
         mode &= ~current->GetUmask() & 0777;
@@ -585,7 +581,7 @@ namespace Syscall::VFS
         if (!parent) return Error(ENOENT);
         if (!parent->IsDirectory()) return Error(ENOTDIR);
 
-        INode* node = std::get<1>(VFS::ResolvePath(parent, path));
+        INode* node = VFS::ResolvePath(parent, path).Node;
         if (node) return Error(EEXIST);
 
         node = VFS::CreateNode(parent, path, mode | S_IFDIR);
