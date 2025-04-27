@@ -71,6 +71,7 @@ namespace Time
         DateTime dateAtBoot(s_BootTime);
         LogInfo("Time: Boot Date: {}", dateAtBoot);
 
+        s_BootTime  = s_BootTime * 1'000'000'000;
         auto now    = static_cast<usize>(Arch::GetEpoch());
         s_RealTime  = now * 1'000'000'000;
         s_Monotonic = s_RealTime;
