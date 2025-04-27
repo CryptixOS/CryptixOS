@@ -11,6 +11,7 @@
 #include <Memory/ScopedMapping.hpp>
 #include <Memory/VMM.hpp>
 
+#include <uacpi/context.h>
 #include <uacpi/event.h>
 #include <uacpi/resources.h>
 #include <uacpi/uacpi.h>
@@ -172,38 +173,25 @@ namespace ACPI
     void Enable()
     {
         LogTrace("ACPI: Entering ACPI Mode");
-        auto status = uacpi_initialize(0);
 
-        if (uacpi_unlikely_error(status))
-        {
-            LogError("ACPI: Failed to enter acpi mode!");
-            return;
-        }
+#define UACPI_DEBUG 0
+#if UACPI_DEBUG == 1
+        uacpi_context_set_log_level(UACPI_LOG_DEBUG);
+#else
+        uacpi_context_set_log_level(UACPI_LOG_INFO);
+#endif
+
+        uAcpiCall(uacpi_initialize(0), "ACPI: Failed to enter acpi mode!");
     }
     void LoadNameSpace()
     {
-        auto status = uacpi_namespace_load();
-        if (uacpi_unlikely_error(status))
-        {
-            LogError("ACPI: Failed to load namespace");
-            return;
-        }
-        status = uacpi_set_interrupt_model(UACPI_INTERRUPT_MODEL_IOAPIC);
-        if (uacpi_unlikely_error(status))
-        {
-            LogError("ACPI: Failed to set uACPI interrupt model");
-            return;
-        }
-        status = uacpi_namespace_initialize();
-        if (uacpi_unlikely_error(status))
-        {
-            LogError("ACPI: Failed to initialize namespace");
-            return;
-        }
-
-        // status = uacpi_finalize_gpe_initialization();
-        // if (uacpi_unlikely_error(status))
-        //     LogError("ACPI: Failed to finalize gpe initialization!");
+        uAcpiCall(uacpi_namespace_load(), "ACPI: Failed to load namespace");
+        uAcpiCall(uacpi_set_interrupt_model(UACPI_INTERRUPT_MODEL_IOAPIC),
+                  "ACPI: Failed to set uACPI interrupt model");
+        uAcpiCall(uacpi_namespace_initialize(),
+                  "ACPI: Failed to initialize namespace");
+        // uAcpiCall(uacpi_finalize_gpe_initialization(),
+        //           "ACPI: Failed to finalize gpe initialization!");
     }
     void EnumerateDevices()
     {
@@ -250,5 +238,4 @@ namespace ACPI
 
         s_FADT->ResetReg.Write(s_FADT->ResetValue);
     }
-
 } // namespace ACPI
