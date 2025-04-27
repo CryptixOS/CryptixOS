@@ -34,5 +34,5 @@ jobs:
       - name: Configure Project
         run: ./Meta/setup.sh ${{ matrix.architecture }} ${{ matrix.build-configuration }} 
           && (cd subprojects/fmt-10.2.0/ && yes | patch -p 1 < ../../Meta/fmt-10.2.0.patch)
-          && ./Meta/build.sh ${{ matrix.build-configuration }} ${{ matrix.architecture }}
+          && ./Meta/build.sh ${{ matrix.architecture }} ${{ matrix.build-configuration }} 
     
