@@ -12,7 +12,7 @@
 
 #include <Prism/Path.hpp>
 #include <Prism/PathView.hpp>
-#include <Prism/TypeTraits.hpp>
+#include <Prism/Core/TypeTraits.hpp>
 
 #include <magic_enum/magic_enum.hpp>
 #include <magic_enum/magic_enum_format.hpp>
