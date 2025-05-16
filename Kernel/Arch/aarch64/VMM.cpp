@@ -130,7 +130,7 @@ namespace Arch::VMM
         if (mmfr0.tGran4 != 0b1111) pageSize = PAGE_SIZE_4KIB;
         else if (mmfr0.tGran16 != 0b0000) pageSize = PAGE_SIZE_16KIB;
         else if (mmfr0.tGran64 == 0b0000) pageSize = PAGE_SIZE_64KIB;
-        else Panic("VMM: Unknown page size");
+        else ::panic("VMM: Unknown page size");
 
         if (BootInfo::GetPagingMode() == 1
             && (tcrEl1 & Bit(59) && featLpa
