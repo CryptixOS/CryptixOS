@@ -13,6 +13,7 @@ extend-ignore-identifiers-re = [
 extend-exclude = [
     "patches/*", "Prism/*",
     "Meta/*.patch",
+    "subprojects/*.patch",
 ]
 
 [default.extend-identifiers]
