@@ -381,7 +381,7 @@ namespace uACPI
         {
             auto& event   = *reinterpret_cast<Event*>(handle);
             event.Pending = 0;
-            event.Listeners.clear();
+            event.Listeners.Clear();
         }
         uacpi_status
         uacpi_kernel_handle_firmware_request(uacpi_firmware_request*)

@@ -10,6 +10,7 @@
 #include <Library/Logger.hpp>
 #include <Library/Spinlock.hpp>
 
+#include <Prism/Containers/Deque.hpp>
 #include <Prism/Utility/Time.hpp>
 
 #include <Scheduler/Event.hpp>
@@ -43,7 +44,7 @@ namespace Time
         Timestep               s_RealTime;
         Timestep               s_Monotonic;
 
-        std::deque<Timer*>     s_ArmedTimers;
+        Deque<Timer*>          s_ArmedTimers;
         Spinlock               s_TimersLock;
     } // namespace
 
@@ -51,8 +52,8 @@ namespace Time
     {
         ScopedLock guard(s_TimersLock);
 
-        Index = s_ArmedTimers.size();
-        s_ArmedTimers.push_back(this);
+        Index = s_ArmedTimers.Size();
+        s_ArmedTimers.PushBack(this);
     }
     void Timer::Disarm()
     {
@@ -61,7 +62,7 @@ namespace Time
         for (; it != s_ArmedTimers.end(); it++)
             if (*it == this) break;
 
-        if (it != s_ArmedTimers.end()) s_ArmedTimers.erase(it);
+        if (it != s_ArmedTimers.end()) s_ArmedTimers.Erase(it);
         Index = std::nullopt;
     }
 

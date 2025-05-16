@@ -25,12 +25,12 @@ static std::optional<usize> CheckPending(std::span<Event*> events)
 
 static void AttachListeners(std::span<Event*> events, Thread* thread)
 {
-    thread->GetEvents().clear();
+    thread->GetEvents().Clear();
 
     for (usize i = 0; const auto& event : events)
     {
-        event->Listeners.emplace_back(thread, i);
-        thread->GetEvents().push_back(event);
+        event->Listeners.EmplaceBack(thread, i);
+        thread->GetEvents().PushBack(event);
         i++;
     }
 }
@@ -42,10 +42,10 @@ static void DetachListeners(Thread* thread)
              it++)
         {
             if (it->Thread != thread) continue;
-            it = event->Listeners.erase(it);
+            it = event->Listeners.Erase(it);
         }
     }
-    thread->GetEvents().clear();
+    thread->GetEvents().Clear();
 }
 
 static void LockEvents(std::span<Event*> events)
@@ -98,7 +98,7 @@ void Event::Trigger(Event* event, bool drop)
 {
     bool intState = CPU::SwapInterruptFlag(false);
 
-    if (event->Listeners.empty())
+    if (event->Listeners.Empty())
     {
         if (!drop) ++event->Pending;
         return;
@@ -112,6 +112,6 @@ void Event::Trigger(Event* event, bool drop)
         Scheduler::Unblock(thread);
     }
 
-    event->Listeners.clear();
+    event->Listeners.Clear();
     CPU::SetInterruptFlag(intState);
 }

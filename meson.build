@@ -133,7 +133,6 @@ deps = [
   dependency('smart_ptr'),
   dependency('string'),
   dependency('uacpi'),
-  dependency('veque'),
 ]
 
 inc_deps = [ ]

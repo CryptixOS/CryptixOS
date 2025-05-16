@@ -18,9 +18,9 @@
 #endif
 
 #include <Library/ELF.hpp>
-#include <Scheduler/Event.hpp>
+#include <Prism/Containers/Deque.hpp>
 
-#include <deque>
+#include <Scheduler/Event.hpp>
 
 enum class ThreadState
 {
@@ -111,11 +111,11 @@ struct Thread
     inline void    SetGsBase(Pointer gs) { m_GsBase = gs; }
 #endif
 
-    inline Event&              GetEvent() { return m_Event; }
-    inline std::deque<Event*>& GetEvents() { return m_Events; }
-    inline usize               GetWhich() const { return m_Which; }
+    inline Event&         GetEvent() { return m_Event; }
+    inline Deque<Event*>& GetEvents() { return m_Events; }
+    inline usize          GetWhich() const { return m_Which; }
 
-    inline void                SetWhich(usize which) { m_Which = which; }
+    inline void           SetWhich(usize which) { m_Which = which; }
 
   private:
     ///// DON'T MOVE /////
@@ -153,13 +153,13 @@ struct Thread
     Pointer m_El0Base;
 #endif
 
-    bool               m_IsEnqueued     = false;
-    sigset_t           m_SignalMask     = 0;
-    sigset_t           m_PendingSignals = 0;
+    bool          m_IsEnqueued     = false;
+    sigset_t      m_SignalMask     = 0;
+    sigset_t      m_PendingSignals = 0;
 
-    Event              m_Event;
-    std::deque<Event*> m_Events;
-    usize              m_Which = 0;
+    Event         m_Event;
+    Deque<Event*> m_Events;
+    usize         m_Which = 0;
 
     friend class Process;
     friend class Scheduler;

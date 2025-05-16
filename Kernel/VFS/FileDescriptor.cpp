@@ -31,18 +31,18 @@ void DirectoryEntries::Push(INode* node, StringView name)
     name.Copy(entry->d_name, name.Size() + 1);
     reinterpret_cast<char*>(entry->d_name)[name.Size()] = 0;
 
-    Entries.push_back(entry);
+    Entries.PushBack(entry);
     Size += entry->d_reclen;
 }
 usize DirectoryEntries::CopyAndPop(u8* out, usize capacity)
 {
-    if (Entries.empty()) return 0;
+    if (Entries.Empty()) return 0;
 
-    auto  entry     = Entries.front();
+    auto  entry     = Entries.Front();
     usize entrySize = entry->d_reclen;
     if (capacity < entrySize) return 0;
 
-    Entries.pop_front();
+    Entries.PopFront();
     if (!entry || !(char*)entry->d_name) return 0;
 
     std::memcpy(out, entry, entry->d_reclen);

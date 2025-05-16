@@ -10,13 +10,13 @@
 #include <Drivers/Device.hpp>
 
 #include <Library/Spinlock.hpp>
+
 #include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Containers/Deque.hpp>
 #include <Prism/Memory/Buffer.hpp>
 #include <Prism/String/String.hpp>
 
 #include <Scheduler/Event.hpp>
-
-#include <deque>
 
 class TTY : public Device
 {
@@ -55,8 +55,7 @@ class TTY : public Device
     gid_t                   m_Pgid       = 100;
 
     CircularQueue<u8, 4096> m_RawBuffer;
-    // std::deque<char>         m_RawBuffer;
-    std::deque<String>      m_LineQueue;
+    Deque<String>           m_LineQueue;
 
     Event                   m_OnAddLine;
     Event                   m_RawEvent;
@@ -87,7 +86,7 @@ class TTY : public Device
         line.Reserve(lineLength);
         while (!m_RawBuffer.Empty()) line += m_RawBuffer.Pop();
         line.ShrinkToFit();
-        m_LineQueue.push_back(line);
+        m_LineQueue.PushBack(line);
 
         m_RawBuffer.Clear();
         m_OnAddLine.Trigger();

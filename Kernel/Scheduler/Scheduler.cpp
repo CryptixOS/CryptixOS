@@ -21,8 +21,6 @@
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/VFS.hpp>
 
-#include <deque>
-
 u8 g_ScheduleVector = 48;
 namespace
 {
@@ -43,63 +41,63 @@ namespace
 
 struct ThreadQueue
 {
-    mutable Spinlock    Lock;
-    std::deque<Thread*> Queue;
+    mutable Spinlock Lock;
+    Deque<Thread*>   Queue;
 
-    constexpr usize     Size() const { return Queue.size(); }
-    constexpr bool      IsEmpty() const { return Queue.empty(); }
+    constexpr usize  Size() const { return Queue.Size(); }
+    constexpr bool   IsEmpty() const { return Queue.Empty(); }
 
-    auto                begin() { return Queue.begin(); }
-    auto                end() { return Queue.end(); }
+    auto             begin() { return Queue.begin(); }
+    auto             end() { return Queue.end(); }
 
-    inline Thread*      Front() const
+    inline Thread*   Front() const
     {
         ScopedLock guard(Lock);
-        return Queue.front();
+        return Queue.Front();
     }
     inline Thread* Back() const
     {
         ScopedLock guard(Lock);
-        return Queue.back();
+        return Queue.Back();
     }
 
     inline void PushBack(Thread* t)
     {
         ScopedLock guard(Lock);
-        Queue.push_back(t);
+        Queue.PushBack(t);
     }
     inline void PushFront(Thread* t)
     {
         ScopedLock guard(Lock);
-        Queue.push_front(t);
+        Queue.PushFront(t);
     }
 
     inline void PopBack()
     {
         ScopedLock guard(Lock);
-        Queue.pop_back();
+        Queue.PopBack();
     }
     inline void PopFront()
     {
         ScopedLock guard(Lock);
-        Queue.pop_front();
+        Queue.PopFront();
     }
 
     inline Thread* PopFrontElement()
     {
         ScopedLock guard(Lock);
-        return Queue.pop_front_element();
+        return Queue.PopFrontElement();
     }
     inline Thread* PopBackElement()
     {
         ScopedLock guard(Lock);
-        return Queue.pop_back_element();
+        return Queue.PopBackElement();
     }
 
-    inline void Erase(Thread** it)
+    inline void Erase(auto it)
     {
         ScopedLock guard(Lock);
-        Queue.erase(it);
+        Queue.Erase(it);
     }
 };
 

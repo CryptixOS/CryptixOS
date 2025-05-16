@@ -134,7 +134,7 @@ namespace icxxabi
 
     void                           Initialize()
     {
-        LogTrace("icxxabi: Calling global constructors...");
+        EarlyLogTrace("icxxabi: Calling global constructors...");
         for (ConstructorFunction* entry = __init_array_start;
              entry < __init_array_end; entry++)
         {

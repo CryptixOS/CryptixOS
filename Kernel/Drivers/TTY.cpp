@@ -123,7 +123,7 @@ isize TTY::Read(void* buffer, off_t offset, usize bytes)
         m_OnAddLine.Await();
 
         ScopedLock    guard(m_RawLock);
-        const String& line  = m_LineQueue.pop_front_element();
+        const String& line  = m_LineQueue.PopFrontElement();
         const usize   count = std::min(bytes, line.Size());
         return line.Copy(reinterpret_cast<char*>(buffer), count);
     }

@@ -9,11 +9,9 @@
 #include <API/Posix/dirent.h>
 #include <API/Posix/fcntl.h>
 
-#include <VFS/INode.hpp>
+#include <Prism/Containers/Deque.hpp>
 
-#include <cerrno>
-#include <deque>
-#include <expected>
+#include <VFS/INode.hpp>
 
 enum class FileAccessMode
 {
@@ -44,15 +42,15 @@ inline bool operator&(const FileAccessMode lhs, FileAccessMode rhs)
 
 struct DirectoryEntries
 {
-    using ListType = std::deque<dirent*>;
+    using ListType = Deque<dirent*>;
     ListType    Entries;
     usize       Size             = 0;
     bool        ShouldRegenerate = false;
 
-    dirent*     Front() const { return Entries.front(); }
-    inline bool IsEmpty() const { return Entries.empty(); }
+    dirent*     Front() const { return Entries.Front(); }
+    inline bool IsEmpty() const { return Entries.Empty(); }
 
-    inline void Clear() { Entries.clear(); }
+    inline void Clear() { Entries.Clear(); }
     void        Push(INode* node, StringView = "");
 
     usize       CopyAndPop(u8* out, usize capacity);
