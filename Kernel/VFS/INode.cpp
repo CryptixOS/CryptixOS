@@ -74,6 +74,15 @@ bool INode::ValidatePermissions(const Credentials& creds, u32 acc)
 {
     return true;
 }
+ErrorOr<isize> INode::ReadLink(UserBuffer& outBuffer)
+{
+    if (!m_Target.Raw() || m_Target.Size() == 0) return Error(EINVAL);
+
+    usize count = std::min(m_Target.Size(), outBuffer.Size());
+    outBuffer.Write(m_Target.Raw(), count);
+
+    return static_cast<isize>(count);
+}
 
 INode* INode::Reduce(bool symlinks, bool automount, usize cnt)
 {

@@ -46,7 +46,11 @@ DevTmpFsINode::DevTmpFsINode(INode* parent, StringView name, Filesystem* fs,
 isize DevTmpFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
     if (!buffer) return_err(-1, EFAULT);
-    if (m_Device) return m_Device->Read(buffer, offset, bytes);
+    if (m_Device)
+    {
+        auto result = m_Device->Read(buffer, offset, bytes);
+        return result ? result.value() : -1;
+    }
 
     ScopedLock guard(m_Lock);
     usize      count = bytes;
@@ -61,7 +65,11 @@ isize DevTmpFsINode::Read(void* buffer, off_t offset, usize bytes)
 isize DevTmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
 {
     if (!buffer) return_err(-1, EFAULT);
-    if (m_Device) return m_Device->Write(buffer, offset, bytes);
+    if (m_Device)
+    {
+        auto result = m_Device->Write(buffer, offset, bytes);
+        return result ? result.value() : -1;
+    }
 
     ScopedLock guard(m_Lock);
 

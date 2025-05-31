@@ -124,6 +124,28 @@ ErrorOr<isize> TmpFsINode::Truncate(usize size)
     return 0;
 }
 
+ErrorOr<void> TmpFsINode::Rename(INode* newParent, StringView newName)
+{
+    auto parent = reinterpret_cast<TmpFsINode*>(m_Parent);
+    parent->m_Children.erase(m_Name);
+
+    m_Name = newName;
+    newParent->InsertChild(this, GetName());
+
+    return {};
+}
+ErrorOr<void> TmpFsINode::MkDir(StringView name, mode_t mode)
+{
+    if (m_Children.contains(name)) return Error(EEXIST);
+    auto umask = Process::Current()->GetUmask();
+    mode &= ~umask & 0777;
+
+    auto node = m_Filesystem->CreateNode(this, name, mode | S_IFDIR);
+    if (!node) return Error(errno);
+
+    m_Children[node->GetName()] = node;
+    return {};
+}
 ErrorOr<void> TmpFsINode::ChMod(mode_t mode)
 {
     m_Stats.st_mode &= ~0777;

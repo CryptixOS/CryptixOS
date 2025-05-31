@@ -34,12 +34,18 @@ class TTY : public Device
     const termios2&    GetTermios() const { return m_Termios; }
     void               SetTermios(const termios2& termios);
 
-    virtual isize      Read(void* dest, off_t offset, usize bytes) override;
-    virtual isize Write(const void* src, off_t offset, usize bytes) override;
+    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override;
+    virtual ErrorOr<isize> Write(const void* src, off_t offset,
+                                 usize bytes) override;
 
-    virtual i32   IoCtl(usize request, uintptr_t argp) override;
+    virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                isize offset = -1) override;
+    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                 isize offset = -1) override;
 
-    static void   Initialize();
+    virtual i32            IoCtl(usize request, uintptr_t argp) override;
+
+    static void            Initialize();
 
   private:
     static Vector<TTY*>     s_TTYs;

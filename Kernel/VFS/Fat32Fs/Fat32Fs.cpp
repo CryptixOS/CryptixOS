@@ -227,6 +227,20 @@ bool Fat32Fs::Populate(INode* node)
     delete[] directoryEntries;
     return (f32node->m_Populated = true);
 }
+ErrorOr<void> Fat32Fs::Stats(statfs& stats)
+{
+    usize freeClusterCount = m_FsInfo.Free;
+
+    stats.f_type           = m_BootRecord.Signature;
+    stats.f_bsize          = m_ClusterSize;
+    stats.f_blocks         = m_ClusterCount;
+    stats.f_bfree          = freeClusterCount;
+    stats.f_bavail         = freeClusterCount;
+    stats.f_fsid           = m_DeviceID;
+    stats.f_namelen        = FAT32_MAX_FILENAME_LFN;
+
+    return {};
+}
 
 bool Fat32Fs::ReadBytes(u32 cluster, u8* out, off_t offset, usize bytes)
 {

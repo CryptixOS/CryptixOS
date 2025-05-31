@@ -42,7 +42,7 @@ class EchFsINode : public INode
     EchFsDirectoryEntry m_DirectoryEntry;
     usize               m_EntryIndex;
     usize               m_DirectoryEntryOffset;
-    std::atomic<usize>  m_NextIndex = 2;
+    Atomic<usize>       m_NextIndex = 2;
 
     friend class EchFs;
 };

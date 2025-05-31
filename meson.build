@@ -168,6 +168,8 @@ qemu_args = [
   '-smbios', 'type=1',
   '-device', 'nvme,id=nvme-ctrl1,serial=nvme',
   '-nic', 'user,model=rtl8139',
+  '-object', 'memory-backend-file,id=erstnvram,mem-path=acpi-erst.backing,size=0x10000,share=on',
+  '-device', 'acpi-erst,memdev=erstnvram',
   #'-device', 'virtio-serial-pci,max_ports=2',
   #'-device', 'virtconsole,chardev=vcon,name=vcon0',
   #'-chardev', 'socket,id=vcon,ipv4=on,host=localhost,port=443,server,telnet=on,wait=off',

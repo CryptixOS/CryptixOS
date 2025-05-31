@@ -72,7 +72,7 @@ FramebufferDevice::FramebufferDevice(limine_framebuffer* framebuffer)
     VFS::MkNod(VFS::GetRootNode(), path, 0666, GetID());
 }
 
-isize FramebufferDevice::Read(void* dest, off_t offset, usize bytes)
+ErrorOr<isize> FramebufferDevice::Read(void* dest, off_t offset, usize bytes)
 {
     if (bytes == 0) return 0;
     if (offset + bytes > m_FixedScreenInfo.smem_len)
@@ -81,7 +81,8 @@ isize FramebufferDevice::Read(void* dest, off_t offset, usize bytes)
     std::memcpy(dest, m_Framebuffer.Address.Offset<void*>(offset), bytes);
     return bytes;
 }
-isize FramebufferDevice::Write(const void* src, off_t offset, usize bytes)
+ErrorOr<isize> FramebufferDevice::Write(const void* src, off_t offset,
+                                        usize bytes)
 {
     if (bytes == 0) return 0;
     if (offset + bytes > m_FixedScreenInfo.smem_len)
@@ -90,6 +91,18 @@ isize FramebufferDevice::Write(const void* src, off_t offset, usize bytes)
     std::memcpy(m_Framebuffer.Address.Offset<u8*>(offset), src, bytes);
     return bytes;
 }
+
+ErrorOr<isize> FramebufferDevice::Read(const UserBuffer& out, usize count,
+                                       isize offset)
+{
+    return Read(out.Raw(), offset, count);
+}
+ErrorOr<isize> FramebufferDevice::Write(const UserBuffer& in, usize count,
+                                        isize offset)
+{
+    return Write(in.Raw(), offset, count);
+}
+
 i32 FramebufferDevice::IoCtl(usize request, uintptr_t argp)
 {
     switch (request)

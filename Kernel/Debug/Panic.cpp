@@ -29,7 +29,7 @@ inline static void enterPanicMode()
     dumpProcessInfo();
 }
 
-static std::atomic<u64> s_HaltedCPUs = 0;
+static Atomic<u64> s_HaltedCPUs = 0;
 [[noreturn]]
 void HaltAndCatchFire(CPUContext* context)
 {

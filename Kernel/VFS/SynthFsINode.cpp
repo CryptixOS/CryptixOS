@@ -9,7 +9,7 @@
 
 #include <VFS/SynthFsINode.hpp>
 
-SynthFsINode::SynthFsINode(INode* parent, std::string_view name,
+SynthFsINode::SynthFsINode(INode* parent, StringView name,
                            Filesystem* filesystem, mode_t mode)
     : INode(parent, name, filesystem)
 {

@@ -7,6 +7,8 @@
 #pragma once
 
 #include <Prism/Core/Singleton.hpp>
+#include <Prism/Utility/Atomic.hpp>
+
 #include <Time/HardwareTimer.hpp>
 
 class Lapic : public HardwareTimer, public Singleton<Lapic>
@@ -40,7 +42,7 @@ class Lapic : public HardwareTimer, public Singleton<Lapic>
     }
 
   private:
-    static std::atomic_bool s_Initialized;
+    static AtomicBool       s_Initialized;
 
     u32                     m_ID               = 0;
     uintptr_t               m_BaseAddress      = 0;

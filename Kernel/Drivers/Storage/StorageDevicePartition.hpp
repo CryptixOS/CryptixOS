@@ -25,17 +25,29 @@ class StorageDevicePartition : public Device
         return m_Device.GetName();
     }
 
-    virtual isize Read(void* dest, off_t offset, usize bytes) override
+    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override
     {
         // if (m_FirstBlock + offset >= m_LastBlock) return_err(-1, ENODEV);
         return m_Device.Read(
             dest, m_Device.GetStats().st_blksize * m_FirstBlock + offset,
             bytes);
     }
-    virtual isize Write(const void* src, off_t offset, usize bytes) override
+    virtual ErrorOr<isize> Write(const void* src, off_t offset,
+                                 usize bytes) override
     {
         if (m_FirstBlock + offset >= m_LastBlock) return_err(-1, ENODEV);
         return m_Device.Write(src, m_FirstBlock + offset, bytes);
+    }
+
+    virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                isize offset = -1) override
+    {
+        return Read(out.Raw(), offset, count);
+    }
+    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                 isize offset = -1) override
+    {
+        return Write(in.Raw(), offset, count);
     }
 
     virtual i32 IoCtl(usize request, uintptr_t argp) override

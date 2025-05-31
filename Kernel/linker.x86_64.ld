@@ -13,6 +13,7 @@ PHDRS
     limine_requests PT_LOAD;
     text    PT_LOAD;
     kernel_init PT_LOAD;
+    module_init PT_LOAD;
     rodata  PT_LOAD;
     data    PT_LOAD;
     dynamic PT_DYNAMIC FLAGS((1 << 1) | (1 << 2)) ;
@@ -37,6 +38,11 @@ SECTIONS
     kernel_init_start_addr = .;
     .kernel_init : { *(.kernel_init .kernel_init.*) } :kernel_init
     kernel_init_end_addr = .;
+
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
+    module_init_start_addr = .;
+    .module_init : { *(.module_init .module_init.*) } :module_init
+    module_init_end_addr = .;
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));
     rodata_start_addr = .;

@@ -132,10 +132,11 @@ namespace Syscall
         RegisterSyscall2(ID::eGetCwd, API::VFS::GetCwd);
         RegisterSyscall(ID::eChDir, VFS::SysChDir);
         RegisterSyscall(ID::eFChDir, VFS::SysFChDir);
-        RegisterSyscall(ID::eMkDir, VFS::SysMkDir);
+        RegisterSyscall2(ID::eRename, API::VFS::Rename);
+        RegisterSyscall2(ID::eMkDir, API::VFS::MkDir);
         RegisterSyscall(ID::eRmDir, SysRmDir);
         RegisterSyscall(ID::eCreat, SysCreat);
-        RegisterSyscall(ID::eReadLink, SysReadLink);
+        RegisterSyscall2(ID::eReadLink, API::VFS::ReadLink);
         RegisterSyscall2(ID::eChMod, API::VFS::ChMod);
         RegisterSyscall2(ID::eUmask, API::Process::Umask);
         RegisterSyscall(ID::eGetTimeOfDay, Time::SysGetTimeOfDay);
@@ -148,6 +149,7 @@ namespace Syscall
         RegisterSyscall(ID::eGet_pGid, Process::SysGet_pGid);
         RegisterSyscall(ID::eGetSid, Process::SysGetSid);
         RegisterSyscall2(ID::eUTime, API::VFS::UTime);
+        RegisterSyscall2(ID::eStatFs, API::VFS::StatFs);
         RegisterSyscall(ID::eFork, Process::SysFork);
         RegisterSyscall(ID::eExecve, Process::SysExecve);
         RegisterSyscall(ID::eArchPrCtl, SysArchPrCtl);
@@ -160,11 +162,14 @@ namespace Syscall
         RegisterSyscall(ID::eNanoSleep, Process::SysNanoSleep);
         RegisterSyscall2(ID::ePanic, API::System::SysPanic);
         RegisterSyscall(ID::eOpenAt, VFS::SysOpenAt);
-        RegisterSyscall(ID::eMkDirAt, VFS::SysMkDirAt);
+        RegisterSyscall2(ID::eMkDirAt, API::VFS::MkDirAt);
         RegisterSyscall2(ID::eFStatAt, API::VFS::FStatAt);
+        RegisterSyscall2(ID::eRenameAt, API::VFS::RenameAt);
+        RegisterSyscall2(ID::eReadLinkAt, API::VFS::ReadLinkAt);
         RegisterSyscall2(ID::eFChModAt, API::VFS::FChModAt);
         RegisterSyscall2(ID::ePSelect6, API::VFS::PSelect6);
         RegisterSyscall2(ID::eDup3, API::VFS::Dup3);
+        RegisterSyscall2(ID::eRenameAt2, API::VFS::RenameAt2);
     }
     void Handle(Arguments& args)
     {

@@ -95,7 +95,7 @@ namespace NVMe
         return true;
     }
 
-    isize NameSpace::Read(void* dest, off_t offset, usize bytes)
+    ErrorOr<isize> NameSpace::Read(void* dest, off_t offset, usize bytes)
     {
         ScopedLock guard(m_Lock);
 
@@ -117,7 +117,7 @@ namespace NVMe
 
         return bytes;
     }
-    isize NameSpace::Write(const void* src, off_t offset, usize bytes)
+    ErrorOr<isize> NameSpace::Write(const void* src, off_t offset, usize bytes)
     {
         ScopedLock guard(m_Lock);
 
@@ -148,6 +148,17 @@ namespace NVMe
         }
 
         return bytes;
+    }
+
+    ErrorOr<isize> NameSpace::Read(const UserBuffer& out, usize count,
+                                   isize offset)
+    {
+        return Read(out.Raw(), offset, count);
+    }
+    ErrorOr<isize> NameSpace::Write(const UserBuffer& in, usize count,
+                                    isize offset)
+    {
+        return NameSpace::Write(in.Raw(), offset, count);
     }
 
     StringView NameSpace::GetName() const noexcept

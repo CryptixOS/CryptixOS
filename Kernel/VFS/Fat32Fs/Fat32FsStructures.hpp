@@ -8,6 +8,8 @@
 
 #include <Prism/Core/Types.hpp>
 
+constexpr usize FAT32_MAX_FILENAME_LFN = 255;
+
 struct [[gnu::packed]] Fat32BootRecord
 {
     u8  Jump[3];

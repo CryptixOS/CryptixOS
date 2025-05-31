@@ -83,12 +83,12 @@ ret:
 }
 Process* Process::CreateIdleProcess()
 {
-    static std::atomic<pid_t> idlePids(-1);
+    static Atomic<pid_t> idlePids(-1);
 
-    Process*                  idle = new Process;
+    Process*             idle = new Process;
 
-    idle->m_Pid                    = idlePids--;
-    idle->m_Name                   = "Idle Process for CPU: "_s;
+    idle->m_Pid               = idlePids--;
+    idle->m_Name              = "Idle Process for CPU: "_s;
     idle->m_Name += StringUtils::ToString(CPU::GetCurrentID());
 
     idle->PageMap = VMM::GetKernelPageMap();

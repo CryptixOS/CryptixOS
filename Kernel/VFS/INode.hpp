@@ -9,6 +9,7 @@
 #include <API/UnixTypes.hpp>
 
 #include <Library/Spinlock.hpp>
+#include <Library/UserBuffer.hpp>
 
 #include <VFS/Filesystem.hpp>
 #include <VFS/VFS.hpp>
@@ -77,6 +78,15 @@ class INode
     virtual isize Write(const void* buffer, off_t offset, usize bytes) = 0;
     virtual i32   IoCtl(usize request, usize arg) { return_err(-1, ENODEV); }
     virtual ErrorOr<isize> Truncate(usize size) { return Error(ENOSYS); }
+    virtual ErrorOr<void>  Rename(INode* newParent, StringView newName)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<void> MkDir(StringView name, mode_t mode)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<isize> ReadLink(UserBuffer& outBuffer);
 
     virtual ErrorOr<isize> CheckPermissions(mode_t mask)
     {

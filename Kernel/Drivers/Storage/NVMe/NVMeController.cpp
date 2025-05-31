@@ -17,11 +17,11 @@
 
 namespace NVMe
 {
-    std::atomic<usize> Controller::s_ControllerCount = 0;
+    Atomic<usize> Controller::s_ControllerCount = 0;
 
     Controller::Controller(const PCI::DeviceAddress& address)
         : PCI::Device(address)
-        , ::Device(241, s_ControllerCount.load())
+        , ::Device(241, s_ControllerCount.Load())
         , m_Index(s_ControllerCount++)
     {
         if (m_Index == 0) DevTmpFs::RegisterDevice(this);

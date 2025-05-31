@@ -29,7 +29,7 @@ namespace
 
     struct CPULocalData
     {
-        std::atomic<bool> PreemptionEnabled;
+        Atomic<bool> PreemptionEnabled;
     };
     CPULocalData*                       s_CPULocalData;
 
@@ -115,7 +115,7 @@ void        Scheduler::Initialize()
     Time::Initialize();
 
     for (usize i = 0; i < cpuCount; i++)
-        s_CPULocalData[i].PreemptionEnabled.store(true);
+        s_CPULocalData[i].PreemptionEnabled.Store(true);
     s_SchedulerEnabled = true;
     Time::GetSchedulerTimer()->SetCallback<Tick>();
 
@@ -154,8 +154,8 @@ bool Scheduler::IsPreemptionEnabled()
     if (!s_SchedulerEnabled) return false;
 
     u64 cpuID = CPU::GetCurrentID();
-    return s_CPULocalData[cpuID].PreemptionEnabled.load(
-        std::memory_order_relaxed);
+    return s_CPULocalData[cpuID].PreemptionEnabled.Load(
+        MemoryOrder::eAtomicRelaxed);
 }
 
 void Scheduler::EnablePreemption()
@@ -163,16 +163,16 @@ void Scheduler::EnablePreemption()
     if (!s_SchedulerEnabled) return;
 
     u64 cpuID = CPU::GetCurrentID();
-    s_CPULocalData[cpuID].PreemptionEnabled.store(true,
-                                                  std::memory_order_release);
+    s_CPULocalData[cpuID].PreemptionEnabled.Store(true,
+                                                  MemoryOrder::eAtomicRelease);
 }
 void Scheduler::DisablePreemption()
 {
     if (!s_SchedulerEnabled) return;
 
     u64 cpuID = CPU::GetCurrentID();
-    s_CPULocalData[cpuID].PreemptionEnabled.store(false,
-                                                  std::memory_order_acquire);
+    s_CPULocalData[cpuID].PreemptionEnabled.Store(false,
+                                                  MemoryOrder::eAtomicAcquire);
 }
 
 void Scheduler::Block(Thread* thread)

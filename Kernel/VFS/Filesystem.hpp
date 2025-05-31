@@ -6,12 +6,13 @@
  */
 #pragma once
 
+#include <API/Posix/sys/statfs.h>
 #include <API/UnixTypes.hpp>
+
 #include <Library/Spinlock.hpp>
 
 #include <Prism/String/String.hpp>
-
-#include <atomic>
+#include <Prism/Utility/Atomic.hpp>
 
 class INode;
 class Filesystem
@@ -48,24 +49,26 @@ class Filesystem
         return nullptr;
     }
 
-    virtual bool ShouldUpdateATime() { return true; }
-    virtual bool ShouldUpdateMTime() { return true; }
-    virtual bool ShouldUpdateCTime() { return true; }
+    virtual ErrorOr<void> Stats(statfs& stats) { return Error(ENOSYS); }
+
+    virtual bool          ShouldUpdateATime() { return true; }
+    virtual bool          ShouldUpdateMTime() { return true; }
+    virtual bool          ShouldUpdateCTime() { return true; }
 
   protected:
-    Spinlock           m_Lock;
+    Spinlock      m_Lock;
 
-    String             m_Name           = "NoFs";
-    dev_t              m_DeviceID       = -1;
-    usize              m_BlockSize      = 512;
-    usize              m_BytesLimit     = 0;
-    u32                m_Flags          = 0;
+    String        m_Name           = "NoFs";
+    dev_t         m_DeviceID       = -1;
+    usize         m_BlockSize      = 512;
+    usize         m_BytesLimit     = 0;
+    u32           m_Flags          = 0;
 
-    INode*             m_SourceDevice   = nullptr;
-    INode*             m_Root           = nullptr;
+    INode*        m_SourceDevice   = nullptr;
+    INode*        m_Root           = nullptr;
 
-    INode*             m_MountedOn      = nullptr;
-    void*              m_MountData      = nullptr;
+    INode*        m_MountedOn      = nullptr;
+    void*         m_MountData      = nullptr;
 
-    std::atomic<ino_t> m_NextInodeIndex = 2;
+    Atomic<ino_t> m_NextInodeIndex = 2;
 };

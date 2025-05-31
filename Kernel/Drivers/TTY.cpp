@@ -116,7 +116,7 @@ void    TTY::SetTermios(const termios2& termios)
     m_RawBuffer.Clear();
 }
 
-isize TTY::Read(void* buffer, off_t offset, usize bytes)
+ErrorOr<isize> TTY::Read(void* buffer, off_t offset, usize bytes)
 {
     if (IsCanonicalMode())
     {
@@ -160,7 +160,7 @@ isize TTY::Read(void* buffer, off_t offset, usize bytes)
 
     return nread;
 }
-isize TTY::Write(const void* src, off_t offset, usize bytes)
+ErrorOr<isize> TTY::Write(const void* src, off_t offset, usize bytes)
 {
     const char*           s = reinterpret_cast<const char*>(src);
     static constexpr char MLIBC_LOG_SIGNATURE[] = "[mlibc]: ";
@@ -179,6 +179,15 @@ isize TTY::Write(const void* src, off_t offset, usize bytes)
     ScopedLock guard(m_OutputLock);
     m_Terminal->PrintString(str);
     return bytes;
+}
+
+ErrorOr<isize> TTY::Read(const UserBuffer& out, usize count, isize offset)
+{
+    return Read(out.Raw(), offset, count);
+}
+ErrorOr<isize> TTY::Write(const UserBuffer& in, usize count, isize offset)
+{
+    return Write(in.Raw(), offset, count);
 }
 
 i32 TTY::IoCtl(usize request, uintptr_t argp)

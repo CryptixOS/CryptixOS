@@ -10,9 +10,9 @@
 
 #include <Arch/CPU.hpp>
 
+#include <Prism/Core/TypeTraits.hpp>
 #include <Prism/Path.hpp>
 #include <Prism/PathView.hpp>
-#include <Prism/Core/TypeTraits.hpp>
 
 #include <magic_enum/magic_enum.hpp>
 #include <magic_enum/magic_enum_format.hpp>
@@ -172,6 +172,7 @@ namespace Syscall
         eGetCwd           = 79,
         eChDir            = 80,
         eFChDir           = 81,
+        eRename           = 82,
         eMkDir            = 83,
         eRmDir            = 84,
         eCreat            = 85,
@@ -192,6 +193,7 @@ namespace Syscall
         eGet_pGid         = 121,
         eGetSid           = 124,
         eUTime            = 132,
+        eStatFs           = 137,
         eArchPrCtl        = 158,
         eSetTimeOfDay     = 164,
         eMount            = 165,
@@ -205,9 +207,12 @@ namespace Syscall
         eOpenAt           = 257,
         eMkDirAt          = 258,
         eFStatAt          = 262,
+        eRenameAt         = 264,
+        eReadLinkAt       = 267,
         eFChModAt         = 268,
         ePSelect6         = 270,
         eDup3             = 292,
+        eRenameAt2        = 316,
     };
 
     StringView GetName(usize index);

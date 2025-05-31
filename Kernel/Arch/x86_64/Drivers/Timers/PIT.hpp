@@ -8,6 +8,7 @@
 
 #include <Prism/Core/Singleton.hpp>
 #include <Prism/Core/Types.hpp>
+#include <Prism/Utility/Atomic.hpp>
 
 #include <Time/HardwareTimer.hpp>
 
@@ -58,7 +59,7 @@ class PIT : public HardwareTimer, public Singleton<PIT>
     // and it will have to be IRQ, only IoApic allows to redirect irqs
     u8                      m_TimerVector = 0;
     usize                   m_CurrentMode = Mode::eRate;
-    std::atomic<u64>        m_Tick        = 0;
+    Atomic<u64>             m_Tick        = 0;
 
     static constexpr usize  FREQUENCY     = 1000;
     static constexpr usize  IRQ_HINT      = 0x20;

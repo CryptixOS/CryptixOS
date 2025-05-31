@@ -112,7 +112,9 @@ namespace Stacktrace
         for (usize i = 0; stackFrame && i < maxFrames; i++)
         {
             auto rip = stackFrame->InstructionPointer;
-            if (!rip.IsHigherHalf()) break;
+            if (!rip.IsHigherHalf() || rip < s_LowestKernelSymbolAddress
+                || rip > s_HighestKernelSymbolAddress)
+                break;
 
             stackFrame           = stackFrame->Base;
             const Symbol* symbol = GetSymbol(rip);

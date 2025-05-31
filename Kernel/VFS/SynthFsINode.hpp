@@ -13,11 +13,11 @@
 class SynthFsINode : public INode
 {
   public:
-    SynthFsINode(INode* parent, std::string_view name, Filesystem* filesystem,
+    SynthFsINode(INode* parent, StringView name, Filesystem* filesystem,
                  mode_t mode);
     virtual ~SynthFsINode() = default;
 
-    virtual void InsertChild(INode* node, std::string_view name) override
+    virtual void InsertChild(INode* node, StringView name) override
     {
         ScopedLock guard(m_Lock);
         m_Children[name] = node;

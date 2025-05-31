@@ -33,9 +33,11 @@ class Fat32Fs final : public Filesystem
     {
         return nullptr;
     }
-    virtual bool   Populate(INode* node) override;
+    virtual bool          Populate(INode* node) override;
 
-    constexpr bool IsFinalCluster(usize cluster) const
+    virtual ErrorOr<void> Stats(statfs& stats) override;
+
+    constexpr bool        IsFinalCluster(usize cluster) const
     {
         return cluster >= 0xffffff8;
     }
@@ -46,17 +48,17 @@ class Fat32Fs final : public Filesystem
     u32   SkipCluster(u32 cluster, usize count, bool& endCluster);
 
   private:
-    INode*           m_Device = nullptr;
-    Fat32BootRecord  m_BootRecord;
-    Fat32FsInfo      m_FsInfo;
-    usize            m_ClusterSize    = 0;
-    usize            m_ClusterCount   = 0;
-    isize            m_FatOffset      = 0;
-    isize            m_DataOffset     = 0;
-    std::atomic<i64> m_NextINodeIndex = 3;
-    Fat32FsINode*    m_RootNode       = nullptr;
+    INode*          m_Device = nullptr;
+    Fat32BootRecord m_BootRecord;
+    Fat32FsInfo     m_FsInfo;
+    usize           m_ClusterSize    = 0;
+    usize           m_ClusterCount   = 0;
+    isize           m_FatOffset      = 0;
+    isize           m_DataOffset     = 0;
+    Atomic<i64>     m_NextINodeIndex = 3;
+    Fat32FsINode*   m_RootNode       = nullptr;
 
-    usize            GetClusterOffset(u32 cluster);
+    usize           GetClusterOffset(u32 cluster);
     constexpr usize
     GetClusterForDirectoryEntry(Fat32DirectoryEntry* entry) const
     {

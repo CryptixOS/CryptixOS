@@ -19,6 +19,7 @@
 #include <Drivers/PCI/PCI.hpp>
 #include <Drivers/Serial.hpp>
 #include <Drivers/TTY.hpp>
+#include <Drivers/Terminal.hpp>
 
 #include <Firmware/ACPI/ACPI.hpp>
 #include <Firmware/DeviceTree/DeviceTree.hpp>
@@ -170,15 +171,22 @@ kernelStart()
     Assert(PMM::Initialize());
     icxxabi::Initialize();
 
+#ifdef CTOS_TARGET_X86_64
+    #define SERIAL_LOG_ENABLE_DEFAULT false
+#else
+    #define SERIAL_LOG_ENABLE_DEFAULT true
+#endif
+
     VMM::Initialize();
     Serial::Initialize();
-    if (!CommandLine::GetBoolean("log.serial").value_or(false))
-        Logger::DisableSink(LOG_SINK_SERIAL);
+
+    if (CommandLine::GetBoolean("log.serial")
+            .value_or(SERIAL_LOG_ENABLE_DEFAULT))
+        Logger::EnableSink(LOG_SINK_SERIAL);
     if (!CommandLine::GetBoolean("log.e9").value_or(true))
         Logger::DisableSink(LOG_SINK_E9);
-
-    if (CommandLine::GetBoolean("log.boot.terminal").value_or(true))
-        Logger::EnableSink(LOG_SINK_TERMINAL);
+    // if (CommandLine::GetBoolean("log.boot.terminal").value_or(true))
+    Logger::EnableSink(LOG_SINK_TERMINAL);
 
     LogInfo(
         "Boot: Kernel loaded with {}-{} -> firmware type: {}, boot time: {}s",

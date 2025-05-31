@@ -17,6 +17,10 @@
 
 extern "C" symbol           text_start_addr;
 extern "C" symbol           text_end_addr;
+extern "C" symbol           kernel_init_start_addr;
+extern "C" symbol           kernel_init_end_addr;
+extern "C" symbol           module_init_start_addr;
+extern "C" symbol           module_init_end_addr;
 extern "C" symbol           rodata_start_addr;
 extern "C" symbol           rodata_end_addr;
 extern "C" symbol           data_start_addr;
@@ -61,6 +65,7 @@ namespace VirtualMemoryManager
         Assert(s_KernelPageMap->MapRange(GetHigherHalfOffset(), 0, 4_gib,
                                          PageAttributes::eRW | flags
                                              | PageAttributes::eWriteBack));
+
         usize entryCount    = 0;
         auto  memoryEntries = BootInfo::GetMemoryMap(entryCount);
         for (usize i = 0; i < entryCount; i++)
@@ -111,6 +116,13 @@ namespace VirtualMemoryManager
             auto base = Pointer(Math::AlignUp(memoryTop, 1_gib)).ToHigherHalf();
             s_VirtualAddressSpace = base.Offset(4_gib);
         }
+
+        auto modulesVirt = Pointer(module_init_start_addr);
+        auto modulesPhys = modulesVirt - kernelVirt + kernelPhys;
+        auto modulesSize = Pointer(module_init_end_addr) - modulesVirt;
+        s_KernelPageMap->MapRange(modulesVirt, modulesPhys, modulesSize,
+                                  PageAttributes::eRWX
+                                      | PageAttributes::eWriteBack);
 
         s_KernelPageMap->Load();
         LogInfo("VMM: Loaded kernel page map");
@@ -181,7 +193,15 @@ namespace VirtualMemoryManager
                      process->GetName(), message);
             Stacktrace::Print();
 
-            if (tty) tty->Write(message.data(), 0, message.size());
+            auto bufferOr
+                = UserBuffer::ForUserBuffer(message.data(), message.size());
+            if (!bufferOr) return;
+            auto messageBuffer = bufferOr.value();
+            if (tty)
+            {
+                auto status = tty->Write(messageBuffer, 0, message.size());
+                (void)status;
+            }
             process->Exit(-1);
             return;
         }

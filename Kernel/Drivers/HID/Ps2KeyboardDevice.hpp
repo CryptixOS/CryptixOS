@@ -21,22 +21,22 @@ enum class KeyModifier
     eCapsLock = Bit(3),
 };
 
-inline KeyModifier operator~(KeyModifier lhs)
+constexpr inline KeyModifier operator~(KeyModifier lhs)
 {
     auto result = ~std::to_underlying(lhs);
     return static_cast<KeyModifier>(result);
 }
-inline bool operator&(KeyModifier lhs, KeyModifier rhs)
+constexpr inline bool operator&(KeyModifier lhs, KeyModifier rhs)
 {
     return std::to_underlying(lhs) & std::to_underlying(rhs);
 }
-inline KeyModifier& operator|=(KeyModifier& lhs, KeyModifier rhs)
+constexpr inline KeyModifier& operator|=(KeyModifier& lhs, KeyModifier rhs)
 {
     u64 result = std::to_underlying(lhs) | std::to_underlying(rhs);
 
     return (lhs = static_cast<KeyModifier>(result));
 }
-inline KeyModifier& operator&=(KeyModifier& lhs, KeyModifier rhs)
+constexpr inline KeyModifier& operator&=(KeyModifier& lhs, KeyModifier rhs)
 {
     u64 result = std::to_underlying(lhs) & std::to_underlying(rhs);
 
@@ -71,14 +71,26 @@ class Ps2KeyboardDevice : public RefCounted, public Device
         return "PS/2 Keyboard"_sv;
     }
 
-    virtual isize Read(void* dest, off_t offset, usize bytes) override
+    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override
     {
         // TODO(v1tr10l7): Read from keyboard
         return -1;
     };
-    virtual isize Write(const void* src, off_t offset, usize bytes) override
+    virtual ErrorOr<isize> Write(const void* src, off_t offset,
+                                 usize bytes) override
     {
         // TODO(v1tr10l7): Write to keyboard
+        return -1;
+    }
+
+    virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                isize offset = -1) override
+    {
+        return -1;
+    }
+    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                 isize offset = -1) override
+    {
         return -1;
     }
 

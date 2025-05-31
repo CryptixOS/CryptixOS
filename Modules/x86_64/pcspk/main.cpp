@@ -27,11 +27,12 @@ class PCSpeakerDevice : public Device
 
     virtual StringView GetName() const noexcept override { return "pcspk"_sv; }
 
-    virtual isize      Read(void* dest, off_t offset, usize bytes) override
+    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override
     {
         return -1;
     }
-    virtual isize Write(const void* src, off_t offset, usize bytes) override
+    virtual ErrorOr<isize> Write(const void* src, off_t offset,
+                                 usize bytes) override
     {
         if (!src || bytes < sizeof(u32)) return_err(-1, EINVAL);
 
@@ -52,6 +53,17 @@ class PCSpeakerDevice : public Device
         PCSpeaker::ToneOff();
 
         return sizeof(Command);
+    }
+
+    virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                isize offset = -1) override
+    {
+        return Read(out.Raw(), offset, count);
+    }
+    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                 isize offset = -1) override
+    {
+        return Write(in.Raw(), offset, count);
     }
 
     virtual i32 IoCtl(usize request, uintptr_t argp) override

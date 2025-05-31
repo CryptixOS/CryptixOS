@@ -4,7 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <API/Posix/unistd.h>
 #include <Arch/CPU.hpp>
 
 #include <Scheduler/Process.hpp>
@@ -91,6 +90,9 @@ ErrorOr<isize> FileDescriptor::Read(void* const outBuffer, usize count)
 
         if (current->WasInterrupted()) return Error(EINTR);
     }
+
+    auto errorOrBuffer = UserBuffer::ForUserBuffer(outBuffer, count);
+    if (!errorOrBuffer) return Error(errorOrBuffer.error());
 
     isize bytesRead
         = m_Description->Node->Read(outBuffer, m_Description->Offset, count);

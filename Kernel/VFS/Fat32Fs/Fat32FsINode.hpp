@@ -30,8 +30,8 @@ class Fat32FsINode : public INode
     friend class Fat32Fs;
 
   private:
-    class Fat32Fs*     m_Fat32Fs         = nullptr;
-    usize              m_Cluster         = 0;
-    usize              m_DirectoryOffset = 0;
-    std::atomic<usize> m_NextIndex       = 2;
+    class Fat32Fs* m_Fat32Fs         = nullptr;
+    usize          m_Cluster         = 0;
+    usize          m_DirectoryOffset = 0;
+    Atomic<usize>  m_NextIndex       = 2;
 };

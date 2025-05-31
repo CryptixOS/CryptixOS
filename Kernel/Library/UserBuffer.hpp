@@ -7,16 +7,29 @@
 #pragma once
 
 #include <Arch/CPU.hpp>
+#include <Arch/User.hpp>
+
 #include <Prism/Memory/Pointer.hpp>
 
-class UserBuffer
+class [[nodiscard]] UserBuffer
 {
   public:
-    UserBuffer(Pointer address, usize size)
-        : m_Base(address)
-        , m_Size(size)
+    static ErrorOr<UserBuffer> ForUserBuffer(u8* userBuffer, usize size)
     {
+        if (userBuffer && !Arch::InUserRange(userBuffer, size))
+            return Error(EFAULT);
+
+        return UserBuffer(userBuffer);
     }
+    static ErrorOr<UserBuffer> ForUserBuffer(Pointer buffer, usize size)
+    {
+        if (buffer && !Arch::InUserRange(buffer, size)) return Error(EFAULT);
+
+        return UserBuffer(buffer, size);
+    }
+
+    constexpr inline u8*   Raw() const { return m_Base; }
+    constexpr inline usize Size() const { return m_Size; }
 
     template <typename T>
     inline ErrorOr<T> Read()
@@ -61,4 +74,14 @@ class UserBuffer
   private:
     Pointer m_Base = nullptr;
     usize   m_Size = 0;
+
+    explicit UserBuffer(Pointer buffer)
+        : m_Base(buffer)
+    {
+    }
+    explicit UserBuffer(Pointer buffer, usize size)
+        : m_Base(buffer)
+        , m_Size(size)
+    {
+    }
 };

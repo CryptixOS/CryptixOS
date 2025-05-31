@@ -11,6 +11,8 @@
 #include <API/UnixTypes.hpp>
 #include <Prism/Utility/Atomic.hpp>
 
+#include <VFS/FileDescriptor.hpp>
+
 using DeviceMajor = u32;
 using DeviceMinor = u32;
 
@@ -36,15 +38,22 @@ class Device
     {
     }
 
-    inline dev_t        GetID() const noexcept { return m_ID; }
-    virtual StringView  GetName() const noexcept = 0;
+    constexpr inline dev_t GetID() const noexcept { return m_ID; }
+    virtual StringView     GetName() const noexcept = 0;
 
-    virtual const stat& GetStats() { return m_Stats; }
+    virtual const stat&    GetStats() { return m_Stats; }
 
-    virtual isize       Read(void* dest, off_t offset, usize bytes)       = 0;
-    virtual isize       Write(const void* src, off_t offset, usize bytes) = 0;
+    virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                isize offset = -1)
+        = 0;
+    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) = 0;
+    virtual ErrorOr<isize> Write(const void* src, off_t offset, usize bytes)
+        = 0;
+    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                 isize offset = -1)
+        = 0;
 
-    virtual i32         IoCtl(usize request, uintptr_t argp)              = 0;
+    virtual i32 IoCtl(usize request, uintptr_t argp) = 0;
 
   protected:
     dev_t m_ID;

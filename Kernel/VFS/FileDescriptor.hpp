@@ -8,7 +8,9 @@
 
 #include <API/Posix/dirent.h>
 #include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
 
+#include <Library/UserBuffer.hpp>
 #include <Prism/Containers/Deque.hpp>
 
 #include <VFS/INode.hpp>
@@ -21,21 +23,22 @@ enum class FileAccessMode
     eExec  = Bit(2),
 };
 
-inline FileAccessMode& operator|=(FileAccessMode& lhs, const FileAccessMode rhs)
+constexpr inline FileAccessMode& operator|=(FileAccessMode&      lhs,
+                                            const FileAccessMode rhs)
 {
     usize ret = static_cast<usize>(lhs) | static_cast<usize>(rhs);
 
     lhs       = static_cast<FileAccessMode>(ret);
     return lhs;
 }
-
-inline FileAccessMode operator|(const FileAccessMode lhs, FileAccessMode rhs)
+constexpr inline FileAccessMode operator|(const FileAccessMode lhs,
+                                          FileAccessMode       rhs)
 {
     usize ret = static_cast<u64>(lhs) | static_cast<u64>(rhs);
 
     return static_cast<FileAccessMode>(ret);
 }
-inline bool operator&(const FileAccessMode lhs, FileAccessMode rhs)
+constexpr inline bool operator&(const FileAccessMode lhs, FileAccessMode rhs)
 {
     return static_cast<u64>(lhs) & static_cast<u64>(rhs);
 }
@@ -60,18 +63,18 @@ struct DirectoryEntries
 };
 struct FileDescription
 {
-    Spinlock           Lock;
-    std::atomic<usize> RefCount = 0;
+    Spinlock         Lock;
+    Atomic<usize>    RefCount = 0;
 
-    INode*             Node;
-    usize              Offset     = 0;
+    INode*           Node;
+    usize            Offset     = 0;
 
-    i32                Flags      = 0;
-    FileAccessMode     AccessMode = FileAccessMode::eRead;
-    DirectoryEntries   DirEntries;
+    i32              Flags      = 0;
+    FileAccessMode   AccessMode = FileAccessMode::eRead;
+    DirectoryEntries DirEntries;
 
-    inline void        IncRefCount() { ++RefCount; }
-    inline void        DecRefCount() { --RefCount; }
+    inline void      IncRefCount() { ++RefCount; }
+    inline void      DecRefCount() { --RefCount; }
 };
 
 class FileDescriptor
@@ -79,7 +82,7 @@ class FileDescriptor
   public:
     FileDescriptor(INode* node, i32 flags, FileAccessMode accMode);
     FileDescriptor(FileDescriptor* fd, i32 flags = 0);
-    ~FileDescriptor();
+    virtual ~FileDescriptor();
 
     inline INode* GetNode() const { return m_Description->Node; }
     inline usize  GetOffset() const { return m_Description->Offset; }
@@ -98,17 +101,35 @@ class FileDescriptor
         m_Description->Flags = flags;
     }
 
-    ErrorOr<isize>       Read(void* const outBuffer, usize count);
-    ErrorOr<isize>       Write(const void* data, isize bytes);
-    ErrorOr<const stat*> Stat() const;
-    ErrorOr<isize>       Seek(i32 whence, off_t offset);
-    ErrorOr<isize>       Truncate(off_t size);
+    virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                isize offset = -1)
+    {
+        if (offset >= 0)
+        {
+            auto result = Seek(SEEK_SET, offset);
+            if (!result) return Error(result.error());
+        }
+        return Read(out.Raw(), count);
+    }
+    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                 isize offset = -1)
+    {
+        auto result = Seek(SEEK_SET, offset);
+        if (!result) return Error(result.error());
 
-    void                 Lock() { m_Description->Lock.Acquire(); }
-    void                 Unlock() { m_Description->Lock.Release(); }
+        return Write(in.Raw(), count);
+    }
+    virtual ErrorOr<isize> Read(void* const outBuffer, usize count);
+    ErrorOr<isize>         Write(const void* data, isize bytes);
+    ErrorOr<const stat*>   Stat() const;
+    ErrorOr<isize>         Seek(i32 whence, off_t offset);
+    ErrorOr<isize>         Truncate(off_t size);
+
+    void                   Lock() { m_Description->Lock.Acquire(); }
+    void                   Unlock() { m_Description->Lock.Release(); }
 
     // TODO(v1t10l7): verify whether the fd is blocking
-    inline bool          WouldBlock() const { return false; }
+    inline bool            WouldBlock() const { return false; }
     inline bool IsSocket() const { return m_Description->Node->IsSocket(); }
     inline bool IsPipe() const
     {
