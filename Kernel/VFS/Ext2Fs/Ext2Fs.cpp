@@ -7,11 +7,12 @@
 #include <Prism/Containers/Bitmap.hpp>
 #include <Time/Time.hpp>
 
+#include <VFS/DirectoryEntry.hpp>
 #include <VFS/Ext2Fs/Ext2Fs.hpp>
 #include <VFS/Ext2Fs/Ext2FsINode.hpp>
 
 INode* Ext2Fs::Mount(INode* parent, INode* source, INode* target,
-                     StringView name, const void* data)
+                     DirectoryEntry* entry, StringView name, const void* data)
 {
     m_Device     = source;
 
@@ -64,7 +65,8 @@ INode* Ext2Fs::Mount(INode* parent, INode* source, INode* target,
     return (m_Root = root);
 }
 
-INode* Ext2Fs::CreateNode(INode* parent, StringView name, mode_t mode)
+INode* Ext2Fs::CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
+                          uid_t uid, gid_t gid)
 {
     return nullptr;
 }

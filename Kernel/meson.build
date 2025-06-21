@@ -44,7 +44,7 @@ srcs += files(
   'Drivers/Storage/NVMe/NVMeQueue.cpp',
   
   'Firmware/ACPI/ACPI.cpp',
-  #'Firmware/ACPI/Interpreter.cpp',
+  'Firmware/ACPI/Interpreter.cpp',
   'Firmware/ACPI/MADT.cpp',
   'Firmware/ACPI/UACPI.cpp',
 
@@ -80,10 +80,12 @@ srcs += files(
   'Library/Stacktrace.cpp',
   'Library/ZLib.cpp',
 
+  'VFS/DirectoryEntry.cpp',
   'VFS/Fifo.cpp',
   'VFS/FileDescriptor.cpp',
   'VFS/FileDescriptorTable.cpp',
   'VFS/INode.cpp',
+  'VFS/PathWalker.cpp',
   #'VFS/SynthFsINode.cpp',
   'VFS/VFS.cpp',
 

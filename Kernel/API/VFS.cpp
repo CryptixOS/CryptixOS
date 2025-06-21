@@ -24,8 +24,8 @@
 
 namespace API::VFS
 {
-    ErrorOr<::VFS::PathResolution> ResolveAtFd(i32 dirFdNum, PathView path,
-                                               isize flags)
+    ErrorOr<::VFS::PathRes> ResolveAtFd(i32 dirFdNum, PathView path,
+                                        isize flags)
     {
         auto process = Process::GetCurrent();
 
@@ -35,7 +35,7 @@ namespace API::VFS
             if (!(flags & AT_EMPTY_PATH)) return Error(ENOENT);
             if (dirFdNum == AT_FDCWD)
             {
-                auto res = ::VFS::ResolvePath(::VFS::GetRootNode(),
+                auto res = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(),
                                               process->GetCWD());
                 if (errno != no_error && errno != ENOENT) return Error(errno);
                 return res;
@@ -43,28 +43,29 @@ namespace API::VFS
 
             auto* fd = process->GetFileHandle(dirFdNum);
             if (!fd) return Error(EBADF);
-            ::VFS::PathResolution res;
-            res.Node     = fd->GetNode();
+            ::VFS::PathRes res;
+            res.Node     = fd->DirectoryEntry();
             res.Parent   = res.Node->GetParent();
-            res.BaseName = res.Node->GetName();
+            res.BaseName = res.Node->Name();
 
             return res;
         }
 
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
-        INode* base = ::VFS::GetRootNode();
+        DirectoryEntry* base = ::VFS::GetRootDirectoryEntry();
+
         if (!path.Absolute())
         {
             if (dirFdNum == AT_FDCWD)
-                base = ::VFS::ResolvePath(::VFS::GetRootNode(),
+                base = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(),
                                           process->GetCWD())
                            .Node;
             else
             {
                 auto* fd = process->GetFileHandle(dirFdNum);
                 if (!fd) return Error(EBADF);
-                base = fd->GetNode();
-                if (!base->IsDirectory()) return Error(ENOTDIR);
+                base = fd->DirectoryEntry();
+                if (!base->INode()->IsDirectory()) return Error(ENOTDIR);
             }
         }
 
@@ -129,7 +130,11 @@ namespace API::VFS
         auto process = Process::GetCurrent();
         if (!process->ValidateRead(path, 4096)) return Error(EFAULT);
 
-        auto inode = ::VFS::ResolvePath(::VFS::GetRootNode(), path).Node;
+        auto vnode
+            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), path).Node;
+        if (!vnode) return Error(errno);
+
+        auto inode = vnode->INode();
         if (!inode) return Error(errno);
 
         return inode->CheckPermissions(mode);
@@ -209,6 +214,15 @@ namespace API::VFS
     {
         return MkDirAt(AT_FDCWD, pathname, mode);
     }
+    ErrorOr<isize> Link(const char* oldPath, const char* newPath)
+    {
+        return LinkAt(AT_FDCWD, oldPath, AT_FDCWD, newPath, 0);
+    }
+    ErrorOr<isize> Unlink(const char* path) { return Error(ENOSYS); }
+    ErrorOr<isize> Symlink(const char* target, const char* linkPath)
+    {
+        return Error(ENOSYS);
+    }
     ErrorOr<isize> RmDir(PathView path)
     {
         Process* current = Process::GetCurrent();
@@ -253,8 +267,8 @@ namespace API::VFS
         Process* current = Process::GetCurrent();
         CtosUnused(current);
 
-        bool success = ::VFS::Mount(::VFS::GetRootNode(), path, target,
-                                    filesystemType, flags, data);
+        bool success
+            = ::VFS::Mount(nullptr, path, target, filesystemType, flags, data);
 
         if (!success) return Error(errno);
         return 0;
@@ -264,7 +278,9 @@ namespace API::VFS
     {
         auto process = Process::Current();
         if (!process->ValidateRead(pathname, 255)) return Error(EFAULT);
-        auto path = CPU::AsUser(
+        const auto& creds = process->GetCredentials();
+
+        auto        path  = CPU::AsUser(
             [&pathname]() -> Path
             {
                 if (!pathname || *pathname == 0) return "";
@@ -274,15 +290,16 @@ namespace API::VFS
 
         auto pathResOr = ResolveAtFd(dirFdNum, path, 0);
         if (!pathResOr) return Error(pathResOr.error());
-        auto pathRes = pathResOr.value();
+        auto pathRes              = pathResOr.value();
 
-        LogDebug("Path: {}", path);
-        LogDebug("BaseName: {}", pathRes.BaseName);
-        auto parent = pathRes.Parent;
+        auto parentDirectoryEntry = pathRes.Parent;
+        auto parent               = parentDirectoryEntry->INode();
+
         if (!parent->IsDirectory()) return Error(ENOTDIR);
         if (pathRes.Node) return Error(EEXIST);
 
-        auto success = parent->MkDir(pathRes.BaseName, mode);
+        auto success
+            = parent->MkDir(pathRes.BaseName, mode, creds.uid, creds.gid);
         if (!success) Error(success.error());
         return 0;
     }
@@ -296,14 +313,16 @@ namespace API::VFS
         if (!pathResOr) return Error(pathResOr.error());
         auto pathRes = pathResOr.value();
 
-        auto node    = pathRes.Node;
+        auto vnode   = pathRes.Node;
+        if (!vnode) return Error(ENOENT);
+        auto inode = vnode->INode();
 
         auto userBufferSuccess
             = UserBuffer::ForUserBuffer(outBuffer, bufferSize);
         if (!userBufferSuccess) return Error(userBufferSuccess.error());
         auto userBuffer = userBufferSuccess.value();
 
-        auto success    = node->ReadLink(userBuffer);
+        auto success    = inode->ReadLink(userBuffer);
         if (!success) return Error(success.error());
 
         return success.value();
@@ -317,8 +336,11 @@ namespace API::VFS
         if (!pathResOr) return Error(pathResOr.error());
         auto pathRes = pathResOr.value();
 
-        auto node    = pathResOr->Node;
-        auto ret     = node->ChMod(mode);
+        auto vnode   = pathRes.Node;
+        if (!vnode) return Error(ENOENT);
+
+        auto node = vnode->INode();
+        auto ret  = node->ChMod(mode);
         if (!ret) return Error(ret.error());
 
         return 0;
@@ -392,8 +414,13 @@ namespace API::VFS
         auto* fd             = current->GetFileHandle(dirFdNum);
         bool  followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
 
-        auto  cwd
-            = ::VFS::ResolvePath(::VFS::GetRootNode(), current->GetCWD()).Node;
+        auto  cwdDirectoryEntry
+            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(),
+                                 current->GetCWD())
+                  .Node;
+        if (!cwdDirectoryEntry) return Error(ENOENT);
+        auto cwd = cwdDirectoryEntry->INode();
+
         if (!path || !*path)
         {
             if (!(flags & AT_EMPTY_PATH)) return Error(ENOENT);
@@ -411,8 +438,12 @@ namespace API::VFS
             return 0;
         }
 
+        auto parentDirectoryEntry = PathView(path).Absolute()
+                                      ? ::VFS::GetRootDirectoryEntry()
+                                      : nullptr;
         auto parent
-            = PathView(path).Absolute() ? ::VFS::GetRootNode() : nullptr;
+            = parentDirectoryEntry ? parentDirectoryEntry->INode() : nullptr;
+
         if (!parent)
         {
             if (dirFdNum == AT_FDCWD) parent = cwd;
@@ -426,16 +457,53 @@ namespace API::VFS
             parent = parent->Reduce(false, true);
         }
 
-        auto node = ::VFS::ResolvePath(parent, path, followSymlinks).Node;
+        DirectoryEntry* vnode
+            = ::VFS::ResolvePath(parent->DirectoryEntry(), path, followSymlinks)
+                  .Node;
+        if (!vnode) return Error(errno);
+
+        auto node = vnode->INode();
         if (!node) return Error(errno);
 
         *out = node->GetStats();
         return 0;
     }
+    ErrorOr<isize> UnlinkAt(isize dirFdNum, const char* path, isize flags)
+    {
+        return Error(ENOSYS);
+    }
     ErrorOr<isize> RenameAt(isize oldDirFdNum, const char* oldPath,
                             isize newDirFdNum, const char* newPath)
     {
         return RenameAt2(oldDirFdNum, oldPath, newDirFdNum, newPath, 0);
+    }
+    ErrorOr<isize> LinkAt(isize oldDirFdNum, const char* oldPath,
+                          isize newDirFdNum, const char* newPath, isize flags)
+    {
+        auto getPath = [](const char* path) -> Path
+        { return CPU::AsUser([path]() -> Path { return path; }); };
+
+        auto oldPathResOr = ResolveAtFd(oldDirFdNum, getPath(oldPath), 0);
+        if (!oldPathResOr) return Error(oldPathResOr.error());
+        auto oldPathRes   = oldPathResOr.value();
+
+        auto newPathResOr = ResolveAtFd(newDirFdNum, getPath(newPath), 0);
+        if (!newPathResOr) return Error(newPathResOr.error());
+        auto newPathRes = newPathResOr.value();
+
+        if (!oldPathRes.Node) return Error(ENOENT);
+        if (newPathRes.Node) return Error(EEXIST);
+
+        auto inode   = oldPathRes.Node->INode();
+        auto success = inode->Link(getPath(newPath));
+        if (!success) return Error(success.error());
+
+        return 0;
+    }
+    ErrorOr<isize> SymlinkAt(const char* target, isize newDirFdNum,
+                             const char* linkPath)
+    {
+        return Error(ENOSYS);
     }
     ErrorOr<isize> Dup3(isize oldFdNum, isize newFdNum, isize flags)
     {
@@ -475,14 +543,16 @@ namespace API::VFS
         if (!newPathResOr) return Error(newPathResOr.error());
         auto newPathRes = newPathResOr.value();
 
-        if (!oldPathRes.Parent->IsDirectory()) return Error(ENOTDIR);
+        auto oldParent  = oldPathRes.Parent->INode();
+        if (!oldParent->IsDirectory()) return Error(ENOTDIR);
+
         if (!oldPathRes.Node) return Error(ENOENT);
         if (newPathRes.Node) return Error(EEXIST);
 
         auto newParent = newPathRes.Parent;
         auto newName   = newPathRes.BaseName.Size() > 0 ? newPathRes.BaseName
                                                         : oldPathRes.BaseName;
-        auto success   = oldPathRes.Node->Rename(newParent, newName);
+        auto success   = oldParent->Rename(newParent->INode(), newName);
 
         if (!success) return Error(success.error());
         return 0;
@@ -526,10 +596,13 @@ namespace Syscall::VFS
         i32         mode = static_cast<i32>(args.Args[1]);
         (void)mode;
 
-        INode* node = CPU::AsUser(
-            [path]() -> INode*
-            { return VFS::ResolvePath(VFS::GetRootNode(), path).Node; });
-        if (!node) return Error(EPERM);
+        DirectoryEntry* vnode = CPU::AsUser(
+            [path]() -> DirectoryEntry*
+            {
+                return VFS::ResolvePath(VFS::GetRootDirectoryEntry(), path)
+                    .Node;
+            });
+        if (!vnode) return Error(EPERM);
 
         return 0;
     }
@@ -575,12 +648,14 @@ namespace Syscall::VFS
     }
     ErrorOr<i32> SysChDir(Arguments& args)
     {
-        const char* path    = reinterpret_cast<const char*>(args.Args[0]);
-        Process*    current = Process::GetCurrent();
+        const char*     path    = reinterpret_cast<const char*>(args.Args[0]);
+        Process*        current = Process::GetCurrent();
 
-        INode*      cwd
+        DirectoryEntry* cwd
             = VFS::ResolvePath(current->GetRootNode(), current->GetCWD()).Node;
-        INode* node = nullptr;
+        if (!cwd) return Error(ENOENT);
+
+        DirectoryEntry* node = nullptr;
         {
             CPU::UserMemoryProtectionGuard guard;
             node = VFS::ResolvePath(cwd, path).Node;
@@ -588,7 +663,7 @@ namespace Syscall::VFS
         if (!node) return Error(ENOENT);
         if (!node->IsDirectory()) return Error(ENOTDIR);
 
-        current->m_CWD = node->GetPath().View();
+        current->m_CWD = node->INode()->GetPath().View();
         return 0;
     }
     ErrorOr<i32> SysFChDir(Arguments& args)
@@ -607,37 +682,6 @@ namespace Syscall::VFS
 
         return 0;
     }
-    ErrorOr<i32> SysMkDir(Syscall::Arguments& args)
-    {
-        PathView path    = args.Get<const char*>(0);
-        mode_t   mode    = args.Get<mode_t>(1);
-
-        // TODO(v1tr10l7): validate whether user has appropriate permissions
-        Process* current = Process::GetCurrent();
-
-        if (!current->ValidateRead(reinterpret_cast<uintptr_t>(path.Raw()),
-                                   Limits::MAX_PATH_LENGTH))
-            return Error(EFAULT);
-        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
-
-        INode* parent
-            = path.Absolute()
-                ? current->GetRootNode()
-                : VFS::ResolvePath(VFS::GetRootNode(), current->GetCWD()).Node;
-        auto [_, node, name] = VFS::ResolvePath(parent, path);
-
-        mode &= ~current->GetUmask() & 0777;
-        if (!parent) return Error(ENOENT);
-        if (!parent->IsDirectory()) return Error(ENOTDIR);
-
-        if (node) return Error(EEXIST);
-
-        node = VFS::CreateNode(parent, path, mode | S_IFDIR);
-        if (!node) return Error(errno);
-
-        return 0;
-    }
-
     [[clang::no_sanitize("alignment")]] ErrorOr<i32>
     SysGetDents64(Arguments& args)
     {
@@ -669,45 +713,5 @@ namespace Syscall::VFS
         mode_t mode  = static_cast<mode_t>(args.Args[3]);
 
         return current->OpenAt(dirFd, path, flags, mode);
-    }
-    ErrorOr<i32> SysMkDirAt(Syscall::Arguments& args)
-    {
-        i32      dirFd   = args.Get<i32>(0);
-        PathView path    = args.Get<const char*>(1);
-        mode_t   mode    = args.Get<mode_t>(2);
-
-        Process* process = Process::GetCurrent();
-        if (!process->ValidateRead(reinterpret_cast<uintptr_t>(path.Raw()),
-                                   Limits::MAX_PATH_LENGTH))
-            return Error(EFAULT);
-        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
-
-        INode*          parent = nullptr;
-        FileDescriptor* fd     = process->GetFileHandle(dirFd);
-
-        if (!path.Absolute())
-        {
-            if (dirFd != AT_FDCWD && !fd) return Error(EBADF);
-
-            INode* node = fd->GetNode();
-            if (!node) return Error(ENOENT);
-            parent = node->GetParent();
-        }
-
-        if (!parent) return Error(ENOENT);
-        if (!parent->IsDirectory()) return Error(ENOTDIR);
-        (void)mode;
-
-        mode &= ~process->GetUmask() & 0777;
-        if (!parent) return Error(ENOENT);
-        if (!parent->IsDirectory()) return Error(ENOTDIR);
-
-        INode* node = VFS::ResolvePath(parent, path).Node;
-        if (node) return Error(EEXIST);
-
-        node = VFS::CreateNode(parent, path, mode | S_IFDIR);
-        if (!node) return Error(errno);
-
-        return 0;
     }
 }; // namespace Syscall::VFS

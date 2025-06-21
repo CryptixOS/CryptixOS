@@ -12,20 +12,23 @@
 
 #include <Prism/Utility/Math.hpp>
 #include <VFS/FileDescriptor.hpp>
+#include <VFS/DirectoryEntry.hpp>
 
-void DirectoryEntries::Push(INode* node, StringView name)
+void DirectoryEntries::Push(INode* inode, StringView name)
 {
-    if (name.Empty()) name = node->GetName();
-    node = node->Reduce(false);
+    if (name.Empty()) name = inode->GetName();
+    auto vnode = inode->DirectoryEntry();
+    inode      = vnode->FollowMounts()->INode();
+    // inode = inode->Reduce(false);
 
     auto reclen
         = Math::AlignUp(DIRENT_LENGTH + name.Size() + 1, alignof(dirent));
 
     auto* entry     = reinterpret_cast<dirent*>(malloc(reclen));
-    entry->d_ino    = node->GetStats().st_ino;
+    entry->d_ino    = inode->GetStats().st_ino;
     entry->d_off    = reclen;
     entry->d_reclen = reclen;
-    entry->d_type   = IF2DT(node->GetStats().st_mode);
+    entry->d_type   = IF2DT(inode->GetStats().st_mode);
 
     name.Copy(entry->d_name, name.Size() + 1);
     reinterpret_cast<char*>(entry->d_name)[name.Size()] = 0;
@@ -50,7 +53,8 @@ usize DirectoryEntries::CopyAndPop(u8* out, usize capacity)
     return entrySize;
 }
 
-FileDescriptor::FileDescriptor(INode* node, i32 flags, FileAccessMode accMode)
+FileDescriptor::FileDescriptor(class DirectoryEntry* node, i32 flags,
+                               FileAccessMode accMode)
 {
     m_Description = new FileDescription;
     m_Description->IncRefCount();
@@ -74,7 +78,8 @@ FileDescriptor::~FileDescriptor()
     if (m_Description->RefCount == 0) delete m_Description;
 }
 
-ErrorOr<isize> FileDescriptor::Read(void* const outBuffer, usize count)
+ErrorOr<isize> FileDescriptor::Read(const UserBuffer& out, usize count,
+                                    isize offset)
 {
     ScopedLock guard(m_Description->Lock);
 
@@ -91,16 +96,16 @@ ErrorOr<isize> FileDescriptor::Read(void* const outBuffer, usize count)
         if (current->WasInterrupted()) return Error(EINTR);
     }
 
-    auto errorOrBuffer = UserBuffer::ForUserBuffer(outBuffer, count);
-    if (!errorOrBuffer) return Error(errorOrBuffer.error());
+    if (offset < 0) offset = m_Description->Offset;
 
-    isize bytesRead
-        = m_Description->Node->Read(outBuffer, m_Description->Offset, count);
-    m_Description->Offset += bytesRead;
+    isize bytesRead = GetNode()->Read(out.Raw(), offset, count);
+    offset += bytesRead;
 
+    m_Description->Offset = offset;
     return bytesRead;
 }
-ErrorOr<isize> FileDescriptor::Write(const void* data, isize bytes)
+ErrorOr<isize> FileDescriptor::Write(const UserBuffer& in, usize count,
+                                     isize offset)
 {
     ScopedLock guard(m_Description->Lock);
 
@@ -108,10 +113,12 @@ ErrorOr<isize> FileDescriptor::Write(const void* data, isize bytes)
 
     INode* node = GetNode();
     if (!node) return Error(ENOENT);
-    isize offset       = m_Description->Offset;
+    if (offset < 0) offset = m_Description->Offset;
 
-    isize bytesWritten = node->Write(data, offset, bytes);
-    m_Description->Offset += bytesWritten;
+    isize bytesWritten = node->Write(in.Raw(), offset, count);
+    offset += bytesWritten;
+
+    m_Description->Offset = offset;
 
     return bytesWritten;
 }
@@ -126,7 +133,7 @@ ErrorOr<const stat*> FileDescriptor::Stat() const
 ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
 {
     ScopedLock guard(m_Description->Lock);
-    INode*     node = m_Description->Node;
+    INode*     node = GetNode();
     if (IsPipe() || node->IsSocket() || node->IsFifo()) return Error(ESPIPE);
 
     switch (whence)
@@ -146,12 +153,11 @@ ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
         }
         case SEEK_END:
         {
-            usize size = m_Description->Node->GetStats().st_size;
+            usize size = GetNode()->GetStats().st_size;
             if (static_cast<usize>(m_Description->Offset) + size
                 > std::numeric_limits<off_t>::max())
                 return Error(EOVERFLOW);
-            m_Description->Offset
-                = m_Description->Node->GetStats().st_size + offset;
+            m_Description->Offset = GetNode()->GetStats().st_size + offset;
             break;
         }
 
@@ -163,12 +169,12 @@ ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
 
 ErrorOr<isize> FileDescriptor::Truncate(off_t size)
 {
-    if (m_Description->Node->IsDirectory()) return Error(EISDIR);
+    if (GetNode()->IsDirectory()) return Error(EISDIR);
     if (!(m_Description->AccessMode & FileAccessMode::eWrite)
-        || !m_Description->Node->IsRegular())
+        || !GetNode()->IsRegular())
         return Error(EBADF);
 
-    return m_Description->Node->Truncate(size);
+    return GetNode()->Truncate(size);
 }
 
 [[clang::no_sanitize("alignment")]] ErrorOr<i32>
@@ -221,7 +227,26 @@ bool FileDescriptor::GenerateDirEntries()
     DirectoryEntries& dirEntries = GetDirEntries();
     dirEntries.Clear();
 
-    node = m_Description->Node->Reduce(true, true);
+    auto current = DirectoryEntry();
+    while (current->IsSymlink() || current->m_MountGate)
+    {
+        if (current->m_MountGate)
+        {
+            current = current->FollowMounts();
+            continue;
+        }
+
+        auto parentDirectoryEntry = current->INode()->GetParent()
+                             ? current->INode()->GetParent()->DirectoryEntry()
+                             : nullptr;
+        auto target      = current->INode()->GetTarget();
+        auto next = VFS::ResolvePath(parentDirectoryEntry, target.Raw(), true).Node;
+
+        if (!next) break;
+        current = next;
+    }
+    node = current->INode();
+    // node = GetNode()->Reduce(true, true);
     for (const auto [name, child] : node->GetChildren())
     {
         if (name.Empty()) continue;
@@ -229,8 +254,11 @@ bool FileDescriptor::GenerateDirEntries()
     }
 
     // . && ..
-    StringView cwdPath = Process::GetCurrent()->GetCWD();
-    auto       cwd     = VFS::ResolvePath(VFS::GetRootNode(), cwdPath).Node;
+    StringView cwdPath  = Process::GetCurrent()->GetCWD();
+    auto       cwdDirectoryEntry = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), cwdPath).Node;
+    if (!cwdDirectoryEntry) return true;
+
+    auto cwd = cwdDirectoryEntry->INode();
     if (!cwd) return true;
 
     dirEntries.Push(cwd, ".");

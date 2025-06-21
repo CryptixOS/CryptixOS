@@ -36,6 +36,9 @@ namespace API::VFS
     ErrorOr<isize> Rename(const char* oldPath, const char* newPath);
     ErrorOr<isize> MkDir(const char* pathname, mode_t mode);
     ErrorOr<isize> RmDir(PathView path);
+    ErrorOr<isize> Link(const char* oldPath, const char* newPath);
+    ErrorOr<isize> Unlink(const char* path);
+    ErrorOr<isize> Symlink(const char* target, const char* linkPath);
     ErrorOr<isize> ReadLink(PathView path, char* out, usize size);
     ErrorOr<isize> ChMod(const char* path, mode_t mode);
 
@@ -54,8 +57,13 @@ namespace API::VFS
     ErrorOr<isize> StatFs(PathView path, statfs* out);
     ErrorOr<isize> FStatAt(isize dirFd, const char* path, isize flags,
                            stat* out);
+    ErrorOr<isize> UnlinkAt(isize dirFdNum, const char* path, isize flags);
     ErrorOr<isize> RenameAt(isize oldDirFdNum, const char* oldPath,
                             isize newDirFdNum, const char* newPath);
+    ErrorOr<isize> LinkAt(isize oldDirFdNum, const char* oldPath,
+                          isize newDirFdNum, const char* newPath, isize flags);
+    ErrorOr<isize> SymlinkAt(const char* target, isize newDirFdNum,
+                             const char* linkPath);
     ErrorOr<isize> Dup3(isize oldFdNum, isize newFdNum, isize flags);
     ErrorOr<isize> RenameAt2(isize oldDirFdNum, const char* oldPath,
                              isize newDirFdNum, const char* newPath,

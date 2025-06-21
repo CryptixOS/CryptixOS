@@ -160,14 +160,16 @@ void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
 ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
-    INode* parent = VFS::ResolvePath(VFS::GetRootNode(), m_CWD.Raw()).Node;
+    DirectoryEntry* parent = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), m_CWD.Raw()).Node;
     if (CPU::AsUser([path]() -> bool { return path.Absolute(); }))
-        parent = VFS::GetRootNode();
+        parent = VFS::GetRootDirectoryEntry();
     else if (dirFd != AT_FDCWD)
     {
         auto* descriptor = GetFileHandle(dirFd);
         if (!descriptor) return Error(EBADF);
-        parent = descriptor->GetNode();
+        auto inode = descriptor->GetNode();
+        if (inode && !inode->m_DirectoryEntry) inode->m_DirectoryEntry = new DirectoryEntry(inode);
+        parent = inode->m_DirectoryEntry;
     }
 
     auto descriptor
@@ -183,10 +185,10 @@ ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
 {
     auto fifo     = new Fifo();
     auto readerFd = fifo->Open(Fifo::Direction::eRead);
-    pipeFds[0]    = m_FdTable.Insert(readerFd);
+    CPU::AsUser([&]() { pipeFds[0] = m_FdTable.Insert(readerFd); });
 
     auto writerFd = fifo->Open(Fifo::Direction::eWrite);
-    pipeFds[1]    = m_FdTable.Insert(writerFd);
+    CPU::AsUser([&]() { pipeFds[1] = m_FdTable.Insert(writerFd); });
 
     return 0;
 }

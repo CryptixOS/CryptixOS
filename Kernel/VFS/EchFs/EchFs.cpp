@@ -26,7 +26,7 @@ EchFs::~EchFs()
 }
 
 INode* EchFs::Mount(INode* parent, INode* source, INode* target,
-                    StringView name, const void* data)
+                    DirectoryEntry* entry, StringView name, const void* data)
 {
     if (!source) return nullptr;
 
@@ -128,7 +128,8 @@ fail_free_id_table:
     return nullptr;
 }
 
-INode* EchFs::CreateNode(INode* parent, StringView name, mode_t mode)
+INode* EchFs::CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
+                         uid_t uid, gid_t gid)
 {
     return nullptr;
 }

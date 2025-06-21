@@ -12,7 +12,8 @@
 class TmpFsINode final : public INode
 {
   public:
-    TmpFsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode);
+    TmpFsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode,
+               uid_t uid = 0, gid_t gid = 0);
 
     virtual ~TmpFsINode()
     {
@@ -31,7 +32,9 @@ class TmpFsINode final : public INode
     virtual ErrorOr<isize> Truncate(usize size) override;
 
     virtual ErrorOr<void> Rename(INode* newParent, StringView newName) override;
-    virtual ErrorOr<void> MkDir(StringView name, mode_t mode) override;
+    virtual ErrorOr<void> MkDir(StringView name, mode_t mode, uid_t uid = 0,
+                                gid_t gid = 0) override;
+    virtual ErrorOr<void> Link(PathView path) override;
     virtual ErrorOr<void> ChMod(mode_t mode) override;
 
   private:

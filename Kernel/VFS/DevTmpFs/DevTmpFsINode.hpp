@@ -42,4 +42,6 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
     Device* m_Device   = nullptr;
     u8*     m_Data     = nullptr;
     usize   m_Capacity = 0;
+
+    friend class DevTmpFs;
 };

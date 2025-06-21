@@ -14,6 +14,11 @@
 #include <VFS/FileDescriptor.hpp>
 #include <VFS/INode.hpp>
 
+INode::INode(StringView name)
+    : m_Name(name)
+{
+    // m_DirectoryEntry = new class DirectoryEntry(this);
+}
 INode::INode(INode* parent, StringView name, Filesystem* fs)
     : m_Parent(parent)
     , m_Name(name)
@@ -40,10 +45,11 @@ Path INode::GetPath()
 {
     StringBuilder pathBuilder;
 
-    auto          current = this;
-    auto          root    = VFS::GetRootNode();
+    auto          current            = this;
+    auto          rootDirectoryEntry = VFS::GetRootDirectoryEntry();
+    auto          rootINode          = rootDirectoryEntry->INode();
 
-    while (current && current != root)
+    while (current && current != rootINode)
     {
         auto segment = "/"_s;
         segment += current->m_Name;
@@ -56,8 +62,16 @@ Path INode::GetPath()
 }
 
 mode_t INode::GetMode() const { return m_Stats.st_mode & ~S_IFMT; }
+bool   INode::IsFilesystemRoot() const
+{
+    auto fsRootEntry
+        = m_Filesystem->GetMountedOn()->DirectoryEntry()->m_MountGate;
 
-bool   INode::IsEmpty()
+    return m_Filesystem->GetMountedOn() && fsRootEntry
+        && this == fsRootEntry->INode();
+}
+
+bool INode::IsEmpty()
 {
     m_Filesystem->Populate(this);
     return m_Children.empty();
@@ -86,19 +100,39 @@ ErrorOr<isize> INode::ReadLink(UserBuffer& outBuffer)
 
 INode* INode::Reduce(bool symlinks, bool automount, usize cnt)
 {
-    if (mountGate && automount)
-        return mountGate->Reduce(symlinks, automount, 0);
-
     if (!m_Target.Empty() && symlinks)
     {
         if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
 
-        auto nextNode
-            = VFS::ResolvePath(m_Parent, m_Target.Raw(), automount).Node;
+        auto nextNode = VFS::ResolvePath(m_Parent->DirectoryEntry(),
+                                         m_Target.Raw(), automount)
+                            .Node;
         if (!nextNode) return_err(nullptr, ENOENT);
 
-        return nextNode->Reduce(symlinks, automount, ++cnt);
+        return nextNode->INode()->Reduce(symlinks, automount, ++cnt);
     }
 
     return this;
+}
+
+ErrorOr<DirectoryEntry*> INode::Lookup(class DirectoryEntry* entry)
+{
+    auto node = Lookup(entry->Name());
+    if (!node) return Error(ENOENT);
+
+    entry->m_INode         = node;
+    node->m_DirectoryEntry = entry;
+
+    return entry;
+}
+DirectoryEntry* INode::DirectoryEntry()
+{
+    if (!m_DirectoryEntry)
+    {
+        LogWarn("VFS: Allocating DirectoryEntry for: `{}`...", GetPath());
+        LogDebug("VFS: Showing backtrace:");
+        Stacktrace::Print(6);
+        m_DirectoryEntry = new class DirectoryEntry(this);
+    }
+    return m_DirectoryEntry;
 }

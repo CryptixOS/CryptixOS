@@ -125,7 +125,7 @@ class Process
         return false;
     }
 
-    inline INode*     GetRootNode() const { return m_RootNode; }
+    inline DirectoryEntry*     GetRootNode() const { return m_RootDirectoryEntry; }
     inline StringView GetCWD() const { return m_CWD; }
     inline mode_t     GetUmask() const { return m_Umask; }
     mode_t            Umask(mode_t mask);
@@ -163,9 +163,9 @@ class Process
     Vector<Process*>    m_Zombies;
     Vector<Thread*>     m_Threads;
 
-    INode*              m_RootNode = VFS::GetRootNode();
-    String              m_CWD      = "/";
-    mode_t              m_Umask    = 0;
+    DirectoryEntry*              m_RootDirectoryEntry = VFS::GetRootDirectoryEntry();
+    String              m_CWD       = "/";
+    mode_t              m_Umask     = 0;
 
     FileDescriptorTable m_FdTable;
     AddressSpace        m_AddressSpace;

@@ -15,25 +15,33 @@ DevTmpFs::DevTmpFs(u32 flags)
 }
 
 INode* DevTmpFs::Mount(INode* parent, INode* source, INode* target,
-                       StringView name, const void* data)
+                       DirectoryEntry* entry, StringView name, const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
                : nullptr;
 
     if (m_Root) VFS::RecursiveDelete(m_Root);
-    m_Root      = CreateNode(parent, name, 0755 | S_IFDIR);
-    m_MountedOn = target;
 
+    m_Root           = CreateNode(parent, entry, 0755 | S_IFDIR);
+    auto targetEntry = target->DirectoryEntry();
+    targetEntry->SetMountGate(m_Root, entry);
+
+    m_MountedOn = target;
     return m_Root;
 }
 
-INode* DevTmpFs::CreateNode(INode* parent, StringView name, mode_t mode)
+INode* DevTmpFs::CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
+                            uid_t uid, gid_t gid)
 {
-    return new DevTmpFsINode(parent, name, this, mode);
+    auto inode = new DevTmpFsINode(parent, entry->Name(), this, mode);
+    entry->Bind(inode);
+
+    return inode;
 }
 
-INode* DevTmpFs::Symlink(INode* parent, StringView name, StringView target)
+INode* DevTmpFs::Symlink(INode* parent, DirectoryEntry* entry,
+                         StringView target)
 {
     ToDo();
 
@@ -46,13 +54,18 @@ INode* DevTmpFs::Link(INode* parent, StringView name, INode* oldNode)
     return nullptr;
 }
 
-INode* DevTmpFs::MkNod(INode* parent, StringView name, mode_t mode, dev_t dev)
+INode* DevTmpFs::MkNod(INode* parent, DirectoryEntry* entry, mode_t mode,
+                       dev_t dev)
 {
     auto it = s_Devices.find(dev);
     if (it == s_Devices.end()) return_err(nullptr, EEXIST);
     Device* device = it->second;
 
-    return new DevTmpFsINode(parent, name, this, mode, device);
+    auto    inode  = reinterpret_cast<DevTmpFsINode*>(
+        CreateNode(parent, entry, mode, 0, 0));
+    inode->m_Device = device;
+
+    return inode;
 }
 
 bool DevTmpFs::RegisterDevice(Device* device)

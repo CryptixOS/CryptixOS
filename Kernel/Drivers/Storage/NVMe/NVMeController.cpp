@@ -35,7 +35,7 @@ namespace NVMe
         }
 
         StringView path = fmt::format("/dev/{}", GetName()).data();
-        VFS::MkNod(VFS::GetRootNode(), path, 0666, GetID());
+        VFS::MkNod(nullptr, path, 0666, GetID());
     }
 
     bool Controller::Initialize()

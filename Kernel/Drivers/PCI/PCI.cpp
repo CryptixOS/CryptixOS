@@ -54,8 +54,12 @@ namespace PCI
     }
     void InitializeDatabase()
     {
-        PathView path = "/usr/share/hwdata/pci.ids";
-        INode*   file = VFS::ResolvePath(VFS::GetRootNode(), path).Node;
+        PathView path  = "/usr/share/hwdata/pci.ids";
+        DirectoryEntry*   vnode = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), path).Node;
+        if (!vnode) return;
+
+        auto file = vnode->INode();
+
         if (!file)
         {
             LogError("PCI: Failed to open pciids database");

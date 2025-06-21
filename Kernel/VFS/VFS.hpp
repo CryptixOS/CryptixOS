@@ -16,44 +16,56 @@
 #include <unordered_map>
 
 class INode;
-
+class DirectoryEntry;
 class FileDescriptor;
 namespace VFS
 {
     Vector<std::pair<bool, StringView>>& GetFilesystems();
 
-    INode*                               GetRootNode();
+    DirectoryEntry*                      GetRootDirectoryEntry();
     void                                 RecursiveDelete(INode* node);
 
     struct PathResolution
     {
         INode* Parent   = nullptr;
         INode* Node     = nullptr;
+
         Path   BaseName = ""_s;
     };
+    struct PathRes
+    {
+        DirectoryEntry* Parent   = nullptr;
+        DirectoryEntry* Node     = nullptr;
+        Path            BaseName = ""_s;
+    };
 
-    ErrorOr<FileDescriptor*> Open(INode* parent, PathView path, i32 flags,
-                                  mode_t mode);
+    ErrorOr<FileDescriptor*> Open(DirectoryEntry* parent, PathView path,
+                                  i32 flags, mode_t mode);
 
     ErrorOr<INode*>          ResolvePath(PathView path);
     PathResolution           ResolvePath(INode* parent, PathView path);
     PathResolution ResolvePath(INode* parent, PathView path, bool followLinks);
+    PathRes        ResolvePath(DirectoryEntry* parent, PathView path,
+                               bool followLinks = true);
 
     std::unordered_map<StringView, class Filesystem*>& GetMountPoints();
 
-    bool         MountRoot(StringView filesystemName);
-    bool         Mount(INode* parent, PathView source, PathView target,
-                       StringView fsName, i32 flags = 0, const void* data = nullptr);
-    bool         Unmount(INode* parent, PathView path, i32 flags = 0);
+    bool MountRoot(StringView filesystemName);
+    bool Mount(DirectoryEntry* parent, PathView source, PathView target,
+               StringView fsName, i32 flags = 0, const void* data = nullptr);
+    bool Unmount(DirectoryEntry* parent, PathView path, i32 flags = 0);
 
-    INode*       CreateNode(INode* parent, PathView path, mode_t mode);
-    ErrorOr<i32> MkDir(INode* parent, mode_t mode);
+    DirectoryEntry* CreateNode(DirectoryEntry* parent, PathView path,
+                               mode_t mode);
+    ErrorOr<i32>    MkDir(INode* parent, mode_t mode);
 
-    INode*       MkNod(INode* parent, PathView path, mode_t mode, dev_t dev);
-    INode*       Symlink(INode* parent, PathView path, StringView target);
-    INode*       Link(INode* oldParent, PathView oldPath, INode* newParent,
-                      PathView newPath, i32 flags = 0);
+    DirectoryEntry* MkNod(DirectoryEntry* parent, PathView path, mode_t mode,
+                          dev_t dev);
+    DirectoryEntry* Symlink(DirectoryEntry* parent, PathView path,
+                            StringView target);
+    DirectoryEntry* Link(DirectoryEntry* oldParent, PathView oldPath,
+                         DirectoryEntry* newParent, PathView newPath,
+                         i32 flags = 0);
 
-    bool         Unlink(INode* parent, PathView path, i32 flags = 0);
-
+    bool Unlink(DirectoryEntry* parent, PathView path, i32 flags = 0);
 }; // namespace VFS

@@ -101,8 +101,8 @@ static void kernelThread()
     Assert(VFS::MountRoot("tmpfs"));
     Initrd::Initialize();
 
-    VFS::CreateNode(VFS::GetRootNode(), "/dev", 0755 | S_IFDIR);
-    Assert(VFS::Mount(VFS::GetRootNode(), "", "/dev", "devtmpfs"));
+    VFS::CreateNode(nullptr, "/dev", 0755 | S_IFDIR);
+    Assert(VFS::Mount(nullptr, "", "/dev", "devtmpfs"));
 
     Scheduler::InitializeProcFs();
 
@@ -120,12 +120,9 @@ static void kernelThread()
     TTY::Initialize();
     MemoryDevices::Initialize();
 
-    VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p1"_sv, "/mnt/ext2"_sv,
-               "ext2fs"_sv);
-    VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p2"_sv, "/mnt/fat32"_sv,
-               "fat32fs"_sv);
-    VFS::Mount(VFS::GetRootNode(), "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv,
-               "echfs"_sv);
+    VFS::Mount(nullptr, "/dev/nvme0n2p1"_sv, "/mnt/ext2"_sv, "ext2fs"_sv);
+    VFS::Mount(nullptr, "/dev/nvme0n2p2"_sv, "/mnt/fat32"_sv, "fat32fs"_sv);
+    VFS::Mount(nullptr, "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv, "echfs"_sv);
 
     auto    kernelExecutable = BootInfo::GetExecutableFile();
     Pointer imageAddress     = kernelExecutable->address;

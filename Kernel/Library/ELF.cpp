@@ -15,6 +15,7 @@
 
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
+#include <VFS/DirectoryEntry.hpp>
 
 #include <cstring>
 #include <magic_enum/magic_enum.hpp>
@@ -148,7 +149,10 @@ namespace ELF
     bool Image::Load(PathView path, PageMap* pageMap,
                      AddressSpace& addressSpace, uintptr_t loadBase)
     {
-        INode* file = VFS::ResolvePath(VFS::GetRootNode(), path, true).Node;
+        DirectoryEntry* vnode = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), path).Node;
+        if (!vnode) return false;
+
+        auto file = vnode->INode();
         if (!file) return_err(false, ENOENT);
 
         isize fileSize = file->GetStats().st_size;

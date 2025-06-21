@@ -124,8 +124,8 @@ void        Scheduler::Initialize()
 }
 void Scheduler::InitializeProcFs()
 {
-    VFS::CreateNode(VFS::GetRootNode(), "/proc", 0755 | S_IFDIR);
-    Assert(VFS::Mount(VFS::GetRootNode(), "", "/proc", "procfs"));
+    VFS::CreateNode(nullptr, "/proc", 0755 | S_IFDIR);
+    Assert(VFS::Mount(nullptr, "", "/proc", "procfs"));
     s_ProcFs = reinterpret_cast<ProcFs*>(VFS::GetMountPoints()["/proc"]);
 
     s_ProcFs->AddProcess(s_KernelProcess);

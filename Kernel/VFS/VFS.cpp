@@ -12,10 +12,12 @@
 #include <Scheduler/Thread.hpp>
 
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
+#include <VFS/DirectoryEntry.hpp>
 #include <VFS/EchFs/EchFs.hpp>
 #include <VFS/Ext2Fs/Ext2Fs.hpp>
 #include <VFS/Fat32Fs/Fat32Fs.hpp>
 #include <VFS/INode.hpp>
+#include <VFS/PathWalker.hpp>
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/TmpFs/TmpFs.hpp>
 #include <VFS/VFS.hpp>
@@ -24,7 +26,8 @@
 
 namespace VFS
 {
-    static INode*                                      s_RootNode = nullptr;
+    static DirectoryEntry*                             s_RootNode = nullptr;
+
     static Spinlock                                    s_Lock;
     static std::unordered_map<StringView, Filesystem*> s_MountPoints;
 
@@ -60,7 +63,8 @@ namespace VFS
         return s_Filesystems;
     }
 
-    INode* GetRootNode()
+    DirectoryEntry* GetRootDirectoryEntry() { return s_RootNode; }
+    INode*          GetRootINode()
     {
         /*Thread* thread = CPU::GetCurrentThread();
         if (!thread) return s_RootNode;
@@ -71,7 +75,7 @@ namespace VFS
         INode* rootNode = process->GetRootNode();
         return rootNode ? rootNode : s_RootNode;*/
 
-        return s_RootNode;
+        return s_RootNode ? s_RootNode->INode() : nullptr;
     }
 
     static Filesystem* CreateFilesystem(StringView name, u32 flags)
@@ -99,8 +103,8 @@ namespace VFS
         delete node;
     }
 
-    ErrorOr<FileDescriptor*> Open(INode* parent, PathView path, i32 flags,
-                                  mode_t mode)
+    ErrorOr<FileDescriptor*> Open(DirectoryEntry* parent, PathView path,
+                                  i32 flags, mode_t mode)
     {
         Process* current        = Process::GetCurrent();
         bool     followSymlinks = !(flags & O_NOFOLLOW);
@@ -137,22 +141,24 @@ namespace VFS
             accMode = FileAccessMode::eNone;
         }
 
-        INode* node = VFS::ResolvePath(parent, path, followSymlinks).Node;
-        if (!node)
+        DirectoryEntry* dentry
+            = VFS::ResolvePath(parent, path, followSymlinks).Node;
+        if (!dentry)
         {
             didExist = false;
             if (errno != ENOENT || !(flags & O_CREAT)) return Error(ENOENT);
 
-            if (!parent->ValidatePermissions(current->GetCredentials(), 5))
+            if (!parent->INode()->ValidatePermissions(current->GetCredentials(),
+                                                      5))
                 return Error(EACCES);
-            node = VFS::CreateNode(parent, path,
-                                   (mode & ~current->GetUmask()) | S_IFREG);
+            auto dentry = VFS::CreateNode(
+                parent, path, (mode & ~current->GetUmask()) | S_IFREG);
 
-            if (!node) return Error(ENOENT);
+            if (!dentry) return Error(ENOENT);
         }
         else if (flags & O_EXCL) return Error(EEXIST);
 
-        node = node->Reduce(followSymlinks, true);
+        auto node = dentry->INode()->Reduce(followSymlinks, true);
         if (!node) return Error(ENOENT);
 
         if (node->IsSymlink()) return Error(ELOOP);
@@ -164,106 +170,41 @@ namespace VFS
         // TODO(v1tr10l7): check acc modes and truncate
         if (flags & O_TRUNC && node->IsRegular() && didExist)
             ;
-        return new FileDescriptor(node, flags, accMode);
+        return new FileDescriptor(node->DirectoryEntry(), flags, accMode);
     }
 
     ErrorOr<INode*> ResolvePath(PathView path)
     {
-        INode* node = ResolvePath(s_RootNode, path).Node;
+        INode* node = ResolvePath(s_RootNode->INode(), path).Node;
         if (!node) return Error(errno);
 
         return node;
     }
     PathResolution ResolvePath(INode* parent, PathView path)
     {
-        if (!parent || path.Absolute()) parent = GetRootNode();
-        if (path.Empty())
-        {
-            errno = ENOENT;
-            return {nullptr, nullptr, ""_sv};
-        }
+        if (!parent || path.Absolute()) parent = GetRootINode();
+        PathResolution res = {nullptr, nullptr, ""_sv};
 
-        auto currentNode = parent;
-        if (parent != s_RootNode) parent = parent->Reduce(false, true);
-        if (!currentNode->Populate()) return {nullptr, nullptr, ""_sv};
+        PathWalker     resolver(parent->DirectoryEntry(), path);
+        auto           resolutionResult = resolver.Resolve();
+        CtosUnused(resolutionResult);
 
-        if (path == "/"_sv || path.Empty())
-            return {currentNode, currentNode, "/"_sv};
-
-        auto getParent = [&currentNode]
-        {
-            if (currentNode == GetRootNode()->Reduce(false)) return currentNode;
-            else if (currentNode == currentNode->GetFilesystem()->GetRootNode())
-                return currentNode->GetFilesystem()
-                    ->GetMountedOn()
-                    ->GetParent();
-
-            return currentNode->GetParent();
-        };
-
-        auto segments = StringView(path).Split('/');
-
-        for (usize i = 0; i < segments.Size(); i++)
-        {
-            auto segment     = String(segments[i].Raw());
-            bool isLast      = i == (segments.Size() - 1);
-
-            bool previousDir = segment == ".."_sv;
-            bool currentDir  = segment == "."_sv;
-
-            currentNode      = currentNode->Reduce(false, true);
-
-            if (currentDir || previousDir)
-            {
-                if (previousDir) currentNode = getParent();
-
-                if (isLast)
-                    return {getParent(), currentNode->Reduce(false, true),
-                            currentNode->GetName()};
-
-                continue;
-            }
-
-            if (currentNode->Lookup(segment))
-            {
-                auto node = currentNode->Lookup(segment);
-                if (!node->Reduce(false, true)->Populate())
-                    return {nullptr, nullptr, ""_sv};
-
-                if (isLast)
-                {
-                    if (path[path.Size() - 1] == '/' && !node->IsDirectory())
-                    {
-                        errno = ENOTDIR;
-                        return {currentNode, nullptr, ""_sv};
-                    }
-                    return {currentNode, node, currentNode->GetName()};
-                }
-                currentNode = node;
-
-                if (currentNode->IsSymlink())
-                {
-                    currentNode = currentNode->Reduce(true);
-                    if (!currentNode) return {nullptr, nullptr, ""_sv};
-                }
-                if (!currentNode->IsDirectory())
-                {
-                    errno = ENOTDIR;
-                    return {nullptr, nullptr, ""_sv};
-                }
-
-                continue;
-            }
-
-            errno = ENOENT;
-            if (isLast) return {currentNode, nullptr, Path(segment)};
-
-            break;
-        }
-
-        errno = ENOENT;
-        return {nullptr, nullptr, ""_sv};
+        return {resolver.ParentINode(), resolver.INode(), resolver.BaseName()};
     }
+
+    PathRes ResolvePath(DirectoryEntry* parent, PathView path, bool followLinks)
+    {
+        if (!parent) parent = s_RootNode;
+        auto res = VFS::ResolvePath(parent->INode(), path, followLinks);
+
+        if (res.Parent && !res.Parent->m_DirectoryEntry)
+            res.Parent->m_DirectoryEntry = new DirectoryEntry(res.Parent);
+        if (res.Node && !res.Node->m_DirectoryEntry)
+            res.Node->m_DirectoryEntry = new DirectoryEntry(res.Node);
+        return {res.Parent ? res.Parent->m_DirectoryEntry : nullptr,
+                res.Node ? res.Node->m_DirectoryEntry : nullptr, res.BaseName};
+    }
+
     PathResolution ResolvePath(INode* parent, PathView path, bool followLinks)
     {
         auto [p, n, b] = ResolvePath(parent, path);
@@ -285,27 +226,29 @@ namespace VFS
             LogError("VFS: Failed to create filesystem: '{}'", filesystemName);
             return false;
         }
-
         if (s_RootNode)
         {
             LogError("VFS: Root already mounted!");
             return false;
         }
 
-        s_RootNode = fs->Mount(nullptr, nullptr, nullptr, "/", nullptr);
+        s_RootNode = new DirectoryEntry("/");
+        auto fsRoot
+            = fs->Mount(nullptr, nullptr, nullptr, s_RootNode, "/", nullptr);
+        fsRoot->m_DirectoryEntry = s_RootNode;
 
-        if (s_RootNode)
+        if (s_RootNode->INode())
             LogInfo("VFS: Mounted Filesystem '{}' on '/'", filesystemName);
         else
             LogError("VFS: Failed to mount filesystem '{}' on '/'",
                      filesystemName);
 
-        s_MountPoints["/"] = s_RootNode->GetFilesystem();
+        s_MountPoints["/"] = s_RootNode->INode()->GetFilesystem();
         return s_RootNode != nullptr;
     }
 
     // TODO: flags
-    bool Mount(INode* parent, PathView sourcePath, PathView target,
+    bool Mount(DirectoryEntry* parent, PathView sourcePath, PathView target,
                StringView fsName, i32 flags, const void* data)
     {
         ScopedLock  guard(s_Lock);
@@ -321,7 +264,7 @@ namespace VFS
         INode* sourceNode = nullptr;
         if (!sourcePath.Empty())
         {
-            sourceNode = ResolvePath(s_RootNode, sourcePath).Node;
+            sourceNode = ResolvePath(s_RootNode->INode(), sourcePath).Node;
             if (!sourceNode)
             {
                 LogError("VFS: Failed to resolve source path -> '{}'",
@@ -334,30 +277,41 @@ namespace VFS
                 return_err(false, EISDIR);
             }
         }
-        auto [nparent, node, baseName] = ResolvePath(parent, target);
-        bool   isRoot                  = (node == GetRootNode());
-        INode* mountGate               = nullptr;
+        auto [nparent, dentry, baseName] = ResolvePath(parent, target);
+        bool            isRoot           = (dentry == GetRootDirectoryEntry());
+        INode*          mountGate        = nullptr;
 
-        if (!node)
+        auto            parentINode      = parent ? parent->INode() : nullptr;
+        auto            sourceINode      = sourceNode;
+        INode*          targetINode      = nullptr;
+
+        DirectoryEntry* entry            = nullptr;
+
+        if (!dentry)
         {
             LogError("VFS: Failed to resolve target path -> '{}'", target);
             goto fail;
         }
 
-        if (!isRoot && !node->IsDirectory())
+        targetINode = dentry->INode();
+        entry       = targetINode->DirectoryEntry();
+
+        if (!isRoot && !dentry->IsDirectory())
         {
             LogError("VFS: '{}' target is not a directory", target);
             return_err(false, ENOTDIR);
         }
 
-        mountGate = fs->Mount(parent, sourceNode, node, baseName, data);
+        entry     = new DirectoryEntry(targetINode->GetName());
+        mountGate = fs->Mount(parentINode, sourceINode, targetINode, entry,
+                              baseName, data);
         if (!mountGate)
         {
             LogError("VFS: Failed to mount '{}' fs", fsName);
             goto fail;
         }
 
-        node->mountGate = mountGate;
+        dentry->m_MountGate = mountGate->DirectoryEntry();
 
         if (sourcePath.Empty())
             LogTrace("VFS: Mounted Filesystem '{}' on '{}'", fsName, target);
@@ -368,70 +322,98 @@ namespace VFS
         s_MountPoints[target] = fs;
         return true;
     fail:
-        if (node) delete node;
+        if (targetINode) delete targetINode;
         if (fs) delete fs;
         return false;
     }
 
-    bool Unmount(INode* parent, PathView path, i32 flags)
+    bool Unmount(DirectoryEntry* parent, PathView path, i32 flags)
     {
         // TODO: Unmount
         ToDo();
         return false;
     }
 
-    INode* CreateNode(INode* parent, PathView path, mode_t mode)
+    DirectoryEntry* CreateNode(DirectoryEntry* parentDir, PathView path,
+                               mode_t mode)
     {
+        if (!parentDir) parentDir = GetRootDirectoryEntry();
         ScopedLock guard(s_Lock);
 
-        auto [newNodeParent, newNode, newNodeName] = ResolvePath(parent, path);
+        auto [newNodeParent, newNode, newNodeName]
+            = ResolvePath(parentDir->INode(), path);
         if (newNode) return_err(nullptr, EEXIST);
 
         if (!newNodeParent) return nullptr;
-        newNode = newNodeParent->GetFilesystem()->CreateNode(
-            newNodeParent, StringView(newNodeName.View().Raw()), mode);
-        if (newNode) newNodeParent->InsertChild(newNode, newNode->GetName());
-        return newNode;
+
+        auto entry = new DirectoryEntry(newNodeName);
+        newNode    = newNodeParent->GetFilesystem()->CreateNode(newNodeParent,
+                                                                entry, mode);
+        if (newNode)
+        {
+            newNodeParent->InsertChild(newNode, newNode->GetName());
+            parentDir->InsertChild(entry);
+        }
+        return newNode->DirectoryEntry();
     }
 
-    INode* MkNod(INode* parent, PathView path, mode_t mode, dev_t dev)
+    DirectoryEntry* MkNod(DirectoryEntry* parent, PathView path, mode_t mode,
+                          dev_t dev)
     {
+        if (!parent) parent = GetRootDirectoryEntry();
         ScopedLock guard(s_Lock);
 
-        auto [nparent, node, newNodeName] = ResolvePath(parent, path);
+        auto [nparent, node, newNodeName] = ResolvePath(parent->INode(), path);
         if (node) return_err(nullptr, EEXIST);
 
         if (!nparent) return nullptr;
-        node = nparent->GetFilesystem()->MkNod(nparent, newNodeName, mode, dev);
 
-        if (node) nparent->InsertChild(node, node->GetName());
+        auto devEntry = new DirectoryEntry(newNodeName);
+        node = nparent->GetFilesystem()->MkNod(nparent, devEntry, mode, dev);
 
-        return node;
+        if (node)
+        {
+            nparent->InsertChild(node, node->GetName());
+            parent->InsertChild(devEntry);
+        }
+
+        return node->DirectoryEntry();
     }
 
-    INode* Symlink(INode* parent, PathView path, StringView target)
+    DirectoryEntry* Symlink(DirectoryEntry* parent, PathView path,
+                            StringView target)
     {
+        if (!parent) parent = GetRootDirectoryEntry();
         ScopedLock guard(s_Lock);
 
-        auto [newNodeParent, newNode, newNodeName] = ResolvePath(parent, path);
+        auto [newNodeParent, newNode, newNodeName]
+            = ResolvePath(parent->INode(), path);
         if (newNode) return_err(nullptr, EEXIST);
         if (!newNodeParent) return_err(nullptr, ENOENT);
 
-        newNode = newNodeParent->GetFilesystem()->Symlink(newNodeParent,
-                                                          newNodeName, target);
-        if (newNode) newNodeParent->InsertChild(newNode, newNode->GetName());
-        return newNode;
+        auto entry = new DirectoryEntry(newNodeName);
+        newNode = newNodeParent->GetFilesystem()->Symlink(newNodeParent, entry,
+                                                          target);
+        if (newNode)
+        {
+            newNodeParent->InsertChild(newNode, newNode->GetName());
+            parent->InsertChild(newNode->DirectoryEntry());
+        }
+
+        return newNode->DirectoryEntry();
     }
 
-    INode* Link(INode* oldParent, PathView oldPath, INode* newParent,
-                PathView newPath, i32 flags)
+    DirectoryEntry* Link(DirectoryEntry* oldParent, PathView oldPath,
+                         DirectoryEntry* newParent, PathView newPath, i32 flags)
     {
         ToDo();
         return nullptr;
     }
 
-    bool Unlink(INode* parent, PathView path, i32 flags)
+    bool Unlink(DirectoryEntry* parent, PathView path, i32 flags)
     {
+        if (!parent) parent = GetRootDirectoryEntry();
+
         ToDo();
         return false;
     }

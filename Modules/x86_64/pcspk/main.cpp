@@ -78,8 +78,7 @@ namespace
     ErrorOr<void>   Probe()
     {
         if (!DevTmpFs::RegisterDevice(&s_PCSpeaker)) return Error(EEXIST);
-        if (!VFS::MkNod(VFS::GetRootNode(), "/dev/pcspk", 0644,
-                        s_PCSpeaker.GetID()))
+        if (!VFS::MkNod(nullptr, "/dev/pcspk", 0644, s_PCSpeaker.GetID()))
             return Error(errno);
 
         return {};

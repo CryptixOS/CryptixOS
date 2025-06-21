@@ -136,6 +136,9 @@ namespace Syscall
         RegisterSyscall2(ID::eMkDir, API::VFS::MkDir);
         RegisterSyscall(ID::eRmDir, SysRmDir);
         RegisterSyscall(ID::eCreat, SysCreat);
+        RegisterSyscall2(ID::eLink, API::VFS::Link);
+        RegisterSyscall2(ID::eUnlink, API::VFS::Unlink);
+        RegisterSyscall2(ID::eSymlink, API::VFS::Symlink);
         RegisterSyscall2(ID::eReadLink, API::VFS::ReadLink);
         RegisterSyscall2(ID::eChMod, API::VFS::ChMod);
         RegisterSyscall2(ID::eUmask, API::Process::Umask);
@@ -164,7 +167,10 @@ namespace Syscall
         RegisterSyscall(ID::eOpenAt, VFS::SysOpenAt);
         RegisterSyscall2(ID::eMkDirAt, API::VFS::MkDirAt);
         RegisterSyscall2(ID::eFStatAt, API::VFS::FStatAt);
+        RegisterSyscall2(ID::eUnlinkAt, API::VFS::UnlinkAt);
         RegisterSyscall2(ID::eRenameAt, API::VFS::RenameAt);
+        RegisterSyscall2(ID::eLinkAt, API::VFS::LinkAt);
+        RegisterSyscall2(ID::eSymlinkAt, API::VFS::SymlinkAt);
         RegisterSyscall2(ID::eReadLinkAt, API::VFS::ReadLinkAt);
         RegisterSyscall2(ID::eFChModAt, API::VFS::FChModAt);
         RegisterSyscall2(ID::ePSelect6, API::VFS::PSelect6);

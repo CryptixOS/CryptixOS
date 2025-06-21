@@ -193,7 +193,7 @@ void ProcFs::RemoveProcess(pid_t pid)
     s_Processes.erase(pid);
 }
 INode* ProcFs::Mount(INode* parent, INode* source, INode* target,
-                     StringView name, const void* data)
+                     DirectoryEntry* entry, StringView name, const void* data)
 {
     ScopedLock guard(m_Lock);
     m_MountData
@@ -217,11 +217,12 @@ INode* ProcFs::Mount(INode* parent, INode* source, INode* target,
 
     return m_Root;
 }
-INode* ProcFs::CreateNode(INode* parent, StringView name, mode_t mode)
+INode* ProcFs::CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
+                          uid_t uid, gid_t gid)
 {
     return nullptr;
 }
-INode* ProcFs::Symlink(INode* parent, StringView name, StringView target)
+INode* ProcFs::Symlink(INode* parent, DirectoryEntry* entry, StringView target)
 {
     return nullptr;
 }

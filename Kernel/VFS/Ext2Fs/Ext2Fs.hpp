@@ -20,10 +20,11 @@ class Ext2Fs : public Filesystem
     virtual ~Ext2Fs() = default;
 
     virtual INode* Mount(INode* parent, INode* source, INode* target,
-                         StringView name, const void* data = nullptr) override;
-    virtual INode* CreateNode(INode* parent, StringView name,
-                              mode_t mode) override;
-    virtual INode* Symlink(INode* parent, StringView name,
+                         DirectoryEntry* entry, StringView name,
+                         const void* data = nullptr) override;
+    virtual INode* CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
+                              uid_t uid = 0, gid_t gid = 0) override;
+    virtual INode* Symlink(INode* parent, DirectoryEntry* entry,
                            StringView target) override
     {
         return nullptr;

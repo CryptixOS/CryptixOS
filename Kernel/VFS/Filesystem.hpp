@@ -15,6 +15,7 @@
 #include <Prism/Utility/Atomic.hpp>
 
 class INode;
+class DirectoryEntry;
 class Filesystem
 {
   public:
@@ -35,16 +36,21 @@ class Filesystem
     virtual StringView GetMountFlagsString() const { return "rw,noatime"; }
 
     virtual INode*     Mount(INode* parent, INode* source, INode* target,
-                             StringView name, const void* data = nullptr)
+                             DirectoryEntry* entry, StringView name,
+                             const void* data = nullptr)
         = 0;
-    virtual INode* CreateNode(INode* parent, StringView name, mode_t mode) = 0;
-    virtual INode* Symlink(INode* parent, StringView name, StringView target)
+    virtual INode* CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
+                              uid_t uid = 0, gid_t gid = 0)
+        = 0;
+    virtual INode* Symlink(INode* parent, DirectoryEntry* entry,
+                           StringView target)
         = 0;
 
     virtual INode* Link(INode* parent, StringView name, INode* oldNode) = 0;
     virtual bool   Populate(INode* node)                                = 0;
 
-    virtual INode* MkNod(INode* parent, StringView path, mode_t mode, dev_t dev)
+    virtual INode* MkNod(INode* parent, DirectoryEntry* entry, mode_t mode,
+                         dev_t dev)
     {
         return nullptr;
     }

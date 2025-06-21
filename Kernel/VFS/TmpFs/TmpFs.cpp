@@ -7,6 +7,7 @@
 
 #include <Memory/PMM.hpp>
 
+#include <VFS/DirectoryEntry.hpp>
 #include <VFS/TmpFs/TmpFs.hpp>
 #include <VFS/TmpFs/TmpFsINode.hpp>
 
@@ -19,7 +20,7 @@ TmpFs::TmpFs(u32 flags)
 }
 
 INode* TmpFs::Mount(INode* parent, INode* source, INode* target,
-                    StringView name, const void* data)
+                    DirectoryEntry* entry, StringView name, const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
@@ -28,11 +29,13 @@ INode* TmpFs::Mount(INode* parent, INode* source, INode* target,
     m_MaxSize       = PMM::GetTotalMemory() / 2;
     m_MaxInodeCount = PMM::GetTotalMemory() / PMM::PAGE_SIZE / 2;
 
-    m_Root          = CreateNode(parent, name, 0644 | S_IFDIR);
+    m_Root          = CreateNode(parent, entry, 0644 | S_IFDIR);
+
     if (m_Root) m_MountedOn = target;
     return m_Root;
 }
-INode* TmpFs::CreateNode(INode* parent, StringView name, mode_t mode)
+INode* TmpFs::CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
+                         uid_t uid, gid_t gid)
 {
     if (m_NextInodeIndex >= m_MaxInodeCount
         || (S_ISREG(mode) && m_Size + TmpFsINode::GetDefaultSize() > m_MaxSize))
@@ -42,16 +45,21 @@ INode* TmpFs::CreateNode(INode* parent, StringView name, mode_t mode)
         return nullptr;
     }
 
-    return new TmpFsINode(parent, name, this, mode);
+    auto inode = new TmpFsINode(parent, entry->Name(), this, mode, uid, gid);
+    entry->Bind(inode);
+
+    return inode;
 }
 
-INode* TmpFs::Symlink(INode* parent, StringView name, StringView target)
+INode* TmpFs::Symlink(INode* parent, DirectoryEntry* entry, StringView target)
 {
     if (m_NextInodeIndex >= m_MaxInodeCount) return_err(nullptr, ENOSPC);
 
-    auto node      = new TmpFsINode(parent, name, this, 0777 | S_IFLNK);
-    node->m_Target = target;
+    mode_t mode = S_IFLNK | 0777;
+    auto   node
+        = reinterpret_cast<TmpFsINode*>(CreateNode(parent, entry, mode, 0, 0));
 
+    node->m_Target = target;
     return node;
 }
 

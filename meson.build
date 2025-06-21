@@ -170,6 +170,12 @@ qemu_args = [
   '-nic', 'user,model=rtl8139',
   '-object', 'memory-backend-file,id=erstnvram,mem-path=acpi-erst.backing,size=0x10000,share=on',
   '-device', 'acpi-erst,memdev=erstnvram',
+  #'-device', 'virtio-mmio-device,dev=hd',
+  #'-device', 'virtio-blk-pci,dev=hd',
+  #'-drive', 'file=image.hdd,if=none,id=virtio-disk0,format=raw,cache=none,aio=native', '-device', 'virtio-blk-pci,scsi=off,drive=virtio-disk0,id=disk0',
+  #'-drive', 'file=mydisk,if=none,id=virtio-disk0,format=raw,cache=none,aio=native',
+  #'-device', 'virtio-blk-pci,drive=virtio-disk0,id=disk0',
+  #'-drive', 'file=mydisk,if=none,format=raw,id=hd', '-device', 'virtio-blk-device,drive=hd',
   #'-device', 'virtio-serial-pci,max_ports=2',
   #'-device', 'virtconsole,chardev=vcon,name=vcon0',
   #'-chardev', 'socket,id=vcon,ipv4=on,host=localhost,port=443,server,telnet=on,wait=off',
@@ -342,7 +348,7 @@ endforeach
 
 if arch == 'x86_64'
 foreach table : acpi_files 
-  qemu_args += ['-acpitable', 'file='+table.full_path()]
+  #qemu_args += ['-acpitable', 'file='+table.full_path()]
 endforeach
 endif
 

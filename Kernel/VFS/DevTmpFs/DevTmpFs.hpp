@@ -17,18 +17,19 @@ class DevTmpFs : public Filesystem
     DevTmpFs(u32 flags);
 
     virtual INode* Mount(INode* parent, INode* source, INode* target,
-                         StringView name, const void* data = nullptr) override;
+                         DirectoryEntry* entry, StringView name,
+                         const void* data = nullptr) override;
 
-    virtual INode* CreateNode(INode* parent, StringView name,
-                              mode_t mode) override;
+    virtual INode* CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
+                              uid_t uid = 0, gid_t gid = 0) override;
 
-    virtual INode* Symlink(INode* parent, StringView name,
+    virtual INode* Symlink(INode* parent, DirectoryEntry* entry,
                            StringView target) override;
     virtual INode* Link(INode* parent, StringView name,
                         INode* oldNode) override;
     virtual bool   Populate(INode* node) override { return true; }
 
-    virtual INode* MkNod(INode* parent, StringView path, mode_t mode,
+    virtual INode* MkNod(INode* parent, DirectoryEntry* entry, mode_t mode,
                          dev_t dev) override;
 
     static bool    RegisterDevice(Device* device);

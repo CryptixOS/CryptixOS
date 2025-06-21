@@ -68,19 +68,19 @@ namespace Ustar
                 continue;
             }
 
-            INode* node = nullptr;
+            DirectoryEntry* vnode = nullptr;
             switch (current->Type)
             {
                 case FILE_TYPE_NORMAL:
                 case FILE_TYPE_NORMAL_:
-                    node = VFS::CreateNode(nullptr, filename, mode | S_IFREG);
+                    vnode = VFS::CreateNode(nullptr, filename, mode | S_IFREG);
 
-                    if (!node)
+                    if (!vnode)
                         LogError(
                             "USTAR: Failed to create regular file!, path: "
                             "'{}'",
                             filename);
-                    else if (node->Write(
+                    else if (vnode->INode()->Write(
                                  reinterpret_cast<u8*>(
                                      reinterpret_cast<uintptr_t>(current)
                                      + 512),
@@ -92,15 +92,11 @@ namespace Ustar
                             filename);
                     break;
                 case FILE_TYPE_HARD_LINK:
-                    LogError("USTAR: Loading hard links is not implemented.");
-                    break;
                     LogError("USTAR: Failed to create hardlink: '{}' -> '{}'",
                              filename, linkName);
                     break;
                 case FILE_TYPE_SYMLINK:
-                    node = VFS::Symlink(VFS::GetRootNode(), filename,
-                                        linkName.Raw());
-                    if (!node)
+                    if (!VFS::Symlink(nullptr, filename, linkName.Raw()))
                         LogError(
                             "USTAR: Failed to create Symlink: '{}' -> '{}'",
                             filename, linkName);
@@ -112,10 +108,8 @@ namespace Ustar
                     u32 deviceMinor = parseOctNumber<u32>(
                         current->DeviceMinor, sizeof(current->DeviceMinor));
 
-                    VFS::MkNod(VFS::GetRootNode(), filename, mode | S_IFCHR,
-                               MakeDevice(deviceMajor, deviceMinor));
-
-                    if (!node)
+                    if (!VFS::MkNod(nullptr, filename, mode | S_IFCHR,
+                                    MakeDevice(deviceMajor, deviceMinor)))
                         LogError(
                             "USTAR: Failed to create character device! path: "
                             "'{}', id: "
@@ -125,8 +119,8 @@ namespace Ustar
                 }
                 case FILE_TYPE_BLOCK_DEVICE: ToDo(); break;
                 case FILE_TYPE_DIRECTORY:
-                    node = VFS::CreateNode(nullptr, filename, mode | S_IFDIR);
-                    if (!node)
+                    vnode = VFS::CreateNode(nullptr, filename, mode | S_IFDIR);
+                    if (!vnode)
                         LogError(
                             "USTAR: Failed to create a directory! path: '{}'",
                             filename);

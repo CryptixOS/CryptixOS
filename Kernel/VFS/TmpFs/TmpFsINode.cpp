@@ -14,17 +14,15 @@
 #include <VFS/TmpFs/TmpFsINode.hpp>
 
 TmpFsINode::TmpFsINode(INode* parent, StringView name, Filesystem* fs,
-                       mode_t mode)
+                       mode_t mode, uid_t uid, gid_t gid)
     : INode(parent, name, fs)
 {
-    Process* process   = Process::GetCurrent();
-
     m_Stats.st_dev     = fs->GetDeviceID();
     m_Stats.st_ino     = fs->GetNextINodeIndex();
     m_Stats.st_nlink   = 1;
     m_Stats.st_mode    = mode;
-    m_Stats.st_uid     = process ? process->GetCredentials().euid : 0;
-    m_Stats.st_gid     = process ? process->GetCredentials().egid : 0;
+    m_Stats.st_uid     = uid;
+    m_Stats.st_gid     = gid;
     m_Stats.st_rdev    = 0;
     m_Stats.st_size    = 0;
     m_Stats.st_blksize = 512;
@@ -134,17 +132,31 @@ ErrorOr<void> TmpFsINode::Rename(INode* newParent, StringView newName)
 
     return {};
 }
-ErrorOr<void> TmpFsINode::MkDir(StringView name, mode_t mode)
+ErrorOr<void> TmpFsINode::MkDir(StringView name, mode_t mode, uid_t uid,
+                                gid_t gid)
 {
     if (m_Children.contains(name)) return Error(EEXIST);
     auto umask = Process::Current()->GetUmask();
     mode &= ~umask & 0777;
 
-    auto node = m_Filesystem->CreateNode(this, name, mode | S_IFDIR);
+    auto entry = new class DirectoryEntry(name);
+    auto node  = reinterpret_cast<TmpFsINode*>(
+        m_Filesystem->CreateNode(this, entry, mode | S_IFDIR, uid, gid));
     if (!node) return Error(errno);
 
     m_Children[node->GetName()] = node;
     return {};
+}
+ErrorOr<void> TmpFsINode::Link(PathView path)
+{
+    // auto pathRes = VFS::ResolvePath(VFS::GetRootNode(), path);
+    // if (pathRes.Node) return Error(EEXIST);
+
+    // auto parent = pathRes.Parent;
+    // parent->InsertChild(this, pathRes.BaseName);
+
+    // return {};
+    return Error(ENOSYS);
 }
 ErrorOr<void> TmpFsINode::ChMod(mode_t mode)
 {

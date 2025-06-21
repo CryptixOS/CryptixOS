@@ -13,7 +13,9 @@
 #include <Library/UserBuffer.hpp>
 #include <Prism/Containers/Deque.hpp>
 
+#include <VFS/File.hpp>
 #include <VFS/INode.hpp>
+#include <VFS/DirectoryEntry.hpp>
 
 enum class FileAccessMode
 {
@@ -66,29 +68,35 @@ struct FileDescription
     Spinlock         Lock;
     Atomic<usize>    RefCount = 0;
 
-    INode*           Node;
+    DirectoryEntry*           Node;
     usize            Offset     = 0;
 
     i32              Flags      = 0;
     FileAccessMode   AccessMode = FileAccessMode::eRead;
     DirectoryEntries DirEntries;
 
-    inline void      IncRefCount() { ++RefCount; }
-    inline void      DecRefCount() { --RefCount; }
+    inline ~FileDescription()
+    {
+        // FIXME(v1t10l7): if (RefCount == 0) delete Node;
+    }
+
+    inline void IncRefCount() { ++RefCount; }
+    inline void DecRefCount() { --RefCount; }
 };
 
-class FileDescriptor
+class FileDescriptor : public File
 {
   public:
-    FileDescriptor(INode* node, i32 flags, FileAccessMode accMode);
+    FileDescriptor(DirectoryEntry* node, i32 flags, FileAccessMode accMode);
     FileDescriptor(FileDescriptor* fd, i32 flags = 0);
     virtual ~FileDescriptor();
 
-    inline INode* GetNode() const { return m_Description->Node; }
-    inline usize  GetOffset() const { return m_Description->Offset; }
+    inline INode*    GetNode() const { return m_Description->Node->INode(); }
+    constexpr DirectoryEntry* DirectoryEntry() const { return m_Description->Node; }
+    inline usize     GetOffset() const { return m_Description->Offset; }
 
-    inline i32    GetFlags() const { return m_Flags; }
-    inline void   SetFlags(i32 flags)
+    inline i32       GetFlags() const { return m_Flags; }
+    inline void      SetFlags(i32 flags)
     {
         ScopedLock guard(m_Lock);
         m_Flags = flags;
@@ -102,35 +110,35 @@ class FileDescriptor
     }
 
     virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
-                                isize offset = -1)
+                                isize offset = -1) override;
+    inline ErrorOr<isize>  Read(void* const outBuffer, usize count)
     {
-        if (offset >= 0)
-        {
-            auto result = Seek(SEEK_SET, offset);
-            if (!result) return Error(result.error());
-        }
-        return Read(out.Raw(), count);
+        auto bufferOr = UserBuffer::ForUserBuffer(outBuffer, count);
+        if (!bufferOr) return Error(bufferOr.error());
+        auto buffer = bufferOr.value();
+
+        return Read(buffer, count, m_Description->Offset);
     }
     virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
-                                 isize offset = -1)
+                                 isize offset = -1) override;
+    inline ErrorOr<isize>  Write(const void* inBuffer, usize count)
     {
-        auto result = Seek(SEEK_SET, offset);
-        if (!result) return Error(result.error());
+        auto bufferOr = UserBuffer::ForUserBuffer(inBuffer, count);
+        if (!bufferOr) return Error(bufferOr.error());
+        auto buffer = bufferOr.value();
 
-        return Write(in.Raw(), count);
+        return Write(buffer, count, m_Description->Offset);
     }
-    virtual ErrorOr<isize> Read(void* const outBuffer, usize count);
-    ErrorOr<isize>         Write(const void* data, isize bytes);
-    ErrorOr<const stat*>   Stat() const;
-    ErrorOr<isize>         Seek(i32 whence, off_t offset);
-    ErrorOr<isize>         Truncate(off_t size);
+    virtual ErrorOr<const stat*> Stat() const override;
+    virtual ErrorOr<isize>       Seek(i32 whence, off_t offset) override;
+    virtual ErrorOr<isize>       Truncate(off_t size) override;
 
-    void                   Lock() { m_Description->Lock.Acquire(); }
-    void                   Unlock() { m_Description->Lock.Release(); }
+    void                         Lock() { m_Description->Lock.Acquire(); }
+    void                         Unlock() { m_Description->Lock.Release(); }
 
     // TODO(v1t10l7): verify whether the fd is blocking
-    inline bool            WouldBlock() const { return false; }
-    inline bool IsSocket() const { return m_Description->Node->IsSocket(); }
+    inline bool                  WouldBlock() const { return false; }
+    inline bool IsSocket() const override { return GetNode()->IsSocket(); }
     inline bool IsPipe() const
     {
         // FIXME(v1tr10l7): implement this once pipes are supported

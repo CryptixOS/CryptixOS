@@ -14,121 +14,78 @@ Fifo::Fifo()
     : INode("Fifo")
 {
     m_Stats.st_mode = 0644 | S_IFIFO;
-    m_Data          = new u8[FIFO_SIZE];
-    m_Capacity      = FIFO_SIZE;
+    m_Buffer.Reserve(FIFO_SIZE);
 }
 
 FileDescriptor* Fifo::Open(Fifo::Direction direction)
 {
 
-    auto fd = new FileDescriptor(this, 0,
+    auto fd = new FileDescriptor(DirectoryEntry(), 0,
                                  direction == Direction::eRead
                                      ? FileAccessMode::eRead
                                      : FileAccessMode::eWrite);
     if (direction == Direction::eRead) ++m_ReaderCount;
     else ++m_WriterCount;
+
+    m_Event.Trigger(false);
     return fd;
 }
 
-isize Fifo::Read(void* buffer, off_t offset, usize bytes)
+isize Fifo::Read(void* buffer, off_t offset, usize count)
 {
-    isize nread      = 0;
-    usize beforeWrap = 0;
-    usize afterWrap  = 0;
-    usize newOffset  = 0;
+    isize nread = 0;
     m_Lock.Acquire();
 
-    while (m_Size == 0)
+    while (m_Buffer.Used() == 0)
     {
-        if (m_WriterCount == 0 || m_NonBlocking) goto cleanup;
+        if (m_WriterCount == 0 || m_NonBlocking)
+        {
+            nread = 0;
+            goto cleanup;
+        }
+
         m_Lock.Release();
         m_Event.Await();
-
         m_Lock.Acquire();
     }
 
-    if (m_Size < bytes) bytes = m_Size;
-
-    if (m_ReadOffset + bytes > m_Capacity)
-    {
-        beforeWrap = m_Capacity - m_ReadOffset;
-        afterWrap  = bytes - beforeWrap;
-        newOffset  = afterWrap;
-    }
-    else
-    {
-        beforeWrap = bytes;
-        afterWrap  = 0;
-        newOffset  = m_ReadOffset + bytes;
-
-        if (newOffset == m_Capacity) newOffset = 0;
-    }
-
-    std::memcpy(buffer, m_Data + m_ReadOffset, beforeWrap);
-    if (afterWrap != 0)
-        std::memcpy(reinterpret_cast<u8*>(buffer) + beforeWrap, m_Data,
-                    afterWrap);
-
-    m_ReadOffset = newOffset;
-    m_Size -= bytes;
+    count = std::min(count, m_Buffer.Used());
+    nread = CPU::AsUser(
+        [&]() -> isize
+        { return m_Buffer.Read(reinterpret_cast<u8*>(buffer), count); });
 
     m_Event.Trigger(false);
-    nread = bytes;
-
 cleanup:
     m_Lock.Release();
     return nread;
 }
-isize Fifo::Write(const void* buffer, off_t offset, usize bytes)
+isize Fifo::Write(const void* buffer, off_t offset, usize count)
 {
-    isize written    = 0;
-    usize beforeWrap = 0;
-    usize afterWrap  = 0;
-    usize newOffset  = 0;
+    isize nwritten = 0;
     m_Lock.Acquire();
-
     if (m_ReaderCount == 0)
     {
-        errno = EPIPE;
+        errno    = EPIPE;
+        nwritten = -1;
         goto cleanup;
     }
 
-    while (m_Size == m_Capacity)
+    while (m_Buffer.Used() == m_Buffer.Capacity())
     {
         m_Lock.Release();
-        m_Event.Await(true);
+        m_Event.Await();
         m_Lock.Acquire();
     }
 
-    if (m_Size + bytes > m_Capacity) bytes = m_Capacity - m_Size;
+    if (m_Buffer.Used() + count > m_Buffer.Capacity())
+        count = m_Buffer.Capacity() - m_Buffer.Used();
 
-    if (m_WriteOffset + bytes > m_Capacity)
-    {
-        beforeWrap = m_Capacity - m_WriteOffset;
-        afterWrap  = bytes - beforeWrap;
-        newOffset  = afterWrap;
-    }
-    else
-    {
-        beforeWrap = bytes;
-        afterWrap  = 0;
-        newOffset  = m_WriteOffset + bytes;
-
-        if (newOffset == m_Capacity) newOffset = 0;
-    }
-
-    std::memcpy(m_Data + m_WriteOffset, buffer, beforeWrap);
-    if (afterWrap != 0)
-        std::memcpy(m_Data, reinterpret_cast<const u8*>(buffer) + beforeWrap,
-                    afterWrap);
-
-    m_WriteOffset = newOffset;
-    m_Size += bytes;
-
+    nwritten = CPU::AsUser(
+        [&]() -> isize
+        { return m_Buffer.Write(reinterpret_cast<const u8*>(buffer), count); });
     m_Event.Trigger();
-    written = bytes;
 
 cleanup:
     m_Lock.Release();
-    return written;
+    return nwritten;
 }

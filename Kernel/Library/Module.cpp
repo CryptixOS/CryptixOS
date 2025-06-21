@@ -12,6 +12,7 @@
 #include <Memory/VMM.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
+#include <VFS/DirectoryEntry.hpp>
 
 #include <magic_enum/magic_enum.hpp>
 
@@ -37,8 +38,11 @@ static void                              LoadModuleFromFile(INode* node)
 }
 bool Module::Load()
 {
-    INode* moduleDirectory
-        = VFS::ResolvePath(VFS::GetRootNode(), "/lib/modules/").Node;
+    auto moduleDirectoryDirectoryEntry
+        = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), "/lib/modules/").Node;
+    if (!moduleDirectoryDirectoryEntry) return false;
+
+    auto moduleDirectory = moduleDirectoryDirectoryEntry->INode();
     if (!moduleDirectory) return false;
 
     for (const auto& [name, child] : moduleDirectory->GetChildren())

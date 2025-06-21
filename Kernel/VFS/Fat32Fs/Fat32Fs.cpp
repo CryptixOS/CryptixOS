@@ -8,6 +8,7 @@
 
 #include <Prism/Utility/Math.hpp>
 
+#include <VFS/DirectoryEntry.hpp>
 #include <VFS/INode.hpp>
 
 #include <VFS/Fat32Fs/Fat32Fs.hpp>
@@ -24,7 +25,7 @@ constexpr usize       FAT32_REAL_FS_INFO_SIGNATURE  = 0x61417272;
 constexpr usize       FAT32_REAL_FS_INFO_SIGNATURE2 = 0xaa550000;
 
 INode* Fat32Fs::Mount(INode* parent, INode* source, INode* target,
-                      StringView name, const void* data)
+                      DirectoryEntry* entry, StringView name, const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
@@ -79,7 +80,7 @@ INode* Fat32Fs::Mount(INode* parent, INode* source, INode* target,
 
     UpdateFsInfo();
 
-    m_Root     = CreateNode(parent, name, 0644 | S_IFDIR);
+    m_Root     = CreateNode(parent, entry, 0644 | S_IFDIR);
     m_RootNode = reinterpret_cast<Fat32FsINode*>(m_Root);
 
     m_RootNode->m_Stats.st_blocks
@@ -95,8 +96,11 @@ INode* Fat32Fs::Mount(INode* parent, INode* source, INode* target,
     return m_RootNode;
 }
 
-INode* Fat32Fs::CreateNode(INode* parent, StringView name, mode_t mode)
+INode* Fat32Fs::CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
+                           uid_t uid, gid_t gid)
 {
+    StringView name = entry->Name();
+
     if (name.Size() > 255) return_err(nullptr, ENAMETOOLONG);
     if (!S_ISREG(mode) && !S_ISDIR(mode)) return_err(nullptr, EPERM);
 
@@ -190,8 +194,10 @@ bool Fat32Fs::Populate(INode* node)
                 entry->Attributes & Fat32Attribute::eDirectory,
                 entry->Attributes & Fat32Attribute::eSystem);
 
-        Fat32FsINode* newNode = reinterpret_cast<Fat32FsINode*>(
-            CreateNode(node, nameBuffer, mode));
+        auto          dentry = new DirectoryEntry(nameBuffer);
+        Fat32FsINode* newNode
+            = reinterpret_cast<Fat32FsINode*>(CreateNode(node, dentry, mode));
+        dentry->Bind(newNode);
         if (!newNode)
         {
             LogError("Fat32::Populate: Failed to create new node");
