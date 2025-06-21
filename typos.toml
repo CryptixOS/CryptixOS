@@ -7,6 +7,7 @@ extend-ignore-identifiers-re = [
     "Paeth", "isue", "childs",
     "fillin", "ful", "Nd", "onl",
     "RELA", "THM", "Rela", "INEX",
+    "SerDesc",
 ]
 
 [files]
