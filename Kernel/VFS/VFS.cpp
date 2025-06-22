@@ -151,14 +151,16 @@ namespace VFS
             if (!parent->INode()->ValidatePermissions(current->GetCredentials(),
                                                       5))
                 return Error(EACCES);
-            auto dentry = VFS::CreateNode(
-                parent, path, (mode & ~current->GetUmask()) | S_IFREG);
+            dentry = VFS::CreateNode(parent, path,
+                                     (mode & ~current->GetUmask()) | S_IFREG);
 
             if (!dentry) return Error(ENOENT);
         }
         else if (flags & O_EXCL) return Error(EEXIST);
 
-        auto node = dentry->INode()->Reduce(followSymlinks, true);
+        dentry    = dentry->FollowMounts();
+        dentry    = dentry->FollowSymlinks();
+        auto node = dentry->INode();
         if (!node) return Error(ENOENT);
 
         if (node->IsSymlink()) return Error(ELOOP);
