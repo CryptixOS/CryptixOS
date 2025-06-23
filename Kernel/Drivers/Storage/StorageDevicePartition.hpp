@@ -12,13 +12,7 @@ class StorageDevicePartition : public Device
 {
   public:
     StorageDevicePartition(StorageDevice& device, u64 firstBlock, u64 lastBlock,
-                           u16 majorID, u16 minorID)
-        : Device(majorID, minorID)
-        , m_Device(device)
-        , m_FirstBlock(firstBlock)
-        , m_LastBlock(lastBlock)
-    {
-    }
+                           u16 majorID, u16 minorID);
 
     virtual StringView GetName() const noexcept override
     {
@@ -35,8 +29,9 @@ class StorageDevicePartition : public Device
     virtual ErrorOr<isize> Write(const void* src, off_t offset,
                                  usize bytes) override
     {
-        if (m_FirstBlock + offset >= m_LastBlock) return_err(-1, ENODEV);
-        return m_Device.Write(src, m_FirstBlock + offset, bytes);
+        // if (m_FirstBlock + offset >= m_LastBlock) return_err(-1, ENODEV);
+        return m_Device.Write(
+            src, m_Device.GetStats().st_blksize * m_FirstBlock + offset, bytes);
     }
 
     virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
@@ -56,7 +51,7 @@ class StorageDevicePartition : public Device
     }
 
   private:
-    StorageDevice& m_Device;
-    u64            m_FirstBlock;
-    u64            m_LastBlock;
+    StorageDevice&  m_Device;
+    u64             m_FirstBlock;
+    CTOS_UNUSED u64 m_LastBlock;
 };

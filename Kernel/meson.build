@@ -38,6 +38,7 @@ srcs += files(
 
   'Drivers/Storage/PartitionTable.cpp',
   'Drivers/Storage/StorageDevice.cpp',
+  'Drivers/Storage/StorageDevicePartition.cpp',
 
   'Drivers/Storage/NVMe/NVMeController.cpp',
   'Drivers/Storage/NVMe/NVMeNameSpace.cpp',
@@ -96,6 +97,7 @@ srcs += files(
   'VFS/EchFs/EchFsINode.cpp',
 
   'VFS/Ext2Fs/Ext2Fs.cpp',
+  'VFS/Ext2Fs/Ext2FsAllocator.cpp',
   'VFS/Ext2Fs/Ext2FsINode.cpp',
 
   'VFS/Fat32Fs/Fat32Fs.cpp',
