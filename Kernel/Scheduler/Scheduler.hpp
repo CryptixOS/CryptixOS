@@ -20,6 +20,11 @@ class Scheduler
     static void     InitializeProcFs();
     static void     PrepareAP(bool start = false);
 
+    static bool     IsPreemptionEnabled();
+
+    static void     EnablePreemption();
+    static void     DisablePreemption();
+
     static void     Block(Thread* thread);
     static void     Unblock(Thread* thread);
 
@@ -27,7 +32,7 @@ class Scheduler
 
     static Process* GetKernelProcess();
 
-    static Process* CreateProcess(Process* parent, std::string_view name,
+    static Process* CreateProcess(Process* parent, StringView name,
                                   const Credentials& creds);
     static void     RemoveProcess(pid_t pid);
 

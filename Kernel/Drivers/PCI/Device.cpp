@@ -24,27 +24,26 @@ namespace PCI
 {
     Pointer Bar::Map(usize alignment)
     {
-        if (!IsMMIO) return 0;
-
-        if (Base.Raw() != 0) return Base;
+        if (!IsMMIO) return nullptr;
+        if (Base) return Base;
 
         if (VMM::GetKernelPageMap()->Virt2Phys(Address.ToHigherHalf<u64>())
             == uintptr_t(-1))
         {
-            usize pageSize = PMM::PAGE_SIZE;
-            auto  base     = Math::AlignDown(Address.Raw(), pageSize);
-            auto  len
-                = Math::AlignUp(Address.Offset<u64>(Size), pageSize) - base;
+            usize   pageSize = PMM::PAGE_SIZE;
+            Pointer base     = Math::AlignDown(Address.Raw(), pageSize);
+            auto    len = Math::AlignUp(Address.Offset<u64>(Size), pageSize)
+                     - base.Raw();
 
             auto virt
                 = VMM::AllocateSpace(len, alignment ?: pageSize, !Is64Bit);
             VMM::GetKernelPageMap()->MapRange(virt, base, len,
                                               PageAttributes::eRW);
-            Base = virt + (Address.Raw() - base);
+            Base = virt + Address - base;
+            return Base;
         }
-        else Base = Address.ToHigherHalf<Pointer>();
 
-        return Base;
+        return (Base = Address.ToHigherHalf<Pointer>());
     }
 
     void Device::EnableMemorySpace()

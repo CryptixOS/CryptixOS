@@ -8,12 +8,18 @@
 
 #include <Library/Stacktrace.hpp>
 
+#include <Memory/AddressSpace.hpp>
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
 
+#include <Prism/Containers/DoublyLinkedList.hpp>
+#include <Prism/Containers/Span.hpp>
 #include <Prism/Containers/Vector.hpp>
+#include <Prism/Memory/Buffer.hpp>
 #include <Prism/Memory/ByteStream.hpp>
 #include <Prism/PathView.hpp>
+
+#include <unordered_map>
 
 namespace ELF
 {
@@ -272,10 +278,12 @@ namespace ELF
     class Image
     {
       public:
-        bool        LoadFromMemory(u8* data, usize size);
-        bool        Load(PathView path, PageMap* pageMap,
-                         Vector<VMM::Region>& addressSpace, uintptr_t loadBase = 0);
-        bool        Load(Pointer image, usize size);
+        bool LoadFromMemory(u8* data, usize size);
+        bool ResolveSymbols(Span<Sym*> symbolTable);
+
+        bool Load(PathView path, PageMap* pageMap, AddressSpace& addressSpace,
+                  uintptr_t loadBase = 0);
+        bool Load(Pointer image, usize size);
 
         static bool LoadModules(const u64 sectionCount, SectionHeader* sections,
                                 char* stringTable);
@@ -298,24 +306,26 @@ namespace ELF
         }
 
         inline const Vector<Symbol>& GetSymbols() const { return m_Symbols; }
-        inline std::string_view      GetLdPath() const { return m_LdPath; }
+        inline StringView            GetLdPath() const { return m_LdPath; }
 
       private:
-        u8*                   m_Image = nullptr;
-        Header                m_Header;
-        Vector<ProgramHeader> m_ProgramHeaders;
-        Vector<SectionHeader> m_Sections;
-        AuxiliaryVector       m_AuxiliaryVector;
+        Buffer                                  m_Image;
 
-        std::optional<u64>    m_StringSectionIndex;
-        std::optional<u64>    m_SymbolSectionIndex;
-        u8*                   m_StringTable = nullptr;
+        Header                                  m_Header;
+        Vector<ProgramHeader>                   m_ProgramHeaders;
+        Vector<SectionHeader>                   m_Sections;
+        AuxiliaryVector                         m_AuxiliaryVector;
 
-        Vector<Symbol>        m_Symbols;
-        std::string_view      m_LdPath;
+        SectionHeader*                          m_SymbolSection = nullptr;
+        SectionHeader*                          m_StringSection = nullptr;
+        u8*                                     m_StringTable   = nullptr;
 
-        bool                  Parse();
-        void                  LoadSymbols();
+        Vector<Symbol>                          m_Symbols;
+        std::unordered_map<StringView, Pointer> m_SymbolTable;
+        StringView                              m_LdPath;
+
+        bool                                    Parse();
+        void                                    LoadSymbols();
 
         bool ParseProgramHeaders(ByteStream<Endian::eLittle>& stream);
         bool ParseSectionHeaders(ByteStream<Endian::eLittle>& stream);
@@ -323,7 +333,7 @@ namespace ELF
         template <typename T>
         void Read(T* buffer, isize offset, isize count = sizeof(T))
         {
-            std::memcpy(buffer, m_Image + offset, count);
+            std::memcpy(buffer, m_Image.Raw() + offset, count);
         }
     };
 }; // namespace ELF

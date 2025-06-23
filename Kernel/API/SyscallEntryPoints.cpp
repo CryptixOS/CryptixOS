@@ -22,17 +22,6 @@ namespace Syscall
     namespace API = API::VFS;
     using namespace ::API;
 
-    ErrorOr<isize> SysMMap(Arguments& args)
-    {
-        uintptr_t addr   = args.Get<uintptr_t>(0);
-        usize     len    = args.Get<usize>(1);
-        i32       prot   = args.Get<uintptr_t>(2);
-        i32       flags  = args.Get<uintptr_t>(3);
-        i32       fdNum  = args.Get<uintptr_t>(4);
-        off_t     offset = args.Get<uintptr_t>(5);
-
-        return ::API::MM::SysMMap(addr, len, prot, flags, fdNum, offset);
-    }
     ErrorOr<isize> SysPipe(Arguments& args)
     {
         i32*     pipeFds = args.Get<i32*>(0);

@@ -6,66 +6,201 @@
  */
 #pragma once
 
+#include <API/Posix/sys/statfs.h>
 #include <API/UnixTypes.hpp>
-#include <Prism/Spinlock.hpp>
 
-#include <atomic>
+#include <Library/Spinlock.hpp>
+
+#include <Prism/String/String.hpp>
+#include <Prism/Utility/Atomic.hpp>
 
 class INode;
+class DirectoryEntry;
+
+/**
+ * @class Filesystem
+ * @brief Abstract base class representing a mounted filesystem.
+ *
+ * A filesystem handles mounting, inode creation, linking,
+ * and other filesystem-level operations.
+ * @ingroup Filesystem
+ */
 class Filesystem
 {
   public:
-    Filesystem(std::string_view name, u32 flags)
+    /**
+     * @brief Construct a new Filesystem instance.
+     *
+     * @param name Name of the filesystem.
+     * @param flags Mount flags or other internal flags.
+     */
+    Filesystem(StringView name, u32 flags)
         : m_Name(name)
         , m_Flags(flags)
     {
     }
+    /**
+     * @brief Destructs the filesystem
+     */
     virtual ~Filesystem() = default;
 
-    inline std::string_view  GetName() const { return m_Name; }
-    inline INode*            GetMountedOn() { return m_MountedOn; }
-    inline INode*            GetRootNode() { return m_Root; }
-    inline ino_t             GetNextINodeIndex() { return m_NextInodeIndex++; }
-    inline dev_t             GetDeviceID() const { return m_DeviceID; }
+    /**
+     * @brief Get the name of the filesystem.
+     *
+     * @return StringView Name of the filesystem.
+     */
+    inline StringView       Name() const { return m_Name; }
+    /**
+     * @brief Get the INode on which this filesystem is mounted.
+     *
+     * @return INode* Pointer to the mount point inode.
+     * @ingroup Filesystem
+     */
+    inline INode*           MountedOn() { return m_MountedOn; }
+    /**
+     * @brief Get the root INode of this filesystem.
+     *
+     * @return INode* Pointer to the root inode.
+     * @ingroup Filesystem
+     */
+    inline INode*           RootNode() { return m_Root; }
+    /**
+     * @brief Get the next available inode index.
+     *
+     * @return ino_t Next inode index (auto-incremented).
+     */
+    inline ino_t            NextINodeIndex() { return m_NextInodeIndex++; }
+    /**
+     * @brief Get the device ID of the backing device.
+     *
+     * @return dev_t Device ID.
+     */
+    inline dev_t            DeviceID() const { return m_DeviceID; }
+    /**
+     * @brief Get the name of the backing device.
+     *
+     * @return StringView Device name.
+     */
+    virtual StringView      DeviceName() const { return m_Name; }
+    /**
+     * @brief Get a string representation of mount flags.
+     *
+     * @return StringView Flags as a string (e.g. "rw,noatime").
+     */
+    virtual StringView      MountFlagsString() const { return "rw,noatime"; }
 
-    virtual std::string_view GetDeviceName() const { return m_Name; }
-    virtual std::string_view GetMountFlagsString() const
-    {
-        return "rw,noatime";
-    }
+    /**
+     * @brief Mount the filesystem.
+     *
+     * @param parent Parent INode where mount occurs.
+     * @param source Optional source device INode.
+     * @param target Target INode to mount onto.
+     * @param entry Directory entry for the mount point.
+     * @param name Filesystem name.
+     * @param data Optional filesystem-specific mount data.
+     *
+     * @return ErrorOr<INode*> Root node of the mounted filesystem or error.
+     */
+    virtual ErrorOr<INode*> Mount(INode* parent, INode* source, INode* target,
+                                  DirectoryEntry* entry, StringView name,
+                                  const void* data = nullptr)
+        = 0;
+    /**
+     * @brief Create a new inode (file or directory).
+     *
+     * @param parent Parent directory.
+     * @param entry Directory entry under which to create node.
+     * @param mode File mode (type and permissions).
+     * @param uid Owner user ID.
+     * @param gid Owner group ID.
+     *
+     * @return ErrorOr<INode*> Pointer to the new inode or error.
+     */
+    virtual ErrorOr<INode*> CreateNode(INode* parent, DirectoryEntry* entry,
+                                       mode_t mode, uid_t uid = 0,
+                                       gid_t gid = 0)
+        = 0;
+    /**
+     * @brief Create a symbolic link.
+     *
+     * @param parent Parent directory.
+     * @param entry Directory entry for the link.
+     * @param target Path the link should point to.
+     *
+     * @return ErrorOr<INode*> Pointer to the symlink inode or error.
+     */
+    virtual ErrorOr<INode*> Symlink(INode* parent, DirectoryEntry* entry,
+                                    StringView target)
+        = 0;
+    /**
+     * @brief Create a hard link to an existing inode.
+     *
+     * @param parent Directory in which to place the link.
+     * @param name Name of the new link.
+     * @param oldNode The inode to link to.
+     *
+     * @return INode* Pointer to the newly linked inode.
+     */
+    virtual INode* Link(INode* parent, StringView name, INode* oldNode) = 0;
+    /**
+     * @brief Populate directory contents, if lazy-loading is used.
+     *
+     * @param node Directory to populate.
+     *
+     * @return true if successful or not needed, false on failure.
+     */
+    virtual bool   Populate(INode* node)                                = 0;
 
-    virtual INode* Mount(INode* parent, INode* source, INode* target,
-                         std::string_view name, const void* data = nullptr)
-        = 0;
-    virtual INode* CreateNode(INode* parent, std::string_view name, mode_t mode)
-        = 0;
-    virtual INode* Symlink(INode* parent, std::string_view name,
-                           std::string_view target)
-        = 0;
-
-    virtual INode* Link(INode* parent, std::string_view name, INode* oldNode)
-        = 0;
-    virtual bool   Populate(INode* node) = 0;
-
-    virtual INode* MkNod(INode* parent, std::string_view path, mode_t mode,
-                         dev_t dev)
+    /**
+     * @brief Create a special or device file node.
+     *
+     * @param parent Parent directory.
+     * @param entry Directory entry.
+     * @param mode Mode specifying node type.
+     * @param dev Device ID for special node.
+     *
+     * @return ErrorOr<INode*> Pointer to new node or error.
+     */
+    virtual ErrorOr<INode*> MkNod(INode* parent, DirectoryEntry* entry,
+                                  mode_t mode, dev_t dev)
     {
         return nullptr;
     }
 
-    virtual bool ShouldUpdateATime() { return true; }
-    virtual bool ShouldUpdateMTime() { return true; }
-    virtual bool ShouldUpdateCTime() { return true; }
+    /**
+     * @brief Return filesystem statistics (like block size, usage).
+     *
+     * @param stats Reference to struct to populate.
+     *
+     * @return ErrorOr<void> Success or error.
+     */
+    virtual ErrorOr<void> Stats(statfs& stats) { return Error(ENOSYS); }
+
+    virtual bool          ShouldUpdateATime() { return true; }
+    virtual bool          ShouldUpdateMTime() { return true; }
+    virtual bool          ShouldUpdateCTime() { return true; }
 
   protected:
-    Spinlock           m_Lock;
+    // Synchronization lock for internal access
+    Spinlock      m_Lock;
 
-    std::string        m_Name;
-    u32                m_Flags          = 0;
-    INode*             m_Root           = nullptr;
-    INode*             m_MountedOn      = nullptr;
-    void*              m_MountData      = nullptr;
+    String        m_Name           = "NoFs";
+    dev_t         m_DeviceID       = -1;
+    usize         m_BlockSize      = 512;
+    usize         m_BytesLimit     = 0;
+    ///> Filesystem specific flags for internal use
+    u32           m_Flags          = 0;
 
-    std::atomic<ino_t> m_NextInodeIndex = 2;
-    dev_t              m_DeviceID       = 0;
+    ///> Backing device
+    INode*        m_SourceDevice   = nullptr;
+    ///> Root inode
+    INode*        m_Root           = nullptr;
+
+    ///> Host inode
+    INode*        m_MountedOn      = nullptr;
+    ///> Filesystem specific data
+    void*         m_MountData      = nullptr;
+
+    ///> Counter for generating inode ids
+    Atomic<ino_t> m_NextInodeIndex = 2;
 };

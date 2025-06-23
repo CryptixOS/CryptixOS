@@ -13,15 +13,13 @@
 
 #include <cstring>
 
-using Prism::Pointer;
-
 #define LIMINE_REQUEST                                                         \
     __attribute__((used, section(".limine_requests"))) volatile
 
 namespace
 {
     __attribute__((
-        used, section(".limine_requests"))) volatile LIMINE_BASE_REVISION(3);
+        used, section(".limine_requests"))) volatile LIMINE_BASE_REVISION(2);
 } // namespace
 
 namespace BootInfo
@@ -148,12 +146,7 @@ namespace
 
 } // namespace
 
-namespace
-{
-    FirmwareType     s_FirmwareType      = FirmwareType::eUndefined;
-    MemoryMapEntry** memoryMap           = nullptr;
-    u64              memoryMapEntryCount = 0;
-} // namespace
+static FirmwareType s_FirmwareType = FirmwareType::eUndefined;
 
 extern "C" CTOS_NO_KASAN [[noreturn]] void kernelStart();
 
@@ -169,7 +162,13 @@ namespace BootInfo
         (void)s_EntryPointRequest.response;
 
         Logger::EnableSink(LOG_SINK_E9);
-#if CTOS_ARCH == CTOS_ARCH_X86_64
+#if defined(CTOS_TARGET_X86_64) && defined(__aarch64__)
+    #error "target is aarch64 and CTOS_TARGET_X86_64 is defined"
+#elif defined(__aarch64__) && !defined(CTOS_TARGET_AARCH64)
+    #error "target is aarch64 and CTOS_TARGET_AARCH64 is not defined"
+#endif
+
+#if defined(CTOS_TARGET_X86_64) && !defined(CTOS_TARGET_AARCH64)
         Logger::EnableSink(LOG_SINK_SERIAL);
 #endif
 
@@ -178,15 +177,11 @@ namespace BootInfo
         if (!s_FramebufferRequest.response
             || s_FramebufferRequest.response->framebuffer_count < 1)
             EarlyPanic("Boot: Failed to acquire the framebuffer!");
-        // Logger::EnableSink(LOG_SINK_TERMINAL);
+        Logger::EnableSink(LOG_SINK_TERMINAL);
 
         if (!s_MemmapRequest.response
             || s_MemmapRequest.response->entry_count == 0)
             Panic("Boot: Failed to acquire limine memory map entries");
-
-        memoryMap = reinterpret_cast<MemoryMapEntry**>(
-            s_MemmapRequest.response->entries);
-        memoryMapEntryCount = s_MemmapRequest.response->entry_count;
 
         switch (s_FirmwareTypeRequest.response->firmware_type)
         {
@@ -216,9 +211,9 @@ namespace BootInfo
         VerifyExistenceOrRet(s_BootloaderInfoRequest);
         return s_BootloaderInfoRequest.response->version;
     }
-    std::string_view GetKernelCommandLine()
+    StringView GetKernelCommandLine()
     {
-        VerifyExistenceOrRet(s_ExecutableCmdlineRequest);
+        VerifyExistenceOrRetValue(s_ExecutableCmdlineRequest, "");
         return s_ExecutableCmdlineRequest.response->cmdline;
     }
     FirmwareType GetFirmwareType()
@@ -261,8 +256,8 @@ namespace BootInfo
         VerifyExistenceOrRet(s_MemmapRequest)
 
             entryCount
-            = memoryMapEntryCount;
-        return memoryMap;
+            = s_MemmapRequest.response->entry_count;
+        return s_MemmapRequest.response->entries;
     }
     limine_file* GetExecutableFile()
     {

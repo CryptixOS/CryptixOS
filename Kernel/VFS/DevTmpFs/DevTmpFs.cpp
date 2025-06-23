@@ -14,52 +14,72 @@ DevTmpFs::DevTmpFs(u32 flags)
 {
 }
 
-INode* DevTmpFs::Mount(INode* parent, INode* source, INode* target,
-                       std::string_view name, const void* data)
+ErrorOr<INode*> DevTmpFs::Mount(INode* parent, INode* source, INode* target,
+                                DirectoryEntry* entry, StringView name,
+                                const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
                : nullptr;
 
     if (m_Root) VFS::RecursiveDelete(m_Root);
-    m_Root      = CreateNode(parent, name, 0755 | S_IFDIR);
-    m_MountedOn = target;
 
+    auto maybeRoot = CreateNode(parent, entry, 0755 | S_IFDIR);
+    if (!maybeRoot) return Error(maybeRoot.error());
+
+    m_Root           = maybeRoot.value();
+    auto targetEntry = target->DirectoryEntry();
+    targetEntry->SetMountGate(m_Root, entry);
+
+    m_MountedOn = target;
     return m_Root;
 }
 
-INode* DevTmpFs::CreateNode(INode* parent, std::string_view name, mode_t mode)
+ErrorOr<INode*> DevTmpFs::CreateNode(INode* parent, DirectoryEntry* entry,
+                                     mode_t mode, uid_t uid, gid_t gid)
 {
-    return new DevTmpFsINode(parent, name, this, mode);
+    auto inode = new DevTmpFsINode(parent, entry->Name(), this, mode);
+    entry->Bind(inode);
+
+    return inode;
 }
 
-INode* DevTmpFs::Symlink(INode* parent, std::string_view name,
-                         std::string_view target)
-{
-    ToDo();
-
-    return nullptr;
-}
-INode* DevTmpFs::Link(INode* parent, std::string_view name, INode* oldNode)
+ErrorOr<INode*> DevTmpFs::Symlink(INode* parent, DirectoryEntry* entry,
+                                  StringView target)
 {
     ToDo();
 
     return nullptr;
 }
+INode* DevTmpFs::Link(INode* parent, StringView name, INode* oldNode)
+{
+    ToDo();
 
-INode* DevTmpFs::MkNod(INode* parent, std::string_view name, mode_t mode,
-                       dev_t dev)
+    return nullptr;
+}
+
+ErrorOr<INode*> DevTmpFs::MkNod(INode* parent, DirectoryEntry* entry,
+                                mode_t mode, dev_t dev)
 {
     auto it = s_Devices.find(dev);
     if (it == s_Devices.end()) return_err(nullptr, EEXIST);
-    Device* device = it->second;
+    Device* device  = it->second;
 
-    return new DevTmpFsINode(parent, name, this, mode, device);
+    auto    inodeOr = CreateNode(parent, entry, mode, 0, 0);
+    if (!inodeOr) return Error(inodeOr.error());
+
+    auto inode      = reinterpret_cast<DevTmpFsINode*>(inodeOr.value());
+    inode->m_Device = device;
+
+    return inode;
 }
 
-void DevTmpFs::RegisterDevice(Device* device)
+bool DevTmpFs::RegisterDevice(Device* device)
 {
     Assert(device);
 
+    if (s_Devices.contains(device->GetID())) return false;
+
     s_Devices[device->GetID()] = device;
+    return true;
 }

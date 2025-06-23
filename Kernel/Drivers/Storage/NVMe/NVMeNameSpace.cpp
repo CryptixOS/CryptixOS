@@ -51,10 +51,10 @@ namespace NVMe
 
         DevTmpFs::RegisterDevice(this);
 
-        std::string_view path
-            = std::format("/dev/{}n{}", m_Controller->GetName(), m_ID);
+        StringView path
+            = fmt::format("/dev/{}n{}", m_Controller->GetName(), m_ID).data();
         LogTrace("NVMe: Creating device at '{}'", path);
-        VFS::MkNod(VFS::GetRootNode(), path, m_Stats.st_mode, GetID());
+        VFS::MkNod(nullptr, path, m_Stats.st_mode, GetID());
         DeviceManager::RegisterBlockDevice(this);
         // TODO(v1tr10l7): enumerate partitions
 
@@ -84,9 +84,10 @@ namespace NVMe
             DevTmpFs::RegisterDevice(partition);
             DeviceManager::RegisterBlockDevice(partition);
 
-            std::string_view partitionPath = std::format(
-                "/dev/{}n{}p{}", m_Controller->GetName(), m_ID, i);
-            VFS::MkNod(VFS::GetRootNode(), partitionPath, m_Stats.st_mode,
+            StringView partitionPath
+                = fmt::format("/dev/{}n{}p{}", m_Controller->GetName(), m_ID, i)
+                      .data();
+            VFS::MkNod(nullptr, partitionPath, m_Stats.st_mode,
                        partition->GetID());
 
             ++i;
@@ -94,7 +95,7 @@ namespace NVMe
         return true;
     }
 
-    isize NameSpace::Read(void* dest, off_t offset, usize bytes)
+    ErrorOr<isize> NameSpace::Read(void* dest, off_t offset, usize bytes)
     {
         ScopedLock guard(m_Lock);
 
@@ -116,7 +117,7 @@ namespace NVMe
 
         return bytes;
     }
-    isize NameSpace::Write(const void* src, off_t offset, usize bytes)
+    ErrorOr<isize> NameSpace::Write(const void* src, off_t offset, usize bytes)
     {
         ScopedLock guard(m_Lock);
 
@@ -149,9 +150,21 @@ namespace NVMe
         return bytes;
     }
 
-    std::string_view NameSpace::GetName() const noexcept
+    ErrorOr<isize> NameSpace::Read(const UserBuffer& out, usize count,
+                                   isize offset)
     {
-        return std::format("{}n{}", m_Controller->GetName(), m_ID);
+        return Read(out.Raw(), offset, count);
+    }
+    ErrorOr<isize> NameSpace::Write(const UserBuffer& in, usize count,
+                                    isize offset)
+    {
+        return NameSpace::Write(in.Raw(), offset, count);
+    }
+
+    StringView NameSpace::GetName() const noexcept
+    {
+        auto name = fmt::format("{}n{}", m_Controller->GetName(), m_ID);
+        return StringView(name.data(), name.size());
     }
 
     bool NameSpace::Identify(NameSpaceInfo* nsid)

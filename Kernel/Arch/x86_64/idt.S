@@ -4,7 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-
 .intel_syntax noprefix
 .code64
 

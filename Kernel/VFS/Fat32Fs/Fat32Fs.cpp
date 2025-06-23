@@ -8,6 +8,7 @@
 
 #include <Prism/Utility/Math.hpp>
 
+#include <VFS/DirectoryEntry.hpp>
 #include <VFS/INode.hpp>
 
 #include <VFS/Fat32Fs/Fat32Fs.hpp>
@@ -23,8 +24,9 @@ constexpr usize       FAT32_FS_INFO_OFFSET          = 484;
 constexpr usize       FAT32_REAL_FS_INFO_SIGNATURE  = 0x61417272;
 constexpr usize       FAT32_REAL_FS_INFO_SIGNATURE2 = 0xaa550000;
 
-INode* Fat32Fs::Mount(INode* parent, INode* source, INode* target,
-                      std::string_view name, const void* data)
+ErrorOr<INode*> Fat32Fs::Mount(INode* parent, INode* source, INode* target,
+                               DirectoryEntry* entry, StringView name,
+                               const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
@@ -79,7 +81,10 @@ INode* Fat32Fs::Mount(INode* parent, INode* source, INode* target,
 
     UpdateFsInfo();
 
-    m_Root     = CreateNode(parent, name, 0644 | S_IFDIR);
+    auto rootOr = CreateNode(parent, entry, 0644 | S_IFDIR);
+    if (!rootOr) return Error(rootOr.error());
+
+    m_Root     = rootOr.value();
     m_RootNode = reinterpret_cast<Fat32FsINode*>(m_Root);
 
     m_RootNode->m_Stats.st_blocks
@@ -95,9 +100,12 @@ INode* Fat32Fs::Mount(INode* parent, INode* source, INode* target,
     return m_RootNode;
 }
 
-INode* Fat32Fs::CreateNode(INode* parent, std::string_view name, mode_t mode)
+ErrorOr<INode*> Fat32Fs::CreateNode(INode* parent, DirectoryEntry* entry,
+                                    mode_t mode, uid_t uid, gid_t gid)
 {
-    if (name.size() > 255) return_err(nullptr, ENAMETOOLONG);
+    StringView name = entry->Name();
+
+    if (name.Size() > 255) return_err(nullptr, ENAMETOOLONG);
     if (!S_ISREG(mode) && !S_ISDIR(mode)) return_err(nullptr, EPERM);
 
     return new Fat32FsINode(parent, name, this, mode);
@@ -105,19 +113,14 @@ INode* Fat32Fs::CreateNode(INode* parent, std::string_view name, mode_t mode)
 
 bool Fat32Fs::Populate(INode* node)
 {
-    char* nameBuffer = new char[256];
-    if (!nameBuffer)
-    {
-        delete[] nameBuffer;
-        return false;
-    }
+    String nameBuffer;
+    nameBuffer.Resize(256);
 
     Fat32DirectoryEntry* directoryEntries
         = reinterpret_cast<Fat32DirectoryEntry*>(
             new u8[node->GetStats().st_size]);
     if (!directoryEntries)
     {
-        delete[] nameBuffer;
         delete[] directoryEntries;
         return false;
     }
@@ -132,7 +135,6 @@ bool Fat32Fs::Populate(INode* node)
         == -1)
     {
         LogError("Fat32::Populate: Failed to read/write clusters");
-        delete[] nameBuffer;
         delete[] directoryEntries;
         return false;
     }
@@ -160,12 +162,11 @@ bool Fat32Fs::Populate(INode* node)
             else if (lfn->Checksum != checksum)
             {
                 LogError("Fat32: Bad lfn checksum. Aborting populate");
-                delete[] nameBuffer;
                 delete[] directoryEntries;
                 return false;
             }
 
-            CopyLfnToString(lfn, nameBuffer + (lfn->Order - 1) * 13);
+            CopyLfnToString(lfn, nameBuffer.Raw() + (lfn->Order - 1) * 13);
             continue;
         }
         if (entry->Attributes & Fat32Attribute::eVolumeID) continue;
@@ -175,19 +176,19 @@ bool Fat32Fs::Populate(INode* node)
             usize nameSize = 8 - CountSpacePadding(entry->Name, 8);
             usize extSize  = 3 - CountSpacePadding(entry->Name + 8, 3);
             if (nameSize)
-                std::strncpy(nameBuffer, reinterpret_cast<char*>(entry->Name),
-                             nameSize);
+                std::strncpy(nameBuffer.Raw(),
+                             reinterpret_cast<char*>(entry->Name), nameSize);
             if (extSize)
             {
                 nameBuffer[nameSize] = '.';
-                std::strncpy(nameBuffer + nameSize + 1,
+                std::strncpy(nameBuffer.Raw() + nameSize + 1,
                              reinterpret_cast<char*>(entry->Name) + 8, extSize);
             }
         }
 
         isLfn = false;
-        if (std::strcmp(nameBuffer, ".") == 0
-            || std::strcmp(nameBuffer, "..") == 0)
+        if (std::strcmp(nameBuffer.Raw(), ".") == 0
+            || std::strcmp(nameBuffer.Raw(), "..") == 0)
             continue;
 
         u16 mode = 0644
@@ -197,12 +198,20 @@ bool Fat32Fs::Populate(INode* node)
                 entry->Attributes & Fat32Attribute::eDirectory,
                 entry->Attributes & Fat32Attribute::eSystem);
 
-        Fat32FsINode* newNode = reinterpret_cast<Fat32FsINode*>(
-            CreateNode(node, nameBuffer, mode));
+        auto dentry    = new DirectoryEntry(nameBuffer);
+        auto newNodeOr = CreateNode(node, dentry, mode);
+        if (!newNodeOr)
+        {
+            LogError("Fat32::Populate: Failed to create new node");
+            delete[] directoryEntries;
+            return false;
+        }
+
+        auto newNode = reinterpret_cast<Fat32FsINode*>(newNodeOr.value());
+        dentry->Bind(newNode);
         if (!newNode)
         {
             LogError("Fat32::Populate: Failed to create new node");
-            delete[] nameBuffer;
             delete[] directoryEntries;
             return false;
         }
@@ -221,20 +230,33 @@ bool Fat32Fs::Populate(INode* node)
             - reinterpret_cast<uintptr_t>(directoryEntries);
 
         usize nameLen = 0;
-        char* start   = nameBuffer;
+        char* start   = nameBuffer.Raw();
         while (*start && std::isalnum(*start++)) nameLen++;
-        std::string name;
-        name.resize(nameLen);
-        std::memcpy(name.data(), nameBuffer, nameLen);
+        String name;
+        name.Resize(nameLen);
 
+        nameBuffer.Copy(name.Raw(), nameLen);
         node->InsertChild(newNode, newNode->GetName());
 
         if (S_ISDIR(mode)) newNode->m_Populated = false;
     }
 
-    delete[] nameBuffer;
     delete[] directoryEntries;
     return (f32node->m_Populated = true);
+}
+ErrorOr<void> Fat32Fs::Stats(statfs& stats)
+{
+    usize freeClusterCount = m_FsInfo.Free;
+
+    stats.f_type           = m_BootRecord.Signature;
+    stats.f_bsize          = m_ClusterSize;
+    stats.f_blocks         = m_ClusterCount;
+    stats.f_bfree          = freeClusterCount;
+    stats.f_bavail         = freeClusterCount;
+    stats.f_fsid           = m_DeviceID;
+    stats.f_namelen        = FAT32_MAX_FILENAME_LFN;
+
+    return {};
 }
 
 bool Fat32Fs::ReadBytes(u32 cluster, u8* out, off_t offset, usize bytes)

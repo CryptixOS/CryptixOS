@@ -6,53 +6,47 @@
  */
 #pragma once
 
+#include <VFS/EchFs/EchFsStructures.hpp>
 #include <VFS/Filesystem.hpp>
 
-struct EchFsIdentityTable
-{
-    u8  JumpInstruction[4];
-    u8  Signature[8];
-    u64 TotalBlockCount;
-    u64 MainDirectoryLength;
-    u64 BytesPerBlock;
-    u64 Reserved;
-    u64 UUID[2];
-} __attribute__((packed));
-
-constexpr usize ECHFS_END_OF_DIRECTORY  = 0x0000'0000'0000'0000;
-constexpr usize ECHFS_DELETED_DIRECTORY = 0xffff'ffff'ffff'fffe;
-constexpr usize ECHFS_ROOT_DIRECTORY    = 0xffff'ffff'ffff'ffff;
-
-class EchFs     final : public Filesystem
+class EchFsINode;
+class EchFs final : public Filesystem
 {
   public:
     EchFs(u32 flags)
         : Filesystem("EchFs", flags)
     {
     }
-    virtual ~EchFs() = default;
+    virtual ~EchFs();
 
-    virtual INode* Mount(INode* parent, INode* source, INode* target,
-                         std::string_view name,
-                         const void*      data = nullptr) override;
-    virtual INode* CreateNode(INode* parent, std::string_view name,
-                              mode_t mode) override;
-    virtual INode* Symlink(INode* parent, std::string_view name,
-                           std::string_view target) override
+    virtual ErrorOr<INode*> Mount(INode* parent, INode* source, INode* target,
+                                  DirectoryEntry* entry, StringView name,
+                                  const void* data = nullptr) override;
+    virtual ErrorOr<INode*> CreateNode(INode* parent, DirectoryEntry* entry,
+                                       mode_t mode, uid_t uid = 0,
+                                       gid_t gid = 0) override;
+    virtual ErrorOr<INode*> Symlink(INode* parent, DirectoryEntry* entry,
+                                    StringView target) override
     {
         return nullptr;
     }
 
-    virtual INode* Link(INode* parent, std::string_view name,
-                        INode* oldNode) override
+    virtual INode* Link(INode* parent, StringView name, INode* oldNode) override
     {
         return nullptr;
     }
     virtual bool Populate(INode* node) override;
 
+    isize ReadDirectoryEntry(EchFsDirectoryEntry& entry, u8* dest, isize offset,
+                             usize bytes);
+
   private:
-    INode* m_Device              = nullptr;
-    usize  m_BlockSize           = 0;
-    usize  m_MainDirectoryOffset = 0;
-    usize  m_MainDirectoryLength = 0;
+    EchFsIdentityTable* m_IdentityTable         = nullptr;
+    EchFsINode*         m_NativeRoot            = nullptr;
+
+    usize               m_AllocationTableOffset = 0;
+    usize               m_AllocationTableSize   = 0;
+
+    usize               m_MainDirectoryStart    = 0;
+    usize               m_MainDirectoryEnd      = 0;
 };

@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Common.hpp"
+#include <Common.hpp>
 
 #include <cxxabi.h>
 #if CTOS_ARCH == CTOS_ARCH_X86_64
@@ -134,7 +134,7 @@ namespace icxxabi
 
     void                           Initialize()
     {
-        LogTrace("icxxabi: Calling global constructors...");
+        EarlyLogTrace("icxxabi: Calling global constructors...");
         for (ConstructorFunction* entry = __init_array_start;
              entry < __init_array_end; entry++)
         {

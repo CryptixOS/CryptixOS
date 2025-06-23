@@ -25,39 +25,46 @@ namespace Syscall
 
     struct Syscall
     {
-        std::string                                   name;
-        std::function<ErrorOr<uintptr_t>(Arguments&)> handler;
+        String                                        Name;
+        std::function<ErrorOr<uintptr_t>(Arguments&)> Handler;
 
         inline ErrorOr<uintptr_t> operator()(Arguments& args)
         {
-            if (handler.operator bool()) return handler(args);
+            if (Handler.operator bool()) return Handler(args);
 
             return 0;
         }
-        inline operator bool() { return handler.operator bool(); }
+        inline operator bool() { return Handler.operator bool(); }
     };
-    static std::array<Syscall, 512>      syscalls;
+    static Array<Syscall, 512>           syscalls;
 
     std::unordered_map<ID, WrapperBase*> s_Syscalls;
 
+    StringView                           GetName(usize index)
+    {
+        auto id = static_cast<ID>(index);
+        return magic_enum::enum_name(id).data();
+    }
     void
     RegisterHandler(usize                                              index,
                     std::function<ErrorOr<uintptr_t>(Arguments& args)> handler,
-                    std::string                                        name)
+                    String                                             name)
     {
         syscalls[index] = {name, handler};
     }
-#define ARCH_SET_GS 0x1001
-#define ARCH_SET_FS 0x1002
-#define ARCH_GET_FS 0x1003
-#define ARCH_GET_GS 0x1004
+
+    constexpr usize  ARCH_SET_GS = 0x1001;
+    constexpr usize  ARCH_SET_FS = 0x1002;
+    constexpr usize  ARCH_GET_FS = 0x1003;
+    constexpr usize  ARCH_GET_GS = 0x1004;
     static uintptr_t SysArchPrCtl(Arguments& args)
     {
 #ifdef CTOS_TARGET_X86_64
-        auto      thread = CPU::GetCurrentThread();
-        i32       op     = args.Args[0];
-        uintptr_t addr   = args.Args[1];
+        auto                           thread = CPU::GetCurrentThread();
+        i32                            op     = args.Args[0];
+        uintptr_t                      addr   = args.Args[1];
 
+        CPU::UserMemoryProtectionGuard guard;
         switch (op)
         {
             case ARCH_SET_GS:
@@ -77,6 +84,11 @@ namespace Syscall
 
             default: return_err(-1, EINVAL);
         }
+#else
+        CtosUnused(ARCH_SET_GS);
+        CtosUnused(ARCH_SET_FS);
+        CtosUnused(ARCH_GET_FS);
+        CtosUnused(ARCH_GET_GS);
 #endif
 
         return 0;
@@ -94,9 +106,9 @@ namespace Syscall
         RegisterSyscall2(ID::eFStat, API::VFS::FStat);
         RegisterSyscall2(ID::eLStat, API::VFS::LStat);
         RegisterSyscall(ID::eLSeek, VFS::SysLSeek);
-        RegisterSyscall(ID::eMMap, SysMMap);
-        RegisterSyscall(ID::eMProtect, MM::SysMProtect);
-        RegisterSyscall(ID::eMUnMap, MM::SysMUnMap);
+        RegisterSyscall2(ID::eMMap, API::MM::MMap);
+        RegisterSyscall2(ID::eMProtect, API::MM::MProtect);
+        RegisterSyscall2(ID::eMUnMap, API::MM::MUnMap);
         RegisterSyscall2(ID::eSigProcMask, API::Process::SigProcMask);
         RegisterSyscall(ID::eIoCtl, VFS::SysIoCtl);
         RegisterSyscall(ID::eAccess, VFS::SysAccess);
@@ -120,10 +132,14 @@ namespace Syscall
         RegisterSyscall2(ID::eGetCwd, API::VFS::GetCwd);
         RegisterSyscall(ID::eChDir, VFS::SysChDir);
         RegisterSyscall(ID::eFChDir, VFS::SysFChDir);
-        RegisterSyscall(ID::eMkDir, VFS::SysMkDir);
+        RegisterSyscall2(ID::eRename, API::VFS::Rename);
+        RegisterSyscall2(ID::eMkDir, API::VFS::MkDir);
         RegisterSyscall(ID::eRmDir, SysRmDir);
         RegisterSyscall(ID::eCreat, SysCreat);
-        RegisterSyscall(ID::eReadLink, SysReadLink);
+        RegisterSyscall2(ID::eLink, API::VFS::Link);
+        RegisterSyscall2(ID::eUnlink, API::VFS::Unlink);
+        RegisterSyscall2(ID::eSymlink, API::VFS::Symlink);
+        RegisterSyscall2(ID::eReadLink, API::VFS::ReadLink);
         RegisterSyscall2(ID::eChMod, API::VFS::ChMod);
         RegisterSyscall2(ID::eUmask, API::Process::Umask);
         RegisterSyscall(ID::eGetTimeOfDay, Time::SysGetTimeOfDay);
@@ -136,6 +152,7 @@ namespace Syscall
         RegisterSyscall(ID::eGet_pGid, Process::SysGet_pGid);
         RegisterSyscall(ID::eGetSid, Process::SysGetSid);
         RegisterSyscall2(ID::eUTime, API::VFS::UTime);
+        RegisterSyscall2(ID::eStatFs, API::VFS::StatFs);
         RegisterSyscall(ID::eFork, Process::SysFork);
         RegisterSyscall(ID::eExecve, Process::SysExecve);
         RegisterSyscall(ID::eArchPrCtl, SysArchPrCtl);
@@ -148,13 +165,24 @@ namespace Syscall
         RegisterSyscall(ID::eNanoSleep, Process::SysNanoSleep);
         RegisterSyscall2(ID::ePanic, API::System::SysPanic);
         RegisterSyscall(ID::eOpenAt, VFS::SysOpenAt);
-        RegisterSyscall(ID::eMkDirAt, VFS::SysMkDirAt);
+        RegisterSyscall2(ID::eMkDirAt, API::VFS::MkDirAt);
         RegisterSyscall2(ID::eFStatAt, API::VFS::FStatAt);
+        RegisterSyscall2(ID::eUnlinkAt, API::VFS::UnlinkAt);
+        RegisterSyscall2(ID::eRenameAt, API::VFS::RenameAt);
+        RegisterSyscall2(ID::eLinkAt, API::VFS::LinkAt);
+        RegisterSyscall2(ID::eSymlinkAt, API::VFS::SymlinkAt);
+        RegisterSyscall2(ID::eReadLinkAt, API::VFS::ReadLinkAt);
         RegisterSyscall2(ID::eFChModAt, API::VFS::FChModAt);
+        RegisterSyscall2(ID::ePSelect6, API::VFS::PSelect6);
+        RegisterSyscall2(ID::eUtimensAt, API::VFS::UtimensAt);
         RegisterSyscall2(ID::eDup3, API::VFS::Dup3);
+        RegisterSyscall2(ID::eRenameAt2, API::VFS::RenameAt2);
     }
     void Handle(Arguments& args)
     {
+        CPU::OnSyscallEnter(args.Index == std::to_underlying(ID::ePanic)
+                                ? CPU::GetCurrent()->LastSyscallID
+                                : args.Index);
 #define LOG_SYSCALLS false
 #if LOG_SYSCALLS == true
         static isize previousSyscall = -1;
@@ -222,5 +250,6 @@ namespace Syscall
                 magic_enum::enum_name(static_cast<ID>(args.Index)).data() + 1);
             args.ReturnValue = -intptr_t(ret.error());
         }
+        CPU::OnSyscallLeave();
     }
 } // namespace Syscall

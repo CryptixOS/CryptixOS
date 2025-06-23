@@ -13,14 +13,14 @@
 
 #include <cstdlib>
 
-DevTmpFsINode::DevTmpFsINode(INode* parent, std::string_view name,
-                             Filesystem* fs, mode_t mode, Device* device)
+DevTmpFsINode::DevTmpFsINode(INode* parent, StringView name, Filesystem* fs,
+                             mode_t mode, Device* device)
     : INode(parent, name, fs)
 {
     m_Device           = device;
 
-    m_Stats.st_dev     = fs->GetDeviceID();
-    m_Stats.st_ino     = fs->GetNextINodeIndex();
+    m_Stats.st_dev     = fs->DeviceID();
+    m_Stats.st_ino     = fs->NextINodeIndex();
     m_Stats.st_nlink   = 1;
     m_Stats.st_mode    = mode;
     m_Stats.st_uid     = 0;
@@ -46,7 +46,11 @@ DevTmpFsINode::DevTmpFsINode(INode* parent, std::string_view name,
 isize DevTmpFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
     if (!buffer) return_err(-1, EFAULT);
-    if (m_Device) return m_Device->Read(buffer, offset, bytes);
+    if (m_Device)
+    {
+        auto result = m_Device->Read(buffer, offset, bytes);
+        return result ? result.value() : -1;
+    }
 
     ScopedLock guard(m_Lock);
     usize      count = bytes;
@@ -61,7 +65,11 @@ isize DevTmpFsINode::Read(void* buffer, off_t offset, usize bytes)
 isize DevTmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
 {
     if (!buffer) return_err(-1, EFAULT);
-    if (m_Device) return m_Device->Write(buffer, offset, bytes);
+    if (m_Device)
+    {
+        auto result = m_Device->Write(buffer, offset, bytes);
+        return result ? result.value() : -1;
+    }
 
     ScopedLock guard(m_Lock);
 

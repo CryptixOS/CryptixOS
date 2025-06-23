@@ -7,8 +7,8 @@
 #pragma once
 
 #include <exception>
-#include <string>
 
+#if 0 
 namespace std
 {
     inline const char *exception::what() const noexcept { return "std::exception"; }
@@ -17,10 +17,10 @@ namespace std
     class runtime_error : public exception
     {
         private:
-        string _str;
+        string_view _str;
 
         public:
-        runtime_error(const string &what_arg) : _str(what_arg) { }
+        runtime_error(const string_view &what_arg) : _str(what_arg) { }
         runtime_error(const char *what_arg) : _str(what_arg) { }
 
         runtime_error(const runtime_error &) noexcept = default;
@@ -30,3 +30,4 @@ namespace std
     };
 } // namespace std
 
+#endif

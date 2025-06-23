@@ -30,7 +30,7 @@ namespace Arch
         return !interruptsDisabled;
     }
 
-    void ProbeTimers(std::vector<HardwareTimer*>&) {}
+    void ProbeTimers(Vector<HardwareTimer*>&) {}
 
     void Reboot() {}
 } // namespace Arch

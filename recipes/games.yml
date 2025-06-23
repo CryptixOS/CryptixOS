@@ -1,0 +1,24 @@
+packages:
+  - name: doom-generic
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      url: 'https://github.com/NSG650/doomgeneric-polaris/archive/4fb357cc9535ae35144d107d5c854c7407d3eefc.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'doom-generic-4.0'
+      version: '4.0'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - libiconv
+    revision: 1
+    build:
+      - args: ['cp', '-rp', '@THIS_SOURCE_DIR@/doom-generic', '@THIS_COLLECT_DIR@']
+      - args: ['make', '-j@PARALLELISM@']
+  

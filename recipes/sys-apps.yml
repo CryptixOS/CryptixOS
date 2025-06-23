@@ -14,6 +14,9 @@ packages:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/sbin']
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/root']
       - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CryptixUtils/reboot.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/reboot']
+      #- args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CryptixUtils/vi.cpp', '-lncurses',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/vi']
+      - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CryptixUtils/shutdown.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/shutdown']
+      - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/AwesomeShell/src/main.cpp', '-lncurses',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/awsh']
 
   - name: coreutils
     architecture: '@OPTION:arch@'
@@ -82,6 +85,54 @@ packages:
       - args: ['make', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
+  - name: htop
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: An interactive process viewer
+      description: htop is an interactive process viewer for Linux. It aims to be a 'better top'; you can scroll the process list vertically and horizontally, and select a process to be killed with the arrow keys instead of by typing its process id.
+      spdx: 'GPL-2.0-or-later'
+      website: 'https://htop.dev/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['sys-process']
+    source:
+      subdir: sources
+      git: 'https://github.com/htop-dev/htop.git'
+      tag: '3.2.1'
+      version: '3.2.1'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+        - host-pkg-config
+      regenerate:
+        - args: ['./autogen.sh']
+    tools_required:
+      - system-gcc
+      - virtual: pkgconfig-for-target
+        triple: "@OPTION:arch-triple@"
+    pkgs_required:
+      - mlibc
+      - ncurses
+    revision: 9
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--enable-unicode'
+        - '--disable-hwloc'
+        - '--disable-affinity'
+        - '--disable-openvz'
+        - '--disable-unwind'
+        - '--disable-vserver'
+        - '--disable-capabilities'
+        - '--disable-delayacct'
+        - '--disable-sensors'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
 
   - name: init
     architecture: '@OPTION:arch@'
@@ -98,6 +149,7 @@ packages:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/sbin']
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/root']
       - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/init.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/init']
+      - args: ['@OPTION:arch-triple@-gcc', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/test_tty.c',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/test_tty']
       
   - name: less
     architecture: '@OPTION:arch@'
@@ -131,6 +183,72 @@ packages:
     build:
       - args: ['make', '-j@PARALLELISM@']
       - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
+
+  - name: man-db
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: sources
+      git: 'https://git.savannah.gnu.org/git/man-db.git'
+      tag: '2.9.4'
+      version: '2.9.4'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-pkg-config
+        - host-libtool
+      regenerate:
+        - args: ['./bootstrap']
+          isolate_network: false
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@THIS_SOURCE_DIR@/build-aux/']
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - libpipeline
+      - gdbm
+      #- groff
+      - less
+      - libiconv
+    revision: 11
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--disable-nls'
+        - '--docdir=/usr/share/doc/man-db-2.9.4'
+        - '--sysconfdir=/etc'
+        - '--disable-setuid'
+        - '--with-systemdtmpfilesdir='
+        - '--with-systemdsystemunitdir='
+        - '--disable-manual'
+        - '--with-pager=/usr/bin/less'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: man-pages-posix
+    architecture: noarch
+    source:
+      subdir: sources
+      url: 'https://mirrors.edge.kernel.org/pub/linux/docs/man-pages/man-pages-posix/man-pages-posix-2017-a.tar.gz'
+      format: 'tar.gz'
+      checksum: blake2b:14305fef7bbe4e39a731468331ea28b68fcfbb5ed66dbfa525907b1817b803a7726ea6dd7fb45f8f5c02dda62750d66e0e7a9a6b535bebfe04ed7181b8804175
+      extract_path: 'man-pages-posix-2017'
+      version: '2017a'
+    tools_required:
+      - system-gcc
+    revision: 6
+    configure: []
+    build:
+      - args: ['mkdir', '-pv', '@THIS_COLLECT_DIR@/usr/share/man']
+      - args: ['cp', '-rv', '@THIS_SOURCE_DIR@/man0p', '@THIS_COLLECT_DIR@/usr/share/man/']
+      - args: ['cp', '-rv', '@THIS_SOURCE_DIR@/man1p', '@THIS_COLLECT_DIR@/usr/share/man/']
+      - args: ['cp', '-rv', '@THIS_SOURCE_DIR@/man3p', '@THIS_COLLECT_DIR@/usr/share/man/']
 
   - name: mini-lspci
     architecture: '@OPTION:arch@'
@@ -198,8 +316,8 @@ packages:
     source:
       subdir: sources
       git: 'https://gitlab.com/procps-ng/procps.git'
-      tag: 'v4.0.4'
-      version: '4.0.4'
+      tag: 'v4.0.5'
+      version: '4.0.5'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.15
@@ -214,6 +332,7 @@ packages:
     pkgs_required:
       - mlibc
       - ncurses
+    revision: 1
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
@@ -221,11 +340,13 @@ packages:
         - '--prefix=/usr'
         - '--disable-static'
         - '--disable-kill'
-        - '--docdir=/usr/share/doc/procps-ng-4.0.4'
+        - '--docdir=/usr/share/doc/procps-ng-4.0.5'
         - '--disable-numa'
         - '--enable-colorwatch'
         - '--disable-nls'
         - '--disable-w'
+        - '--without-systemd'
+        - '--disable-pidwait'
         environ:
           ac_cv_func_malloc_0_nonnull: 'yes'
           ac_cv_func_realloc_0_nonnull: 'yes'
@@ -234,6 +355,119 @@ packages:
       - args: ['make', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: sys-apps
+    architecture: noarch
+    source:
+      subdir: 'sources'
+      version: '0.1'
+    pkgs_required:
+      - cryptix-utils
+      - coreutils
+      - file 
+      - less
+      - util-linux
+      - which
+    configure: []
+    build: []
+
+  - name: util-linux
+    architecture: '@OPTION:arch@'
+    from_source: util-linux
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - util-linux-libs
+      - readline
+      - ncurses
+      - zlib
+      - libiconv
+      - file
+      #- libxcrypt
+      #- pcre2
+    revision: 17
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--exec-prefix=/usr'
+        - '--libdir=/usr/lib'
+        - '--bindir=/usr/bin'
+        - '--sbindir=/usr/sbin'
+        - '--without-udev'
+        - '--disable-nls'
+        - '--disable-static'
+        - '--disable-eject'
+        - '--without-python'
+        - '--without-systemd'
+        - '--without-systemdsystemunitdir'
+        - '--disable-partx'
+        - '--disable-fallocate'
+        - '--disable-unshare'
+        - '--disable-nsenter'
+        - '--disable-setpriv'
+        - '--enable-eject'
+        - '--disable-plymouth_support'
+        - '--disable-fdformat'
+        - '--disable-hwclock'
+        - '--disable-hwclock-cmos'
+        - '--disable-hwclock-gplv3'
+        - '--disable-wdctl'
+        - '--disable-logger'
+        - '--enable-switch_root'
+        - '--disable-pivot_root'
+        - '--disable-chmem'
+        - '--disable-ipcrm'
+        - '--disable-ipcs'
+        - '--disable-irqtop'
+        - '--disable-rfkill'
+        - '--disable-utmpdump'
+        - '--disable-raw'
+        - '--disable-chfn-chsh'
+        - '--disable-login'
+        - '--disable-nologin'
+        - '--disable-sulogin'
+        - '--disable-su'
+        - '--disable-runuser'
+        - '--disable-setterm'
+        - '--disable-schedutils'
+        - '--disable-pg-bell'
+        - '--disable-fstrim'
+        - '--disable-swapon'
+        - '--disable-lscpu'
+        - '--disable-chcpu'
+        - '--disable-blockdev'
+        - '--disable-prlimit'
+        - '--disable-lsipc'
+        - '--disable-lsns'
+        - '--disable-readprofile'
+        - '--enable-dmesg'
+        - '--disable-fincore'
+        - '--disable-fsfreeze'
+        - '--disable-blkdiscard'
+        - '--disable-blkzone'
+        - '--disable-ldattach'
+        - '--disable-rtcwake'
+        - '--disable-setarch'
+        - '--disable-tunelp'
+        - '--enable-write'
+        - '--without-cap-ng'
+        - '--without-btrfs'
+        - '--without-selinux'
+        - '--without-audit'
+        - '--enable-usrdir-path'
+        - '--disable-makeinstall-chown'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/include']
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/lib']
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/share/man/man3']
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/share/man/man5/terminal-colors.d.5']
 
   - name: which
     architecture: '@OPTION:arch@'
@@ -259,4 +493,5 @@ packages:
       - args: ['make', 'install']
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
+
 

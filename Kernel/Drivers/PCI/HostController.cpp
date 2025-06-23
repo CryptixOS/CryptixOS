@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Boot/CommandLine.hpp>
 #include <Drivers/PCI/HostController.hpp>
 
 #include <Library/Logger.hpp>
@@ -12,9 +13,9 @@
 
 namespace PCI
 {
-    std::vector<HostController::IrqRoute> HostController::s_IrqRoutes;
+    Vector<HostController::IrqRoute> HostController::s_IrqRoutes;
 
-    void                                  HostController::InitializeIrqRoutes()
+    void                             HostController::InitializeIrqRoutes()
     {
         static const char* rootIds[] = {
             "PNP0A03",
@@ -97,9 +98,9 @@ namespace PCI
                         gsi, slot, func, entry.pin + 1, edgeTriggered,
                         activeHigh);
 #endif
-                    s_IrqRoutes.emplace_back(gsi, slot, func,
-                                             static_cast<u8>(entry.pin + 1),
-                                             edgeTriggered, activeHigh);
+                    s_IrqRoutes.EmplaceBack(gsi, slot, func,
+                                            static_cast<u8>(entry.pin + 1),
+                                            edgeTriggered, activeHigh);
                 }
 
                 uacpi_free_pci_routing_table(pciRoutes);
@@ -114,9 +115,18 @@ namespace PCI
 
     void HostController::Initialize()
     {
-        if (m_Address)
+        bool pciUseEcam = CommandLine::GetBoolean("pci.ecam").value_or(true);
+
+        if (pciUseEcam && m_Address)
+        {
+            LogTrace("PCI: Using the ECAM");
             m_AccessMechanism = new ECAM(m_Address, m_Domain.BusStart);
-        else m_AccessMechanism = new LegacyAccessMechanism();
+        }
+        else
+        {
+            LogTrace("PCI: ECAM {}", pciUseEcam ? "Unavailable" : "Disabled");
+            m_AccessMechanism = new LegacyAccessMechanism();
+        }
         Assert(m_AccessMechanism);
 
         if ((Read<u8>(DeviceAddress(),

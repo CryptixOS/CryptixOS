@@ -29,6 +29,11 @@ srcs += files(
   'Drivers/Timers/PIT.cpp',
   'Drivers/Timers/RTC.cpp',
 )
+asm_sources = files(
+  'idt.S',
+  'memory.S',
+  'syscall.S',
+)
 
 c_args += [
   '-march=x86-64',
@@ -54,4 +59,19 @@ cxx_args += [
   '-mrdseed',
 ]
 
+#foreach source : asm_sources
+#  segments = source.full_path().split('/')
+#  basename = segments[segments.length() - 1]
+#  objs += custom_target(
+#    basename,
+#    input: source,
+#    output: basename + '.o',
+#    command: [
+#      'fasm', '@INPUT@', '@OUTPUT@',
+#    ],
+#    build_by_default: true,
+#    console: true,
+#    install: false,
+#  )
+#endforeach
 ld_args += ['-Wl,-z,noexecstack']

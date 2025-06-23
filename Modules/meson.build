@@ -32,9 +32,9 @@ foreach name, mod : all_modules
       dependencies: [inc_deps, dep],
       install: false
   )
-  ext_mods += custom_target(name + '.ko',
+  ext_mods += custom_target(name.split('/')[1] + '.ko',
     input: lib.extract_all_objects(recursive: true),
-    output: name + '.ko',
+    output: name.split('/')[1] + '.ko',
     command: [c.get_linker_id(), ld_args, '@INPUT@', '-o', '@OUTPUT@'],
     build_by_default: true,
     install: false,

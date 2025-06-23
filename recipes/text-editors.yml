@@ -100,6 +100,7 @@ packages:
         - '--with-tlib=tinfo'
         - '--enable-gui=no'
         - '--without-x'
+        - '--with-features=small'
         environ:
           ac_cv_small_wchar_t: 'no'
           ac_cv_func_sigsetjmp: 'no'

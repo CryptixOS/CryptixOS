@@ -18,7 +18,7 @@ namespace RTL8139
       public:
         AdapterCard(PCI::DeviceAddress& addr);
 
-        bool Send(u8* data, usize length);
+        virtual bool SendPacket(const u8* data, usize length) override;
 
       private:
         Pointer                m_Base;

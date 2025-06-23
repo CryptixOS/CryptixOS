@@ -30,11 +30,12 @@ namespace CPU
     u64             GetOnlineCPUsCount();
 
     struct CPU;
+    CPU*    Current();
     CPU*    GetCurrent();
     u64     GetCurrentID();
     Thread* GetCurrentThread();
 
-    void    PrepareThread(Thread* thread, uintptr_t pc, uintptr_t arg = 0);
+    void    PrepareThread(Thread* thread, Pointer pc, Pointer arg = 0);
 
     void    SaveThread(Thread* thread, CPUContext* ctx);
     void    LoadThread(Thread* thread, CPUContext* ctx);
@@ -43,4 +44,39 @@ namespace CPU
 
     void    HaltAll();
     void    WakeUp(usize id, bool everyone);
+
+    // NOTE(v1tr10l7): allows accessing usermode memory from ring0
+    struct UserMemoryProtectionGuard
+    {
+        UserMemoryProtectionGuard();
+        ~UserMemoryProtectionGuard();
+    };
+
+    template <typename F, typename... Args>
+        requires(!std::same_as<std::invoke_result_t<F, Args...>, void>)
+    inline decltype(auto) AsUser(F&& f, Args&&... args)
+    {
+        UserMemoryProtectionGuard guard;
+
+        return f(std::forward<Args>(args)...);
+    }
+    template <typename T>
+        requires(!SameAs<T, void>)
+    inline constexpr decltype(auto) CopyFromUser(const T& value)
+    {
+        UserMemoryProtectionGuard guard;
+
+        return value;
+    }
+
+    template <typename F, typename... Args>
+    inline static void AsUser(F&& f, Args&&... args)
+    {
+        UserMemoryProtectionGuard guard;
+        f(std::forward<Args>(args)...);
+    }
+
+    bool DuringSyscall();
+    void OnSyscallEnter(usize index);
+    void OnSyscallLeave();
 }; // namespace CPU

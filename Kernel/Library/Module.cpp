@@ -5,29 +5,67 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Library/ELF.hpp>
 #include <Library/Logger.hpp>
 #include <Library/Module.hpp>
 
+#include <Memory/VMM.hpp>
+#include <VFS/INode.hpp>
+#include <VFS/VFS.hpp>
+#include <VFS/DirectoryEntry.hpp>
+
 #include <magic_enum/magic_enum.hpp>
-#include <unordered_map>
 
-static std::unordered_map<std::string_view, Module*> list;
+static std::unordered_map<StringView, Module*> s_Modules;
+static Vector<ELF::Image*>                     s_LoadedModules;
 
-bool AddModule(Module* drv, std::string_view name)
+std::unordered_map<StringView, Module*>& GetModules() { return s_Modules; }
+
+static void                              LoadModuleFromFile(INode* node)
 {
-    if (list.contains(name))
+    LogTrace("Module: Loading '{}'...", node->GetPath());
+    Vector<u8> elf;
+    elf.Resize(node->GetStats().st_size);
+    node->Read(elf.Raw(), 0, node->GetStats().st_size);
+
+    ELF::Image* image = new ELF::Image();
+    if (!image->LoadFromMemory(elf.Raw(), elf.Size()))
+    {
+        LogError("Module: Failed to load '{}'", node->GetPath());
+        return;
+    }
+    s_LoadedModules.PushBack(image);
+}
+bool Module::Load()
+{
+    auto moduleDirectoryDirectoryEntry
+        = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), "/lib/modules/").Node;
+    if (!moduleDirectoryDirectoryEntry) return false;
+
+    auto moduleDirectory = moduleDirectoryDirectoryEntry->INode();
+    if (!moduleDirectory) return false;
+
+    for (const auto& [name, child] : moduleDirectory->GetChildren())
+        LoadModuleFromFile(child);
+
+    return true;
+}
+
+bool AddModule(Module* drv, StringView name)
+{
+    if (s_Modules.contains(name))
     {
         LogError("Module: '{}' already exists, aborting...", name);
         return false;
     }
 
-    list[name] = drv;
+    s_Modules[name] = drv;
     drv->Initialize();
     return true;
 }
 bool LoadModule(Module* drv)
 {
-    std::string_view name(drv->Name);
+    StringView name(drv->Name);
 
     LogInfo("Module: Successfully loaded '{}'", name);
     return AddModule(drv, name);

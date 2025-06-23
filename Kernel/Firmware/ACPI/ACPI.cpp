@@ -8,8 +8,10 @@
 #include <Firmware/ACPI/MADT.hpp>
 
 #include <Boot/BootInfo.hpp>
+#include <Memory/ScopedMapping.hpp>
 #include <Memory/VMM.hpp>
 
+#include <uacpi/context.h>
 #include <uacpi/event.h>
 #include <uacpi/resources.h>
 #include <uacpi/uacpi.h>
@@ -44,7 +46,11 @@ namespace ACPI
         struct [[gnu::packed]] RSDT
         {
             SDTHeader Header;
-            u64       Sdts[];
+            union
+            {
+                u32 Sdts32[];
+                u64 Sdts64[];
+            };
         };
 
         bool  s_XsdtAvailable = false;
@@ -62,11 +68,10 @@ namespace ACPI
         }
         Pointer GetTablePointer(u8 index)
         {
-            if (s_XsdtAvailable)
-                return Pointer(s_Rsdt->Sdts[index]).ToHigherHalf();
+            Pointer tableAddress = s_XsdtAvailable ? s_Rsdt->Sdts64[index]
+                                                   : s_Rsdt->Sdts32[index];
 
-            const u32* ptr = reinterpret_cast<u32*>(s_Rsdt->Sdts);
-            return Pointer(ptr[index]).ToHigherHalf();
+            return tableAddress.ToHigherHalf();
         }
         void DetectACPIEntries()
         {
@@ -88,6 +93,24 @@ namespace ACPI
                 LogTrace("  -{}", acpiSignature);
             }
         }
+        void InitializeFADT(Pointer fadtAddress)
+        {
+            ScopedMapping<FADT> fadt(fadtAddress,
+                                     PageAttributes::eRW
+                                         | PageAttributes::eUncacheableStrong);
+
+            if (fadt->Header.Revision <= 2)
+            {
+                fadt->PreferredPmProfile = 0;
+                fadt->PStateControl      = 0;
+                fadt->CStateControl      = 0;
+                fadt->X86BootArchitectureFlags
+                    = static_cast<X86BootArchitectureFlags>(0);
+            }
+            if (!fadt->X_Dsdt) fadt->X_Dsdt = fadt->DSDT;
+            LogTrace("ACPI: Found DSDT table");
+        }
+
     } // namespace
 
     bool IsAvailable() { return BootInfo::GetRSDPAddress().operator bool(); }
@@ -96,12 +119,12 @@ namespace ACPI
         using namespace std::literals;
 
         LogTrace("ACPI: Initializing...");
-        constexpr std::string_view RSDP_SIGNATURE = "RSD PTR"sv;
-        auto                       rsdpPointer    = BootInfo::GetRSDPAddress();
+        constexpr StringView RSDP_SIGNATURE = "RSD PTR"_sv;
+        auto                 rsdpPointer    = BootInfo::GetRSDPAddress();
         if (!rsdpPointer) return false;
 
         RSDP* rsdp = rsdpPointer.ToHigherHalf<Pointer>().As<RSDP>();
-        if (RSDP_SIGNATURE.compare(0, 7, rsdp->Signature) == 0)
+        if (RSDP_SIGNATURE.Compare(0, 7, rsdp->Signature) == 0)
         {
             LogError("ACPI: Invalid RSDP signature!");
             return false;
@@ -120,6 +143,7 @@ namespace ACPI
 
         MADT::Initialize();
         s_FADT = GetTable<FADT>("FACP");
+        InitializeFADT(Pointer(s_FADT).FromHigherHalf());
 
         LogInfo("ACPI: Loaded static tables");
         return true;
@@ -149,34 +173,25 @@ namespace ACPI
     void Enable()
     {
         LogTrace("ACPI: Entering ACPI Mode");
-        auto status = uacpi_initialize(0);
 
-        if (uacpi_unlikely_error(status))
-        {
-            LogError("ACPI: Failed to enter acpi mode!");
-            return;
-        }
+#define UACPI_DEBUG 0
+#if UACPI_DEBUG == 1
+        uacpi_context_set_log_level(UACPI_LOG_DEBUG);
+#else
+        uacpi_context_set_log_level(UACPI_LOG_INFO);
+#endif
+
+        uAcpiCall(uacpi_initialize(0), "ACPI: Failed to enter acpi mode!");
     }
     void LoadNameSpace()
     {
-        auto status = uacpi_namespace_load();
-        if (uacpi_unlikely_error(status))
-        {
-            LogError("ACPI: Failed to load namespace");
-            return;
-        }
-        status = uacpi_set_interrupt_model(UACPI_INTERRUPT_MODEL_IOAPIC);
-        if (uacpi_unlikely_error(status))
-        {
-            LogError("ACPI: Failed to set uACPI interrupt model");
-            return;
-        }
-        status = uacpi_namespace_initialize();
-        if (uacpi_unlikely_error(status))
-        {
-            LogError("ACPI: Failed to initialize namespace");
-            return;
-        }
+        uAcpiCall(uacpi_namespace_load(), "ACPI: Failed to load namespace");
+        uAcpiCall(uacpi_set_interrupt_model(UACPI_INTERRUPT_MODEL_IOAPIC),
+                  "ACPI: Failed to set uACPI interrupt model");
+        uAcpiCall(uacpi_namespace_initialize(),
+                  "ACPI: Failed to initialize namespace");
+        // uAcpiCall(uacpi_finalize_gpe_initialization(),
+        //           "ACPI: Failed to finalize gpe initialization!");
     }
     void EnumerateDevices()
     {
@@ -223,5 +238,4 @@ namespace ACPI
 
         s_FADT->ResetReg.Write(s_FADT->ResetValue);
     }
-
 } // namespace ACPI

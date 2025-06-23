@@ -11,8 +11,6 @@
 #include <Prism/Core/Types.hpp>
 #include <Prism/Debug/Log.hpp>
 
-#include <string_view>
-
 constexpr usize LOG_SINK_E9              = Bit(0);
 constexpr usize LOG_SINK_SERIAL          = Bit(1);
 constexpr usize LOG_SINK_TERMINAL        = Bit(2);
@@ -47,10 +45,10 @@ namespace Logger
     CTOS_NO_KASAN void DisableSink(usize sink);
 
     void               LogChar(u64 c);
-    CTOS_NO_KASAN void Print(std::string_view string);
+    CTOS_NO_KASAN void Print(StringView string);
     CTOS_NO_KASAN i32  Printv(const char* format, va_list* args);
 
-    CTOS_NO_KASAN void Log(LogLevel logLevel, std::string_view str,
+    CTOS_NO_KASAN void Log(LogLevel logLevel, StringView str,
                            bool printNewline = true);
     CTOS_NO_KASAN void Logf(LogLevel logLevel, const char* format, ...);
     CTOS_NO_KASAN void Logv(LogLevel logLevel, const char* format,
@@ -63,7 +61,7 @@ namespace Logger
 #define CTOS_BUILD_DEBUG
 #ifdef CTOS_BUILD_DEBUG
     #define LogDebug(...)                                                      \
-        Logger::Log(LogLevel::eDebug, std::format(__VA_ARGS__))
+        Logger::Log(LogLevel::eDebug, fmt::format(__VA_ARGS__).data())
     #define EarlyLogDebug(...) Logger::Logf(LogLevel::eDebug, __VA_ARGS__)
 #else
     #define LogDebug(...)
@@ -71,7 +69,7 @@ namespace Logger
 #endif
 
 #define LogMessage(...)                                                        \
-    Logger::Log(LogLevel::eNone, std::format(__VA_ARGS__).data())
+    Logger::Log(LogLevel::eNone, fmt::format(__VA_ARGS__).data())
 #define EarlyLogMessage(...) Logger::Logf(LogLevel::eNone, __VA_ARGS__)
 
 #define ENABLE_LOGGING       true

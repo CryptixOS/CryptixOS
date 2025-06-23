@@ -9,8 +9,6 @@
 #include <Common.hpp>
 #include <Prism/Core/Types.hpp>
 
-using Prism::LogLevel;
-
 namespace std
 {
     [[gnu::noreturn]]
@@ -25,82 +23,67 @@ extern "C"
     FILE* stdout = (FILE*)&stdout;
     FILE* stderr = (FILE*)stderr;
 
-    int   fputc(int c, FILE* stream)
-    {
-        /*std::string_view s(reinterpret_cast<const char*>(&c), 1);
-        if (stream == stdout) Logger::LogString(s);
-        else if (stream == stderr) Logger::Log(LogLevel::eError, s);
-        else return -1;
-*/
-        return 0;
-    }
-    int fputs(const char* s, FILE* stream)
-    {
-        /*      if (stream == stdout) Logger::LogString(s);
-              else if (stream == stderr) Logger::Log(LogLevel::eError, s);
-              else return -1;
-      */
-        return 0;
-    }
-    int fputws(const wchar_t* s, FILE* stream) { return -1; }
+    i32   fputc(i32 c, FILE* stream) { return 0; }
+    i32   fputs(const char* s, FILE* stream) { return 0; }
+    i32   fputws(const wchar_t* s, FILE* stream) { return -1; }
 
-    int fflush(FILE* stream)
+    i32   fflush(FILE* stream)
     {
         assert(false);
         return -1;
     }
 
-    int   fprintf(FILE* stream, const char* format, ...) { return -1; }
+    i32   fprintf(FILE* stream, const char* format, ...) { return -1; }
     usize fwrite(const void* buffer, usize size, usize count, FILE* stream)
     {
         return -1;
     }
 
-    int printf(const char* format, ...)
+    i32 printf(const char* format, ...)
     {
         va_list args;
 
         va_start(args, format);
-        const int ret = vprintf(format, args);
+        const i32 ret = vprintf(format, args);
         va_end(args);
 
         return ret;
     }
-    int vprintf(const char* format, va_list args)
+    i32 vprintf(const char* format, va_list args)
     {
         return Logger::Printv(format, reinterpret_cast<va_list*>(&args));
     }
-    int sprintf(char* s, const char* format, ...)
+    i32 sprintf(char* s, const char* format, ...)
     {
         va_list args;
 
         va_start(args, format);
-        const int ret = vsprintf(s, format, args);
+        const i32 ret = vsprintf(s, format, args);
         va_end(args);
 
         return ret;
     }
-    int vsprintf(char* s, const char* format, va_list args)
+    i32 vsprintf(char* s, const char* format, va_list args)
     {
-        return vsnprintf(s, std::numeric_limits<int>::max(), format, args);
+        return vsnprintf(s, std::numeric_limits<i32>::max(), format, args);
     }
-    int snprintf(char* s, usize count, const char* format, ...)
+    i32 snprintf(char* s, usize count, const char* format, ...)
     {
         va_list args;
         va_start(args, format);
-        const int ret = vsnprintf(s, count, format, args);
+        const i32 ret = vsnprintf(s, count, format, args);
         va_end(args);
 
         return ret;
     }
-    int vsnprintf(char* s, usize count, const char* format, va_list args)
+    i32 vsnprintf(char* s, usize count, const char* format, va_list args)
     {
         return -1;
     }
-    int vasprintf(char** s, const char* format, va_list args) { return -1; }
-    int asprintf(char** s, const char* format, ...) { return -1; }
+    i32 vasprintf(char** s, const char* format, va_list args) { return -1; }
+    i32 asprintf(char** s, const char* format, ...) { return -1; }
 
-    int putchar(int c)
+    i32 putchar(i32 c)
     {
         Logger::LogChar(c);
 

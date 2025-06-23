@@ -9,21 +9,37 @@
 #include <Arch/Arch.hpp>
 #include <Arch/PowerManager.hpp>
 
+#include <Drivers/Terminal.hpp>
+
+#include <Prism/String/String.hpp>
+#include <Scheduler/Process.hpp>
+
+#include <Version.hpp>
+
 namespace API::System
 {
     ErrorOr<isize> Uname(utsname* out)
     {
-        std::strncpy(out->sysname, "Cryptix", sizeof(out->sysname));
-        std::strncpy(out->nodename, "cryptix", sizeof(out->sysname));
-        std::strncpy(out->release, "0.0.1", sizeof(out->sysname));
-        std::strncpy(out->version, __DATE__ " " __TIME__, sizeof(out->sysname));
-        std::strncpy(out->machine, CTOS_ARCH_STRING, sizeof(out->sysname));
+        auto process = Process::GetCurrent();
+        if (!process->ValidateWrite(out)) return Error(EFAULT);
+
+        CPU::UserMemoryProtectionGuard guard;
+        Kernel::NAME.Copy(out->sysname, sizeof(out->sysname));
+        std::strncpy(out->nodename, "cryptix", sizeof(out->nodename));
+        Kernel::VERSION_STRING.Copy(out->release, sizeof(out->release));
+
+        auto version = Kernel::BUILD_DATE + " ";
+        version += Kernel::BUILD_TIME;
+        version.Copy(out->version, sizeof(out->version));
+        Kernel::ARCH_STRING.Copy(out->machine, sizeof(out->machine));
 
         return 0;
     }
     ErrorOr<isize> GetResourceLimit(isize resource, rlimit* rlimit)
     {
         // TODO(v1tr10l7): Set proper limits
+        CPU::UserMemoryProtectionGuard guard;
+
         rlimit->rlim_cur = INT64_MAX;
         rlimit->rlim_max = INT64_MAX;
         return 0;
@@ -84,7 +100,35 @@ namespace API::System
 
     ErrorOr<uintptr_t> SysPanic(const char* errorMessage)
     {
-        panic(std::format("SYS_PANIC: {}", errorMessage));
+        CPU::UserMemoryProtectionGuard guard;
+
+        EarlyLogMessage(AnsiColor::FOREGROUND_MAGENTA);
+        EarlyLogMessage("SystemMemoryStatistics");
+        EarlyLogMessage(AnsiColor::FOREGROUND_WHITE);
+        EarlyLogMessage(": =>\n");
+
+        EarlyLogMessage(AnsiColor::FOREGROUND_MAGENTA);
+        EarlyLogMessage("TotalMemory");
+        EarlyLogMessage(AnsiColor::FOREGROUND_WHITE);
+        EarlyLogMessage(": %#p\n", PMM::GetTotalMemory());
+
+        EarlyLogMessage(AnsiColor::FOREGROUND_MAGENTA);
+        EarlyLogMessage("FreeMemory");
+        EarlyLogMessage(AnsiColor::FOREGROUND_WHITE);
+        EarlyLogMessage(": %#p\n", PMM::GetFreeMemory());
+
+        EarlyLogMessage(AnsiColor::FOREGROUND_MAGENTA);
+        EarlyLogMessage("UsedMemory");
+        EarlyLogMessage(AnsiColor::FOREGROUND_WHITE);
+        EarlyLogMessage(": %#p\n", PMM::GetUsedMemory());
+
+        usize lastSyscall = CPU::GetCurrent()->LastSyscallID;
+        auto  syscallName = Syscall::GetName(lastSyscall);
+        panic(std::format("SYS_PANIC: {}\nLast called syscall: "
+                          "{}\n",
+                          errorMessage, syscallName)
+                  .data());
+
         return -1;
     }
 } // namespace API::System

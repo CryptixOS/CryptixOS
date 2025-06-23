@@ -8,6 +8,7 @@
 
 #include <Prism/Core/Types.hpp>
 #include <Prism/Memory/Pointer.hpp>
+#include <Prism/String/StringView.hpp>
 
 #include <limine.h>
 
@@ -41,24 +42,24 @@ enum class FirmwareType : i32
 
 namespace BootInfo
 {
-    const char*                         GetBootloaderName();
-    const char*                         GetBootloaderVersion();
-    std::string_view                    GetKernelCommandLine();
-    FirmwareType                        GetFirmwareType();
-    u64                                 GetHHDMOffset();
-    Framebuffer**                       GetFramebuffers(usize& outCount);
-    Framebuffer*                        GetPrimaryFramebuffer();
-    usize                               GetPagingMode();
-    limine_mp_response*                 GetSMP_Response();
-    MemoryMap                           GetMemoryMap(u64& entryCount);
-    limine_file*                        GetExecutableFile();
-    limine_file*                        FindModule(const char* name);
-    PM::Pointer                         GetRSDPAddress();
-    std::pair<PM::Pointer, PM::Pointer> GetSmBiosEntries();
-    Pointer                             GetEfiSystemTable();
-    limine_efi_memmap_response*         GetEfiMemoryMap();
-    u64                                 GetDateAtBoot();
-    Pointer                             GetKernelPhysicalAddress();
-    Pointer                             GetKernelVirtualAddress();
-    Pointer                             GetDeviceTreeBlobAddress();
+    const char*                 GetBootloaderName();
+    const char*                 GetBootloaderVersion();
+    StringView                  GetKernelCommandLine();
+    FirmwareType                GetFirmwareType();
+    u64                         GetHHDMOffset();
+    Framebuffer**               GetFramebuffers(usize& outCount);
+    Framebuffer*                GetPrimaryFramebuffer();
+    usize                       GetPagingMode();
+    limine_mp_response*         GetSMP_Response();
+    MemoryMap                   GetMemoryMap(u64& entryCount);
+    limine_file*                GetExecutableFile();
+    limine_file*                FindModule(const char* name);
+    Pointer                     GetRSDPAddress();
+    std::pair<Pointer, Pointer> GetSmBiosEntries();
+    Pointer                     GetEfiSystemTable();
+    limine_efi_memmap_response* GetEfiMemoryMap();
+    u64                         GetDateAtBoot();
+    Pointer                     GetKernelPhysicalAddress();
+    Pointer                     GetKernelVirtualAddress();
+    Pointer                     GetDeviceTreeBlobAddress();
 }; // namespace BootInfo

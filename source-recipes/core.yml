@@ -83,7 +83,12 @@ sources:
        - args: ['cp',
            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
            '@THIS_SOURCE_DIR@/build-aux/']
-
+  - name: gnuconfig
+    subdir: 'sources'
+    git: 'https://git.savannah.gnu.org/git/config.git'
+    branch: 'master'
+    commit: '63acb96f92473ceb5e21d873d7c0aee266b3d6d3'
+    version: '20230121'
 
   - name: llvm
     subdir: 'sources'
@@ -94,6 +99,19 @@ sources:
   - name: mlibc
     subdir: 'sources'
     git: 'https://github.com/managarm/mlibc.git'
-    branch: 'release-5.0'
+    branch: 'v6.x'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
+
+  - name: util-linux
+    subdir: 'sources'
+    git: 'https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git'
+    tag: 'v2.36.2'
+    version: '2.36.2'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-pkg-config
+      - host-libtool
+    regenerate:
+      - args: ['./autogen.sh']

@@ -114,7 +114,7 @@ namespace std
             if (new_cap < _size) return;
 
             T* new_data = new T[new_cap];
-            for (size_type i = 0; i < _size; i++) new_data[i] = _data[i];
+            for (size_type i = 0; i < _size; i++) new_data[i] = std::move(_data[i]);
 
             _capacity = new_cap;
             if (_size > 0) delete[] _data;

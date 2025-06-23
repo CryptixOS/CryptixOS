@@ -1,0 +1,280 @@
+From a15e6470a8a202d16a1b9737a63207e22aa8da29 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Sat, 19 Apr 2025 11:34:16 +0200
+Subject: [PATCH 2/2] cryptix: add linux abi-bits
+
+---
+ meson.build                                 | 10 +--
+ sysdeps/cryptix/entry/entry.cpp             | 76 +++++++++------------
+ sysdeps/cryptix/include/abi-bits/ipc.h      |  1 +
+ sysdeps/cryptix/include/abi-bits/random.h   |  1 +
+ sysdeps/cryptix/include/abi-bits/rlim_t.h   |  1 +
+ sysdeps/cryptix/include/abi-bits/sigevent.h |  1 +
+ sysdeps/cryptix/include/abi-bits/sigval.h   |  1 +
+ sysdeps/cryptix/meson.build                 | 66 +++++++++---------
+ 8 files changed, 79 insertions(+), 78 deletions(-)
+ create mode 120000 sysdeps/cryptix/include/abi-bits/ipc.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/random.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/rlim_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/sigevent.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/sigval.h
+
+diff --git a/meson.build b/meson.build
+index 087de66d..76c5b83a 100644
+--- a/meson.build
++++ b/meson.build
+@@ -203,11 +203,11 @@ libc_include_dirs += include_directories('sysdeps/generic-helpers/include')
+ provides_bits_syscall_h = false
+ 
+ if host_machine.system() == 'cryptix'
+-    disable_linux_option = false
+-    disable_glibc_option = false
+-    disable_posix_option = false
+-    disable_ansi_option = false
+-    disable_libgcc_dependency = false
++    posix_option = true
++    linux_option = true
++    glibc_option = true
++    bsd_option = true
++    libgcc_dependency = true
+     debug_allocator = true
+     rtld_include_dirs += include_directories('sysdeps/cryptix/include')
+     libc_include_dirs += include_directories('sysdeps/cryptix/include')
+diff --git a/sysdeps/cryptix/entry/entry.cpp b/sysdeps/cryptix/entry/entry.cpp
+index 72b7f3e0..3a09166d 100644
+--- a/sysdeps/cryptix/entry/entry.cpp
++++ b/sysdeps/cryptix/entry/entry.cpp
+@@ -8,64 +8,56 @@
+ #include <stdlib.h>
+ 
+ // defined by the POSIX library
+-void                          __mlibc_initLocale();
++// void                          __mlibc_initLocale();
+ 
+-extern "C"
+-{
+-    unsigned int __mlibc_dev_major(unsigned long long int __dev)
+-    {
+-        return ((__dev >> 8) & 0xfff) | ((unsigned int)(__dev >> 32) & ~0xfff);
+-    }
++extern "C" {
++unsigned int __mlibc_dev_major(unsigned long long int __dev) {
++	return ((__dev >> 8) & 0xfff) | ((unsigned int)(__dev >> 32) & ~0xfff);
++}
+ 
+-    unsigned int __mlibc_dev_minor(unsigned long long int __dev)
+-    {
+-        return (__dev & 0xff) | ((unsigned int)(__dev >> 12) & ~0xff);
+-    }
++unsigned int __mlibc_dev_minor(unsigned long long int __dev) {
++	return (__dev & 0xff) | ((unsigned int)(__dev >> 12) & ~0xff);
++}
+ 
+-    unsigned long long int __mlibc_dev_makedev(unsigned int __major,
+-                                               unsigned int __minor)
+-    {
+-        return ((__minor & 0xff) | ((__major & 0xfff) << 8)
+-                | (((unsigned long long int)(__minor & ~0xff)) << 12)
+-                | (((unsigned long long int)(__major & ~0xfff)) << 32));
+-    }
++unsigned long long int __mlibc_dev_makedev(unsigned int __major, unsigned int __minor) {
++	return (
++	    (__minor & 0xff) | ((__major & 0xfff) << 8)
++	    | (((unsigned long long int)(__minor & ~0xff)) << 12)
++	    | (((unsigned long long int)(__major & ~0xfff)) << 32)
++	);
++}
+ }
+ 
+-extern "C" uintptr_t*         __dlapi_entrystack();
+-extern "C" void               __dlapi_enter(uintptr_t*);
++extern "C" uintptr_t *__dlapi_entrystack();
++extern "C" void __dlapi_enter(uintptr_t *);
+ 
+-extern char**                 environ;
++extern char **environ;
+ static mlibc::exec_stack_data __mlibc_stack_data;
+ 
+-struct LibraryGuard
+-{
+-    LibraryGuard();
++struct LibraryGuard {
++	LibraryGuard();
+ };
+ 
+ static LibraryGuard guard;
+-namespace mlibc
+-{
++namespace mlibc {
+ 
+-    int sys_anon_allocate(size_t size, void** pointer);
++int sys_anon_allocate(size_t size, void **pointer);
+ }
+ 
+-LibraryGuard::LibraryGuard()
+-{
+-    __mlibc_initLocale();
++LibraryGuard::LibraryGuard() {
++	//__mlibc_initLocale();
+ 
+-    // Parse the exec() stack.
+-    mlibc::parse_exec_stack(__dlapi_entrystack(), &__mlibc_stack_data);
+-    mlibc::set_startup_data(__mlibc_stack_data.argc, __mlibc_stack_data.argv,
+-                            __mlibc_stack_data.envp);
++	// Parse the exec() stack.
++	mlibc::parse_exec_stack(__dlapi_entrystack(), &__mlibc_stack_data);
++	mlibc::set_startup_data(
++	    __mlibc_stack_data.argc, __mlibc_stack_data.argv, __mlibc_stack_data.envp
++	);
+ }
+ 
+-extern "C" void __mlibc_entry(uintptr_t* entry_stack,
+-                              int        (*main_fn)(int argc, char* argv[],
+-                                             char* env[]))
+-{
+-    __dlapi_enter(entry_stack);
++extern "C" void
++__mlibc_entry(uintptr_t *entry_stack, int (*main_fn)(int argc, char *argv[], char *env[])) {
++	__dlapi_enter(entry_stack);
+ 
+-    auto result
+-        = main_fn(__mlibc_stack_data.argc, __mlibc_stack_data.argv, environ);
+-    exit(result);
++	auto result = main_fn(__mlibc_stack_data.argc, __mlibc_stack_data.argv, environ);
++	exit(result);
+ }
+diff --git a/sysdeps/cryptix/include/abi-bits/ipc.h b/sysdeps/cryptix/include/abi-bits/ipc.h
+new file mode 120000
+index 00000000..2c7ffc4c
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/ipc.h
+@@ -0,0 +1 @@
++../../../../abis/linux/ipc.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/random.h b/sysdeps/cryptix/include/abi-bits/random.h
+new file mode 120000
+index 00000000..83fc3d96
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/random.h
+@@ -0,0 +1 @@
++../../../../abis/linux/random.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/rlim_t.h b/sysdeps/cryptix/include/abi-bits/rlim_t.h
+new file mode 120000
+index 00000000..e92eb5fb
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/rlim_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/rlim_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/sigevent.h b/sysdeps/cryptix/include/abi-bits/sigevent.h
+new file mode 120000
+index 00000000..83d069b5
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/sigevent.h
+@@ -0,0 +1 @@
++../../../../abis/linux/sigevent.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/sigval.h b/sysdeps/cryptix/include/abi-bits/sigval.h
+new file mode 120000
+index 00000000..ccd43a55
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/sigval.h
+@@ -0,0 +1 @@
++../../../../abis/linux/sigval.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
+index 8dc0f578..074e2b79 100644
+--- a/sysdeps/cryptix/meson.build
++++ b/sysdeps/cryptix/meson.build
+@@ -29,52 +29,56 @@ libc_sources += common_sources
+ 
+ if not no_headers
+   install_headers(
++    'include/abi-bits/access.h',
+     'include/abi-bits/auxv.h',
+-    'include/abi-bits/seek-whence.h',
+-    'include/abi-bits/vm-flags.h',
+-    'include/abi-bits/errno.h',
+-    'include/abi-bits/fcntl.h',
+-    'include/abi-bits/in.h',
+-    'include/abi-bits/stat.h',
+-    'include/abi-bits/statx.h',
+-    'include/abi-bits/signal.h',
+-    'include/abi-bits/reboot.h',
+-    'include/abi-bits/resource.h',
+-    'include/abi-bits/socket.h',
+-    'include/abi-bits/termios.h',
+-    'include/abi-bits/time.h',
+     'include/abi-bits/blkcnt_t.h',
+     'include/abi-bits/blksize_t.h',
++    'include/abi-bits/clockid_t.h',
+     'include/abi-bits/dev_t.h',
++    'include/abi-bits/epoll.h',
++    'include/abi-bits/errno.h',
++    'include/abi-bits/fcntl.h',
++    'include/abi-bits/fsblkcnt_t.h',
++    'include/abi-bits/fsfilcnt_t.h',
+     'include/abi-bits/gid_t.h',
++    'include/abi-bits/in.h',
++    'include/abi-bits/inotify.h',
+     'include/abi-bits/ino_t.h',
++    'include/abi-bits/ioctls.h',
++    'include/abi-bits/ipc.h',
++    'include/abi-bits/limits.h',
+     'include/abi-bits/mode_t.h',
++    'include/abi-bits/msg.h',
++    'include/abi-bits/mqueue.h',
+     'include/abi-bits/nlink_t.h',
++    'include/abi-bits/packet.h',
+     'include/abi-bits/pid_t.h',
+-    'include/abi-bits/uid_t.h',
+-    'include/abi-bits/access.h',
+-    'include/abi-bits/wait.h',
+-    'include/abi-bits/limits.h',
+-    'include/abi-bits/utsname.h',
+-    'include/abi-bits/ptrace.h',
+-    'include/abi-bits/vt.h',
+-    'include/abi-bits/ptrace.h',
+     'include/abi-bits/poll.h',
+-    'include/abi-bits/epoll.h',
+-    'include/abi-bits/packet.h',
+-    'include/abi-bits/inotify.h',
+-    'include/abi-bits/clockid_t.h',
++    'include/abi-bits/ptrace.h',
++    'include/abi-bits/random.h',
++    'include/abi-bits/reboot.h',
++    'include/abi-bits/resource.h',
++    'include/abi-bits/rlim_t.h',
++    'include/abi-bits/seek-whence.h',
+     'include/abi-bits/shm.h',
+-    'include/abi-bits/mqueue.h',
+-    'include/abi-bits/suseconds_t.h',
+-    'include/abi-bits/fsfilcnt_t.h',
+-    'include/abi-bits/fsblkcnt_t.h',
++    'include/abi-bits/sigevent.h',
++    'include/abi-bits/signal.h',
++    'include/abi-bits/sigval.h',
++    'include/abi-bits/socket.h',
+     'include/abi-bits/socklen_t.h',
++    'include/abi-bits/stat.h',
+     'include/abi-bits/statfs.h',
+     'include/abi-bits/statvfs.h',
+-    'include/abi-bits/ioctls.h',
++    'include/abi-bits/statx.h',
++    'include/abi-bits/suseconds_t.h',
++    'include/abi-bits/termios.h',
++    'include/abi-bits/time.h',
++    'include/abi-bits/uid_t.h',
++    'include/abi-bits/utsname.h',
++    'include/abi-bits/vm-flags.h',
++    'include/abi-bits/vt.h',
++    'include/abi-bits/wait.h',
+     'include/abi-bits/xattr.h',
+-    'include/abi-bits/msg.h',
+     subdir: 'abi-bits',
+     follow_symlinks: true,
+   )
+-- 
+2.49.0
+

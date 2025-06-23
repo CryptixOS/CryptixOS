@@ -7,9 +7,11 @@
 #pragma once
 
 #include <Prism/Core/Singleton.hpp>
+#include <Prism/Utility/Atomic.hpp>
+
 #include <Time/HardwareTimer.hpp>
 
-class Lapic : public HardwareTimer, public PM::Singleton<Lapic>
+class Lapic : public HardwareTimer, public Singleton<Lapic>
 {
   public:
     enum class Mode : u8
@@ -19,28 +21,28 @@ class Lapic : public HardwareTimer, public PM::Singleton<Lapic>
         eTscDeadline = 2,
     };
 
-    void             Initialize();
+    void          Initialize();
 
-    static bool      IsInitialized() { return s_Initialized; }
+    static bool   IsInitialized() { return s_Initialized; }
 
-    std::string_view GetModelString() const override { return "Local APIC"; }
+    StringView    GetModelString() const override { return "Local APIC"_sv; }
 
-    void             SendIpi(u32 flags, u32 id);
-    void             SendEOI();
+    void          SendIpi(u32 flags, u32 id);
+    void          SendEOI();
 
-    static void      PanicIpi();
+    static void   PanicIpi();
 
-    ErrorOr<void>    Start(TimerMode mode, TimeStep interval) override;
-    void             Stop() override;
+    ErrorOr<void> Start(TimerMode mode, TimeStep interval) override;
+    void          Stop() override;
 
-    ErrorOr<void>    SetFrequency(usize frequency) override
+    ErrorOr<void> SetFrequency(usize frequency) override
     {
         (void)frequency;
         return {};
     }
 
   private:
-    static std::atomic_bool s_Initialized;
+    static AtomicBool       s_Initialized;
 
     u32                     m_ID               = 0;
     uintptr_t               m_BaseAddress      = 0;

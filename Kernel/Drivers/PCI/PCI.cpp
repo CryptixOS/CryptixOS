@@ -11,6 +11,8 @@
 
 #include <Firmware/ACPI/MCFG.hpp>
 #include <Library/Logger.hpp>
+#include <Prism/String/String.hpp>
+#include <Prism/String/StringUtils.hpp>
 
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
@@ -22,8 +24,71 @@
 namespace PCI
 {
     static std::unordered_map<u32, HostController*> s_HostControllers;
+    struct Vendor
+    {
+        String                          Name;
+        std::unordered_map<u16, String> DeviceIDs;
+    };
 
-    static void                                     DetectControllers()
+    std::unordered_map<u16, Vendor> s_VendorIDs;
+
+    void                            ParseVendorID(StringView line)
+    {
+        if (line.Size() < 4) return;
+        for (usize i = 0; i < 4; i++)
+            if (!IsHexDigit(line[i])) return;
+
+        usize nameStartPos = 4;
+        while (nameStartPos < line.Size() && !std::isalpha(line[nameStartPos]))
+            ++nameStartPos;
+        if (nameStartPos >= line.Size()) return;
+
+        u16        id       = StringUtils::ToNumber<u16>(line.Substr(0, 4), 16);
+        auto&      vendor   = s_VendorIDs[id];
+        usize      nameSize = line.Size() - nameStartPos;
+        StringView name(line.Raw() + nameStartPos, nameSize);
+        if (line.Empty()) return;
+
+        vendor.Name     = name;
+        s_VendorIDs[id] = vendor;
+    }
+    void InitializeDatabase()
+    {
+        PathView path  = "/usr/share/hwdata/pci.ids";
+        DirectoryEntry*   vnode = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), path).Node;
+        if (!vnode) return;
+
+        auto file = vnode->INode();
+
+        if (!file)
+        {
+            LogError("PCI: Failed to open pciids database");
+            return;
+        }
+
+        usize fileSize = file->GetStats().st_size;
+        assert(fileSize > 0);
+
+        String buffer;
+        buffer.Resize(fileSize);
+        fileSize         = file->Read(buffer.Raw(), 0, fileSize);
+
+        usize currentPos = 0;
+        usize newLinePos = String::NPos;
+        while ((newLinePos = buffer.FindFirstOf("\n", currentPos))
+                   < buffer.Size()
+               && currentPos < buffer.Size())
+        {
+            usize  lineLength = newLinePos - currentPos;
+            String line       = buffer.Substr(currentPos, lineLength);
+            currentPos        = buffer.FindFirstNotOf("\n\r", newLinePos);
+            if (line.Empty()) continue;
+
+            ParseVendorID(line);
+        }
+    }
+
+    static void DetectControllers()
     {
         const MCFG* mcfg       = ACPI::GetTable<MCFG>(MCFG_SIGNATURE);
         usize       entryCount = 0;
@@ -79,17 +144,19 @@ namespace PCI
             [](const DeviceAddress& addr) -> bool
             {
                 HostController* controller = s_HostControllers[addr.Domain];
-                VendorID vendorID = static_cast<VendorID>(controller->Read<u16>(
-                    addr, std::to_underlying(RegisterOffset::eVendorID)));
-                u16      deviceID = controller->Read<u16>(
+                u16             vendorID   = controller->Read<u16>(
+                    addr, std::to_underlying(RegisterOffset::eVendorID));
+                u16 deviceID = controller->Read<u16>(
                     addr, std::to_underlying(RegisterOffset::eDeviceID));
                 u8 classID = controller->Read<u8>(
                     addr, std::to_underlying(RegisterOffset::eClassID));
                 u8 subclassID = controller->Read<u8>(
                     addr, std::to_underlying(RegisterOffset::eSubClassID));
 
-                std::string_view vendorName = magic_enum::enum_name(vendorID);
-                if (vendorName.empty()) vendorName = "Unrecognized";
+                auto       vendor     = s_VendorIDs.find(vendorID);
+                StringView vendorName = vendor != s_VendorIDs.end()
+                                          ? vendor->second.Name.View()
+                                          : "Unrecognized"_sv;
 
                 LogInfo(
                     "PCI: {:#x}:{:#x}:{:#x}, ID: {:#x}:{:#x}:{:#x}:{:#x} - {}",
@@ -114,6 +181,7 @@ namespace PCI
                 return false;
             });
 
+        InitializeDatabase();
         EnumerateDevices(enumerator);
     }
 

@@ -4,7 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <API/Posix/unistd.h>
 #include <Arch/CPU.hpp>
 
 #include <Scheduler/Process.hpp>
@@ -13,28 +12,49 @@
 
 #include <Prism/Utility/Math.hpp>
 #include <VFS/FileDescriptor.hpp>
+#include <VFS/DirectoryEntry.hpp>
 
-void DirectoryEntries::Push(INode* node, std::string_view name)
+void DirectoryEntries::Push(INode* inode, StringView name)
 {
-    if (name.empty()) name = node->GetName();
-    node            = node->Reduce(false);
+    if (name.Empty()) name = inode->GetName();
+    auto vnode = inode->DirectoryEntry();
+    inode      = vnode->FollowMounts()->INode();
+    // inode = inode->Reduce(false);
 
-    auto  reclen    = Math::AlignUp(DIRENT_LENGTH + name.length() + 1, 8);
+    auto reclen
+        = Math::AlignUp(DIRENT_LENGTH + name.Size() + 1, alignof(dirent));
 
     auto* entry     = reinterpret_cast<dirent*>(malloc(reclen));
-    entry->d_ino    = node->GetStats().st_ino;
+    entry->d_ino    = inode->GetStats().st_ino;
     entry->d_off    = reclen;
     entry->d_reclen = reclen;
-    entry->d_type   = IF2DT(node->GetStats().st_mode);
+    entry->d_type   = IF2DT(inode->GetStats().st_mode);
 
-    name.copy(entry->d_name, name.length());
-    reinterpret_cast<char*>(entry->d_name)[name.length()] = 0;
+    name.Copy(entry->d_name, name.Size() + 1);
+    reinterpret_cast<char*>(entry->d_name)[name.Size()] = 0;
 
-    Entries.push_back(entry);
+    Entries.PushBack(entry);
     Size += entry->d_reclen;
 }
+usize DirectoryEntries::CopyAndPop(u8* out, usize capacity)
+{
+    if (Entries.Empty()) return 0;
 
-FileDescriptor::FileDescriptor(INode* node, i32 flags, FileAccessMode accMode)
+    auto  entry     = Entries.Front();
+    usize entrySize = entry->d_reclen;
+    if (capacity < entrySize) return 0;
+
+    Entries.PopFront();
+    if (!entry || !(char*)entry->d_name) return 0;
+
+    std::memcpy(out, entry, entry->d_reclen);
+    delete entry;
+
+    return entrySize;
+}
+
+FileDescriptor::FileDescriptor(class DirectoryEntry* node, i32 flags,
+                               FileAccessMode accMode)
 {
     m_Description = new FileDescription;
     m_Description->IncRefCount();
@@ -58,7 +78,8 @@ FileDescriptor::~FileDescriptor()
     if (m_Description->RefCount == 0) delete m_Description;
 }
 
-ErrorOr<isize> FileDescriptor::Read(void* const outBuffer, usize count)
+ErrorOr<isize> FileDescriptor::Read(const UserBuffer& out, usize count,
+                                    isize offset)
 {
     ScopedLock guard(m_Description->Lock);
 
@@ -75,13 +96,16 @@ ErrorOr<isize> FileDescriptor::Read(void* const outBuffer, usize count)
         if (current->WasInterrupted()) return Error(EINTR);
     }
 
-    isize bytesRead
-        = m_Description->Node->Read(outBuffer, m_Description->Offset, count);
-    m_Description->Offset += bytesRead;
+    if (offset < 0) offset = m_Description->Offset;
 
+    isize bytesRead = GetNode()->Read(out.Raw(), offset, count);
+    offset += bytesRead;
+
+    m_Description->Offset = offset;
     return bytesRead;
 }
-ErrorOr<isize> FileDescriptor::Write(const void* data, isize bytes)
+ErrorOr<isize> FileDescriptor::Write(const UserBuffer& in, usize count,
+                                     isize offset)
 {
     ScopedLock guard(m_Description->Lock);
 
@@ -89,10 +113,12 @@ ErrorOr<isize> FileDescriptor::Write(const void* data, isize bytes)
 
     INode* node = GetNode();
     if (!node) return Error(ENOENT);
-    isize offset       = m_Description->Offset;
+    if (offset < 0) offset = m_Description->Offset;
 
-    isize bytesWritten = node->Write(data, offset, bytes);
-    m_Description->Offset += bytesWritten;
+    isize bytesWritten = node->Write(in.Raw(), offset, count);
+    offset += bytesWritten;
+
+    m_Description->Offset = offset;
 
     return bytesWritten;
 }
@@ -107,7 +133,7 @@ ErrorOr<const stat*> FileDescriptor::Stat() const
 ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
 {
     ScopedLock guard(m_Description->Lock);
-    INode*     node = m_Description->Node;
+    INode*     node = GetNode();
     if (IsPipe() || node->IsSocket() || node->IsFifo()) return Error(ESPIPE);
 
     switch (whence)
@@ -127,12 +153,11 @@ ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
         }
         case SEEK_END:
         {
-            usize size = m_Description->Node->GetStats().st_size;
+            usize size = GetNode()->GetStats().st_size;
             if (static_cast<usize>(m_Description->Offset) + size
                 > std::numeric_limits<off_t>::max())
                 return Error(EOVERFLOW);
-            m_Description->Offset
-                = m_Description->Node->GetStats().st_size + offset;
+            m_Description->Offset = GetNode()->GetStats().st_size + offset;
             break;
         }
 
@@ -144,12 +169,12 @@ ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
 
 ErrorOr<isize> FileDescriptor::Truncate(off_t size)
 {
-    if (m_Description->Node->IsDirectory()) return Error(EISDIR);
+    if (GetNode()->IsDirectory()) return Error(EISDIR);
     if (!(m_Description->AccessMode & FileAccessMode::eWrite)
-        || !m_Description->Node->IsRegular())
+        || !GetNode()->IsRegular())
         return Error(EBADF);
 
-    return m_Description->Node->Truncate(size);
+    return GetNode()->Truncate(size);
 }
 
 [[clang::no_sanitize("alignment")]] ErrorOr<i32>
@@ -167,7 +192,7 @@ FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
 
     usize length = 0;
     for (const auto& entry : dirEntries) length += entry->d_reclen;
-    length = std::min(maxSize, length);
+    length = std::min(maxSize, length) - sizeof(dirent);
 
     if (dirEntries.Front()->d_reclen > maxSize) return Error(EINVAL);
 
@@ -179,8 +204,13 @@ FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
 
     while (offset < length)
     {
-        bytes = offset;
-        offset += dirEntries.CopyAndPop(reinterpret_cast<u8*>(out) + offset);
+        bytes        = offset;
+
+        usize copied = dirEntries.CopyAndPop(
+            reinterpret_cast<u8*>(out) + offset, length - offset);
+
+        if (copied == 0) break;
+        offset += copied;
     }
 
     if (dirEntries.IsEmpty()) dirEntries.ShouldRegenerate = true;
@@ -197,12 +227,38 @@ bool FileDescriptor::GenerateDirEntries()
     DirectoryEntries& dirEntries = GetDirEntries();
     dirEntries.Clear();
 
-    node = m_Description->Node->Reduce(true, true);
-    for (const auto [name, child] : node->GetChildren()) dirEntries.Push(child);
+    auto current = DirectoryEntry();
+    while (current->IsSymlink() || current->m_MountGate)
+    {
+        if (current->m_MountGate)
+        {
+            current = current->FollowMounts();
+            continue;
+        }
+
+        auto parentDirectoryEntry = current->INode()->GetParent()
+                             ? current->INode()->GetParent()->DirectoryEntry()
+                             : nullptr;
+        auto target      = current->INode()->GetTarget();
+        auto next = VFS::ResolvePath(parentDirectoryEntry, target.Raw(), true).Node;
+
+        if (!next) break;
+        current = next;
+    }
+    node = current->INode();
+    // node = GetNode()->Reduce(true, true);
+    for (const auto [name, child] : node->GetChildren())
+    {
+        if (name.Empty()) continue;
+        dirEntries.Push(child);
+    }
 
     // . && ..
-    std::string_view cwdPath = Process::GetCurrent()->GetCWD();
-    auto cwd = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), cwdPath));
+    StringView cwdPath  = Process::GetCurrent()->GetCWD();
+    auto       cwdDirectoryEntry = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), cwdPath).Node;
+    if (!cwdDirectoryEntry) return true;
+
+    auto cwd = cwdDirectoryEntry->INode();
     if (!cwd) return true;
 
     dirEntries.Push(cwd, ".");

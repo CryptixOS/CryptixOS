@@ -8,8 +8,9 @@
 #include <Debug/Assertions.hpp>
 
 #include <Library/Logger.hpp>
-#include <Prism/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
+#include <Prism/Containers/Deque.hpp>
 #include <Prism/Utility/Time.hpp>
 
 #include <Scheduler/Event.hpp>
@@ -36,23 +37,23 @@ namespace Time
 
     namespace
     {
-        std::vector<HardwareTimer*> s_HardwareTimers;
-        HardwareTimer*              s_SchedulerTimer = nullptr;
+        Vector<HardwareTimer*> s_HardwareTimers;
+        HardwareTimer*         s_SchedulerTimer = nullptr;
 
-        Timestep                    s_BootTime;
-        Timestep                    s_RealTime;
-        Timestep                    s_Monotonic;
+        Timestep               s_BootTime;
+        Timestep               s_RealTime;
+        Timestep               s_Monotonic;
 
-        std::deque<Timer*>          s_ArmedTimers;
-        Spinlock                    s_TimersLock;
+        Deque<Timer*>          s_ArmedTimers;
+        Spinlock               s_TimersLock;
     } // namespace
 
     void Timer::Arm()
     {
         ScopedLock guard(s_TimersLock);
 
-        Index = s_ArmedTimers.size();
-        s_ArmedTimers.push_back(this);
+        Index = s_ArmedTimers.Size();
+        s_ArmedTimers.PushBack(this);
     }
     void Timer::Disarm()
     {
@@ -61,7 +62,7 @@ namespace Time
         for (; it != s_ArmedTimers.end(); it++)
             if (*it == this) break;
 
-        if (it != s_ArmedTimers.end()) s_ArmedTimers.erase(it);
+        if (it != s_ArmedTimers.end()) s_ArmedTimers.Erase(it);
         Index = std::nullopt;
     }
 
@@ -71,19 +72,20 @@ namespace Time
         DateTime dateAtBoot(s_BootTime);
         LogInfo("Time: Boot Date: {}", dateAtBoot);
 
+        s_BootTime  = s_BootTime * 1'000'000'000;
         auto now    = static_cast<usize>(Arch::GetEpoch());
         s_RealTime  = now * 1'000'000'000;
         s_Monotonic = s_RealTime;
 
         LogTrace("Time: Probing available timers...");
         Arch::ProbeTimers(s_HardwareTimers);
-        Assert(s_HardwareTimers.size() > 0);
+        Assert(s_HardwareTimers.Size() > 0);
 
-        LogInfo("Time: Detected {} timers", s_HardwareTimers.size());
+        LogInfo("Time: Detected {} timers", s_HardwareTimers.Size());
         for (usize i = 0; auto& timer : s_HardwareTimers)
             LogInfo("Time: Timer[{}] = '{}'", i++, timer->GetModelString());
 
-        s_SchedulerTimer = s_HardwareTimers.front();
+        s_SchedulerTimer = s_HardwareTimers.Front();
     }
 
     HardwareTimer* GetSchedulerTimer() { return s_SchedulerTimer; }

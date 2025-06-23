@@ -7,23 +7,48 @@
 #pragma once
 
 #include <Prism/Core/Types.hpp>
-#include <Prism/StringView.hpp>
+#include <Prism/String/StringView.hpp>
 
-constexpr const char* KERNEL_NAME = "@kernel_name@";
+#include <format>
 
-#mesondefine KERNEL_VERSION_MAJ
-#mesondefine KERNEL_VERSION_MIN
-#mesondefine KERNEL_VERSION_PAT
-constexpr usize       KERNEL_VERSION_MAJOR  = KERNEL_VERSION_MAJ;
-constexpr usize       KERNEL_VERSION_MINOR  = KERNEL_VERSION_MIN;
-constexpr usize       KERNEL_VERSION_PATCH  = KERNEL_VERSION_PAT;
-constexpr const char* KERNEL_GIT_TAG        = "@git_tag@";
+#mesondefine CTOS_VERSION_MAJOR
+#mesondefine CTOS_VERSION_MINOR
+#mesondefine CTOS_VERSION_PATCH
 
-constexpr const char* KERNEL_BUILD_DATE     = __DATE__;
-constexpr const char* KERNEL_BUILD_TIME     = __TIME__;
+class Version
+{
+  public:
+    constexpr Version(usize major, usize minor, usize patch)
+        : m_Major(major)
+        , m_Minor(minor)
+        , m_Patch(patch)
+    {
+    }
 
-constexpr const char* KERNEL_ARCH_STRING    = "@arch@";
-constexpr const char* KERNEL_COMPILER       = "@compiler@";
-constexpr const char* COMPILER_VERSION      = "@compiler_version@";
+    inline constexpr usize Major() const { return m_Major; }
+    inline constexpr usize Minor() const { return m_Minor; }
+    inline constexpr usize Patch() const { return m_Patch; }
 
-constexpr StringView  KERNEL_VERSION_STRING = "@kernel_version_string@";
+  private:
+    usize m_Major = 0;
+    usize m_Minor = 0;
+    usize m_Patch = 0;
+};
+
+namespace Kernel
+{
+    constexpr StringView NAME = "@kernel_name@";
+
+    constexpr Version    VERSION
+        = {CTOS_VERSION_MAJOR, CTOS_VERSION_MINOR, CTOS_VERSION_PATCH};
+    constexpr StringView GIT_TAG          = "@git_tag@";
+
+    constexpr StringView BUILD_DATE       = __DATE__;
+    constexpr StringView BUILD_TIME       = __TIME__;
+
+    constexpr StringView ARCH_STRING      = "@arch@";
+    constexpr StringView COMPILER         = "@compiler@";
+    constexpr StringView COMPILER_VERSION = "@compiler_version@";
+
+    constexpr StringView VERSION_STRING   = "@kernel_version_string@";
+}; // namespace Kernel

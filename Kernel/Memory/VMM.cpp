@@ -4,22 +4,30 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Syscall.hpp>
+#include <Arch/CPU.hpp>
+
 #include <Boot/BootInfo.hpp>
 
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
 #include <Prism/Utility/Math.hpp>
+#include <Scheduler/Process.hpp>
 
 extern "C" symbol           text_start_addr;
 extern "C" symbol           text_end_addr;
+extern "C" symbol           kernel_init_start_addr;
+extern "C" symbol           kernel_init_end_addr;
+extern "C" symbol           module_init_start_addr;
+extern "C" symbol           module_init_end_addr;
 extern "C" symbol           rodata_start_addr;
 extern "C" symbol           rodata_end_addr;
 extern "C" symbol           data_start_addr;
 extern "C" symbol           data_end_addr;
 
 static PageMap*             s_KernelPageMap;
-static uintptr_t            s_VirtualAddressSpace{};
+static Pointer              s_VirtualAddressSpace{};
 
 static std::optional<usize> s_HigherHalfOffset = BootInfo::GetHHDMOffset();
 
@@ -29,15 +37,12 @@ void* PageMap::GetNextLevel(PageTableEntry& entry, bool allocate,
                             uintptr_t virt)
 {
     if (entry.IsValid())
-        return ToHigherHalfAddress<void*>(
-            static_cast<uintptr_t>(entry.GetAddress()));
-
+        return Pointer(entry.GetAddress()).ToHigherHalf<void*>();
     if (!allocate) return nullptr;
 
-    auto newEntry = Arch::VMM::AllocatePageTable();
-    entry.SetAddress(FromHigherHalfAddress<uintptr_t>(
-        reinterpret_cast<uintptr_t>(newEntry)));
-    entry.SetFlags(Arch::VMM::defaultPteFlags, true);
+    Pointer newEntry = Arch::VMM::AllocatePageTable();
+    entry.SetAddress(newEntry.FromHigherHalf());
+    entry.SetFlags(Arch::VMM::g_DefaultPteFlags, true);
     return newEntry;
 }
 
@@ -56,22 +61,22 @@ namespace VirtualMemoryManager
         Assert(s_KernelPageMap->GetTopLevel() != 0);
 
         auto [pageSize, flags] = s_KernelPageMap->RequiredSize(4_gib);
-        for (uintptr_t i = 0; i < 1_gib * 4; i += pageSize)
-            Assert(s_KernelPageMap->Map(ToHigherHalfAddress<uintptr_t>(i), i,
-                                        PageAttributes::eRW | flags
-                                            | PageAttributes::eWriteBack));
 
-        usize entryCount = 0;
-        auto  entries    = BootInfo::GetMemoryMap(entryCount);
+        Assert(s_KernelPageMap->MapRange(GetHigherHalfOffset(), 0, 4_gib,
+                                         PageAttributes::eRW | flags
+                                             | PageAttributes::eWriteBack));
+
+        usize entryCount    = 0;
+        auto  memoryEntries = BootInfo::GetMemoryMap(entryCount);
         for (usize i = 0; i < entryCount; i++)
         {
-            MemoryMapEntry* entry = entries[i];
+            MemoryMapEntry* entry = memoryEntries[i];
 
-            uintptr_t       base  = Math::AlignDown(entry->base, GetPageSize());
-            uintptr_t       top
+            Pointer         base  = Math::AlignDown(entry->base, GetPageSize());
+            Pointer         top
                 = Math::AlignUp(entry->base + entry->length, GetPageSize());
 
-            auto size              = top - base;
+            auto size              = (top - base).Raw();
             auto [pageSize, flags] = s_KernelPageMap->RequiredSize(size);
 
             auto alignedSize       = Math::AlignDown(size, pageSize);
@@ -80,41 +85,44 @@ namespace VirtualMemoryManager
             if (entry->type == MEMORY_MAP_FRAMEBUFFER)
                 flags |= PageAttributes::eWriteCombining;
 
-            for (uintptr_t t = base; t < (base + alignedSize); t += pageSize)
-            {
-                if (t < 4_gib) continue;
-
-                Assert(s_KernelPageMap->Map(
-                    ToHigherHalfAddress<uintptr_t>(t), t,
-                    PageAttributes::eRW | flags | PageAttributes::eWriteBack));
-            }
+            if (base < 4_gib) continue;
+            Assert(s_KernelPageMap->MapRange(
+                base.ToHigherHalf(), base, alignedSize,
+                PageAttributes::eRW | flags | PageAttributes::eWriteBack));
             base += alignedSize;
 
-            for (uintptr_t t = base; t < (base + size - alignedSize);
-                 t += GetPageSize())
-            {
-                if (t < 4_gib) continue;
-
-                Assert(s_KernelPageMap->Map(
-                    ToHigherHalfAddress<uintptr_t>(t), t,
-                    PageAttributes::eRW | PageAttributes::eWriteBack));
-            }
+            Assert(s_KernelPageMap->MapRange(
+                base.ToHigherHalf(), base, size - alignedSize,
+                PageAttributes::eRW | PageAttributes::eWriteBack));
         }
 
-        for (usize i = 0; i < BootInfo::GetExecutableFile()->size;
-             i += GetPageSize())
+        auto kernelExecutable = BootInfo::GetExecutableFile();
+        auto kernelPhys       = BootInfo::GetKernelPhysicalAddress();
+        auto kernelVirt       = BootInfo::GetKernelVirtualAddress();
+
+        Assert(s_KernelPageMap->MapRange(
+            kernelVirt, kernelPhys, kernelExecutable->size,
+            PageAttributes::eRWX | PageAttributes::eWriteBack));
+
+        auto textVirt = Pointer(text_start_addr);
+        auto textPhys = Pointer(text_start_addr) - kernelVirt + kernelPhys;
+        auto textSize = Pointer(text_end_addr) - textVirt;
+        Assert(s_KernelPageMap->MapRange(textVirt, textPhys, textSize,
+                                         PageAttributes::eRWX
+                                             | PageAttributes::eWriteBack));
+
         {
-            uintptr_t phys = BootInfo::GetKernelPhysicalAddress().Raw<>() + i;
-            uintptr_t virt = BootInfo::GetKernelVirtualAddress().Raw<>() + i;
-            Assert(s_KernelPageMap->Map(
-                virt, phys, PageAttributes::eRWX | PageAttributes::eWriteBack));
+            auto memoryTop = PMM::GetMemoryTop();
+            auto base = Pointer(Math::AlignUp(memoryTop, 1_gib)).ToHigherHalf();
+            s_VirtualAddressSpace = base.Offset(4_gib);
         }
 
-        {
-            auto base = ToHigherHalfAddress<uintptr_t>(
-                Math::AlignUp(PMM::GetMemoryTop(), 1_gib));
-            s_VirtualAddressSpace = base + 4_gib;
-        }
+        auto modulesVirt = Pointer(module_init_start_addr);
+        auto modulesPhys = modulesVirt - kernelVirt + kernelPhys;
+        auto modulesSize = Pointer(module_init_end_addr) - modulesVirt;
+        s_KernelPageMap->MapRange(modulesVirt, modulesPhys, modulesSize,
+                                  PageAttributes::eRWX
+                                      | PageAttributes::eWriteBack);
 
         s_KernelPageMap->Load();
         LogInfo("VMM: Loaded kernel page map");
@@ -124,22 +132,99 @@ namespace VirtualMemoryManager
         return s_HigherHalfOffset.has_value() ? s_HigherHalfOffset.value() : 0;
     }
 
-    uintptr_t AllocateSpace(usize increment, usize alignment, bool lowerHalf)
+    Pointer AllocateSpace(usize increment, usize alignment, bool lowerHalf)
     {
         Assert(alignment <= PMM::PAGE_SIZE);
 
-        uintptr_t ret = alignment
-                          ? Math::AlignUp(s_VirtualAddressSpace, alignment)
-                          : s_VirtualAddressSpace;
-        s_VirtualAddressSpace += increment + (ret - s_VirtualAddressSpace);
+        if (alignment == 0) alignment = sizeof(void*);
+        Pointer virt = Math::AlignUp(s_VirtualAddressSpace, alignment);
 
-        return lowerHalf ? FromHigherHalfAddress<uintptr_t>(ret) : ret;
+        s_VirtualAddressSpace
+            += (virt - s_VirtualAddressSpace).Offset(increment);
+
+        return lowerHalf ? virt.FromHigherHalf() : virt.ToHigherHalf<>();
     }
 
     PageMap* GetKernelPageMap()
     {
         if (!s_Initialized) Initialize();
         return s_KernelPageMap;
+    }
+    void HandlePageFault(const PageFaultInfo& info)
+    {
+        auto message
+            = fmt::format("Page Fault occurred at '{:#x}'\nCaused by:\n",
+                          info.VirtualAddress().Raw());
+        auto reason = info.Reason();
+
+        if (reason & PageFaultReason::eNotPresent)
+            message += "\t- Non-present page\n";
+        if (reason & PageFaultReason::eWrite)
+            message += "\t- Write violation\n";
+        else message += "\t- Read violation\n";
+        if (reason & PageFaultReason::eUser) message += "\t- Reserved Write\n";
+        if (reason & PageFaultReason::eInstructionFetch)
+            message += "\t- Instruction Fetch\n";
+        if (reason & PageFaultReason::eProtectionKey)
+            message += "\t- Protection-Key violation\n";
+        if (reason & PageFaultReason::eShadowStack)
+            message += "\t- Shadow stack access\n";
+        if (reason & PageFaultReason::eSoftwareGuardExtension)
+            message += "\t- SGX violation\n";
+
+        bool kernelFault = !(reason & PageFaultReason::eUser);
+        message += fmt::format("In {} space", kernelFault ? "User" : "Kernel");
+
+        if (CPU::DuringSyscall())
+        {
+            usize      syscallID   = CPU::GetCurrent()->LastSyscallID;
+            StringView syscallName = Syscall::GetName(syscallID);
+            message += fmt::format(", and during syscall({}) => {}", syscallID,
+                                   syscallName);
+        }
+
+        message += '\n';
+        auto process = Process::GetCurrent();
+
+        if (process && !kernelFault)
+        {
+            auto tty = process->GetTTY();
+            LogError("{}: Segmentation Fault(core dumped)\n{}",
+                     process->GetName(), message);
+            Stacktrace::Print();
+
+            auto bufferOr
+                = UserBuffer::ForUserBuffer(message.data(), message.size());
+            if (!bufferOr) return;
+            auto messageBuffer = bufferOr.value();
+            if (tty)
+            {
+                auto status = tty->Write(messageBuffer, 0, message.size());
+                (void)status;
+            }
+            process->Exit(-1);
+            return;
+        }
+
+        earlyPanic(message.data());
+    }
+
+    bool MapKernelRegion(Pointer virt, Pointer phys, usize pageCount,
+                         PageAttributes attributes)
+    {
+        return MapKernelRange(virt, phys, pageCount * PMM::PAGE_SIZE,
+                              attributes);
+    }
+    bool MapKernelRange(Pointer virt, Pointer phys, usize size,
+                        PageAttributes attributes)
+    {
+        if (!s_KernelPageMap) return false;
+
+        return s_KernelPageMap->MapRange(virt, phys, size, attributes);
+    }
+    bool UnmapKernelRange(Pointer virt, usize size, PageAttributes flags)
+    {
+        return s_KernelPageMap->UnmapRange(virt, size, flags);
     }
 
     Pointer MapIoRegion(PhysAddr phys, usize size, bool write, usize alignment)

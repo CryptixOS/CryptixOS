@@ -11,8 +11,8 @@
 #include <Arch/InterruptManager.hpp>
 #include <Arch/x86_64/Drivers/IoApic.hpp>
 
+#include <Library/Spinlock.hpp>
 #include <Memory/PMM.hpp>
-#include <Prism/Spinlock.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
@@ -21,12 +21,17 @@
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/VFS.hpp>
 
-#include <deque>
-
 u8 g_ScheduleVector = 48;
 namespace
 {
-    Spinlock                            s_Lock{};
+    Spinlock s_Lock{};
+    bool     s_SchedulerEnabled = false;
+
+    struct CPULocalData
+    {
+        Atomic<bool> PreemptionEnabled;
+    };
+    CPULocalData*                       s_CPULocalData;
 
     Process*                            s_KernelProcess = nullptr;
     Spinlock                            s_ProcessListLock;
@@ -36,63 +41,63 @@ namespace
 
 struct ThreadQueue
 {
-    mutable Spinlock    Lock;
-    std::deque<Thread*> Queue;
+    mutable Spinlock Lock;
+    Deque<Thread*>   Queue;
 
-    constexpr usize     Size() const { return Queue.size(); }
-    constexpr bool      IsEmpty() const { return Queue.empty(); }
+    constexpr usize  Size() const { return Queue.Size(); }
+    constexpr bool   IsEmpty() const { return Queue.Empty(); }
 
-    auto                begin() { return Queue.begin(); }
-    auto                end() { return Queue.end(); }
+    auto             begin() { return Queue.begin(); }
+    auto             end() { return Queue.end(); }
 
-    inline Thread*      Front() const
+    inline Thread*   Front() const
     {
         ScopedLock guard(Lock);
-        return Queue.front();
+        return Queue.Front();
     }
     inline Thread* Back() const
     {
         ScopedLock guard(Lock);
-        return Queue.back();
+        return Queue.Back();
     }
 
     inline void PushBack(Thread* t)
     {
         ScopedLock guard(Lock);
-        Queue.push_back(t);
+        Queue.PushBack(t);
     }
     inline void PushFront(Thread* t)
     {
         ScopedLock guard(Lock);
-        Queue.push_front(t);
+        Queue.PushFront(t);
     }
 
     inline void PopBack()
     {
         ScopedLock guard(Lock);
-        Queue.pop_back();
+        Queue.PopBack();
     }
     inline void PopFront()
     {
         ScopedLock guard(Lock);
-        Queue.pop_front();
+        Queue.PopFront();
     }
 
     inline Thread* PopFrontElement()
     {
         ScopedLock guard(Lock);
-        return Queue.pop_front_element();
+        return Queue.PopFrontElement();
     }
     inline Thread* PopBackElement()
     {
         ScopedLock guard(Lock);
-        return Queue.pop_back_element();
+        return Queue.PopBackElement();
     }
 
-    inline void Erase(Thread** it)
+    inline void Erase(auto it)
     {
         ScopedLock guard(Lock);
-        Queue.erase(it);
+        Queue.Erase(it);
     }
 };
 
@@ -103,9 +108,15 @@ ThreadQueue s_BlockedQueue;
 
 void        Scheduler::Initialize()
 {
+    u64 cpuCount    = CPU::GetOnlineCPUsCount();
+    s_CPULocalData  = new CPULocalData[cpuCount];
     s_KernelProcess = Process::CreateKernelProcess();
 
     Time::Initialize();
+
+    for (usize i = 0; i < cpuCount; i++)
+        s_CPULocalData[i].PreemptionEnabled.Store(true);
+    s_SchedulerEnabled = true;
     Time::GetSchedulerTimer()->SetCallback<Tick>();
 
     LogInfo("Scheduler: Kernel process created");
@@ -113,8 +124,8 @@ void        Scheduler::Initialize()
 }
 void Scheduler::InitializeProcFs()
 {
-    VFS::CreateNode(VFS::GetRootNode(), "/proc", 0755 | S_IFDIR);
-    Assert(VFS::Mount(VFS::GetRootNode(), "", "/proc", "procfs"));
+    VFS::CreateNode(nullptr, "/proc", 0755 | S_IFDIR);
+    Assert(VFS::Mount(nullptr, "", "/proc", "procfs"));
     s_ProcFs = reinterpret_cast<ProcFs*>(VFS::GetMountPoints()["/proc"]);
 
     s_ProcFs->AddProcess(s_KernelProcess);
@@ -137,6 +148,32 @@ void Scheduler::PrepareAP(bool start)
         for (;;) Arch::Halt();
     }
 };
+
+bool Scheduler::IsPreemptionEnabled()
+{
+    if (!s_SchedulerEnabled) return false;
+
+    u64 cpuID = CPU::GetCurrentID();
+    return s_CPULocalData[cpuID].PreemptionEnabled.Load(
+        MemoryOrder::eAtomicRelaxed);
+}
+
+void Scheduler::EnablePreemption()
+{
+    if (!s_SchedulerEnabled) return;
+
+    u64 cpuID = CPU::GetCurrentID();
+    s_CPULocalData[cpuID].PreemptionEnabled.Store(true,
+                                                  MemoryOrder::eAtomicRelease);
+}
+void Scheduler::DisablePreemption()
+{
+    if (!s_SchedulerEnabled) return;
+
+    u64 cpuID = CPU::GetCurrentID();
+    s_CPULocalData[cpuID].PreemptionEnabled.Store(false,
+                                                  MemoryOrder::eAtomicAcquire);
+}
 
 void Scheduler::Block(Thread* thread)
 {
@@ -198,7 +235,7 @@ void Scheduler::Yield(bool saveCtx)
 
 Process* Scheduler::GetKernelProcess() { return s_KernelProcess; }
 
-Process* Scheduler::CreateProcess(Process* parent, std::string_view name,
+Process* Scheduler::CreateProcess(Process* parent, StringView name,
                                   const Credentials& creds)
 {
     auto       proc = new Process(parent, name, creds);
@@ -328,11 +365,16 @@ void Scheduler::SwitchContext(Thread* newThread, CPUContext* oldContext)
 
 void Scheduler::Tick(CPUContext* ctx)
 {
-    auto newThread = PickReadyThread();
+    Thread* newThread = CPU::GetCurrentThread();
+    if (!newThread) newThread = CPU::GetCurrent()->Idle;
+    if (!IsPreemptionEnabled()) goto reschedule;
+
+    newThread = PickReadyThread();
     SwitchContext(newThread, ctx);
 
     if (newThread != CPU::GetCurrent()->Idle)
         newThread->SetState(ThreadState::eRunning);
 
+reschedule:
     CPU::Reschedule(newThread->GetParent()->m_Quantum * 1_ms);
 }

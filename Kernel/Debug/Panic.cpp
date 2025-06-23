@@ -16,7 +16,7 @@ CTOS_NO_KASAN void dumpProcessInfo()
     Process* currentProcess = Process::GetCurrent();
     if (!currentProcess) return;
 
-    EarlyLogInfo("Process: %s", currentProcess->m_Name.data());
+    EarlyLogInfo("Process: %s", currentProcess->m_Name.Raw());
 }
 
 inline static void enterPanicMode()
@@ -29,7 +29,7 @@ inline static void enterPanicMode()
     dumpProcessInfo();
 }
 
-static std::atomic<u64> s_HaltedCPUs = 0;
+static Atomic<u64> s_HaltedCPUs = 0;
 [[noreturn]]
 void HaltAndCatchFire(CPUContext* context)
 {
@@ -44,10 +44,10 @@ void HaltAndCatchFire(CPUContext* context)
 }
 
 CTOS_NO_KASAN [[noreturn]]
-void panic(std::string_view msg)
+void panic(StringView msg)
 {
     enterPanicMode();
-    EarlyLogError("Error Message: %s\n", msg.data());
+    EarlyLogError("Error Message: %s\n", msg.Raw());
 
     Stacktrace::Print(16);
     EarlyLogFatal("CPU[%d]: Halted", CPU::GetCurrentID());

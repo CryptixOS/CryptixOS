@@ -6,8 +6,7 @@
  */
 #pragma once
 
-#include <string>
-
+#if 0 
 namespace std
 {
     struct error_code { error_code(auto...) { } };
@@ -36,3 +35,4 @@ namespace std
     };
 } // namespace std
 
+#endif

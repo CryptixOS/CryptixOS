@@ -22,6 +22,8 @@ srcs += files(
   'Debug/Panic.cpp',
 
   'Drivers/DeviceManager.cpp',
+  'Drivers/FramebufferDevice.cpp',
+  'Drivers/GenericDriver.cpp',
   'Drivers/Terminal.cpp',
   'Drivers/TTY.cpp',
   'Drivers/VideoTerminal.cpp',
@@ -36,21 +38,28 @@ srcs += files(
 
   'Drivers/Storage/PartitionTable.cpp',
   'Drivers/Storage/StorageDevice.cpp',
+  'Drivers/Storage/StorageDevicePartition.cpp',
 
   'Drivers/Storage/NVMe/NVMeController.cpp',
   'Drivers/Storage/NVMe/NVMeNameSpace.cpp',
   'Drivers/Storage/NVMe/NVMeQueue.cpp',
   
   'Firmware/ACPI/ACPI.cpp',
+  #'Firmware/ACPI/Interpreter.cpp',
   'Firmware/ACPI/MADT.cpp',
   'Firmware/ACPI/UACPI.cpp',
 
   'Firmware/DeviceTree/DeviceTree.cpp',
+  'Firmware/DeviceTree/Node.cpp',
+
+  'Firmware/EFI/Initialize.cpp',
 
   'Firmware/SMBIOS/SMBIOS.cpp',
 
+  'Memory/AddressSpace.cpp',
   'Memory/KernelHeap.cpp',
   'Memory/PMM.cpp',
+  'Memory/Region.cpp',
   'Memory/VMM.cpp',
 
   'Network/NetworkAdapter.cpp',
@@ -68,13 +77,16 @@ srcs += files(
   'Library/Kasan.cpp',
   'Library/Logger.cpp',
   'Library/Module.cpp',
+  'Library/Spinlock.cpp',
   'Library/Stacktrace.cpp',
   'Library/ZLib.cpp',
 
+  'VFS/DirectoryEntry.cpp',
   'VFS/Fifo.cpp',
   'VFS/FileDescriptor.cpp',
   'VFS/FileDescriptorTable.cpp',
   'VFS/INode.cpp',
+  'VFS/PathWalker.cpp',
   #'VFS/SynthFsINode.cpp',
   'VFS/VFS.cpp',
 
@@ -85,6 +97,7 @@ srcs += files(
   'VFS/EchFs/EchFsINode.cpp',
 
   'VFS/Ext2Fs/Ext2Fs.cpp',
+  'VFS/Ext2Fs/Ext2FsAllocator.cpp',
   'VFS/Ext2Fs/Ext2FsINode.cpp',
 
   'VFS/Fat32Fs/Fat32Fs.cpp',
@@ -113,6 +126,7 @@ ld_args = [
 ]
 
 args = []
+objs = []
 if arch == 'x86_64'
   cxx_args += ['-DCTOS_ARCH=CTOS_ARCH_X86_64', '-DCTOS_TARGET_X86_64']
   subdir('Arch/x86_64')
@@ -127,10 +141,10 @@ git_tag = run_command('git', 'rev-parse', 'HEAD').stdout().strip()
 
 version = meson.project_version().substring(1).split('.')
 versionConf = configuration_data()
-versionConf.set('kernel_name', meson.project_name())
-versionConf.set('KERNEL_VERSION_MAJ', version[0])
-versionConf.set('KERNEL_VERSION_MIN', version[1])
-versionConf.set('KERNEL_VERSION_PAT', version[2])
+versionConf.set('kernel_name', 'cryptix')
+versionConf.set('CTOS_VERSION_MAJOR', version[0])
+versionConf.set('CTOS_VERSION_MINOR', version[1])
+versionConf.set('CTOS_VERSION_PATCH', version[2])
 versionConf.set('git_tag', git_tag)
 versionConf.set('arch', arch)
 versionConf.set('compiler', cxx.get_id())
@@ -149,9 +163,9 @@ subdir('Library/KLibC++')
 
 kernel_elf = executable(
   'Cryptix.elf',
-  [srcs, font],
+  [srcs, objs],
   dependencies: [deps, mod_deps],
-  link_depends: [meson.current_source_dir() / 'linker.' + arch + '.ld', font],
+  link_depends: [meson.current_source_dir() / 'linker.' + arch + '.ld'],
   include_directories: [include_directories, incs, include_directories('.')],
   c_args: [c_args, args],
   cpp_args: [cxx_args, args],

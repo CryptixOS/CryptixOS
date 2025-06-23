@@ -8,6 +8,7 @@
 
 #include <Prism/Core/Singleton.hpp>
 #include <Prism/Core/Types.hpp>
+#include <Prism/Utility/Atomic.hpp>
 
 #include <Time/HardwareTimer.hpp>
 
@@ -16,20 +17,20 @@ class PIT : public HardwareTimer, public Singleton<PIT>
   public:
     PIT();
 
-    static void            Initialize();
-    static bool            IsInitialized();
+    static void   Initialize();
+    static bool   IsInitialized();
 
-    std::string_view       GetModelString() const override { return "i8253"; }
+    StringView    GetModelString() const override { return "i8253"_sv; }
 
-    ErrorOr<void>          Start(TimerMode mode, TimeStep interval) override;
-    void                   Stop() override;
+    ErrorOr<void> Start(TimerMode mode, TimeStep interval) override;
+    void          Stop() override;
 
-    u8                     GetInterruptVector();
+    u8            GetInterruptVector();
 
-    u64                    GetCurrentCount();
+    u64           GetCurrentCount();
 
-    ErrorOr<void>          SetFrequency(usize frequency) override;
-    void                   SetReloadValue(u16 reloadValue);
+    ErrorOr<void> SetFrequency(usize frequency) override;
+    void          SetReloadValue(u16 reloadValue);
 
     static constexpr usize BASE_FREQUENCY  = 1193182ull;
     static constexpr usize SEND_WORD       = 0x30;
@@ -58,7 +59,7 @@ class PIT : public HardwareTimer, public Singleton<PIT>
     // and it will have to be IRQ, only IoApic allows to redirect irqs
     u8                      m_TimerVector = 0;
     usize                   m_CurrentMode = Mode::eRate;
-    std::atomic<u64>        m_Tick        = 0;
+    Atomic<u64>             m_Tick        = 0;
 
     static constexpr usize  FREQUENCY     = 1000;
     static constexpr usize  IRQ_HINT      = 0x20;

@@ -7,6 +7,7 @@
 #include <API/Posix/sys/wait.h>
 #include <Arch/CPU.hpp>
 
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <Scheduler/Process.hpp>
@@ -15,8 +16,6 @@
 
 #include <VFS/Fifo.hpp>
 #include <VFS/FileDescriptor.hpp>
-
-#include <cctype>
 
 inline usize AllocatePid()
 {
@@ -38,21 +37,26 @@ Credentials Credentials::s_Root = {
     .pgid = 0,
 };
 
-Process::Process(Process* parent, std::string_view name,
-                 const Credentials& creds)
+Process::Process(Process* parent, StringView name, const Credentials& creds)
     : m_Parent(parent)
     , m_Pid(AllocatePid())
-    , m_Name(name)
+    , m_Name(name.Raw())
     , m_Credentials(creds)
     , m_Ring(PrivilegeLevel::eUnprivileged)
     , m_NextTid(m_Pid)
+    , m_CWD("/")
 
 {
-    m_CWD = "/";
     m_FdTable.OpenStdioStreams();
 }
 
 Process* Process::GetCurrent()
+{
+    Thread* currentThread = CPU::GetCurrentThread();
+
+    return currentThread ? currentThread->m_Parent : nullptr;
+}
+Process* Process::Current()
 {
     Thread* currentThread = CPU::GetCurrentThread();
 
@@ -65,7 +69,7 @@ Process* Process::CreateKernelProcess()
 
     kernelProcess                = new Process;
     kernelProcess->m_Pid         = 0;
-    kernelProcess->m_Name        = "TheOverlord";
+    kernelProcess->m_Name        = "TheOverlord"_s;
     kernelProcess->PageMap       = VMM::GetKernelPageMap();
     kernelProcess->m_Credentials = Credentials::s_Root;
     kernelProcess->m_Ring        = PrivilegeLevel::ePrivileged;
@@ -79,48 +83,56 @@ ret:
 }
 Process* Process::CreateIdleProcess()
 {
-    static std::atomic<pid_t> idlePids(-1);
+    static Atomic<pid_t> idlePids(-1);
 
-    std::string               name = "Idle Process for CPU: ";
-    name += std::to_string(CPU::GetCurrentID());
+    Process*             idle = new Process;
 
-    Process* idle = new Process;
-    idle->m_Pid   = idlePids--;
-    idle->m_Name  = name;
+    idle->m_Pid               = idlePids--;
+    idle->m_Name              = "Idle Process for CPU: "_s;
+    idle->m_Name += StringUtils::ToString(CPU::GetCurrentID());
+
     idle->PageMap = VMM::GetKernelPageMap();
 
     return idle;
 }
 
-Thread* Process::CreateThread(uintptr_t rip, bool isUser, i64 runOn)
+Thread* Process::CreateThread(Pointer rip, bool isUser, i64 runOn)
 {
     auto thread      = new Thread(this, rip, 0, runOn);
     thread->m_IsUser = isUser;
 
-    if (m_Threads.empty()) m_MainThread = thread;
+    if (m_Threads.Empty()) m_MainThread = thread;
 
-    m_Threads.push_back(thread);
+    m_Threads.PushBack(thread);
     return thread;
 }
-Thread* Process::CreateThread(uintptr_t                      rip,
-                              std::vector<std::string_view>& argv,
-                              std::vector<std::string_view>& envp,
-                              ELF::Image& program, i64 runOn)
+Thread* Process::CreateThread(Pointer rip, Vector<StringView>& argv,
+                              Vector<StringView>& envp, ELF::Image& program,
+                              i64 runOn)
 {
     auto thread = new Thread(this, rip, argv, envp, program, runOn);
 
-    if (m_Threads.empty()) m_MainThread = thread;
+    if (m_Threads.Empty()) m_MainThread = thread;
 
-    m_Threads.push_back(thread);
+    m_Threads.PushBack(thread);
     return thread;
 }
 
-bool Process::ValidateAddress(Pointer address, i32 accessMode)
+bool Process::ValidateAddress(Pointer address, i32 accessMode, usize size)
 {
     // TODO(v1tr10l7): Validate access mode
-    for (const auto& region : m_AddressSpace)
-        if (region.Contains(address)) return true;
+    for (const auto& [base, region] : m_AddressSpace)
+    {
+        if (region->Contains(address)) return true;
+        if (!region->Contains(address)
+            || !region->Contains(address.Offset(size)))
+            continue;
 
+        if (accessMode & PROT_READ && !region->IsReadable()) return false;
+        if (accessMode & PROT_WRITE && !region->IsWriteable()) return false;
+        if (accessMode & PROT_EXEC && !region->IsExecutable()) return false;
+        return true;
+    }
     return false;
 }
 
@@ -148,16 +160,21 @@ void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
 ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
-    INode* parent = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), m_CWD));
-    if (path.IsAbsolute()) parent = VFS::GetRootNode();
+    DirectoryEntry* parent = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), m_CWD.Raw()).Node;
+    if (CPU::AsUser([path]() -> bool { return path.Absolute(); }))
+        parent = VFS::GetRootDirectoryEntry();
     else if (dirFd != AT_FDCWD)
     {
         auto* descriptor = GetFileHandle(dirFd);
         if (!descriptor) return Error(EBADF);
-        parent = descriptor->GetNode();
+        auto inode = descriptor->GetNode();
+        if (inode && !inode->m_DirectoryEntry) inode->m_DirectoryEntry = new DirectoryEntry(inode);
+        parent = inode->m_DirectoryEntry;
     }
 
-    auto descriptor = VFS::Open(parent, path, flags, mode);
+    auto descriptor
+        = CPU::AsUser([&]() -> ErrorOr<FileDescriptor*>
+                      { return VFS::Open(parent, path, flags, mode); });
     if (!descriptor) return Error(descriptor.error());
 
     return m_FdTable.Insert(descriptor.value());
@@ -168,42 +185,47 @@ ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
 {
     auto fifo     = new Fifo();
     auto readerFd = fifo->Open(Fifo::Direction::eRead);
-    pipeFds[0]    = m_FdTable.Insert(readerFd);
+    CPU::AsUser([&]() { pipeFds[0] = m_FdTable.Insert(readerFd); });
 
     auto writerFd = fifo->Open(Fifo::Direction::eWrite);
-    pipeFds[1]    = m_FdTable.Insert(writerFd);
+    CPU::AsUser([&]() { pipeFds[1] = m_FdTable.Insert(writerFd); });
 
     return 0;
 }
 
-std::vector<std::string> SplitArguments(const std::string& str)
+Vector<String> SplitArguments(const String& str)
 {
-    std::vector<std::string> segments;
-    usize                    start     = str[0] == ' ' ? 1 : 0;
-    usize                    end       = start;
+    Vector<String> segments;
+    String         path(str.Raw(), str.Size());
 
-    auto                     findSlash = [str](usize pos) -> usize
+    if (str.Empty()) return {""};
+    usize start     = str[0] == ' ' ? 1 : 0;
+    usize end       = start;
+
+    auto  findSlash = [&str, &path](usize pos) -> usize
     {
         usize current = pos;
-        while (str[current] != ' ' && current < str.size()) current++;
+        while (current < path.Size() && str[current] != ' ') current++;
 
-        return current == str.size() ? std::string::npos : current;
+        return current == path.Size() ? String::NPos : current;
     };
 
-    while ((end = findSlash(start)) != std::string::npos)
+    while ((end = findSlash(start)) < path.Size())
     {
-        std::string segment = str.substr(start, end - start);
-        if (start != end) segments.push_back(segment);
+        usize      segmentLength = end - start;
+        StringView segment(path.Raw() + start, segmentLength);
+        if (start != end) segments.PushBack(segment);
 
         start = end + 1;
     }
 
     // handle last segment
-    if (start < str.length()) segments.push_back(str.substr(start));
+    if (start < path.Size())
+        segments.EmplaceBack(path.Raw() + start, path.Size() - start);
     return segments;
 }
 
-ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
+ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 {
     m_FdTable.Clear();
     m_FdTable.OpenStdioStreams();
@@ -211,26 +233,30 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
     m_Name = path;
     Arch::VMM::DestroyPageMap(PageMap);
     delete PageMap;
-    PageMap     = new class PageMap();
+    PageMap = new class PageMap();
 
-    auto nodeOr = VFS::ResolvePath(path);
+    /*
+    auto nodeOr = CPU::AsUser([path]() -> auto
+                              { return VFS::ResolvePath(path.Raw()); });
     if (!nodeOr) return nodeOr.error();
 
-    std::string shellPath;
+    String shellPath;
     char        shebang[2];
     nodeOr.value()->Read(shebang, 0, 2);
+    bool containsShebang = false;
     if (shebang[0] == '#' && shebang[1] == '!')
     {
-        std::string buffer;
-        buffer.resize(20);
+        containsShebang = true;
+        String buffer;
+        buffer.Resize(20);
         usize offset = 0;
         usize index  = 0;
-        nodeOr.value()->Read(buffer.data(), offset + 2, 20);
+        nodeOr.value()->Read(buffer.Raw(), offset + 2, 20);
         for (;;)
         {
-            if (index >= buffer.size())
+            if (index >= buffer.Size())
             {
-                nodeOr.value()->Read(buffer.data(), offset + 2, 20);
+                nodeOr.value()->Read(buffer.Raw(), offset + 2, 20);
                 index = 0;
             }
 
@@ -239,25 +265,39 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
             ++offset;
         }
 
-        shellPath.resize(offset + 1);
-        nodeOr.value()->Read(shellPath.data(), 2, offset);
+        shellPath.Resize(offset + 1);
+        nodeOr.value()->Read(shellPath.Raw(), 2, offset);
 
         shellPath[offset] = 0;
-        EarlyLogInfo("Shell: %s", shellPath.data());
+        EarlyLogInfo("Shell: %s", shellPath.Raw());
     }
 
-    std::vector<std::string>      args = SplitArguments(shellPath);
-    std::vector<std::string_view> argvArr;
-    for (auto& arg : args) argvArr.push_back(arg);
-    if (!shellPath.empty()) argvArr.push_back(path);
+    shellPath.ShrinkToFit();
+    EarlyLogInfo("ShellPath: %s", shellPath.Raw() ?: "<NULL>");
+    EarlyLogInfo("Path: %s", path.Raw() ?: "<NULL>");
+    StringView     shPath = String(shellPath.Raw(), shellPath.Size());
+
+    Vector<String> args   = SplitArguments(
+        containsShebang && !shellPath.empty() ? shPath : StringView(path));
+    */
+    Vector<StringView> argvArr;
+    {
+        CPU::UserMemoryProtectionGuard guard;
+        // for (auto& arg : args) argvArr.EmplaceBack(arg.Raw(), arg.Size());
+    }
+    // if (!shellPath.Empty()) argvArr.PushBack(path);
 
     static ELF::Image program, ld;
-    if (!program.Load(shellPath.empty() ? path : argvArr[0], PageMap,
-                      m_AddressSpace))
+    // if (!program.Load(shellPath.Empty() || !containsShebang ? path.Raw()
+    // : argvArr[0].Raw(),
+    // PageMap, m_AddressSpace))
+    // return Error(ENOEXEC);
+
+    if (!program.Load(path.Raw(), PageMap, m_AddressSpace))
         return Error(ENOEXEC);
 
-    std::string_view ldPath = program.GetLdPath();
-    if (!ldPath.empty())
+    auto ldPath = program.GetLdPath();
+    if (!ldPath.Empty())
         Assert(ld.Load(ldPath, PageMap, m_AddressSpace, 0x40000000));
     Thread* currentThread = CPU::GetCurrentThread();
     currentThread->SetState(ThreadState::eExited);
@@ -269,15 +309,21 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
     }
 
     uintptr_t address
-        = ldPath.empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
+        = ldPath.Empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
 
-    for (char** arg = argv; *arg; arg++) argvArr.push_back(*arg);
+    {
+        CPU::UserMemoryProtectionGuard guard;
+        for (char** arg = argv; *arg; arg++) argvArr.PushBack(*arg);
 
-    for (usize i = 0; auto& arg : args)
-        LogDebug("Process::Exec: argv[{}] = '{}'", i++, arg);
+        // for (usize i = 0; auto& arg : args)
+        //     LogDebug("Process::Exec: argv[{}] = '{}'", i++, arg);
+    }
 
-    std::vector<std::string_view> envpArr;
-    for (char** env = envp; *env; env++) envpArr.push_back(*env);
+    Vector<StringView> envpArr;
+    {
+        CPU::UserMemoryProtectionGuard guard;
+        for (char** env = envp; *env; env++) envpArr.PushBack(*env);
+    }
 
     auto thread = CreateThread(address, argvArr, envpArr, program,
                                CPU::GetCurrent()->ID);
@@ -289,9 +335,9 @@ ErrorOr<i32> Process::Exec(std::string path, char** argv, char** envp)
 ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
                                 rusage* rusage)
 {
-    Process*              process = Process::GetCurrent();
-    std::vector<Process*> procs;
-    if (m_Children.empty()) return Error(ECHILD);
+    Process*         process = Process::GetCurrent();
+    Vector<Process*> procs;
+    if (m_Children.Empty()) return Error(ECHILD);
 
     if (pid < -1)
     {
@@ -303,7 +349,7 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
                                    return false;
                                });
         if (it == m_Children.end()) return Error(ECHILD);
-        procs.push_back(*it);
+        procs.PushBack(*it);
     }
     else if (pid == -1) procs = process->m_Children;
     else if (pid == 0)
@@ -317,7 +363,7 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
                                });
 
         if (it == m_Children.end()) return Error(ECHILD);
-        procs.push_back(*it);
+        procs.PushBack(*it);
     }
     else if (pid > 0)
     {
@@ -329,11 +375,11 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
                                });
 
         if (it == m_Children.end()) return Error(ECHILD);
-        procs.push_back(*it);
+        procs.PushBack(*it);
     }
 
-    std::vector<Event*> events;
-    for (auto& proc : procs) events.push_back(&proc->m_Event);
+    Vector<Event*> events;
+    for (auto& proc : procs) events.PushBack(&proc->m_Event);
 
     bool block = !(flags & WNOHANG);
     for (;;)
@@ -348,7 +394,10 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
             && WIFCONTINUED(which->GetStatus().value_or(0)))
             continue;
 
-        if (wstatus) *wstatus = W_EXITCODE(which->GetStatus().value_or(0), 0);
+        if (wstatus)
+            CPU::AsUser(
+                [wstatus, &which]()
+                { *wstatus = W_EXITCODE(which->GetStatus().value_or(0), 0); });
 
         return which->GetPid();
     }
@@ -368,29 +417,43 @@ ErrorOr<Process*> Process::Fork()
     newProcess->PageMap = pageMap;
     newProcess->m_CWD   = m_CWD;
     newProcess->m_Umask = m_Umask;
-    m_Children.push_back(newProcess);
+    m_Children.PushBack(newProcess);
 
-    for (auto& range : m_AddressSpace)
+    newProcess->m_AddressSpace.Clear();
+    for (const auto& [base, range] : m_AddressSpace)
     {
         usize pageCount
-            = Math::AlignUp(range.GetSize(), PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
+            = Math::AlignUp(range->GetSize(), PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
 
         uintptr_t physicalSpace = PMM::CallocatePages<uintptr_t>(pageCount);
         Assert(physicalSpace);
 
         std::memcpy(Pointer(physicalSpace).ToHigherHalf<void*>(),
-                    range.GetPhysicalBase().ToHigherHalf<void*>(),
-                    range.GetSize());
-        pageMap->MapRange(range.GetVirtualBase(), physicalSpace,
-                          range.GetSize(),
+                    range->GetPhysicalBase().ToHigherHalf<void*>(),
+                    range->GetSize());
+        pageMap->MapRange(range->GetVirtualBase(), physicalSpace,
+                          range->GetSize(),
                           PageAttributes::eRWXU | PageAttributes::eWriteBack);
-        newProcess->m_AddressSpace.EmplaceBack(
-            physicalSpace, range.GetVirtualBase(), range.GetSize());
 
-        // TODO(v1tr10l7): Free regions;
+        auto newRegion = new Region(physicalSpace, range->GetVirtualBase(),
+                                    range->GetSize());
+        newRegion->SetProt(range->GetAccess(), range->GetProt());
+        newProcess->m_AddressSpace.Insert(range->GetVirtualBase().Raw(),
+                                          newRegion);
+        continue;
+        // auto newRegion = newProcess->m_AddressSpace.AllocateFixed(
+        //     range->GetVirtualBase(), range->GetSize());
+        // if (!newRegion)
+        //    newRegion
+        //        = newProcess->m_AddressSpace.AllocateRegion(range->GetSize());
+        newRegion->SetPhysicalBase(physicalSpace);
+        newRegion->SetProt(range->GetAccess(), range->GetProt());
+
+        // pageMap->MapRegion(newRegion);
+        //  TODO(v1tr10l7): Free regions;
     }
 
-    newProcess->m_NextTid.store(m_NextTid);
+    newProcess->m_NextTid.Store(m_NextTid.Load());
     for (const auto& [i, fd] : m_FdTable)
     {
         FileDescriptor* newFd = new FileDescriptor(fd);
@@ -425,16 +488,16 @@ i32 Process::Exit(i32 code)
         for (auto& child : m_Children)
         {
             child->m_Parent = subreaper;
-            subreaper->m_Children.push_back(child);
+            subreaper->m_Children.PushBack(child);
         }
     }
 
     for (auto& zombie : m_Zombies)
     {
         zombie->m_Parent = m_Parent;
-        m_Parent->m_Zombies.push_back(zombie);
+        m_Parent->m_Zombies.PushBack(zombie);
     }
-    m_Zombies.clear();
+    m_Zombies.Clear();
 
     delete PageMap;
     m_Status = W_EXITCODE(code, 0);

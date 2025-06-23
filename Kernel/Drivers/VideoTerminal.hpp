@@ -7,8 +7,8 @@
 #pragma once
 
 #include <Boot/BootInfo.hpp>
-
 #include <Drivers/Terminal.hpp>
+
 #include <Library/Image.hpp>
 
 #include <Prism/Containers/Bitmap.hpp>
@@ -67,14 +67,8 @@ class VideoTerminal final : public Terminal
     virtual void SetTextForeground(AnsiColor color) override;
     virtual void SetTextBackground(AnsiColor color) override;
 
-    virtual void SetTextForegroundRgb(u32 color) override;
-    virtual void SetTextBackgroundRgb(u32 color) override;
-
-    virtual void SetTextForegroundDefault() override;
-    virtual void SetTextBackgroundDefault() override;
-
-    virtual void SetTextForegroundDefaultBright() override;
-    virtual void SetTextBackgroundDefaultBright() override;
+    virtual void SetTextForegroundRgb(Color color) override;
+    virtual void SetTextBackgroundRgb(Color color) override;
 
     virtual void Destroy() override;
 
@@ -93,9 +87,15 @@ class VideoTerminal final : public Terminal
         u8          BlueMaskSize;
         u8          BlueMaskShift;
 
-        inline void PutPixel(usize x, usize y, u32 color)
+        inline void PutPixel(usize x, usize y, Color color) const
         {
-            Address.As<volatile u32>()[y * (Pitch / sizeof(u32)) + x] = color;
+            u32   red    = color.Red() << RedMaskShift;
+            u32   green  = color.Green() << GreenMaskShift;
+            u32   blue   = color.Blue() << BlueMaskShift;
+
+            u32   rgb    = red | green | blue;
+            usize offset = y * (Pitch / sizeof(u32)) + x;
+            Address.As<volatile u32>()[offset] = rgb;
         }
 
     } m_Framebuffer = {};
@@ -125,20 +125,20 @@ class VideoTerminal final : public Terminal
     {
         usize CursorX;
         usize CursorY;
-        usize TextForeground;
-        usize TextBackground;
+        Color TextForeground;
+        Color TextBackground;
         usize Bold;
         usize BackgroundBold;
         usize ReverseVideo;
         usize Charset;
         usize Primary;
-        usize Background;
+        Color Background;
     };
 
-    constexpr static usize DEFAULT_TEXT_FOREGROUND        = 0x00aaaaaa;
-    constexpr static usize DEFAULT_TEXT_BACKGROUND        = 0xffffffff;
-    constexpr static usize DEFAULT_TEXT_FOREGROUND_BRIGHT = 0xa0555555;
-    constexpr static usize DEFAULT_TEXT_BACKGROUND_BRIGHT = 0x00aaaaaa;
+    constexpr static Color DEFAULT_TEXT_FOREGROUND        = 0x00'aa'aa'aa;
+    constexpr static Color DEFAULT_TEXT_BACKGROUND        = 0xff'ff'ff'ff;
+    constexpr static Color DEFAULT_TEXT_FOREGROUND_BRIGHT = 0xa0'55'55'55;
+    constexpr static Color DEFAULT_TEXT_BACKGROUND_BRIGHT = 0x00'aa'aa'aa;
 
     ConsoleState           m_CurrentState;
     ConsoleState           m_SavedState;
@@ -154,8 +154,8 @@ class VideoTerminal final : public Terminal
     struct Character
     {
         u32            CodePoint;
-        u32            Foreground;
-        u32            Background;
+        Color          Foreground;
+        Color          Background;
 
         constexpr bool operator==(const Character& other) const
         {
@@ -187,19 +187,9 @@ class VideoTerminal final : public Terminal
     void               SetCanvas(u8* image, usize size);
 
     void               GenerateGradient();
-    u32                BlendMargin(usize x, usize y, u32 orig);
+    Color              BlendMargin(usize x, usize y, Color orig);
 
-    constexpr u32      ConvertColor(u32 color)
-    {
-        u32 r = (color >> 16) & 0xff;
-        u32 g = (color >> 8) & 0xff;
-        u32 b = color & 0xff;
-
-        return (r << m_Framebuffer.RedMaskShift)
-             | (g << m_Framebuffer.GreenMaskShift)
-             | (b << m_Framebuffer.BlueMaskShift);
-    }
-    constexpr bool VerifyBounds(usize x, usize y)
+    constexpr bool     VerifyBounds(usize x, usize y)
     {
         return x < m_Size.ws_col && y < m_Size.ws_row;
     }

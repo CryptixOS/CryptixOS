@@ -11,15 +11,13 @@
 class Fat32FsINode : public INode
 {
   public:
-    Fat32FsINode(INode* parent, std::string_view name, Filesystem* fs,
-                 mode_t mode);
+    Fat32FsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode);
 
     virtual ~Fat32FsINode() {}
 
-    virtual std::unordered_map<std::string_view, INode*>&
-                  GetChildren() override;
+    virtual std::unordered_map<StringView, INode*>& GetChildren() override;
 
-    virtual void  InsertChild(INode* node, std::string_view name) override;
+    virtual void  InsertChild(INode* node, StringView name) override;
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override
     {
@@ -32,8 +30,8 @@ class Fat32FsINode : public INode
     friend class Fat32Fs;
 
   private:
-    class Fat32Fs*     m_Fat32Fs         = nullptr;
-    usize              m_Cluster         = 0;
-    usize              m_DirectoryOffset = 0;
-    std::atomic<usize> m_NextIndex       = 2;
+    class Fat32Fs* m_Fat32Fs         = nullptr;
+    usize          m_Cluster         = 0;
+    usize          m_DirectoryOffset = 0;
+    Atomic<usize>  m_NextIndex       = 2;
 };

@@ -9,21 +9,23 @@
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
+
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/VFS.hpp>
 
 namespace NVMe
 {
-    std::atomic<usize> Controller::s_ControllerCount = 0;
+    Atomic<usize> Controller::s_ControllerCount = 0;
 
     Controller::Controller(const PCI::DeviceAddress& address)
         : PCI::Device(address)
-        , ::Device(241, s_ControllerCount.load())
+        , ::Device(241, s_ControllerCount.Load())
         , m_Index(s_ControllerCount++)
     {
         if (m_Index == 0) DevTmpFs::RegisterDevice(this);
-        m_Name += std::to_string(m_Index);
+        m_Name += StringUtils::ToString(m_Index);
 
         LogTrace("NVMe{}: Initializing...", m_Index);
         if (!Initialize())
@@ -32,8 +34,8 @@ namespace NVMe
             return;
         }
 
-        std::string_view path = std::format("/dev/{}", GetName());
-        VFS::MkNod(VFS::GetRootNode(), path, 0666, GetID());
+        StringView path = fmt::format("/dev/{}", GetName()).data();
+        VFS::MkNod(nullptr, path, 0666, GetID());
     }
 
     bool Controller::Initialize()
@@ -41,6 +43,12 @@ namespace NVMe
         EnableMemorySpace();
         EnableBusMastering();
         PCI::Bar bar = GetBar(0);
+        LogInfo(
+            "NVMe{}: bar0 = {{ Base: {:#x}, Address: {:#x}, Size: {:#x}, "
+            "IsMMIO: {} }}",
+            m_Index, bar.Base.Raw<u64>(), bar.Address.Raw<u64>(), bar.Size,
+            bar.IsMMIO);
+
         if (!bar)
         {
             LogError("NVMe: Failed to acquire BAR0!");
@@ -48,10 +56,8 @@ namespace NVMe
         }
 
         m_CrAddress = bar.Map(0);
-        LogInfo("NVMe{}: bar0 = {{ Base: {:#x}, Size: {:#x}, IsMMIO: {} }}",
-                m_Index, bar.Address.Raw<u64>(), bar.Size, bar.IsMMIO);
 
-        m_Register = m_CrAddress.As<volatile ControllerRegister>();
+        m_Register  = m_CrAddress.As<volatile ControllerRegister>();
 
         AssertMsg(bar.IsMMIO, "PCI bar is not memory mapped!");
         Assert((ReadAt(0x10, 4) & 0b111) == 0b100);

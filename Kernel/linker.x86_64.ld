@@ -12,6 +12,8 @@ PHDRS
 {
     limine_requests PT_LOAD;
     text    PT_LOAD;
+    kernel_init PT_LOAD;
+    module_init PT_LOAD;
     rodata  PT_LOAD;
     data    PT_LOAD;
     dynamic PT_DYNAMIC FLAGS((1 << 1) | (1 << 2)) ;
@@ -28,13 +30,21 @@ SECTIONS
     } :limine_requests
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));
-
     text_start_addr = .;
     .text : { *(.text .text.*) } :text
     text_end_addr = .;
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));
+    kernel_init_start_addr = .;
+    .kernel_init : { *(.kernel_init .kernel_init.*) } :kernel_init
+    kernel_init_end_addr = .;
 
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
+    module_init_start_addr = .;
+    .module_init : { *(.module_init .module_init.*) } :module_init
+    module_init_end_addr = .;
+
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
     rodata_start_addr = .;
     .rodata : { *(.rodata .rodata.*) } :rodata
     rodata_end_addr = .;
@@ -46,8 +56,8 @@ SECTIONS
         KEEP(*(.init_array .ctors))
         PROVIDE_HIDDEN(__init_array_end = .);
     } :rodata
-    . = ALIGN(CONSTANT(MAXPAGESIZE));
 
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
     data_start_addr = .;
     .data : { *(.data .data.*) } :data
 

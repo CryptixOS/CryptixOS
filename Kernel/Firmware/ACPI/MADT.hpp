@@ -7,56 +7,61 @@
 #pragma once
 
 #include <Firmware/ACPI/ACPI.hpp>
-
-#include <vector>
+#include <Prism/Containers/Vector.hpp>
 
 namespace MADT
 {
-    struct Header
+    struct [[gnu::packed]] Header
     {
         u8 ID;
         u8 Length;
-    } __attribute__((packed));
-
-    struct LapicEntry
+    };
+    struct [[gnu::packed]] LapicEntry
     {
         Header Header;
         u8     ProcessorID;
         u8     ApicID;
         u32    Flags;
-    } __attribute__((packed));
-
-    struct IoApicEntry
+    };
+    struct [[gnu::packed]] IoApicEntry
     {
         Header Header;
         u8     ApicID;
         u8     Reserved;
         u32    Address;
         u32    GsiBase;
-    } __attribute__((packed));
-
-    struct IsoEntry
+    };
+    struct [[gnu::packed]] IsoEntry
     {
         Header Header;
         u8     BusSource;
         u8     IrqSource;
         u32    Gsi;
         u16    Flags;
-    } __attribute__((packed));
-
-    struct LapicNmiEntry
+    };
+    struct [[gnu::packed]] LapicNmiEntry
     {
         Header Header;
         u8     Processor;
         u16    Flags;
         u8     Lint;
-    } __attribute__((packed));
+    };
+    struct [[gnu::packed]] GenericEntry
+    {
+        union
+        {
+            LapicEntry    Lapic;
+            IoApicEntry   IoApic;
+            IsoEntry      Iso;
+            LapicNmiEntry LapicNmi;
+        } Entry;
+    };
 
-    void                         Initialize();
-    bool                         LegacyPIC();
+    void                   Initialize();
+    bool                   LegacyPIC();
 
-    std::vector<LapicEntry*>&    GetLapicEntries();
-    std::vector<IoApicEntry*>&   GetIoApicEntries();
-    std::vector<IsoEntry*>&      GetIsoEntries();
-    std::vector<LapicNmiEntry*>& GetLapicNmiEntries();
+    Vector<LapicEntry>&    GetLapicEntries();
+    Vector<IoApicEntry>&   GetIoApicEntries();
+    Vector<IsoEntry>&      GetIsoEntries();
+    Vector<LapicNmiEntry>& GetLapicNmiEntries();
 } // namespace MADT

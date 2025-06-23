@@ -1,0 +1,5035 @@
+From ccde3e2f3706ae72f6bca231fef70be7236a1923 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Thu, 17 Apr 2025 18:05:26 +0200
+Subject: [PATCH 1/2] [cryptix]: switch to v6.x release of mlibc
+
+---
+ abis/cryptix/access.h                         |   9 +
+ abis/cryptix/auxv.h                           |  13 +
+ abis/cryptix/blkcnt_t.h                       |   8 +
+ abis/cryptix/blksize_t.h                      |   8 +
+ abis/cryptix/clockid_t.h                      |   7 +
+ abis/cryptix/dev_t.h                          |  10 +
+ abis/cryptix/epoll.h                          |   6 +
+ abis/cryptix/errno.h                          | 143 +++++
+ abis/cryptix/fcntl.h                          |  89 ++++
+ abis/cryptix/fsblkcnt_t.h                     |   8 +
+ abis/cryptix/fsfilcnt_t.h                     |   8 +
+ abis/cryptix/gid_t.h                          |   8 +
+ abis/cryptix/in.h                             | 217 ++++++++
+ abis/cryptix/ino_t.h                          |  10 +
+ abis/cryptix/inotify.h                        |   9 +
+ abis/cryptix/ioctls.h                         |  15 +
+ abis/cryptix/limits.h                         |   9 +
+ abis/cryptix/mode_t.h                         |   8 +
+ abis/cryptix/mqueue.h                         |  21 +
+ abis/cryptix/msg.h                            |  45 ++
+ abis/cryptix/nlink_t.h                        |   8 +
+ abis/cryptix/packet.h                         |   6 +
+ abis/cryptix/pid_t.h                          |   8 +
+ abis/cryptix/poll.h                           |  16 +
+ abis/cryptix/ptrace.h                         |  59 +++
+ abis/cryptix/reboot.h                         |  12 +
+ abis/cryptix/resource.h                       |  53 ++
+ abis/cryptix/seek-whence.h                    |  10 +
+ abis/cryptix/shm.h                            |  25 +
+ abis/cryptix/signal.h                         | 499 ++++++++++++++++++
+ abis/cryptix/socket.h                         | 300 +++++++++++
+ abis/cryptix/socklen_t.h                      |   6 +
+ abis/cryptix/stat.h                           | 124 +++++
+ abis/cryptix/statfs.h                         |  44 ++
+ abis/cryptix/statvfs.h                        |  44 ++
+ abis/cryptix/statx.h                          |  76 +++
+ abis/cryptix/suseconds_t.h                    |   8 +
+ abis/cryptix/termios.h                        | 155 ++++++
+ abis/cryptix/time.h                           |  15 +
+ abis/cryptix/uid_t.h                          |   8 +
+ abis/cryptix/utsname.h                        |  13 +
+ abis/cryptix/vm-flags.h                       |  70 +++
+ abis/cryptix/vt.h                             |  76 +++
+ abis/cryptix/wait.h                           |  28 +
+ abis/cryptix/xattr.h                          |  21 +
+ meson.build                                   |  13 +-
+ sysdeps/cryptix/entry/entry.cpp               |  71 +++
+ sysdeps/cryptix/entry/thread.cpp              |  45 ++
+ sysdeps/cryptix/generic/mntent.cpp            |  94 ++++
+ sysdeps/cryptix/generic/mount.cpp             |  18 +
+ sysdeps/cryptix/generic/reboot.cpp            |  38 ++
+ sysdeps/cryptix/include/abi-bits/access.h     |   1 +
+ sysdeps/cryptix/include/abi-bits/auxv.h       |   1 +
+ sysdeps/cryptix/include/abi-bits/blkcnt_t.h   |   1 +
+ sysdeps/cryptix/include/abi-bits/blksize_t.h  |   1 +
+ sysdeps/cryptix/include/abi-bits/clockid_t.h  |   1 +
+ sysdeps/cryptix/include/abi-bits/dev_t.h      |   1 +
+ sysdeps/cryptix/include/abi-bits/do           |   3 +
+ sysdeps/cryptix/include/abi-bits/epoll.h      |   1 +
+ sysdeps/cryptix/include/abi-bits/errno.h      |   1 +
+ sysdeps/cryptix/include/abi-bits/fcntl.h      |   1 +
+ sysdeps/cryptix/include/abi-bits/fsblkcnt_t.h |   1 +
+ sysdeps/cryptix/include/abi-bits/fsfilcnt_t.h |   1 +
+ sysdeps/cryptix/include/abi-bits/gid_t.h      |   1 +
+ sysdeps/cryptix/include/abi-bits/in.h         |   1 +
+ sysdeps/cryptix/include/abi-bits/ino_t.h      |   1 +
+ sysdeps/cryptix/include/abi-bits/inotify.h    |   1 +
+ sysdeps/cryptix/include/abi-bits/ioctls.h     |   1 +
+ sysdeps/cryptix/include/abi-bits/limits.h     |   1 +
+ sysdeps/cryptix/include/abi-bits/mode_t.h     |   1 +
+ sysdeps/cryptix/include/abi-bits/mqueue.h     |   1 +
+ sysdeps/cryptix/include/abi-bits/msg.h        |   1 +
+ sysdeps/cryptix/include/abi-bits/nlink_t.h    |   1 +
+ sysdeps/cryptix/include/abi-bits/packet.h     |   1 +
+ sysdeps/cryptix/include/abi-bits/pid_t.h      |   1 +
+ sysdeps/cryptix/include/abi-bits/poll.h       |   1 +
+ sysdeps/cryptix/include/abi-bits/ptrace.h     |   1 +
+ sysdeps/cryptix/include/abi-bits/reboot.h     |   1 +
+ sysdeps/cryptix/include/abi-bits/resource.h   |   1 +
+ .../cryptix/include/abi-bits/seek-whence.h    |   1 +
+ sysdeps/cryptix/include/abi-bits/shm.h        |   1 +
+ sysdeps/cryptix/include/abi-bits/signal.h     |   1 +
+ sysdeps/cryptix/include/abi-bits/socket.h     |   1 +
+ sysdeps/cryptix/include/abi-bits/socklen_t.h  |   1 +
+ sysdeps/cryptix/include/abi-bits/stat.h       |   1 +
+ sysdeps/cryptix/include/abi-bits/statfs.h     |   1 +
+ sysdeps/cryptix/include/abi-bits/statvfs.h    |   1 +
+ sysdeps/cryptix/include/abi-bits/statx.h      |   1 +
+ .../cryptix/include/abi-bits/suseconds_t.h    |   1 +
+ sysdeps/cryptix/include/abi-bits/termios.h    |   1 +
+ sysdeps/cryptix/include/abi-bits/time.h       |   1 +
+ sysdeps/cryptix/include/abi-bits/uid_t.h      |   1 +
+ sysdeps/cryptix/include/abi-bits/utsname.h    |   1 +
+ sysdeps/cryptix/include/abi-bits/vm-flags.h   |   1 +
+ sysdeps/cryptix/include/abi-bits/vt.h         |   1 +
+ sysdeps/cryptix/include/abi-bits/wait.h       |   1 +
+ sysdeps/cryptix/include/abi-bits/xattr.h      |   1 +
+ sysdeps/cryptix/include/asm/ioctl.h           | 105 ++++
+ sysdeps/cryptix/include/asm/ioctls.h          | 121 +++++
+ sysdeps/cryptix/include/cryptix/reboot.hpp    |  15 +
+ sysdeps/cryptix/include/cryptix/syscall.h     | 196 +++++++
+ sysdeps/cryptix/include/mntent.h              |  50 ++
+ sysdeps/cryptix/include/sys/mount.h           |  54 ++
+ sysdeps/cryptix/include/sys/reboot.h          |  20 +
+ sysdeps/cryptix/include/sys/statfs.h          |   1 +
+ sysdeps/cryptix/include/sys/sysmacros.h       |  24 +
+ sysdeps/cryptix/include/sys/vfs.h             |   1 +
+ sysdeps/cryptix/meson.build                   | 127 +++++
+ sysdeps/cryptix/sysdeps/internal.cpp          |  54 ++
+ sysdeps/cryptix/sysdeps/memory.cpp            |  54 ++
+ sysdeps/cryptix/sysdeps/process.cpp           |  92 ++++
+ sysdeps/cryptix/sysdeps/signal.cpp            |  24 +
+ sysdeps/cryptix/sysdeps/system.cpp            |  55 ++
+ sysdeps/cryptix/sysdeps/time.cpp              |  35 ++
+ sysdeps/cryptix/sysdeps/vfs.cpp               | 282 ++++++++++
+ sysdeps/cryptix/x86_64/crt0.S                 |   7 +
+ sysdeps/cryptix/x86_64/crti.S                 |  10 +
+ sysdeps/cryptix/x86_64/crtn.S                 |   8 +
+ sysdeps/cryptix/x86_64/thread_entry.S         |  24 +
+ 119 files changed, 4020 insertions(+), 1 deletion(-)
+ create mode 100644 abis/cryptix/access.h
+ create mode 100644 abis/cryptix/auxv.h
+ create mode 100644 abis/cryptix/blkcnt_t.h
+ create mode 100644 abis/cryptix/blksize_t.h
+ create mode 100644 abis/cryptix/clockid_t.h
+ create mode 100644 abis/cryptix/dev_t.h
+ create mode 100644 abis/cryptix/epoll.h
+ create mode 100644 abis/cryptix/errno.h
+ create mode 100644 abis/cryptix/fcntl.h
+ create mode 100644 abis/cryptix/fsblkcnt_t.h
+ create mode 100644 abis/cryptix/fsfilcnt_t.h
+ create mode 100644 abis/cryptix/gid_t.h
+ create mode 100644 abis/cryptix/in.h
+ create mode 100644 abis/cryptix/ino_t.h
+ create mode 100644 abis/cryptix/inotify.h
+ create mode 100644 abis/cryptix/ioctls.h
+ create mode 100644 abis/cryptix/limits.h
+ create mode 100644 abis/cryptix/mode_t.h
+ create mode 100644 abis/cryptix/mqueue.h
+ create mode 100644 abis/cryptix/msg.h
+ create mode 100644 abis/cryptix/nlink_t.h
+ create mode 100644 abis/cryptix/packet.h
+ create mode 100644 abis/cryptix/pid_t.h
+ create mode 100644 abis/cryptix/poll.h
+ create mode 100644 abis/cryptix/ptrace.h
+ create mode 100644 abis/cryptix/reboot.h
+ create mode 100644 abis/cryptix/resource.h
+ create mode 100644 abis/cryptix/seek-whence.h
+ create mode 100644 abis/cryptix/shm.h
+ create mode 100644 abis/cryptix/signal.h
+ create mode 100644 abis/cryptix/socket.h
+ create mode 100644 abis/cryptix/socklen_t.h
+ create mode 100644 abis/cryptix/stat.h
+ create mode 100644 abis/cryptix/statfs.h
+ create mode 100644 abis/cryptix/statvfs.h
+ create mode 100644 abis/cryptix/statx.h
+ create mode 100644 abis/cryptix/suseconds_t.h
+ create mode 100644 abis/cryptix/termios.h
+ create mode 100644 abis/cryptix/time.h
+ create mode 100644 abis/cryptix/uid_t.h
+ create mode 100644 abis/cryptix/utsname.h
+ create mode 100644 abis/cryptix/vm-flags.h
+ create mode 100644 abis/cryptix/vt.h
+ create mode 100644 abis/cryptix/wait.h
+ create mode 100644 abis/cryptix/xattr.h
+ create mode 100644 sysdeps/cryptix/entry/entry.cpp
+ create mode 100644 sysdeps/cryptix/entry/thread.cpp
+ create mode 100644 sysdeps/cryptix/generic/mntent.cpp
+ create mode 100644 sysdeps/cryptix/generic/mount.cpp
+ create mode 100644 sysdeps/cryptix/generic/reboot.cpp
+ create mode 120000 sysdeps/cryptix/include/abi-bits/access.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/auxv.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/blkcnt_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/blksize_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/clockid_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/dev_t.h
+ create mode 100755 sysdeps/cryptix/include/abi-bits/do
+ create mode 120000 sysdeps/cryptix/include/abi-bits/epoll.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/errno.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/fcntl.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/fsblkcnt_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/fsfilcnt_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/gid_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/in.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/ino_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/inotify.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/ioctls.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/limits.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/mode_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/mqueue.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/msg.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/nlink_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/packet.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/pid_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/poll.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/ptrace.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/reboot.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/resource.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/seek-whence.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/shm.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/signal.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/socket.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/socklen_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/stat.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/statfs.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/statvfs.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/statx.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/suseconds_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/termios.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/time.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/uid_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/utsname.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/vm-flags.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/vt.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/wait.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/xattr.h
+ create mode 100644 sysdeps/cryptix/include/asm/ioctl.h
+ create mode 100644 sysdeps/cryptix/include/asm/ioctls.h
+ create mode 100644 sysdeps/cryptix/include/cryptix/reboot.hpp
+ create mode 100644 sysdeps/cryptix/include/cryptix/syscall.h
+ create mode 100644 sysdeps/cryptix/include/mntent.h
+ create mode 100644 sysdeps/cryptix/include/sys/mount.h
+ create mode 100644 sysdeps/cryptix/include/sys/reboot.h
+ create mode 120000 sysdeps/cryptix/include/sys/statfs.h
+ create mode 100644 sysdeps/cryptix/include/sys/sysmacros.h
+ create mode 120000 sysdeps/cryptix/include/sys/vfs.h
+ create mode 100644 sysdeps/cryptix/meson.build
+ create mode 100644 sysdeps/cryptix/sysdeps/internal.cpp
+ create mode 100644 sysdeps/cryptix/sysdeps/memory.cpp
+ create mode 100644 sysdeps/cryptix/sysdeps/process.cpp
+ create mode 100644 sysdeps/cryptix/sysdeps/signal.cpp
+ create mode 100644 sysdeps/cryptix/sysdeps/system.cpp
+ create mode 100644 sysdeps/cryptix/sysdeps/time.cpp
+ create mode 100644 sysdeps/cryptix/sysdeps/vfs.cpp
+ create mode 100644 sysdeps/cryptix/x86_64/crt0.S
+ create mode 100644 sysdeps/cryptix/x86_64/crti.S
+ create mode 100644 sysdeps/cryptix/x86_64/crtn.S
+ create mode 100644 sysdeps/cryptix/x86_64/thread_entry.S
+
+diff --git a/abis/cryptix/access.h b/abis/cryptix/access.h
+new file mode 100644
+index 00000000..f76ca620
+--- /dev/null
++++ b/abis/cryptix/access.h
+@@ -0,0 +1,9 @@
++#ifndef _ABIBITS_ACCESS_H
++#define _ABIBITS_ACCESS_H
++
++#define F_OK 0
++#define X_OK 1
++#define W_OK 2
++#define R_OK 4
++
++#endif // _ABIBITS_ACCESS_H
+diff --git a/abis/cryptix/auxv.h b/abis/cryptix/auxv.h
+new file mode 100644
+index 00000000..8eb80491
+--- /dev/null
++++ b/abis/cryptix/auxv.h
+@@ -0,0 +1,13 @@
++#ifndef _ABIBITS_AUXV_H
++#define _ABIBITS_AUXV_H
++
++#define AT_PLATFORM 15
++#define AT_HWCAP 16
++#define AT_CLKTCK 17
++#define AT_FPUCW 18
++#define AT_SECURE 23
++#define AT_RANDOM 25
++#define AT_EXECFN 31
++#define AT_SYSINFO_EHDR 33
++
++#endif // _ABIBITS_AUXV_H
+diff --git a/abis/cryptix/blkcnt_t.h b/abis/cryptix/blkcnt_t.h
+new file mode 100644
+index 00000000..c4b45051
+--- /dev/null
++++ b/abis/cryptix/blkcnt_t.h
+@@ -0,0 +1,8 @@
++#ifndef _ABIBITS_BLKCNT_T_H
++#define _ABIBITS_BLKCNT_T_H
++
++#include <bits/types.h>
++
++typedef __mlibc_int64 blkcnt_t;
++
++#endif // _ABIBITS_BLKCNT_T_H
+diff --git a/abis/cryptix/blksize_t.h b/abis/cryptix/blksize_t.h
+new file mode 100644
+index 00000000..afabadb8
+--- /dev/null
++++ b/abis/cryptix/blksize_t.h
+@@ -0,0 +1,8 @@
++
++#ifndef _ABIBITS_BLKSIZE_T_H
++#define _ABIBITS_BLKSIZE_T_H
++
++typedef long blksize_t;
++
++#endif // _ABIBITS_BLKSIZE_T_H
++
+diff --git a/abis/cryptix/clockid_t.h b/abis/cryptix/clockid_t.h
+new file mode 100644
+index 00000000..8d928268
+--- /dev/null
++++ b/abis/cryptix/clockid_t.h
+@@ -0,0 +1,7 @@
++#ifndef _ABIBITS_CLOCKID_T_H
++#define _ABIBITS_CLOCKID_T_H
++
++typedef int clockid_t;
++
++#endif /* _ABIBITS_CLOCKID_T_H */
++
+diff --git a/abis/cryptix/dev_t.h b/abis/cryptix/dev_t.h
+new file mode 100644
+index 00000000..839a4457
+--- /dev/null
++++ b/abis/cryptix/dev_t.h
+@@ -0,0 +1,10 @@
++
++#ifndef _ABIBITS_DEV_T_H
++#define _ABIBITS_DEV_T_H
++
++#include <bits/types.h>
++
++typedef __mlibc_uint64 dev_t;
++
++#endif // _ABIBITS_DEV_T_H
++
+diff --git a/abis/cryptix/epoll.h b/abis/cryptix/epoll.h
+new file mode 100644
+index 00000000..0b984b64
+--- /dev/null
++++ b/abis/cryptix/epoll.h
+@@ -0,0 +1,6 @@
++#ifndef _ABIBITS_EPOLL_H
++#define _ABIBITS_EPOLL_H
++
++#define EPOLL_CLOEXEC 02000000 // Same as __MLIBC_O_CLOEXEC
++
++#endif // _ABIBITS_EPOLL_H
+diff --git a/abis/cryptix/errno.h b/abis/cryptix/errno.h
+new file mode 100644
+index 00000000..b2680e39
+--- /dev/null
++++ b/abis/cryptix/errno.h
+@@ -0,0 +1,143 @@
++#ifndef _ABIBITS_ERRNO_H
++#define _ABIBITS_ERRNO_H
++
++#define EPERM            1
++#define ENOENT           2
++#define ESRCH            3
++#define EINTR            4
++#define EIO              5
++#define ENXIO            6
++#define E2BIG            7
++#define ENOEXEC          8
++#define EBADF            9
++#define ECHILD          10
++#define EAGAIN          11
++#define ENOMEM          12
++#define EACCES          13
++#define EFAULT          14
++#define ENOTBLK         15
++#define EBUSY           16
++#define EEXIST          17
++#define EXDEV           18
++#define ENODEV          19
++#define ENOTDIR         20
++#define EISDIR          21
++#define EINVAL          22
++#define ENFILE          23
++#define EMFILE          24
++#define ENOTTY          25
++#define ETXTBSY         26
++#define EFBIG           27
++#define ENOSPC          28
++#define ESPIPE          29
++#define EROFS           30
++#define EMLINK          31
++#define EPIPE           32
++#define EDOM            33
++#define ERANGE          34
++#define EDEADLK         35
++#define ENAMETOOLONG    36
++#define ENOLCK          37
++#define ENOSYS          38
++#define ENOTEMPTY       39
++#define ELOOP           40
++#define EWOULDBLOCK     EAGAIN
++#define ENOMSG          42
++#define EIDRM           43
++#define ECHRNG          44
++#define EL2NSYNC        45
++#define EL3HLT          46
++#define EL3RST          47
++#define ELNRNG          48
++#define EUNATCH         49
++#define ENOCSI          50
++#define EL2HLT          51
++#define EBADE           52
++#define EBADR           53
++#define EXFULL          54
++#define ENOANO          55
++#define EBADRQC         56
++#define EBADSLT         57
++#define EDEADLOCK       EDEADLK
++#define EBFONT          59
++#define ENOSTR          60
++#define ENODATA         61
++#define ETIME           62
++#define ENOSR           63
++#define ENONET          64
++#define ENOPKG          65
++#define EREMOTE         66
++#define ENOLINK         67
++#define EADV            68
++#define ESRMNT          69
++#define ECOMM           70
++#define EPROTO          71
++#define EMULTIHOP       72
++#define EDOTDOT         73
++#define EBADMSG         74
++#define EOVERFLOW       75
++#define ENOTUNIQ        76
++#define EBADFD          77
++#define EREMCHG         78
++#define ELIBACC         79
++#define ELIBBAD         80
++#define ELIBSCN         81
++#define ELIBMAX         82
++#define ELIBEXEC        83
++#define EILSEQ          84
++#define ERESTART        85
++#define ESTRPIPE        86
++#define EUSERS          87
++#define ENOTSOCK        88
++#define EDESTADDRREQ    89
++#define EMSGSIZE        90
++#define EPROTOTYPE      91
++#define ENOPROTOOPT     92
++#define EPROTONOSUPPORT 93
++#define ESOCKTNOSUPPORT 94
++#define EOPNOTSUPP      95
++#define ENOTSUP         EOPNOTSUPP
++#define EPFNOSUPPORT    96
++#define EAFNOSUPPORT    97
++#define EADDRINUSE      98
++#define EADDRNOTAVAIL   99
++#define ENETDOWN        100
++#define ENETUNREACH     101
++#define ENETRESET       102
++#define ECONNABORTED    103
++#define ECONNRESET      104
++#define ENOBUFS         105
++#define EISCONN         106
++#define ENOTCONN        107
++#define ESHUTDOWN       108
++#define ETOOMANYREFS    109
++#define ETIMEDOUT       110
++#define ECONNREFUSED    111
++#define EHOSTDOWN       112
++#define EHOSTUNREACH    113
++#define EALREADY        114
++#define EINPROGRESS     115
++#define ESTALE          116
++#define EUCLEAN         117
++#define ENOTNAM         118
++#define ENAVAIL         119
++#define EISNAM          120
++#define EREMOTEIO       121
++#define EDQUOT          122
++#define ENOMEDIUM       123
++#define EMEDIUMTYPE     124
++#define ECANCELED       125
++#define ENOKEY          126
++#define EKEYEXPIRED     127
++#define EKEYREVOKED     128
++#define EKEYREJECTED    129
++#define EOWNERDEAD      130
++#define ENOTRECOVERABLE 131
++#define ERFKILL         132
++#define EHWPOISON       133
++
++
++// This is mlibc-specific.
++#define EIEIO           4095
++
++#endif // _ABIBITS_ERRNO_H
+diff --git a/abis/cryptix/fcntl.h b/abis/cryptix/fcntl.h
+new file mode 100644
+index 00000000..35be9790
+--- /dev/null
++++ b/abis/cryptix/fcntl.h
+@@ -0,0 +1,89 @@
++#ifndef _ABIBITS_FCNTL_H
++#define _ABIBITS_FCNTL_H
++
++#include <abi-bits/pid_t.h>
++
++#define O_PATH 010000000
++
++#define O_ACCMODE (03 | O_PATH)
++#define O_RDONLY   00
++#define O_WRONLY   01
++#define O_RDWR     02
++
++#define O_CREAT         0100
++#define O_EXCL          0200
++#define O_NOCTTY        0400
++#define O_TRUNC        01000
++#define O_APPEND       02000
++#define O_NONBLOCK     04000
++#define O_DSYNC       010000
++#define O_ASYNC       020000
++#define O_DIRECT      040000
++#define O_DIRECTORY  0200000
++#define O_NOFOLLOW   0400000
++#define O_CLOEXEC   02000000
++#define O_SYNC      04010000
++#define O_RSYNC     04010000
++#define O_LARGEFILE  0100000
++#define O_NOATIME   01000000
++#define O_TMPFILE  020000000
++
++#define O_EXEC O_PATH
++#define O_SEARCH O_PATH
++
++#define F_DUPFD  0
++#define F_GETFD  1
++#define F_SETFD  2
++#define F_GETFL  3
++#define F_SETFL  4
++
++#define F_SETOWN 8
++#define F_GETOWN 9
++#define F_SETSIG 10
++#define F_GETSIG 11
++
++#define F_GETLK 5
++#define F_SETLK 6
++#define F_SETLKW 7
++
++#define F_SETOWN_EX 15
++#define F_GETOWN_EX 16
++
++#define F_GETOWNER_UIDS 17
++
++#define F_DUPFD_CLOEXEC 1030
++#define F_ADD_SEALS 1033
++#define F_GET_SEALS 1034
++
++#define F_SEAL_SEAL 0x0001
++#define F_SEAL_SHRINK 0x0002
++#define F_SEAL_GROW 0x0004
++#define F_SEAL_WRITE 0x0008
++
++#define F_RDLCK 0
++#define F_WRLCK 1
++#define F_UNLCK 2
++
++#define FD_CLOEXEC 1
++
++#define AT_FDCWD -100
++#define AT_SYMLINK_NOFOLLOW 0x100
++#define AT_REMOVEDIR 0x200
++#define AT_SYMLINK_FOLLOW 0x400
++#define AT_EACCESS 0x200
++#define AT_EMPTY_PATH 0x1000
++
++
++struct f_owner_ex {
++	int type;
++	pid_t pid;
++};
++
++#define POSIX_FADV_NORMAL 0
++#define POSIX_FADV_RANDOM 1
++#define POSIX_FADV_SEQUENTIAL 2
++#define POSIX_FADV_WILLNEED 3
++#define POSIX_FADV_DONTNEED 4
++#define POSIX_FADV_NOREUSE 5
++
++#endif // _ABIBITS_FCNTL_H
+diff --git a/abis/cryptix/fsblkcnt_t.h b/abis/cryptix/fsblkcnt_t.h
+new file mode 100644
+index 00000000..0d744561
+--- /dev/null
++++ b/abis/cryptix/fsblkcnt_t.h
+@@ -0,0 +1,8 @@
++#ifndef _ABIBITS_FSBLKCNT_T_H
++#define _ABIBITS_FSBLKCNT_T_H
++
++#include <bits/types.h>
++
++typedef __mlibc_uint64 fsblkcnt_t;
++
++#endif /* _ABIBITS_FSBLKCNT_T_H */
+diff --git a/abis/cryptix/fsfilcnt_t.h b/abis/cryptix/fsfilcnt_t.h
+new file mode 100644
+index 00000000..1abda9a9
+--- /dev/null
++++ b/abis/cryptix/fsfilcnt_t.h
+@@ -0,0 +1,8 @@
++#ifndef _ABIBITS_FSFILCNT_T_H
++#define _ABIBITS_FSFILCNT_T_H
++
++#include <bits/types.h>
++
++typedef __mlibc_uint64 fsfilcnt_t;
++
++#endif /* _ABIBITS_FSFILCNT_T_H */
+diff --git a/abis/cryptix/gid_t.h b/abis/cryptix/gid_t.h
+new file mode 100644
+index 00000000..65afa401
+--- /dev/null
++++ b/abis/cryptix/gid_t.h
+@@ -0,0 +1,8 @@
++
++#ifndef _ABIBITS_GID_T_H
++#define _ABIBITS_GID_T_H
++
++typedef unsigned int gid_t;
++
++#endif // _ABIBITS_GID_T_H
++
+diff --git a/abis/cryptix/in.h b/abis/cryptix/in.h
+new file mode 100644
+index 00000000..eb7be7b6
+--- /dev/null
++++ b/abis/cryptix/in.h
+@@ -0,0 +1,217 @@
++#ifndef _ABIBITS_IN_H
++#define _ABIBITS_IN_H
++
++#include <bits/posix/in_addr_t.h>
++#include <bits/posix/in_port_t.h>
++#include <abi-bits/socket.h>
++#include <stdint.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++struct in_addr {
++	in_addr_t s_addr;
++};
++
++struct sockaddr_in {
++	sa_family_t sin_family;
++	in_port_t sin_port;
++	struct in_addr sin_addr;
++	uint8_t sin_zero[8];
++};
++
++struct in6_addr {
++	union {
++		uint8_t __s6_addr[16];
++		uint16_t __s6_addr16[8];
++		uint32_t __s6_addr32[4];
++	} __in6_union;
++};
++#define s6_addr __in6_union.__s6_addr
++#define s6_addr16 __in6_union.__s6_addr16
++#define s6_addr32 __in6_union.__s6_addr32
++
++struct sockaddr_in6 {
++	sa_family_t     sin6_family;
++	in_port_t       sin6_port;
++	uint32_t        sin6_flowinfo;
++	struct in6_addr sin6_addr;
++	uint32_t        sin6_scope_id;
++};
++
++#define MCAST_INCLUDE 1
++
++struct ip_mreq {
++	struct in_addr imr_multiaddr;
++	struct in_addr imr_interface;
++};
++
++struct ip_mreq_source {
++	struct in_addr imr_multiaddr;
++	struct in_addr imr_interface;
++	struct in_addr imr_sourceaddr;
++};
++
++struct ip_mreqn {
++	struct in_addr imr_multiaddr;
++	struct in_addr imr_address;
++	int imr_ifindex;
++};
++
++struct ipv6_mreq {
++	struct in6_addr ipv6mr_multiaddr;
++	unsigned        ipv6mr_interface;
++};
++
++struct in_pktinfo {
++	unsigned int ipi_ifindex;
++	struct in_addr ipi_spec_dst;
++	struct in_addr ipi_addr;
++};
++
++struct in6_pktinfo {
++	struct in6_addr ipi6_addr;
++	uint32_t ipi6_ifindex;
++};
++
++struct group_req {
++	uint32_t gr_interface;
++	struct sockaddr_storage gr_group;
++};
++
++struct group_source_req {
++	uint32_t gsr_interface;
++	struct sockaddr_storage gsr_group;
++	struct sockaddr_storage gsr_source;
++};
++
++#ifdef __cplusplus
++}
++#endif
++
++#define INADDR_ANY        ((in_addr_t) 0x00000000)
++#define INADDR_BROADCAST  ((in_addr_t) 0xffffffff)
++#define INADDR_NONE       ((in_addr_t) 0xffffffff)
++#define INADDR_LOOPBACK   ((in_addr_t) 0x7f000001)
++
++#define INADDR_UNSPEC_GROUP     ((in_addr_t) 0xe0000000)
++#define INADDR_ALLHOSTS_GROUP   ((in_addr_t) 0xe0000001)
++#define INADDR_ALLRTRS_GROUP    ((in_addr_t) 0xe0000002)
++#define INADDR_ALLSNOOPERS_GROUP ((in_addr_t) 0xe000006a)
++#define INADDR_MAX_LOCAL_GROUP  ((in_addr_t) 0xe00000ff)
++
++#define IN6ADDR_ANY_INIT      { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 } } }
++#define IN6ADDR_LOOPBACK_INIT { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }
++
++#define INET_ADDRSTRLEN  16
++#define INET6_ADDRSTRLEN 46
++
++#define IPPORT_RESERVED 1024
++
++#define IPPROTO_IP       0
++#define IPPROTO_HOPOPTS  0
++#define IPPROTO_ICMP     1
++#define IPPROTO_IGMP     2
++#define IPPROTO_IPIP     4
++#define IPPROTO_TCP      6
++#define IPPROTO_EGP      8
++#define IPPROTO_PUP      12
++#define IPPROTO_UDP      17
++#define IPPROTO_IDP      22
++#define IPPROTO_TP       29
++#define IPPROTO_DCCP     33
++#define IPPROTO_IPV6     41
++#define IPPROTO_ROUTING  43
++#define IPPROTO_FRAGMENT 44
++#define IPPROTO_RSVP     46
++#define IPPROTO_GRE      47
++#define IPPROTO_ESP      50
++#define IPPROTO_AH       51
++#define IPPROTO_ICMPV6   58
++#define IPPROTO_NONE     59
++#define IPPROTO_DSTOPTS  60
++#define IPPROTO_MTP      92
++#define IPPROTO_BEETPH   94
++#define IPPROTO_ENCAP    98
++#define IPPROTO_PIM      103
++#define IPPROTO_COMP     108
++#define IPPROTO_SCTP     132
++#define IPPROTO_MH       135
++#define IPPROTO_UDPLITE  136
++#define IPPROTO_MPLS     137
++#define IPPROTO_RAW      255
++#define IPPROTO_MAX      256
++
++#define IP_TOS 1
++#define IP_TTL 2
++#define IP_HDRINCL 3
++#define IP_OPTIONS 4
++#define IP_RECVOPTS 6
++#define IP_PKTINFO 8
++#define IP_PKTOPTIONS 9
++#define IP_MTU_DISCOVER 10
++#define IP_RECVERR 11
++#define IP_RECVTTL 12
++#define IP_MTU 14
++#define IP_MULTICAST_IF 32
++#define IP_MULTICAST_TTL 33
++#define IP_MULTICAST_LOOP 34
++#define IP_ADD_MEMBERSHIP 35
++#define IP_DROP_MEMBERSHIP 36
++#define IP_UNBLOCK_SOURCE 37
++#define IP_BLOCK_SOURCE 38
++#define IP_ADD_SOURCE_MEMBERSHIP 39
++#define IP_DROP_SOURCE_MEMBERSHIP 40
++#define IP_UNICAST_IF 50
++
++#define IPV6_2292PKTOPTIONS 6
++#define IPV6_UNICAST_HOPS 16
++#define IPV6_MULTICAST_IF 17
++#define IPV6_MULTICAST_HOPS 18
++#define IPV6_MULTICAST_LOOP 19
++#define IPV6_JOIN_GROUP 20
++#define IPV6_LEAVE_GROUP 21
++#define IPV6_MTU 24
++#define IPV6_RECVERR 25
++#define IPV6_V6ONLY 26
++#define IPV6_RECVPKTINFO 49
++#define IPV6_PKTINFO 50
++#define IPV6_RECVHOPLIMIT 51
++#define IPV6_HOPLIMIT 52
++
++#define IPV6_RECVTCLASS	66
++#define IPV6_TCLASS 67
++
++#define IPV6_ADD_MEMBERSHIP IPV6_JOIN_GROUP
++#define IPV6_DROP_MEMBERSHIP IPV6_LEAVE_GROUP
++
++#define IP_PMTUDISC_DONT 0
++#define IP_PMTUDISC_WANT 1
++#define IP_PMTUDISC_DO 2
++#define IP_PMTUDISC_PROBE 3
++#define IP_PMTUDISC_INTERFACE 4
++#define IP_PMTUDISC_OMIT 5
++
++#define MCAST_BLOCK_SOURCE 43
++#define MCAST_UNBLOCK_SOURCE 44
++#define MCAST_JOIN_SOURCE_GROUP 46
++#define MCAST_LEAVE_SOURCE_GROUP 47
++
++/* These defines are needed for compatibility with Linux kernel headers. */
++#define __UAPI_DEF_IN_ADDR      0
++#define __UAPI_DEF_IN_IPPROTO   0
++#define __UAPI_DEF_IN_PKTINFO   0
++#define __UAPI_DEF_IP_MREQ      0
++#define __UAPI_DEF_SOCKADDR_IN  0
++#define __UAPI_DEF_IN_CLASS     0
++#define __UAPI_DEF_IN6_ADDR     0
++#define __UAPI_DEF_IN6_ADDR_ALT 0
++#define __UAPI_DEF_SOCKADDR_IN6 0
++#define __UAPI_DEF_IPV6_MREQ    0
++#define __UAPI_DEF_IPPROTO_V6   0
++#define __UAPI_DEF_IPV6_OPTIONS 0
++#define __UAPI_DEF_IN6_PKTINFO  0
++#define __UAPI_DEF_IP6_MTUINFO  0
++
++#endif // _ABITBITS_IN_H
+diff --git a/abis/cryptix/ino_t.h b/abis/cryptix/ino_t.h
+new file mode 100644
+index 00000000..ba076f40
+--- /dev/null
++++ b/abis/cryptix/ino_t.h
+@@ -0,0 +1,10 @@
++
++#ifndef _ABIBITS_INO_T_H
++#define _ABIBITS_INO_T_H
++
++#include <bits/types.h>
++
++typedef __mlibc_uint64 ino_t;
++
++#endif // _ABIBITS_INO_T_H
++
+diff --git a/abis/cryptix/inotify.h b/abis/cryptix/inotify.h
+new file mode 100644
+index 00000000..4a0bd4cb
+--- /dev/null
++++ b/abis/cryptix/inotify.h
+@@ -0,0 +1,9 @@
++#ifndef _ABIBITS_INOTIFY_H
++#define _ABIBITS_INOTIFY_H
++
++#include <abi-bits/fcntl.h>
++
++#define IN_CLOEXEC O_CLOEXEC
++#define IN_NONBLOCK O_NONBLOCK
++
++#endif // _ABIBITS_INOTIFY_H
+diff --git a/abis/cryptix/ioctls.h b/abis/cryptix/ioctls.h
+new file mode 100644
+index 00000000..3a957bfc
+--- /dev/null
++++ b/abis/cryptix/ioctls.h
+@@ -0,0 +1,15 @@
++#ifndef _ABIBITS_IOCTLS_H
++#define _ABIBITS_IOCTLS_H
++
++#define SIOCPROTOPRIVATE 0x89E0
++#define SIOCGIFNAME 0x8910
++#define SIOCGIFCONF 0x8912
++#define SIOCGIFFLAGS 0x8913
++#define SIOCSIFFLAGS 0x8914
++#define SIOCGIFINDEX 0x8933
++#define SIOCATMARK 0x8905
++#define SIOCGIFHWADDR 0x8927
++#define SIOCGIFBRDADDR 0x8919
++#define SIOCGIFNETMASK 0x891B
++
++#endif /* _ABIBITS_IOCTLS_H */
+diff --git a/abis/cryptix/limits.h b/abis/cryptix/limits.h
+new file mode 100644
+index 00000000..091b14ba
+--- /dev/null
++++ b/abis/cryptix/limits.h
+@@ -0,0 +1,9 @@
++#ifndef _ABIBITS_LIMITS_H
++#define _ABIBITS_LIMITS_H
++
++#define IOV_MAX 1024
++#define LOGIN_NAME_MAX 256
++#define NAME_MAX 255
++#define OPEN_MAX 256
++
++#endif //_ABIBITS_LIMITS_H
+diff --git a/abis/cryptix/mode_t.h b/abis/cryptix/mode_t.h
+new file mode 100644
+index 00000000..8374c125
+--- /dev/null
++++ b/abis/cryptix/mode_t.h
+@@ -0,0 +1,8 @@
++
++#ifndef _ABIBITS_MODE_T_H
++#define _ABIBITS_MODE_T_H
++
++typedef unsigned int mode_t;
++
++#endif // _ABIBITS_MODE_T_H
++
+diff --git a/abis/cryptix/mqueue.h b/abis/cryptix/mqueue.h
+new file mode 100644
+index 00000000..1e2d3eb8
+--- /dev/null
++++ b/abis/cryptix/mqueue.h
+@@ -0,0 +1,21 @@
++#ifndef _ABIBITS_MQUEUE_H
++#define _ABIBITS_MQUEUE_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++struct mq_attr {
++	long mq_flags;
++	long mq_maxmsg;
++	long mq_msgsize;
++	long mq_curmsgs;
++	long __pad[4];
++};
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* _ABIBITS_MQUEUE_H */
++
+diff --git a/abis/cryptix/msg.h b/abis/cryptix/msg.h
+new file mode 100644
+index 00000000..577456c9
+--- /dev/null
++++ b/abis/cryptix/msg.h
+@@ -0,0 +1,45 @@
++#ifndef _ABIBITS_MSG_H
++#define _ABIBITS_MSG_H
++
++#include <sys/ipc.h>
++#include <bits/ansi/time_t.h>
++#include <bits/types.h>
++#include <abi-bits/pid_t.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++typedef unsigned long msglen_t;
++typedef unsigned long msgqnum_t;
++
++struct msqid64_ds {
++	struct ipc64_perm msg_perm;
++#if (UINTPTR_MAX == UINT64_MAX) /* || x32 ABI */
++	time_t msg_stime;
++	time_t msg_rtime;
++	time_t msg_ctime;
++#else
++	unsigned long msg_stime;
++	unsigned long msg_stime_high;
++	unsigned long msg_rtime;
++	unsigned long msg_rtime_high;
++	unsigned long msg_ctime;
++	unsigned long msg_ctime_high;
++#endif
++	unsigned long msg_cbytes;
++	msgqnum_t msg_qnum;
++	msglen_t msg_qbytes;
++	pid_t msg_lspid;
++	pid_t msg_lrpid;
++	unsigned long __unused[2];
++};
++
++#define msqid_ds msqid64_ds
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* _ABIBITS_MSG_H */
++
+diff --git a/abis/cryptix/nlink_t.h b/abis/cryptix/nlink_t.h
+new file mode 100644
+index 00000000..e0d9322d
+--- /dev/null
++++ b/abis/cryptix/nlink_t.h
+@@ -0,0 +1,8 @@
++
++#ifndef _ABIBITS_NLINK_T_H
++#define _ABIBITS_NLINK_T_H
++
++typedef unsigned long nlink_t;
++
++#endif // _ABIBITS_NLINK_T_H
++
+diff --git a/abis/cryptix/packet.h b/abis/cryptix/packet.h
+new file mode 100644
+index 00000000..ee1a424f
+--- /dev/null
++++ b/abis/cryptix/packet.h
+@@ -0,0 +1,6 @@
++#ifndef _ABIBITS_PACKET_H
++#define _ABIBITS_PACKET_H
++
++#define PACKET_HOST 0
++
++#endif // _ABIBITS_PACKET_H
+diff --git a/abis/cryptix/pid_t.h b/abis/cryptix/pid_t.h
+new file mode 100644
+index 00000000..323168e6
+--- /dev/null
++++ b/abis/cryptix/pid_t.h
+@@ -0,0 +1,8 @@
++
++#ifndef _ABIBITS_PID_T_H
++#define _ABIBITS_PID_T_H
++
++typedef int pid_t;
++
++#endif // _ABIBITS_PID_T_H
++
+diff --git a/abis/cryptix/poll.h b/abis/cryptix/poll.h
+new file mode 100644
+index 00000000..1585b46f
+--- /dev/null
++++ b/abis/cryptix/poll.h
+@@ -0,0 +1,16 @@
++#ifndef _ABIBITS_POLL_H
++#define _ABIBITS_POLL_H
++
++#define POLLIN 0x0001
++#define POLLPRI 0x0002
++#define POLLOUT 0x0004
++#define POLLERR 0x0008
++#define POLLHUP 0x0010
++#define POLLNVAL 0x0020
++#define POLLRDNORM 0x0040
++#define POLLRDBAND 0x0080
++#define POLLWRNORM 0x0100
++#define POLLWRBAND 0x0200
++#define POLLRDHUP 0x2000
++
++#endif // _ABIBITS_POLL_H
+diff --git a/abis/cryptix/ptrace.h b/abis/cryptix/ptrace.h
+new file mode 100644
+index 00000000..3d73aa17
+--- /dev/null
++++ b/abis/cryptix/ptrace.h
+@@ -0,0 +1,59 @@
++#ifndef _ABIBITS_PTRACE_H
++#define _ABIBITS_PTRACE_H
++
++#define PTRACE_PEEKTEXT 1
++#define PTRACE_PEEKDATA 2
++#define PTRACE_PEEKUSER 3
++#define PTRACE_POKETEXT 4
++#define PTRACE_POKEDATA 5
++#define PTRACE_POKEUSER 6
++#define PTRACE_CONT 7
++#define PTRACE_KILL 8
++#define PTRACE_SINGLESTEP 9
++#define PTRACE_GETREGS 12
++#define PTRACE_SETREGS 13
++#define PTRACE_GETFPREGS 14
++#define PTRACE_SETFPREGS 15
++#define PTRACE_ATTACH 16
++#define PTRACE_DETACH 17
++#define PTRACE_GETFPXREGS 18
++#define PTRACE_SETFPXREGS 19
++#define PTRACE_SYSCALL 24
++#define PTRACE_SETOPTIONS 0x4200
++#define PTRACE_GETEVENTMSG 0x4201
++#define PTRACE_GETSIGINFO 0x4202
++#define PTRACE_SETSIGINFO 0x4203
++#define PTRACE_GETREGSET 0x4204
++#define PTRACE_SETREGSET 0x4205
++#define PTRACE_SEIZE 0x4206
++#define PTRACE_INTERRUPT 0x4207
++#define PTRACE_LISTEN 0x4208
++#define PTRACE_PEEKSIGINFO 0x4209
++#define PTRACE_GETSIGMASK 0x420A
++#define PTRACE_SETSIGMASK 0x420B
++#define PTRACE_SECCOMP_GET_FILTER 0x420C
++
++#define PTRACE_O_TRACESYSGOOD 0x00000001
++#define PTRACE_O_TRACEFORK 0x00000002
++#define PTRACE_O_TRACEVFORK 0x00000004
++#define PTRACE_O_TRACECLONE 0x00000008
++#define PTRACE_O_TRACEEXEC 0x00000010
++#define PTRACE_O_TRACEVFORKDONE 0x00000020
++#define PTRACE_O_TRACEEXIT 0x00000040
++#define PTRACE_O_TRACESECCOMP 0x00000080
++#define PTRACE_O_EXITKILL 0x00100000
++#define PTRACE_O_SUSPEND_SECCOMP 0x00200000
++#define PTRACE_O_MASK 0x003000ff
++
++#define PTRACE_EVENT_FORK 1
++#define PTRACE_EVENT_VFORK 2
++#define PTRACE_EVENT_CLONE 3
++#define PTRACE_EVENT_EXEC 4
++#define PTRACE_EVENT_VFORK_DONE 5
++#define PTRACE_EVENT_EXIT 6
++#define PTRACE_EVENT_SECCOMP 7
++#define PTRACE_EVENT_STOP 128
++
++#define PTRACE_PEEKSIGINFO_SHARED 1
++
++#endif // _ABIBITS_PTRACE_H
+diff --git a/abis/cryptix/reboot.h b/abis/cryptix/reboot.h
+new file mode 100644
+index 00000000..aadc18f2
+--- /dev/null
++++ b/abis/cryptix/reboot.h
+@@ -0,0 +1,12 @@
++#ifndef _ABIBITS_REBOOT_H
++#define _ABIBITS_REBOOT_H
++
++#define RB_AUTOBOOT 0x01234567
++#define RB_HALT_SYSTEM 0xcdef0123
++#define RB_ENABLE_CAD 0x89abcdef
++#define RB_DISABLE_CAD 0
++#define RB_POWER_OFF 0x4321fedc
++#define RB_SW_SUSPEND 0xd000fce2
++#define RB_KEXEC 0x45584543
++
++#endif // _ABIBITS_REBOOT_H
+diff --git a/abis/cryptix/resource.h b/abis/cryptix/resource.h
+new file mode 100644
+index 00000000..75e81207
+--- /dev/null
++++ b/abis/cryptix/resource.h
+@@ -0,0 +1,53 @@
++#ifndef _ABIBITS_RESOURCE_H
++#define _ABIBITS_RESOURCE_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include <bits/posix/timeval.h>
++
++#define RUSAGE_SELF 0
++#define RUSAGE_CHILDREN -1
++
++#define RLIMIT_CPU 0
++#define RLIMIT_FSIZE 1
++#define RLIMIT_DATA 2
++#define RLIMIT_STACK 3
++#define RLIMIT_CORE 4
++#define RLIMIT_RSS 5
++#define RLIMIT_NPROC 6
++#define RLIMIT_NOFILE 7
++#define RLIMIT_MEMLOCK 8
++#define RLIMIT_AS 9
++#define RLIMIT_LOCKS 10
++#define RLIMIT_SIGPENDING 11
++#define RLIMIT_MSGQUEUE 12
++#define RLIMIT_NICE 13
++#define RLIMIT_RTPRIO 14
++#define RLIMIT_NLIMITS 16
++
++struct rusage {
++	struct timeval ru_utime;
++	struct timeval ru_stime;
++	long ru_maxrss;
++	long ru_ixrss;
++	long ru_idrss;
++	long ru_isrss;
++	long ru_minflt;
++	long ru_majflt;
++	long ru_nswap;
++	long ru_inblock;
++	long ru_oublock;
++	long ru_msgsnd;
++	long ru_msgrcv;
++	long ru_nsignals;
++	long ru_nvcsw;
++	long ru_nivcsw;
++};
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif // _ABIBITS_RESOURCE_H
+diff --git a/abis/cryptix/seek-whence.h b/abis/cryptix/seek-whence.h
+new file mode 100644
+index 00000000..47a5b0e9
+--- /dev/null
++++ b/abis/cryptix/seek-whence.h
+@@ -0,0 +1,10 @@
++#ifndef _ABIBITS_SEEK_WHENCE_H
++#define _ABIBITS_SEEK_WHENCE_H
++
++#define SEEK_SET 0
++#define SEEK_CUR 1
++#define SEEK_END 2
++#define SEEK_DATA 3
++#define SEEK_HOLE 4
++
++#endif // _ABIBITS_SEEK_WHENCE_H
+diff --git a/abis/cryptix/shm.h b/abis/cryptix/shm.h
+new file mode 100644
+index 00000000..bf71c8c6
+--- /dev/null
++++ b/abis/cryptix/shm.h
+@@ -0,0 +1,25 @@
++#ifndef _ABIBITS_SHM_H
++#define _ABIBITS_SHM_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include <unistd.h>
++
++struct shm_info {
++	int used_ids;
++	unsigned long shm_tot;
++	unsigned long shm_rss;
++	unsigned long shm_swp;
++	unsigned long swap_attempts;
++	unsigned long swap_successes;
++};
++
++#define SHMLBA (getpagesize())
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* _ABIBITS_SHM_H */
+diff --git a/abis/cryptix/signal.h b/abis/cryptix/signal.h
+new file mode 100644
+index 00000000..3d0aa6cc
+--- /dev/null
++++ b/abis/cryptix/signal.h
+@@ -0,0 +1,499 @@
++#ifndef _ABIBITS_SIGNAL_H
++#define _ABIBITS_SIGNAL_H
++
++#include <stdint.h>
++#include <time.h>
++#include <abi-bits/pid_t.h>
++#include <abi-bits/uid_t.h>
++#include <bits/size_t.h>
++
++#define POLL_IN 1
++#define POLL_OUT 2
++#define POLL_MSG 3
++#define POLL_ERR 4
++#define POLL_PRI 5
++#define POLL_HUP 6
++
++union sigval {
++	int sival_int;
++	void *sival_ptr;
++};
++
++// struct taken from musl.
++
++typedef struct {
++	int si_signo, si_errno, si_code;
++	union {
++		char __pad[128 - 2*sizeof(int) - sizeof(long)];
++		struct {
++			union {
++				struct {
++					pid_t si_pid;
++					uid_t si_uid;
++				} __piduid;
++				struct {
++					int si_timerid;
++					int si_overrun;
++				} __timer;
++			} __first;
++			union {
++				union sigval si_value;
++				struct {
++					int si_status;
++					clock_t si_utime, si_stime;
++				} __sigchld;
++			} __second;
++		} __si_common;
++		struct {
++			void *si_addr;
++			short si_addr_lsb;
++			union {
++				struct {
++					void *si_lower;
++					void *si_upper;
++				} __addr_bnd;
++				unsigned si_pkey;
++			} __first;
++		} __sigfault;
++		struct {
++			long si_band;
++			int si_fd;
++		} __sigpoll;
++		struct {
++			void *si_call_addr;
++			int si_syscall;
++			unsigned si_arch;
++		} __sigsys;
++	} __si_fields;
++} siginfo_t;
++#define si_pid     __si_fields.__si_common.__first.__piduid.si_pid
++#define si_uid     __si_fields.__si_common.__first.__piduid.si_uid
++#define si_status  __si_fields.__si_common.__second.__sigchld.si_status
++#define si_utime   __si_fields.__si_common.__second.__sigchld.si_utime
++#define si_stime   __si_fields.__si_common.__second.__sigchld.si_stime
++#define si_value   __si_fields.__si_common.__second.si_value
++#define si_addr    __si_fields.__sigfault.si_addr
++#define si_addr_lsb __si_fields.__sigfault.si_addr_lsb
++#define si_lower   __si_fields.__sigfault.__first.__addr_bnd.si_lower
++#define si_upper   __si_fields.__sigfault.__first.__addr_bnd.si_upper
++#define si_pkey    __si_fields.__sigfault.__first.si_pkey
++#define si_band    __si_fields.__sigpoll.si_band
++#define si_fd      __si_fields.__sigpoll.si_fd
++#define si_timerid __si_fields.__si_common.__first.__timer.si_timerid
++#define si_overrun __si_fields.__si_common.__first.__timer.si_overrun
++#define si_ptr     si_value.sival_ptr
++#define si_int     si_value.sival_int
++#define si_call_addr __si_fields.__sigsys.si_call_addr
++#define si_syscall __si_fields.__sigsys.si_syscall
++#define si_arch    __si_fields.__sigsys.si_arch
++
++// Required for sys_sigaction sysdep.
++#define SA_NOCLDSTOP 1
++#define SA_NOCLDWAIT 2
++#define SA_SIGINFO 4
++#define SA_ONSTACK 0x08000000
++#define SA_RESTART 0x10000000
++#define SA_NODEFER 0x40000000
++#define SA_RESETHAND 0x80000000
++#define SA_RESTORER 0x04000000
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++// Argument for signal()
++typedef void (*__sighandler) (int);
++
++#define SIG_ERR ((__sighandler)(void *)(-1))
++#define SIG_DFL ((__sighandler)(void *)(0))
++#define SIG_IGN ((__sighandler)(void *)(1))
++
++#define SIGABRT 6
++#define SIGFPE 8
++#define SIGILL 4
++#define SIGINT 2
++#define SIGSEGV 11
++#define SIGTERM 15
++#define SIGPROF 27
++#define SIGIO 29
++#define SIGPWR 30
++#define SIGRTMIN 35
++#define SIGRTMAX 64
++
++typedef struct {
++	unsigned long sig[1024 / (8 * sizeof(long))];
++} sigset_t;
++
++// constants for sigprocmask()
++#define SIG_BLOCK 0
++#define SIG_UNBLOCK 1
++#define SIG_SETMASK 2
++
++#define SIGHUP    1
++#define SIGQUIT   3
++#define SIGTRAP   5
++#define SIGIOT    SIGABRT
++#define SIGBUS    7
++#define SIGKILL   9
++#define SIGUSR1   10
++#define SIGUSR2   12
++#define SIGPIPE   13
++#define SIGALRM   14
++#define SIGSTKFLT 16
++#define SIGCHLD   17
++#define SIGCONT   18
++#define SIGSTOP   19
++#define SIGTSTP   20
++#define SIGTTIN   21
++#define SIGTTOU   22
++#define SIGURG    23
++#define SIGXCPU   24
++#define SIGXFSZ   25
++#define SIGVTALRM 26
++#define SIGWINCH  28
++#define SIGPOLL   29
++#define SIGSYS    31
++#define SIGUNUSED SIGSYS
++#define SIGCANCEL 32
++
++#define MINSIGSTKSZ 2048
++#define SIGSTKSZ 8192
++#define SS_ONSTACK 1
++#define SS_DISABLE 2
++
++typedef struct __stack {
++	void *ss_sp;
++	int ss_flags;
++	size_t ss_size;
++} stack_t;
++
++// constants for sigev_notify of struct sigevent
++#define SIGEV_SIGNAL 0
++#define SIGEV_NONE 1
++#define SIGEV_THREAD 2
++#define SIGEV_THREAD_ID 4
++
++#define SEGV_MAPERR 1
++#define SEGV_ACCERR 2
++
++#define BUS_ADRALN 1
++#define BUS_ADRERR 2
++#define BUS_OBJERR 3
++#define BUS_MCEERR_AR 4
++#define BUS_MCEERR_AO 5
++
++#define ILL_ILLOPC 1
++#define ILL_ILLOPN 2
++#define ILL_ILLADR 3
++#define ILL_ILLTRP 4
++#define ILL_PRVOPC 5
++#define ILL_PRVREG 6
++#define ILL_COPROC 7
++#define ILL_BADSTK 8
++#define ILL_BADIADDR 9
++
++#define NSIG 65
++
++#define SI_ASYNCNL (-60)
++#define SI_TKILL (-6)
++#define SI_SIGIO (-5)
++#define SI_ASYNCIO (-4)
++#define SI_MESGQ (-3)
++#define SI_TIMER (-2)
++#define SI_QUEUE (-1)
++#define SI_USER 0
++#define SI_KERNEL 128
++
++#if defined(__i386__)
++#define REG_GS 0
++#define REG_FS 1
++#define REG_ES 2
++#define REG_DS 3
++#define REG_EDI 4
++#define REG_ESI 5
++#define REG_EBP 6
++#define REG_ESP 7
++#define REG_EBX 8
++#define REG_EDX 9
++#define REG_ECX 10
++#define REG_EAX 11
++#define REG_TRAPNO 12
++#define REG_ERR 13
++#define REG_EIP 14
++#define REG_CS 15
++#define REG_EFL 16
++#define REG_UESP 17
++#define REG_SS 18
++#define NGREG 19
++#elif defined(__x86_64__)
++#define REG_R8 0
++#define REG_R9 1
++#define REG_R10 2
++#define REG_R11 3
++#define REG_R12 4
++#define REG_R13 5
++#define REG_R14 6
++#define REG_R15 7
++#define REG_RDI 8
++#define REG_RSI 9
++#define REG_RBP 10
++#define REG_RBX 11
++#define REG_RDX 12
++#define REG_RAX 13
++#define REG_RCX 14
++#define REG_RSP 15
++#define REG_RIP 16
++#define REG_EFL 17
++#define REG_CSGSFS 18
++#define REG_ERR 19
++#define REG_TRAPNO 20
++#define REG_OLDMASK 21
++#define REG_CR2 22
++#define NGREG 23
++#endif
++
++#include <bits/threads.h>
++
++struct sigevent {
++	union sigval sigev_value;
++	int sigev_notify;
++	int sigev_signo;
++	void (*sigev_notify_function)(union sigval);
++	struct __mlibc_threadattr *sigev_notify_attributes;
++	pid_t sigev_notify_thread_id;
++};
++
++struct sigaction {
++	union {
++		void (*sa_handler)(int);
++		void (*sa_sigaction)(int, siginfo_t *, void *);
++	} __sa_handler;
++	unsigned long sa_flags;
++	void (*sa_restorer)(void);
++	sigset_t sa_mask;
++};
++
++#define sa_handler __sa_handler.sa_handler
++#define sa_sigaction __sa_handler.sa_sigaction
++
++// Taken from the linux kernel headers
++
++#if defined(__x86_64__) || defined(__i386__)
++
++struct _fpreg {
++	unsigned short significand[4];
++	unsigned short exponent;
++};
++
++struct _fpxreg {
++	unsigned short significand[4];
++	unsigned short exponent;
++	unsigned short padding[3];
++};
++
++struct _xmmreg {
++	uint32_t element[4];
++};
++
++struct _fpstate {
++#if defined(__x86_64__)
++	uint16_t cwd;
++	uint16_t swd;
++	uint16_t ftw;
++	uint16_t fop;
++	uint64_t rip;
++	uint64_t rdp;
++	uint32_t mxcsr;
++	uint32_t mxcr_mask;
++	struct _fpxreg _st[8];
++	struct _xmmreg _xmm[16];
++	uint32_t padding[24];
++#elif defined(__i386__)
++	uint32_t cw;
++	uint32_t sw;
++	uint32_t tag;
++	uint32_t ipoff;
++	uint32_t cssel;
++	uint32_t dataoff;
++	uint32_t datasel;
++	struct _fpreg _st[8];
++	uint16_t status;
++	uint16_t magic;
++
++	// FXSR FPU
++
++	uint32_t _fxsr_env[6];
++	uint32_t mxscr;
++	uint32_t reserved;
++	struct _fpxreg _fxsr_st[8];
++	struct _xmmreg _xmm[8];
++
++	uint32_t padding2[56];
++#endif
++};
++
++typedef struct {
++	unsigned long gregs[NGREG];
++	struct _fpstate *fpregs;
++	unsigned long __reserved1[8];
++} mcontext_t;
++
++typedef struct __ucontext {
++	unsigned long uc_flags;
++	struct __ucontext *uc_link;
++	stack_t uc_stack;
++	mcontext_t uc_mcontext;
++	sigset_t uc_sigmask;
++} ucontext_t;
++
++#elif defined(__riscv) && __riscv_xlen == 64
++// Definitions from Linux kernel headers.
++
++#define NGREG 32
++
++enum {
++  REG_PC = 0,
++#define REG_PC REG_PC
++  REG_RA = 1,
++#define REG_RA REG_RA
++  REG_SP = 2,
++#define REG_SP REG_SP
++  REG_TP = 4,
++#define REG_TP REG_TP
++  REG_S0 = 8,
++#define REG_S0 REG_S0
++  REG_A0 = 10,
++#define REG_A0 REG_A0
++};
++
++struct __riscv_f_ext_state {
++	uint32_t f[32];
++	uint32_t fcsr;
++};
++
++struct __riscv_d_ext_state {
++	uint64_t f[32];
++	uint32_t fcsr;
++};
++
++struct __riscv_q_ext_state {
++	uint64_t f[64] __attribute__((__aligned__(16)));
++	uint32_t fcsr;
++	uint32_t reserved[3];
++};
++
++union __riscv_fp_state {
++	struct __riscv_f_ext_state f;
++	struct __riscv_d_ext_state d;
++	struct __riscv_q_ext_state q;
++};
++
++typedef unsigned long __riscv_mc_gp_state[NGREG];
++
++typedef struct sigcontext {
++	__riscv_mc_gp_state gregs;
++	union __riscv_fp_state fpregs;
++} mcontext_t;
++
++typedef struct __ucontext {
++	unsigned long uc_flags;
++	struct ucontext	*uc_link;
++	stack_t uc_stack;
++	sigset_t uc_sigmask;
++	uint8_t  __unused[1024 / 8 - sizeof(sigset_t)];
++	mcontext_t uc_mcontext;
++} ucontext_t;
++
++#elif defined (__aarch64__)
++
++#define NGREG 34
++
++typedef struct sigcontext {
++	uint64_t fault_address;
++	uint64_t regs[31];
++	uint64_t sp;
++	uint64_t pc;
++	uint64_t pstate;
++	uint8_t __reserved[4096];
++} mcontext_t;
++
++#define FPSIMD_MAGIC 0x46508001
++#define ESR_MAGIC 0x45535201
++#define EXTRA_MAGIC 0x45585401
++#define SVE_MAGIC 0x53564501
++struct _aarch64_ctx {
++	uint32_t magic;
++	uint32_t size;
++};
++struct fpsimd_context {
++	struct _aarch64_ctx head;
++	uint32_t fpsr;
++	uint32_t fpcr;
++	__uint128_t vregs[32];
++};
++struct esr_context {
++	struct _aarch64_ctx head;
++	uint64_t esr;
++};
++struct extra_context {
++	struct _aarch64_ctx head;
++	uint64_t datap;
++	uint32_t size;
++	uint32_t __reserved[3];
++};
++struct sve_context {
++	struct _aarch64_ctx head;
++	uint16_t vl;
++	uint16_t __reserved[3];
++};
++#define SVE_VQ_BYTES		16
++#define SVE_VQ_MIN		1
++#define SVE_VQ_MAX		512
++#define SVE_VL_MIN		(SVE_VQ_MIN * SVE_VQ_BYTES)
++#define SVE_VL_MAX		(SVE_VQ_MAX * SVE_VQ_BYTES)
++#define SVE_NUM_ZREGS		32
++#define SVE_NUM_PREGS		16
++#define sve_vl_valid(vl) \
++	((vl) % SVE_VQ_BYTES == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
++#define sve_vq_from_vl(vl)	((vl) / SVE_VQ_BYTES)
++#define sve_vl_from_vq(vq)	((vq) * SVE_VQ_BYTES)
++#define SVE_SIG_ZREG_SIZE(vq)	((unsigned)(vq) * SVE_VQ_BYTES)
++#define SVE_SIG_PREG_SIZE(vq)	((unsigned)(vq) * (SVE_VQ_BYTES / 8))
++#define SVE_SIG_FFR_SIZE(vq)	SVE_SIG_PREG_SIZE(vq)
++#define SVE_SIG_REGS_OFFSET					\
++	((sizeof(struct sve_context) + (SVE_VQ_BYTES - 1))	\
++		/ SVE_VQ_BYTES * SVE_VQ_BYTES)
++#define SVE_SIG_ZREGS_OFFSET	SVE_SIG_REGS_OFFSET
++#define SVE_SIG_ZREG_OFFSET(vq, n) \
++	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREG_SIZE(vq) * (n))
++#define SVE_SIG_ZREGS_SIZE(vq) \
++	(SVE_SIG_ZREG_OFFSET(vq, SVE_NUM_ZREGS) - SVE_SIG_ZREGS_OFFSET)
++#define SVE_SIG_PREGS_OFFSET(vq) \
++	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREGS_SIZE(vq))
++#define SVE_SIG_PREG_OFFSET(vq, n) \
++	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREG_SIZE(vq) * (n))
++#define SVE_SIG_PREGS_SIZE(vq) \
++	(SVE_SIG_PREG_OFFSET(vq, SVE_NUM_PREGS) - SVE_SIG_PREGS_OFFSET(vq))
++#define SVE_SIG_FFR_OFFSET(vq) \
++	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREGS_SIZE(vq))
++#define SVE_SIG_REGS_SIZE(vq) \
++	(SVE_SIG_FFR_OFFSET(vq) + SVE_SIG_FFR_SIZE(vq) - SVE_SIG_REGS_OFFSET)
++#define SVE_SIG_CONTEXT_SIZE(vq) (SVE_SIG_REGS_OFFSET + SVE_SIG_REGS_SIZE(vq))
++
++typedef struct __ucontext {
++	unsigned long uc_flags;
++	struct __ucontext *uc_link;
++	stack_t uc_stack;
++	sigset_t uc_sigmask;
++	mcontext_t uc_mcontext;
++} ucontext_t;
++
++#else
++#error "Missing architecture specific code."
++#endif
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif // _ABIBITS_SIGNAL_H
+diff --git a/abis/cryptix/socket.h b/abis/cryptix/socket.h
+new file mode 100644
+index 00000000..78e1dc32
+--- /dev/null
++++ b/abis/cryptix/socket.h
+@@ -0,0 +1,300 @@
++#ifndef _ABIBITS_SOCKET_H
++#define _ABIBITS_SOCKET_H
++
++#include <stddef.h>
++#include <abi-bits/socklen_t.h>
++#include <bits/posix/iovec.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++typedef unsigned short sa_family_t;
++
++struct msghdr {
++	void *msg_name;
++	socklen_t msg_namelen;
++	struct iovec *msg_iov;
++	size_t msg_iovlen; /* int in POSIX */
++	void *msg_control;
++	size_t msg_controllen; /* socklen_t in POSIX */
++	int msg_flags;
++};
++
++struct sockaddr_storage {
++	sa_family_t ss_family;
++	char __padding[128 - sizeof(sa_family_t) - sizeof(long)];
++	long __force_alignment;
++};
++
++struct mmsghdr {
++	struct msghdr msg_hdr;
++	unsigned int  msg_len;
++};
++
++struct cmsghdr {
++	size_t cmsg_len; /* socklen_t in POSIX */
++	int cmsg_level;
++	int cmsg_type;
++};
++
++#ifdef __cplusplus
++}
++#endif
++
++#define SCM_RIGHTS 1
++#define SCM_CREDENTIALS 2
++
++#define SHUT_RD 0
++#define SHUT_WR 1
++#define SHUT_RDWR 2
++
++#ifndef SOCK_STREAM
++#define SOCK_STREAM    1
++#define SOCK_DGRAM     2
++#endif
++
++#define SOCK_RAW       3
++#define SOCK_RDM       4
++#define SOCK_SEQPACKET 5
++#define SOCK_DCCP      6
++#define SOCK_PACKET    10
++
++#ifndef SOCK_CLOEXEC
++#define SOCK_CLOEXEC   02000000
++#define SOCK_NONBLOCK  04000
++#endif
++
++#define PF_UNSPEC       0
++#define PF_LOCAL        1
++#define PF_UNIX         PF_LOCAL
++#define PF_FILE         PF_LOCAL
++#define PF_INET         2
++#define PF_AX25         3
++#define PF_IPX          4
++#define PF_APPLETALK    5
++#define PF_NETROM       6
++#define PF_BRIDGE       7
++#define PF_ATMPVC       8
++#define PF_X25          9
++#define PF_INET6        10
++#define PF_ROSE         11
++#define PF_DECnet       12
++#define PF_NETBEUI      13
++#define PF_SECURITY     14
++#define PF_KEY          15
++#define PF_NETLINK      16
++#define PF_ROUTE        PF_NETLINK
++#define PF_PACKET       17
++#define PF_ASH          18
++#define PF_ECONET       19
++#define PF_ATMSVC       20
++#define PF_RDS          21
++#define PF_SNA          22
++#define PF_IRDA         23
++#define PF_PPPOX        24
++#define PF_WANPIPE      25
++#define PF_LLC          26
++#define PF_IB           27
++#define PF_MPLS         28
++#define PF_CAN          29
++#define PF_TIPC         30
++#define PF_BLUETOOTH    31
++#define PF_IUCV         32
++#define PF_RXRPC        33
++#define PF_ISDN         34
++#define PF_PHONET       35
++#define PF_IEEE802154   36
++#define PF_CAIF         37
++#define PF_ALG          38
++#define PF_NFC          39
++#define PF_VSOCK        40
++#define PF_KCM          41
++#define PF_QIPCRTR      42
++#define PF_SMC          43
++#define PF_XDP          44
++#define PF_MAX          45
++
++#define AF_UNSPEC       PF_UNSPEC
++#define AF_LOCAL        PF_LOCAL
++#define AF_UNIX         AF_LOCAL
++#define AF_FILE         AF_LOCAL
++#define AF_INET         PF_INET
++#define AF_AX25         PF_AX25
++#define AF_IPX          PF_IPX
++#define AF_APPLETALK    PF_APPLETALK
++#define AF_NETROM       PF_NETROM
++#define AF_BRIDGE       PF_BRIDGE
++#define AF_ATMPVC       PF_ATMPVC
++#define AF_X25          PF_X25
++#define AF_INET6        PF_INET6
++#define AF_ROSE         PF_ROSE
++#define AF_DECnet       PF_DECnet
++#define AF_NETBEUI      PF_NETBEUI
++#define AF_SECURITY     PF_SECURITY
++#define AF_KEY          PF_KEY
++#define AF_NETLINK      PF_NETLINK
++#define AF_ROUTE        PF_ROUTE
++#define AF_PACKET       PF_PACKET
++#define AF_ASH          PF_ASH
++#define AF_ECONET       PF_ECONET
++#define AF_ATMSVC       PF_ATMSVC
++#define AF_RDS          PF_RDS
++#define AF_SNA          PF_SNA
++#define AF_IRDA         PF_IRDA
++#define AF_PPPOX        PF_PPPOX
++#define AF_WANPIPE      PF_WANPIPE
++#define AF_LLC          PF_LLC
++#define AF_IB           PF_IB
++#define AF_MPLS         PF_MPLS
++#define AF_CAN          PF_CAN
++#define AF_TIPC         PF_TIPC
++#define AF_BLUETOOTH    PF_BLUETOOTH
++#define AF_IUCV         PF_IUCV
++#define AF_RXRPC        PF_RXRPC
++#define AF_ISDN         PF_ISDN
++#define AF_PHONET       PF_PHONET
++#define AF_IEEE802154   PF_IEEE802154
++#define AF_CAIF         PF_CAIF
++#define AF_ALG          PF_ALG
++#define AF_NFC          PF_NFC
++#define AF_VSOCK        PF_VSOCK
++#define AF_KCM          PF_KCM
++#define AF_QIPCRTR      PF_QIPCRTR
++#define AF_SMC          PF_SMC
++#define AF_XDP          PF_XDP
++#define AF_MAX          PF_MAX
++
++#define SO_DEBUG        1
++#define SO_REUSEADDR    2
++#define SO_TYPE         3
++#define SO_ERROR        4
++#define SO_DONTROUTE    5
++#define SO_BROADCAST    6
++#define SO_SNDBUF       7
++#define SO_RCVBUF       8
++#define SO_KEEPALIVE    9
++#define SO_OOBINLINE    10
++#define SO_NO_CHECK     11
++#define SO_PRIORITY     12
++#define SO_LINGER       13
++#define SO_BSDCOMPAT    14
++#define SO_REUSEPORT    15
++#define SO_PASSCRED     16
++#define SO_PEERCRED     17
++#define SO_RCVLOWAT     18
++#define SO_SNDLOWAT     19
++#define SO_ACCEPTCONN   30
++#define SO_PEERSEC      31
++#define SO_SNDBUFFORCE  32
++#define SO_RCVBUFFORCE  33
++#define SO_PROTOCOL     38
++#define SO_DOMAIN       39
++
++#define SO_RCVTIMEO     20
++#define SO_SNDTIMEO     21
++
++#define SO_TIMESTAMP    29
++#define SO_TIMESTAMPNS  35
++#define SO_TIMESTAMPING 37
++
++#define SO_SECURITY_AUTHENTICATION              22
++#define SO_SECURITY_ENCRYPTION_TRANSPORT        23
++#define SO_SECURITY_ENCRYPTION_NETWORK          24
++
++#define SO_BINDTODEVICE 25
++
++#define SO_ATTACH_FILTER        26
++#define SO_DETACH_FILTER        27
++#define SO_GET_FILTER           SO_ATTACH_FILTER
++
++#define SO_PEERNAME             28
++#define SCM_TIMESTAMP           SO_TIMESTAMP
++#define SO_PASSSEC              34
++#define SCM_TIMESTAMPNS         SO_TIMESTAMPNS
++#define SO_MARK                 36
++#define SCM_TIMESTAMPING        SO_TIMESTAMPING
++#define SO_RXQ_OVFL             40
++#define SO_WIFI_STATUS          41
++#define SCM_WIFI_STATUS         SO_WIFI_STATUS
++#define SO_PEEK_OFF             42
++#define SO_NOFCS                43
++#define SO_LOCK_FILTER          44
++#define SO_SELECT_ERR_QUEUE     45
++#define SO_BUSY_POLL            46
++#define SO_MAX_PACING_RATE      47
++#define SO_BPF_EXTENSIONS       48
++#define SO_INCOMING_CPU         49
++#define SO_ATTACH_BPF           50
++#define SO_DETACH_BPF           SO_DETACH_FILTER
++#define SO_ATTACH_REUSEPORT_CBPF 51
++#define SO_ATTACH_REUSEPORT_EBPF 52
++#define SO_CNX_ADVICE           53
++#define SCM_TIMESTAMPING_OPT_STATS 54
++#define SO_MEMINFO              55
++#define SO_INCOMING_NAPI_ID     56
++#define SO_COOKIE               57
++#define SCM_TIMESTAMPING_PKTINFO 58
++#define SO_PEERGROUPS           59
++#define SO_ZEROCOPY             60
++#define SO_TXTIME               61
++#define SCM_TXTIME              SO_TXTIME
++#define SO_BINDTOIFINDEX        62
++#define SO_DETACH_REUSEPORT_BPF 68
++
++#define SOL_SOCKET      1
++
++#define SOL_IP          0
++#define SOL_IPV6        41
++#define SOL_ICMPV6      58
++
++#define SOL_RAW         255
++#define SOL_DECNET      261
++#define SOL_X25         262
++#define SOL_PACKET      263
++#define SOL_ATM         264
++#define SOL_AAL         265
++#define SOL_IRDA        266
++#define SOL_NETBEUI     267
++#define SOL_LLC         268
++#define SOL_DCCP        269
++#define SOL_NETLINK     270
++#define SOL_TIPC        271
++#define SOL_RXRPC       272
++#define SOL_PPPOL2TP    273
++#define SOL_BLUETOOTH   274
++#define SOL_PNPIPE      275
++#define SOL_RDS         276
++#define SOL_IUCV        277
++#define SOL_CAIF        278
++#define SOL_ALG         279
++#define SOL_NFC         280
++#define SOL_KCM         281
++#define SOL_TLS         282
++#define SOL_XDP         283
++
++#define SOMAXCONN       128
++
++#define MSG_OOB       0x0001
++#define MSG_PEEK      0x0002
++#define MSG_DONTROUTE 0x0004
++#define MSG_CTRUNC    0x0008
++#define MSG_PROXY     0x0010
++#define MSG_TRUNC     0x0020
++#define MSG_DONTWAIT  0x0040
++#define MSG_EOR       0x0080
++#define MSG_WAITALL   0x0100
++#define MSG_FIN       0x0200
++#define MSG_SYN       0x0400
++#define MSG_CONFIRM   0x0800
++#define MSG_RST       0x1000
++#define MSG_ERRQUEUE  0x2000
++#define MSG_NOSIGNAL  0x4000
++#define MSG_MORE      0x8000
++#define MSG_WAITFORONE 0x10000
++#define MSG_BATCH     0x40000
++#define MSG_ZEROCOPY  0x4000000
++#define MSG_FASTOPEN  0x20000000
++#define MSG_CMSG_CLOEXEC 0x40000000
++
++#endif
+diff --git a/abis/cryptix/socklen_t.h b/abis/cryptix/socklen_t.h
+new file mode 100644
+index 00000000..190e5f9f
+--- /dev/null
++++ b/abis/cryptix/socklen_t.h
+@@ -0,0 +1,6 @@
++#ifndef _ABIBITS_SOCKLEN_T_H
++#define _ABIBITS_SOCKLEN_T_H
++
++typedef unsigned socklen_t;
++
++#endif /* _ABIBITS_SOCKLEN_T_H */
+diff --git a/abis/cryptix/stat.h b/abis/cryptix/stat.h
+new file mode 100644
+index 00000000..9b35bfe0
+--- /dev/null
++++ b/abis/cryptix/stat.h
+@@ -0,0 +1,124 @@
++#ifndef _ABIBITS_STAT_H
++#define _ABIBITS_STAT_H
++
++#include <abi-bits/uid_t.h>
++#include <abi-bits/gid_t.h>
++#include <bits/off_t.h>
++#include <abi-bits/mode_t.h>
++#include <abi-bits/dev_t.h>
++#include <abi-bits/ino_t.h>
++#include <abi-bits/blksize_t.h>
++#include <abi-bits/blkcnt_t.h>
++#include <abi-bits/nlink_t.h>
++#include <bits/ansi/time_t.h>
++#include <bits/ansi/timespec.h>
++
++#define S_IFMT 0x0F000
++#define S_IFBLK 0x06000
++#define S_IFCHR 0x02000
++#define S_IFIFO 0x01000
++#define S_IFREG 0x08000
++#define S_IFDIR 0x04000
++#define S_IFLNK 0x0A000
++#define S_IFSOCK 0x0C000
++
++#define S_IRWXU 0700
++#define S_IRUSR 0400
++#define S_IWUSR 0200
++#define S_IXUSR 0100
++#define S_IEXEC S_IXUSR
++#define S_IRWXG 070
++#define S_IRGRP 040
++#define S_IWGRP 020
++#define S_IXGRP 010
++#define S_IRWXO 07
++#define S_IROTH 04
++#define S_IWOTH 02
++#define S_IXOTH 01
++#define S_ISUID 04000
++#define S_ISGID 02000
++#define S_ISVTX 01000
++
++#define S_IREAD  S_IRUSR
++#define S_IWRITE S_IWUSR
++#define S_IEXEC  S_IXUSR
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#if defined(__x86_64__)
++
++struct stat {
++	dev_t st_dev;
++	ino_t st_ino;
++	nlink_t st_nlink;
++	mode_t st_mode;
++	uid_t st_uid;
++	gid_t st_gid;
++	unsigned int __pad0;
++	dev_t st_rdev;
++	off_t st_size;
++	blksize_t st_blksize;
++	blkcnt_t st_blocks;
++	struct timespec st_atim;
++	struct timespec st_mtim;
++	struct timespec st_ctim;
++	long __unused[3];
++};
++
++#elif (defined(__riscv) && __riscv_xlen == 64) || defined (__aarch64__)
++
++struct stat {
++	dev_t st_dev;
++	ino_t st_ino;
++	mode_t st_mode;
++	nlink_t st_nlink;
++	uid_t st_uid;
++	gid_t st_gid;
++	dev_t st_rdev;
++	dev_t __pad1;
++	off_t st_size;
++	blksize_t st_blksize;
++	int __pad2;
++	blkcnt_t st_blocks;
++	struct timespec st_atim;
++	struct timespec st_mtim;
++	struct timespec st_ctim;
++	int __pad3[2];
++};
++
++#elif defined(__i386__)
++
++struct stat {
++	dev_t st_dev;
++	int __st_dev_padding;
++	long __st_ino_truncated;
++	mode_t st_mode;
++	nlink_t st_nlink;
++	uid_t st_uid;
++	gid_t st_gid;
++	dev_t st_rdev;
++	int __st_rdev_padding;
++	off_t st_size;
++	blksize_t st_blksize;
++	blkcnt_t st_blocks;
++	struct {
++		long tv_sec;
++		long tv_nsec;
++	} __st_atim32, __st_mtim32, __st_ctim32;
++	ino_t st_ino;
++	struct timespec st_atim;
++	struct timespec st_mtim;
++	struct timespec st_ctim;
++};
++
++#endif
++
++#define stat64 stat
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif // _ABIBITS_STAT_H
+diff --git a/abis/cryptix/statfs.h b/abis/cryptix/statfs.h
+new file mode 100644
+index 00000000..2f0ffa71
+--- /dev/null
++++ b/abis/cryptix/statfs.h
+@@ -0,0 +1,44 @@
++#ifndef _ABIBITS_STATFS_H
++#define _ABIBITS_STATFS_H
++
++#include <abi-bits/fsblkcnt_t.h>
++#include <abi-bits/fsfilcnt_t.h>
++
++typedef struct __mlibc_fsid {
++	int __val[2];
++} fsid_t;
++
++/* WARNING: keep `statfs` and `statfs64` in sync or bad things will happen! */
++struct statfs {
++	unsigned long f_type;
++	unsigned long f_bsize;
++	fsblkcnt_t f_blocks;
++	fsblkcnt_t f_bfree;
++	fsblkcnt_t f_bavail;
++	fsfilcnt_t f_files;
++	fsfilcnt_t f_ffree;
++	fsid_t f_fsid;
++	unsigned long f_namelen;
++	unsigned long f_frsize;
++	unsigned long f_flags;
++	unsigned long __f_spare[4];
++};
++
++/* WARNING: keep `statfs` and `statfs64` in sync or bad things will happen! */
++struct statfs64 {
++	unsigned long f_type;
++	unsigned long f_bsize;
++	fsblkcnt_t f_blocks;
++	fsblkcnt_t f_bfree;
++	fsblkcnt_t f_bavail;
++	fsfilcnt_t f_files;
++	fsfilcnt_t f_ffree;
++	fsid_t f_fsid;
++	unsigned long f_namelen;
++	unsigned long f_frsize;
++	unsigned long f_flags;
++	unsigned long __f_spare[4];
++};
++
++#endif /* _ABIBITS_STATFS_H */
++
+diff --git a/abis/cryptix/statvfs.h b/abis/cryptix/statvfs.h
+new file mode 100644
+index 00000000..0fd011b4
+--- /dev/null
++++ b/abis/cryptix/statvfs.h
+@@ -0,0 +1,44 @@
++#ifndef _ABIBITS_STATVFS_H
++#define _ABIBITS_STATVFS_H
++
++#include <abi-bits/fsblkcnt_t.h>
++#include <abi-bits/fsfilcnt_t.h>
++
++#define ST_RDONLY 1
++#define ST_NOSUID 2
++#define ST_MANDLOCK 64
++
++// On Linux, this struct is not directly used by the kernel.
++
++/* WARNING: keep `statvfs` and `statvfs64` in sync or bad things will happen! */
++struct statvfs {
++	unsigned long f_bsize;
++	unsigned long f_frsize;
++	fsblkcnt_t f_blocks;
++	fsblkcnt_t f_bfree;
++	fsblkcnt_t f_bavail;
++	fsfilcnt_t f_files;
++	fsfilcnt_t f_ffree;
++	fsfilcnt_t f_favail;
++	unsigned long f_fsid;
++	unsigned long f_flag;
++	unsigned long f_namemax;
++};
++
++/* WARNING: keep `statvfs` and `statvfs64` in sync or bad things will happen! */
++struct statvfs64 {
++	unsigned long f_bsize;
++	unsigned long f_frsize;
++	fsblkcnt_t f_blocks;
++	fsblkcnt_t f_bfree;
++	fsblkcnt_t f_bavail;
++	fsfilcnt_t f_files;
++	fsfilcnt_t f_ffree;
++	fsfilcnt_t f_favail;
++	unsigned long f_fsid;
++	unsigned long f_flag;
++	unsigned long f_namemax;
++};
++
++#endif /* _ABIBITS_STATVFS_H */
++
+diff --git a/abis/cryptix/statx.h b/abis/cryptix/statx.h
+new file mode 100644
+index 00000000..591c4e16
+--- /dev/null
++++ b/abis/cryptix/statx.h
+@@ -0,0 +1,76 @@
++#ifndef _ABIBITS_STATX_H
++#define _ABIBITS_STATX_H
++
++#include <bits/types.h>
++
++struct statx_timestamp
++{
++    __mlibc_int64  tv_sec;
++    __mlibc_uint32 tv_nsec;
++    __mlibc_uint32 __padding;
++};
++
++#define STATX_TYPE            0x1
++#define STATX_MODE            0x2
++#define STATX_NLINK           0x4
++#define STATX_UID             0x8
++#define STATX_GID             0x10
++#define STATX_ATIME           0x20
++#define STATX_MTIME           0x40
++#define STATX_CTIME           0x80
++#define STATX_INO             0x100
++#define STATX_SIZE            0x200
++#define STATX_BLOCKS          0x400
++#define STATX_BASIC_STATS     0x7ff
++#define STATX_BTIME           0x800
++#define STATX_MNT_ID          0x1000
++#define STATX_DIOALIGN        0x2000
++#define STATX_ALL             0xfff
++
++#define STATX_ATTR_COMPRESSED 0x4
++#define STATX_ATTR_IMMUTABLE  0x10
++#define STATX_ATTR_APPEND     0x20
++#define STATX_ATTR_NODUMP     0x40
++#define STATX_ATTR_ENCRYPTED  0x800
++#define STATX_ATTR_AUTOMOUNT  0x1000
++#define STATX_ATTR_MOUNT_ROOT 0x2000
++#define STATX_ATTR_VERITY     0x100000
++#define STATX_ATTR_DAX        0x200000
++
++#define AT_STATX_FORCE_SYNC   0x2000
++#define AT_STATX_DONT_SYNC    0x4000
++
++struct statx
++{
++    __mlibc_uint32         stx_mask;
++
++    __mlibc_uint32         stx_blksize;
++    __mlibc_uint64         stx_attributes;
++    __mlibc_uint32         stx_nlink;
++    __mlibc_uint32         stx_uid;
++    __mlibc_uint32         stx_gid;
++    __mlibc_uint16         stx_mode;
++    __mlibc_uint16         __padding;
++    __mlibc_uint64         stx_ino;
++    __mlibc_uint64         stx_size;
++    __mlibc_uint64         stx_blocks;
++    __mlibc_uint64         stx_attributes_mask;
++
++    struct statx_timestamp stx_atime;
++    struct statx_timestamp stx_btime;
++    struct statx_timestamp stx_ctime;
++    struct statx_timestamp stx_mtime;
++
++    __mlibc_uint32         stx_rdev_major;
++    __mlibc_uint32         stx_rdev_minor;
++    __mlibc_uint32         stx_dev_major;
++    __mlibc_uint32         stx_dev_minor;
++
++    __mlibc_uint64         stx_mnt_id;
++    __mlibc_uint32         stx_dio_mem_align;
++    __mlibc_uint32         stx_dio_offset_align;
++
++    __mlibc_uint64         __padding1[12];
++};
++
++#endif
+diff --git a/abis/cryptix/suseconds_t.h b/abis/cryptix/suseconds_t.h
+new file mode 100644
+index 00000000..1de1a7cb
+--- /dev/null
++++ b/abis/cryptix/suseconds_t.h
+@@ -0,0 +1,8 @@
++#ifndef _ABIBITS_SUSECONDS_T_H
++#define _ABIBITS_SUSECONDS_T_H
++
++#include <bits/types.h>
++
++typedef long suseconds_t;
++
++#endif /* _ABIBITS_SUSECONDS_T_H */
+diff --git a/abis/cryptix/termios.h b/abis/cryptix/termios.h
+new file mode 100644
+index 00000000..3ee43d03
+--- /dev/null
++++ b/abis/cryptix/termios.h
+@@ -0,0 +1,155 @@
++#ifndef _ABIBITS_TERMIOS_H
++#define _ABIBITS_TERMIOS_H
++
++typedef unsigned char cc_t;
++typedef unsigned int speed_t;
++typedef unsigned int tcflag_t;
++
++// indices for the c_cc array in struct termios
++#define NCCS     32
++#define VINTR    0
++#define VQUIT    1
++#define VERASE   2
++#define VKILL    3
++#define VEOF     4
++#define VTIME    5
++#define VMIN     6
++#define VSWTC    7
++#define VSTART   8
++#define VSTOP    9
++#define VSUSP    10
++#define VEOL     11
++#define VREPRINT 12
++#define VDISCARD 13
++#define VWERASE  14
++#define VLNEXT   15
++#define VEOL2    16
++
++// bitwise flags for c_iflag in struct termios
++#define IGNBRK 0000001
++#define BRKINT 0000002
++#define IGNPAR 0000004
++#define PARMRK 0000010
++#define INPCK 0000020
++#define ISTRIP 0000040
++#define INLCR 0000100
++#define IGNCR 0000200
++#define ICRNL 0000400
++#define IUCLC 0001000
++#define IXON 0002000
++#define IXANY 0004000
++#define IXOFF 0010000
++#define IMAXBEL 0020000
++#define IUTF8 0040000
++
++// bitwise flags for c_oflag in struct termios
++#define OPOST 0000001
++#define OLCUC 0000002
++#define ONLCR 0000004
++#define OCRNL 0000010
++#define ONOCR 0000020
++#define ONLRET 0000040
++#define OFILL 0000100
++#define OFDEL 0000200
++
++#if defined(_GNU_SOURCE) || defined(_BSD_SOURCE) || defined(_XOPEN_SOURCE)
++
++#define NLDLY 0000400
++#define NL0 0000000
++#define NL1 0000400
++
++#define CRDLY 0003000
++#define CR0 0000000
++#define CR1 0001000
++#define CR2 0002000
++#define CR3 0003000
++
++#define TABDLY 0014000
++#define TAB0 0000000
++#define TAB1 0004000
++#define TAB2 0010000
++#define TAB3 0014000
++
++#define BSDLY 0020000
++#define BS0 0000000
++#define BS1 0020000
++
++#define FFDLY 0100000
++#define FF0 0000000
++#define FF1 0100000
++
++#endif
++
++#define VTDLY 0040000
++#define VT0 0000000
++#define VT1 0040000
++
++// bitwise constants for c_cflag in struct termios
++#define CSIZE 0000060
++#define CS5 0000000
++#define CS6 0000020
++#define CS7 0000040
++#define CS8 0000060
++
++#define CSTOPB 0000100
++#define CREAD 0000200
++#define PARENB 0000400
++#define PARODD 0001000
++#define HUPCL 0002000
++#define CLOCAL 0004000
++
++// bitwise constants for c_lflag in struct termios
++#define ISIG 0000001
++#define ICANON 0000002
++#define ECHO 0000010
++#define ECHOE 0000020
++#define ECHOK 0000040
++#define ECHONL 0000100
++#define NOFLSH 0000200
++#define TOSTOP 0000400
++#define IEXTEN 0100000
++
++#if defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
++
++#define EXTA    0000016
++#define EXTB    0000017
++#define CBAUD   0010017
++#define CBAUDEX 0010000
++#define CIBAUD  002003600000
++#define CMSPAR  010000000000
++#define CRTSCTS 020000000000
++
++#define XCASE   0000004
++#define ECHOCTL 0001000
++#define ECHOPRT 0002000
++#define ECHOKE  0004000
++#define FLUSHO  0010000
++#define PENDIN  0040000
++#define EXTPROC 0200000
++
++#define XTABS 0014000
++
++#endif
++
++struct termios {
++	tcflag_t c_iflag;
++	tcflag_t c_oflag;
++	tcflag_t c_cflag;
++	tcflag_t c_lflag;
++	cc_t c_line;
++	cc_t c_cc[NCCS];
++	speed_t ibaud;
++	speed_t obaud;
++};
++
++#define NCC 8
++struct termio {
++	unsigned short c_iflag;
++	unsigned short c_oflag;
++	unsigned short c_cflag;
++	unsigned short c_lflag;
++	unsigned char c_line;
++	unsigned char c_cc[NCC];
++};
++
++#endif
+diff --git a/abis/cryptix/time.h b/abis/cryptix/time.h
+new file mode 100644
+index 00000000..3f49db3c
+--- /dev/null
++++ b/abis/cryptix/time.h
+@@ -0,0 +1,15 @@
++#ifndef _ABIBITS_TIME_H
++#define _ABIBITS_TIME_H
++
++#include <bits/posix/timeval.h>
++
++struct itimerval {
++	struct timeval it_interval;	/* Interval for periodic timer */
++	struct timeval it_value;	/* Time until next expiration */
++};
++
++#define ITIMER_REAL	0
++#define ITIMER_VIRTUAL	1
++#define ITIMER_PROF	2
++
++#endif // _ABIBITS_TIME_H
+diff --git a/abis/cryptix/uid_t.h b/abis/cryptix/uid_t.h
+new file mode 100644
+index 00000000..5b53ca30
+--- /dev/null
++++ b/abis/cryptix/uid_t.h
+@@ -0,0 +1,8 @@
++
++#ifndef _ABIBITS_UID_T_H
++#define _ABIBITS_UID_T_H
++
++typedef unsigned int uid_t;
++
++#endif // _ABIBITS_UID_T_H
++
+diff --git a/abis/cryptix/utsname.h b/abis/cryptix/utsname.h
+new file mode 100644
+index 00000000..9875a46e
+--- /dev/null
++++ b/abis/cryptix/utsname.h
+@@ -0,0 +1,13 @@
++#ifndef _ABIBITS_UTSNAME_T_H
++#define _ABIBITS_UTSNAME_T_H
++
++struct utsname {
++	char sysname[65];
++	char nodename[65];
++	char release[65];
++	char version[65];
++	char machine[65];
++	char domainname[65];
++};
++
++#endif // _ABIBITS_UTSNAME_T_H
+diff --git a/abis/cryptix/vm-flags.h b/abis/cryptix/vm-flags.h
+new file mode 100644
+index 00000000..3f8137c6
+--- /dev/null
++++ b/abis/cryptix/vm-flags.h
+@@ -0,0 +1,70 @@
++#ifndef _ABIBITS_VM_FLAGS_H
++#define _ABIBITS_VM_FLAGS_H
++
++#define PROT_NONE  0x00
++#define PROT_READ  0x01
++#define PROT_WRITE 0x02
++#define PROT_EXEC  0x04
++
++#define MAP_FAILED ((void *)(-1))
++#define MAP_FILE    0x00
++#define MAP_SHARED    0x01
++#define MAP_PRIVATE   0x02
++#define MAP_FIXED     0x10
++#define MAP_ANON      0x20
++#define MAP_ANONYMOUS 0x20
++#define MAP_GROWSDOWN 0x100
++#define MAP_DENYWRITE 0x800
++#define MAP_EXECUTABLE 0x1000
++#define MAP_LOCKED    0x2000
++#define MAP_NORESERVE 0x4000
++#define MAP_POPULATE  0x8000
++#define MAP_NONBLOCK  0x10000
++#define MAP_STACK     0x20000
++#define MAP_HUGETLB   0x40000
++#define MAP_SYNC      0x80000
++#define MAP_FIXED_NOREPLACE 0x100000
++
++#define MS_ASYNC 0x01
++#define MS_INVALIDATE 0x02
++#define MS_SYNC 0x04
++
++#define MCL_CURRENT 0x01
++#define MCL_FUTURE 0x02
++
++#define POSIX_MADV_NORMAL 0
++#define POSIX_MADV_RANDOM 1
++#define POSIX_MADV_SEQUENTIAL 2
++#define POSIX_MADV_WILLNEED 3
++#define POSIX_MADV_DONTNEED 4
++
++#define MADV_NORMAL 0
++#define MADV_RANDOM 1
++#define MADV_SEQUENTIAL 2
++#define MADV_WILLNEED 3
++#define MADV_DONTNEED 4
++#define MADV_FREE 8
++#define MADV_REMOVE 9
++#define MADV_DONTFORK 10
++#define MADV_DOFORK 11
++#define MADV_MERGEABLE 12
++#define MADV_UNMERGEABLE 13
++#define MADV_HUGEPAGE 14
++#define MADV_NOHUGEPAGE 15
++#define MADV_DONTDUMP 16
++#define MADV_DODUMP 17
++#define MADV_WIPEONFORK 18
++#define MADV_KEEPONFORK 19
++#define MADV_COLD 20
++#define MADV_PAGEOUT 21
++#define MADV_HWPOISON 100
++#define MADV_SOFT_OFFLINE 101
++
++#define MREMAP_MAYMOVE 1
++#define MREMAP_FIXED 2
++
++#define MFD_CLOEXEC 1U
++#define MFD_ALLOW_SEALING 2U
++#define MFD_HUGETLB 4U
++
++#endif // _ABIBITS_VM_FLAGS_H
+diff --git a/abis/cryptix/vt.h b/abis/cryptix/vt.h
+new file mode 100644
+index 00000000..811933b6
+--- /dev/null
++++ b/abis/cryptix/vt.h
+@@ -0,0 +1,76 @@
++#ifndef _ABIBITS_VT_H
++#define _ABIBITS_VT_H
++
++#define MIN_NR_CONSOLES 1
++#define MAX_NR_CONSOLES 63
++
++#define VT_OPENQRY 0x5600
++#define VT_GETMODE 0x5601
++#define VT_SETMODE 0x5602
++#define VT_GETSTATE 0x5603
++#define VT_SENDSIG 0x5604
++#define VT_RELDISP 0x5605
++#define VT_ACTIVATE 0x5606
++#define VT_WAITACTIVE 0x5607
++#define VT_DISALLOCATE 0x5608
++#define VT_RESIZE 0x5609
++#define VT_RESIZEX 0x560A
++#define VT_LOCKSWITCH 0x560B
++#define VT_UNLOCKSWITCH 0x560C
++#define VT_GETHIFONTMASK 0x560D
++#define VT_WAITEVENT 0x560E
++#define VT_SETACTIVATE 0x560F
++
++struct vt_mode {
++  char mode;
++  char waitv;
++  short relsig;
++  short acqsig;
++  short frsig;
++};
++
++#define VT_AUTO 0x00
++#define VT_PROCESS 0x01
++#define VT_ACKACQ 0x02
++
++struct vt_stat {
++  unsigned short v_active;
++  unsigned short v_signal;
++  unsigned short v_state;
++};
++
++struct vt_sizes {
++  unsigned short v_rows;
++  unsigned short v_cols;
++  unsigned short v_scrollsize;
++};
++
++struct vt_consize {
++  unsigned short v_rows;
++  unsigned short v_cols;
++  unsigned short v_vlin;
++  unsigned short v_clin;
++  unsigned short v_vcol;
++  unsigned short v_ccol;
++};
++
++#define VT_EVENT_SWITCH 0x0001
++#define VT_EVENT_BLANK 0x0002
++#define VT_EVENT_UNBLANK 0x0004
++#define VT_EVENT_RESIZE 0x0008
++#define VT_MAX_EVENT 0x000F
++
++struct vt_event {
++  unsigned int event;
++
++  unsigned int oldev;
++  unsigned int newev;
++  unsigned int pad[4];
++};
++
++struct vt_setactivate {
++  unsigned int console;
++  struct vt_mode mode;
++};
++
++#endif // _ABIBITS_VT_H
+diff --git a/abis/cryptix/wait.h b/abis/cryptix/wait.h
+new file mode 100644
+index 00000000..58d14625
+--- /dev/null
++++ b/abis/cryptix/wait.h
+@@ -0,0 +1,28 @@
++#ifndef _ABIBITS_WAIT_H
++#define _ABIBITS_WAIT_H
++
++#define WNOHANG 1
++#define WUNTRACED 2
++#define WSTOPPED 2
++#define WEXITED 4
++#define WCONTINUED 8
++#define WNOWAIT 0x01000000
++
++#define __WALL 0x40000000
++#define __WCLONE 0x80000000
++
++#define WCOREFLAG 0x80
++
++#define WEXITSTATUS(x) (((x) & 0xff00) >> 8)
++#define WTERMSIG(x) ((x) & 0x7f)
++#define WSTOPSIG(x) WEXITSTATUS(x)
++#define WIFEXITED(x) (WTERMSIG(x) == 0)
++#define WIFSIGNALED(x) (((signed char) (((x) & 0x7f) + 1) >> 1) > 0)
++#define WIFSTOPPED(x) (((x) & 0xff) == 0x7f)
++#define WIFCONTINUED(x) ((x) == 0xffff)
++#define WCOREDUMP(x) ((x) & WCOREFLAG)
++
++/* glibc extension, but also useful for kernels */
++#define W_EXITCODE(ret, sig) (((ret) << 8) | (sig))
++
++#endif //_ABIBITS_WAIT_H
+diff --git a/abis/cryptix/xattr.h b/abis/cryptix/xattr.h
+new file mode 100644
+index 00000000..c0e7fbeb
+--- /dev/null
++++ b/abis/cryptix/xattr.h
+@@ -0,0 +1,21 @@
++#ifndef MLIBC_ABIS_LINUX_XATTR_H
++#define MLIBC_ABIS_LINUX_XATTR_H
++
++/* __USE_KERNEL_XATTR_DEFS is exported when XATTR_* are emitted, and
++ * __UAPI_DEF_XATTR is used to determine the behaviour of the
++ * <linux/xattr.h> header (through <linux/libc-compat.h>), if it's set
++ * to 1, the header exports xattr defines and __USE_KERNEL_XATTR_DEFS.
++ * This applies for pretty much all other defines in libc-compat.h
++ * AFAICT.
++ */
++#ifndef __USE_KERNEL_XATTR_DEFS
++enum {
++	XATTR_CREATE = 1,
++#define XATTR_CREATE XATTR_CREATE
++	XATTR_REPLACE = 2,
++#define XATTR_REPLACE XATTR_REPLACE
++};
++#	define __UAPI_DEF_XATTR 0
++#endif
++
++#endif /* MLIBC_ABIS_LINUX_XATTR_H */
+diff --git a/meson.build b/meson.build
+index c1187a47..087de66d 100644
+--- a/meson.build
++++ b/meson.build
+@@ -201,7 +201,18 @@ libc_include_dirs += include_directories('sysdeps/generic-helpers/include')
+ 
+ # Process sysdeps first, as sysdeps might want to disable unsupported options.
+ provides_bits_syscall_h = false
+-if host_machine.system() == 'linux'
++
++if host_machine.system() == 'cryptix'
++    disable_linux_option = false
++    disable_glibc_option = false
++    disable_posix_option = false
++    disable_ansi_option = false
++    disable_libgcc_dependency = false
++    debug_allocator = true
++    rtld_include_dirs += include_directories('sysdeps/cryptix/include')
++    libc_include_dirs += include_directories('sysdeps/cryptix/include')
++    subdir('sysdeps/cryptix')
++elif host_machine.system() == 'linux'
+ 	provides_bits_syscall_h = true
+ 	rtld_include_dirs += include_directories('sysdeps/linux/include')
+ 	libc_include_dirs += include_directories('sysdeps/linux/include')
+diff --git a/sysdeps/cryptix/entry/entry.cpp b/sysdeps/cryptix/entry/entry.cpp
+new file mode 100644
+index 00000000..72b7f3e0
+--- /dev/null
++++ b/sysdeps/cryptix/entry/entry.cpp
+@@ -0,0 +1,71 @@
++#include <cryptix/syscall.h>
++#include <mlibc/elf/startup.h>
++
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++// defined by the POSIX library
++void                          __mlibc_initLocale();
++
++extern "C"
++{
++    unsigned int __mlibc_dev_major(unsigned long long int __dev)
++    {
++        return ((__dev >> 8) & 0xfff) | ((unsigned int)(__dev >> 32) & ~0xfff);
++    }
++
++    unsigned int __mlibc_dev_minor(unsigned long long int __dev)
++    {
++        return (__dev & 0xff) | ((unsigned int)(__dev >> 12) & ~0xff);
++    }
++
++    unsigned long long int __mlibc_dev_makedev(unsigned int __major,
++                                               unsigned int __minor)
++    {
++        return ((__minor & 0xff) | ((__major & 0xfff) << 8)
++                | (((unsigned long long int)(__minor & ~0xff)) << 12)
++                | (((unsigned long long int)(__major & ~0xfff)) << 32));
++    }
++}
++
++extern "C" uintptr_t*         __dlapi_entrystack();
++extern "C" void               __dlapi_enter(uintptr_t*);
++
++extern char**                 environ;
++static mlibc::exec_stack_data __mlibc_stack_data;
++
++struct LibraryGuard
++{
++    LibraryGuard();
++};
++
++static LibraryGuard guard;
++namespace mlibc
++{
++
++    int sys_anon_allocate(size_t size, void** pointer);
++}
++
++LibraryGuard::LibraryGuard()
++{
++    __mlibc_initLocale();
++
++    // Parse the exec() stack.
++    mlibc::parse_exec_stack(__dlapi_entrystack(), &__mlibc_stack_data);
++    mlibc::set_startup_data(__mlibc_stack_data.argc, __mlibc_stack_data.argv,
++                            __mlibc_stack_data.envp);
++}
++
++extern "C" void __mlibc_entry(uintptr_t* entry_stack,
++                              int        (*main_fn)(int argc, char* argv[],
++                                             char* env[]))
++{
++    __dlapi_enter(entry_stack);
++
++    auto result
++        = main_fn(__mlibc_stack_data.argc, __mlibc_stack_data.argv, environ);
++    exit(result);
++}
+diff --git a/sysdeps/cryptix/entry/thread.cpp b/sysdeps/cryptix/entry/thread.cpp
+new file mode 100644
+index 00000000..8a01eb9a
+--- /dev/null
++++ b/sysdeps/cryptix/entry/thread.cpp
+@@ -0,0 +1,45 @@
++#include <bits/ensure.h>
++#include <errno.h>
++#include <mlibc/all-sysdeps.hpp>
++#include <mlibc/thread.hpp>
++#include <stddef.h>
++#include <stdint.h>
++#include <sys/mman.h>
++
++namespace mlibc
++{
++
++    static constexpr size_t default_stacksize = 0x200000; // 2 mib
++
++    int sys_prepare_stack(void** stack, void* entry, void* user_arg, void* tcb,
++                          size_t* stack_size, size_t* guard_size,
++                          void** stack_base)
++    {
++        (void)tcb;
++        if (!*stack_size) *stack_size = default_stacksize;
++
++        uintptr_t map;
++        if (*stack)
++        {
++            map         = reinterpret_cast<uintptr_t>(*stack);
++            *guard_size = 0;
++        }
++        else
++        {
++            map = reinterpret_cast<uintptr_t>(
++                mmap(nullptr, *stack_size + *guard_size, PROT_NONE,
++                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
++            if (reinterpret_cast<void*>(map) == MAP_FAILED) return EAGAIN;
++            int ret = mprotect(reinterpret_cast<void*>(map + *guard_size),
++                               *stack_size, PROT_READ | PROT_WRITE);
++            if (ret) return EAGAIN;
++        }
++
++        *stack_base = reinterpret_cast<void*>(map);
++        auto sp = reinterpret_cast<uintptr_t*>(map + *guard_size + *stack_size);
++        *--sp   = reinterpret_cast<uintptr_t>(user_arg);
++        *--sp   = reinterpret_cast<uintptr_t>(entry);
++        *stack  = reinterpret_cast<void*>(sp);
++        return 0;
++    }
++} // namespace mlibc
+diff --git a/sysdeps/cryptix/generic/mntent.cpp b/sysdeps/cryptix/generic/mntent.cpp
+new file mode 100644
+index 00000000..51bdceb8
+--- /dev/null
++++ b/sysdeps/cryptix/generic/mntent.cpp
+@@ -0,0 +1,94 @@
++#include <bits/ensure.h>
++#include <errno.h>
++#include <limits.h>
++#include <mntent.h>
++#include <stdio.h>
++#include <string.h>
++
++namespace
++{
++    char*  internal_buf;
++    size_t internal_bufsize;
++} // namespace
++
++#define SENTINEL (char*)&internal_buf
++
++FILE* setmntent(const char* name, const char* mode)
++{
++    return fopen(name, mode);
++}
++
++struct mntent* getmntent(FILE* f)
++{
++    static struct mntent mnt;
++    return getmntent_r(f, &mnt, SENTINEL, 0);
++}
++
++int addmntent(FILE* f, const struct mntent* mnt)
++{
++    if (fseek(f, 0, SEEK_END)) { return 1; }
++    return fprintf(f, "%s\t%s\t%s\t%s\t%d\t%d\n", mnt->mnt_fsname, mnt->mnt_dir,
++                   mnt->mnt_type, mnt->mnt_opts, mnt->mnt_freq, mnt->mnt_passno)
++         < 0;
++}
++
++int endmntent(FILE* f)
++{
++    if (f) { fclose(f); }
++    return 1;
++}
++
++char* hasmntopt(const struct mntent* mnt, const char* opt)
++{
++    return strstr(mnt->mnt_opts, opt);
++}
++
++/* Adapted from musl */
++struct mntent* getmntent_r(FILE* f, struct mntent* mnt, char* linebuf,
++                           int buflen)
++{
++    int    n[8];
++    bool   use_internal = (linebuf == SENTINEL);
++    int    len;
++    size_t i;
++
++    mnt->mnt_freq   = 0;
++    mnt->mnt_passno = 0;
++
++    do {
++        if (use_internal)
++        {
++            getline(&internal_buf, &internal_bufsize, f);
++            linebuf = internal_buf;
++        }
++        else { fgets(linebuf, buflen, f); }
++        if (feof(f) || ferror(f)) { return 0; }
++        if (!strchr(linebuf, '\n'))
++        {
++            fscanf(f, "%*[^\n]%*[\n]");
++            errno = ERANGE;
++            return 0;
++        }
++
++        len = strlen(linebuf);
++        if (len > INT_MAX) { continue; }
++
++        for (i = 0; i < sizeof n / sizeof *n; i++) { n[i] = len; }
++
++        sscanf(linebuf, " %n%*s%n %n%*s%n %n%*s%n %n%*s%n %d %d", n, n + 1,
++               n + 2, n + 3, n + 4, n + 5, n + 6, n + 7, &mnt->mnt_freq,
++               &mnt->mnt_passno);
++    } while (linebuf[n[0]] == '#' || n[1] == len);
++
++    linebuf[n[1]]   = 0;
++    linebuf[n[3]]   = 0;
++    linebuf[n[5]]   = 0;
++    linebuf[n[7]]   = 0;
++
++    mnt->mnt_fsname = linebuf + n[0];
++    mnt->mnt_dir    = linebuf + n[2];
++    mnt->mnt_type   = linebuf + n[4];
++    mnt->mnt_opts   = linebuf + n[6];
++
++    return mnt;
++}
+diff --git a/sysdeps/cryptix/generic/mount.cpp b/sysdeps/cryptix/generic/mount.cpp
+new file mode 100644
+index 00000000..b17de66d
+--- /dev/null
++++ b/sysdeps/cryptix/generic/mount.cpp
+@@ -0,0 +1,18 @@
++#include <bits/ensure.h>
++#include <errno.h>
++#include <sys/mount.h>
++
++int mount(const char* source, const char* target, const char* fstype,
++          unsigned long flags, const void* data)
++{
++    return 0;
++}
++
++int umount(const char* target) { return umount2(target, 0); }
++
++int umount2(const char* target, int flags) { return 0; }
++
++extern "C"
++{
++    int statfs(const char* path, struct statfs* buf) { return 0; }
++}
+diff --git a/sysdeps/cryptix/generic/reboot.cpp b/sysdeps/cryptix/generic/reboot.cpp
+new file mode 100644
+index 00000000..c4ceb444
+--- /dev/null
++++ b/sysdeps/cryptix/generic/reboot.cpp
+@@ -0,0 +1,38 @@
++#include <bits/ensure.h>
++#include <cryptix/reboot.hpp>
++#include <cryptix/syscall.h>
++#include <errno.h>
++#include <sys/reboot.h>
++
++using namespace cryptix;
++
++RebootCmd cryptix_reboot_cmd(unsigned int what)
++{
++    switch (what)
++    {
++        case 0x01234567: return RebootCmd::eRestart;
++        case 0xCDEF0123: return RebootCmd::eHalt;
++        case 0x4321FEDC: return RebootCmd::ePowerOff;
++        case 0xA1B2C3D4: return RebootCmd::eRestart2;
++        case 0xD000FCE2: return RebootCmd::eSuspend;
++        case 0x45584543: return RebootCmd::eKexec;
++
++        default: break;
++    }
++
++    return RebootCmd::eUndefined;
++}
++
++int reboot(int what)
++{
++    auto cmd = cryptix_reboot_cmd(what);
++
++    auto ret = Syscall(SYS_REBOOT, cmd);
++    if (auto e = syscall_error(ret); e)
++    {
++        errno = e;
++        return -1;
++    }
++
++    return 0;
++}
+diff --git a/sysdeps/cryptix/include/abi-bits/access.h b/sysdeps/cryptix/include/abi-bits/access.h
+new file mode 120000
+index 00000000..cb839316
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/access.h
+@@ -0,0 +1 @@
++../../../../abis/linux/access.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/auxv.h b/sysdeps/cryptix/include/abi-bits/auxv.h
+new file mode 120000
+index 00000000..c43f8786
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/auxv.h
+@@ -0,0 +1 @@
++../../../../abis/linux/auxv.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/blkcnt_t.h b/sysdeps/cryptix/include/abi-bits/blkcnt_t.h
+new file mode 120000
+index 00000000..0b0ec270
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/blkcnt_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/blkcnt_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/blksize_t.h b/sysdeps/cryptix/include/abi-bits/blksize_t.h
+new file mode 120000
+index 00000000..7dc8d7cf
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/blksize_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/blksize_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/clockid_t.h b/sysdeps/cryptix/include/abi-bits/clockid_t.h
+new file mode 120000
+index 00000000..6a42da56
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/clockid_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/clockid_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/dev_t.h b/sysdeps/cryptix/include/abi-bits/dev_t.h
+new file mode 120000
+index 00000000..bca881e9
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/dev_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/dev_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/do b/sysdeps/cryptix/include/abi-bits/do
+new file mode 100755
+index 00000000..0c32dae4
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/do
+@@ -0,0 +1,3 @@
++#!/bin/sh
++
++ln -s ../../../../abis/linux/$1.h $1.h
+diff --git a/sysdeps/cryptix/include/abi-bits/epoll.h b/sysdeps/cryptix/include/abi-bits/epoll.h
+new file mode 120000
+index 00000000..eb4b76dc
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/epoll.h
+@@ -0,0 +1 @@
++../../../../abis/linux/epoll.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/errno.h b/sysdeps/cryptix/include/abi-bits/errno.h
+new file mode 120000
+index 00000000..6e507def
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/errno.h
+@@ -0,0 +1 @@
++../../../../abis/linux/errno.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/fcntl.h b/sysdeps/cryptix/include/abi-bits/fcntl.h
+new file mode 120000
+index 00000000..463e2c95
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/fcntl.h
+@@ -0,0 +1 @@
++../../../../abis/linux/fcntl.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/fsblkcnt_t.h b/sysdeps/cryptix/include/abi-bits/fsblkcnt_t.h
+new file mode 120000
+index 00000000..898dfb2f
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/fsblkcnt_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/fsblkcnt_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/fsfilcnt_t.h b/sysdeps/cryptix/include/abi-bits/fsfilcnt_t.h
+new file mode 120000
+index 00000000..791755c9
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/fsfilcnt_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/fsfilcnt_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/gid_t.h b/sysdeps/cryptix/include/abi-bits/gid_t.h
+new file mode 120000
+index 00000000..abce6d69
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/gid_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/gid_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/in.h b/sysdeps/cryptix/include/abi-bits/in.h
+new file mode 120000
+index 00000000..418d1d5c
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/in.h
+@@ -0,0 +1 @@
++../../../../abis/linux/in.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/ino_t.h b/sysdeps/cryptix/include/abi-bits/ino_t.h
+new file mode 120000
+index 00000000..4c20aca2
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/ino_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/ino_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/inotify.h b/sysdeps/cryptix/include/abi-bits/inotify.h
+new file mode 120000
+index 00000000..b5cb2823
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/inotify.h
+@@ -0,0 +1 @@
++../../../../abis/linux/inotify.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/ioctls.h b/sysdeps/cryptix/include/abi-bits/ioctls.h
+new file mode 120000
+index 00000000..595106b6
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/ioctls.h
+@@ -0,0 +1 @@
++../../../../abis/linux/ioctls.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/limits.h b/sysdeps/cryptix/include/abi-bits/limits.h
+new file mode 120000
+index 00000000..6c88db2e
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/limits.h
+@@ -0,0 +1 @@
++../../../../abis/linux/limits.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/mode_t.h b/sysdeps/cryptix/include/abi-bits/mode_t.h
+new file mode 120000
+index 00000000..5d78fdfc
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/mode_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/mode_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/mqueue.h b/sysdeps/cryptix/include/abi-bits/mqueue.h
+new file mode 120000
+index 00000000..fa87b078
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/mqueue.h
+@@ -0,0 +1 @@
++../../../../abis/linux/mqueue.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/msg.h b/sysdeps/cryptix/include/abi-bits/msg.h
+new file mode 120000
+index 00000000..f402b493
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/msg.h
+@@ -0,0 +1 @@
++../../../../abis/linux/msg.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/nlink_t.h b/sysdeps/cryptix/include/abi-bits/nlink_t.h
+new file mode 120000
+index 00000000..bb3b625c
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/nlink_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/nlink_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/packet.h b/sysdeps/cryptix/include/abi-bits/packet.h
+new file mode 120000
+index 00000000..998ef1ab
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/packet.h
+@@ -0,0 +1 @@
++../../../../abis/linux/packet.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/pid_t.h b/sysdeps/cryptix/include/abi-bits/pid_t.h
+new file mode 120000
+index 00000000..baa90f6a
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/pid_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/pid_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/poll.h b/sysdeps/cryptix/include/abi-bits/poll.h
+new file mode 120000
+index 00000000..8ea6a0a3
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/poll.h
+@@ -0,0 +1 @@
++../../../../abis/linux/poll.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/ptrace.h b/sysdeps/cryptix/include/abi-bits/ptrace.h
+new file mode 120000
+index 00000000..b2517b2c
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/ptrace.h
+@@ -0,0 +1 @@
++../../../../abis/linux/ptrace.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/reboot.h b/sysdeps/cryptix/include/abi-bits/reboot.h
+new file mode 120000
+index 00000000..77013a41
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/reboot.h
+@@ -0,0 +1 @@
++../../../../abis/linux/reboot.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/resource.h b/sysdeps/cryptix/include/abi-bits/resource.h
+new file mode 120000
+index 00000000..88d74025
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/resource.h
+@@ -0,0 +1 @@
++../../../../abis/linux/resource.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/seek-whence.h b/sysdeps/cryptix/include/abi-bits/seek-whence.h
+new file mode 120000
+index 00000000..df7bccf0
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/seek-whence.h
+@@ -0,0 +1 @@
++../../../../abis/linux/seek-whence.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/shm.h b/sysdeps/cryptix/include/abi-bits/shm.h
+new file mode 120000
+index 00000000..067d8c4f
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/shm.h
+@@ -0,0 +1 @@
++../../../../abis/linux/shm.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/signal.h b/sysdeps/cryptix/include/abi-bits/signal.h
+new file mode 120000
+index 00000000..4dcb0b7c
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/signal.h
+@@ -0,0 +1 @@
++../../../../abis/linux/signal.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/socket.h b/sysdeps/cryptix/include/abi-bits/socket.h
+new file mode 120000
+index 00000000..f1dc016e
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/socket.h
+@@ -0,0 +1 @@
++../../../../abis/linux/socket.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/socklen_t.h b/sysdeps/cryptix/include/abi-bits/socklen_t.h
+new file mode 120000
+index 00000000..41f3b11f
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/socklen_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/socklen_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/stat.h b/sysdeps/cryptix/include/abi-bits/stat.h
+new file mode 120000
+index 00000000..1f63b41f
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/stat.h
+@@ -0,0 +1 @@
++../../../../abis/linux/stat.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/statfs.h b/sysdeps/cryptix/include/abi-bits/statfs.h
+new file mode 120000
+index 00000000..e3d202f5
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/statfs.h
+@@ -0,0 +1 @@
++../../../../abis/linux/statfs.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/statvfs.h b/sysdeps/cryptix/include/abi-bits/statvfs.h
+new file mode 120000
+index 00000000..1fc80c2a
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/statvfs.h
+@@ -0,0 +1 @@
++../../../../abis/linux/statvfs.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/statx.h b/sysdeps/cryptix/include/abi-bits/statx.h
+new file mode 120000
+index 00000000..a2bc7a84
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/statx.h
+@@ -0,0 +1 @@
++../../../../abis/cryptix/statx.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/suseconds_t.h b/sysdeps/cryptix/include/abi-bits/suseconds_t.h
+new file mode 120000
+index 00000000..9ed65977
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/suseconds_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/suseconds_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/termios.h b/sysdeps/cryptix/include/abi-bits/termios.h
+new file mode 120000
+index 00000000..3881c6c8
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/termios.h
+@@ -0,0 +1 @@
++../../../../abis/cryptix/termios.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/time.h b/sysdeps/cryptix/include/abi-bits/time.h
+new file mode 120000
+index 00000000..2a026257
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/time.h
+@@ -0,0 +1 @@
++../../../../abis/linux/time.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/uid_t.h b/sysdeps/cryptix/include/abi-bits/uid_t.h
+new file mode 120000
+index 00000000..b3067778
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/uid_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/uid_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/utsname.h b/sysdeps/cryptix/include/abi-bits/utsname.h
+new file mode 120000
+index 00000000..b2857547
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/utsname.h
+@@ -0,0 +1 @@
++../../../../abis/linux/utsname.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/vm-flags.h b/sysdeps/cryptix/include/abi-bits/vm-flags.h
+new file mode 120000
+index 00000000..bbe258cf
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/vm-flags.h
+@@ -0,0 +1 @@
++../../../../abis/linux/vm-flags.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/vt.h b/sysdeps/cryptix/include/abi-bits/vt.h
+new file mode 120000
+index 00000000..5798a4ac
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/vt.h
+@@ -0,0 +1 @@
++../../../../abis/linux/vt.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/wait.h b/sysdeps/cryptix/include/abi-bits/wait.h
+new file mode 120000
+index 00000000..feb2840c
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/wait.h
+@@ -0,0 +1 @@
++../../../../abis/linux/wait.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/xattr.h b/sysdeps/cryptix/include/abi-bits/xattr.h
+new file mode 120000
+index 00000000..66412d70
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/xattr.h
+@@ -0,0 +1 @@
++../../../../abis/linux/xattr.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/asm/ioctl.h b/sysdeps/cryptix/include/asm/ioctl.h
+new file mode 100644
+index 00000000..8cbb3645
+--- /dev/null
++++ b/sysdeps/cryptix/include/asm/ioctl.h
+@@ -0,0 +1,105 @@
++/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
++#ifndef _ASM_GENERIC_IOCTL_H
++#define _ASM_GENERIC_IOCTL_H
++
++/* ioctl command encoding: 32 bits total, command in lower 16 bits,
++ * size of the parameter structure in the lower 14 bits of the
++ * upper 16 bits.
++ * Encoding the size of the parameter structure in the ioctl request
++ * is useful for catching programs compiled with old versions
++ * and to avoid overwriting user space outside the user buffer area.
++ * The highest 2 bits are reserved for indicating the ``access mode''.
++ * NOTE: This limits the max parameter size to 16kB -1 !
++ */
++
++/*
++ * The following is for compatibility across the various Linux
++ * platforms.  The generic ioctl numbering scheme doesn't really enforce
++ * a type field.  De facto, however, the top 8 bits of the lower 16
++ * bits are indeed used as a type field, so we might just as well make
++ * this explicit here.  Please be sure to use the decoding macros
++ * below from now on.
++ */
++#define _IOC_NRBITS	8
++#define _IOC_TYPEBITS	8
++
++/*
++ * Let any architecture override either of the following before
++ * including this file.
++ */
++
++#ifndef _IOC_SIZEBITS
++# define _IOC_SIZEBITS	14
++#endif
++
++#ifndef _IOC_DIRBITS
++# define _IOC_DIRBITS	2
++#endif
++
++#define _IOC_NRMASK	((1 << _IOC_NRBITS)-1)
++#define _IOC_TYPEMASK	((1 << _IOC_TYPEBITS)-1)
++#define _IOC_SIZEMASK	((1 << _IOC_SIZEBITS)-1)
++#define _IOC_DIRMASK	((1 << _IOC_DIRBITS)-1)
++
++#define _IOC_NRSHIFT	0
++#define _IOC_TYPESHIFT	(_IOC_NRSHIFT+_IOC_NRBITS)
++#define _IOC_SIZESHIFT	(_IOC_TYPESHIFT+_IOC_TYPEBITS)
++#define _IOC_DIRSHIFT	(_IOC_SIZESHIFT+_IOC_SIZEBITS)
++
++/*
++ * Direction bits, which any architecture can choose to override
++ * before including this file.
++ *
++ * NOTE: _IOC_WRITE means userland is writing and kernel is
++ * reading. _IOC_READ means userland is reading and kernel is writing.
++ */
++
++#ifndef _IOC_NONE
++# define _IOC_NONE	0U
++#endif
++
++#ifndef _IOC_WRITE
++# define _IOC_WRITE	1U
++#endif
++
++#ifndef _IOC_READ
++# define _IOC_READ	2U
++#endif
++
++#define _IOC(dir,type,nr,size) \
++	(((dir)  << _IOC_DIRSHIFT) | \
++	 ((type) << _IOC_TYPESHIFT) | \
++	 ((nr)   << _IOC_NRSHIFT) | \
++	 ((size) << _IOC_SIZESHIFT))
++
++#define _IOC_TYPECHECK(t) (sizeof(t))
++
++/*
++ * Used to create numbers.
++ *
++ * NOTE: _IOW means userland is writing and kernel is reading. _IOR
++ * means userland is reading and kernel is writing.
++ */
++#define _IO(type,nr)		_IOC(_IOC_NONE,(type),(nr),0)
++#define _IOR(type,nr,size)	_IOC(_IOC_READ,(type),(nr),(_IOC_TYPECHECK(size)))
++#define _IOW(type,nr,size)	_IOC(_IOC_WRITE,(type),(nr),(_IOC_TYPECHECK(size)))
++#define _IOWR(type,nr,size)	_IOC(_IOC_READ|_IOC_WRITE,(type),(nr),(_IOC_TYPECHECK(size)))
++#define _IOR_BAD(type,nr,size)	_IOC(_IOC_READ,(type),(nr),sizeof(size))
++#define _IOW_BAD(type,nr,size)	_IOC(_IOC_WRITE,(type),(nr),sizeof(size))
++#define _IOWR_BAD(type,nr,size)	_IOC(_IOC_READ|_IOC_WRITE,(type),(nr),sizeof(size))
++
++/* used to decode ioctl numbers.. */
++#define _IOC_DIR(nr)		(((nr) >> _IOC_DIRSHIFT) & _IOC_DIRMASK)
++#define _IOC_TYPE(nr)		(((nr) >> _IOC_TYPESHIFT) & _IOC_TYPEMASK)
++#define _IOC_NR(nr)		(((nr) >> _IOC_NRSHIFT) & _IOC_NRMASK)
++#define _IOC_SIZE(nr)		(((nr) >> _IOC_SIZESHIFT) & _IOC_SIZEMASK)
++
++/* ...and for the drivers/sound files... */
++
++#define IOC_IN		(_IOC_WRITE << _IOC_DIRSHIFT)
++#define IOC_OUT		(_IOC_READ << _IOC_DIRSHIFT)
++#define IOC_INOUT	((_IOC_WRITE|_IOC_READ) << _IOC_DIRSHIFT)
++#define IOCSIZE_MASK	(_IOC_SIZEMASK << _IOC_SIZESHIFT)
++#define IOCSIZE_SHIFT	(_IOC_SIZESHIFT)
++
++#endif /* _ASM_GENERIC_IOCTL_H */
+diff --git a/sysdeps/cryptix/include/asm/ioctls.h b/sysdeps/cryptix/include/asm/ioctls.h
+new file mode 100644
+index 00000000..bdbba9bf
+--- /dev/null
++++ b/sysdeps/cryptix/include/asm/ioctls.h
+@@ -0,0 +1,121 @@
++/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
++#ifndef __ASM_GENERIC_IOCTLS_H
++#define __ASM_GENERIC_IOCTLS_H
++
++#include <asm/ioctl.h>
++
++/*
++ * These are the most common definitions for tty ioctl numbers.
++ * Most of them do not use the recommended _IOC(), but there is
++ * probably some source code out there hardcoding the number,
++ * so we might as well use them for all new platforms.
++ *
++ * The architectures that use different values here typically
++ * try to be compatible with some Unix variants for the same
++ * architecture.
++ */
++
++/* 0x54 is just a magic number to make these relatively unique ('T') */
++
++#define TCGETS		0x5401
++#define TCSETS		0x5402
++#define TCSETSW		0x5403
++#define TCSETSF		0x5404
++#define TCGETA		0x5405
++#define TCSETA		0x5406
++#define TCSETAW		0x5407
++#define TCSETAF		0x5408
++#define TCSBRK		0x5409
++#define TCXONC		0x540A
++#define TCFLSH		0x540B
++#define TIOCEXCL	0x540C
++#define TIOCNXCL	0x540D
++#define TIOCSCTTY	0x540E
++#define TIOCGPGRP	0x540F
++#define TIOCSPGRP	0x5410
++#define TIOCOUTQ	0x5411
++#define TIOCSTI		0x5412
++#define TIOCGWINSZ	0x5413
++#define TIOCSWINSZ	0x5414
++#define TIOCMGET	0x5415
++#define TIOCMBIS	0x5416
++#define TIOCMBIC	0x5417
++#define TIOCMSET	0x5418
++#define TIOCGSOFTCAR	0x5419
++#define TIOCSSOFTCAR	0x541A
++#define FIONREAD	0x541B
++#define TIOCINQ		FIONREAD
++#define TIOCLINUX	0x541C
++#define TIOCCONS	0x541D
++#define TIOCGSERIAL	0x541E
++#define TIOCSSERIAL	0x541F
++#define TIOCPKT		0x5420
++#define FIONBIO		0x5421
++#define TIOCNOTTY	0x5422
++#define TIOCSETD	0x5423
++#define TIOCGETD	0x5424
++#define TCSBRKP		0x5425	/* Needed for POSIX tcsendbreak() */
++#define TIOCSBRK	0x5427  /* BSD compatibility */
++#define TIOCCBRK	0x5428  /* BSD compatibility */
++#define TIOCGSID	0x5429  /* Return the session ID of FD */
++#define TCGETS2		_IOR('T', 0x2A, struct termios2)
++#define TCSETS2		_IOW('T', 0x2B, struct termios2)
++#define TCSETSW2	_IOW('T', 0x2C, struct termios2)
++#define TCSETSF2	_IOW('T', 0x2D, struct termios2)
++#define TIOCGRS485	0x542E
++#ifndef TIOCSRS485
++#define TIOCSRS485	0x542F
++#endif
++#define TIOCGPTN	_IOR('T', 0x30, unsigned int) /* Get Pty Number (of pty-mux device) */
++#define TIOCSPTLCK	_IOW('T', 0x31, int)  /* Lock/unlock Pty */
++#define TIOCGDEV	_IOR('T', 0x32, unsigned int) /* Get primary device node of /dev/console */
++#define TCGETX		0x5432 /* SYS5 TCGETX compatibility */
++#define TCSETX		0x5433
++#define TCSETXF		0x5434
++#define TCSETXW		0x5435
++#define TIOCSIG		_IOW('T', 0x36, int)  /* pty: generate signal */
++#define TIOCVHANGUP	0x5437
++#define TIOCGPKT	_IOR('T', 0x38, int) /* Get packet mode state */
++#define TIOCGPTLCK	_IOR('T', 0x39, int) /* Get Pty lock state */
++#define TIOCGEXCL	_IOR('T', 0x40, int) /* Get exclusive mode state */
++#define TIOCGPTPEER	_IO('T', 0x41) /* Safely open the slave */
++#define TIOCGISO7816	_IOR('T', 0x42, struct serial_iso7816)
++#define TIOCSISO7816	_IOWR('T', 0x43, struct serial_iso7816)
++
++#define FIONCLEX	0x5450
++#define FIOCLEX		0x5451
++#define FIOASYNC	0x5452
++#define TIOCSERCONFIG	0x5453
++#define TIOCSERGWILD	0x5454
++#define TIOCSERSWILD	0x5455
++#define TIOCGLCKTRMIOS	0x5456
++#define TIOCSLCKTRMIOS	0x5457
++#define TIOCSERGSTRUCT	0x5458 /* For debugging only */
++#define TIOCSERGETLSR   0x5459 /* Get line status register */
++#define TIOCSERGETMULTI 0x545A /* Get multiport config  */
++#define TIOCSERSETMULTI 0x545B /* Set multiport config */
++
++#define TIOCMIWAIT	0x545C	/* wait for a change on serial input line(s) */
++#define TIOCGICOUNT	0x545D	/* read serial port __inline__ interrupt counts */
++
++/*
++ * Some arches already define FIOQSIZE due to a historical
++ * conflict with a Hayes modem-specific ioctl value.
++ */
++#ifndef FIOQSIZE
++# define FIOQSIZE	0x5460
++#endif
++
++/* Used for packet mode */
++#define TIOCPKT_DATA		 0
++#define TIOCPKT_FLUSHREAD	 1
++#define TIOCPKT_FLUSHWRITE	 2
++#define TIOCPKT_STOP		 4
++#define TIOCPKT_START		 8
++#define TIOCPKT_NOSTOP		16
++#define TIOCPKT_DOSTOP		32
++#define TIOCPKT_IOCTL		64
++
++#define TIOCSER_TEMT	0x01	/* Transmitter physically empty */
++
++#endif /* __ASM_GENERIC_IOCTLS_H */
+diff --git a/sysdeps/cryptix/include/cryptix/reboot.hpp b/sysdeps/cryptix/include/cryptix/reboot.hpp
+new file mode 100644
+index 00000000..6eb97384
+--- /dev/null
++++ b/sysdeps/cryptix/include/cryptix/reboot.hpp
+@@ -0,0 +1,15 @@
++#pragma once
++
++namespace cryptix
++{
++    enum class RebootCmd
++    {
++        eRestart   = 0,
++        eHalt      = 1,
++        ePowerOff  = 2,
++        eRestart2  = 3,
++        eSuspend   = 4,
++        eKexec     = 5,
++        eUndefined = -1,
++    };
++};
+diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
+new file mode 100644
+index 00000000..f8eeb036
+--- /dev/null
++++ b/sysdeps/cryptix/include/cryptix/syscall.h
+@@ -0,0 +1,196 @@
++#include <cstddef>
++#include <cstdint>
++
++#define SyscallInvoker "syscall"
++
++#define STUB(signature)                                                        \
++    signature { sys_libc_log(#signature "is a stub!"); }
++#define STUB_RET(signature)                                                    \
++    signature                                                                  \
++    {                                                                          \
++        sys_libc_log(#signature " is a stub!");                                \
++        return 0;                                                              \
++    }
++
++inline int syscall_error(intptr_t ret)
++{
++    auto v = static_cast<intptr_t>(ret);
++    if (static_cast<uintptr_t>(v) > -4096ul) return -v;
++    return 0;
++}
++
++#pragma region
++constexpr size_t SYS_READ          = 0;
++constexpr size_t SYS_WRITE         = 1;
++constexpr size_t SYS_OPEN          = 2;
++constexpr size_t SYS_CLOSE         = 3;
++constexpr size_t SYS_STAT          = 4;
++constexpr size_t SYS_FSTAT         = 5;
++constexpr size_t SYS_LSTAT         = 6;
++constexpr size_t SYS_LSEEK         = 8;
++constexpr size_t SYS_MMAP          = 9;
++constexpr size_t SYS_MPROTECT      = 10;
++constexpr size_t SYS_MUNMAP        = 11;
++constexpr size_t SYS_IOCTL         = 16;
++constexpr size_t SYS_ACCESS        = 21;
++constexpr size_t SYS_PIPE          = 22;
++constexpr size_t SYS_DUP           = 32;
++constexpr size_t SYS_DUP2          = 33;
++constexpr size_t SYS_NANOSLEEP     = 35;
++constexpr size_t SYS_GETPID        = 39;
++constexpr size_t SYS_FORK          = 57;
++constexpr size_t SYS_EXECVE        = 59;
++constexpr size_t SYS_EXIT          = 60;
++constexpr size_t SYS_WAIT4         = 61;
++constexpr size_t SYS_UNAME         = 63;
++constexpr size_t SYS_FCNTL         = 72;
++constexpr size_t SYS_GETCWD        = 79;
++constexpr size_t SYS_CHDIR         = 80;
++constexpr size_t SYS_FCHDIR        = 81;
++constexpr size_t SYS_MKDIR         = 83;
++constexpr size_t SYS_CREAT         = 85;
++constexpr size_t SYS_UMASK         = 95;
++constexpr size_t SYS_GETRLIMIT     = 97;
++constexpr size_t SYS_GETRUSAGE     = 98;
++constexpr size_t SYS_GETUID        = 102;
++constexpr size_t SYS_GETGID        = 104;
++constexpr size_t SYS_GETEUID       = 107;
++constexpr size_t SYS_GETEGID       = 108;
++constexpr size_t SYS_SETPGID       = 109;
++constexpr size_t SYS_GETPPID       = 110;
++constexpr size_t SYS_SETSID        = 112;
++constexpr size_t SYS_GETPGID       = 121;
++constexpr size_t SYS_GETSID        = 124;
++constexpr size_t SYS_ARCH_PRCTL    = 158;
++constexpr size_t SYS_MOUNT         = 165;
++constexpr size_t SYS_UMOUNT        = 166;
++constexpr size_t SYS_REBOOT        = 169;
++constexpr size_t SYS_GETDENTS64    = 217;
++constexpr size_t SYS_CLOCK_GETTIME = 228;
++constexpr size_t SYS_PANIC         = 255;
++constexpr size_t SYS_OPENAT        = 257;
++constexpr size_t SYS_FSTATAT       = 262;
++constexpr size_t SYS_FCHMODAT      = 268;
++
++#pragma endregion
++
++static inline uintptr_t SyscallAsm0(uintptr_t n)
++{
++
++    uintptr_t ret;
++    asm volatile(SyscallInvoker : "=a"(ret) : "a"(n) : "rcx", "r11", "memory");
++    return ret;
++}
++
++static inline uintptr_t SyscallAsm1(uintptr_t n, uintptr_t a1)
++{
++    uintptr_t ret;
++    asm volatile(SyscallInvoker
++                 : "=a"(ret)
++                 : "a"(n), "D"(a1)
++                 : "rcx", "r11", "memory");
++    return ret;
++}
++
++static inline uintptr_t SyscallAsm2(uintptr_t n, uintptr_t a1, uintptr_t a2)
++{
++    uintptr_t ret;
++    asm volatile(SyscallInvoker
++                 : "=a"(ret)
++                 : "a"(n), "D"(a1), "S"(a2)
++                 : "rcx", "r11", "memory");
++    return ret;
++}
++
++static inline uintptr_t SyscallAsm3(uintptr_t n, uintptr_t a1, uintptr_t a2,
++                                    uintptr_t a3)
++{
++    uintptr_t ret;
++    asm volatile(SyscallInvoker
++                 : "=a"(ret)
++                 : "a"(n), "D"(a1), "S"(a2), "d"(a3)
++                 : "rcx", "r11", "memory");
++    return ret;
++}
++
++static inline uintptr_t SyscallAsm4(uintptr_t n, uintptr_t a1, uintptr_t a2,
++                                    uintptr_t a3, uintptr_t a4)
++{
++    uintptr_t          ret;
++    register uintptr_t r10 asm("r10") = a4;
++    asm volatile(SyscallInvoker
++                 : "=a"(ret)
++                 : "a"(n), "D"(a1), "S"(a2), "d"(a3), "r"(r10)
++                 : "rcx", "r11", "memory");
++    return ret;
++}
++
++static inline uintptr_t SyscallAsm5(uintptr_t n, uintptr_t a1, uintptr_t a2,
++                                    uintptr_t a3, uintptr_t a4, uintptr_t a5)
++{
++    uintptr_t          ret;
++    register uintptr_t r10 asm("r10") = a4;
++    register uintptr_t r8 asm("r8")   = a5;
++    asm volatile(SyscallInvoker
++                 : "=a"(ret)
++                 : "a"(n), "D"(a1), "S"(a2), "d"(a3), "r"(r10), "r"(r8)
++                 : "rcx", "r11", "memory");
++    return ret;
++}
++
++static inline uintptr_t SyscallAsm6(uintptr_t n, uintptr_t a1, uintptr_t a2,
++                                    uintptr_t a3, uintptr_t a4, uintptr_t a5,
++                                    uintptr_t a6)
++{
++    uintptr_t          ret;
++    register uintptr_t r10 asm("r10") = a4;
++    register uintptr_t r8 asm("r8")   = a5;
++    register uintptr_t r9 asm("r9")   = a6;
++    asm volatile(SyscallInvoker
++                 : "=a"(ret)
++                 : "a"(n), "D"(a1), "S"(a2), "d"(a3), "r"(r10), "r"(r8), "r"(r9)
++                 : "rcx", "r11", "memory");
++    return ret;
++}
++
++#define GetMacro(_1, _2, _3, _4, _5, _6, _7, NAME, ...) NAME
++#define InvokeSyscall(...)                                                     \
++    GetMacro(__VA_ARGS__, SyscallAsm6, SyscallAsm5, SyscallAsm4, SyscallAsm3,  \
++             SyscallAsm2, SyscallAsm1, SyscallAsm0)(__VA_ARGS__)
++
++inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1, uintptr_t a2,
++                           uintptr_t a3, uintptr_t a4, uintptr_t a5,
++                           uintptr_t a6)
++{
++    return InvokeSyscall(n, a1, a2, a3, a4, a5, a6);
++}
++inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1, uintptr_t a2,
++                           uintptr_t a3, uintptr_t a4, uintptr_t a5)
++{
++    return InvokeSyscall(n, a1, a2, a3, a4, a5);
++}
++inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1, uintptr_t a2,
++                           uintptr_t a3, uintptr_t a4)
++{
++    return InvokeSyscall(n, a1, a2, a3, a4);
++}
++inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1, uintptr_t a2,
++                           uintptr_t a3)
++{
++    return InvokeSyscall(n, a1, a2, a3);
++}
++inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1, uintptr_t a2)
++{
++    return InvokeSyscall(n, a1, a2);
++}
++inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1)
++{
++    return InvokeSyscall(n, a1);
++}
++inline uintptr_t DoSyscall(uintptr_t n) { return InvokeSyscall(n); }
++
++template <typename... Args>
++inline uintptr_t Syscall(Args&&... args)
++{
++    return DoSyscall(uintptr_t(args)...);
++}
+diff --git a/sysdeps/cryptix/include/mntent.h b/sysdeps/cryptix/include/mntent.h
+new file mode 100644
+index 00000000..bafd289e
+--- /dev/null
++++ b/sysdeps/cryptix/include/mntent.h
+@@ -0,0 +1,50 @@
++#ifndef _MNTENT_H
++#define _MNTENT_H
++
++#include <stdio.h>
++
++// TODO: Refer to _PATH_MOUNTED
++#define MOUNTED "/etc/mtab"
++
++/* Generic mount options */
++#define MNTOPT_DEFAULTS "defaults"		/* Use all default options. */
++#define MNTOPT_RO       "ro"			/* Read only. */
++#define MNTOPT_RW       "rw"			/* Read/write. */
++#define MNTOPT_SUID     "suid"			/* Set uid allowed. */
++#define MNTOPT_NOSUID   "nosuid"		/* No set uid allowed. */
++#define MNTOPT_NOAUTO   "noauto"		/* Do not auto mount. */
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++struct mntent {
++	char *mnt_fsname;
++	char *mnt_dir;
++	char *mnt_type;
++	char *mnt_opts;
++	int mnt_freq;
++	int mnt_passno;
++};
++
++#ifndef __MLIBC_ABI_ONLY
++
++FILE *setmntent(const char *, const char *);
++
++struct mntent *getmntent(FILE *);
++
++int addmntent(FILE *, const struct mntent *);
++
++int endmntent(FILE *);
++
++char *hasmntopt(const struct mntent *, const char *);
++
++struct mntent *getmntent_r(FILE *, struct mntent *,  char *, int);
++
++#endif /* !__MLIBC_ABI_ONLY */
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif // _MNTENT_H
+diff --git a/sysdeps/cryptix/include/sys/mount.h b/sysdeps/cryptix/include/sys/mount.h
+new file mode 100644
+index 00000000..b19f3d7e
+--- /dev/null
++++ b/sysdeps/cryptix/include/sys/mount.h
+@@ -0,0 +1,54 @@
++#ifndef _SYS_MOUNT_H
++#define _SYS_MOUNT_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#define MS_RDONLY 1
++#define MS_NOSUID 2
++#define MS_NODEV 4
++#define MS_NOEXEC 8
++#define MS_SYNCHRONOUS 16
++#define MS_REMOUNT 32
++#define MS_MANDLOCK 64
++#define MS_DIRSYNC 128
++#define MS_NOSYMFOLLOW 256
++#define MS_NOATIME 1024
++#define MS_NODIRATIME 2048
++#define MS_BIND 4096
++#define MS_MOVE 8192
++#define MS_REC 16384
++#define MS_SILENT 32768
++#define MS_POSIXACL (1 << 16)
++#define MS_UNBINDABLE (1 << 17)
++#define MS_PRIVATE (1 << 18)
++#define MS_SLAVE (1 << 19)
++#define MS_SHARED (1 << 20)
++#define MS_RELATIME (1 << 21)
++#define MS_KERNMOUNT (1 << 22)
++#define MS_I_VERSION (1 << 23)
++#define MS_STRICTATIME (1 << 24)
++#define MS_LAZYTIME (1 << 25)
++#define MS_NOREMOTELOCK (1 << 27)
++#define MS_NOSEC (1 << 28)
++#define MS_BORN (1 << 29)
++#define MS_ACTIVE (1 << 30)
++#define MS_NOUSER (1 << 31)
++
++#define MNT_FORCE 1
++
++#ifndef __MLIBC_ABI_ONLY
++
++int mount(const char *source, const char *target,
++		const char *fstype, unsigned long flags, const void *data);
++int umount(const char *target);
++int umount2(const char *target, int flags);
++
++#endif /* !__MLIBC_ABI_ONLY */
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif // _SYS_MOUNT_H
+diff --git a/sysdeps/cryptix/include/sys/reboot.h b/sysdeps/cryptix/include/sys/reboot.h
+new file mode 100644
+index 00000000..6c4e4959
+--- /dev/null
++++ b/sysdeps/cryptix/include/sys/reboot.h
+@@ -0,0 +1,20 @@
++#ifndef MLIBC_SYS_REBOOT_H
++#define MLIBC_SYS_REBOOT_H
++
++#include <abi-bits/reboot.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#ifndef __MLIBC_ABI_ONLY
++
++int reboot(int arg);
++
++#endif /* !__MLIBC_ABI_ONLY */
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif // MLIBC_SYS_REBOOT_H
+diff --git a/sysdeps/cryptix/include/sys/statfs.h b/sysdeps/cryptix/include/sys/statfs.h
+new file mode 120000
+index 00000000..785b00a4
+--- /dev/null
++++ b/sysdeps/cryptix/include/sys/statfs.h
+@@ -0,0 +1 @@
++../../../../options/linux/include/sys/statfs.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/sys/sysmacros.h b/sysdeps/cryptix/include/sys/sysmacros.h
+new file mode 100644
+index 00000000..1d81ef56
+--- /dev/null
++++ b/sysdeps/cryptix/include/sys/sysmacros.h
+@@ -0,0 +1,24 @@
++#ifndef _SYS_SYSMACROS_H
++#define _SYS_SYSMACROS_H
++
++#ifdef __cplusplus
++extern "C"
++{
++#endif
++
++    unsigned int           __mlibc_dev_major(unsigned long long int __dev);
++
++    unsigned int           __mlibc_dev_minor(unsigned long long int __dev);
++
++    unsigned long long int __mlibc_dev_makedev(unsigned int __major,
++                                               unsigned int __minor);
++
++#define major(dev)            __mlibc_dev_major(dev)
++#define minor(dev)            __mlibc_dev_minor(dev)
++#define makedev(major, minor) __mlibc_dev_makedev(major, minor)
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif // _SYS_SYSMACROS_H
+diff --git a/sysdeps/cryptix/include/sys/vfs.h b/sysdeps/cryptix/include/sys/vfs.h
+new file mode 120000
+index 00000000..aca87dd7
+--- /dev/null
++++ b/sysdeps/cryptix/include/sys/vfs.h
+@@ -0,0 +1 @@
++../../../../options/linux/include/sys/vfs.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
+new file mode 100644
+index 00000000..8dc0f578
+--- /dev/null
++++ b/sysdeps/cryptix/meson.build
+@@ -0,0 +1,127 @@
++sysdep_supported_options = {
++  'posix': true,
++  'linux': true,
++  'glibc': true,
++  'bsd': true,
++  'ansi': true,
++}
++
++common_sources = files(
++  'sysdeps/internal.cpp',
++  'sysdeps/memory.cpp',
++  'sysdeps/process.cpp',
++  'sysdeps/signal.cpp',
++  'sysdeps/system.cpp',
++  'sysdeps/time.cpp',
++  'sysdeps/vfs.cpp',
++)
++
++rtld_dso_sources += common_sources
++libc_sources += files(
++  'entry/entry.cpp',
++
++  #'generic/mntent.cpp',
++  #'generic/mount.cpp',
++  #'generic/reboot.cpp',
++)
++libc_sources += common_sources
++
++
++if not no_headers
++  install_headers(
++    'include/abi-bits/auxv.h',
++    'include/abi-bits/seek-whence.h',
++    'include/abi-bits/vm-flags.h',
++    'include/abi-bits/errno.h',
++    'include/abi-bits/fcntl.h',
++    'include/abi-bits/in.h',
++    'include/abi-bits/stat.h',
++    'include/abi-bits/statx.h',
++    'include/abi-bits/signal.h',
++    'include/abi-bits/reboot.h',
++    'include/abi-bits/resource.h',
++    'include/abi-bits/socket.h',
++    'include/abi-bits/termios.h',
++    'include/abi-bits/time.h',
++    'include/abi-bits/blkcnt_t.h',
++    'include/abi-bits/blksize_t.h',
++    'include/abi-bits/dev_t.h',
++    'include/abi-bits/gid_t.h',
++    'include/abi-bits/ino_t.h',
++    'include/abi-bits/mode_t.h',
++    'include/abi-bits/nlink_t.h',
++    'include/abi-bits/pid_t.h',
++    'include/abi-bits/uid_t.h',
++    'include/abi-bits/access.h',
++    'include/abi-bits/wait.h',
++    'include/abi-bits/limits.h',
++    'include/abi-bits/utsname.h',
++    'include/abi-bits/ptrace.h',
++    'include/abi-bits/vt.h',
++    'include/abi-bits/ptrace.h',
++    'include/abi-bits/poll.h',
++    'include/abi-bits/epoll.h',
++    'include/abi-bits/packet.h',
++    'include/abi-bits/inotify.h',
++    'include/abi-bits/clockid_t.h',
++    'include/abi-bits/shm.h',
++    'include/abi-bits/mqueue.h',
++    'include/abi-bits/suseconds_t.h',
++    'include/abi-bits/fsfilcnt_t.h',
++    'include/abi-bits/fsblkcnt_t.h',
++    'include/abi-bits/socklen_t.h',
++    'include/abi-bits/statfs.h',
++    'include/abi-bits/statvfs.h',
++    'include/abi-bits/ioctls.h',
++    'include/abi-bits/xattr.h',
++    'include/abi-bits/msg.h',
++    subdir: 'abi-bits',
++    follow_symlinks: true,
++  )
++  install_headers('include/cryptix/syscall.h', 'include/cryptix/reboot.hpp', subdir: 'cryptix')
++
++  install_headers(
++    'include/sys/reboot.h',
++	'include/sys/mount.h',
++	'include/sys/sysmacros.h',
++    'include/sys/statfs.h',
++    'include/sys/vfs.h',
++    subdir: 'sys')
++
++  install_headers(
++	'include/mntent.h',
++  )
++    
++endif
++
++if not headers_only
++  crt = custom_target(
++    'crt0',
++    build_by_default: true,
++    command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
++    input: host_machine.cpu_family() / 'crt0.S',
++    output: 'crt0.o',
++    install: true,
++    install_dir: get_option('libdir'),
++  )
++
++  custom_target(
++    'crti',
++    build_by_default: true,
++    command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
++    input: host_machine.cpu_family() / 'crti.S',
++    output: 'crti.o',
++    install: true,
++    install_dir: get_option('libdir'),
++  )
++
++  custom_target(
++    'crtn',
++    build_by_default: true,
++    command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
++    input: host_machine.cpu_family() / 'crtn.S',
++    output: 'crtn.o',
++    install: true,
++    install_dir: get_option('libdir'),
++  )
++endif
+diff --git a/sysdeps/cryptix/sysdeps/internal.cpp b/sysdeps/cryptix/sysdeps/internal.cpp
+new file mode 100644
+index 00000000..0515571b
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/internal.cpp
+@@ -0,0 +1,54 @@
++#include <cstddef>
++#include <stdio.h>
++#include <stdlib.h>
++
++#include <cryptix/syscall.h>
++
++#include <execinfo.h>
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++
++#include <sys/mman.h>
++
++namespace mlibc
++{
++    void sys_libc_log(const char* message)
++    {
++        static constexpr char MLIBC_SIG[] = "[mlibc]: ";
++
++        size_t                len         = strlen(message) + 1;
++        char*                 messageEOL
++            = reinterpret_cast<char*>(alloca(len + sizeof(MLIBC_SIG)));
++
++        memcpy(messageEOL, MLIBC_SIG, sizeof(MLIBC_SIG) - 1);
++        memcpy(messageEOL + sizeof(MLIBC_SIG) - 1, message, len);
++        len += sizeof(MLIBC_SIG) - 1;
++
++        messageEOL[len - 1] = '\n';
++        Syscall(SYS_WRITE, 1, messageEOL, len);
++    }
++    [[noreturn]] void sys_libc_panic()
++    {
++        Syscall(SYS_PANIC, "mlibc crashed");
++
++        __builtin_unreachable();
++    }
++
++    STUB_RET(int sys_clone([[maybe_unused]] void*  tcb,
++                           [[maybe_unused]] pid_t* pid_out,
++                           [[maybe_unused]] void*  stack));
++    STUB_RET(int sys_kill([[maybe_unused]] pid_t, [[maybe_unused]] int));
++
++    //////
++    int sys_tcb_set(void* pointer)
++    {
++        auto ret = Syscall(SYS_ARCH_PRCTL, 0x1002, pointer);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return ret;
++    }
++
++    STUB_RET(int sys_futex_wait(int* pointer, int expected,
++                                const struct timespec* time));
++    STUB_RET(int sys_futex_wake([[maybe_unused]] int* pointer));
++} // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/memory.cpp b/sysdeps/cryptix/sysdeps/memory.cpp
+new file mode 100644
+index 00000000..c9257ba9
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/memory.cpp
+@@ -0,0 +1,54 @@
++#include <cstddef>
++#include <stdio.h>
++#include <stdlib.h>
++
++#include <cryptix/syscall.h>
++
++#include <execinfo.h>
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++
++#include <sys/mman.h>
++
++namespace mlibc
++{
++    int sys_anon_allocate(size_t size, void** pointer)
++    {
++        auto ret = sys_vm_map(nullptr, size, PROT_READ | PROT_WRITE, 0x20, -1,
++                              0, pointer);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_anon_free(void* pointer, size_t size)
++    {
++        auto ret = sys_vm_unmap(pointer, size);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++
++    int sys_vm_map(void* hint, size_t size, int prot, int flags, int fd,
++                   off_t offset, void** window)
++    {
++        auto ret = Syscall(SYS_MMAP, hint, size, prot, flags, fd, offset);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *window = reinterpret_cast<void*>(ret);
++        return 0;
++    }
++    int sys_vm_unmap(void* pointer, size_t size)
++    {
++        auto ret = Syscall(SYS_MUNMAP, pointer, size);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_vm_protect(void* pointer, size_t size, int prot)
++    {
++        // auto ret = Syscall(SYS_MPROTECT, pointer, size, prot);
++        // if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++} // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/process.cpp b/sysdeps/cryptix/sysdeps/process.cpp
+new file mode 100644
+index 00000000..0b6fe77f
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/process.cpp
+@@ -0,0 +1,92 @@
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++
++#include <algorithm>
++#include <cryptix/syscall.h>
++
++namespace mlibc
++{
++    pid_t sys_getpid() { return Syscall(SYS_GETPID); }
++    void  sys_exit(int code)
++    {
++        Syscall(SYS_EXIT, code);
++
++        __builtin_unreachable();
++    }
++    int sys_waitpid(pid_t pid, int* status, int flags, struct rusage* ru,
++                    pid_t* ret_pid)
++    {
++        auto ret = Syscall(SYS_WAIT4, pid, status, flags, ru);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *ret_pid = ret;
++        return 0;
++    }
++
++    uid_t sys_getuid() { return Syscall(SYS_GETUID); }
++    gid_t sys_getgid() { return Syscall(SYS_GETGID); }
++    uid_t sys_geteuid() { return Syscall(SYS_GETEUID); }
++    gid_t sys_getegid() { return Syscall(SYS_GETEGID); }
++    int   sys_setpgid(pid_t pid, pid_t pgid)
++    {
++        auto ret = Syscall(SYS_SETPGID, pid, pgid);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    pid_t sys_getppid() { return Syscall(SYS_GETPPID); }
++    pid_t sys_setsid(pid_t* out)
++    {
++        auto ret = Syscall(SYS_SETSID);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *out = ret;
++        return 0;
++    }
++    pid_t sys_getpgid(pid_t pid, pid_t* out)
++    {
++        auto ret = Syscall(SYS_GETPGID, pid);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *out = ret;
++        return 0;
++    }
++    pid_t sys_getsid(pid_t pid, pid_t* out)
++    {
++        auto ret = Syscall(SYS_GETSID, pid);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *out = ret;
++        return 0;
++    }
++
++    int sys_fork(pid_t* child)
++    {
++        auto ret = Syscall(SYS_FORK);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *child = ret;
++        return 0;
++    }
++    int sys_execve(const char* path, char* const argv[], char* const envp[])
++    {
++        return Syscall(SYS_EXECVE, path, argv, envp);
++    }
++
++    int sys_futex_tid()
++    {
++        // TODO(v1tr10l7): implement sys_futex_tid
++        return 0;
++    }
++
++    int sys_gethostname(char* buffer, size_t bufsize)
++    {
++        utsname data{};
++        auto    e = sys_uname(&data);
++        if (e) return e;
++
++        size_t hostname_size = strlen(data.nodename);
++        memcpy(buffer, data.nodename, std::min(bufsize, hostname_size));
++        return 0;
++    }
++}; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/signal.cpp b/sysdeps/cryptix/sysdeps/signal.cpp
+new file mode 100644
+index 00000000..f272ba62
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/signal.cpp
+@@ -0,0 +1,24 @@
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++
++#include <cryptix/syscall.h>
++
++namespace mlibc
++{
++    int sys_sigaction([[maybe_unused]] int signum,
++                      [[maybe_unused]] const struct sigaction* __restrict act,
++                      [[maybe_unused]] struct sigaction* __restrict oldact)
++    {
++        // TODO(v1tr10l7): implement sys_sigaction;
++        return 0;
++    }
++
++    int sys_sigprocmask([[maybe_unused]] int             how,
++                        [[maybe_unused]] const sigset_t* set,
++                        [[maybe_unused]] sigset_t*       retrieve)
++    {
++
++        // TODO(v1tr10l7): implement sys_sigprocmask;
++        return 0;
++    }
++}; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/system.cpp b/sysdeps/cryptix/sysdeps/system.cpp
+new file mode 100644
+index 00000000..e49ec356
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/system.cpp
+@@ -0,0 +1,55 @@
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++
++#include <cryptix/syscall.h>
++
++#include <bits/ensure.h>
++#include <cryptix/reboot.hpp>
++#include <errno.h>
++#include <sys/reboot.h>
++
++using namespace cryptix;
++
++RebootCmd cryptix_reboot_cmd(unsigned int what)
++{
++    switch (what)
++    {
++        case 0x01234567: return RebootCmd::eRestart;
++        case 0xCDEF0123: return RebootCmd::eHalt;
++        case 0x4321FEDC: return RebootCmd::ePowerOff;
++        case 0xA1B2C3D4: return RebootCmd::eRestart2;
++        case 0xD000FCE2: return RebootCmd::eSuspend;
++        case 0x45584543: return RebootCmd::eKexec;
++
++        default: break;
++    }
++
++    return RebootCmd::eUndefined;
++}
++
++namespace mlibc
++{
++    int sys_getrlimit(int resource, struct rlimit* rlim)
++    {
++        auto ret = Syscall(SYS_GETRLIMIT, resource, rlim);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_getrusage(int who, struct rusage* usage)
++    {
++        auto ret = Syscall(SYS_GETRUSAGE, who, usage);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_reboot(int what)
++    {
++        auto cmd = cryptix_reboot_cmd(what);
++
++        auto ret = Syscall(SYS_REBOOT, cmd);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++}; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/time.cpp b/sysdeps/cryptix/sysdeps/time.cpp
+new file mode 100644
+index 00000000..16b6c9ed
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/time.cpp
+@@ -0,0 +1,35 @@
++#include <cstddef>
++#include <stdio.h>
++#include <stdlib.h>
++
++#include <cryptix/syscall.h>
++
++#include <execinfo.h>
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++
++#include <sys/mman.h>
++
++namespace mlibc
++{
++    int sys_sleep(time_t* secs, long* nanos)
++    {
++        timespec duration = {.tv_sec = *secs, .tv_nsec = nanos ? *nanos : 0};
++        timespec remaining;
++        auto     ret = Syscall(SYS_NANOSLEEP, &duration, &remaining);
++
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_clock_get(int clockid, time_t* secs, long* nanos)
++    {
++        timespec ts;
++        auto     ret = Syscall(SYS_CLOCK_GETTIME, clockid, &ts);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *secs  = ts.tv_sec;
++        *nanos = ts.tv_nsec;
++        return 0;
++    }
++}; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/vfs.cpp b/sysdeps/cryptix/sysdeps/vfs.cpp
+new file mode 100644
+index 00000000..af2df149
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/vfs.cpp
+@@ -0,0 +1,282 @@
++#include <bits/ensure.h>
++#include <dirent.h>
++#include <errno.h>
++#include <fcntl.h>
++#include <limits.h>
++#include <mlibc/all-sysdeps.hpp>
++#include <mlibc/allocator.hpp>
++#include <mlibc/debug.hpp>
++#include <mlibc/posix-sysdeps.hpp>
++#include <stdlib.h>
++
++#include <abi-bits/fcntl.h>
++#include <dirent.h>
++#include <errno.h>
++#include <fcntl.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <sys/ioctl.h>
++#include <unistd.h>
++
++#include <cryptix/syscall.h>
++
++namespace mlibc
++{
++    int sys_sysconf(int num, long* ret)
++    {
++        switch (num)
++        {
++            case _SC_OPEN_MAX:
++            case _SC_CHILD_MAX:
++            case _SC_LINE_MAX:
++            case _SC_PHYS_PAGES: *ret = INT32_MAX; break;
++
++            default: return EINVAL;
++        }
++
++        return 0;
++    }
++
++    int sys_read(int fd, void* buffer, size_t count, ssize_t* bytesRead)
++    {
++        auto ret = Syscall(SYS_READ, fd, buffer, count);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *bytesRead = ssize_t(ret);
++        return 0;
++    }
++    int sys_write(int fd, void const* buffer, unsigned long bytes,
++                  long* bytesWritten)
++    {
++
++        auto ret = Syscall(SYS_WRITE, fd, buffer, bytes);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *bytesWritten = ret;
++        return 0;
++    }
++    int sys_open(const char* path, int flags, mode_t mode, int* fd)
++    {
++        auto ret = Syscall(SYS_OPENAT, AT_FDCWD, path, flags, mode);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *fd = ret;
++        return 0;
++    }
++    int sys_close(int fd)
++    {
++        auto ret = Syscall(SYS_CLOSE, fd);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++
++    int sys_stat(fsfd_target fsfdt, int fd, const char* path, int flags,
++                 struct stat* statbuf)
++    {
++        int ret = -1;
++        switch (fsfdt)
++        {
++            case fsfd_target::fd:
++                ret = Syscall(SYS_FSTATAT, fd, "", flags | AT_EMPTY_PATH,
++                              statbuf);
++                break;
++            case fsfd_target::path:
++                ret = Syscall(SYS_FSTATAT, AT_FDCWD, path, flags, statbuf);
++                break;
++            case fsfd_target::fd_path:
++                ret = Syscall(SYS_FSTATAT, fd, path, flags, statbuf);
++                break;
++
++            default:
++                __ensure(!"sys_stat: invalid fsfdt");
++                __builtin_unreachable();
++        }
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_seek(int fd, off_t offset, int whence, off_t* newOffset)
++    {
++        auto ret = Syscall(SYS_LSEEK, fd, offset, whence);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *newOffset = off_t(ret);
++        return 0;
++    }
++    int sys_ioctl(int fd, unsigned long request, void* arg, int* result)
++    {
++        int ret = Syscall(SYS_IOCTL, fd, request, arg);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *result = ret;
++        return 0;
++    }
++
++    int sys_access(const char* path, int mode)
++    {
++        int ret = Syscall(SYS_ACCESS, path, mode);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_pipe(int* fds, int flags)
++    {
++        int ret = Syscall(SYS_PIPE, fds);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_dup(int fd, int flags, int* newfd)
++    {
++        // TODO(v1tr10l7): implement flags;
++        (void)flags;
++        auto ret = Syscall(SYS_DUP, fd);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *newfd = ret;
++        return 0;
++    }
++    int sys_dup2(int fd, int flags, int newfd)
++    {
++        // TODO(v1tr10l7): implement flags;
++        (void)flags;
++        auto ret = Syscall(SYS_DUP2, fd, newfd);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++
++    int sys_uname(struct utsname* out)
++    {
++        auto ret = Syscall(SYS_UNAME, out);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_fcntl(int fd, int request, va_list args, int* result)
++    {
++        auto ret = Syscall(SYS_FCNTL, fd, request, args);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *result = ret;
++        return 0;
++    }
++
++    int sys_getcwd(char* buffer, size_t size)
++    {
++        auto ret = Syscall(SYS_GETCWD, buffer, size);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_chdir(const char* path)
++    {
++        auto ret = Syscall(SYS_CHDIR, path);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_fchdir(int fd)
++    {
++        auto ret = Syscall(SYS_FCHDIR, fd);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_mkdir(const char* path, mode_t mode)
++    {
++        auto ret = Syscall(SYS_MKDIR, path, mode);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++    int sys_mount(const char* source, const char* target, const char* fs_name,
++                  unsigned long flags, const void* data)
++    {
++        auto ret = Syscall(SYS_MOUNT, source, target, fs_name, flags, data);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return ret;
++    }
++
++    int sys_read_entries(int fdnum, void* buffer, size_t max_size,
++                         size_t* bytes_read)
++    {
++        auto ret = Syscall(SYS_GETDENTS64, fdnum, buffer, max_size);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *bytes_read = ret;
++        return 0;
++    }
++    int sys_openat(int dirfd, const char* path, int flags, mode_t mode, int* fd)
++    {
++        int ret = Syscall(SYS_OPENAT, dirfd, path, flags, mode);
++        if (auto e = syscall_error(ret); e) return e;
++
++        *fd = ret;
++        return 0;
++    }
++    int sys_open_dir(const char* path, int* fd)
++    {
++        return sys_openat(AT_FDCWD, path, O_DIRECTORY, 0, fd);
++    }
++
++    int sys_fchmodat(int fd, const char* pathname, mode_t mode, int flags)
++    {
++        auto ret = Syscall(SYS_FCHMODAT, fd, pathname, mode, flags);
++        if (auto e = syscall_error(ret); e) return e;
++
++        return 0;
++    }
++
++    int sys_isatty(int fd)
++    {
++        winsize ws;
++        int     ret;
++        if (!sys_ioctl(fd, TIOCGWINSZ, &ws, &ret)) return 0;
++
++        return ENOTTY;
++    }
++    int sys_ttyname(int fd, char* buf, size_t size)
++    {
++        buf[0] = 'T';
++        buf[1] = 0;
++        return 0;
++    }
++
++#ifndef TCGETS
++    constexpr size_t TCGETS  = 0x5401;
++    constexpr size_t TCSETS  = 0x5402;
++    constexpr size_t TCSETSW = 0x5403;
++    constexpr size_t TCSETSF = 0x5404;
++#endif
++
++    int sys_tcgetattr(int fd, struct termios* attr)
++    {
++        int ret;
++        if (int r = sys_ioctl(fd, TCGETS, attr, &ret) != 0) return r;
++
++        return 0;
++    }
++
++    int sys_tcsetattr(int fd, int optional_action, const struct termios* attr)
++    {
++        int ret;
++        switch (optional_action)
++        {
++            case TCSANOW: optional_action = TCSETS; break;
++            case TCSADRAIN: optional_action = TCSETSW; break;
++            case TCSAFLUSH: optional_action = TCSETSF; break;
++            default: __ensure(!"Unsupported tcsetattr");
++        }
++
++        if (int r = sys_ioctl(fd, optional_action, (void*)attr, &ret) != 0)
++            return r;
++
++        return 0;
++    }
++    STUB_RET(int sys_pselect(int nfds, fd_set* readfds, fd_set* writefds,
++                             fd_set* exceptfds, const struct timespec* timeout,
++                             const sigset_t* sigmask, int* num_events));
++} // namespace mlibc
+diff --git a/sysdeps/cryptix/x86_64/crt0.S b/sysdeps/cryptix/x86_64/crt0.S
+new file mode 100644
+index 00000000..bc06417a
+--- /dev/null
++++ b/sysdeps/cryptix/x86_64/crt0.S
+@@ -0,0 +1,7 @@
++.section .text
++.global _start
++_start:
++	mov %rsp, %rdi
++	mov $main, %rsi
++	call __mlibc_entry
++.section .note.GNU-stack,"",%progbitst
+diff --git a/sysdeps/cryptix/x86_64/crti.S b/sysdeps/cryptix/x86_64/crti.S
+new file mode 100644
+index 00000000..f04679c0
+--- /dev/null
++++ b/sysdeps/cryptix/x86_64/crti.S
+@@ -0,0 +1,10 @@
++.section .init
++.global _init
++_init:
++	push %rax
++
++.section .fini
++.global _fini
++_fini:
++	push %rax
++.section .note.GNU-stack,"",%progbits
+diff --git a/sysdeps/cryptix/x86_64/crtn.S b/sysdeps/cryptix/x86_64/crtn.S
+new file mode 100644
+index 00000000..1b61d5a3
+--- /dev/null
++++ b/sysdeps/cryptix/x86_64/crtn.S
+@@ -0,0 +1,8 @@
++.section .init
++	pop %rax
++	ret
++
++.section .fini
++	pop %rax
++	ret
++.section .note.GNU-stack,"",%progbits
+diff --git a/sysdeps/cryptix/x86_64/thread_entry.S b/sysdeps/cryptix/x86_64/thread_entry.S
+new file mode 100644
+index 00000000..cea1b172
+--- /dev/null
++++ b/sysdeps/cryptix/x86_64/thread_entry.S
+@@ -0,0 +1,24 @@
++
++.section .text
++.global __mlibc_spawn_thread
++.type __mlibc_spawn_thread, "function"
++__mlibc_spawn_thread:
++	xor %eax, %eax
++	/* The rest of the args are already in the right registers,
++	* only need to fixup rcx to r10
++	*/
++	mov %rcx, %r10
++	mov $56, %al
++	syscall
++	test %eax, %eax
++	jnz 1f
++	xor %ebp, %ebp
++	pop %rdi
++	pop %rsi
++	call __mlibc_enter_thread
++	hlt
++1:
++	ret
++.section .note.GNU-stack,"",%progbits
++
++
+-- 
+2.49.0
+

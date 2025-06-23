@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <Prism/Containers/RingBuffer.hpp>
 #include <Scheduler/Event.hpp>
 
 #include <VFS/FileDescriptor.hpp>
@@ -24,7 +25,7 @@ class Fifo : public INode
 
     FileDescriptor* Open(Direction direction);
 
-    virtual void    InsertChild(INode*, std::string_view) override
+    virtual void    InsertChild(INode*, StringView) override
     {
         AssertNotReached();
     }
@@ -38,17 +39,13 @@ class Fifo : public INode
     }
 
   private:
-    usize m_ReaderCount = 0;
-    usize m_WriterCount = 0;
-    Event m_Event;
+    Atomic<usize> m_ReaderCount = 0;
+    Atomic<usize> m_WriterCount = 0;
+    Event         m_Event;
+    RingBuffer    m_Buffer;
 
-    u8*   m_Data        = nullptr;
-    usize m_Size        = 0;
-    usize m_Capacity    = 0;
-    usize m_ReadOffset  = 0;
-    usize m_WriteOffset = 0;
-    bool  m_NonBlocking = false;
+    bool          m_NonBlocking = false;
 
-    void  Attach(Direction direction);
-    void  Detach();
+    void          Attach(Direction direction);
+    void          Detach();
 };

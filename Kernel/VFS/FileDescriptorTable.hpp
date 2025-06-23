@@ -40,7 +40,7 @@ class FileDescriptorTable
     inline FileDescriptor*& operator[](usize i) { return m_Table[i]; }
 
   private:
-    Spinlock         m_Lock;
-    TableType        m_Table;
-    std::atomic<i32> m_NextIndex = 3;
+    Spinlock    m_Lock;
+    TableType   m_Table;
+    Atomic<i32> m_NextIndex = 3;
 };

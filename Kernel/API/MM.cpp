@@ -21,125 +21,157 @@
 
 namespace API::MM
 {
-    inline PageAttributes Prot2PageAttributes(i32 prot)
+    using VirtualMemoryManager::Access;
+    static Access Prot2AccessFlags(isize prot)
     {
-        PageAttributes attribs = PageAttributes::eUser;
-        if (prot & PROT_READ) attribs |= PageAttributes::eRead;
-        if (prot & PROT_WRITE) attribs |= PageAttributes::eWrite;
-        if (prot & PROT_EXEC) attribs |= PageAttributes::eExecutable;
+        Access access = Access::eUser;
 
-        return attribs;
+        if (prot & PROT_READ) access |= Access::eRead;
+        if (prot & PROT_WRITE) access |= Access::eWrite;
+        if (prot & PROT_EXEC) access |= Access::eExecute;
+
+        return access;
     }
 
-    ErrorOr<intptr_t> SysMMap(Pointer addr, usize len, i32 prot, i32 flags,
-                              i32 fdNum, off_t offset)
+    ErrorOr<intptr_t> MMap(Pointer addr, usize length, i32 prot, i32 flags,
+                           i32 fdNum, off_t offset)
     {
-        Process*        current = Process::GetCurrent();
-        FileDescriptor* fd      = nullptr;
+        Process*               current   = Process::GetCurrent();
+        std::optional<errno_t> errorCode = std::nullopt;
 
-        // LogInfo(
-        //     "addr: {:#x}, len: {:#x}, prot: {:#x}, flags: {:#x}, fdNum:
-        //     {:#x}, " "offset: {:#x}", addr.Raw(), len, prot, flags, fdNum,
-        //     offset);
+        using VirtualMemoryManager::Access;
+        Access access = Access::eUser;
+        if (prot & PROT_READ) access |= Access::eRead;
+        if (prot & PROT_WRITE) access |= Access::eWrite;
+        if (prot & PROT_EXEC) access |= Access::eExecute;
 
-        if (len == 0) return Error(EINVAL);
-        len = Math::AlignUp(len, PMM::PAGE_SIZE);
-        if (fdNum != -1 || !(flags & MAP_ANONYMOUS))
-        {
-            fd = current->GetFileHandle(fdNum);
-            if (!fd) return Error(EBADF);
+        if (length == 0) return Error(EINVAL);
+        length         = Math::AlignUp(length, PMM::PAGE_SIZE);
+        usize pageSize = PMM::PAGE_SIZE;
+        if (flags & MAP_HUGE_2MB) pageSize = 2_mib;
+        else if (flags & MAP_HUGE_1GB) pageSize = 1_gib;
 
-            usize pageCount
-                = Math::AlignUp(len, PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
-            uintptr_t phys = PMM::CallocatePages<u64>(pageCount);
-            uintptr_t virt = VMM::AllocateSpace(len, 0);
+        FileDescriptor* fd = nullptr;
+        if (fdNum != -1) fd = current->GetFileHandle(fdNum);
 
-            if (!fd->CanRead()) return Error(EPERM);
-            current->PageMap->MapRange(virt, phys, len,
-                                       Prot2PageAttributes(prot));
-
-            ErrorOr<isize> sizeOrError;
-            if (offset) sizeOrError = fd->Seek(SEEK_SET, offset);
-            if (!sizeOrError) return sizeOrError.error();
-
-            sizeOrError = fd->Read(reinterpret_cast<void*>(virt), len);
-            if (!sizeOrError) return sizeOrError.error();
-
-            ScopedLock guard(current->m_Lock);
-            current->m_AddressSpace.EmplaceBack(phys, virt, len, prot, fd);
-
-            return virt;
-        }
         if (offset != 0) return Error(EINVAL);
-
-        if (!(flags & MAP_ANONYMOUS)) return Error(ENOSYS);
-        uintptr_t virt = addr;
-        if (!(flags & MAP_FIXED)) virt = VMM::AllocateSpace(len, 0, true);
-
-        usize pageCount = Math::AlignUp(len, PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
-        uintptr_t phys  = PMM::CallocatePages<uintptr_t>(pageCount);
-        if (!phys) return Error(ENOMEM);
-
-        current->PageMap->MapRange(virt, phys, len,
-                                   Prot2PageAttributes(prot)
-                                       | PageAttributes::eWriteBack);
-
-        ScopedLock guard(current->m_Lock);
-        current->m_AddressSpace.EmplaceBack(phys, virt, len, prot);
-        DebugSyscall("MMAP: virt: {:#x}", virt);
-        return virt;
-    }
-} // namespace API::MM
-
-namespace Syscall::MM
-{
-    ErrorOr<intptr_t> SysMProtect(Arguments& args)
-    {
-        uintptr_t addr    = args.Get<uintptr_t>(0);
-        usize     size    = args.Get<usize>(1);
-        i32       prot    = args.Get<i32>(2);
-
-        Process*  current = Process::GetCurrent();
-        current->PageMap->MapRange(addr, addr, size,
-                                   API::MM::Prot2PageAttributes(prot));
-
-        return 0;
-    }
-    ErrorOr<i32> SysMUnMap(Arguments& args)
-    {
-        return 0;
-        Pointer                            addr    = args.Get<uintptr_t>(0);
-        usize                              length  = args.Get<usize>(1);
-
-        Process*                           current = Process::GetCurrent();
-        ScopedLock                         guard(current->m_Lock);
-
-        Pointer                            phys = 0;
-        std::vector<VMM::Region>::iterator it = current->m_AddressSpace.begin();
-        for (; it < current->m_AddressSpace.end(); it++)
-        {
-            if (it->GetVirtualBase() == addr)
-            {
-                phys = it->GetPhysicalBase();
-                break;
-            }
-        }
-
-        if (!phys || it == current->m_AddressSpace.end()) return Error(EFAULT);
-        FileDescriptor* fd = it->GetFileDescriptor();
-        if (fd)
-        {
-            auto errorOrBytes = fd->Write(addr, length);
-            if (!errorOrBytes) return errorOrBytes.error();
-        }
-
-        current->m_AddressSpace.Erase(it);
-
-        current->PageMap->UnmapRange(addr, length);
         usize pageCount
             = Math::AlignUp(length, PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
-        PMM::FreePages(phys.ToHigherHalf<uintptr_t>(), pageCount);
+
+        auto&   addressSpace = current->GetAddressSpace();
+        auto*   pageMap      = current->PageMap;
+        Region* region       = nullptr;
+
+        Pointer phys         = PMM::CallocatePages<uintptr_t>(pageCount);
+        if (!phys) return Error(ENOMEM);
+
+        // TODO(v1tr10l7): File mapping
+        if (fdNum != -1 && !(flags & MAP_ANONYMOUS))
+        {
+            if (!fd)
+            {
+                errorCode = EBADF;
+                goto free_pages;
+            }
+            region = addressSpace.AllocateRegion(length);
+            region->SetPhysicalBase(phys);
+            auto virt = region->GetVirtualBase();
+
+            if (!fd->CanRead())
+            {
+                errorCode = EPERM;
+                goto free_region;
+            }
+
+            region->SetProt(access, prot);
+            pageMap->MapRegion(region, pageSize);
+
+            ErrorOr<isize> sizeOr;
+            if (offset) sizeOr = fd->Seek(SEEK_SET, offset);
+            if (!sizeOr)
+            {
+                errorCode = sizeOr.error();
+                goto free_region;
+            }
+
+            sizeOr = fd->Read(virt, length);
+            if (!sizeOr)
+            {
+                errorCode = sizeOr.error();
+                goto free_region;
+            }
+
+            return virt.Raw();
+        }
+        if (offset)
+        {
+            errorCode = EINVAL;
+            goto free_pages;
+        }
+        if (!(flags & MAP_ANONYMOUS))
+        {
+            errorCode = ENOSYS;
+            goto free_pages;
+        }
+
+        if (flags & MAP_FIXED)
+            region = addressSpace.AllocateFixed(addr, length);
+        else if (flags & MAP_ANONYMOUS)
+            region = addressSpace.AllocateRegion(length, pageSize);
+
+        // TODO(v1tr10l7): sharring mappings
+        if (flags & MAP_SHARED)
+            ;
+
+        if (!region) goto free_pages;
+        region->SetPhysicalBase(phys);
+        region->SetProt(access, prot);
+        pageMap->MapRegion(region, pageSize);
+
+        return region->GetVirtualBase().Raw();
+
+    free_region:
+        addressSpace.Erase(region->GetVirtualBase());
+    free_pages:
+        PMM::FreePages(phys, pageCount);
+    [[maybe_unused]] fail:
+        return Error(errorCode.value_or(ENOMEM));
+    }
+    ErrorOr<isize> MProtect(Pointer virt, usize length, i32 prot)
+    {
+        if (virt & ~PMM::PAGE_SIZE) return Error(EINVAL);
+        length = Math::AlignUp(length, PMM::PAGE_SIZE);
+        if (length == 0) return Error(EINVAL);
+
+        auto regionEnd = virt.Offset<Pointer>(length);
+        if (regionEnd < virt) return Error(EINVAL);
+        else if (virt == regionEnd) return 0;
+        if (prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC)) return Error(EINVAL);
+
+        auto  process      = Process::GetCurrent();
+        auto& addressSpace = process->GetAddressSpace();
+        auto  region       = addressSpace.Find(virt);
+        if (!region) return Error(EFAULT);
+
+        auto accessFlags = Prot2AccessFlags(prot);
+        region->SetProt(accessFlags, prot);
+
+        process->PageMap->RemapRegion(region);
         return 0;
     }
+    ErrorOr<isize> MUnMap(Pointer virt, usize length)
+    {
+        auto  process      = Process::GetCurrent();
+        auto& addressSpace = process->GetAddressSpace();
+        if (!addressSpace.Contains(virt)) return Error(EINVAL);
 
-}; // namespace Syscall::MM
+        auto        region    = addressSpace[virt];
+
+        const auto  phys      = region->GetPhysicalBase();
+        const usize pageCount = region->GetSize() / PMM::PAGE_SIZE;
+        PMM::FreePages(phys, pageCount);
+
+        addressSpace.Erase(virt);
+        return 0;
+    }
+} // namespace API::MM

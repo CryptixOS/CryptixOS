@@ -9,109 +9,85 @@
 #include <Firmware/DeviceTree/DeviceTree.hpp>
 #include <Library/Logger.hpp>
 
+#include <Prism/Containers/Vector.hpp>
 #include <Prism/Debug/Assertions.hpp>
-
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-
-// FDT token definitions
-#define FDT_BEGIN_NODE 0x1
-#define FDT_END_NODE   0x2
-#define FDT_PROP       0x3
-#define FDT_NOP        0x4
-#define FDT_END        0x9
 
 namespace DeviceTree
 {
-    // Function to convert big-endian to host-endian
-    static uint32_t fdt32_to_cpu(uint32_t x) { return __builtin_bswap32(x); }
+    static Node* s_RootNode = nullptr;
 
-    // Function to align offset to 4 bytes
-    static uint32_t fdt_align_offset(uint32_t offset)
+    bool         ParseFDT(FDT_Header* header)
     {
-        return (offset + 3) & ~3;
-    }
+        char* structureBlock = reinterpret_cast<char*>(header)
+                             + header->StructureBlockOffset.Load();
+        char* stringBlock = reinterpret_cast<char*>(header)
+                          + header->StringBlockOffset.Load();
+        usize structureBlockSize = header->StructureBlockLength.Load();
 
-    // Function to get a string from the strings block
-    static const char* fdt_get_string(const char* strings, uint32_t stroffset)
-    {
-        return strings + stroffset;
-    }
-
-    // Function to iterate through FDT nodes
-    bool ParseFDT(FDT_Header* header)
-    {
-        char* struct_block
-            = (char*)header + header->StructureBlockOffset.Load();
-        char* strings_block = (char*)header + header->StringBlockOffset.Load();
-        uint32_t             offset = 0;
-        [[maybe_unused]] int depth  = 0;
-
-        while (offset < header->StructureBlockLength.Load())
+        u64   offset             = 0;
+        Node* root               = nullptr;
+        Node* current            = nullptr;
+        while (offset < structureBlockSize)
         {
-            BigEndian<u32> tokenOffset
-                = *reinterpret_cast<u32*>(struct_block + offset);
-            uint32_t token = tokenOffset.Load();
-            offset += sizeof(uint32_t);
+            BigEndian<FDT_TokenType> tokenType
+                = *reinterpret_cast<FDT_TokenType*>(structureBlock + offset);
+            offset += sizeof(u32);
 
-            switch (token)
+            switch (tokenType.Load())
             {
-                case FDT_BEGIN_NODE:
+                case FDT_TokenType::eBeginNode:
                 {
-                    const char* name = struct_block + offset;
-                    Logger::Logf(LogLevel::eTrace, "Node: %s\n", name);
-                    offset += strlen(name) + 1;
-                    offset = fdt_align_offset(offset);
-                    depth++;
+                    StringView name = structureBlock + offset;
+                    offset
+                        = Math::AlignUp(offset + name.Size() + 1, sizeof(u32));
+
+                    auto* newNode = new Node(current, !root ? "/" : name);
+                    if (!root) root = current;
+                    else current->InsertNode(name, newNode);
+
+                    current = newNode;
                     break;
                 }
-                case FDT_END_NODE: depth--; break;
-                case FDT_PROP:
+                case FDT_TokenType::eEndNode:
+                    current = (current && current->GetParent())
+                                ? current->GetParent()
+                                : root;
+                    break;
+                case FDT_TokenType::eProperty:
                 {
-                    Property*   prop      = (Property*)(struct_block + offset);
-                    u32         propLen   = prop->m_Length.Load();
-                    const char* prop_name = fdt_get_string(
-                        strings_block, prop->m_NameOffset.Load());
-                    u8* propData = (u8*)(prop + 1);
+                    auto* propertyHeader = reinterpret_cast<PropertyHeader*>(
+                        structureBlock + offset);
 
-                    Logger::Logf(LogLevel::eTrace, "Property: %s (Length: %u)",
-                                 prop_name, propLen);
+                    StringView propertyName
+                        = stringBlock + propertyHeader->m_NameOffset.Load();
+                    u8* propertyData
+                        = reinterpret_cast<u8*>(propertyHeader + 1);
+                    u32 propertyDataSize = propertyHeader->m_Length.Load();
 
-                    if (propLen == 4)
+                    offset += sizeof(PropertyHeader) + propertyDataSize;
+                    offset = Math::AlignUp(offset, 4);
+
+                    if (current)
                     {
-                        u32 value
-                            = fdt32_to_cpu(*reinterpret_cast<u32*>(propData));
-                        LogTrace(" Value (u32): {:#x} ({})", value, value);
+                        Property* property
+                            = new Property(current, propertyName, propertyData,
+                                           propertyDataSize);
+                        current->InsertProperty(propertyName, property);
                     }
-                    else if (propLen > 0 && propData[propLen - 1 == '\0'])
-                        LogTrace(" Value (string): '{}'",
-                                 (const char*)propData);
-                    else
-                    {
-                        LogTrace(" Value (raw): ");
-                        for (u32 i = 0; i < propLen; i++)
-                            Logger::Log(LogLevel::eTrace,
-                                        std::format("{:02x}", propData[i]),
-                                        false);
-                        Logger::Print("\n");
-                    }
-
-                    offset += sizeof(Property) + prop->m_Length.Load();
-                    offset = fdt_align_offset(offset);
                     break;
                 }
-                case FDT_NOP:
+                case FDT_TokenType::eNop:
                     // No operation; skip
                     break;
-                case FDT_END: return true;
+                case FDT_TokenType::eEnd: s_RootNode = root; return true;
                 default:
-                    Logger::Logf(LogLevel::eTrace, "Unknown token: 0x%x\n",
-                                 token);
+                    EarlyLogError("DeviceTree: Unknown token: %#x",
+                                  tokenType.Load());
                     return false;
             }
         }
 
+        s_RootNode = root;
         return true;
     }
     bool ParseFDT(FDT_Header* header);
@@ -123,7 +99,7 @@ namespace DeviceTree
 
         if (!header)
 #ifdef CTOS_TARGET_AARCH64
-            AssertMsg(header, "AARCH64: Cannot boot without FDT header");
+            AssertMsg(header, "DeviceTree: Cannot boot without FDT header");
 #else
             return false;
 #endif
@@ -131,10 +107,16 @@ namespace DeviceTree
         auto magic = header->Magic;
         if (magic.Load() != FDT_MAGIC)
         {
-            LogError("FDT: Invalid magic: {:#x}", magic.Load());
+            LogError("DeviceTree: FDT has an invalid magic: {:#x}",
+                     magic.Load());
             return false;
         }
 
-        return ParseFDT(header);
+        auto success = ParseFDT(header);
+        if (!success) return false;
+
+        s_RootNode->Print();
+        LogInfo("DeviceTree: FDT parsed successfully");
+        return success;
     }
 } // namespace DeviceTree

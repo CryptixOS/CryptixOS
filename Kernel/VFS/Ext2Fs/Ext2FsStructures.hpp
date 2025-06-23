@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <API/UnixTypes.hpp>
 #include <Prism/Core/Types.hpp>
 
 enum class Ext2FsState : u16
@@ -103,10 +104,10 @@ struct [[gnu::packed]] Ext2FsINodeMeta
         return static_cast<usize>(SizeLow)
              | (static_cast<usize>(SizeHigh) << 32);
     }
-    inline void SetSize(usize sizeLow, usize sizeHigh)
+    inline void SetSize(usize size)
     {
-        SizeLow  = sizeLow;
-        SizeHigh = sizeHigh >> 32;
+        SizeLow  = size;
+        SizeHigh = size >> 32;
     }
 };
 
@@ -129,3 +130,27 @@ struct [[gnu::packed]] Ext2FsDirectoryEntry
     Ext2FsDirectoryEntryType Type;
     u8                       Name[];
 };
+
+constexpr Ext2FsDirectoryEntryType Ext2Mode2DirectoryEntryType(mode_t mode)
+{
+    if (S_ISREG(mode)) return Ext2FsDirectoryEntryType::eRegular;
+    else if (S_ISDIR(mode)) return Ext2FsDirectoryEntryType::eDirectory;
+    else if (S_ISCHR(mode)) return Ext2FsDirectoryEntryType::eCharacterDevice;
+    else if (S_ISBLK(mode)) return Ext2FsDirectoryEntryType::eBlockDevice;
+    else if (S_ISFIFO(mode)) return Ext2FsDirectoryEntryType::eFifo;
+    else if (S_ISSOCK(mode)) return Ext2FsDirectoryEntryType::eSocket;
+    else if (S_ISLNK(mode)) return Ext2FsDirectoryEntryType::eSymlink;
+
+    return Ext2FsDirectoryEntryType::eUnknown;
+}
+constexpr u16 Ext2Mode2INodeType(mode_t mode)
+{
+    if (S_ISREG(mode)) return 0x8000;
+    else if (S_ISDIR(mode)) return 0x4000;
+    else if (S_ISCHR(mode)) return 0x2000;
+    else if (S_ISBLK(mode)) return 0x6000;
+    else if (S_ISFIFO(mode)) return 0x1000;
+    else if (S_ISSOCK(mode)) return 0xc000;
+
+    return 0xa000;
+}

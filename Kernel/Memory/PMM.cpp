@@ -13,25 +13,25 @@
 #include <Memory/KernelHeap.hpp>
 #include <Memory/PMM.hpp>
 
-#include <Prism/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
 namespace PhysicalMemoryManager
 {
     namespace
     {
-        bool          s_Initialized = false;
-        Prism::Bitmap s_Bitmap{};
+        bool     s_Initialized = false;
+        Bitmap   s_Bitmap{};
 
-        uintptr_t     s_MemoryTop        = 0;
-        uintptr_t     s_UsableMemoryTop  = 0;
+        Pointer  s_MemoryTop        = 0;
+        Pointer  s_UsableMemoryTop  = 0;
 
-        usize         s_UsableMemorySize = 0;
-        usize         s_TotalMemory      = 0;
-        usize         s_UsedMemory       = 0;
+        usize    s_UsableMemorySize = 0;
+        usize    s_TotalMemory      = 0;
+        usize    s_UsedMemory       = 0;
 
-        Spinlock      s_Lock;
+        Spinlock s_Lock;
 
-        void*         FindFreeRegion(usize& start, usize count, usize limit)
+        void*    FindFreeRegion(usize& start, usize count, usize limit)
         {
             usize contiguousPages = 0;
             while (start < limit)
@@ -64,8 +64,8 @@ namespace PhysicalMemoryManager
         for (usize i = 0; i < entryCount; i++)
         {
             MemoryMapEntry* currentEntry = memoryMap[i];
-            uintptr_t       top = currentEntry->base + currentEntry->length;
-            s_MemoryTop         = std::max(s_MemoryTop, top);
+            Pointer         top = currentEntry->base + currentEntry->length;
+            s_MemoryTop         = std::max(s_MemoryTop.Raw(), top.Raw());
 
             switch (currentEntry->type)
             {
@@ -84,30 +84,12 @@ namespace PhysicalMemoryManager
             s_TotalMemory += currentEntry->length;
         }
 
-        if (s_MemoryTop == 0) return false;
+        if (!s_MemoryTop) return false;
 
-        usize s_BitmapEntryCount = s_UsableMemoryTop / PAGE_SIZE;
+        usize s_BitmapEntryCount = s_UsableMemoryTop.Raw() / PAGE_SIZE;
         usize s_BitmapSize = Math::AlignUp(s_BitmapEntryCount / 8, PAGE_SIZE);
         s_BitmapEntryCount = s_BitmapSize * 8;
-        for (usize i = 0; i < entryCount; i++)
-        {
-            MemoryMapEntry* currentEntry = memoryMap[i];
-            if (currentEntry->type != MEMORY_MAP_USABLE
-                || currentEntry->length < s_BitmapSize)
-                continue;
 
-            s_Bitmap.Initialize(reinterpret_cast<u8*>(currentEntry->base)
-                                    + BootInfo::GetHHDMOffset(),
-                                s_BitmapEntryCount);
-            s_Bitmap.SetAll(0xff);
-            currentEntry->base += s_BitmapSize;
-            currentEntry->length -= s_BitmapSize;
-
-            s_UsedMemory += s_BitmapSize;
-            break;
-        }
-
-        Assert(s_Bitmap.GetSize() != 0);
         [[maybe_unused]]
         auto entryTypeToString
             = [](u64 type)
@@ -129,13 +111,37 @@ namespace PhysicalMemoryManager
 
             return "Undefined";
         };
+        for (usize i = 0; i < entryCount; i++)
+        {
+            MemoryMapEntry* currentEntry = memoryMap[i];
+            Pointer         entryBase    = currentEntry->base;
+            usize           entryLength  = currentEntry->length;
+            auto entryTypeString = entryTypeToString(currentEntry->type);
 
+            EarlyLogDebug(
+                "PMM: MemoryMap[%zu] = { .Base: %#p, .Length: %#x, .Type: "
+                "%s }",
+                i, entryBase.Raw(), entryLength, entryTypeString);
+
+            if (currentEntry->type != LIMINE_MEMMAP_USABLE
+                || currentEntry->length <= s_BitmapSize)
+                continue;
+            s_Bitmap.Initialize(entryBase.ToHigherHalf(), s_BitmapSize, 0xff);
+
+            currentEntry->base += s_BitmapSize;
+            currentEntry->length -= s_BitmapSize;
+
+            s_UsedMemory += s_BitmapSize;
+            break;
+        }
+
+        Assert(s_Bitmap.GetSize() != 0);
         for (usize i = 0; i < entryCount; i++)
         {
             MemoryMapEntry* currentEntry = memoryMap[i];
             if (currentEntry->type != MEMORY_MAP_USABLE) continue;
 
-            for (uintptr_t page = currentEntry->base == 0 ? 4096 : 0;
+            for (usize page = currentEntry->base == 0 ? 4096 : 0;
                  page < currentEntry->length; page += PAGE_SIZE)
                 s_Bitmap.SetIndex((currentEntry->base + page) / PAGE_SIZE,
                                   false);
@@ -164,8 +170,8 @@ namespace PhysicalMemoryManager
         static usize lastIndex = 0;
 
         usize        i         = lastIndex;
-        void*        ret
-            = FindFreeRegion(lastIndex, count, s_UsableMemoryTop / PAGE_SIZE);
+        void*        ret       = FindFreeRegion(lastIndex, count,
+                                                s_UsableMemoryTop.Raw() / PAGE_SIZE);
         if (!ret)
         {
             lastIndex = 0;

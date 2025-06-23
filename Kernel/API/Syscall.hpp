@@ -8,13 +8,15 @@
 
 #include <Common.hpp>
 
+#include <Arch/CPU.hpp>
+
+#include <Prism/Core/TypeTraits.hpp>
 #include <Prism/Path.hpp>
 #include <Prism/PathView.hpp>
 
 #include <magic_enum/magic_enum.hpp>
 #include <magic_enum/magic_enum_format.hpp>
 
-#include <concepts>
 #include <type_traits>
 
 namespace Syscall
@@ -44,11 +46,11 @@ namespace Syscall
     }
 
     template <typename T>
-    using ToFormattablePtr = typename std::conditional_t<
-        std::is_pointer_v<T>,
-        std::conditional_t<std::is_constructible_v<std::string_view, T>,
-                           NullableString, const void*>,
-        T>;
+    using ToFormattablePtr
+        = Conditional<std::is_pointer_v<T>,
+                      Conditional<std::is_constructible_v<StringView, T>,
+                                  NullableString, const void*>,
+                      T>;
 
     template <typename... Ts>
     auto Ptr(const std::tuple<Ts...>& tup)
@@ -59,10 +61,14 @@ namespace Syscall
     template <typename T>
     constexpr auto ConvertArgument(uintptr_t value)
     {
-        if constexpr (std::is_same_v<
-                          std::remove_cvref_t<std::remove_reference_t<T>>,
-                          Prism::PathView>)
-            return PathView(reinterpret_cast<const char*>(value));
+        if constexpr (IsSameV<std::remove_cvref_t<std::remove_reference_t<T>>,
+                              Prism::PathView>)
+            return CPU::AsUser(
+                [value]() -> PathView
+                {
+                    return PathView(
+                        StringView(reinterpret_cast<const char*>(value)));
+                });
         else if constexpr (std::is_pointer_v<T>)
             return reinterpret_cast<T>(value);
         else return static_cast<T>(value);
@@ -92,16 +98,19 @@ namespace Syscall
             usize                        i = 0;
 
             // Convert array to actual function arguments
-            std::apply(
-                [&](auto&&... args)
-                {
-                    (std::invoke([&]<typename T>(T& arg)
-                                 { arg = ConvertArgument<T>(arr[i++]); },
-                                 args),
-                     ...);
-                },
-                args);
 
+            {
+                CPU::UserMemoryProtectionGuard guard;
+                std::apply(
+                    [&](auto&&... args)
+                    {
+                        (std::invoke([&]<typename T>(T& arg)
+                                     { arg = ConvertArgument<T>(arr[i++]); },
+                                     args),
+                         ...);
+                    },
+                    args);
+            }
             errno    = no_error;
             auto ret = std::apply(Function, args);
             if (!ret) return Error(ret.error());
@@ -163,9 +172,13 @@ namespace Syscall
         eGetCwd           = 79,
         eChDir            = 80,
         eFChDir           = 81,
+        eRename           = 82,
         eMkDir            = 83,
         eRmDir            = 84,
         eCreat            = 85,
+        eLink             = 86,
+        eUnlink           = 86,
+        eSymlink          = 87,
         eReadLink         = 89,
         eChMod            = 90,
         eUmask            = 95,
@@ -183,6 +196,7 @@ namespace Syscall
         eGet_pGid         = 121,
         eGetSid           = 124,
         eUTime            = 132,
+        eStatFs           = 137,
         eArchPrCtl        = 158,
         eSetTimeOfDay     = 164,
         eMount            = 165,
@@ -196,13 +210,22 @@ namespace Syscall
         eOpenAt           = 257,
         eMkDirAt          = 258,
         eFStatAt          = 262,
+        eUnlinkAt         = 263,
+        eRenameAt         = 264,
+        eLinkAt           = 265,
+        eSymlinkAt        = 266,
+        eReadLinkAt       = 267,
         eFChModAt         = 268,
+        ePSelect6         = 270,
+        eUtimensAt        = 280,
         eDup3             = 292,
+        eRenameAt2        = 316,
     };
 
-    void RegisterHandler(usize                                         index,
-                         std::function<ErrorOr<uintptr_t>(Arguments&)> handler,
-                         std::string                                   name);
+    StringView GetName(usize index);
+    void       RegisterHandler(usize                                         index,
+                               std::function<ErrorOr<uintptr_t>(Arguments&)> handler,
+                               String                                        name);
 #define RegisterSyscall(index, handler)                                        \
     ::Syscall::RegisterHandler(std::to_underlying(index), handler, #handler)
 #define RegisterSyscall2(id, handler)                                          \

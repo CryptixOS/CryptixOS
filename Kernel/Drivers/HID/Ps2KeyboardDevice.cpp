@@ -4,8 +4,10 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Drivers/HID/PS2Scancodes.hpp>
+#include <Arch/PowerManager.hpp>
+#include <Boot/CommandLine.hpp>
 
+#include <Drivers/HID/PS2Scancodes.hpp>
 #include <Drivers/HID/Ps2KeyboardDevice.hpp>
 #include <Drivers/TTY.hpp>
 
@@ -75,6 +77,12 @@ void Ps2KeyboardDevice::HandleScanCodeSet1Key(u8 raw)
         m_ExtraScanCode    = false;
         auto tty           = TTY::GetCurrent();
         bool cursorKeyMode = tty ? tty->GetCursorKeyMode() : false;
+        bool disableArrowKeys
+            = CommandLine::GetBoolean("disableArrowKeys").value_or(false);
+
+        char cursorSequence[3];
+        cursorSequence[0] = '\e';
+        cursorSequence[1] = cursorKeyMode ? 'O' : '[';
 
         switch (raw)
         {
@@ -86,16 +94,24 @@ void Ps2KeyboardDevice::HandleScanCodeSet1Key(u8 raw)
             case SCANCODE_ENTER: Emit("\n", 1); return;
             case 0x35: Emit("/", 1); return;
             case SCANCODE_UP_ARROW:
-                Emit(cursorKeyMode ? "\eOA" : "\e[A", 3);
+                if (disableArrowKeys) return;
+                cursorSequence[2] = 'A';
+                Emit(cursorSequence, 3);
                 return;
             case SCANCODE_LEFT_ARROW:
-                Emit(cursorKeyMode ? "\eOD" : "\e[D", 3);
+                if (disableArrowKeys) return;
+                cursorSequence[2] = 'D';
+                Emit(cursorSequence, 3);
                 return;
             case SCANCODE_DOWN_ARROW:
-                Emit(cursorKeyMode ? "\eOB" : "\e[B", 3);
+                if (disableArrowKeys) return;
+                cursorSequence[2] = 'B';
+                Emit(cursorSequence, 3);
                 return;
             case SCANCODE_RIGHT_ARROW:
-                Emit(cursorKeyMode ? "\eOC" : "\e[C", 3);
+                if (disableArrowKeys) return;
+                cursorSequence[2] = 'C';
+                Emit(cursorSequence, 3);
                 return;
             case SCANCODE_HOME_PRESS: Emit("\e[1~", 4); return;
             case SCANCODE_END_PRESS: Emit("\e[4~", 4); return;
@@ -151,6 +167,10 @@ void Ps2KeyboardDevice::HandleScanCodeSet1Key(u8 raw)
     if (m_Modifiers & KeyModifier::eControl) c = std::toupper(c) - 0x40;
 
     if (!pressed) return;
+
+    if (m_Modifiers & KeyModifier::eShift && m_Modifiers & KeyModifier::eAlt
+        && c == '\r')
+        PowerManager::Reboot();
     Emit(&c, 1);
 }
 void Ps2KeyboardDevice::HandleScanCodeSet2Key(u8 raw) {}

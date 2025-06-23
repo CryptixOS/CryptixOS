@@ -19,25 +19,27 @@ class Fat32Fs final : public Filesystem
     }
     virtual ~Fat32Fs() = default;
 
-    virtual INode* Mount(INode* parent, INode* source, INode* target,
-                         std::string_view name,
-                         const void*      data = nullptr) override;
-    virtual INode* CreateNode(INode* parent, std::string_view name,
-                              mode_t mode) override;
-    virtual INode* Symlink(INode* parent, std::string_view name,
-                           std::string_view target) override
+    virtual ErrorOr<INode*> Mount(INode* parent, INode* source, INode* target,
+                                  DirectoryEntry* entry, StringView name,
+                                  const void* data = nullptr) override;
+    virtual ErrorOr<INode*> CreateNode(INode* parent, DirectoryEntry* entry,
+                                       mode_t mode, uid_t uid = 0,
+                                       gid_t gid = 0) override;
+    virtual ErrorOr<INode*> Symlink(INode* parent, DirectoryEntry* entry,
+                                    StringView target) override
     {
         return nullptr;
     }
 
-    virtual INode* Link(INode* parent, std::string_view name,
-                        INode* oldNode) override
+    virtual INode* Link(INode* parent, StringView name, INode* oldNode) override
     {
         return nullptr;
     }
-    virtual bool   Populate(INode* node) override;
+    virtual bool          Populate(INode* node) override;
 
-    constexpr bool IsFinalCluster(usize cluster) const
+    virtual ErrorOr<void> Stats(statfs& stats) override;
+
+    constexpr bool        IsFinalCluster(usize cluster) const
     {
         return cluster >= 0xffffff8;
     }
@@ -48,17 +50,17 @@ class Fat32Fs final : public Filesystem
     u32   SkipCluster(u32 cluster, usize count, bool& endCluster);
 
   private:
-    INode*           m_Device = nullptr;
-    Fat32BootRecord  m_BootRecord;
-    Fat32FsInfo      m_FsInfo;
-    usize            m_ClusterSize    = 0;
-    usize            m_ClusterCount   = 0;
-    isize            m_FatOffset      = 0;
-    isize            m_DataOffset     = 0;
-    std::atomic<i64> m_NextINodeIndex = 3;
-    Fat32FsINode*    m_RootNode       = nullptr;
+    INode*          m_Device = nullptr;
+    Fat32BootRecord m_BootRecord;
+    Fat32FsInfo     m_FsInfo;
+    usize           m_ClusterSize    = 0;
+    usize           m_ClusterCount   = 0;
+    isize           m_FatOffset      = 0;
+    isize           m_DataOffset     = 0;
+    Atomic<i64>     m_NextINodeIndex = 3;
+    Fat32FsINode*   m_RootNode       = nullptr;
 
-    usize            GetClusterOffset(u32 cluster);
+    usize           GetClusterOffset(u32 cluster);
     constexpr usize
     GetClusterForDirectoryEntry(Fat32DirectoryEntry* entry) const
     {

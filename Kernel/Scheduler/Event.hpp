@@ -6,10 +6,11 @@
  */
 #pragma once
 
-#include <Prism/Core/Types.hpp>
-#include <Prism/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
-#include <deque>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Core/Types.hpp>
+
 #include <span>
 
 constexpr usize MAX_LISTENERS = 32;
@@ -34,5 +35,5 @@ struct Event
 
     Spinlock                    Lock;
     usize                       Pending;
-    std::deque<EventListener>   Listeners;
+    Deque<EventListener>        Listeners;
 };

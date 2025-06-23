@@ -19,32 +19,28 @@ namespace PhysicalMemoryManager
     CTOS_NO_KASAN void* CallocatePages(usize count = 1);
     CTOS_NO_KASAN void  FreePages(void* ptr, usize count);
 
-    template <typename T>
-    CTOS_NO_KASAN T AllocatePages(usize count = 1)
+    template <PointerHolder T>
+    inline CTOS_NO_KASAN T AllocatePages(usize count = 1)
     {
+        if constexpr (std::is_same_v<T, Pointer>) return AllocatePages(count);
+
         return reinterpret_cast<T>(AllocatePages(count));
     }
-    template <>
-    inline PM::Pointer AllocatePages<PM::Pointer>(usize count)
-    {
-        return reinterpret_cast<uintptr_t>(AllocatePages(count));
-    }
 
-    template <typename T>
+    template <PointerHolder T>
     CTOS_NO_KASAN T CallocatePages(usize count = 1)
     {
+        if constexpr (std::is_same_v<T, Pointer>) return AllocatePages(count);
+
         return reinterpret_cast<T>(CallocatePages(count));
     }
-    template <>
-    inline PM::Pointer CallocatePages<PM::Pointer>(usize count)
-    {
-        return reinterpret_cast<uintptr_t>(CallocatePages(count));
-    }
 
-    template <typename T>
+    template <PointerHolder T>
     CTOS_NO_KASAN void FreePages(T ptr, usize count)
     {
-        FreePages(reinterpret_cast<void*>(ptr), count);
+        if constexpr (std::is_same_v<T, Pointer>)
+            FreePages(ptr.template FromHigherHalf<void*>(), count);
+        else FreePages(reinterpret_cast<void*>(ptr), count);
     }
 
     uintptr_t GetMemoryTop();

@@ -13,20 +13,21 @@
 #include <Library/Stacktrace.hpp>
 #include <Prism/Core/Types.hpp>
 
-#include <format>
-#include <string_view>
+#define KERNEL_INIT_CODE_SECTION_NAME ".kernel_init"
+#define KERNEL_INIT_CODE                                                       \
+    [[gnu::section(KERNEL_INIT_CODE_SECTION_NAME), gnu::used]]
 
-inline constexpr u64 BIT(u64 n) { return (1ull << n); }
+#define CTOS_ALWAYS_INLINE     [[gnu::always_inline]]
+#define CTOS_UNUSED            [[maybe_unused]]
 
-#define CTOS_UNUSED               [[maybe_unused]]
-#define CtosUnused(var)           ((void)var)
-#define CTOS_GET_FRAME_ADDRESS(n) __builtin_frame_address(n)
+#define CtosUnused(var)        ((void)var)
+#define CtosGetFrameAddress(n) __builtin_frame_address(n)
 
-#define CTOS_ARCH_X86_64          0
-#define CTOS_ARCH_AARCH64         1
-#define CTOS_ARCH_RISC_V          2
+#define CTOS_ARCH_X86_64       0
+#define CTOS_ARCH_AARCH64      1
+#define CTOS_ARCH_RISC_V       2
 
-#define CTOS_DEBUG_SYSCALLS       0
+#define CTOS_DEBUG_SYSCALLS    0
 #if CTOS_DEBUG_SYSCALLS == 1
     #define DebugSyscall(...) LogDebug(__VA_ARGS__)
 #else

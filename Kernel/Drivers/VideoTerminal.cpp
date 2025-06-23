@@ -5,49 +5,15 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Drivers/VideoTerminal.hpp>
+#include <Embed/Font.hpp>
 
 #include <Library/Logger.hpp>
 
-constexpr u32   RED_BITS_MASK      = 0x00ff0000;
-constexpr u32   GREEN_BITS_MASK    = 0x0000ff00;
-constexpr u32   BLUE_BITS_MASK     = 0x000000ff;
-constexpr u32   ALPHA_BITS_MASK    = 0xff000000;
+#include <magic_enum/magic_enum.hpp>
 
-constexpr u32   RED_BITS_SHIFT     = 16;
-constexpr u32   GREEN_BITS_SHIFT   = 8;
-constexpr u32   BLUE_BITS_SHIFT    = 0;
-constexpr u32   ALPHA_BITS_SHIFT   = 24;
-
-constexpr usize MAX_FONT_GLYPHS    = 256;
-constexpr usize DEFAULT_BACKGROUND = 0xa0000000;
-constexpr usize DEFAULT_BACKDROP   = 0x00000000;
-extern "C"
-{
-    extern u8    _binary____Meta_fonts_font_bin_start[];
-    extern u8    _binary____Meta_fonts_font_bin_end[];
-    extern usize _binary____Meta_fonts_font_bin_size;
-}
-
-constexpr u32 BlendColors(u32 fg, u32 bg)
-{
-    u32   alpha        = 255 - (fg & ALPHA_BITS_MASK);
-    u32   inverseAlpha = (fg >> ALPHA_BITS_SHIFT) + 1;
-
-    u8    fgR          = (fg & RED_BITS_MASK) >> RED_BITS_SHIFT;
-    u8    fgG          = (fg & GREEN_BITS_MASK) >> GREEN_BITS_SHIFT;
-    u8    fgB          = (fg & BLUE_BITS_MASK) >> BLUE_BITS_SHIFT;
-
-    u8    bgR          = (bg & RED_BITS_MASK) >> RED_BITS_SHIFT;
-    u8    bgG          = (bg & GREEN_BITS_MASK) >> GREEN_BITS_SHIFT;
-    u8    bgB          = (bg & BLUE_BITS_MASK) >> BLUE_BITS_SHIFT;
-
-    u8    r     = static_cast<u8>((alpha * fgR + inverseAlpha * bgR) / 256);
-    u8    g     = static_cast<u8>((alpha * fgG + inverseAlpha * bgG) / 256);
-    u8    b     = static_cast<u8>((alpha * fgB + inverseAlpha * bgB) / 256);
-
-    usize final = (r << RED_BITS_SHIFT) | (g << GREEN_BITS_SHIFT) | b;
-    return final;
-}
+constexpr usize MAX_FONT_GLYPHS     = 256;
+constexpr Color DEFAULT_BACKGROUND  = 0xa0'00'00'00;
+constexpr Color DEFAULT_BACKDROP    = 0x00'00'00'00;
 
 constexpr usize BUILTIN_FONT_WIDTH  = 8;
 constexpr usize BUILTIN_FONT_HEIGHT = 16;
@@ -57,21 +23,20 @@ bool            VideoTerminal::Initialize(const limine_framebuffer& framebuffer)
     if (!framebuffer.address) return false;
     else if (m_Initialized) return true;
 
-    m_Framebuffer = {.Address        = framebuffer.address,
-                     .Width          = framebuffer.width,
-                     .Height         = framebuffer.height,
-                     .Pitch          = framebuffer.pitch,
-                     .BitsPerPixel   = framebuffer.bpp,
-                     .RedMaskSize    = framebuffer.red_mask_size,
-                     .RedMaskShift   = framebuffer.red_mask_shift,
-                     .GreenMaskSize  = framebuffer.green_mask_size,
-                     .GreenMaskShift = framebuffer.green_mask_shift,
-                     .BlueMaskSize   = framebuffer.blue_mask_size,
-                     .BlueMaskShift  = framebuffer.blue_mask_shift};
+    m_Framebuffer    = {.Address        = framebuffer.address,
+                        .Width          = framebuffer.width,
+                        .Height         = framebuffer.height,
+                        .Pitch          = framebuffer.pitch,
+                        .BitsPerPixel   = framebuffer.bpp,
+                        .RedMaskSize    = framebuffer.red_mask_size,
+                        .RedMaskShift   = framebuffer.red_mask_shift,
+                        .GreenMaskSize  = framebuffer.green_mask_size,
+                        .GreenMaskShift = framebuffer.green_mask_shift,
+                        .BlueMaskSize   = framebuffer.blue_mask_size,
+                        .BlueMaskShift  = framebuffer.blue_mask_shift};
 
-    auto fontAddress
-        = reinterpret_cast<uintptr_t>(&_binary____Meta_fonts_font_bin_start);
-    auto fontModule = BootInfo::FindModule("font");
+    auto fontAddress = reinterpret_cast<uintptr_t>(&Meta_fonts_font_bin);
+    auto fontModule  = BootInfo::FindModule("font");
     if (fontModule)
         fontAddress = reinterpret_cast<uintptr_t>(fontModule->address);
 
@@ -81,8 +46,8 @@ bool            VideoTerminal::Initialize(const limine_framebuffer& framebuffer)
         SetCanvas(reinterpret_cast<u8*>(backgroundModule->address),
                   backgroundModule->size);
 
-    SetTextForegroundDefault();
-    SetTextBackgroundDefault();
+    SetTextForeground(AnsiColor::eDefault);
+    SetTextBackground(AnsiColor::eDefault);
 
     m_Margin         = 64;
     m_MarginGradient = 4;
@@ -119,10 +84,6 @@ bool            VideoTerminal::Initialize(const limine_framebuffer& framebuffer)
     Reset();
     Refresh();
 
-    LogInfo(
-        "VT: ws_col: {}, ws_row: {}, scrollMarginBottom: {}, scrollMarginTop: "
-        "{}",
-        m_Size.ws_col, m_Size.ws_row, m_ScrollBottomMargin, m_ScrollTopMargin);
     return (m_Initialized = true);
 }
 
@@ -231,12 +192,12 @@ void VideoTerminal::ScrollUp()
 
 void VideoTerminal::Refresh()
 {
-    u32 bgColor = 0xffffffff;
+    auto bgColor = m_CurrentState.TextBackground;
     for (usize y = 0; y < m_Framebuffer.Height; y++)
     {
         for (usize x = 0; x < m_Framebuffer.Width; x++)
         {
-            if (m_Canvas.Address)
+            if (m_Canvas.Address && bgColor == DEFAULT_TEXT_BACKGROUND)
                 bgColor = m_Canvas.Address
                               .As<volatile u32>()[y * m_Framebuffer.Width + x];
             m_Framebuffer.PutPixel(x, y, bgColor);
@@ -311,49 +272,60 @@ void VideoTerminal::SwapPalette()
     std::swap(m_CurrentState.TextForeground, m_CurrentState.TextBackground);
 }
 
-constexpr usize s_AnsiColors[]
-    = {0x00000000, 0x00aa0000, 0x0000aa00, 0x00aa5500, 0x000000aa, 0x00aa00aa,
-       0x0000aaaa, 0x00aaaaaa, 0x00555555, 0x00ff5555, 0x0055ff55, 0x00ffff55,
-       0x005555ff, 0x00ff55ff, 0x0055ffff, 0x00ffffff};
+inline constexpr Color s_AnsiColors[]
+    = {Color::AnsiBlack(), Color::AnsiRed(), Color::AnsiGreen(),
+       Color::AnsiYellow(), Color::AnsiBlue(), Color::AnsiMagenta(),
+       // Cyan, White, ---
+       Color::AnsiCyan(), Color::AnsiWhite(), 0x00555555,
+       // Default, BrightBlack, BrightRed
+       0x00ff5555, Color::AnsiBrightBlack(), Color::AnsiBrightRed(),
+       // Bright Green, Bright Yellow, Bright Blue
+       Color::AnsiBrightGreen(), Color::AnsiBrightYellow(),
+       Color::AnsiBrightBlue(),
+       // Bright Magenta, Bright Cyan, Bright White
+       Color::AnsiBrightMagenta(), Color::AnsiBrightCyan(),
+       Color::AnsiBrightWhite()};
 
-static_assert(std::size(s_AnsiColors) == 16);
+// 8 ansi colors(0-7) + empty entry(8) + default(9) + 8 bright ansi
+// colors(10-17)
+static_assert(std::size(s_AnsiColors) == 8 * 2 + 2);
 
 void VideoTerminal::SetTextForeground(AnsiColor color)
 {
-    m_CurrentState.TextForeground
-        = ConvertColor(s_AnsiColors[std::to_underlying(color)]);
+    if (color == AnsiColor::eDefault)
+        return SetTextForegroundRgb(DEFAULT_TEXT_FOREGROUND);
+    else if (color == AnsiColor::eDefaultBright)
+        return SetTextForegroundRgb(DEFAULT_TEXT_FOREGROUND_BRIGHT);
+    else if (!magic_enum::enum_contains(color))
+    {
+        LogWarn("VT100: Invalid color -> {:#x}", std::to_underlying(color));
+        return;
+    }
+
+    SetTextForegroundRgb(s_AnsiColors[std::to_underlying(color)]);
 }
 void VideoTerminal::SetTextBackground(AnsiColor color)
 {
-    m_CurrentState.TextBackground
-        = ConvertColor(s_AnsiColors[std::to_underlying(color)]);
+    if (color == AnsiColor::eDefault)
+        return SetTextBackgroundRgb(DEFAULT_TEXT_BACKGROUND);
+    else if (color == AnsiColor::eDefaultBright)
+        return SetTextBackgroundRgb(DEFAULT_TEXT_BACKGROUND_BRIGHT);
+    else if (!magic_enum::enum_contains(color))
+    {
+        LogWarn("VT100: Invalid color -> {:#x}", std::to_underlying(color));
+        return;
+    }
+
+    SetTextBackgroundRgb(s_AnsiColors[std::to_underlying(color)]);
 }
 
-void VideoTerminal::SetTextForegroundRgb(u32 rgb)
+void VideoTerminal::SetTextForegroundRgb(Color rgb)
 {
-    m_CurrentState.TextForeground = ConvertColor(rgb);
+    m_CurrentState.TextForeground = rgb;
 }
-void VideoTerminal::SetTextBackgroundRgb(u32 rgb)
+void VideoTerminal::SetTextBackgroundRgb(Color rgb)
 {
-    m_CurrentState.TextBackground = ConvertColor(rgb);
-}
-
-void VideoTerminal::SetTextForegroundDefault()
-{
-    SetTextForegroundRgb(DEFAULT_TEXT_FOREGROUND);
-}
-void VideoTerminal::SetTextBackgroundDefault()
-{
-    m_CurrentState.TextBackground = 0xffffffff;
-}
-
-void VideoTerminal::SetTextForegroundDefaultBright()
-{
-    SetTextForegroundRgb(DEFAULT_TEXT_FOREGROUND_BRIGHT);
-}
-void VideoTerminal::SetTextBackgroundDefaultBright()
-{
-    SetTextBackgroundRgb(DEFAULT_TEXT_BACKGROUND_BRIGHT);
+    m_CurrentState.TextBackground = rgb;
 }
 
 void VideoTerminal::Destroy()
@@ -364,12 +336,14 @@ void VideoTerminal::Destroy()
 void VideoTerminal::PlotChar(Character* c, usize xpos, usize ypos)
 {
     if (!VerifyBounds(xpos, ypos)) return;
-    u32 defaultBg = 0xffffffff;
+    Color defaultBg  = DEFAULT_TEXT_BACKGROUND;
 
-    xpos          = m_OffsetX + xpos * m_Font.GlyphWidth;
-    ypos          = m_OffsetY + ypos * m_Font.GlyphHeight;
+    xpos             = m_OffsetX + xpos * m_Font.GlyphWidth;
+    ypos             = m_OffsetY + ypos * m_Font.GlyphHeight;
 
-    bool* glyph   = &m_Glyphs[c->CodePoint * m_Font.Height * m_Font.Width];
+    bool* glyph      = &m_Glyphs[c->CodePoint * m_Font.Height * m_Font.Width];
+    Color foreground = c->Foreground;
+    Color background = c->Background;
 
     for (usize gy = 0; gy < m_Font.GlyphHeight; gy++)
     {
@@ -378,23 +352,17 @@ void VideoTerminal::PlotChar(Character* c, usize xpos, usize ypos)
                         + (ypos + gy) * m_Framebuffer.Width;
         for (usize fx = 0; fx < m_Font.Width; fx++)
         {
-            bool draw = glyph[fy * m_Font.Width + fx];
+            bool draw  = glyph[fy * m_Font.Width + fx];
+            auto color = draw ? foreground : background;
             for (usize i = 0; i < m_Font.ScaleX; i++)
             {
                 usize gx = m_Font.ScaleX * fx + i;
-                u32   bg
-                    = c->Background == 0xffffffff ? defaultBg : c->Background;
-                u32 fg
-                    = c->Foreground == 0xffffffff ? defaultBg : c->Foreground;
+                if (m_Canvas.Address && color == defaultBg)
+                    color = canvasLine[gx];
+                // color = BlendColors(m_CurrentState.TextBackground,
+                //                     canvasLine[gx]);
 
-                if (m_Canvas.Address)
-                {
-                    bg = c->Background == 0xffffffff ? canvasLine[gx]
-                                                     : c->Background;
-                    fg = c->Foreground == 0xffffffff ? canvasLine[gx]
-                                                     : c->Foreground;
-                }
-                m_Framebuffer.PutPixel(xpos + gx, ypos + gy, draw ? fg : bg);
+                m_Framebuffer.PutPixel(xpos + gx, ypos + gy, color);
             }
         }
     }
@@ -466,20 +434,14 @@ void VideoTerminal::SetFont(const Font& font)
         u8* glyph = m_Font.Address.Offset<Pointer>(i * m_Font.Height).As<u8>();
         for (usize y = 0; y < m_Font.Height; y++)
         {
-            for (usize x = 0; x < 8; x++)
+            for (usize x = 0; x < m_Font.Width; x++)
             {
                 usize offset
                     = i * m_Font.Height * m_Font.Width + y * m_Font.Width + x;
 
-                m_Glyphs[offset] = glyph[y] & (0x80 >> x);
-            }
-
-            for (usize x = 8; x < m_Font.Width; x++)
-            {
-                usize offset
-                    = i * m_Font.Height * m_Font.Width + y * m_Font.Width + x;
-
-                m_Glyphs[offset] = (i >= 0xc0 && i <= 0xdf) && glyph[y] & 1;
+                bool draw = glyph[y] & (0x80 >> x);
+                if (x >= 8) draw = i >= 0xc0 && i <= 0xdf && glyph[y] & Bit(0);
+                m_Glyphs[offset] = draw;
             }
         }
     }
@@ -545,17 +507,20 @@ void VideoTerminal::GenerateGradient()
             usize   imageX     = (x - displacementX);
             Pointer imagePixel = pixels.Offset(imageX * columnSize + offset);
 
-            u32     color      = imageX >= m_Image.Width() ? DEFAULT_BACKDROP
-                                                           : *imagePixel.As<u32>();
+            u8      r = *imagePixel.As<u32>() >> m_Framebuffer.RedMaskShift;
+            u8      g = *imagePixel.As<u32>() >> m_Framebuffer.GreenMaskShift;
+            u8      b = *imagePixel.As<u32>() >> m_Framebuffer.BlueMaskShift;
+            Color   color
+                = imageX >= m_Image.Width() ? DEFAULT_BACKDROP : Color(r, g, b);
             if (gradientArea.InBounds(x, y))
-                color = BlendColors(DEFAULT_BACKGROUND, color);
+                color = color.Blend(DEFAULT_BACKGROUND);
             else color = BlendMargin(x, y, color);
             m_Canvas.Address.As<u32>()[canvasOffset + x] = color;
         }
     }
 }
 
-u32 VideoTerminal::BlendMargin(usize x, usize y, u32 backgroundPixel)
+Color VideoTerminal::BlendMargin(usize x, usize y, Color backgroundPixel)
 {
     usize gradientStopX = m_Framebuffer.Width - m_Margin;
     usize gradientStopY = m_Framebuffer.Height - m_Margin;
@@ -573,9 +538,8 @@ u32 VideoTerminal::BlendMargin(usize x, usize y, u32 backgroundPixel)
 
     if (distance > m_MarginGradient) return backgroundPixel;
 
-    u8 gradientStep = (0xff - (DEFAULT_BACKGROUND >> 24)) / m_MarginGradient;
-    u8 newAlpha     = (DEFAULT_BACKGROUND >> 24) + gradientStep * distance;
+    u8 gradientStep = (0xff - DEFAULT_BACKGROUND.Alpha()) / m_MarginGradient;
+    u8 newAlpha     = DEFAULT_BACKGROUND.Alpha() + gradientStep * distance;
 
-    return BlendColors((DEFAULT_BACKGROUND & 0xffffff) | (newAlpha << 24),
-                       backgroundPixel);
+    return backgroundPixel.Blend({DEFAULT_BACKGROUND, newAlpha});
 }

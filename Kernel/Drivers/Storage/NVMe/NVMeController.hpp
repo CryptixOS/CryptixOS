@@ -10,7 +10,9 @@
 #include <Drivers/Storage/NVMe/NVMeNameSpace.hpp>
 #include <Drivers/Storage/NVMe/NVMeQueue.hpp>
 
-#include <atomic>
+#include <Prism/String/String.hpp>
+#include <Prism/Utility/Atomic.hpp>
+
 #include <utility>
 
 namespace NVMe
@@ -27,7 +29,7 @@ namespace NVMe
         eCfs   = Bit(1),
     };
 
-    struct ControllerInfo
+    struct [[gnu::packed]] ControllerInfo
     {
         u16 VendorID;
         u16 SubsystemVendorID;
@@ -70,21 +72,23 @@ namespace NVMe
         u32 SglSupport;
         u32 Unused6[1401];
         u8  VendorSpecific[1024];
-    } __attribute__((packed));
+    };
 
-    inline Configuration operator|(Configuration lhs, Configuration rhs)
+    constexpr inline Configuration operator|(Configuration lhs,
+                                             Configuration rhs)
     {
         auto result = std::to_underlying(lhs) | std::to_underlying(rhs);
 
         return static_cast<Configuration>(result);
     }
-    inline Configuration operator~(Configuration conf)
+    constexpr inline Configuration operator~(Configuration conf)
     {
         auto result = ~std::to_underlying(conf);
 
         return static_cast<Configuration>(result);
     }
-    inline Configuration& operator&=(Configuration& lhs, Configuration rhs)
+    constexpr inline Configuration& operator&=(Configuration& lhs,
+                                               Configuration  rhs)
     {
         auto result = std::to_underlying(lhs);
         result &= std::to_underlying(rhs);
@@ -92,7 +96,7 @@ namespace NVMe
         return lhs = static_cast<Configuration>(result);
     }
 
-    inline bool operator&(Status lhs, Status rhs)
+    constexpr inline bool operator&(Status lhs, Status rhs)
     {
         auto result = std::to_underlying(lhs) & std::to_underlying(rhs);
 
@@ -173,16 +177,26 @@ namespace NVMe
 
         bool          CreateIoQueues(NameSpace& ns, Queue*& queues, u32 id);
 
-        virtual std::string_view GetName() const noexcept override
-        {
-            return m_Name;
-        }
+        virtual StringView GetName() const noexcept override { return m_Name; }
 
-        virtual isize Read(void* dest, off_t offset, usize bytes) override
+        virtual ErrorOr<isize> Read(void* dest, off_t offset,
+                                    usize bytes) override
         {
             return 0;
         }
-        virtual isize Write(const void* src, off_t offset, usize bytes) override
+        virtual ErrorOr<isize> Write(const void* src, off_t offset,
+                                     usize bytes) override
+        {
+            return 0;
+        }
+
+        virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                    isize offset = -1) override
+        {
+            return 0;
+        }
+        virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                     isize offset = -1) override
         {
             return 0;
         }
@@ -190,10 +204,10 @@ namespace NVMe
         virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
 
       private:
-        std::string m_Name                               = "nvme";
-        usize       m_Index                              = 0;
+        String m_Name                                    = "nvme"_s;
+        usize  m_Index                                   = 0;
         ControllerRegister volatile* volatile m_Register = nullptr;
-        PM::Pointer                         m_CrAddress;
+        Pointer                             m_CrAddress;
 
         u64                                 m_QueueSlots     = 0;
         u64                                 m_DoorbellStride = 0;
@@ -203,7 +217,7 @@ namespace NVMe
         usize                               m_MaxTransShift = 0;
         std::unordered_map<u32, NameSpace*> m_NameSpaces;
 
-        static std::atomic<usize>           s_ControllerCount;
+        static Atomic<usize>                s_ControllerCount;
 
         i32                                 Identify(ControllerInfo* info);
         bool  DetectNameSpaces(u32 namespaceCount);

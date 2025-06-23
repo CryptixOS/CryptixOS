@@ -9,10 +9,10 @@
 #include <Drivers/VideoTerminal.hpp>
 
 #include <Library/Logger.hpp>
-#include <Prism/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
 #include <Prism/Debug/LogSink.hpp>
-#include <Prism/StringUtils.hpp>
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <cctype>
@@ -22,12 +22,12 @@ namespace E9
 {
     CTOS_NO_KASAN static void PrintChar(u8 c)
     {
-#if CTOS_ARCH == CTOS_ARCH_X86_64
+#ifdef CTOS_TARGET_X86_64
         __asm__ volatile("outb %0, %1" : : "a"(c), "d"(u16(0xe9)));
 #endif
     }
 
-    CTOS_NO_KASAN static void PrintString(std::string_view str)
+    CTOS_NO_KASAN static void PrintString(StringView str)
     {
         for (auto c : str) PrintChar(c);
     }
@@ -35,16 +35,20 @@ namespace E9
 
 using namespace Prism;
 
-static usize         s_EnabledSinks = 0;
-static VideoTerminal s_Terminal;
-class CoreSink       final : public LogSink
+static usize   s_EnabledSinks = 0;
+class CoreSink final : public LogSink
 {
   public:
-    void WriteNoLock(std::string_view str) override
+    void WriteNoLock(StringView str) override
     {
         if (s_EnabledSinks & LOG_SINK_E9) E9::PrintString(str);
         if (s_EnabledSinks & LOG_SINK_SERIAL) Serial::Write(str);
-        if (s_EnabledSinks & LOG_SINK_TERMINAL) s_Terminal.PrintString(str);
+        if (s_EnabledSinks & LOG_SINK_TERMINAL)
+        {
+            auto terminal = Terminal::GetPrimary();
+            if (!terminal) return;
+            terminal->PrintString(str);
+        }
     }
 };
 CoreSink g_CoreSink;
@@ -67,11 +71,13 @@ namespace Logger
                   bool plusSign = false, bool spaceIfNoSign = false,
                   bool zeroPadding = false, usize lengthSpecifier = 0)
         {
-            char   buf[64];
-            T      value   = va_arg(args, T);
-            char*  str     = ToString(value, buf, base);
-            size_t len     = strlen(str);
-            char   padding = zeroPadding ? '0' : ' ';
+            char       buf[64];
+            T          value    = va_arg(args, T);
+            StringView strStart = ToString(value, buf, base);
+            char*      str      = const_cast<char*>(strStart.Raw());
+
+            size_t     len      = strlen(str);
+            char       padding  = zeroPadding ? '0' : ' ';
             if (plusSign && lengthSpecifier > 0) lengthSpecifier--;
             if (!justifyLeft)
             {
@@ -132,22 +138,22 @@ namespace Logger
                 char* start  = const_cast<char*>(fmt);
                 usize length = 0;
 
-                for (; std::isdigit(*fmt); length++, fmt++)
-                    ;
+                for (; StringUtils::IsDigit(*fmt); length++, fmt++);
+                StringView numberString(start, length);
 
-                return ToNumber<isize>(start, length);
+                return ToNumber<isize>(numberString, 10);
             };
 
             isize width     = 0;
             isize precision = 1000;
             if (fmt != precisionStart)
             {
-                if (std::isdigit(*fmt)) width = parseNumber(fmt);
+                if (StringUtils::IsDigit(*fmt)) width = parseNumber(fmt);
                 else if (*fmt == '*') width = va_arg(args, i32);
             }
             if (*fmt == '*' && fmt == precisionStart)
                 precision = va_arg(args, i32);
-            else if (std::isdigit(*fmt) && fmt == precisionStart)
+            else if (StringUtils::IsDigit(*fmt) && fmt == precisionStart)
                 precision = parseNumber(fmt);
 
             enum class ArgLength
@@ -250,15 +256,16 @@ namespace Logger
 
     CTOS_NO_KASAN void EnableSink(usize output)
     {
-        if (output == LOG_SINK_TERMINAL)
-            s_Terminal.Initialize(*BootInfo::GetPrimaryFramebuffer());
+        auto terminal = Terminal::GetPrimary();
+        if (output == LOG_SINK_TERMINAL && terminal)
+            terminal->Initialize(*BootInfo::GetPrimaryFramebuffer());
 
         s_EnabledSinks |= output;
     }
     CTOS_NO_KASAN void DisableSink(usize output) { s_EnabledSinks &= ~output; }
 
     void LogChar(u64 c) { Print(reinterpret_cast<const char*>(&c)); }
-    void Print(std::string_view string) { g_CoreSink.WriteNoLock(string); }
+    void Print(StringView string) { g_CoreSink.WriteNoLock(string); }
     i32  Printv(const char* format, va_list* args)
     {
         Logv(LogLevel::eNone, format, *args);
@@ -266,7 +273,7 @@ namespace Logger
         return 0;
     }
 
-    CTOS_NO_KASAN void Log(LogLevel logLevel, std::string_view string,
+    CTOS_NO_KASAN void Log(LogLevel logLevel, StringView string,
                            bool printNewline)
     {
         ScopedLock guard(s_Lock, true);
@@ -304,6 +311,6 @@ namespace Logger
         if (printNewline) LogChar('\n');
     }
 
-    Terminal& GetTerminal() { return s_Terminal; }
+    Terminal& GetTerminal() { return *Terminal::GetPrimary(); }
     void      Unlock() { s_Lock.Release(); }
 } // namespace Logger

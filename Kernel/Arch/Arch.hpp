@@ -7,9 +7,9 @@
 #pragma once
 
 #include <API/Posix/time.h>
-#include <Prism/Core/Types.hpp>
 
-#include <vector>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/Types.hpp>
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
     #define CTOS_ARCH_STRING "x86-64"
@@ -20,14 +20,14 @@
 class HardwareTimer;
 namespace Arch
 {
-    void                           Initialize();
+    void              Initialize();
 
-    __attribute__((noreturn)) void Halt();
-    void                           Pause();
+    [[noreturn]] void Halt();
+    void              Pause();
 
-    void                           PowerOff();
-    void                           Reboot();
+    void              PowerOff();
+    void              Reboot();
 
-    void   ProbeTimers(std::vector<HardwareTimer*>& timers);
-    time_t GetEpoch();
+    void              ProbeTimers(Vector<HardwareTimer*>& timers);
+    time_t            GetEpoch();
 }; // namespace Arch

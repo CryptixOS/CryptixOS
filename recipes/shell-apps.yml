@@ -1,3 +1,47 @@
+tools:
+  - name: host-icmake
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      git: 'https://gitlab.com/fbb-git/icmake'
+      tag: '9.03.01'
+      regenerate:
+        - args: ['sed', '-i', 's#"usr/bin"#"bin"#', '@THIS_SOURCE_DIR@/icmake/INSTALL.im']
+    revision: 2
+    configure:
+      - args: ['@THIS_SOURCE_DIR@/icmake/icm_prepare', '@PREFIX@/']
+        workdir: '@THIS_SOURCE_DIR@/icmake'
+    compile:
+      - args: ['@THIS_SOURCE_DIR@/icmake/icm_bootstrap', 'x']
+        workdir: '@THIS_SOURCE_DIR@/icmake'
+    install:
+      - args: ['@THIS_SOURCE_DIR@/icmake/icm_install', 'strip', 'all', '/']
+        workdir: '@THIS_SOURCE_DIR@/icmake'
+
+  - name: host-yodl
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      git: 'https://gitlab.com/fbb-git/yodl'
+      tag: '4.03.03'
+      regenerate:
+        - args: ['sed', '-i', 's#"/usr"#"/"#', '@THIS_SOURCE_DIR@/yodl/INSTALL.im']
+        - args: ['sed', '-i', 's#/usr/bin/icmake#@BUILD_ROOT@/tools/host-icmake/bin/icmake#', '@THIS_SOURCE_DIR@/yodl/build']
+    tools_required:
+      - host-icmake
+    compile:
+      - args: ['./build', 'programs']
+        workdir: '@THIS_SOURCE_DIR@/yodl'
+      - args: ['./build', 'macros']
+        workdir: '@THIS_SOURCE_DIR@/yodl'
+    install:
+      - args: ['./build', 'install', 'programs', '@PREFIX@']
+        workdir: '@THIS_SOURCE_DIR@/yodl'
+      - args: ['./build', 'install', 'macros', '@PREFIX@']
+        workdir: '@THIS_SOURCE_DIR@/yodl'
+
 packages:
   - name: shell-apps
     architecture: noarch
@@ -9,6 +53,37 @@ packages:
       - dash
     configure: []
     build: []
+
+  - name: awsh 
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      version: '0.1'
+    tools_required:
+      - system-gcc
+      - host-pkg-config
+      - virtual: pkgconfig-for-target
+        triple: "@OPTION:arch-triple@"
+    pkgs_required:
+      - base-files
+      - mlibc
+      - prism
+    configure: 
+      - args:
+        - 'meson'
+        - 'setup'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/@OPTION:arch-triple@-target.cross-file'
+        - '--prefix=/usr'
+        - '--libdir=/lib'
+        - '--buildtype=debugoptimized'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
     
   - name: bash
     architecture: '@OPTION:arch@'
@@ -53,9 +128,11 @@ packages:
         - '--prefix=/usr'
         - '--without-bash-malloc'
         - '--disable-nls'
-        - '--disable-readline'
+        - '--enable-readline'
+        #- '--disable-readline'
+        #- '--without-readline'
         - '--with-curses'
-        #- '--with-installed-readline=$SYSROOT_DIR$/usr'
+        - '--with-installed-readline=$SYSROOT_DIR$/usr'
         environ:
           ac_cv_func_wcswidth: 'no'
     build:
@@ -102,4 +179,85 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
+  - name: zsh
+    metadata:
+      summary: 'UNIX Shell similar to the Korn shell'
+      description: 'Zsh is a shell designed for interactive use, although it is also a powerful scripting language. Many of the useful features of bash, ksh, and tcsh were incorporated into zsh; many original features were added.'
+      spdx: 'MIT'
+      website: 'https://zsh.sourceforge.io/'
+      maintainer: "no92 <no92.mail@gmail.com>"
+      categories: ['app-shells']
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      git: 'https://git.code.sf.net/p/zsh/code'
+      tag: 'zsh-5.9'
+      version: '5.9'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.11
+      regenerate:
+        - args: ['./Util/preconfig']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-automake-v1.11/share/automake-1.11/config.sub',
+            '@THIS_SOURCE_DIR@/']
+        - args: |
+            sed -e 's/^main/int &/' -e 's/exit(/return(/' -i aczsh.m4 @THIS_SOURCE_DIR@/configure.ac
+        - args: |
+            sed -e 's/test = /&(char**)/' -i @THIS_SOURCE_DIR@/configure.ac
+    tools_required:
+      - host-yodl
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - ncurses
+    revision: 3
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--quiet'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc/zsh'
+        - '--enable-etcdir=/etc/zsh'
+    build:
+      - args: ['make', 'prep']
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
+        quiet: true
+        
+  - name: vttest
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/hharte/vttest.git'
+      branch: 'master'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+      regenerate:
+        # While we do not need to regenerate the configure script, we need to touch it
+        # after patching config.sub so that make does not try to regenerate it.
+        - args: ['autoconf']
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - ncurses
+      - readline
+      - libiconv
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--with-curses'
+        environ:
+          ac_cv_func_wcswidth: 'no'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
+        quiet: true
 

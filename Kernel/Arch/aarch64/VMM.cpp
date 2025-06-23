@@ -4,14 +4,16 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Debug/Assertions.hpp>
+#include <Debug/Panic.hpp>
+
+#include <Library/Spinlock.hpp>
 #include <Memory/VMM.hpp>
 
-#include <Prism/Spinlock.hpp>
-
-struct TTBR
+struct [[gnu::packed]] TTBR
 {
     PageTableEntry entries[512]{};
-} __attribute__((packed));
+};
 
 struct PageTable
 {
@@ -82,35 +84,35 @@ static constexpr size_t PAGE_SIZE_64KIB = 64_kib;
 
 namespace Arch::VMM
 {
-    constexpr usize                  VALID           = (1 << 0);
-    constexpr usize                  TABLE           = (1 << 1);
-    [[maybe_unused]] constexpr usize BLOCK           = (0 << 1);
-    constexpr usize                  PAGE            = Bit(1);
+    constexpr usize                  VALID             = (1 << 0);
+    constexpr usize                  TABLE             = (1 << 1);
+    [[maybe_unused]] constexpr usize BLOCK             = (0 << 1);
+    constexpr usize                  PAGE              = Bit(1);
 
-    constexpr usize                  USER            = Bit(6);
+    constexpr usize                  USER              = Bit(6);
 
-    [[maybe_unused]] constexpr usize RW              = (0 << 7);
-    constexpr usize                  RO              = (1 << 7);
+    [[maybe_unused]] constexpr usize RW                = (0 << 7);
+    constexpr usize                  RO                = (1 << 7);
 
-    constexpr usize                  ACCESS          = (1 << 10);
-    constexpr usize                  NOTGLOBAL       = (1 << 11);
-    constexpr usize                  EXECNEVER       = (1ul << 54);
+    constexpr usize                  ACCESS            = (1 << 10);
+    constexpr usize                  NOTGLOBAL         = (1 << 11);
+    constexpr usize                  EXECNEVER         = (1ul << 54);
 
-    [[maybe_unused]] constexpr usize NONSHARE        = (0 << 8);
-    constexpr usize                  OUTSHARE        = (0b10 << 8);
-    constexpr usize                  INSHARE         = (0b11 << 8);
+    [[maybe_unused]] constexpr usize NONSHARE          = (0 << 8);
+    constexpr usize                  OUTSHARE          = (0b10 << 8);
+    constexpr usize                  INSHARE           = (0b11 << 8);
 
-    constexpr usize                  WB              = (0b00 << 2) | INSHARE;
-    [[maybe_unused]] constexpr usize NC              = (0b01 << 2) | OUTSHARE;
-    [[maybe_unused]] constexpr usize WT              = (0b10 << 2) | OUTSHARE;
+    constexpr usize                  WB                = (0b00 << 2) | INSHARE;
+    [[maybe_unused]] constexpr usize NC                = (0b01 << 2) | OUTSHARE;
+    [[maybe_unused]] constexpr usize WT                = (0b10 << 2) | OUTSHARE;
 
-    static usize                     vaWidth         = 0;
-    static usize                     pageSize        = 0;
-    static usize                     lPageSize       = 0;
-    static usize                     llPageSize      = 0;
+    static usize                     vaWidth           = 0;
+    static usize                     pageSize          = 0;
+    static usize                     lPageSize         = 0;
+    static usize                     llPageSize        = 0;
 
-    uintptr_t                        pteAddressMask  = 0;
-    uintptr_t                        defaultPteFlags = VALID | TABLE;
+    uintptr_t                        pteAddressMask    = 0;
+    uintptr_t                        g_DefaultPteFlags = VALID | TABLE;
 
     void                             Initialize()
     {
@@ -128,7 +130,7 @@ namespace Arch::VMM
         if (mmfr0.tGran4 != 0b1111) pageSize = PAGE_SIZE_4KIB;
         else if (mmfr0.tGran16 != 0b0000) pageSize = PAGE_SIZE_16KIB;
         else if (mmfr0.tGran64 == 0b0000) pageSize = PAGE_SIZE_64KIB;
-        else Panic("VMM: Unknown page size");
+        else ::panic("VMM: Unknown page size");
 
         if (BootInfo::GetPagingMode() == 1
             && (tcrEl1 & Bit(59) && featLpa

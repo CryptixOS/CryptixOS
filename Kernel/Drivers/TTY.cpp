@@ -13,7 +13,7 @@
 #include <Drivers/TTY.hpp>
 #include <Drivers/Terminal.hpp>
 
-#include <Prism/StringView.hpp>
+#include <Prism/String/StringView.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
@@ -23,11 +23,10 @@
 #include <VFS/VFS.hpp>
 
 #include <algorithm>
-#include <cctype>
 #include <magic_enum/magic_enum.hpp>
 
-std::vector<TTY*> TTY::s_TTYs{};
-TTY*              TTY::s_CurrentTTY = nullptr;
+Vector<TTY*> TTY::s_TTYs{};
+TTY*         TTY::s_CurrentTTY = nullptr;
 
 TTY::TTY(Terminal* terminal, usize minor)
     : Device(4, minor)
@@ -114,33 +113,46 @@ void    TTY::SetTermios(const termios2& termios)
 {
     LogDebug("TTY: Setting termios to ->\n{}", termios);
     m_Termios = termios;
+    m_RawBuffer.Clear();
 }
 
-isize TTY::Read(void* buffer, off_t offset, usize bytes)
+ErrorOr<isize> TTY::Read(void* buffer, off_t offset, usize bytes)
 {
     if (IsCanonicalMode())
     {
         m_OnAddLine.Await();
 
-        ScopedLock         guard(m_RawLock);
-        const std::string& line  = m_LineQueue.pop_front_element();
-        const usize        count = std::min(bytes, line.size());
-        return line.copy(reinterpret_cast<char*>(buffer), count);
+        ScopedLock    guard(m_RawLock);
+        const String& line  = m_LineQueue.PopFrontElement();
+        const usize   count = std::min(bytes, line.Size());
+        return line.Copy(reinterpret_cast<char*>(buffer), count);
     }
 
-    if (m_RawBuffer.size() < bytes) m_RawEvent.Await();
-    usize count = std::min(m_RawBuffer.size(), bytes);
-    // std::string_view src(m_RawBuffer.begin(), m_RawBuffer.end());
-    char* dest  = reinterpret_cast<char*>(buffer);
+    char* dest = reinterpret_cast<char*>(buffer);
+    if (m_RawBuffer.Size() < bytes) m_RawEvent.Await();
+
+    ScopedLock guard(m_RawLock);
+    usize      count = std::min(m_RawBuffer.Size(), bytes);
+
+    isize      nread = 0;
+    while (count--)
+    {
+        auto value = m_RawBuffer.Pop();
+
+        if (value == 0x04) LogError("EOF: {:#x}", value);
+        *dest++ = value;
+        ++nread;
+    }
+
+    return nread;
 
     // isize            nread = src.copy(dest, count);
-    isize nread = 0;
     // for (; count > 0; count--) m_RawBuffer.pop_front();
-    while (count > 0 && m_RawBuffer.size())
+    while (count > 0 && m_RawBuffer.Size())
     {
         ScopedLock guard(m_RawLock);
-        u8         ch = m_RawBuffer.front();
-        m_RawBuffer.pop_front();
+        u8         ch = m_RawBuffer.Front();
+        m_RawBuffer.Pop();
         *dest++ = ch;
         ++nread;
         --count;
@@ -148,44 +160,34 @@ isize TTY::Read(void* buffer, off_t offset, usize bytes)
 
     return nread;
 }
-isize TTY::Write(const void* src, off_t offset, usize bytes)
+ErrorOr<isize> TTY::Write(const void* src, off_t offset, usize bytes)
 {
     const char*           s = reinterpret_cast<const char*>(src);
     static constexpr char MLIBC_LOG_SIGNATURE[] = "[mlibc]: ";
 
-    std::string_view      str(s, bytes);
+    StringView            str(s, bytes);
 
-    if (str.starts_with(MLIBC_LOG_SIGNATURE))
+    if (str.StartsWith(MLIBC_LOG_SIGNATURE))
     {
-        std::string_view errorMessage(s + sizeof(MLIBC_LOG_SIGNATURE) - 1 - 1);
-        LogMessage("[{}mlibc{}]: {} ", AnsiColor::FOREGROUND_MAGENTA,
+        StringView errorMessage(s + sizeof(MLIBC_LOG_SIGNATURE) - 1 - 1);
+        LogMessage("[{}mlibc{}]: {}", AnsiColor::FOREGROUND_MAGENTA,
                    AnsiColor::FOREGROUND_WHITE, errorMessage);
 
         return bytes;
     }
 
     ScopedLock guard(m_OutputLock);
-
-#if 0
-    bool       escape = false;
-    Logger::Log(LogLevel::eNone, "Sequence: '", false);
-#endif
-
-    for (usize i = 0; i < str.size(); i++)
-    {
-        char* c = const_cast<char*>(&str[i]);
-#if 0
-        Logger::Log(LogLevel::eNone,
-                    std::isprint(*c) ? std::format("{:c} ", *c)
-                                     : std::format("{:#x} ", *c),
-                    false);
-#endif
-        EchoRaw(*c);
-    }
-#if 0
-    Logger::Log(LogLevel::eNone, "\b'\n", true);
-#endif
+    m_Terminal->PrintString(str);
     return bytes;
+}
+
+ErrorOr<isize> TTY::Read(const UserBuffer& out, usize count, isize offset)
+{
+    return Read(out.Raw(), offset, count);
+}
+ErrorOr<isize> TTY::Write(const UserBuffer& in, usize count, isize offset)
+{
+    return Write(in.Raw(), offset, count);
 }
 
 i32 TTY::IoCtl(usize request, uintptr_t argp)
@@ -251,7 +253,7 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         case TIOCGWINSZ: *reinterpret_cast<winsize*>(argp) = GetSize(); break;
         case TIOCSWINSZ: return_err(-1, ENOSYS); break;
 
-        case TIOCINQ: *reinterpret_cast<u32*>(argp) = m_RawBuffer.size(); break;
+        case TIOCINQ: *reinterpret_cast<u32*>(argp) = m_RawBuffer.Size(); break;
 
         case TIOCGETD: *reinterpret_cast<u32*>(argp) = m_Termios.c_line; break;
         case TIOCSETD: m_Termios.c_line = *reinterpret_cast<u32*>(argp); break;
@@ -315,28 +317,26 @@ void TTY::Initialize()
         LogTrace("TTY: Creating device /dev/tty{}...", minor);
 
         auto tty = new TTY(terminal, minor);
-        s_TTYs.push_back(tty);
+        s_TTYs.PushBack(tty);
         DevTmpFs::RegisterDevice(tty);
 
-        std::string path = "/dev/tty";
-        path += std::to_string(minor);
-        VFS::MkNod(VFS::GetRootNode(), path, 0666, tty->GetID());
+        auto path = fmt::format("/dev/tty{}", tty->GetID());
+        VFS::MkNod(nullptr, path.data(), 0666, tty->GetID());
         minor++;
     }
 
-    if (s_TTYs.empty())
+    if (s_TTYs.Empty())
     {
         LogTrace("TTY: Creating device /dev/tty...");
         auto tty = new TTY(Terminal::GetPrimary(), 0);
-        s_TTYs.push_back(tty);
+        s_TTYs.PushBack(tty);
         DevTmpFs::RegisterDevice(tty);
 
-        std::string path = "/dev/tty";
-        VFS::MkNod(VFS::GetRootNode(), path, 0666, tty->GetID());
+        StringView path = "/dev/tty"_sv;
+        VFS::MkNod(nullptr, path, 0666, tty->GetID());
     }
-    if (!s_TTYs.empty())
-        VFS::MkNod(VFS::GetRootNode(), "/dev/tty", 0644 | S_IFCHR,
-                   s_TTYs[0]->GetID());
+    if (!s_TTYs.Empty())
+        VFS::MkNod(nullptr, "/dev/tty"_sv, 0644 | S_IFCHR, s_TTYs[0]->GetID());
 
     LogInfo("TTY: Initialized");
 }
@@ -413,14 +413,14 @@ void TTY::EnqueueChar(u64 c)
 #if TTY_DEBUG == 1
     LogDebug("raw: {:#x}", c);
 #endif
-    m_RawBuffer.push_back(c);
+    m_RawBuffer.Push(c);
 }
 
 void TTY::FlushInput()
 {
     ScopedLock rawGuard(m_RawLock);
 
-    m_RawBuffer.clear();
+    m_RawBuffer.Clear();
 }
 void TTY::Echo(u64 c)
 {
@@ -438,9 +438,9 @@ void TTY::EraseChar()
     Assert(IsCanonicalMode());
     ScopedLock guard(m_RawLock);
 
-    if (m_RawBuffer.empty()) return;
+    if (m_RawBuffer.Empty()) return;
     usize count = 1;
-    if (IsControl(m_RawBuffer.pop_back_element())) count = 2;
+    if (IsControl(m_RawBuffer.PopFront())) count = 2;
     while (count-- && m_Termios.c_lflag & (ECHO | ECHOK))
     {
         EchoRaw('\b');
@@ -450,6 +450,6 @@ void TTY::EraseChar()
 }
 void TTY::EraseWord()
 {
-    while (!m_RawBuffer.empty() && m_RawBuffer.back() != ' ') EraseChar();
-    while (!m_RawBuffer.empty() && m_RawBuffer.back() == ' ') EraseChar();
+    while (!m_RawBuffer.Empty() && m_RawBuffer.Back() != ' ') EraseChar();
+    while (!m_RawBuffer.Empty() && m_RawBuffer.Back() == ' ') EraseChar();
 }

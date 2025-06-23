@@ -10,15 +10,17 @@
 #include <Prism/Delegate.hpp>
 
 #include <Prism/Memory/Buffer.hpp>
-#include <Prism/StringView.hpp>
+#include <Prism/String/StringView.hpp>
 
 #include <VFS/INode.hpp>
 
+class ProcFsINode;
 struct ProcFsProperty
 {
-    using ProcFsGenPropertyFunc = Delegate<void(std::string&)>;
+    using ProcFsGenPropertyFunc = Delegate<void(String&)>;
     Delegate<void(ProcFsProperty&)> GenProp;
-    std::string                     Buffer;
+    ProcFsINode*                    m_Parent = nullptr;
+    String                          Buffer;
     usize                           Offset = 0;
 
     Spinlock                        Lock;
@@ -32,9 +34,9 @@ struct ProcFsProperty
     template <typename... Args>
     void Write(fmt::format_string<Args...> format, Args&&... args)
     {
-        if (Offset >= Buffer.size()) Offset = 0;
+        if (Offset >= Buffer.Size()) Offset = 0;
         auto result
-            = fmt::format_to_n(Buffer.data() + Offset, Buffer.size() - Offset,
+            = fmt::format_to_n(Buffer.Raw() + Offset, Buffer.Size() - Offset,
                                format, std::forward<Args>(args)...);
         Offset += result.size;
     }
@@ -48,13 +50,13 @@ struct ProcFsProperty
 
     virtual void GenerateRecord()
     {
-        Buffer.clear();
+        Buffer.Clear();
         GenProp(*this);
     }
-    operator std::string&()
+    operator String&()
     {
-        if (Buffer.empty()) GenerateRecord();
-        Buffer.shrink_to_fit();
+        if (Buffer.Empty()) GenerateRecord();
+        Buffer.ShrinkToFit();
         return Buffer;
     }
 };
@@ -71,8 +73,8 @@ class ProcFsINode : public INode
 
     virtual const stat& GetStats() override;
 
-    virtual void  InsertChild(INode* node, std::string_view name) override;
-    virtual isize Read(void* buffer, off_t offset, usize bytes) override;
+    virtual void        InsertChild(INode* node, StringView name) override;
+    virtual isize       Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
 

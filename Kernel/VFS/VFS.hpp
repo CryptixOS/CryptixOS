@@ -11,45 +11,61 @@
 
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Path.hpp>
+#include <Prism/String/String.hpp>
 
-#include <cerrno>
-#include <expected>
 #include <unordered_map>
 
 class INode;
-
+class DirectoryEntry;
 class FileDescriptor;
 namespace VFS
 {
-    Vector<std::pair<bool, std::string_view>>& GetFilesystems();
+    Vector<std::pair<bool, StringView>>& GetFilesystems();
 
-    INode*                                     GetRootNode();
-    void                                       RecursiveDelete(INode* node);
+    DirectoryEntry*                      GetRootDirectoryEntry();
+    void                                 RecursiveDelete(INode* node);
 
-    std::expected<FileDescriptor*, std::errno_t>
-                    Open(INode* parent, PathView path, i32 flags, mode_t mode);
+    struct PathResolution
+    {
+        INode* Parent   = nullptr;
+        INode* Node     = nullptr;
 
-    ErrorOr<INode*> ResolvePath(PathView path);
-    std::tuple<INode*, INode*, std::string> ResolvePath(INode*   parent,
-                                                        PathView path);
-    std::tuple<INode*, INode*, std::string>
-    ResolvePath(INode* parent, PathView path, bool followLinks);
+        Path   BaseName = ""_s;
+    };
+    struct PathRes
+    {
+        DirectoryEntry* Parent   = nullptr;
+        DirectoryEntry* Node     = nullptr;
+        Path            BaseName = ""_s;
+    };
 
-    std::unordered_map<std::string_view, class Filesystem*>& GetMountPoints();
+    ErrorOr<FileDescriptor*> Open(DirectoryEntry* parent, PathView path,
+                                  i32 flags, mode_t mode);
 
-    bool         MountRoot(std::string_view filesystemName);
-    bool         Mount(INode* parent, PathView source, PathView target,
-                       std::string_view fsName, i32 flags = 0,
-                       const void* data = nullptr);
-    bool         Unmount(INode* parent, PathView path, i32 flags = 0);
+    ErrorOr<INode*>          ResolvePath(PathView path);
+    PathResolution           ResolvePath(INode* parent, PathView path);
+    PathResolution ResolvePath(INode* parent, PathView path, bool followLinks);
+    PathRes        ResolvePath(DirectoryEntry* parent, PathView path,
+                               bool followLinks = true);
 
-    INode*       CreateNode(INode* parent, PathView path, mode_t mode);
-    ErrorOr<i32> MkDir(INode* parent, mode_t mode);
+    std::unordered_map<StringView, class Filesystem*>& GetMountPoints();
 
-    INode*       MkNod(INode* parent, PathView path, mode_t mode, dev_t dev);
-    INode*       Symlink(INode* parent, PathView path, std::string_view target);
-    INode*       Link(INode* oldParent, PathView oldPath, INode* newParent,
-                      PathView newPath, i32 flags = 0);
-    bool         Unlink(INode* parent, PathView path, i32 flags = 0);
+    bool MountRoot(StringView filesystemName);
+    bool Mount(DirectoryEntry* parent, PathView source, PathView target,
+               StringView fsName, i32 flags = 0, const void* data = nullptr);
+    bool Unmount(DirectoryEntry* parent, PathView path, i32 flags = 0);
 
+    DirectoryEntry* CreateNode(DirectoryEntry* parent, PathView path,
+                               mode_t mode);
+    ErrorOr<i32>    MkDir(INode* parent, mode_t mode);
+
+    DirectoryEntry* MkNod(DirectoryEntry* parent, PathView path, mode_t mode,
+                          dev_t dev);
+    DirectoryEntry* Symlink(DirectoryEntry* parent, PathView path,
+                            StringView target);
+    DirectoryEntry* Link(DirectoryEntry* oldParent, PathView oldPath,
+                         DirectoryEntry* newParent, PathView newPath,
+                         i32 flags = 0);
+
+    bool Unlink(DirectoryEntry* parent, PathView path, i32 flags = 0);
 }; // namespace VFS

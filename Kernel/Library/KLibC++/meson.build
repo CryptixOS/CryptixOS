@@ -5,4 +5,4 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 srcs += files()
-include_directories += [include_directories('.')]
+incs += [include_directories('.')]

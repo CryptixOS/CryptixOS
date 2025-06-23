@@ -4,14 +4,15 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Initrd.hpp"
+#include <Library/Logger.hpp>
 
-#include "Memory/PMM.hpp"
-#include "Memory/VMM.hpp"
+#include <Memory/PMM.hpp>
+#include <Memory/VMM.hpp>
 
-#include "Library/Logger.hpp"
-#include "Prism/Utility/Math.hpp"
-#include "VFS/Initrd/Ustar.hpp"
+#include <Prism/Utility/Math.hpp>
+
+#include <VFS/Initrd/Initrd.hpp>
+#include <VFS/Initrd/Ustar.hpp>
 
 namespace Initrd
 {

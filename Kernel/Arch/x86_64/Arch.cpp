@@ -62,10 +62,10 @@ namespace Arch
         IO::Out<word>(0x604, 0x2000);
     }
 
-    void ProbeTimers(std::vector<HardwareTimer*>& timers)
+    void ProbeTimers(Vector<HardwareTimer*>& timers)
     {
-        if (Lapic::IsInitialized()) timers.push_back(Lapic::Instance());
-        if (PIT::IsInitialized()) timers.push_back(PIT::Instance());
+        if (Lapic::IsInitialized()) timers.PushBack(Lapic::Instance());
+        if (PIT::IsInitialized()) timers.PushBack(PIT::Instance());
     }
     time_t GetEpoch() { return RTC::CurrentTime(); }
 }; // namespace Arch

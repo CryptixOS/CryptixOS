@@ -1,10 +1,15 @@
 # CryptixOS 
 
-<img src="./Meta/images/screenshot.png">
+<p align="center">
+  <img src="./Meta/images/logo.jpg" width="50%" height="50%">
+</p>
 
 ## Description
 CryptixOS is a WIP 64 bit unix-like operating system,
 it uses limine boot protocol to boot and mlibc as the c library implementation
+
+## Screenshots
+<img src="./Meta/images/screenshot.png">
 
 ## Supported architectures
 
@@ -57,7 +62,6 @@ To run the CryptixOS you will use the ./run.sh script with either uefi or bios o
 * [Limine](https://github.com/limine-bootloader/limine.git) - Modern, advanced, portable, multiprotocol bootloader and boot manager, also used as the reference implementation for the Limine boot protocol.
 * [compiler-rt-builtins](https://github.com/ilobilo/compiler-rt-builtins.git)
 * [demangler](https://github.com/ilobilo/demangler.git) - C++, Microsoft C++, Rust and DLang name demangler
-* [flanterm](https://github.com/mintsuki/flanterm.git) - Flanterm is a fast and reasonably complete terminal emulator with support for multiple output backends. Included is a fast framebuffer backend.
 * [fmt](https://github.com/fmtlib/fmt.git) - fmt is an open-source formatting library providing a fast and safe alternative to C stdio and C++ iostreams.
 * [libstdcxx-freestanding](https://github.com/ilobilo/libstdcxx-headers.git) - Headers from GCC's libstdc++ that can be used in a freestanding environment.
 * [magic_enum](https://github.com/Neargye/magic_enum.git) - Header-only C++17 library provides static reflection for enums, work with any enum type without any macro or boilerplate code.

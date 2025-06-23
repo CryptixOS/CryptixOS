@@ -7,8 +7,7 @@
 #pragma once
 
 #include <Firmware/ACPI/HPET.hpp>
-
-#include <vector>
+#include <Prism/Containers/Vector.hpp>
 
 namespace HPET
 {
@@ -16,7 +15,7 @@ namespace HPET
     class TimerBlock
     {
       public:
-        static ErrorOr<TimerBlock*> GetFromTable(PM::Pointer hpetPhys);
+        static ErrorOr<TimerBlock*> GetFromTable(Pointer hpetPhys);
 
         TimerBlock() = default;
         TimerBlock(Table* hpet);
@@ -31,7 +30,7 @@ namespace HPET
         usize         tickPeriod = 0;
     };
 
-    ErrorOr<void>                  DetectAndSetup();
+    ErrorOr<void>             DetectAndSetup();
 
-    const std::vector<TimerBlock>& GetDevices();
+    const Vector<TimerBlock>& GetDevices();
 }; // namespace HPET

@@ -14,14 +14,17 @@ declare_options:
 imports:
   - file: host-recipes/core-tools.yml
 
-  - file: recipes/sys-apps.yml
-  - file: recipes/sys-libs.yml
+  #- file: recipes/games.yml
   - file: recipes/misc.yml
   - file: recipes/misc-apps.yml
+  #- file: recipes/net-utils.yml
   - file: recipes/shell-apps.yml
+  - file: recipes/sys-apps.yml
+  - file: recipes/sys-libs.yml
   - file: recipes/text-editors.yml
 
   - file: source-recipes/core.yml
+  #- file: source-recipes/rust-libs.yml
 
 packages:
   - name: base
@@ -31,13 +34,10 @@ packages:
       version: '1.0'
     pkgs_required:
       - base-files
-      - cryptix-utils
-      - coreutils
-      - file
       - init
       - mlibc
-      - which
       - shell-apps
+      - sys-apps
       - misc-apps
       - text-editors
     configure: []

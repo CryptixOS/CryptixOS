@@ -19,7 +19,9 @@ PIT* PIT::s_Instance = nullptr;
 PIT::PIT()
 {
     LogTrace("PIT: Initializing...");
-    (void)SetFrequency(FREQUENCY / 10);
+    auto success = SetFrequency(FREQUENCY / 10);
+    if (!success) LogWarn("PIT: Failed to set frequency to {:#x}", FREQUENCY);
+
     LogInfo("PIT: Frequency set to {}Hz", FREQUENCY);
 
     m_Handler = IDT::AllocateHandler(IRQ_HINT);

@@ -6,13 +6,20 @@
  */
 #include <Arch/CPU.hpp>
 
+#include <Prism/String/StringBuilder.hpp>
+
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 
 #include <VFS/FileDescriptor.hpp>
 #include <VFS/INode.hpp>
 
-INode::INode(INode* parent, std::string_view name, Filesystem* fs)
+INode::INode(StringView name)
+    : m_Name(name)
+{
+    // m_DirectoryEntry = new class DirectoryEntry(this);
+}
+INode::INode(INode* parent, StringView name, Filesystem* fs)
     : m_Parent(parent)
     , m_Name(name)
     , m_Filesystem(fs)
@@ -34,26 +41,36 @@ INode::INode(INode* parent, std::string_view name, Filesystem* fs)
     m_Stats.st_gid = process->m_Credentials.egid;
 }
 
-std::string INode::GetPath()
+Path INode::GetPath()
 {
-    std::string ret("");
+    StringBuilder pathBuilder;
 
-    auto        current = this;
-    auto        root    = VFS::GetRootNode();
+    auto          current            = this;
+    auto          rootDirectoryEntry = VFS::GetRootDirectoryEntry();
+    auto          rootINode          = rootDirectoryEntry->INode();
 
-    while (current && current != root)
+    while (current && current != rootINode)
     {
-        ret.insert(0, "/" + current->m_Name);
+        auto segment = "/"_s;
+        segment += current->m_Name;
+        pathBuilder.Insert(segment);
+
         current = current->m_Parent;
     }
 
-    if (ret.empty()) ret += "/";
-    return ret;
+    return pathBuilder.Empty() ? "/"_s : pathBuilder.ToString();
 }
 
 mode_t INode::GetMode() const { return m_Stats.st_mode & ~S_IFMT; }
+bool   INode::IsFilesystemRoot() const
+{
+    auto fsRootEntry = m_Filesystem->MountedOn()->DirectoryEntry()->m_MountGate;
 
-bool   INode::IsEmpty()
+    return m_Filesystem->MountedOn() && fsRootEntry
+        && this == fsRootEntry->INode();
+}
+
+bool INode::IsEmpty()
 {
     m_Filesystem->Populate(this);
     return m_Children.empty();
@@ -70,22 +87,63 @@ bool INode::ValidatePermissions(const Credentials& creds, u32 acc)
 {
     return true;
 }
+ErrorOr<isize> INode::ReadLink(UserBuffer& outBuffer)
+{
+    if (!m_Target.Raw() || m_Target.Size() == 0) return Error(EINVAL);
+
+    usize count = std::min(m_Target.Size(), outBuffer.Size());
+    outBuffer.Write(m_Target.Raw(), count);
+
+    return static_cast<isize>(count);
+}
 
 INode* INode::Reduce(bool symlinks, bool automount, usize cnt)
 {
-    if (mountGate && automount)
-        return mountGate->Reduce(symlinks, automount, 0);
-
-    if (!target.empty() && symlinks)
+    if (!m_Target.Empty() && symlinks)
     {
         if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
 
-        auto nextNode
-            = std::get<1>(VFS::ResolvePath(m_Parent, target, automount));
+        auto nextNode = VFS::ResolvePath(m_Parent->DirectoryEntry(),
+                                         m_Target.Raw(), automount)
+                            .Node;
         if (!nextNode) return_err(nullptr, ENOENT);
 
-        return nextNode->Reduce(symlinks, automount, ++cnt);
+        return nextNode->INode()->Reduce(symlinks, automount, ++cnt);
     }
 
     return this;
+}
+
+ErrorOr<DirectoryEntry*> INode::Lookup(class DirectoryEntry* entry)
+{
+    auto node = Lookup(entry->Name());
+    if (!node) return Error(ENOENT);
+
+    entry->m_INode         = node;
+    node->m_DirectoryEntry = entry;
+
+    return entry;
+}
+DirectoryEntry* INode::DirectoryEntry()
+{
+    if (!m_DirectoryEntry)
+    {
+        LogWarn("VFS: Allocating DirectoryEntry for: `{}`...", GetPath());
+        LogDebug("VFS: Showing backtrace:");
+        Stacktrace::Print(6);
+        m_DirectoryEntry = new class DirectoryEntry(this);
+    }
+    return m_DirectoryEntry;
+}
+
+ErrorOr<void> INode::UpdateTimestamps(timespec atime, timespec mtime,
+                                      timespec ctime)
+{
+    if (atime) m_Attributes.AccessTime = atime;
+    if (mtime) m_Attributes.ModificationTime = mtime;
+    if (ctime) m_Attributes.ChangeTime = ctime;
+
+    // TODO(v1tr10l7): Verify permissions
+    m_Dirty = true;
+    return {};
 }

@@ -24,13 +24,14 @@ namespace CPU
     usize GetOnlineCPUsCount() { return 1; }
 
     struct CPU;
+    CPU*    Current() { return nullptr; }
     CPU*    GetCurrent() { return nullptr; }
     u64     GetCurrentID() { return 0; }
     Thread* GetCurrentThread() { return nullptr; }
 
     bool    SwapInterruptFlag(bool) { return false; }
 
-    void    PrepareThread(Thread* thread, uintptr_t pc, uintptr_t)
+    void    PrepareThread(Thread* thread, Pointer pc, Pointer)
     {
         (void)thread;
         (void)pc;
@@ -51,4 +52,11 @@ namespace CPU
 
     void HaltAll() {}
     void WakeUp(usize, bool) {}
+
+    UserMemoryProtectionGuard::UserMemoryProtectionGuard() {}
+    UserMemoryProtectionGuard::~UserMemoryProtectionGuard() {}
+
+    bool DuringSyscall() { return false; }
+    void OnSyscallEnter(usize index) {}
+    void OnSyscallLeave() {}
 } // namespace CPU

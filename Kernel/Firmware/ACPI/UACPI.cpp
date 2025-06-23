@@ -28,7 +28,7 @@
 
 #include <Time/Time.hpp>
 
-#include <Prism/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <uacpi/kernel_api.h>
@@ -39,7 +39,7 @@ namespace uACPI
     {
         uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr* outRsdp)
         {
-            uacpi_phys_addr rsdp = BootInfo::GetRSDPAddress();
+            uacpi_phys_addr rsdp = BootInfo::GetRSDPAddress().FromHigherHalf();
 
             if (rsdp)
             {
@@ -300,7 +300,7 @@ namespace uACPI
 
         uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void)
         {
-            return Time::GetTimeSinceBoot();
+            return Time::GetTimeSinceBoot().Nanoseconds();
         }
         void uacpi_kernel_stall(uacpi_u8 usec)
         {
@@ -309,8 +309,13 @@ namespace uACPI
         }
         void uacpi_kernel_sleep(uacpi_u64 msec)
         {
-            CtosUnused(msec);
-            ToDoWarn();
+            timespec duration;
+            duration.tv_sec  = msec / 1000;
+            duration.tv_nsec = msec * 1000;
+            timespec remaining;
+
+            if (Time::Sleep(&duration, &remaining))
+                ;
         }
 
         uacpi_handle uacpi_kernel_create_mutex(void)
@@ -376,7 +381,7 @@ namespace uACPI
         {
             auto& event   = *reinterpret_cast<Event*>(handle);
             event.Pending = 0;
-            event.Listeners.clear();
+            event.Listeners.Clear();
         }
         uacpi_status
         uacpi_kernel_handle_firmware_request(uacpi_firmware_request*)

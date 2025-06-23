@@ -225,33 +225,43 @@ struct fmt::formatter<termios2> : fmt::formatter<std::string>
                    "{}, "
                    "ISTRIP: {}, INLCR: {}, IGNCR: {}, ICRNL: {}, IUCLC: {}, "
                    "IXON: {}, IXANY: {}, IXOFF: {}, IMAXBEL: {}, IUTF: {} }}",
-            iflag & IGNBRK, iflag & BRKINT, iflag & IGNPAR, iflag & PARMRK,
-            iflag & INPCK, iflag & ISTRIP, iflag & INLCR, iflag & IGNCR,
-            iflag & ICRNL, iflag & IUCLC, iflag & IXON, iflag & IXANY,
-            iflag & IXOFF, iflag & IMAXBEL, iflag & IUTF8);
+            (iflag & IGNBRK) == IGNBRK, (iflag & BRKINT) == BRKINT,
+            (iflag & IGNPAR) == IGNPAR, (iflag & PARMRK) == PARMRK,
+            (iflag & INPCK) == INPCK, (iflag & ISTRIP) == ISTRIP,
+            (iflag & INLCR) == INLCR, (iflag & IGNCR) == IGNCR,
+            (iflag & ICRNL) == ICRNL, (iflag & IUCLC) == IUCLC,
+            (iflag & IXON) == IXON, (iflag & IXANY) == IXANY,
+            (iflag & IXOFF) == IXOFF, (iflag & IMAXBEL) == IMAXBEL,
+            (iflag & IUTF8) == IUTF8);
         ;
 
         auto oflagFormatted = fmt::format(
             "OFLAG = {{ OPOST: {}, OLCUC: {}, ONLCR: {}, OCRNL: {}, ONOCR: {}, "
             "ONLRET: {}, OFILL: {}, OFDEL: {}, XTABS: {} }}",
-            oflag & OPOST, oflag & OLCUC, oflag & ONLCR, oflag & OCRNL,
-            oflag & ONOCR, oflag & ONLRET, oflag & OFILL, oflag & OFDEL,
-            oflag & XTABS);
+            (oflag & OPOST) == OPOST, (oflag & OLCUC) == OLCUC,
+            (oflag & ONLCR) == ONLCR, (oflag & OCRNL) == OCRNL,
+            (oflag & ONOCR) == ONOCR, (oflag & ONLRET) == ONLRET,
+            (oflag & OFILL) == OFILL, (oflag & OFDEL) == OFDEL,
+            (oflag & XTABS) == XTABS);
 
         auto cflagFormatted = fmt::format(
             "CFLAG = {{ CSTOPB: {}, CREAD: {}, PARENB: {}, PARODD: {}, HUPCL: "
             "{}, "
             "CLOCAL: {} }}",
-            cflag & CSTOPB, cflag & CREAD, cflag & PARENB, cflag & PARODD,
-            cflag & HUPCL, cflag & CLOCAL);
+            (cflag & CSTOPB) == CSTOPB, (cflag & CREAD) == CREAD,
+            (cflag & PARENB) == PARENB, (cflag & PARODD) == PARODD,
+            (cflag & HUPCL) == HUPCL, (cflag & CLOCAL) == CLOCAL);
         auto lflagFormatted = fmt::format(
             "LFLAG = {{ ISIG: {}, ICANON: {}, ECHO: {}, ECHOE: {}, ECHOK: {}, "
             "ECHONL: {}, NOFLSH: {}, TOSTOP: {}, ECHOCTL: {}, ECHOPRT: {}, "
             "ECHOKE: "
             "{}, IEXTEN: {} }}",
-            lflag & ISIG, lflag & ICANON, lflag & ECHO, lflag & ECHOE,
-            lflag & ECHOK, lflag & ECHONL, lflag & NOFLSH, lflag & TOSTOP,
-            lflag & ECHOCTL, lflag & ECHOPRT, lflag & ECHOKE, lflag & IEXTEN);
+            (lflag & ISIG) == ISIG, (lflag & ICANON) == ICANON,
+            (lflag & ECHO) == ECHO, (lflag & ECHOE) == ECHOE,
+            (lflag & ECHOK) == ECHOK, (lflag & ECHONL) == ECHONL,
+            (lflag & NOFLSH) == NOFLSH, (lflag & TOSTOP) == TOSTOP,
+            (lflag & ECHOCTL) == ECHOCTL, (lflag & ECHOPRT) == ECHOPRT,
+            (lflag & ECHOKE) == ECHOKE, (lflag & IEXTEN) == IEXTEN);
         auto ccFormatted = fmt::format(
             "CC = {{ VINTR: {}, VQUIT: {}, VERASE: {}, VKILL: {}, VEOF: {}, "
             "VTIME: {}, VMIN: {}, VSWTC: {}, VSTART: {}, VSTOP: {}, VSUSP: {}, "

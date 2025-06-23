@@ -12,30 +12,37 @@ class StorageDevicePartition : public Device
 {
   public:
     StorageDevicePartition(StorageDevice& device, u64 firstBlock, u64 lastBlock,
-                           u16 majorID, u16 minorID)
-        : Device(majorID, minorID)
-        , m_Device(device)
-        , m_FirstBlock(firstBlock)
-        , m_LastBlock(lastBlock)
-    {
-    }
+                           u16 majorID, u16 minorID);
 
-    virtual std::string_view GetName() const noexcept override
+    virtual StringView GetName() const noexcept override
     {
         return m_Device.GetName();
     }
 
-    virtual isize Read(void* dest, off_t offset, usize bytes) override
+    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override
     {
         // if (m_FirstBlock + offset >= m_LastBlock) return_err(-1, ENODEV);
         return m_Device.Read(
             dest, m_Device.GetStats().st_blksize * m_FirstBlock + offset,
             bytes);
     }
-    virtual isize Write(const void* src, off_t offset, usize bytes) override
+    virtual ErrorOr<isize> Write(const void* src, off_t offset,
+                                 usize bytes) override
     {
-        if (m_FirstBlock + offset >= m_LastBlock) return_err(-1, ENODEV);
-        return m_Device.Write(src, m_FirstBlock + offset, bytes);
+        // if (m_FirstBlock + offset >= m_LastBlock) return_err(-1, ENODEV);
+        return m_Device.Write(
+            src, m_Device.GetStats().st_blksize * m_FirstBlock + offset, bytes);
+    }
+
+    virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                isize offset = -1) override
+    {
+        return Read(out.Raw(), offset, count);
+    }
+    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                 isize offset = -1) override
+    {
+        return Write(in.Raw(), offset, count);
     }
 
     virtual i32 IoCtl(usize request, uintptr_t argp) override
@@ -44,7 +51,7 @@ class StorageDevicePartition : public Device
     }
 
   private:
-    StorageDevice& m_Device;
-    u64            m_FirstBlock;
-    u64            m_LastBlock;
+    StorageDevice&  m_Device;
+    u64             m_FirstBlock;
+    CTOS_UNUSED u64 m_LastBlock;
 };

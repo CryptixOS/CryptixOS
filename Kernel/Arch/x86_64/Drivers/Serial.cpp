@@ -7,7 +7,7 @@
 #include <Arch/x86_64/IO.hpp>
 
 #include <Drivers/Serial.hpp>
-#include <Prism/Spinlock.hpp>
+#include <Library/Spinlock.hpp>
 
 #include <utility>
 
@@ -74,5 +74,10 @@ namespace Serial
 
         IO::Out<byte>(port, data);
     }
-
+    void Write2(byte data)
+    {
+        ScopedLock guard(s_Lock);
+        word       port = std::to_underlying(Port::eCom1);
+        IO::Out<byte>(port, data);
+    }
 }; // namespace Serial

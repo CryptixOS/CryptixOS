@@ -9,6 +9,9 @@
 #include <Common.hpp>
 
 #include <API/UnixTypes.hpp>
+#include <Prism/Utility/Atomic.hpp>
+
+#include <VFS/FileDescriptor.hpp>
 
 using DeviceMajor = u32;
 using DeviceMinor = u32;
@@ -27,21 +30,41 @@ class Device
 {
   public:
     Device(DeviceMajor major, DeviceMinor minor)
-        : id(MakeDevice(major, minor))
+        : m_ID(MakeDevice(major, minor))
+    {
+    }
+    Device(DeviceMajor major)
+        : Device(major, AllocateMinor())
     {
     }
 
-    inline dev_t             GetID() const noexcept { return id; }
-    virtual std::string_view GetName() const noexcept = 0;
+    constexpr inline dev_t GetID() const noexcept { return m_ID; }
+    virtual StringView     GetName() const noexcept = 0;
 
-    virtual const stat&      GetStats() { return m_Stats; }
+    virtual const stat&    GetStats() { return m_Stats; }
 
-    virtual isize            Read(void* dest, off_t offset, usize bytes) = 0;
-    virtual isize Write(const void* src, off_t offset, usize bytes)      = 0;
+    virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                isize offset = -1)
+        = 0;
+    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) = 0;
+    virtual ErrorOr<isize> Write(const void* src, off_t offset, usize bytes)
+        = 0;
+    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                 isize offset = -1)
+        = 0;
 
-    virtual i32   IoCtl(usize request, uintptr_t argp)                   = 0;
+    virtual i32 IoCtl(usize request, uintptr_t argp) = 0;
 
   protected:
-    dev_t id;
+    dev_t m_ID;
     stat  m_Stats;
+
+  private:
+    static DeviceMinor AllocateMinor()
+    {
+        // TODO(v1tr10l7): Allocate minor numbers per major
+        static Atomic<DeviceMinor> s_Base = 1000;
+
+        return s_Base++;
+    }
 };

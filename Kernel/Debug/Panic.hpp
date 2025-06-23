@@ -6,12 +6,12 @@
  */
 #pragma once
 
-#include <string_view>
+#include <Prism/String/StringView.hpp>
 
 [[noreturn]]
 void HaltAndCatchFire(struct CPUContext* context);
 
 [[noreturn]]
-void panic(std::string_view message);
+void panic(StringView message);
 [[noreturn]]
 void earlyPanic(const char* format, ...);

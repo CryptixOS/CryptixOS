@@ -5,119 +5,201 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Memory/PMM.hpp>
+#include <Prism/Utility/Math.hpp>
 
+#include <Time/Time.hpp>
 #include <VFS/INode.hpp>
 
 #include <VFS/EchFs/EchFs.hpp>
 #include <VFS/EchFs/EchFsINode.hpp>
 
-constexpr const char* ECHFS_SIGNATURE   = "_ECH_FS_";
+constexpr StringView ECHFS_SIGNATURE = "_ECH_FS_"_sv;
 
-constexpr usize       ROOT_DIRECTORY_ID = 0xffff'ffff'ffff'ffff;
-
-INode*                EchFs::Mount(INode* parent, INode* source, INode* target,
-                                   std::string_view name, const void* data)
+EchFs::~EchFs()
 {
+    if (m_Root) VFS::RecursiveDelete(m_Root);
+    if (m_IdentityTable)
+    {
+        delete m_IdentityTable;
+        m_IdentityTable = nullptr;
+    }
+}
+
+ErrorOr<INode*> EchFs::Mount(INode* parent, INode* source, INode* target,
+                             DirectoryEntry* entry, StringView name,
+                             const void* data)
+{
+    if (!source) return nullptr;
+
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
                : nullptr;
 
-    LogTrace("EchFs: Mounting");
-    EchFsIdentityTable* identityTable = new EchFsIdentityTable;
-    if (!identityTable) return nullptr;
+    m_IdentityTable = new EchFsIdentityTable;
+    if (!m_IdentityTable) return nullptr;
+    m_SourceDevice = source;
+    m_DeviceID     = source->GetStats().st_rdev;
 
-    usize allocationTableOffset = 0, allocationTableSize = 0;
-    if (!source)
+    StringView signature;
+    usize      totalBlockCount = 0;
+    usize      mainDirectoryLength;
+    u64        uuid[2];
+
+    if (source->Read(m_IdentityTable, 0, sizeof(EchFsIdentityTable))
+        != sizeof(EchFsIdentityTable))
     {
-        delete identityTable;
-        return nullptr;
+        LogError("EchFs: Failed to read the identity table");
+        goto fail_free_id_table;
     }
-    m_Device = source;
-    source->Read(identityTable, 0, sizeof(EchFsIdentityTable));
+    signature = {reinterpret_cast<const char*>(m_IdentityTable->Signature), 8};
 
-    if (std::strncmp(reinterpret_cast<char*>(identityTable->Signature),
-                     ECHFS_SIGNATURE, 8))
+    totalBlockCount     = m_IdentityTable->TotalBlockCount;
+    mainDirectoryLength = m_IdentityTable->MainDirectoryLength;
+    m_BlockSize         = m_IdentityTable->BytesPerBlock;
+    uuid[0]             = m_IdentityTable->UUID[0];
+    uuid[1]             = m_IdentityTable->UUID[1];
+
+    EchFsDebug("EchFs", "", "IdentityTable =>");
+    EchFsDebug("Signature", "", signature);
+    EchFsDebug("TotalBlockCount", ":#x", totalBlockCount);
+    EchFsDebug("MainDirectoryLength", ":#x", mainDirectoryLength);
+    EchFsDebug("BytesPerBlock", ":#x", m_BlockSize);
+    EchFsDebug("UUID0", ":#x", uuid[0]);
+    EchFsDebug("UUID1", ":#x", uuid[1]);
+
+    if (signature != ECHFS_SIGNATURE)
     {
-        delete identityTable;
-        return nullptr;
-    }
-
-    m_BlockSize           = identityTable->BytesPerBlock;
-    allocationTableOffset = 16;
-    allocationTableSize
-        = (identityTable->TotalBlockCount * sizeof(u64) + m_BlockSize - 1)
-        / m_BlockSize;
-
-    m_MainDirectoryOffset = allocationTableOffset + allocationTableSize;
-    m_MainDirectoryLength = identityTable->MainDirectoryLength;
-
-    EchFsDirectoryEntry dirEntry;
-    usize               offset = m_MainDirectoryOffset * m_BlockSize;
-    source->Read(&dirEntry, offset, sizeof(EchFsDirectoryEntry));
-
-    EchFsDirectoryEntry rootDirectory;
-    if (dirEntry.DirectoryID != ROOT_DIRECTORY_ID) rootDirectory = dirEntry;
-    while (dirEntry.DirectoryID)
-    {
-        source->Read(&dirEntry, offset, sizeof(EchFsDirectoryEntry));
-        if (dirEntry.DirectoryID) LogInfo("Entry: {}", (char*)dirEntry.Name);
-        offset += sizeof(EchFsDirectoryEntry);
+        LogError("EchFs: Invalid identity table signature => '{}'", signature);
+        goto fail_free_id_table;
     }
 
-    usize               count = 0;
-    EchFsDirectoryEntry entry;
-    for (;;)
-    {
-        source->Read(&entry, offset, sizeof(EchFsDirectoryEntry));
-        offset += sizeof(EchFsDirectoryEntry);
-        if (entry.DirectoryID == ECHFS_END_OF_DIRECTORY) break;
+    m_BytesLimit            = m_IdentityTable->TotalBlockCount * m_BlockSize;
 
-        ++count;
+    m_AllocationTableOffset = 16;
+    m_AllocationTableSize
+        = (totalBlockCount * sizeof(u64) + m_BlockSize - 1) / m_BlockSize;
+
+    m_MainDirectoryStart
+        = (m_AllocationTableOffset + m_AllocationTableSize) * m_BlockSize;
+    m_MainDirectoryEnd
+        = m_MainDirectoryStart + mainDirectoryLength * m_BlockSize;
+
+    m_NativeRoot = new EchFsINode(parent, "/", this, 0644 | S_IFDIR);
+    m_Root       = m_NativeRoot;
+
+    if (!m_NativeRoot) goto fail_free_id_table;
+
+    if (source->Read(&m_NativeRoot->m_DirectoryEntry, m_MainDirectoryStart,
+                     sizeof(EchFsDirectoryEntry))
+        != sizeof(EchFsDirectoryEntry))
+    {
+        LogError("EchFs: Failed to read root directory entry");
+        goto fail_free_inode_and_id_table;
     }
 
-    m_Root = new EchFsINode(parent, name, this, 0644 | S_IFDIR, rootDirectory,
-                            m_MainDirectoryOffset * m_BlockSize, count);
-    if (m_Root) m_MountedOn = target;
+    m_NativeRoot->m_DirectoryEntryOffset = m_MainDirectoryStart;
+    if (m_NativeRoot->m_DirectoryEntry.ParentID != ECHFS_ROOT_DIRECTORY_ID)
+    {
+        LogError("EchFs: Corrupted root directory entry");
+        goto fail_free_inode_and_id_table;
+    }
 
-    delete identityTable;
-    return m_Root;
+    m_NativeRoot->m_Stats.st_dev     = DeviceID();
+    m_NativeRoot->m_Stats.st_ino     = 2;
+    m_NativeRoot->m_Stats.st_mode    = 0644 | S_IFDIR;
+    m_NativeRoot->m_Stats.st_nlink   = 2;
+    m_NativeRoot->m_Stats.st_uid     = 0;
+    m_NativeRoot->m_Stats.st_gid     = 0;
+    m_NativeRoot->m_Stats.st_rdev    = 0;
+    m_NativeRoot->m_Stats.st_size    = totalBlockCount * m_BlockSize;
+    m_NativeRoot->m_Stats.st_blksize = m_BlockSize;
+    m_NativeRoot->m_Stats.st_blocks  = totalBlockCount;
+
+    m_NativeRoot->m_Stats.st_ctim    = Time::GetReal();
+    m_NativeRoot->m_Stats.st_atim    = Time::GetReal();
+    m_NativeRoot->m_Stats.st_mtim    = Time::GetReal();
+
+    m_MountedOn                      = target;
+    return m_NativeRoot;
+fail_free_inode_and_id_table:
+    delete m_NativeRoot;
+fail_free_id_table:
+    delete m_IdentityTable;
+    m_IdentityTable = nullptr;
+    return nullptr;
 }
 
-INode* EchFs::CreateNode(INode* parent, std::string_view name, mode_t mode)
+ErrorOr<INode*> EchFs::CreateNode(INode* parent, DirectoryEntry* entry,
+                                  mode_t mode, uid_t uid, gid_t gid)
 {
-    return nullptr; // new EchFsINode(parent, name, this, mode);
+    return nullptr;
 }
 
 bool EchFs::Populate(INode* node)
 {
-    EchFsINode*         inode  = reinterpret_cast<EchFsINode*>(node);
-    usize               offset = inode->m_DirectoryEntryOffset;
+    EchFsINode*         inode      = reinterpret_cast<EchFsINode*>(node);
+    EchFsDirectoryEntry inodeEntry = inode->m_DirectoryEntry;
+    ScopedLock          guard(m_Lock);
 
+    // TODO(v1tr10l7): Traversing whole main directory, in order to read all
+    // children is incredibely slow, so we should introduce some caching,
+    // to make it a bit more efficient
     EchFsDirectoryEntry entry{};
-    m_Device->Read(&entry, offset, sizeof(EchFsDirectoryEntry));
-
-    usize depth = 1;
-    for (;;)
+    for (usize offset = inode->m_DirectoryEntryOffset;
+         offset < m_MainDirectoryEnd; offset += sizeof(EchFsDirectoryEntry))
     {
-        if (entry.DirectoryID == ECHFS_END_OF_DIRECTORY)
-        {
-            --depth;
-            if (depth == 0) break;
-        }
+        m_SourceDevice->Read(&entry, offset, sizeof(EchFsDirectoryEntry));
+        StringView name = reinterpret_cast<const char*>(entry.Name);
+        if (name.Empty()) continue;
 
-        [[maybe_unused]] mode_t type = 0;
-        if (entry.ObjectType == 0) type = S_IFREG;
-        else if (entry.ObjectType == 1)
+        u64    inodeDirectoryID = inodeEntry.Payload;
+        mode_t mode             = 0644;
+
+        if (entry.ObjectType == EchFsDirectoryEntryType::eRegular)
+            mode |= S_IFREG;
+        else if (entry.ObjectType == EchFsDirectoryEntryType::eDirectory)
         {
-            type = S_IFDIR;
-            ++depth;
+            if (inode->IsFilesystemRoot())
+                inodeDirectoryID = ECHFS_ROOT_DIRECTORY_ID;
+            mode |= S_IFDIR;
         }
-        /*inode->m_Children[std::string(reinterpret_cast<char*>(entry.Name))]
-            = new EchFsINode(node, reinterpret_cast<char*>(entry.Name), this,
-                             0644 | type, entry, offset);*/
-        offset += sizeof(EchFsDirectoryEntry);
-        m_Device->Read(&entry, offset, sizeof(EchFsDirectoryEntry));
+        if (entry.ParentID != inodeDirectoryID) continue;
+
+        EchFsINode* child
+            = new EchFsINode(inode, name, this, mode, entry, offset);
+        child->m_Stats.st_dev     = DeviceID();
+        child->m_Stats.st_ino     = 2;
+        child->m_Stats.st_mode    = mode;
+        child->m_Stats.st_nlink   = 1;
+        child->m_Stats.st_uid     = entry.OwnerID;
+        child->m_Stats.st_gid     = entry.GroupID;
+        child->m_Stats.st_rdev    = 0;
+        child->m_Stats.st_size    = entry.FileSize;
+        child->m_Stats.st_blksize = m_BlockSize;
+        child->m_Stats.st_blocks
+            = Math::DivRoundUp(entry.FileSize, m_BlockSize);
+
+        child->m_Stats.st_ctim = Time::GetReal();
+        child->m_Stats.st_atim = Time::GetReal();
+        child->m_Stats.st_mtim = Time::GetReal();
+
+        inode->InsertChild(child, name);
     }
 
     return (inode->m_Populated = true);
+}
+
+isize EchFs::ReadDirectoryEntry(EchFsDirectoryEntry& entry, u8* dest,
+                                isize offset, usize bytes)
+{
+    Assert(entry.ObjectType == EchFsDirectoryEntryType::eRegular);
+
+    if (static_cast<usize>(offset) > entry.FileSize) return 0;
+    if (static_cast<usize>(offset) + bytes > entry.FileSize)
+        bytes = entry.FileSize - offset;
+
+    isize nread = m_SourceDevice->Read(
+        dest, entry.Payload * m_BlockSize + offset, bytes);
+
+    return nread;
 }

@@ -24,18 +24,27 @@ namespace MemoryDevices
         {
         }
 
-        virtual std::string_view GetName() const noexcept override
-        {
-            return "null";
-        }
+        virtual StringView GetName() const noexcept override { return "null"; }
 
-        virtual isize Read(void* dest, off_t offset, usize bytes) override
+        virtual ErrorOr<isize> Read(void* dest, off_t offset,
+                                    usize bytes) override
         {
             return EOF;
         }
-        virtual isize Write(const void* src, off_t offset, usize bytes) override
+        virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                    isize offset = -1) override
+        {
+            return EOF;
+        }
+        virtual ErrorOr<isize> Write(const void* src, off_t offset,
+                                     usize bytes) override
         {
             return bytes;
+        }
+        virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                     isize offset = -1) override
+        {
+            return count;
         }
 
         virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
@@ -49,20 +58,30 @@ namespace MemoryDevices
         {
         }
 
-        virtual std::string_view GetName() const noexcept override
-        {
-            return "zero";
-        }
+        virtual StringView GetName() const noexcept override { return "zero"; }
 
-        virtual isize Read(void* dest, off_t offset, usize bytes) override
+        virtual ErrorOr<isize> Read(void* dest, off_t offset,
+                                    usize bytes) override
         {
             std::memset(dest, 0, bytes);
 
             return bytes;
         }
-        virtual isize Write(const void* src, off_t offset, usize bytes) override
+        virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                    isize offset = -1) override
+        {
+            std::memset(out.Raw(), 0, count);
+            return EOF;
+        }
+        virtual ErrorOr<isize> Write(const void* src, off_t offset,
+                                     usize bytes) override
         {
             return bytes;
+        }
+        virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                     isize offset = -1) override
+        {
+            return count;
         }
 
         virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
@@ -76,21 +95,32 @@ namespace MemoryDevices
         {
         }
 
-        virtual std::string_view GetName() const noexcept override
-        {
-            return "full";
-        }
+        virtual StringView GetName() const noexcept override { return "full"; }
 
-        virtual isize Read(void* dest, off_t offset, usize bytes) override
+        virtual ErrorOr<isize> Read(void* dest, off_t offset,
+                                    usize bytes) override
         {
             std::memset(dest, 0, bytes);
 
             return bytes;
         }
-        virtual isize Write(const void* src, off_t offset, usize bytes) override
+        virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                    isize offset = -1) override
+        {
+            std::memset(out.Raw(), 0, count);
+
+            return count;
+        }
+        virtual ErrorOr<isize> Write(const void* src, off_t offset,
+                                     usize bytes) override
         {
             errno = ENOSPC;
             return -1;
+        }
+        virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                     isize offset = -1) override
+        {
+            return Error(ENOSPC);
         }
 
         virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
@@ -107,10 +137,9 @@ namespace MemoryDevices
         for (auto device : devices)
         {
             DevTmpFs::RegisterDevice(device);
-            std::string path = "/dev/";
-            path += device->GetName();
+            Path path(fmt::format("/dev/{}", device->GetName()).data());
 
-            VFS::MkNod(VFS::GetRootNode(), path, 0666, device->GetID());
+            VFS::MkNod(nullptr, PathView(path.View()), 0666, device->GetID());
         }
     }
 }; // namespace MemoryDevices

@@ -12,9 +12,6 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-#include <array>
-#include <span>
-
 class Mutex
 {
   public:
@@ -22,7 +19,7 @@ class Mutex
 
     bool TryLock()
     {
-        if (!m_Locked.exchange(true, std::memory_order_acquire))
+        if (!m_Locked.Exchange(true, MemoryOrder::eAtomicAcquire))
         {
             m_Holder = Thread::GetCurrent();
             return true;
@@ -32,24 +29,16 @@ class Mutex
     }
     void Lock()
     {
-        if (TryLock())
-        {
-            m_Holder = Thread::GetCurrent();
-            return;
-        };
+        if (TryLock()) goto lock_success;
 
         for (;;)
         {
-            if (!TryLock())
-            {
-                std::array<Event*, 1> evs = {&m_LockEvent};
-                Event::Await(evs);
-                Scheduler::Block(Thread::GetCurrent());
-            }
-
             if (TryLock()) break;
+
+            m_LockEvent.Await(true);
         }
 
+    lock_success:
         m_Holder = Thread::GetCurrent();
     }
     void Unlock()
@@ -57,13 +46,13 @@ class Mutex
         Assert(Thread::GetCurrent() == m_Holder);
         m_Holder = nullptr;
 
-        m_Locked.exchange(false, std::memory_order_release);
+        m_Locked.Exchange(false, MemoryOrder::eAtomicRelease);
         Event::Trigger(&m_LockEvent);
     }
 
   private:
-    std::atomic<bool>  m_Locked             = false;
-    std::atomic<usize> m_WaitingThreadCount = 0;
-    Event              m_LockEvent;
-    Thread*            m_Holder = nullptr;
+    Atomic<bool>  m_Locked             = false;
+    Atomic<usize> m_WaitingThreadCount = 0;
+    Event         m_LockEvent;
+    Thread*       m_Holder = nullptr;
 };

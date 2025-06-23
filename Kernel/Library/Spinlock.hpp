@@ -4,12 +4,20 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-
 #pragma once
 
 #include <Common.hpp>
 
 #include <Arch/Arch.hpp>
+
+#ifdef CTOS_TARGET_X86_64
+    #include <Arch/x86_64/Atomic.hpp>
+inline void Pause() { __asm__ volatile("pause"); }
+#elifdef CTOS_TARGET_AARCH64
+inline void Pause() { __asm__ volatile("isb" ::: "memory"); }
+#endif
+
+#include <Debug/Panic.hpp>
 
 namespace CPU
 {
@@ -17,55 +25,44 @@ namespace CPU
     void SetInterruptFlag(bool);
 } // namespace CPU
 
-class Spinlock
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/Platform.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Assertions.hpp>
+
+#include <Prism/Utility/Atomic.hpp>
+
+class Spinlock : public NonCopyable<Spinlock>
 {
+    enum class LockState : u32
+    {
+        eUnlocked = 0,
+        eLocked   = 1,
+    };
+
   public:
-    inline bool Test() { return !m_Lock.load(); }
-    inline bool TestAndAcquire()
+    CTOS_ALWAYS_INLINE bool Test()
     {
-        return !m_Lock.exchange(true, std::memory_order_acquire);
+        return m_Lock.Load(MemoryOrder::eAtomicRelaxed) == LockState::eUnlocked;
+    }
+    CTOS_ALWAYS_INLINE bool TestAndAcquire()
+    {
+        LockState expected = LockState::eUnlocked;
+        return m_Lock.CompareExchange(expected, LockState::eLocked, false,
+                                      MemoryOrder::eAtomicAcquire,
+                                      MemoryOrder::eAtomicRelaxed);
     }
 
-    inline void Acquire(bool disableInterrupts = false)
-    {
-        if (disableInterrupts)
-            m_SavedInterruptState = CPU::SwapInterruptFlag(false);
-        volatile usize deadLockCounter = 0;
-        for (;;)
-        {
-            if (TestAndAcquire()) break;
-
-            while (m_Lock.load(std::memory_order_relaxed))
-            {
-                deadLockCounter += 1;
-                if (deadLockCounter >= 100000000) goto deadlock;
-
-                Arch::Pause();
-            }
-        }
-
-        m_LastAcquirer = __builtin_return_address(0);
-        return;
-
-    deadlock:
-        earlyPanic("DEADLOCK");
-    }
-    inline void Release(bool restoreInterrupts = false)
-    {
-        m_LastAcquirer = nullptr;
-        m_Lock.store(false, std::memory_order_release);
-
-        if (restoreInterrupts) CPU::SetInterruptFlag(m_SavedInterruptState);
-        m_SavedInterruptState = false;
-    }
+    void Acquire(bool disableInterrupts = false);
+    void Release(bool restoreInterrupts = false);
 
   private:
-    std::atomic_bool m_Lock                = false;
-    void*            m_LastAcquirer        = nullptr;
-    bool             m_SavedInterruptState = false;
+    Atomic<LockState> m_Lock                = LockState::eUnlocked;
+    void*             m_LastAcquirer        = nullptr;
+    bool              m_SavedInterruptState = false;
 };
 
-class ScopedLock final
+class ScopedLock final : public NonCopyable<ScopedLock>
 {
   public:
     ScopedLock(Spinlock& lock, bool disableInterrupts = false)

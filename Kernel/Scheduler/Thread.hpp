@@ -18,11 +18,9 @@
 #endif
 
 #include <Library/ELF.hpp>
-#include <Scheduler/Event.hpp>
+#include <Prism/Containers/Deque.hpp>
 
-#include <deque>
-#include <errno.h>
-#include <vector>
+#include <Scheduler/Event.hpp>
 
 enum class ThreadState
 {
@@ -40,14 +38,30 @@ class Process;
 struct Thread
 {
     Thread() = default;
-    Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn = -1);
-    Thread(Process* parent, uintptr_t pc, std::vector<std::string_view>& arg,
-           std::vector<std::string_view>& envp, ELF::Image& program,
-           i64 runOn = -1);
-    Thread(Process* parent, uintptr_t pc, bool user = true);
+    Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn = -1);
+    Thread(Process* parent, Pointer pc, Vector<StringView>& arg,
+           Vector<StringView>& envp, ELF::Image& program, i64 runOn = -1);
+    Thread(Process* parent, Pointer pc, bool user = true);
     ~Thread();
 
+    static Thread*     Current();
     static Thread*     GetCurrent();
+
+    void               SetRunningOn(isize runningOn);
+
+    Pointer            GetStack() const;
+    void               SetStack(Pointer stack);
+
+    Pointer            GetPageFaultStack() const;
+    Pointer            GetKernelStack() const;
+
+    void               SetPageFaultStack(Pointer pfstack);
+    void               SetKernelStack(Pointer kstack);
+
+    Pointer            GetFpuStorage() const;
+    usize              GetFpuStoragePageCount() const;
+
+    void               SetFpuStorage(Pointer fpuStorage, usize pageCount);
 
     inline tid_t       GetTid() const { return m_Tid; }
     inline ThreadState GetState() const { return m_State; }
@@ -90,61 +104,62 @@ struct Thread
     bool        DispatchSignal(u8 signal);
 
 #ifdef CTOS_TARGET_X86_64
-    inline uintptr_t GetFsBase() const { return m_FsBase; }
-    inline uintptr_t GetGsBase() const { return m_GsBase; }
+    inline Pointer GetFsBase() const { return m_FsBase; }
+    inline Pointer GetGsBase() const { return m_GsBase; }
 
-    inline void      SetFsBase(uintptr_t fs) { m_FsBase = fs; }
-    inline void      SetGsBase(uintptr_t gs) { m_GsBase = gs; }
+    inline void    SetFsBase(Pointer fs) { m_FsBase = fs; }
+    inline void    SetGsBase(Pointer gs) { m_GsBase = gs; }
 #endif
 
-    inline Event&              GetEvent() { return m_Event; }
-    inline std::deque<Event*>& GetEvents() { return m_Events; }
-    inline usize               GetWhich() const { return m_Which; }
+    inline Event&         GetEvent() { return m_Event; }
+    inline Deque<Event*>& GetEvents() { return m_Events; }
+    inline usize          GetWhich() const { return m_Which; }
 
-    inline void                SetWhich(usize which) { m_Which = which; }
-
-    // DON'T MOVE
-    //////////////////////
-    usize                      runningOn;
-    Thread*                    self;
-    uintptr_t                  stack;
-
-    uintptr_t                  kernelStack;
-    uintptr_t                  pageFaultStack;
-
-    usize                      fpuStoragePageCount;
-    uintptr_t                  fpuStorage;
-    //////////////////////
-
-    Spinlock                   m_Lock;
-    tid_t                      m_Tid;
-    ThreadState                m_State = ThreadState::eIdle;
-    errno_t                    m_ErrorCode;
-    Process*                   m_Parent;
-    uintptr_t                  m_StackVirt;
-
-    CPUContext                 ctx;
-    CPUContext                 SavedContext;
-    Spinlock                   YieldAwaitLock;
+    inline void           SetWhich(usize which) { m_Which = which; }
 
   private:
-    std::vector<std::pair<uintptr_t, usize>> m_Stacks;
-    bool                                     m_IsUser = false;
+    ///// DON'T MOVE /////
+    isize       m_RunningOn = -1;
+    Thread*     m_Self      = this;
+    Pointer     m_Stack;
+
+    Pointer     m_KernelStack;
+    Pointer     m_PageFaultStack;
+
+    usize       m_FpuStoragePageCount;
+    Pointer     m_FpuStorage;
+    ///// ^^^^^^^^^^ /////
+
+    Spinlock    m_Lock;
+    tid_t       m_Tid;
+    ThreadState m_State = ThreadState::eIdle;
+    errno_t     m_ErrorCode;
+    Process*    m_Parent;
+    Pointer     m_StackVirt;
+
+  public:
+    CPUContext Context;
+    CPUContext SavedContext;
+    Spinlock   YieldAwaitLock;
+
+  private:
+    Vector<Region> m_Stacks;
+    bool           m_IsUser = false;
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
-    uintptr_t m_GsBase;
-    uintptr_t m_FsBase;
+    Pointer m_GsBase;
+    Pointer m_FsBase;
 #elif CTOS_ARCH == CTOS_ARCH_AARCH64
-    uintptr_t m_El0Base;
+    Pointer m_El0Base;
 #endif
 
-    bool               m_IsEnqueued     = false;
-    sigset_t           m_SignalMask     = 0;
-    sigset_t           m_PendingSignals = 0;
+    bool          m_IsEnqueued     = false;
+    sigset_t      m_SignalMask     = 0;
+    sigset_t      m_PendingSignals = 0;
 
-    Event              m_Event;
-    std::deque<Event*> m_Events;
-    usize              m_Which = 0;
+    Event         m_Event;
+    Deque<Event*> m_Events;
+    usize         m_Which = 0;
 
     friend class Process;
     friend class Scheduler;

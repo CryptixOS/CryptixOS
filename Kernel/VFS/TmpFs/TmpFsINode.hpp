@@ -12,8 +12,8 @@
 class TmpFsINode final : public INode
 {
   public:
-    TmpFsINode(INode* parent, std::string_view name, Filesystem* fs,
-               mode_t mode);
+    TmpFsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode,
+               uid_t uid = 0, gid_t gid = 0);
 
     virtual ~TmpFsINode()
     {
@@ -22,7 +22,7 @@ class TmpFsINode final : public INode
 
     inline static constexpr usize GetDefaultSize() { return 0x1000; }
 
-    virtual void InsertChild(INode* node, std::string_view name) override
+    virtual void InsertChild(INode* node, StringView name) override
     {
         ScopedLock guard(m_Lock);
         m_Children[name] = node;
@@ -31,9 +31,15 @@ class TmpFsINode final : public INode
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
 
-    virtual ErrorOr<void>  ChMod(mode_t mode) override;
+    virtual ErrorOr<void> Rename(INode* newParent, StringView newName) override;
+    virtual ErrorOr<void> MkDir(StringView name, mode_t mode, uid_t uid = 0,
+                                gid_t gid = 0) override;
+    virtual ErrorOr<void> Link(PathView path) override;
+    virtual ErrorOr<void> ChMod(mode_t mode) override;
 
   private:
     u8*   m_Data     = nullptr;
     usize m_Capacity = 0;
+
+    friend class TmpFs;
 };

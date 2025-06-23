@@ -31,8 +31,7 @@ i32 FileDescriptorTable::Erase(i32 fdNum)
 void FileDescriptorTable::OpenStdioStreams()
 {
     // FIXME(v1tr10l7): Should we verify whether stdio fds are already open?
-    INode* ttyNode
-        = std::get<1>(VFS::ResolvePath(VFS::GetRootNode(), "/dev/tty"));
+    DirectoryEntry* ttyNode = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), "/dev/tty").Node;
 
     Insert(new FileDescriptor(ttyNode, 0, FileAccessMode::eRead), 0);
     Insert(new FileDescriptor(ttyNode, 0, FileAccessMode::eWrite), 1);

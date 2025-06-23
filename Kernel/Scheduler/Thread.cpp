@@ -5,19 +5,19 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Scheduler/Thread.hpp>
-
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptGuard.hpp>
 
 #include <Memory/PMM.hpp>
 
 #include <Prism/Utility/Math.hpp>
-#include <Scheduler/Process.hpp>
 
-Thread::Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn)
-    : runningOn(runOn)
-    , self(this)
+#include <Scheduler/Process.hpp>
+#include <Scheduler/Thread.hpp>
+
+Thread::Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn)
+    : m_RunningOn(runOn)
+    , m_Self(this)
     , m_State(ThreadState::eDequeued)
     , m_ErrorCode(no_error)
     , m_Parent(parent)
@@ -29,32 +29,51 @@ Thread::Thread(Process* parent, uintptr_t pc, uintptr_t arg, i64 runOn)
     CPU::PrepareThread(this, pc, arg);
 }
 
-Thread*          Thread::GetCurrent() { return CPU::GetCurrentThread(); }
+Thread* Thread::Current() { return CPU::GetCurrentThread(); }
+Thread* Thread::GetCurrent() { return CPU::GetCurrentThread(); }
 
-static uintptr_t prepareStack(uintptr_t _stack, uintptr_t sp,
-                              std::vector<std::string_view> argv,
-                              std::vector<std::string_view> envp,
-                              ELF::Image&                   image)
+void    Thread::SetRunningOn(isize runningOn) { m_RunningOn = runningOn; }
+
+Pointer Thread::GetStack() const { return m_Stack; }
+void    Thread::SetStack(Pointer stack) { m_Stack = stack; }
+
+Pointer Thread::GetPageFaultStack() const { return m_PageFaultStack; }
+Pointer Thread::GetKernelStack() const { return m_KernelStack; }
+
+void Thread::SetPageFaultStack(Pointer pfstack) { m_PageFaultStack = pfstack; }
+void Thread::SetKernelStack(Pointer kstack) { m_KernelStack = kstack; }
+
+Pointer Thread::GetFpuStorage() const { return m_FpuStorage; }
+void    Thread::SetFpuStorage(Pointer fpuStorage, usize pageCount)
 {
-    auto stack = reinterpret_cast<uintptr_t*>(_stack);
+    m_FpuStorage          = fpuStorage;
+    m_FpuStoragePageCount = pageCount;
+}
 
+static Pointer prepareStack(uintptr_t _stack, uintptr_t sp,
+                            Vector<StringView> argv, Vector<StringView> envp,
+                            ELF::Image& image)
+{
+    auto                           stack = reinterpret_cast<uintptr_t*>(_stack);
+
+    CPU::UserMemoryProtectionGuard guard;
     for (auto env : envp)
     {
         stack = reinterpret_cast<uintptr_t*>(reinterpret_cast<char*>(stack)
-                                             - env.length() - 1);
-        std::memcpy(stack, env.data(), env.length());
+                                             - env.Size() - 1);
+        std::memcpy(stack, env.Raw(), env.Size());
     }
 
     for (auto arg : argv)
     {
         stack = reinterpret_cast<uintptr_t*>(reinterpret_cast<char*>(stack)
-                                             - arg.length() - 1);
-        std::memcpy(stack, arg.data(), arg.length());
+                                             - arg.Size() - 1);
+        std::memcpy(stack, arg.Raw(), arg.Size());
     }
 
     stack = reinterpret_cast<uintptr_t*>(
         Math::AlignDown(reinterpret_cast<uintptr_t>(stack), 16));
-    if ((argv.size() + envp.size() + 1) & 1) stack--;
+    if ((argv.Size() + envp.Size() + 1) & 1) stack--;
 
     constexpr usize AT_ENTRY = 9;
     constexpr usize AT_PHDR  = 3;
@@ -74,31 +93,29 @@ static uintptr_t prepareStack(uintptr_t _stack, uintptr_t sp,
 
     uintptr_t oldSp = sp;
     *(--stack)      = 0;
-    stack -= envp.size();
+    stack -= envp.Size();
     for (usize i = 0; auto env : envp)
     {
-        oldSp -= env.length() + 1;
+        oldSp -= env.Size() + 1;
         stack[i++] = oldSp;
     }
 
     *(--stack) = 0;
-    stack -= argv.size();
+    stack -= argv.Size();
     for (usize i = 0; auto arg : argv)
     {
-        oldSp -= arg.length() + 1;
+        oldSp -= arg.Size() + 1;
         stack[i++] = oldSp;
     }
 
-    *(--stack) = argv.size();
+    *(--stack) = argv.Size();
     return sp - (_stack - reinterpret_cast<uintptr_t>(stack));
 }
 
-Thread::Thread(Process* parent, uintptr_t pc,
-               std::vector<std::string_view>& argv,
-               std::vector<std::string_view>& envp, ELF::Image& program,
-               i64 runOn)
-    : runningOn(CPU::GetCurrent()->ID)
-    , self(this)
+Thread::Thread(Process* parent, Pointer pc, Vector<StringView>& argv,
+               Vector<StringView>& envp, ELF::Image& program, i64 runOn)
+    : m_RunningOn(CPU::GetCurrent()->ID)
+    , m_Self(this)
     , m_State(ThreadState::eDequeued)
     , m_ErrorCode(no_error)
     , m_Parent(parent)
@@ -111,37 +128,36 @@ Thread::Thread(Process* parent, uintptr_t pc,
 
     auto mapUserStack = [this]() -> std::pair<uintptr_t, uintptr_t>
     {
-        uintptr_t pstack  = PMM::CallocatePages<uintptr_t>(CPU::USER_STACK_SIZE
-                                                           / PMM::PAGE_SIZE);
-        uintptr_t vustack = m_Parent->m_UserStackTop - CPU::USER_STACK_SIZE;
+        Pointer pstack
+            = PMM::CallocatePages(CPU::USER_STACK_SIZE / PMM::PAGE_SIZE);
+        Pointer vustack = m_Parent->m_UserStackTop.Raw() - CPU::USER_STACK_SIZE;
 
         Assert(m_Parent->PageMap->MapRange(
             vustack, pstack, CPU::USER_STACK_SIZE,
             PageAttributes::eRWXU | PageAttributes::eWriteBack));
-        m_Parent->m_AddressSpace.EmplaceBack(pstack, vustack,
-                                             CPU::USER_STACK_SIZE);
+
+        using VirtualMemoryManager::Access;
+        auto stackRegion = new Region(pstack, vustack, CPU::USER_STACK_SIZE);
+        stackRegion->SetProt(Access::eReadWriteExecute | Access::eUser,
+                             PROT_READ | PROT_WRITE | PROT_EXEC);
+        m_Stacks.PushBack(*stackRegion);
+        m_Parent->m_AddressSpace.Insert(vustack, stackRegion);
+
         m_StackVirt              = vustack;
-
-        m_Parent->m_UserStackTop = vustack - PMM::PAGE_SIZE;
-
-        m_Stacks.push_back(std::make_pair(pstack, CPU::USER_STACK_SIZE));
-        return {ToHigherHalfAddress<uintptr_t>(pstack) + CPU::USER_STACK_SIZE,
-                vustack + CPU::USER_STACK_SIZE};
+        m_Parent->m_UserStackTop = vustack.Raw() - PMM::PAGE_SIZE;
+        return {pstack.ToHigherHalf<Pointer>().Offset(CPU::USER_STACK_SIZE),
+                vustack.Offset(CPU::USER_STACK_SIZE)};
     };
 
     auto [vstack, vustack] = mapUserStack();
 
-    // argv.push_back("/usr/sbin/init");
-    // envp.push_back("TERM=linux");
-
-    this->stack            = prepareStack(vstack, vustack, argv, envp, program);
-
+    m_Stack                = prepareStack(vstack, vustack, argv, envp, program);
     CPU::PrepareThread(this, pc, 0);
 }
 
-Thread::Thread(Process* parent, uintptr_t pc, bool user)
-    : runningOn(CPU::GetCurrent()->ID)
-    , self(this)
+Thread::Thread(Process* parent, Pointer pc, bool user)
+    : m_RunningOn(CPU::GetCurrent()->ID)
+    , m_Self(this)
     , m_State(ThreadState::eDequeued)
     , m_ErrorCode(no_error)
     , m_Parent(parent)
@@ -150,22 +166,21 @@ Thread::Thread(Process* parent, uintptr_t pc, bool user)
 {
     m_Tid = parent->m_NextTid++;
 
-    uintptr_t pstack
+    Pointer pstack
         = PMM::CallocatePages<uintptr_t>(CPU::USER_STACK_SIZE / PMM::PAGE_SIZE);
-    uintptr_t vustack = parent->m_UserStackTop - CPU::USER_STACK_SIZE;
+    Pointer vustack = parent->m_UserStackTop.Raw() - CPU::USER_STACK_SIZE;
 
     if (!parent->PageMap) parent->PageMap = VMM::GetKernelPageMap();
     Assert(parent->PageMap->MapRange(vustack, pstack, CPU::USER_STACK_SIZE,
                                      PageAttributes::eRW | PageAttributes::eUser
                                          | PageAttributes::eWriteBack));
-    parent->m_UserStackTop = vustack - PMM::PAGE_SIZE;
-    m_Stacks.push_back(std::make_pair(pstack, CPU::USER_STACK_SIZE));
+    parent->m_UserStackTop = vustack.Raw() - PMM::PAGE_SIZE;
+    m_Stacks.EmplaceBack(pstack, vustack, CPU::USER_STACK_SIZE);
 
-    [[maybe_unused]] uintptr_t stack1
-        = ToHigherHalfAddress<uintptr_t>(pstack) + CPU::USER_STACK_SIZE;
-    [[maybe_unused]] uintptr_t stack2 = vustack + CPU::USER_STACK_SIZE;
+    Pointer stack1
+        = pstack.Offset<Pointer>(CPU::USER_STACK_SIZE).ToHigherHalf();
 
-    this->stack                       = Math::AlignDown(stack1, 16);
+    this->m_Stack = Math::AlignDown(stack1, 16);
 
     CPU::PrepareThread(this, pc, 0);
 }
@@ -247,48 +262,52 @@ bool Thread::DispatchSignal(u8 signal)
 Thread* Thread::Fork(Process* process)
 {
     Thread* newThread
-        = process->CreateThread(ctx.rip, m_IsUser, CPU::GetCurrent()->ID);
-    newThread->self  = newThread;
-    newThread->stack = stack;
+        = process->CreateThread(Context.rip, m_IsUser, CPU::GetCurrent()->ID);
+    newThread->m_Self  = newThread;
+    newThread->m_Stack = m_Stack;
 
-    Pointer kstack   = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
-                                                      / PMM::PAGE_SIZE);
-    newThread->kernelStack = kstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
+    Pointer kstack     = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
+                                                        / PMM::PAGE_SIZE);
+    newThread->m_KernelStack = kstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
         CPU::KERNEL_STACK_SIZE);
 
     Pointer pfstack = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
                                                      / PMM::PAGE_SIZE);
-    newThread->pageFaultStack
+    newThread->m_PageFaultStack
         = pfstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
             CPU::KERNEL_STACK_SIZE);
 
-    for (const auto& [stackPhys, size] : m_Stacks)
+    for (const auto& stack : m_Stacks)
     {
-        uintptr_t newStack = PMM::CallocatePages<uintptr_t>(
-            Math::AlignUp(size, PMM::PAGE_SIZE) / PMM::PAGE_SIZE);
+        auto    stackPhys    = stack.GetPhysicalBase();
+        usize   stackVirt    = stack.GetVirtualBase();
+        usize   stackSize    = stack.GetSize();
 
-        std::memcpy(Pointer(newStack).ToHigherHalf<void*>(),
-                    Pointer(stackPhys).ToHigherHalf<void*>(), size);
+        Pointer newStackPhys = PMM::CallocatePages<uintptr_t>(
+            Math::AlignUp(stackSize, PMM::PAGE_SIZE) / PMM::PAGE_SIZE);
 
-        process->PageMap->MapRange(m_StackVirt, newStack, size,
+        std::memcpy(newStackPhys.ToHigherHalf<void*>(),
+                    stackPhys.ToHigherHalf<void*>(), stackSize);
+
+        process->PageMap->MapRange(stackVirt, newStackPhys, stackSize,
                                    PageAttributes::eRWXU
                                        | PageAttributes::eWriteBack);
-        newThread->m_Stacks.push_back({newStack, size});
+        newThread->m_Stacks.EmplaceBack(newStackPhys, newStackPhys, stackSize);
     }
 
-    newThread->fpuStoragePageCount = fpuStoragePageCount;
-    newThread->fpuStorage
-        = Pointer(PMM::CallocatePages<uintptr_t>(fpuStoragePageCount))
+    newThread->m_FpuStoragePageCount = m_FpuStoragePageCount;
+    newThread->m_FpuStorage
+        = Pointer(PMM::CallocatePages<uintptr_t>(m_FpuStoragePageCount))
               .ToHigherHalf<uintptr_t>();
-    std::memcpy((void*)newThread->fpuStorage, (void*)fpuStorage,
-                fpuStoragePageCount * PMM::PAGE_SIZE);
+    std::memcpy(newThread->m_FpuStorage, m_FpuStorage,
+                m_FpuStoragePageCount * PMM::PAGE_SIZE);
 
-    newThread->m_Parent = process;
-    newThread->ctx      = SavedContext;
-    newThread->ctx.rax  = 0;
-    newThread->ctx.rdx  = 0;
+    newThread->m_Parent    = process;
+    newThread->Context     = SavedContext;
+    newThread->Context.rax = 0;
+    newThread->Context.rdx = 0;
 
-    newThread->m_IsUser = m_IsUser;
+    newThread->m_IsUser    = m_IsUser;
 #ifdef CTOS_TARGET_X86_64
     newThread->m_GsBase = m_GsBase;
     newThread->m_FsBase = m_FsBase;

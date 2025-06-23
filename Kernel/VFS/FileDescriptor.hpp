@@ -8,12 +8,14 @@
 
 #include <API/Posix/dirent.h>
 #include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
 
+#include <Library/UserBuffer.hpp>
+#include <Prism/Containers/Deque.hpp>
+
+#include <VFS/File.hpp>
 #include <VFS/INode.hpp>
-
-#include <cerrno>
-#include <deque>
-#include <expected>
+#include <VFS/DirectoryEntry.hpp>
 
 enum class FileAccessMode
 {
@@ -23,82 +25,78 @@ enum class FileAccessMode
     eExec  = Bit(2),
 };
 
-inline FileAccessMode& operator|=(FileAccessMode& lhs, const FileAccessMode rhs)
+constexpr inline FileAccessMode& operator|=(FileAccessMode&      lhs,
+                                            const FileAccessMode rhs)
 {
     usize ret = static_cast<usize>(lhs) | static_cast<usize>(rhs);
 
     lhs       = static_cast<FileAccessMode>(ret);
     return lhs;
 }
-
-inline FileAccessMode operator|(const FileAccessMode lhs, FileAccessMode rhs)
+constexpr inline FileAccessMode operator|(const FileAccessMode lhs,
+                                          FileAccessMode       rhs)
 {
     usize ret = static_cast<u64>(lhs) | static_cast<u64>(rhs);
 
     return static_cast<FileAccessMode>(ret);
 }
-inline bool operator&(const FileAccessMode lhs, FileAccessMode rhs)
+constexpr inline bool operator&(const FileAccessMode lhs, FileAccessMode rhs)
 {
     return static_cast<u64>(lhs) & static_cast<u64>(rhs);
 }
 
 struct DirectoryEntries
 {
-    using ListType = std::deque<dirent*>;
+    using ListType = Deque<dirent*>;
     ListType    Entries;
     usize       Size             = 0;
     bool        ShouldRegenerate = false;
 
-    dirent*     Front() const { return Entries.front(); }
-    inline bool IsEmpty() const { return Entries.empty(); }
+    dirent*     Front() const { return Entries.Front(); }
+    inline bool IsEmpty() const { return Entries.Empty(); }
 
-    inline void Clear() { Entries.clear(); }
-    void        Push(INode* node, std::string_view = "");
+    inline void Clear() { Entries.Clear(); }
+    void        Push(INode* node, StringView = "");
 
-    usize       CopyAndPop(u8* out)
-    {
-        if (Entries.empty()) return 0;
+    usize       CopyAndPop(u8* out, usize capacity);
 
-        auto  entry     = Entries.pop_front_element();
-        usize entrySize = entry->d_reclen;
-
-        std::memcpy(out, entry, entry->d_reclen);
-        delete entry;
-
-        return entrySize;
-    }
-
-    auto begin() { return Entries.begin(); }
-    auto end() { return Entries.end(); }
+    auto        begin() { return Entries.begin(); }
+    auto        end() { return Entries.end(); }
 };
 struct FileDescription
 {
-    Spinlock           Lock;
-    std::atomic<usize> RefCount = 0;
+    Spinlock         Lock;
+    Atomic<usize>    RefCount = 0;
 
-    INode*             Node;
-    usize              Offset     = 0;
+    DirectoryEntry*           Node;
+    usize            Offset     = 0;
 
-    i32                Flags      = 0;
-    FileAccessMode     AccessMode = FileAccessMode::eRead;
-    DirectoryEntries   DirEntries;
+    i32              Flags      = 0;
+    FileAccessMode   AccessMode = FileAccessMode::eRead;
+    DirectoryEntries DirEntries;
 
-    inline void        IncRefCount() { ++RefCount; }
-    inline void        DecRefCount() { --RefCount; }
+    inline ~FileDescription()
+    {
+        // FIXME(v1t10l7): if (RefCount == 0) delete Node;
+    }
+
+    inline void IncRefCount() { ++RefCount; }
+    inline void DecRefCount() { --RefCount; }
 };
 
-class FileDescriptor
+class FileDescriptor : public File
 {
   public:
-    FileDescriptor(INode* node, i32 flags, FileAccessMode accMode);
+    FileDescriptor(DirectoryEntry* node, i32 flags, FileAccessMode accMode);
     FileDescriptor(FileDescriptor* fd, i32 flags = 0);
-    ~FileDescriptor();
+    virtual ~FileDescriptor();
 
-    inline INode* GetNode() const { return m_Description->Node; }
-    inline usize  GetOffset() const { return m_Description->Offset; }
+    inline INode*    GetNode() const { return m_Description->Node->INode(); }
+    constexpr DirectoryEntry* DirectoryEntry() const { return m_Description->Node; }
+    inline usize     GetOffset() const { return m_Description->Offset; }
 
-    inline i32    GetFlags() const { return m_Flags; }
-    inline void   SetFlags(i32 flags)
+    inline i32       GetFlags() const { return m_Flags; }
+    inline void      SetFlags(i32 flags)
     {
         ScopedLock guard(m_Lock);
         m_Flags = flags;
@@ -111,18 +109,36 @@ class FileDescriptor
         m_Description->Flags = flags;
     }
 
-    ErrorOr<isize>       Read(void* const outBuffer, usize count);
-    ErrorOr<isize>       Write(const void* data, isize bytes);
-    ErrorOr<const stat*> Stat() const;
-    ErrorOr<isize>       Seek(i32 whence, off_t offset);
-    ErrorOr<isize>       Truncate(off_t size);
+    virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                isize offset = -1) override;
+    inline ErrorOr<isize>  Read(void* const outBuffer, usize count)
+    {
+        auto bufferOr = UserBuffer::ForUserBuffer(outBuffer, count);
+        if (!bufferOr) return Error(bufferOr.error());
+        auto buffer = bufferOr.value();
 
-    void                 Lock() { m_Description->Lock.Acquire(); }
-    void                 Unlock() { m_Description->Lock.Release(); }
+        return Read(buffer, count, m_Description->Offset);
+    }
+    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                 isize offset = -1) override;
+    inline ErrorOr<isize>  Write(const void* inBuffer, usize count)
+    {
+        auto bufferOr = UserBuffer::ForUserBuffer(inBuffer, count);
+        if (!bufferOr) return Error(bufferOr.error());
+        auto buffer = bufferOr.value();
+
+        return Write(buffer, count, m_Description->Offset);
+    }
+    virtual ErrorOr<const stat*> Stat() const override;
+    virtual ErrorOr<isize>       Seek(i32 whence, off_t offset) override;
+    virtual ErrorOr<isize>       Truncate(off_t size) override;
+
+    void                         Lock() { m_Description->Lock.Acquire(); }
+    void                         Unlock() { m_Description->Lock.Release(); }
 
     // TODO(v1t10l7): verify whether the fd is blocking
-    inline bool          WouldBlock() const { return false; }
-    inline bool IsSocket() const { return m_Description->Node->IsSocket(); }
+    inline bool                  WouldBlock() const { return false; }
+    inline bool IsSocket() const override { return GetNode()->IsSocket(); }
     inline bool IsPipe() const
     {
         // FIXME(v1tr10l7): implement this once pipes are supported

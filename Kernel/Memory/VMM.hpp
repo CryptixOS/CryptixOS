@@ -6,9 +6,12 @@
  */
 #pragma once
 
-#include <Memory/PMM.hpp>
+#include <Library/Spinlock.hpp>
 
-#include <Prism/Spinlock.hpp>
+#include <Memory/PMM.hpp>
+#include <Memory/PageFault.hpp>
+#include <Memory/Region.hpp>
+
 #include <Prism/Utility/Math.hpp>
 
 enum class PageAttributes : isize
@@ -108,7 +111,7 @@ inline static constexpr T FromHigherHalfAddress(U addr)
 class PageMap;
 namespace Arch::VMM
 {
-    extern uintptr_t      defaultPteFlags;
+    extern uintptr_t      g_DefaultPteFlags;
 
     extern void           Initialize();
 
@@ -161,22 +164,34 @@ class PageTableEntry final
 
 namespace VirtualMemoryManager
 {
-    void      Initialize();
+    void     Initialize();
 
-    usize     GetHigherHalfOffset();
+    usize    GetHigherHalfOffset();
 
-    uintptr_t AllocateSpace(usize increment = 0, usize alignment = 0,
-                            bool lowerHalf = false);
+    Pointer  AllocateSpace(usize increment = 0, usize alignment = 0,
+                           bool lowerHalf = false);
 
-    PageMap*  GetKernelPageMap();
+    PageMap* GetKernelPageMap();
+    void     HandlePageFault(const PageFaultInfo& info);
 
-    void      SaveCurrentPageMap(PageMap& out);
-    void      LoadPageMap(PageMap& pageMap, bool);
+    void     SaveCurrentPageMap(PageMap& out);
+    void     LoadPageMap(PageMap& pageMap, bool);
 
-    Pointer   MapIoRegion(PhysAddr phys, usize size, bool write = true);
+    bool     MapKernelRegion(Pointer virt, Pointer phys, usize pageCount = 1,
+                             PageAttributes attributes
+                             = PageAttributes::eWriteBack | PageAttributes::eRW);
 
-    Pointer   MapIoRegion(PhysAddr phys, usize size, bool write,
-                          usize alignment = 0);
+    bool     MapKernelRange(Pointer virt, Pointer phys, usize size,
+                            PageAttributes attributes
+                            = PageAttributes::eWriteBack | PageAttributes::eRW);
+
+    bool     UnmapKernelRange(Pointer virt, usize size,
+                              PageAttributes flags
+                              = static_cast<PageAttributes>(0));
+
+    Pointer  MapIoRegion(PhysAddr phys, usize size, bool write = true);
+    Pointer  MapIoRegion(PhysAddr phys, usize size, bool write,
+                         usize alignment = 0);
     template <typename T>
     inline T* MapIoRegion(PhysAddr phys, bool write = true,
                           usize alignment = alignof(T))
@@ -242,12 +257,12 @@ class PageMap
                                   PageAttributes flags = static_cast<PageAttributes>(0));
 
     template <typename T>
-    inline ErrorOr<T*> MapIoRegion(PM::Pointer phys)
+    inline ErrorOr<T*> MapIoRegion(Pointer phys)
     {
-        usize       length = Math::AlignUp(sizeof(T), PMM::PAGE_SIZE);
+        usize   length = Math::AlignUp(sizeof(T), PMM::PAGE_SIZE);
 
-        PM::Pointer virt   = VMM::AllocateSpace(length, alignof(u64), true);
-        phys               = Math::AlignDown(phys, PMM::PAGE_SIZE);
+        Pointer virt   = VMM::AllocateSpace(length, alignof(u64), true);
+        phys           = Math::AlignDown(phys, PMM::PAGE_SIZE);
 
         if (MapRange(virt, phys, length,
                      PageAttributes::eRW | PageAttributes::eUncacheableStrong))
@@ -294,6 +309,25 @@ class PageMap
             }
         }
         return true;
+    }
+    bool MapRegion(const Region* region, const usize pageSize = PMM::PAGE_SIZE)
+    {
+        const auto           virt = region->GetVirtualBase();
+        const auto           phys = region->GetPhysicalBase();
+        const usize          size = region->GetSize();
+
+        const PageAttributes flags
+            = region->GetPageAttributes() | GetPageSizeFlags(pageSize);
+        return MapRange(virt, phys, size, flags);
+    }
+    bool RemapRegion(const Region* region, Pointer newVirt = 0)
+    {
+        Pointer              oldVirt = region->GetVirtualBase();
+        const usize          size    = region->GetSize();
+        const PageAttributes flags   = region->GetPageAttributes();
+
+        if (!newVirt) newVirt = region->GetVirtualBase();
+        return RemapRange(oldVirt, newVirt, size, flags);
     }
 
     bool UnmapRange(uintptr_t virt, usize size,

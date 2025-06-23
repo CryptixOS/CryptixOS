@@ -9,52 +9,62 @@
 #include <API/Posix/termios.h>
 #include <Drivers/Device.hpp>
 
-#include <Prism/Spinlock.hpp>
-#include <Scheduler/Event.hpp>
+#include <Library/Spinlock.hpp>
 
-#include <deque>
-#include <vector>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/String/String.hpp>
+
+#include <Scheduler/Event.hpp>
 
 class TTY : public Device
 {
   public:
     TTY(Terminal* terminal, usize minor);
 
-    inline static TTY*       GetCurrent() { return s_CurrentTTY; }
+    inline static TTY* GetCurrent() { return s_CurrentTTY; }
 
-    bool                     GetCursorKeyMode() const;
-    void                     SendBuffer(const char* string, usize bytes = 1);
+    bool               GetCursorKeyMode() const;
+    void               SendBuffer(const char* string, usize bytes = 1);
 
-    virtual std::string_view GetName() const noexcept override { return "tty"; }
-    winsize                  GetSize() const;
+    virtual StringView GetName() const noexcept override { return "tty"_sv; }
+    winsize            GetSize() const;
 
-    void                     SetTermios(const termios2& termios);
+    const termios2&    GetTermios() const { return m_Termios; }
+    void               SetTermios(const termios2& termios);
 
-    virtual isize Read(void* dest, off_t offset, usize bytes) override;
-    virtual isize Write(const void* src, off_t offset, usize bytes) override;
+    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override;
+    virtual ErrorOr<isize> Write(const void* src, off_t offset,
+                                 usize bytes) override;
 
-    virtual i32   IoCtl(usize request, uintptr_t argp) override;
+    virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                isize offset = -1) override;
+    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                 isize offset = -1) override;
 
-    static void   Initialize();
+    virtual i32            IoCtl(usize request, uintptr_t argp) override;
+
+    static void            Initialize();
 
   private:
-    static std::vector<TTY*> s_TTYs;
-    static TTY*              s_CurrentTTY;
+    static Vector<TTY*>     s_TTYs;
+    static TTY*             s_CurrentTTY;
 
-    Spinlock                 m_RawLock;
-    Spinlock                 m_OutputLock;
+    Spinlock                m_RawLock;
+    Spinlock                m_OutputLock;
 
-    Terminal*                m_Terminal = nullptr;
-    termios2                 m_Termios;
+    Terminal*               m_Terminal = nullptr;
+    termios2                m_Termios;
 
-    pid_t                    m_ControlSid = -1;
-    gid_t                    m_Pgid       = 100;
+    pid_t                   m_ControlSid = -1;
+    gid_t                   m_Pgid       = 100;
 
-    std::deque<char>         m_RawBuffer;
-    std::deque<std::string>  m_LineQueue;
+    CircularQueue<u8, 4096> m_RawBuffer;
+    Deque<String>           m_LineQueue;
 
-    Event                    m_OnAddLine;
-    Event                    m_RawEvent;
+    Event                   m_OnAddLine;
+    Event                   m_RawEvent;
 
     enum class State
     {
@@ -76,15 +86,21 @@ class TTY : public Device
     inline void AddLine()
     {
         ScopedLock guard(m_RawLock);
-        m_LineQueue.emplace_back(m_RawBuffer.begin(), m_RawBuffer.end());
-        m_RawBuffer.clear();
 
+        usize      lineLength = m_RawBuffer.Size();
+        String     line;
+        line.Reserve(lineLength);
+        while (!m_RawBuffer.Empty()) line += m_RawBuffer.Pop();
+        line.ShrinkToFit();
+        m_LineQueue.PushBack(line);
+
+        m_RawBuffer.Clear();
         m_OnAddLine.Trigger();
     }
     inline void KillLine()
     {
         ScopedLock guard(m_RawLock);
-        m_RawBuffer.clear();
+        m_RawBuffer.Clear();
     }
 
     void           EnqueueChar(u64 c);

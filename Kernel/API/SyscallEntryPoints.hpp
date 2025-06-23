@@ -10,7 +10,6 @@
 
 namespace Syscall
 {
-    ErrorOr<isize> SysMMap(Arguments& args);
     ErrorOr<isize> SysPipe(Arguments& args);
     ErrorOr<isize> SysNanoSleep(Arguments& args);
     ErrorOr<isize> SysRmDir(Arguments& args);

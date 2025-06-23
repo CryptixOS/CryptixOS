@@ -72,7 +72,7 @@ namespace RTL8139
         PCI::DeviceID{PCI::DeviceID::ANY_ID, 0x8139, 0x13d1, 0xab06, 2, 0},
     };
 
-    bool AdapterCard::Send(u8* data, usize length)
+    bool AdapterCard::SendPacket(const u8* data, usize length)
     {
         usize bufferIndex = 0;
         for (usize i = 0; i < 4; i++)
@@ -230,6 +230,12 @@ namespace RTL8139
             LogError("RTL8139: Failed to register interrupt handler");
 #endif
 
+        m_OnIrq.BindLambda(
+            [&]()
+            {
+                return;
+                HandleInterrupt();
+            });
         InterruptStatus ack;
         ack.Rok         = true;
         ack.Rer         = true;

@@ -6,46 +6,46 @@
  */
 #pragma once
 
-#include "Prism/Core/Types.hpp"
+#include <Prism/Core/Types.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/String/StringView.hpp>
 
 namespace Ustar
 {
-#pragma pack(push, 1)
-    struct FileHeader
+    struct [[gnu::packed]] FileHeader
     {
-        char filename[100];
-        char mode[8];
-        char uid[8];
-        char gid[8];
-        char fileSize[12];
-        char mtime[12];
-        char checksum[8];
-        char type;
-        char linkName[100];
-        char signature[6];
-        char version[2];
-        char userName[32];
-        char groupName[32];
-        char deviceMajor[8];
-        char deviceMinor[8];
-        char filenamePrefix[155];
-    } __attribute__((packed));
-#pragma pack(pop)
+        char FileName[100];
+        char Mode[8];
+        char Uid[8];
+        char Gid[8];
+        char FileSize[12];
+        char MTime[12];
+        char Checksum[8];
+        char Type;
+        char LinkName[100];
+        char Signature[6];
+        char Version[2];
+        char UserName[32];
+        char GroupName[32];
+        char DeviceMajor[8];
+        char DeviceMinor[8];
+        char FilenamePrefix[155];
+    };
 
-    inline static constexpr const char* const MAGIC               = "ustar";
-    inline static constexpr const u8          MAGIC_LENGTH        = 6;
+    constexpr StringView MAGIC                      = "ustar";
+    constexpr const u8   MAGIC_LENGTH               = 6;
 
     // NOTE: Both '0' and '\0' mean the same file type
-    inline static constexpr const u8          FILE_TYPE_NORMAL    = '\0';
-    inline static constexpr const u8          FILE_TYPE_NORMAL_   = '0';
-    inline static constexpr const u8          FILE_TYPE_HARD_LINK = '1';
-    inline static constexpr const u8          FILE_TYPE_SYMLINK   = '2';
-    inline static constexpr const u8          FILE_TYPE_CHARACTER_DEVICE = '3';
-    inline static constexpr const u8          FILE_TYPE_BLOCK_DEVICE     = '4';
-    inline static constexpr const u8          FILE_TYPE_DIRECTORY        = '5';
-    inline static constexpr const u8          FILE_TYPE_FIFO             = '6';
-    inline static constexpr const u8          FILE_TYPE_CONTIGUOUS       = '7';
+    constexpr const u8   FILE_TYPE_NORMAL           = '\0';
+    constexpr const u8   FILE_TYPE_NORMAL_          = '0';
+    constexpr const u8   FILE_TYPE_HARD_LINK        = '1';
+    constexpr const u8   FILE_TYPE_SYMLINK          = '2';
+    constexpr const u8   FILE_TYPE_CHARACTER_DEVICE = '3';
+    constexpr const u8   FILE_TYPE_BLOCK_DEVICE     = '4';
+    constexpr const u8   FILE_TYPE_DIRECTORY        = '5';
+    constexpr const u8   FILE_TYPE_FIFO             = '6';
+    constexpr const u8   FILE_TYPE_CONTIGUOUS       = '7';
 
-    bool                                      Validate(uintptr_t address);
-    void                                      Load(uintptr_t address);
+    bool                 Validate(uintptr_t address);
+    void                 Load(uintptr_t address);
 } // namespace Ustar

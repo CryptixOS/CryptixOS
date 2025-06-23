@@ -25,12 +25,14 @@ namespace Syscall::Time
         // TODO(v1tr10l7): Provide better abstraction over time management
         if (tv)
         {
-            if (!current->ValidateAddress(tv, PROT_READ | PROT_WRITE))
-                return Error(EFAULT);
+            if (!current->ValidateWrite(tv)) return Error(EFAULT);
 
             time_t now = 0;
 #if CTOS_ARCH_X86_64
             now = RTC::CurrentTime();
+#else
+            LogWarn("API: SysGetTimeOfDay is not implemented on this platform");
+            return Error(ENOSYS);
 #endif
 
             tv->tv_sec  = now;
@@ -38,14 +40,14 @@ namespace Syscall::Time
         }
         if (tz)
         {
-            if (!current->ValidateAddress(tz, PROT_READ | PROT_WRITE))
-                return Error(EFAULT);
+            if (!current->ValidateWrite(tz)) return Error(EFAULT);
 
+            // TODO(v1tr10l7): SysGetTimeOfDay -> Get time zone
             tz->tz_dsttime     = 0;
             tz->tz_minuteswest = 0;
         }
 
-        return Error(ENOSYS);
+        return 0;
     }
     ErrorOr<i32> SysSetTimeOfDay(Arguments& args)
     {
@@ -57,8 +59,7 @@ namespace Syscall::Time
         Process*  current = Process::GetCurrent();
         if (tv)
         {
-            if (!current->ValidateAddress(tv, PROT_READ | PROT_WRITE))
-                return Error(EFAULT);
+            if (!current->ValidateRead(tv)) return Error(EFAULT);
 
             time_t now = 0;
 #ifdef CTOS_TARGET_X86_64
@@ -72,8 +73,7 @@ namespace Syscall::Time
         }
         if (tz)
         {
-            if (!current->ValidateAddress(tz, PROT_READ | PROT_WRITE))
-                return Error(EFAULT);
+            if (!current->ValidateRead(tz)) return Error(EFAULT);
 
             // TODO(vt1r10l7): Set the timezone
         }
@@ -86,22 +86,28 @@ namespace API::Time
 {
     ErrorOr<isize> SysClockGetTime(clockid_t clockID, timespec* res)
     {
+        timespec ts;
+
         switch (clockID)
         {
             case CLOCK_REALTIME:
-            case CLOCK_REALTIME_COARSE: *res = ::Time::GetReal(); break;
+            case CLOCK_REALTIME_COARSE: ts = ::Time::GetReal(); break;
             case CLOCK_MONOTONIC:
             case CLOCK_MONOTONIC_RAW:
             case CLOCK_MONOTONIC_COARSE:
-            case CLOCK_BOOTTIME: *res = ::Time::GetMonotonic(); break;
+            case CLOCK_BOOTTIME: ts = ::Time::GetMonotonic(); break;
             case CLOCK_PROCESS_CPUTIME_ID:
             case CLOCK_THREAD_CPUTIME_ID:
-                *res = {.tv_sec = 0, .tv_nsec = 0};
+                ts = {.tv_sec = 0, .tv_nsec = 0};
                 break;
 
             default: return Error(ENOSYS);
         }
 
+        auto current = Process::GetCurrent();
+        if (!current->ValidateWrite(res)) return Error(EFAULT);
+
+        CPU::AsUser([res, &ts]() { *res = ts; });
         return 0;
     }
 }; // namespace API::Time

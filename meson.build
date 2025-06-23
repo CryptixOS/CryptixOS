@@ -22,7 +22,6 @@ if not meson.get_compiler('cpp').has_argument('-std=gnu++23')
   error('C++23 support is needed. Please install clang 17 or higher.')
 endif
 
-
 c = meson.get_compiler('c')
 cxx = meson.get_compiler('cpp')
 ld = cxx.get_linker_id()
@@ -56,7 +55,7 @@ macros = [
     '-DFMT_USE_DOUBLE=0',
     '-DFMT_USE_FLOAT=0',
     '-DFMT_USE_FLOAT128=0',
-    '-DFMT_USE_EXCEPTIONS=0',
+    '-DFMT_EXCEPTIONS=0',
     '-DLIMINE_API_REVISION=3',
     '-DMAGIC_ENUM_NO_STREAMS=1',
     '-DMAGIC_ENUM_RANGE_MAX=0x8a00',
@@ -134,7 +133,6 @@ deps = [
   dependency('smart_ptr'),
   dependency('string'),
   dependency('uacpi'),
-  dependency('veque'),
 ]
 
 inc_deps = [ ]
@@ -144,26 +142,19 @@ endforeach
 
 mod_deps = [ ]
 ext_mods = [ ]
+incs = [include_directories('Kernel'), include_directories('Kernel/Library/KLibC'), include_directories('Kernel/Library/KLibC++')]
+subdir('Prism/Source')
+
 subdir('Modules')
 
+subdir('Kernel')
 no_ext_mods = ext_mods.length() == 0
 
-font = custom_target(
-  'font.bin',
-  input: 'Meta/fonts/font.bin',
-  output: 'font.o',
-  command: ['objcopy', '-I', 'binary', '-O', 'elf64-x86-64', '-B', 'i386', '@INPUT@', '@OUTPUT@'],
-)
-
-incs = []
-subdir('Prism/Source')
-subdir('Kernel')
 # ==============================================================================
 ### Qemu args
 qemu_args = [
   '-cpu', 'max',
   '-net', 'none',
-  '-serial', 'stdio',
   '-d', 'int,guest_errors',
   '-smp', '4',
   '-d', 'cpu_reset',
@@ -176,9 +167,26 @@ qemu_args = [
   '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
   '-smbios', 'type=1',
   '-device', 'nvme,id=nvme-ctrl1,serial=nvme',
+  '-nic', 'user,model=rtl8139',
+  '-object', 'memory-backend-file,id=erstnvram,mem-path=acpi-erst.backing,size=0x10000,share=on',
+  '-device', 'acpi-erst,memdev=erstnvram',
+  #'-device', 'virtio-mmio-device,dev=hd',
+  #'-device', 'virtio-blk-pci,dev=hd',
+  #'-drive', 'file=image.hdd,if=none,id=virtio-disk0,format=raw,cache=none,aio=native', '-device', 'virtio-blk-pci,scsi=off,drive=virtio-disk0,id=disk0',
+  #'-drive', 'file=mydisk,if=none,id=virtio-disk0,format=raw,cache=none,aio=native',
+  #'-device', 'virtio-blk-pci,drive=virtio-disk0,id=disk0',
+  #'-drive', 'file=mydisk,if=none,format=raw,id=hd', '-device', 'virtio-blk-device,drive=hd',
+  #'-device', 'virtio-serial-pci,max_ports=2',
+  #'-device', 'virtconsole,chardev=vcon,name=vcon0',
+  #'-chardev', 'socket,id=vcon,ipv4=on,host=localhost,port=443,server,telnet=on,wait=off',
+  #'-device', 'virtio-rng-pci',
+  #'-device', 'virtio-keyboard',
+  #'-device', 'virtio-tablet',
+  '-vga', 'std',
+  #'-device', 'virtio-serial,max_ports=2',
   #'-netdev', 'tap,id=mynet0,ifname=tap0,script=no,downscript=no',
   #'-device', 'rtl8139,netdev=mynet0',
-  '-nic', 'bridge,model=rtl8139',
+  #'-nic', 'bridge,model=rtl8139',
   #'-netdev', 'user,id=net0', '-device', 'rtl8139,netdev=net0',
   #'-object', 'filter-dump,id=filter0,netdev=net0,file=packet.pcap',
 ]
@@ -186,9 +194,10 @@ qemu = 'qemu-system-' + arch
 
 if arch == 'x86_64'
   qemu_args += [
-    '-M', 'q35,smm=off',
+    '-M', 'q35',
     '-device', 'isa-debug-exit',
-    '-debugcon', 'file:' + meson.project_source_root() / 'debug.log',
+    '-debugcon', 'stdio',
+    '-serial', 'file:' + meson.project_source_root() / 'debug.log',
     '-enable-kvm',
     '-machine', 'pcspk-audiodev=audio',
     '-cpu', 'host',
@@ -207,10 +216,13 @@ if arch == 'x86_64'
 
 elif arch == 'aarch64'
   qemu_args += [
-    '-M', 'virt,acpi=off', 
-    #'-dtb', meson.project_source_root() / 'qemu.dtb',
-    '-cpu', 'max',
+    '-M', 'virt', 
+    '-cpu', 'cortex-a72',
     '-device', 'ramfb',
+    '-device', 'qemu-xhci',
+    '-device', 'usb-kbd',
+    '-device', 'usb-mouse',
+    '-serial', 'stdio',
   ]
   ovmf_id = 'AA64'
   xorriso_args = [
@@ -328,15 +340,27 @@ iso = custom_target(
   depends: [kernel_elf, initrd, echfs_image],
 )
 
+acpi_dir = meson.project_source_root() / 'Meta' / 'firmware' / 'acpi-tables'
+acpi_files = []
+foreach f : run_command('find', acpi_dir, '-name', '*.dat').stdout().split()
+  acpi_files += files(f)
+endforeach
+
+if arch == 'x86_64'
+foreach table : acpi_files 
+  #qemu_args += ['-acpitable', 'file='+table.full_path()]
+endforeach
+endif
+
 run_bios = custom_target(
   'run_bios',
-  input: iso,
+  input: [iso, echfs_image],
   output: 'run_bios',
-  command: [qemu, qemu_args, '-cdrom', '@INPUT@'],
+  command: [qemu, qemu_args, '-cdrom', '@INPUT0@', '-drive', 'format=raw,file=@INPUT1@,if=none,id=nvm1', '-device', 'nvme-ns,drive=nvm1,nsid=2,bus=nvme-ctrl1'],
   build_by_default: true,
   console: true,
   install: false,
-  depends: [iso],
+  depends: [iso, echfs_image],
 )
 
 ovmf_binaries = subproject('ovmf_binaries')
@@ -365,6 +389,15 @@ run_uefi_gdb = custom_target(
   input: iso,
   output: 'run_uefi_gdb',
   command: [qemu, qemu_args, '-s', '-S', '-cdrom', '@INPUT@'],
+  console: true,
+  install: false,
+  depends: iso,
+)
+run_bochs = custom_target(
+  'run_bochs',
+  input: iso,
+  output: 'run_bochs',
+  command: ['bochs', '-q', '-f', meson.project_source_root() / '.bochsrc'],
   console: true,
   install: false,
   depends: iso,

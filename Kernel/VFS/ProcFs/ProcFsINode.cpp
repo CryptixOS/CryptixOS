@@ -10,24 +10,24 @@
 
 isize ProcFsProperty::Read(u8* outBuffer, off_t offset, usize size)
 {
-    if (static_cast<usize>(offset) >= Buffer.length()) return 0;
+    if (static_cast<usize>(offset) >= Buffer.Size()) return 0;
 
-    usize bytesCopied = Buffer.copy(reinterpret_cast<char*>(outBuffer) + offset,
-                                    std::min(size, Buffer.length() - offset));
+    usize bytesCopied = Buffer.Copy(reinterpret_cast<char*>(outBuffer) + offset,
+                                    std::min(size, Buffer.Size() - offset));
 
-    if (offset + bytesCopied >= Buffer.length()) GenerateRecord();
+    if (offset + bytesCopied >= Buffer.Size()) GenerateRecord();
     return bytesCopied;
 }
 
 ProcFsINode::ProcFsINode(INode* parent, StringView name, Filesystem* fs,
                          mode_t mode, ProcFsProperty* property)
-    : INode(parent, name.Raw(), fs)
+    : INode(parent, name, fs)
     , m_Property(property)
 {
     Assert(!S_ISDIR(mode) || !m_Property);
 
-    m_Stats.st_dev     = m_Filesystem->GetDeviceID();
-    m_Stats.st_ino     = m_Filesystem->GetNextINodeIndex();
+    m_Stats.st_dev     = m_Filesystem->DeviceID();
+    m_Stats.st_ino     = m_Filesystem->NextINodeIndex();
     m_Stats.st_nlink   = 1;
     m_Stats.st_mode    = mode;
     m_Stats.st_uid     = 0;
@@ -43,12 +43,12 @@ const stat& ProcFsINode::GetStats()
     if (m_Property)
     {
         m_Property->GenerateRecord();
-        m_Stats.st_size = m_Property->Buffer.length();
+        m_Stats.st_size = m_Property->Buffer.Size();
     }
     return m_Stats;
 }
 
-void ProcFsINode::InsertChild(INode* node, std::string_view name)
+void ProcFsINode::InsertChild(INode* node, StringView name)
 {
     ScopedLock guard(m_Lock);
     m_Children[name] = node;
@@ -56,7 +56,8 @@ void ProcFsINode::InsertChild(INode* node, std::string_view name)
 isize ProcFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
     u8* dest = reinterpret_cast<u8*>(buffer);
-    return m_Property->Read(dest, offset, bytes);
+
+    return m_Property ? m_Property->Read(dest, offset, bytes) : -1;
 }
 isize ProcFsINode::Write(const void* buffer, off_t offset, usize bytes)
 {

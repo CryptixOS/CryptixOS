@@ -38,7 +38,7 @@ constexpr u32                  LAPIC_TIMER_DIVIDER_REGISTER       = 0x3e0;
 CTOS_UNUSED constexpr u32      LAPIC_TIMER_MASKED                 = 0x10000;
 CTOS_UNUSED constexpr u32      LAPIC_TIMER_PERIODIC               = 0x20000;
 
-std::atomic_bool               Lapic::s_Initialized               = false;
+AtomicBool                     Lapic::s_Initialized               = false;
 
 bool                           Checkm_X2Apic()
 {

@@ -12,17 +12,17 @@
 
 #include <Drivers/TTY.hpp>
 
+#include <Memory/AddressSpace.hpp>
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
 
 #include <Library/ELF.hpp>
+#include <Prism/String/String.hpp>
+
 #include <Scheduler/Event.hpp>
 
 #include <VFS/FileDescriptorTable.hpp>
 #include <VFS/VFS.hpp>
-
-#include <expected>
-#include <vector>
 
 enum class PrivilegeLevel
 {
@@ -51,25 +51,39 @@ class Process
 {
   public:
     Process() = default;
-    Process(Process* parent, std::string_view name, const Credentials& creds);
+    Process(Process* parent, StringView name, const Credentials& creds);
 
     static Process* GetCurrent();
+    static Process* Current();
     static Process* CreateKernelProcess();
     static Process* CreateIdleProcess();
 
-    Thread* CreateThread(uintptr_t rip, bool isUser = true, i64 runOn = -1);
-    Thread* CreateThread(uintptr_t rip, std::vector<std::string_view>& argv,
-                         std::vector<std::string_view>& envp,
-                         ELF::Image& program, i64 runOn = -1);
+    Thread* CreateThread(Pointer rip, bool isUser = true, i64 runOn = -1);
+    Thread* CreateThread(Pointer rip, Vector<StringView>& argv,
+                         Vector<StringView>& envp, ELF::Image& program,
+                         i64 runOn = -1);
 
-    bool    ValidateAddress(const Pointer address, i32 accessMode);
-    bool    ValidateRead(const Pointer address, usize size)
+    bool    ValidateAddress(const Pointer address, i32 accessMode, usize size);
+    inline bool ValidateRead(const Pointer address, usize size)
     {
-        return ValidateAddress(address, 0);
+        return ValidateAddress(address, PROT_READ, size);
     }
-    bool ValidateWrite(const Pointer address, usize size)
+    inline bool ValidateWrite(const Pointer address, usize size)
     {
-        return ValidateAddress(address, 0);
+        return ValidateAddress(address, PROT_WRITE, size);
+    }
+
+    template <typename T>
+        requires(!std::is_pointer_v<T>)
+    inline bool ValidateRead(const T* address)
+    {
+        return ValidateRead(address, sizeof(T));
+    }
+    template <typename T>
+        requires(!std::is_pointer_v<T>)
+    inline bool ValidateWrite(const T* address)
+    {
+        return ValidateWrite(address, sizeof(T));
     }
 
     inline pid_t GetParentPid() const
@@ -81,11 +95,12 @@ class Process
     }
     inline Process*           GetParent() const { return m_Parent; }
     inline pid_t              GetPid() const { return m_Pid; }
-    inline std::string_view   GetName() const { return m_Name; }
+    inline StringView         GetName() const { return m_Name; }
     inline const Credentials& GetCredentials() const { return m_Credentials; }
     inline std::optional<i32> GetStatus() const { return m_Status; }
 
     inline Thread*            GetMainThread() { return m_MainThread; }
+    inline AddressSpace&      GetAddressSpace() { return m_AddressSpace; }
 
     inline pid_t              GetSid() const { return m_Credentials.sid; }
     inline pid_t              GetPGid() const { return m_Credentials.pgid; }
@@ -96,12 +111,9 @@ class Process
     inline TTY*               GetTTY() const { return m_TTY; }
     inline void               SetTTY(TTY* tty) { m_TTY = tty; }
 
-    inline const std::vector<Process*>& GetChildren() const
-    {
-        return m_Children;
-    }
-    inline const std::vector<Process*>& GetZombies() const { return m_Zombies; }
-    inline const std::vector<Thread*>&  GetThreads() const { return m_Threads; }
+    inline const Vector<Process*>& GetChildren() const { return m_Children; }
+    inline const Vector<Process*>& GetZombies() const { return m_Zombies; }
+    inline const Vector<Thread*>&  GetThreads() const { return m_Threads; }
 
     inline bool IsSessionLeader() const { return m_Pid == m_Credentials.sid; }
     inline bool IsGroupLeader() const { return m_Pid == m_Credentials.pgid; }
@@ -113,13 +125,13 @@ class Process
         return false;
     }
 
-    inline INode*           GetRootNode() const { return m_RootNode; }
-    inline std::string_view GetCWD() const { return m_CWD; }
-    inline mode_t           GetUmask() const { return m_Umask; }
-    mode_t                  Umask(mode_t mask);
+    inline DirectoryEntry*     GetRootNode() const { return m_RootDirectoryEntry; }
+    inline StringView GetCWD() const { return m_CWD; }
+    inline mode_t     GetUmask() const { return m_Umask; }
+    mode_t            Umask(mode_t mask);
 
-    static void             SendGroupSignal(pid_t pgid, i32 signal);
-    void                    SendSignal(i32 signal);
+    static void       SendGroupSignal(pid_t pgid, i32 signal);
+    void              SendSignal(i32 signal);
 
     ErrorOr<i32>   OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
     i32            CloseFd(i32 fd);
@@ -131,36 +143,37 @@ class Process
                                    struct rusage* rusage);
 
     ErrorOr<Process*>      Fork();
-    ErrorOr<i32>           Exec(std::string path, char** argv, char** envp);
+    ErrorOr<i32>           Exec(String path, char** argv, char** envp);
     i32                    Exit(i32 code);
 
     friend struct Thread;
-    Process*              m_Parent      = nullptr;
-    pid_t                 m_Pid         = -1;
-    std::string           m_Name        = "?";
-    PageMap*              PageMap       = nullptr;
-    Credentials           m_Credentials = {};
-    TTY*                  m_TTY;
-    PrivilegeLevel        m_Ring = PrivilegeLevel::eUnprivileged;
-    std::optional<i32>    m_Status;
-    bool                  m_Exited     = false;
+    Process*            m_Parent      = nullptr;
+    pid_t               m_Pid         = -1;
+    String              m_Name        = "?";
+    PageMap*            PageMap       = nullptr;
+    Credentials         m_Credentials = {};
+    TTY*                m_TTY;
+    PrivilegeLevel      m_Ring = PrivilegeLevel::eUnprivileged;
+    std::optional<i32>  m_Status;
+    bool                m_Exited     = false;
 
-    Thread*               m_MainThread = nullptr;
-    std::atomic<tid_t>    m_NextTid    = m_Pid;
-    std::vector<Process*> m_Children;
-    std::vector<Process*> m_Zombies;
-    std::vector<Thread*>  m_Threads;
+    Thread*             m_MainThread = nullptr;
+    Atomic<tid_t>       m_NextTid    = m_Pid;
+    Vector<Process*>    m_Children;
+    Vector<Process*>    m_Zombies;
+    Vector<Thread*>     m_Threads;
 
-    INode*                m_RootNode = VFS::GetRootNode();
-    std::string           m_CWD      = "/";
-    mode_t                m_Umask    = 0;
+    DirectoryEntry*              m_RootDirectoryEntry = VFS::GetRootDirectoryEntry();
+    String              m_CWD       = "/";
+    mode_t              m_Umask     = 0;
 
-    FileDescriptorTable   m_FdTable;
-    Vector<VMM::Region>   m_AddressSpace{};
-    uintptr_t             m_UserStackTop = 0x70000000000;
-    usize                 m_Quantum      = 1000;
-    Spinlock              m_Lock;
-    Event                 m_Event;
+    FileDescriptorTable m_FdTable;
+    AddressSpace        m_AddressSpace;
+
+    Pointer             m_UserStackTop = 0x70000000000u;
+    usize               m_Quantum      = 1000;
+    Spinlock            m_Lock;
+    Event               m_Event;
 
     friend class Scheduler;
     friend struct Thread;

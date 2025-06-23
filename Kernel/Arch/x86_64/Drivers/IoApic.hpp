@@ -7,9 +7,9 @@
 #pragma once
 
 #include <Common.hpp>
+#include <Prism/Containers/Vector.hpp>
 
 #include <magic_enum/magic_enum.hpp>
-#include <vector>
 
 enum class DeliveryMode
 {
@@ -29,9 +29,9 @@ enum class DestinationMode
 
 enum class IoApicRedirectionFlags
 {
-    eActiveLow      = BIT(0),
-    eLevelTriggered = BIT(1),
-    eMasked         = BIT(16),
+    eActiveLow      = Bit(0),
+    eLevelTriggered = Bit(1),
+    eMasked         = Bit(16),
 };
 
 inline u64& operator|=(u64& lhs, const IoApicRedirectionFlags rhs)
@@ -73,7 +73,7 @@ enum class InterruptTriggerMode
     eLevel = 1,
 };
 
-union IoApicRedirectionEntry
+union [[gnu::packed]] IoApicRedirectionEntry
 {
     struct
     {
@@ -94,7 +94,7 @@ union IoApicRedirectionEntry
         u32 Low;
         u32 High;
     };
-} __attribute__((packed));
+};
 
 enum class IoApicRegister
 {
@@ -147,9 +147,9 @@ class IoApic final
         SetRedirectionEntry(gsi,
                             (static_cast<u64>(entry.High) << 32) | entry.Low);
     }
-    void                        SetRedirectionEntry(u32 gsi, u64 entry);
+    void                   SetRedirectionEntry(u32 gsi, u64 entry);
 
-    static std::vector<IoApic>& GetIoApics();
+    static Vector<IoApic>& GetIoApics();
 
     static void SetIrqRedirect(u32 lapicID, u8 vector, u8 irq, bool status);
     static void SetGsiRedirect(u32 lapicID, u8 vector, u8 gsi, u16 flags,

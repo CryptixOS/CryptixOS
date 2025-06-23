@@ -7,12 +7,13 @@
 #pragma once
 
 #include <Prism/Core/Types.hpp>
+#include <Prism/String/StringView.hpp>
 
 namespace CommandLine
 {
     void                Initialize();
 
-    bool                Contains(std::string_view key);
-    std::string_view    GetString(std::string_view key);
-    std::optional<bool> GetBoolean(std::string_view key);
+    bool                Contains(StringView key);
+    StringView          GetString(StringView key);
+    std::optional<bool> GetBoolean(StringView key);
 }; // namespace CommandLine
