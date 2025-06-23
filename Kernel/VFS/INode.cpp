@@ -136,3 +136,15 @@ DirectoryEntry* INode::DirectoryEntry()
     }
     return m_DirectoryEntry;
 }
+
+ErrorOr<void> INode::UpdateTimestamps(timespec atime, timespec mtime,
+                                      timespec ctime)
+{
+    if (atime) m_Attributes.AccessTime = atime;
+    if (mtime) m_Attributes.ModificationTime = mtime;
+    if (ctime) m_Attributes.ChangeTime = ctime;
+
+    // TODO(v1tr10l7): Verify permissions
+    m_Dirty = true;
+    return {};
+}

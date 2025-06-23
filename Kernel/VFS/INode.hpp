@@ -26,6 +26,17 @@ struct Credentials;
 class INode
 {
   public:
+    struct Attributes
+    {
+        mode_t   Mode             = 0;
+        uid_t    UID              = 0;
+        gid_t    GID              = 0;
+        loff_t   Size             = 0;
+        timespec AccessTime       = {};
+        timespec ModificationTime = {};
+        timespec ChangeTime       = {};
+    };
+
     INode(StringView name);
     INode(INode* parent, StringView name, Filesystem* fs);
     virtual ~INode() {}
@@ -93,7 +104,12 @@ class INode
     {
         return Error(ENOSYS);
     }
+
+    virtual ErrorOr<void> UpdateTimestamps(timespec atime = {},
+                                           timespec mtime = {},
+                                           timespec ctime = {});
     virtual ErrorOr<void> ChMod(mode_t mode) { return Error(ENOSYS); }
+    virtual ErrorOr<void> FlushMetadata() { return Error(ENOSYS); }
 
     inline bool           Populate()
     {
@@ -108,10 +124,14 @@ class INode
     String                                 m_Name;
     String                                 m_Target;
     Spinlock                               m_Lock;
+    Attributes                             m_Attributes = {};
     // Ref<class DirectoryEntry>                       m_DirectoryEntry;
 
     Filesystem*                            m_Filesystem;
     std::unordered_map<StringView, INode*> m_Children;
     stat                                   m_Stats;
     bool                                   m_Populated = false;
+    bool                                   m_Dirty     = false;
 };
+
+using INodeAttributes = INode::Attributes;
