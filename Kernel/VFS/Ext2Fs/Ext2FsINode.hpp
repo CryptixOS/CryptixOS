@@ -16,9 +16,11 @@ class Ext2FsINode : public INode
 
     virtual ~Ext2FsINode() {}
 
-    virtual void  InsertChild(INode* node, StringView name) override;
-    virtual isize Read(void* buffer, off_t offset, usize bytes) override;
-    virtual isize Write(const void* buffer, off_t offset, usize bytes) override
+    virtual INode* Lookup(const String& name) override;
+
+    virtual void   InsertChild(INode* node, StringView name) override;
+    virtual isize  Read(void* buffer, off_t offset, usize bytes) override;
+    virtual isize  Write(const void* buffer, off_t offset, usize bytes) override
     {
         return -1;
     }
@@ -31,4 +33,7 @@ class Ext2FsINode : public INode
   private:
     Ext2Fs*         m_Fs;
     Ext2FsINodeMeta m_Meta;
+
+    void            Initialize(ino_t index, mode_t mode, u16 type);
+    ErrorOr<void>   AddDirectoryEntry(Ext2FsDirectoryEntry& dentry);
 };

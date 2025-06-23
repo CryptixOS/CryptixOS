@@ -6,7 +6,9 @@
  */
 #pragma once
 
+#include <VFS/Ext2Fs/Ext2FsAllocator.hpp>
 #include <VFS/Ext2Fs/Ext2FsStructures.hpp>
+
 #include <VFS/Filesystem.hpp>
 #include <VFS/INode.hpp>
 
@@ -39,7 +41,6 @@ class Ext2Fs : public Filesystem
     inline Ext2FsSuperBlock* GetSuperBlock() const { return m_SuperBlock; }
     inline usize             GetBlockSize() const { return m_BlockSize; }
 
-    usize                    AllocateINode();
     void                     FreeINode(usize inode);
 
     isize SetINodeBlock(Ext2FsINodeMeta& meta, u32 inode, u32 iblock,
@@ -65,6 +66,8 @@ class Ext2Fs : public Filesystem
     usize             m_BlockSize;
     usize             m_FragmentSize;
     usize             m_BlockGroupDescriptionCount;
+    friend class Ext2FsAllocator;
+    Ext2FsAllocator m_Allocator;
 
     void ReadBlockGroupDescriptor(Ext2FsBlockGroupDescriptor* out, usize index);
     void WriteBlockGroupDescriptor(Ext2FsBlockGroupDescriptor& in, usize index);
