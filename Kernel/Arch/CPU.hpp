@@ -60,6 +60,15 @@ namespace CPU
 
         return f(std::forward<Args>(args)...);
     }
+    template <typename T>
+        requires(!SameAs<T, void>)
+    inline constexpr decltype(auto) CopyFromUser(const T& value)
+    {
+        UserMemoryProtectionGuard guard;
+
+        return value;
+    }
+
     template <typename F, typename... Args>
     inline static void AsUser(F&& f, Args&&... args)
     {
