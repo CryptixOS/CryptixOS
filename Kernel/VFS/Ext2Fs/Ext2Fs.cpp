@@ -78,6 +78,7 @@ ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, DirectoryEntry* entry,
 
     inode->Initialize(inodeIndex, mode, Ext2Mode2INodeType(mode));
 
+    // TODO(v1tr10l7): Defer allocation of inode blocks
     AssignINodeBlocks(inode->m_Meta, inodeIndex, 0, 1);
     WriteINodeEntry(inode->m_Meta, inodeIndex);
 
@@ -128,7 +129,8 @@ ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, DirectoryEntry* entry,
     dentry->Size       = entrySize;
     dentry->NameSize   = entry->Name().Size();
     dentry->Type       = Ext2Mode2DirectoryEntryType(mode);
-    entry->Name().Copy(reinterpret_cast<char*>(dentry->Name), dentry->NameSize);
+    std::strncpy(reinterpret_cast<char*>(dentry->Name), entry->Name().Raw(),
+                 dentry->NameSize);
     auto result
         = reinterpret_cast<Ext2FsINode*>(parent)->AddDirectoryEntry(*dentry);
     if (!result)
@@ -394,7 +396,6 @@ usize Ext2Fs::AllocateBlock(Ext2FsINodeMeta& meta, u32 inode)
     meta.SectorCount += m_BlockSize / m_Device->GetStats().st_blksize;
     WriteINodeEntry(meta, inode);
 
-    ScopedLock guard(m_Lock);
     --m_SuperBlock->FreeBlockCount;
     FlushSuperBlock();
 
@@ -514,13 +515,13 @@ ScopedLock&& Ext2Fs::LockSuperBlock()
 }
 void Ext2Fs::ReadSuperBlock()
 {
-    CTOS_UNUSED auto&& guard = Move(LockSuperBlock());
+    ScopedLock guard(m_Lock);
 
     m_Device->Read(m_SuperBlock, 1024, sizeof(Ext2FsSuperBlock));
 }
 void Ext2Fs::FlushSuperBlock()
 {
-    CTOS_UNUSED auto&& guard = Move(LockSuperBlock());
+    ScopedLock guard(m_Lock);
 
     m_Device->Write(m_SuperBlock, 1024, sizeof(Ext2FsSuperBlock));
 }
