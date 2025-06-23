@@ -20,10 +20,16 @@ class File
   public:
     virtual ~File() = default;
 
-    virtual ErrorOr<isize>       Read(const UserBuffer& out, usize count,
-                                      isize offset = -1);
-    virtual ErrorOr<isize>       Write(const UserBuffer& in, usize count,
-                                       isize offset = -1);
+    virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                isize offset = -1)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                 isize offset = -1)
+    {
+        return Error(ENOSYS);
+    }
     virtual ErrorOr<const stat*> Stat() const { return Error(ENOSYS); }
     virtual ErrorOr<isize>       Seek(i32 whence, off_t offset)
     {
