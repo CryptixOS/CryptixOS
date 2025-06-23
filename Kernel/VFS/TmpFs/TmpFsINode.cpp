@@ -17,8 +17,8 @@ TmpFsINode::TmpFsINode(INode* parent, StringView name, Filesystem* fs,
                        mode_t mode, uid_t uid, gid_t gid)
     : INode(parent, name, fs)
 {
-    m_Stats.st_dev     = fs->GetDeviceID();
-    m_Stats.st_ino     = fs->GetNextINodeIndex();
+    m_Stats.st_dev     = fs->DeviceID();
+    m_Stats.st_ino     = fs->NextINodeIndex();
     m_Stats.st_nlink   = 1;
     m_Stats.st_mode    = mode;
     m_Stats.st_uid     = uid;
@@ -140,11 +140,13 @@ ErrorOr<void> TmpFsINode::MkDir(StringView name, mode_t mode, uid_t uid,
     mode &= ~umask & 0777;
 
     auto entry = new class DirectoryEntry(name);
-    auto node  = reinterpret_cast<TmpFsINode*>(
-        m_Filesystem->CreateNode(this, entry, mode | S_IFDIR, uid, gid));
-    if (!node) return Error(errno);
 
-    m_Children[node->GetName()] = node;
+    auto inodeOr
+        = m_Filesystem->CreateNode(this, entry, mode | S_IFDIR, uid, gid);
+    auto inode = reinterpret_cast<TmpFsINode*>(inodeOr.value());
+    if (!inode) return Error(errno);
+
+    m_Children[inode->GetName()] = inode;
     return {};
 }
 ErrorOr<void> TmpFsINode::Link(PathView path)

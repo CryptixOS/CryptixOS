@@ -25,8 +25,9 @@ EchFs::~EchFs()
     }
 }
 
-INode* EchFs::Mount(INode* parent, INode* source, INode* target,
-                    DirectoryEntry* entry, StringView name, const void* data)
+ErrorOr<INode*> EchFs::Mount(INode* parent, INode* source, INode* target,
+                             DirectoryEntry* entry, StringView name,
+                             const void* data)
 {
     if (!source) return nullptr;
 
@@ -103,7 +104,7 @@ INode* EchFs::Mount(INode* parent, INode* source, INode* target,
         goto fail_free_inode_and_id_table;
     }
 
-    m_NativeRoot->m_Stats.st_dev     = GetDeviceID();
+    m_NativeRoot->m_Stats.st_dev     = DeviceID();
     m_NativeRoot->m_Stats.st_ino     = 2;
     m_NativeRoot->m_Stats.st_mode    = 0644 | S_IFDIR;
     m_NativeRoot->m_Stats.st_nlink   = 2;
@@ -128,8 +129,8 @@ fail_free_id_table:
     return nullptr;
 }
 
-INode* EchFs::CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
-                         uid_t uid, gid_t gid)
+ErrorOr<INode*> EchFs::CreateNode(INode* parent, DirectoryEntry* entry,
+                                  mode_t mode, uid_t uid, gid_t gid)
 {
     return nullptr;
 }
@@ -166,7 +167,7 @@ bool EchFs::Populate(INode* node)
 
         EchFsINode* child
             = new EchFsINode(inode, name, this, mode, entry, offset);
-        child->m_Stats.st_dev     = GetDeviceID();
+        child->m_Stats.st_dev     = DeviceID();
         child->m_Stats.st_ino     = 2;
         child->m_Stats.st_mode    = mode;
         child->m_Stats.st_nlink   = 1;

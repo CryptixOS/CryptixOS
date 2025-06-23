@@ -19,8 +19,8 @@ DevTmpFsINode::DevTmpFsINode(INode* parent, StringView name, Filesystem* fs,
 {
     m_Device           = device;
 
-    m_Stats.st_dev     = fs->GetDeviceID();
-    m_Stats.st_ino     = fs->GetNextINodeIndex();
+    m_Stats.st_dev     = fs->DeviceID();
+    m_Stats.st_ino     = fs->NextINodeIndex();
     m_Stats.st_nlink   = 1;
     m_Stats.st_mode    = mode;
     m_Stats.st_uid     = 0;

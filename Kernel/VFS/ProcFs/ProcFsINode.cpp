@@ -26,8 +26,8 @@ ProcFsINode::ProcFsINode(INode* parent, StringView name, Filesystem* fs,
 {
     Assert(!S_ISDIR(mode) || !m_Property);
 
-    m_Stats.st_dev     = m_Filesystem->GetDeviceID();
-    m_Stats.st_ino     = m_Filesystem->GetNextINodeIndex();
+    m_Stats.st_dev     = m_Filesystem->DeviceID();
+    m_Stats.st_ino     = m_Filesystem->NextINodeIndex();
     m_Stats.st_nlink   = 1;
     m_Stats.st_mode    = mode;
     m_Stats.st_uid     = 0;

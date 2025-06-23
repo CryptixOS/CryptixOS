@@ -189,9 +189,9 @@ DirectoryEntry* PathWalker::GetEffectiveParent(class INode* node)
     auto root = VFS::GetRootDirectoryEntry()->FollowMounts()->INode();
 
     if (node == root) return node->DirectoryEntry();
-    else if (node == node->GetFilesystem()->GetRootNode())
+    else if (node == node->GetFilesystem()->RootNode())
         return node->GetFilesystem()
-            ->GetMountedOn()
+            ->MountedOn()
             ->GetParent()
             ->DirectoryEntry();
 

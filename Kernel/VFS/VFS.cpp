@@ -235,8 +235,10 @@ namespace VFS
         }
 
         s_RootNode = new DirectoryEntry("/");
-        auto fsRoot
+        auto fsRootOr
             = fs->Mount(nullptr, nullptr, nullptr, s_RootNode, "/", nullptr);
+
+        auto fsRoot              = fsRootOr.value();
         fsRoot->m_DirectoryEntry = s_RootNode;
 
         if (s_RootNode->INode())
@@ -292,7 +294,10 @@ namespace VFS
         if (!dentry)
         {
             LogError("VFS: Failed to resolve target path -> '{}'", target);
-            goto fail;
+
+            delete targetINode;
+            delete fs;
+            return false;
         }
 
         targetINode = dentry->INode();
@@ -304,9 +309,11 @@ namespace VFS
             return_err(false, ENOTDIR);
         }
 
-        entry     = new DirectoryEntry(targetINode->GetName());
-        mountGate = fs->Mount(parentINode, sourceINode, targetINode, entry,
-                              baseName, data);
+        entry            = new DirectoryEntry(targetINode->GetName());
+        auto mountGateOr = fs->Mount(parentINode, sourceINode, targetINode,
+                                     entry, baseName, data);
+
+        mountGate        = mountGateOr.value();
         if (!mountGate)
         {
             LogError("VFS: Failed to mount '{}' fs", fsName);
@@ -324,8 +331,8 @@ namespace VFS
         s_MountPoints[target] = fs;
         return true;
     fail:
-        if (targetINode) delete targetINode;
-        if (fs) delete fs;
+        delete targetINode;
+        delete fs;
         return false;
     }
 
@@ -348,9 +355,11 @@ namespace VFS
 
         if (!newNodeParent) return nullptr;
 
-        auto entry = new DirectoryEntry(newNodeName);
-        newNode    = newNodeParent->GetFilesystem()->CreateNode(newNodeParent,
-                                                                entry, mode);
+        auto entry     = new DirectoryEntry(newNodeName);
+        auto newNodeOr = newNodeParent->GetFilesystem()->CreateNode(
+            newNodeParent, entry, mode);
+        newNode = newNodeOr.value();
+
         if (newNode)
         {
             newNodeParent->InsertChild(newNode, newNode->GetName());
@@ -371,8 +380,11 @@ namespace VFS
         if (!nparent) return nullptr;
 
         auto devEntry = new DirectoryEntry(newNodeName);
-        node = nparent->GetFilesystem()->MkNod(nparent, devEntry, mode, dev);
+        auto nodeOr
+            = nparent->GetFilesystem()->MkNod(nparent, devEntry, mode, dev);
+        if (!nodeOr) return_err(nullptr, nodeOr.error());
 
+        node = nodeOr.value();
         if (node)
         {
             nparent->InsertChild(node, node->GetName());
@@ -393,9 +405,12 @@ namespace VFS
         if (newNode) return_err(nullptr, EEXIST);
         if (!newNodeParent) return_err(nullptr, ENOENT);
 
-        auto entry = new DirectoryEntry(newNodeName);
-        newNode = newNodeParent->GetFilesystem()->Symlink(newNodeParent, entry,
-                                                          target);
+        auto entry     = new DirectoryEntry(newNodeName);
+        auto newNodeOr = newNodeParent->GetFilesystem()->Symlink(newNodeParent,
+                                                                 entry, target);
+        if (!newNodeOr) return_err(nullptr, newNodeOr.error());
+        newNode = newNodeOr.value();
+
         if (newNode)
         {
             newNodeParent->InsertChild(newNode, newNode->GetName());

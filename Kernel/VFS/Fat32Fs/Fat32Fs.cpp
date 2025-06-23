@@ -24,8 +24,9 @@ constexpr usize       FAT32_FS_INFO_OFFSET          = 484;
 constexpr usize       FAT32_REAL_FS_INFO_SIGNATURE  = 0x61417272;
 constexpr usize       FAT32_REAL_FS_INFO_SIGNATURE2 = 0xaa550000;
 
-INode* Fat32Fs::Mount(INode* parent, INode* source, INode* target,
-                      DirectoryEntry* entry, StringView name, const void* data)
+ErrorOr<INode*> Fat32Fs::Mount(INode* parent, INode* source, INode* target,
+                               DirectoryEntry* entry, StringView name,
+                               const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
@@ -80,7 +81,10 @@ INode* Fat32Fs::Mount(INode* parent, INode* source, INode* target,
 
     UpdateFsInfo();
 
-    m_Root     = CreateNode(parent, entry, 0644 | S_IFDIR);
+    auto rootOr = CreateNode(parent, entry, 0644 | S_IFDIR);
+    if (!rootOr) return Error(rootOr.error());
+
+    m_Root     = rootOr.value();
     m_RootNode = reinterpret_cast<Fat32FsINode*>(m_Root);
 
     m_RootNode->m_Stats.st_blocks
@@ -96,8 +100,8 @@ INode* Fat32Fs::Mount(INode* parent, INode* source, INode* target,
     return m_RootNode;
 }
 
-INode* Fat32Fs::CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
-                           uid_t uid, gid_t gid)
+ErrorOr<INode*> Fat32Fs::CreateNode(INode* parent, DirectoryEntry* entry,
+                                    mode_t mode, uid_t uid, gid_t gid)
 {
     StringView name = entry->Name();
 
@@ -194,9 +198,16 @@ bool Fat32Fs::Populate(INode* node)
                 entry->Attributes & Fat32Attribute::eDirectory,
                 entry->Attributes & Fat32Attribute::eSystem);
 
-        auto          dentry = new DirectoryEntry(nameBuffer);
-        Fat32FsINode* newNode
-            = reinterpret_cast<Fat32FsINode*>(CreateNode(node, dentry, mode));
+        auto dentry    = new DirectoryEntry(nameBuffer);
+        auto newNodeOr = CreateNode(node, dentry, mode);
+        if (!newNodeOr)
+        {
+            LogError("Fat32::Populate: Failed to create new node");
+            delete[] directoryEntries;
+            return false;
+        }
+
+        auto newNode = reinterpret_cast<Fat32FsINode*>(newNodeOr.value());
         dentry->Bind(newNode);
         if (!newNode)
         {

@@ -26,31 +26,32 @@ class Filesystem
     }
     virtual ~Filesystem() = default;
 
-    inline StringView  GetName() const { return m_Name; }
-    inline INode*      GetMountedOn() { return m_MountedOn; }
-    inline INode*      GetRootNode() { return m_Root; }
-    inline ino_t       GetNextINodeIndex() { return m_NextInodeIndex++; }
-    inline dev_t       GetDeviceID() const { return m_DeviceID; }
+    inline StringView       Name() const { return m_Name; }
+    inline INode*           MountedOn() { return m_MountedOn; }
+    inline INode*           RootNode() { return m_Root; }
+    inline ino_t            NextINodeIndex() { return m_NextInodeIndex++; }
+    inline dev_t            DeviceID() const { return m_DeviceID; }
 
-    virtual StringView GetDeviceName() const { return m_Name; }
-    virtual StringView GetMountFlagsString() const { return "rw,noatime"; }
+    virtual StringView      DeviceName() const { return m_Name; }
+    virtual StringView      MountFlagsString() const { return "rw,noatime"; }
 
-    virtual INode*     Mount(INode* parent, INode* source, INode* target,
-                             DirectoryEntry* entry, StringView name,
-                             const void* data = nullptr)
+    virtual ErrorOr<INode*> Mount(INode* parent, INode* source, INode* target,
+                                  DirectoryEntry* entry, StringView name,
+                                  const void* data = nullptr)
         = 0;
-    virtual INode* CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
-                              uid_t uid = 0, gid_t gid = 0)
+    virtual ErrorOr<INode*> CreateNode(INode* parent, DirectoryEntry* entry,
+                                       mode_t mode, uid_t uid = 0,
+                                       gid_t gid = 0)
         = 0;
-    virtual INode* Symlink(INode* parent, DirectoryEntry* entry,
-                           StringView target)
+    virtual ErrorOr<INode*> Symlink(INode* parent, DirectoryEntry* entry,
+                                    StringView target)
         = 0;
 
     virtual INode* Link(INode* parent, StringView name, INode* oldNode) = 0;
     virtual bool   Populate(INode* node)                                = 0;
 
-    virtual INode* MkNod(INode* parent, DirectoryEntry* entry, mode_t mode,
-                         dev_t dev)
+    virtual ErrorOr<INode*> MkNod(INode* parent, DirectoryEntry* entry,
+                                  mode_t mode, dev_t dev)
     {
         return nullptr;
     }

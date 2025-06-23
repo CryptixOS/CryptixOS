@@ -25,21 +25,22 @@ class ProcFs : public Filesystem
     void               AddProcess(Process* process);
     void               RemoveProcess(pid_t pid);
 
-    virtual StringView GetMountFlagsString() const override
+    virtual StringView MountFlagsString() const override
     {
         return "rw,nosuid,nodev,noexec,relatime";
     }
 
-    virtual INode* Mount(INode* parent, INode* source, INode* target,
-                         DirectoryEntry* entry, StringView name,
-                         const void* data = nullptr) override;
-    virtual INode* CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
-                              uid_t uid = 0, gid_t gid = 0) override;
-    virtual INode* Symlink(INode* parent, DirectoryEntry* entry,
-                           StringView target) override;
-    virtual INode* Link(INode* parent, StringView name,
-                        INode* oldNode) override;
-    virtual bool   Populate(INode* node) override;
+    virtual ErrorOr<INode*> Mount(INode* parent, INode* source, INode* target,
+                                  DirectoryEntry* entry, StringView name,
+                                  const void* data = nullptr) override;
+    virtual ErrorOr<INode*> CreateNode(INode* parent, DirectoryEntry* entry,
+                                       mode_t mode, uid_t uid = 0,
+                                       gid_t gid = 0) override;
+    virtual ErrorOr<INode*> Symlink(INode* parent, DirectoryEntry* entry,
+                                    StringView target) override;
+    virtual INode*          Link(INode* parent, StringView name,
+                                 INode* oldNode) override;
+    virtual bool            Populate(INode* node) override;
 
   private:
     static std::unordered_map<pid_t, Process*>      s_Processes;

@@ -14,8 +14,8 @@ Fat32FsINode::Fat32FsINode(INode* parent, StringView name, Filesystem* fs,
     : INode(parent, name, fs)
     , m_Fat32Fs(reinterpret_cast<Fat32Fs*>(fs))
 {
-    m_Stats.st_dev    = fs->GetDeviceID();
-    m_Stats.st_ino    = fs->GetNextINodeIndex();
+    m_Stats.st_dev    = fs->DeviceID();
+    m_Stats.st_ino    = fs->NextINodeIndex();
     m_Stats.st_nlink  = 1;
     m_Stats.st_mode   = mode;
     m_Stats.st_uid    = 0;

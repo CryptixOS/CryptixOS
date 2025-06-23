@@ -59,8 +59,8 @@ struct ProcFsMountsProperty : public ProcFsProperty
         Buffer.Resize(PMM::PAGE_SIZE);
 
         for (const auto& [mountPath, fs] : VFS::GetMountPoints())
-            Write("{} {} {} {}\n", fs->GetDeviceName(), mountPath,
-                  fs->GetName(), fs->GetMountFlagsString());
+            Write("{} {} {} {}\n", fs->DeviceName(), mountPath, fs->Name(),
+                  fs->MountFlagsString());
     }
 };
 struct ProcFsPartitionsProperty : public ProcFsProperty
@@ -192,8 +192,9 @@ void ProcFs::RemoveProcess(pid_t pid)
     ScopedLock guard(m_Lock);
     s_Processes.erase(pid);
 }
-INode* ProcFs::Mount(INode* parent, INode* source, INode* target,
-                     DirectoryEntry* entry, StringView name, const void* data)
+ErrorOr<INode*> ProcFs::Mount(INode* parent, INode* source, INode* target,
+                              DirectoryEntry* entry, StringView name,
+                              const void* data)
 {
     ScopedLock guard(m_Lock);
     m_MountData
@@ -217,12 +218,13 @@ INode* ProcFs::Mount(INode* parent, INode* source, INode* target,
 
     return m_Root;
 }
-INode* ProcFs::CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
-                          uid_t uid, gid_t gid)
+ErrorOr<INode*> ProcFs::CreateNode(INode* parent, DirectoryEntry* entry,
+                                   mode_t mode, uid_t uid, gid_t gid)
 {
     return nullptr;
 }
-INode* ProcFs::Symlink(INode* parent, DirectoryEntry* entry, StringView target)
+ErrorOr<INode*> ProcFs::Symlink(INode* parent, DirectoryEntry* entry,
+                                StringView target)
 {
     return nullptr;
 }

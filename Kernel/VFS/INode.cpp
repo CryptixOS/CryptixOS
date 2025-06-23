@@ -64,10 +64,9 @@ Path INode::GetPath()
 mode_t INode::GetMode() const { return m_Stats.st_mode & ~S_IFMT; }
 bool   INode::IsFilesystemRoot() const
 {
-    auto fsRootEntry
-        = m_Filesystem->GetMountedOn()->DirectoryEntry()->m_MountGate;
+    auto fsRootEntry = m_Filesystem->MountedOn()->DirectoryEntry()->m_MountGate;
 
-    return m_Filesystem->GetMountedOn() && fsRootEntry
+    return m_Filesystem->MountedOn() && fsRootEntry
         && this == fsRootEntry->INode();
 }
 

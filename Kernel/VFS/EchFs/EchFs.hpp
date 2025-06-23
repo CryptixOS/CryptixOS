@@ -19,13 +19,14 @@ class EchFs final : public Filesystem
     }
     virtual ~EchFs();
 
-    virtual INode* Mount(INode* parent, INode* source, INode* target,
-                         DirectoryEntry* entry, StringView name,
-                         const void* data = nullptr) override;
-    virtual INode* CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
-                              uid_t uid = 0, gid_t gid = 0) override;
-    virtual INode* Symlink(INode* parent, DirectoryEntry* entry,
-                           StringView target) override
+    virtual ErrorOr<INode*> Mount(INode* parent, INode* source, INode* target,
+                                  DirectoryEntry* entry, StringView name,
+                                  const void* data = nullptr) override;
+    virtual ErrorOr<INode*> CreateNode(INode* parent, DirectoryEntry* entry,
+                                       mode_t mode, uid_t uid = 0,
+                                       gid_t gid = 0) override;
+    virtual ErrorOr<INode*> Symlink(INode* parent, DirectoryEntry* entry,
+                                    StringView target) override
     {
         return nullptr;
     }

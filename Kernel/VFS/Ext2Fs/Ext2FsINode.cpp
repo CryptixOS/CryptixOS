@@ -15,8 +15,8 @@ Ext2FsINode::Ext2FsINode(INode* parent, StringView name, Ext2Fs* fs,
     : INode(parent, name, fs)
     , m_Fs(fs)
 {
-    m_Stats.st_dev     = fs->GetDeviceID();
-    m_Stats.st_ino     = fs->GetNextINodeIndex();
+    m_Stats.st_dev     = fs->DeviceID();
+    m_Stats.st_ino     = fs->NextINodeIndex();
     m_Stats.st_mode    = mode;
     m_Stats.st_nlink   = 1;
     m_Stats.st_uid     = 0;
@@ -149,7 +149,7 @@ ErrorOr<void> Ext2FsINode::ChMod(mode_t mode)
 
 void Ext2FsINode::Initialize(ino_t index, mode_t mode, u16 type)
 {
-    m_Stats.st_dev                  = m_Fs->GetDeviceID();
+    m_Stats.st_dev                  = m_Fs->DeviceID();
     m_Stats.st_ino                  = index;
     m_Stats.st_nlink                = 1;
     m_Stats.st_mode                 = mode;

@@ -11,13 +11,14 @@
 #include <VFS/Ext2Fs/Ext2Fs.hpp>
 #include <VFS/Ext2Fs/Ext2FsINode.hpp>
 
-INode* Ext2Fs::Mount(INode* parent, INode* source, INode* target,
-                     DirectoryEntry* entry, StringView name, const void* data)
+ErrorOr<INode*> Ext2Fs::Mount(INode* parent, INode* source, INode* target,
+                              DirectoryEntry* entry, StringView name,
+                              const void* data)
 {
     m_Device     = source;
 
     m_SuperBlock = new Ext2FsSuperBlock;
-    m_Device->Read(m_SuperBlock, 1024, sizeof(Ext2FsSuperBlock));
+    ReadSuperBlock();
 
     constexpr usize EXT2_FS_SIGNATURE = 0xef53;
     if (m_SuperBlock->Signature != EXT2_FS_SIGNATURE)
@@ -41,7 +42,7 @@ INode* Ext2Fs::Mount(INode* parent, INode* source, INode* target,
         = m_SuperBlock->BlockCount / m_SuperBlock->BlocksPerGroup;
 
     m_SuperBlock->LastMountTime = Time::GetReal().tv_sec;
-    m_Device->Write(m_SuperBlock, 1024, sizeof(Ext2FsSuperBlock));
+    FlushSuperBlock();
 
     m_Allocator.Initialize(this);
     auto* root = new Ext2FsINode(parent, name.Raw(), this, 0644 | S_IFDIR);
@@ -66,8 +67,8 @@ INode* Ext2Fs::Mount(INode* parent, INode* source, INode* target,
     return (m_Root = root);
 }
 
-INode* Ext2Fs::CreateNode(INode* parent, DirectoryEntry* entry, mode_t mode,
-                          uid_t uid, gid_t gid)
+ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, DirectoryEntry* entry,
+                                   mode_t mode, uid_t uid, gid_t gid)
 {
     usize inodeIndex = m_Allocator.AllocateINode();
     if (!inodeIndex) return nullptr;
@@ -249,7 +250,7 @@ void Ext2Fs::FreeINode(usize inode)
     ++m_SuperBlock->FreeINodeCount;
 
     WriteBlockGroupDescriptor(blockGroup, blockGroupIndex);
-    m_Device->Write(m_SuperBlock, 1024, sizeof(Ext2FsSuperBlock));
+    FlushSuperBlock();
 
     bitmap.Free();
 }
@@ -395,7 +396,7 @@ usize Ext2Fs::AllocateBlock(Ext2FsINodeMeta& meta, u32 inode)
 
     ScopedLock guard(m_Lock);
     --m_SuperBlock->FreeBlockCount;
-    m_Device->Write(m_SuperBlock, 1024, sizeof(Ext2FsSuperBlock));
+    FlushSuperBlock();
 
     return allocatedBlock;
 }
@@ -419,7 +420,7 @@ void Ext2Fs::FreeBlock(usize block)
     ++m_SuperBlock->FreeBlockCount;
 
     WriteBlockGroupDescriptor(blockGroup, blockGroupIndex);
-    m_Device->Write(m_SuperBlock, 1024, sizeof(Ext2FsSuperBlock));
+    FlushSuperBlock();
 
     bitmap.Free();
 }
@@ -505,6 +506,24 @@ isize Ext2Fs::ReadINode(Ext2FsINodeMeta& meta, u8* out, off_t offset,
     return bytes;
 }
 
+ScopedLock&& Ext2Fs::LockSuperBlock()
+{
+    ScopedLock guard(m_Lock);
+
+    return Move(guard);
+}
+void Ext2Fs::ReadSuperBlock()
+{
+    CTOS_UNUSED auto&& guard = Move(LockSuperBlock());
+
+    m_Device->Read(m_SuperBlock, 1024, sizeof(Ext2FsSuperBlock));
+}
+void Ext2Fs::FlushSuperBlock()
+{
+    CTOS_UNUSED auto&& guard = Move(LockSuperBlock());
+
+    m_Device->Write(m_SuperBlock, 1024, sizeof(Ext2FsSuperBlock));
+}
 void Ext2Fs::ReadBlockGroupDescriptor(Ext2FsBlockGroupDescriptor* out,
                                       usize                       index)
 {

@@ -25,9 +25,11 @@ namespace CPU
     void SetInterruptFlag(bool);
 } // namespace CPU
 
+#include <Prism/Core/NonCopyable.hpp>
 #include <Prism/Core/Platform.hpp>
 #include <Prism/Core/Types.hpp>
 #include <Prism/Debug/Assertions.hpp>
+
 #include <Prism/Utility/Atomic.hpp>
 
 class Spinlock
@@ -60,7 +62,7 @@ class Spinlock
     bool              m_SavedInterruptState = false;
 };
 
-class ScopedLock final
+class ScopedLock final : public NonCopyable<ScopedLock>
 {
   public:
     ScopedLock(Spinlock& lock, bool disableInterrupts = false)
