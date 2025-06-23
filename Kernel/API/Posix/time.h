@@ -17,6 +17,10 @@ struct timespec
     time_t           tv_sec;
     time_t           tv_nsec;
 
+    inline constexpr operator bool() const
+    {
+        return tv_sec != 0 || tv_nsec != 0;
+    }
     constexpr auto   operator<=>(const timespec& other) const = default;
     inline timespec& operator-=(const timespec& other)
     {
