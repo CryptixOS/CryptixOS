@@ -32,7 +32,7 @@ namespace CPU
 
 #include <Prism/Utility/Atomic.hpp>
 
-class Spinlock
+class Spinlock : public NonCopyable<Spinlock>
 {
     enum class LockState : u32
     {
