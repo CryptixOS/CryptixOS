@@ -174,6 +174,7 @@ namespace Syscall
         RegisterSyscall2(ID::eReadLinkAt, API::VFS::ReadLinkAt);
         RegisterSyscall2(ID::eFChModAt, API::VFS::FChModAt);
         RegisterSyscall2(ID::ePSelect6, API::VFS::PSelect6);
+        RegisterSyscall2(ID::eUtimensAt, API::VFS::UtimensAt);
         RegisterSyscall2(ID::eDup3, API::VFS::Dup3);
         RegisterSyscall2(ID::eRenameAt2, API::VFS::RenameAt2);
     }

@@ -17,6 +17,7 @@
 #include <Scheduler/Thread.hpp>
 
 #include <Prism/Path.hpp>
+#include <Time/Time.hpp>
 
 #include <VFS/FileDescriptor.hpp>
 #include <VFS/INode.hpp>
@@ -376,16 +377,26 @@ namespace API::VFS
 
     ErrorOr<isize> UTime(PathView path, const utimbuf* out)
     {
-        ErrorOr<INode*> nodeOrError = ::VFS::ResolvePath(path);
-        if (!nodeOrError) return nodeOrError.error();
-        CTOS_UNUSED auto tv = CPU::AsUser([&out]() -> utimbuf { return *out; });
+        auto pathRes
+            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), path, true);
+        auto entry = pathRes.Node;
+        if (!entry) return Error(ENOENT);
+        auto inode = entry->INode();
+        if (!inode) return Error(ENOENT);
 
-        // FIXME(v1tr10l7): finish this
-        Process*         process = Process::GetCurrent();
-        INode*           node    = nodeOrError.value();
-        (void)process;
-        (void)node;
-        return Error(ENOSYS);
+        Process* process = Process::GetCurrent();
+        if (!inode->CanWrite(process->GetCredentials())) return Error(EPERM);
+        auto     utime      = CPU::AsUser([&out]() -> utimbuf { return *out; });
+
+        timespec accessTime = {utime.actime, 0};
+        timespec modificationTime = {utime.modtime, 0};
+
+        auto     result = inode->UpdateTimestamps(accessTime, modificationTime);
+        if (!result) return Error(result.error());
+        result = inode->FlushMetadata();
+        if (!result) return Error(result.error());
+
+        return {};
     }
     ErrorOr<isize> StatFs(PathView path, statfs* out)
     {
@@ -504,6 +515,68 @@ namespace API::VFS
                              const char* linkPath)
     {
         return Error(ENOSYS);
+    }
+
+    ErrorOr<isize> UtimensAt(i64 dirFdNum, const char* pathname,
+                             const timespec times[2], i64 flags)
+    {
+        auto process = Process::Current();
+        if ((pathname && !process->ValidateRead(pathname))
+            || (times && !process->ValidateRead(times, sizeof(timespec) * 2)))
+            return Error(EFAULT);
+
+        auto atime = times ? CPU::CopyFromUser(times[0]) : Time::GetReal();
+        auto mtime = times ? CPU::CopyFromUser(times[1]) : Time::GetReal();
+        auto ctime = Time::GetReal();
+        if (atime.tv_nsec == UTIME_OMIT && mtime.tv_nsec == UTIME_OMIT)
+            return 0;
+        auto validateTimespec = [](const timespec& timespec) -> bool
+        {
+            auto nsec = timespec.tv_nsec;
+
+            if (nsec == UTIME_NOW || nsec == UTIME_OMIT) return true;
+
+            return nsec >= 0 && nsec <= 999999999;
+        };
+
+        if (times && !validateTimespec(atime) && !validateTimespec(mtime))
+            return Error(EINVAL);
+        if (atime.tv_nsec == UTIME_NOW) atime = Time::GetReal();
+        else if (atime.tv_nsec == UTIME_OMIT) atime = {};
+
+        if (mtime.tv_nsec == UTIME_NOW) mtime = Time::GetReal();
+        else if (mtime.tv_nsec == UTIME_OMIT) mtime = {};
+
+        auto   path      = CPU::AsUser([&]() -> PathView { return pathname; });
+        auto   pathResOr = ResolveAtFd(dirFdNum, path, flags);
+
+        INode* inode     = nullptr;
+        if (!pathResOr)
+        {
+            if (dirFdNum < 0 && dirFdNum != AT_FDCWD)
+                return Error(pathResOr.error());
+
+            auto fd = process->GetFileHandle(dirFdNum);
+            if (!fd) return Error(EBADF);
+
+            inode = fd->GetNode();
+        }
+        else
+        {
+            auto dentry = pathResOr.value().Node;
+            if (!dentry) return Error(ENOENT);
+            inode = dentry->INode();
+        }
+
+        if (!inode) return Error(ENOENT);
+        if (!inode->CanWrite(process->GetCredentials())) return Error(EPERM);
+
+        auto result = inode->UpdateTimestamps(atime, mtime, ctime);
+        if (!result) return Error(result.error());
+        result = inode->FlushMetadata();
+        if (!result) return result.error();
+
+        return 0;
     }
     ErrorOr<isize> Dup3(isize oldFdNum, isize newFdNum, isize flags)
     {

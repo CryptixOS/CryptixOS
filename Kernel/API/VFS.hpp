@@ -64,6 +64,8 @@ namespace API::VFS
                           isize newDirFdNum, const char* newPath, isize flags);
     ErrorOr<isize> SymlinkAt(const char* target, isize newDirFdNum,
                              const char* linkPath);
+    ErrorOr<isize> UtimensAt(i64 dirFdNum, const char* path,
+                             const timespec times[2], i64 flags);
     ErrorOr<isize> Dup3(isize oldFdNum, isize newFdNum, isize flags);
     ErrorOr<isize> RenameAt2(isize oldDirFdNum, const char* oldPath,
                              isize newDirFdNum, const char* newPath,

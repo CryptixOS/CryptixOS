@@ -217,6 +217,7 @@ namespace Syscall
         eReadLinkAt       = 267,
         eFChModAt         = 268,
         ePSelect6         = 270,
+        eUtimensAt        = 280,
         eDup3             = 292,
         eRenameAt2        = 316,
     };
