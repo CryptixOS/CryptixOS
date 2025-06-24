@@ -17,7 +17,7 @@ constexpr StringView ECHFS_SIGNATURE = "_ECH_FS_"_sv;
 
 EchFs::~EchFs()
 {
-    if (m_Root) VFS::RecursiveDelete(m_Root);
+    // TODO(v1tr10l7): if (m_Root) VFS::RecursiveDelete(m_Root);
     if (m_IdentityTable)
     {
         delete m_IdentityTable;

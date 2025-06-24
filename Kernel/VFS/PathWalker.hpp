@@ -26,6 +26,7 @@ enum class ResolutionState
     eTerminated    = 5,
 };
 
+// TODO(v1tr10l7): Allow backtracing the path
 class PathWalker
 {
   public:
@@ -39,7 +40,7 @@ class PathWalker
     explicit PathWalker(DirectoryEntry* const root, PathView path);
 
     ErrorOr<void> Initialize(DirectoryEntry* const root, PathView path);
-    ErrorOr<DirectoryEntry*>  Resolve();
+    ErrorOr<DirectoryEntry*>  Resolve(bool followLinks = true);
 
     ErrorOr<void>             Step();
     ErrorOr<DirectoryEntry*>  FollowMounts(DirectoryEntry* dentry = nullptr);
@@ -56,7 +57,13 @@ class PathWalker
         return m_CurrentSegment.Name;
     }
 
-    DirectoryEntry*  GetEffectiveParent(INode* node = nullptr);
+    DirectoryEntry*           GetEffectiveParent(INode* node = nullptr);
+    constexpr DirectoryEntry* ParentEntry() const { return m_Parent; }
+    constexpr DirectoryEntry* DirectoryEntry() const
+    {
+        return m_DirectoryEntry;
+    }
+
     constexpr INode* ParentINode() const
     {
         return m_Parent ? m_Parent->INode() : nullptr;
@@ -72,13 +79,13 @@ class PathWalker
     constexpr const Path& BaseName() const { return m_BaseName; }
 
   private:
-    DirectoryEntry* m_Root  = nullptr;
+    class DirectoryEntry* m_Root  = nullptr;
 
-    ResolutionState m_State = ResolutionState::eUninitialized;
-    PathView        m_Path  = "/"_s;
-    Vector<String>  m_Tokens;
-    isize           m_Position     = 0;
-    isize           m_SymlinkDepth = 0;
+    ResolutionState       m_State = ResolutionState::eUninitialized;
+    PathView              m_Path  = "/"_s;
+    Vector<String>        m_Tokens;
+    isize                 m_Position     = 0;
+    isize                 m_SymlinkDepth = 0;
 
     struct Segment
     {

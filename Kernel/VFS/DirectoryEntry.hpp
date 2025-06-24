@@ -16,12 +16,8 @@ class DirectoryEntry : public RefCounted
         : m_Name(name)
     {
     }
-    DirectoryEntry(INode* inode)
-        : m_INode(inode)
-    {
-        m_Name                    = inode->GetName();
-        m_INode->m_DirectoryEntry = this;
-    }
+    DirectoryEntry(INode* inode);
+    DirectoryEntry(DirectoryEntry* parent, StringView name);
     DirectoryEntry(const DirectoryEntry& other)
         : m_INode(other.m_INode)
     {
@@ -30,8 +26,12 @@ class DirectoryEntry : public RefCounted
     inline INode*          INode() const { return m_INode; }
     inline usize           RefCount() const { return m_RefCount; }
     inline StringView      Name() const { return m_Name; }
-    inline DirectoryEntry* GetParent() const { return m_Parent; }
+    inline DirectoryEntry* Parent() const { return m_Parent; }
 
+    Path                   Path() const;
+    const std::unordered_map<StringView, DirectoryEntry*>& Children() const;
+
+    void            SetParent(DirectoryEntry* entry);
     void            SetMountGate(class INode* inode, DirectoryEntry* mountGate);
     void            Bind(class INode* inode);
     void            InsertChild(class DirectoryEntry* entry);
@@ -39,7 +39,7 @@ class DirectoryEntry : public RefCounted
     DirectoryEntry* FollowMounts();
     DirectoryEntry* FollowSymlinks();
 
-    DirectoryEntry* GetEffectiveParent();
+    DirectoryEntry* GetEffectiveParent() const;
     DirectoryEntry* Lookup(const String& name);
 
     inline bool     IsCharDevice() const { return m_INode->IsCharDevice(); }

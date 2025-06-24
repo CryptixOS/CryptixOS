@@ -10,9 +10,9 @@
 #include <Library/Module.hpp>
 
 #include <Memory/VMM.hpp>
+#include <VFS/DirectoryEntry.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
-#include <VFS/DirectoryEntry.hpp>
 
 #include <magic_enum/magic_enum.hpp>
 
@@ -21,31 +21,30 @@ static Vector<ELF::Image*>                     s_LoadedModules;
 
 std::unordered_map<StringView, Module*>& GetModules() { return s_Modules; }
 
-static void                              LoadModuleFromFile(INode* node)
+static void LoadModuleFromFile(DirectoryEntry* entry)
 {
-    LogTrace("Module: Loading '{}'...", node->GetPath());
+    auto inode = entry->INode();
+
+    LogTrace("Module: Loading '{}'...", inode->GetPath());
     Vector<u8> elf;
-    elf.Resize(node->GetStats().st_size);
-    node->Read(elf.Raw(), 0, node->GetStats().st_size);
+    elf.Resize(inode->GetStats().st_size);
+    inode->Read(elf.Raw(), 0, inode->GetStats().st_size);
 
     ELF::Image* image = new ELF::Image();
     if (!image->LoadFromMemory(elf.Raw(), elf.Size()))
     {
-        LogError("Module: Failed to load '{}'", node->GetPath());
+        LogError("Module: Failed to load '{}'", inode->GetPath());
         return;
     }
     s_LoadedModules.PushBack(image);
 }
 bool Module::Load()
 {
-    auto moduleDirectoryDirectoryEntry
-        = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), "/lib/modules/").Node;
-    if (!moduleDirectoryDirectoryEntry) return false;
-
-    auto moduleDirectory = moduleDirectoryDirectoryEntry->INode();
+    auto moduleDirectory
+        = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), "/lib/modules/").Entry;
     if (!moduleDirectory) return false;
 
-    for (const auto& [name, child] : moduleDirectory->GetChildren())
+    for (const auto& [name, child] : moduleDirectory->Children())
         LoadModuleFromFile(child);
 
     return true;

@@ -36,6 +36,15 @@ ErrorOr<INode*> TmpFs::Mount(INode* parent, INode* source, INode* target,
     auto inode = inodeOr.value();
     if (inode) m_MountedOn = target;
 
+    entry->Bind(inode);
+
+    if (target)
+    {
+        auto targetEntry = target->DirectoryEntry();
+        entry->SetParent(targetEntry);
+        if (targetEntry) targetEntry->SetMountGate(inode, entry);
+    }
+    m_RootEntry = entry;
     return (m_Root = inode);
 }
 ErrorOr<INode*> TmpFs::CreateNode(INode* parent, DirectoryEntry* entry,

@@ -6,7 +6,7 @@
  */
 #include <Arch/x86_64/GDT.hpp>
 
-#include <Library/Spinlock.hpp>
+#include <Library/Locking/Spinlock.hpp>
 
 namespace GDT
 {

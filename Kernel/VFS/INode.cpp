@@ -105,7 +105,7 @@ INode* INode::Reduce(bool symlinks, bool automount, usize cnt)
 
         auto nextNode = VFS::ResolvePath(m_Parent->DirectoryEntry(),
                                          m_Target.Raw(), automount)
-                            .Node;
+                            .Entry;
         if (!nextNode) return_err(nullptr, ENOENT);
 
         return nextNode->INode()->Reduce(symlinks, automount, ++cnt);

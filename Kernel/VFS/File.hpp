@@ -13,8 +13,6 @@
 #include <Library/UserBuffer.hpp>
 #include <Prism/Containers/Deque.hpp>
 
-#include <VFS/INode.hpp>
-
 class File
 {
   public:

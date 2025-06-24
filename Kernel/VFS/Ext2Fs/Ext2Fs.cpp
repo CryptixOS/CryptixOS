@@ -23,7 +23,8 @@ ErrorOr<INode*> Ext2Fs::Mount(INode* parent, INode* source, INode* target,
     constexpr usize EXT2_FS_SIGNATURE = 0xef53;
     if (m_SuperBlock->Signature != EXT2_FS_SIGNATURE)
     {
-        LogError("Ext2Fs: '{}' -> Invalid signature", source->GetPath());
+        LogError("Ext2Fs: '{}' -> Invalid signature",
+                 source->DirectoryEntry()->Path());
         delete m_SuperBlock;
         return nullptr;
     }
@@ -31,7 +32,7 @@ ErrorOr<INode*> Ext2Fs::Mount(INode* parent, INode* source, INode* target,
     if (m_SuperBlock->VersionMajor < 1)
     {
         LogError("Ext2Fs: '{}' -> Unsupported ext2fs version: {}",
-                 source->GetPath(), m_SuperBlock->VersionMajor);
+                 source->DirectoryEntry()->Path(), m_SuperBlock->VersionMajor);
         delete m_SuperBlock;
         return nullptr;
     }
@@ -58,12 +59,21 @@ ErrorOr<INode*> Ext2Fs::Mount(INode* parent, INode* source, INode* target,
     if (!root)
     {
         LogError("Ext2Fs: '{}' -> Failed to create root node",
-                 source->GetPath());
+                 source->DirectoryEntry()->Path());
         delete m_SuperBlock;
         return nullptr;
     }
 
+    entry->Bind(root);
     m_MountedOn = target;
+    if (target)
+    {
+        auto targetEntry = target->DirectoryEntry();
+        entry->SetParent(targetEntry);
+        if (targetEntry) targetEntry->SetMountGate(root, entry);
+    }
+
+    m_RootEntry = entry;
     return (m_Root = root);
 }
 
@@ -197,6 +207,9 @@ bool Ext2Fs::Populate(INode* node)
                 break;
         }
 
+        DirectoryEntry* newEntry
+            = new DirectoryEntry(node->DirectoryEntry(), nameBuffer);
+
         Ext2FsINode* newNode    = new Ext2FsINode(node, nameBuffer, this, mode);
         newNode->m_Stats.st_uid = inodeMeta.UID;
         newNode->m_Stats.st_gid = inodeMeta.GID;
@@ -214,6 +227,8 @@ bool Ext2Fs::Populate(INode* node)
 
         newNode->m_Populated             = false;
         newNode->m_Meta                  = inodeMeta;
+
+        newEntry->Bind(newNode);
         e2node->InsertChild(newNode, newNode->GetName());
 
         // TODO(v1tr10l7): resolve link

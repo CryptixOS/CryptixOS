@@ -7,7 +7,7 @@
 #include <Debug/Assertions.hpp>
 #include <Debug/Panic.hpp>
 
-#include <Library/Spinlock.hpp>
+#include <Library/Locking/Spinlock.hpp>
 #include <Memory/VMM.hpp>
 
 struct [[gnu::packed]] TTBR

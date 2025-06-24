@@ -24,11 +24,13 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
     {
         return m_Device ? m_Device->GetStats() : m_Stats;
     }
+    virtual INode* Lookup(const String& name) override;
 
-    virtual void InsertChild(INode* node, StringView name) override
+    virtual void   InsertChild(INode* node, StringView name) override
     {
         ScopedLock guard(m_Lock);
         m_Children[name] = node;
+        DirectoryEntry()->InsertChild(node->DirectoryEntry());
     }
 
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;

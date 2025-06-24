@@ -9,7 +9,7 @@
 #include <API/UnixTypes.hpp>
 
 #include <Drivers/Storage/StorageDevice.hpp>
-#include <Library/Spinlock.hpp>
+#include <Library/Locking/Spinlock.hpp>
 
 #include <Prism/Core/Types.hpp>
 #include <Prism/Memory/Pointer.hpp>

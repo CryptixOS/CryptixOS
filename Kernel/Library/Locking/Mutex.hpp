@@ -12,15 +12,17 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-class Mutex
+class Mutex : public NonCopyable<Mutex>
 {
   public:
     Mutex() = default;
 
     bool TryLock()
     {
-        if (!m_Locked.Exchange(true, MemoryOrder::eAtomicAcquire))
+        ScopedLock guard(m_Lock);
+        if (!m_Locked)
         {
+            m_Locked = true;
             m_Holder = Thread::GetCurrent();
             return true;
         }
@@ -43,16 +45,18 @@ class Mutex
     }
     void Unlock()
     {
-        Assert(Thread::GetCurrent() == m_Holder);
+        ScopedLock guard(m_Lock);
+        Assert(m_Locked && Thread::GetCurrent() == m_Holder);
+
+        m_Locked = false;
         m_Holder = nullptr;
 
-        m_Locked.Exchange(false, MemoryOrder::eAtomicRelease);
         Event::Trigger(&m_LockEvent);
     }
 
   private:
-    Atomic<bool>  m_Locked             = false;
-    Atomic<usize> m_WaitingThreadCount = 0;
-    Event         m_LockEvent;
-    Thread*       m_Holder = nullptr;
+    Spinlock m_Lock;
+    bool     m_Locked = false;
+    Thread*  m_Holder = nullptr;
+    Event    m_LockEvent;
 };

@@ -9,8 +9,6 @@
 #include <API/Posix/termios.h>
 #include <Drivers/Device.hpp>
 
-#include <Library/Spinlock.hpp>
-
 #include <Prism/Containers/CircularQueue.hpp>
 #include <Prism/Containers/Deque.hpp>
 #include <Prism/Memory/Buffer.hpp>

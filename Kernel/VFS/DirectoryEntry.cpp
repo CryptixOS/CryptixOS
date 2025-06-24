@@ -5,6 +5,8 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <API/Limits.hpp>
+#include <Prism/String/StringBuilder.hpp>
+
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/VFS.hpp>
 
@@ -12,6 +14,46 @@
 // NOTE(v1tr10l7): Directories should only have one DirectoryEntry, regular
 // files might have multiple pointing to the same inode
 
+DirectoryEntry::DirectoryEntry(class INode* inode)
+    : m_INode(inode)
+{
+    m_Name                    = inode->GetName();
+    m_INode->m_DirectoryEntry = this;
+
+    auto parent               = inode->GetParent();
+    if (parent) m_Parent = parent->DirectoryEntry();
+}
+DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, StringView name)
+    : m_Name(name)
+    , m_Parent(parent)
+{
+}
+
+Path DirectoryEntry::Path() const
+{
+    StringBuilder pathBuilder;
+
+    auto          current   = this;
+    auto          rootEntry = VFS::GetRootDirectoryEntry();
+
+    while (current && current != rootEntry)
+    {
+        auto segment = "/"_s;
+        segment += current->m_Name;
+        pathBuilder.Insert(segment);
+
+        current = current->GetEffectiveParent();
+    }
+
+    return pathBuilder.Empty() ? "/"_s : pathBuilder.ToString();
+}
+const std::unordered_map<StringView, DirectoryEntry*>&
+DirectoryEntry::Children() const
+{
+    return m_Children;
+}
+
+void DirectoryEntry::SetParent(DirectoryEntry* entry) { m_Parent = entry; }
 void DirectoryEntry::SetMountGate(class INode*    inode,
                                   DirectoryEntry* mountPoint)
 {
@@ -50,14 +92,26 @@ DirectoryEntry* DirectoryEntry::FollowSymlinks()
     while (!target.Empty())
     {
         auto next = VFS::ResolvePath(m_Parent, target.Raw());
-        if (!next.Node) return_err(nullptr, ENOENT);
+        if (!next.Entry) return_err(nullptr, ENOENT);
 
-        return next.Node->FollowSymlinks();
+        return next.Entry->FollowSymlinks();
     }
 
     return this;
 }
-DirectoryEntry* DirectoryEntry::GetEffectiveParent() { return m_Parent; }
+DirectoryEntry* DirectoryEntry::GetEffectiveParent() const
+{
+    auto rootEntry = VFS::GetRootDirectoryEntry()->FollowMounts();
+
+    if (this == rootEntry) return const_cast<DirectoryEntry*>(this);
+    else if (this == m_INode->GetFilesystem()->RootDirectoryEntry())
+        return m_INode->GetFilesystem()
+            ->MountedOn()
+            ->GetParent()
+            ->DirectoryEntry();
+
+    return m_INode->GetParent()->DirectoryEntry();
+}
 DirectoryEntry* DirectoryEntry::Lookup(const String& name)
 {
     auto entryIt = m_Children.find(name);

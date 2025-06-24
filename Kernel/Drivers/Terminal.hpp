@@ -10,7 +10,7 @@
 #include <Boot/BootInfo.hpp>
 
 #include <Library/Color.hpp>
-#include <Library/Spinlock.hpp>
+#include <Library/Locking/Spinlock.hpp>
 
 #include <Prism/Containers/Array.hpp>
 #include <Prism/Containers/Vector.hpp>

@@ -1,4 +1,4 @@
-/*
+/*resolver.INode()
  * Created by v1tr10l7 on 20.06.2025.
  * Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
  *
@@ -6,13 +6,14 @@
  */
 #include <VFS/PathWalker.hpp>
 
-PathWalker::PathWalker(DirectoryEntry* const root, PathView path)
+PathWalker::PathWalker(class DirectoryEntry* const root, PathView path)
 {
     auto result = Initialize(root, path);
     CtosUnused(result);
 }
 
-ErrorOr<void> PathWalker::Initialize(DirectoryEntry* const root, PathView path)
+ErrorOr<void> PathWalker::Initialize(class DirectoryEntry* const root,
+                                     PathView                    path)
 {
     if (path.Empty()) return Terminate(EINVAL);
     m_Root           = root ?: VFS::GetRootDirectoryEntry();
@@ -40,15 +41,7 @@ ErrorOr<void> PathWalker::Initialize(DirectoryEntry* const root, PathView path)
     return {};
 }
 
-INode* GetRootINode()
-{
-    auto vnode = VFS::GetRootDirectoryEntry() ?: nullptr;
-    if (!vnode) return nullptr;
-
-    return vnode->INode();
-}
-
-ErrorOr<DirectoryEntry*> PathWalker::Resolve()
+ErrorOr<DirectoryEntry*> PathWalker::Resolve(bool followLinks)
 {
     Assert(m_State == ResolutionState::eInitialized);
     if (m_Path == "/"_sv || m_Path.Empty())
@@ -85,6 +78,8 @@ ErrorOr<DirectoryEntry*> PathWalker::Resolve()
         if (errno == no_error) errno = ENOENT;
         return Error(errno);
     }
+
+    (void)followLinks;
     return m_DirectoryEntry;
 }
 
@@ -147,11 +142,13 @@ ErrorOr<DirectoryEntry*> PathWalker::FollowSymlink()
     if (m_SymlinkDepth >= static_cast<isize>(SYMLOOP_MAX - 1))
         return Error(ELOOP);
 
-    auto inode                = m_DirectoryEntry->INode();
-    auto target               = inode->GetTarget();
-    auto parentDirectoryEntry = m_DirectoryEntry->GetParent();
+    auto inode  = m_DirectoryEntry->INode();
+    auto target = inode->GetTarget();
+    if (target.Empty()) return m_DirectoryEntry;
+
+    auto parentDirectoryEntry = m_DirectoryEntry->Parent();
     auto next
-        = VFS::ResolvePath(parentDirectoryEntry, target.Raw(), false).Node;
+        = VFS::ResolvePath(parentDirectoryEntry, target.Raw(), false).Entry;
 
     if (!next) return Error(ENOLINK);
     return next;
@@ -159,12 +156,12 @@ ErrorOr<DirectoryEntry*> PathWalker::FollowSymlink()
 DirectoryEntry* PathWalker::FollowDots()
 {
     if (m_CurrentSegment.Type == PathSegmentType::eDotDot)
-        m_DirectoryEntry = GetEffectiveParent();
+        m_DirectoryEntry = m_DirectoryEntry->GetEffectiveParent();
 
     if (m_CurrentSegment.IsLast)
     {
         m_State          = ResolutionState::eFinished;
-        m_Parent         = GetEffectiveParent();
+        m_Parent         = m_DirectoryEntry->GetEffectiveParent();
         m_DirectoryEntry = m_DirectoryEntry->FollowMounts();
         m_BaseName       = m_DirectoryEntry->Name();
     }
@@ -180,22 +177,6 @@ Error PathWalker::Terminate(ErrorCode code)
     errno            = code;
 
     return Error(code);
-}
-
-DirectoryEntry* PathWalker::GetEffectiveParent(class INode* node)
-{
-    auto inode = m_DirectoryEntry->INode();
-    if (!node) node = inode;
-    auto root = VFS::GetRootDirectoryEntry()->FollowMounts()->INode();
-
-    if (node == root) return node->DirectoryEntry();
-    else if (node == node->GetFilesystem()->RootNode())
-        return node->GetFilesystem()
-            ->MountedOn()
-            ->GetParent()
-            ->DirectoryEntry();
-
-    return node->GetParent()->DirectoryEntry();
 }
 
 PathWalker::Segment PathWalker::GetNextSegment()

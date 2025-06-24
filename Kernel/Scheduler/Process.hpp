@@ -19,10 +19,7 @@
 #include <Library/ELF.hpp>
 #include <Prism/String/String.hpp>
 
-#include <Scheduler/Event.hpp>
-
 #include <VFS/FileDescriptorTable.hpp>
-#include <VFS/VFS.hpp>
 
 enum class PrivilegeLevel
 {
@@ -125,13 +122,13 @@ class Process
         return false;
     }
 
-    inline DirectoryEntry*     GetRootNode() const { return m_RootDirectoryEntry; }
-    inline StringView GetCWD() const { return m_CWD; }
-    inline mode_t     GetUmask() const { return m_Umask; }
-    mode_t            Umask(mode_t mask);
+    inline DirectoryEntry* GetRootNode() const { return m_RootDirectoryEntry; }
+    inline StringView      GetCWD() const { return m_CWD; }
+    inline mode_t          GetUmask() const { return m_Umask; }
+    mode_t                 Umask(mode_t mask);
 
-    static void       SendGroupSignal(pid_t pgid, i32 signal);
-    void              SendSignal(i32 signal);
+    static void            SendGroupSignal(pid_t pgid, i32 signal);
+    void                   SendSignal(i32 signal);
 
     ErrorOr<i32>   OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
     i32            CloseFd(i32 fd);
@@ -163,9 +160,9 @@ class Process
     Vector<Process*>    m_Zombies;
     Vector<Thread*>     m_Threads;
 
-    DirectoryEntry*              m_RootDirectoryEntry = VFS::GetRootDirectoryEntry();
-    String              m_CWD       = "/";
-    mode_t              m_Umask     = 0;
+    DirectoryEntry*     m_RootDirectoryEntry = VFS::GetRootDirectoryEntry();
+    String              m_CWD                = "/";
+    mode_t              m_Umask              = 0;
 
     FileDescriptorTable m_FdTable;
     AddressSpace        m_AddressSpace;

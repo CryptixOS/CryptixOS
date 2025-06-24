@@ -7,6 +7,7 @@
 #pragma once
 
 #include <Library/Logger.hpp>
+#include <VFS/DirectoryEntry.hpp>
 #include <VFS/INode.hpp>
 
 class TmpFsINode final : public INode
@@ -20,11 +21,14 @@ class TmpFsINode final : public INode
         if (m_Capacity > 0) delete m_Data;
     }
 
+    virtual INode*                Lookup(const String& name) override;
+
     inline static constexpr usize GetDefaultSize() { return 0x1000; }
 
     virtual void InsertChild(INode* node, StringView name) override
     {
         ScopedLock guard(m_Lock);
+        DirectoryEntry()->InsertChild(node->DirectoryEntry());
         m_Children[name] = node;
     }
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;

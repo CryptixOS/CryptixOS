@@ -13,9 +13,9 @@
 #include <Prism/String/StringView.hpp>
 #include <Prism/Utility/Math.hpp>
 
+#include <VFS/DirectoryEntry.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
-#include <VFS/DirectoryEntry.hpp>
 
 #include <cstring>
 #include <magic_enum/magic_enum.hpp>
@@ -149,10 +149,11 @@ namespace ELF
     bool Image::Load(PathView path, PageMap* pageMap,
                      AddressSpace& addressSpace, uintptr_t loadBase)
     {
-        DirectoryEntry* vnode = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), path).Node;
-        if (!vnode) return false;
+        DirectoryEntry* entry
+            = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), path).Entry;
+        if (!entry) return false;
 
-        auto file = vnode->INode();
+        auto file = entry->INode();
         if (!file) return_err(false, ENOENT);
 
         isize fileSize = file->GetStats().st_size;

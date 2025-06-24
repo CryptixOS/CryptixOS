@@ -13,8 +13,6 @@
 #include <Prism/Path.hpp>
 #include <Prism/String/String.hpp>
 
-#include <unordered_map>
-
 class INode;
 class DirectoryEntry;
 class FileDescriptor;
@@ -27,30 +25,18 @@ namespace VFS
 
     struct PathResolution
     {
-        INode* Parent   = nullptr;
-        INode* Node     = nullptr;
-
-        Path   BaseName = ""_s;
-    };
-    struct PathRes
-    {
         DirectoryEntry* Parent   = nullptr;
-        DirectoryEntry* Node     = nullptr;
+        DirectoryEntry* Entry    = nullptr;
         Path            BaseName = ""_s;
     };
 
     ErrorOr<FileDescriptor*> Open(DirectoryEntry* parent, PathView path,
                                   i32 flags, mode_t mode);
 
-    ErrorOr<INode*>          ResolvePath(PathView path);
-    PathResolution           ResolvePath(INode* parent, PathView path);
-    PathResolution ResolvePath(INode* parent, PathView path, bool followLinks);
-    PathRes        ResolvePath(DirectoryEntry* parent, PathView path,
-                               bool followLinks = true);
+    PathResolution           ResolvePath(DirectoryEntry* parent, PathView path,
+                                         bool followLinks = true);
 
-    std::unordered_map<StringView, class Filesystem*>& GetMountPoints();
-
-    bool MountRoot(StringView filesystemName);
+    bool                     MountRoot(StringView filesystemName);
     bool Mount(DirectoryEntry* parent, PathView source, PathView target,
                StringView fsName, i32 flags = 0, const void* data = nullptr);
     bool Unmount(DirectoryEntry* parent, PathView path, i32 flags = 0);

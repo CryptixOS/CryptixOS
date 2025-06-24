@@ -10,7 +10,7 @@
 #include <Drivers/PCI/Access.hpp>
 #include <Drivers/PCI/Definitions.hpp>
 
-#include <Library/Spinlock.hpp>
+#include <Library/Locking/Spinlock.hpp>
 #include <Prism/Containers/Bitmap.hpp>
 #include <Prism/Core/Types.hpp>
 #include <Prism/Delegate.hpp>

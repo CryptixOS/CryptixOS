@@ -43,6 +43,16 @@ DevTmpFsINode::DevTmpFsINode(INode* parent, StringView name, Filesystem* fs,
     m_Stats.st_mtim = Time::GetReal();
 }
 
+INode* DevTmpFsINode::Lookup(const String& name)
+{
+    ScopedLock guard(m_Lock);
+
+    auto       child = GetChildren().find(name);
+    if (child != GetChildren().end()) return child->second;
+
+    return nullptr;
+}
+
 isize DevTmpFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
     if (!buffer) return_err(-1, EFAULT);

@@ -35,14 +35,16 @@ ErrorOr<INode*> Fat32Fs::Mount(INode* parent, INode* source, INode* target,
     source->Read(&m_BootRecord, 0, sizeof(Fat32BootRecord));
     if (m_BootRecord.Signature != 0x29)
     {
-        LogError("Fat32: '{}' -> Bad boot record signature", source->GetPath());
+        LogError("Fat32: '{}' -> Bad boot record signature",
+                 source->DirectoryEntry()->Path());
         return nullptr;
     }
 
     if (std::strncmp(reinterpret_cast<char*>(m_BootRecord.IdentifierString),
                      FAT32_IDENTIFIER_STRING, 8))
     {
-        LogError("Fat32: '{}' -> Bad identifier string", source->GetPath());
+        LogError("Fat32: '{}' -> Bad identifier string",
+                 source->DirectoryEntry()->Path());
         return nullptr;
     }
 
@@ -51,7 +53,8 @@ ErrorOr<INode*> Fat32Fs::Mount(INode* parent, INode* source, INode* target,
                  sizeof(Fat32FsInfo));
     if (m_FsInfo.Signature != FAT32_FS_INFO_SIGNATURE)
     {
-        LogError("Fat32: '{}' -> bad fsinfo signature", source->GetPath());
+        LogError("Fat32: '{}' -> bad fsinfo signature",
+                 source->DirectoryEntry()->Path());
         return nullptr;
     }
 
@@ -63,7 +66,8 @@ ErrorOr<INode*> Fat32Fs::Mount(INode* parent, INode* source, INode* target,
     if (m_FsInfo.Signature != FAT32_REAL_FS_INFO_SIGNATURE
         || m_FsInfo.Signature2 != FAT32_REAL_FS_INFO_SIGNATURE2)
     {
-        LogError("Fat32: '{}' -> Bad fsinfo signature", source->GetPath());
+        LogError("Fat32: '{}' -> Bad fsinfo signature",
+                 source->DirectoryEntry()->Path());
         return nullptr;
     }
 

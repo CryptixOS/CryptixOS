@@ -196,8 +196,10 @@ namespace NVMe
             if ((bytes * m_LbaSize) > (PMM::PAGE_SIZE * 2))
             {
                 usize prpcount = ((bytes - 1) * m_LbaSize) / PMM::PAGE_SIZE;
-                AssertMsg(!(prpcount > m_MaxPhysRPages),
-                          "NVMe: Exceeded physical region pages");
+                AssertFmt(!(prpcount > m_MaxPhysRPages),
+                          "NVMe: Exceeded physical region pages, prpcount => "
+                          "{:#x}, bytes => {:#x}",
+                          prpcount, bytes);
                 for (usize i = 0; i < prpcount; i++)
                 {
                     m_IoQueue->GetPhysRegPages()[i + cid * m_MaxPhysRPages]

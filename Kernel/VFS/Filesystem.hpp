@@ -9,7 +9,7 @@
 #include <API/Posix/sys/statfs.h>
 #include <API/UnixTypes.hpp>
 
-#include <Library/Spinlock.hpp>
+#include <Library/Locking/Spinlock.hpp>
 
 #include <Prism/String/String.hpp>
 #include <Prism/Utility/Atomic.hpp>
@@ -57,6 +57,13 @@ class Filesystem
      * @ingroup Filesystem
      */
     inline INode*           MountedOn() { return m_MountedOn; }
+    /**
+     * @brief Get the root DirectoryEntry of this filesystem.
+     *
+     * @return DirectoryEntry* Pointer to the root directory entry.
+     * @ingroup Filesystem
+     */
+    inline DirectoryEntry*  RootDirectoryEntry() { return m_RootEntry; }
     /**
      * @brief Get the root INode of this filesystem.
      *
@@ -182,25 +189,27 @@ class Filesystem
 
   protected:
     // Synchronization lock for internal access
-    Spinlock      m_Lock;
+    Spinlock        m_Lock;
 
-    String        m_Name           = "NoFs";
-    dev_t         m_DeviceID       = -1;
-    usize         m_BlockSize      = 512;
-    usize         m_BytesLimit     = 0;
+    String          m_Name           = "NoFs";
+    dev_t           m_DeviceID       = -1;
+    usize           m_BlockSize      = 512;
+    usize           m_BytesLimit     = 0;
     ///> Filesystem specific flags for internal use
-    u32           m_Flags          = 0;
+    u32             m_Flags          = 0;
 
     ///> Backing device
-    INode*        m_SourceDevice   = nullptr;
+    INode*          m_SourceDevice   = nullptr;
+    ///> Root directory entry
+    DirectoryEntry* m_RootEntry      = nullptr;
     ///> Root inode
-    INode*        m_Root           = nullptr;
+    INode*          m_Root           = nullptr;
 
     ///> Host inode
-    INode*        m_MountedOn      = nullptr;
+    INode*          m_MountedOn      = nullptr;
     ///> Filesystem specific data
-    void*         m_MountData      = nullptr;
+    void*           m_MountData      = nullptr;
 
     ///> Counter for generating inode ids
-    Atomic<ino_t> m_NextInodeIndex = 2;
+    Atomic<ino_t>   m_NextInodeIndex = 2;
 };

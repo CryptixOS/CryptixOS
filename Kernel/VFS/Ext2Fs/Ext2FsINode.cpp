@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 
+#include <VFS/DirectoryEntry.hpp>
 #include <VFS/Ext2Fs/Ext2Fs.hpp>
 #include <VFS/Ext2Fs/Ext2FsINode.hpp>
 
@@ -113,6 +114,7 @@ INode* Ext2FsINode::Lookup(const String& name)
 void Ext2FsINode::InsertChild(INode* node, StringView name)
 {
     ScopedLock guard(m_Lock);
+    DirectoryEntry()->InsertChild(node->DirectoryEntry());
     m_Children[name] = node;
 }
 isize Ext2FsINode::Read(void* buffer, off_t offset, usize bytes)

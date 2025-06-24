@@ -9,7 +9,7 @@
 #include <Drivers/VideoTerminal.hpp>
 
 #include <Library/Logger.hpp>
-#include <Library/Spinlock.hpp>
+#include <Library/Locking/Spinlock.hpp>
 
 #include <Prism/Debug/LogSink.hpp>
 #include <Prism/String/StringUtils.hpp>

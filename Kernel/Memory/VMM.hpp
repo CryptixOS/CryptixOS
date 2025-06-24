@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Library/Spinlock.hpp>
+#include <Library/Locking/Spinlock.hpp>
 
 #include <Memory/PMM.hpp>
 #include <Memory/PageFault.hpp>

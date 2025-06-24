@@ -45,6 +45,17 @@ TmpFsINode::TmpFsINode(INode* parent, StringView name, Filesystem* fs,
         m_Data          = new u8[m_Capacity];
     }
 }
+
+INode* TmpFsINode::Lookup(const String& name)
+{
+    ScopedLock guard(m_Lock);
+
+    auto       child = GetChildren().find(name);
+    if (child != GetChildren().end()) return child->second;
+
+    return nullptr;
+}
+
 isize TmpFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
     ScopedLock guard(m_Lock);

@@ -8,7 +8,7 @@
 
 #include <API/UnixTypes.hpp>
 
-#include <Library/Spinlock.hpp>
+#include <Library/Locking/Spinlock.hpp>
 #include <Library/UserBuffer.hpp>
 
 #include <Prism/Memory/Ref.hpp>
@@ -50,13 +50,7 @@ class INode
     inline Filesystem*  GetFilesystem() { return m_Filesystem; }
     virtual const stat& GetStats() { return m_Stats; }
 
-    virtual INode*      Lookup(const String& name)
-    {
-        auto child = GetChildren().find(name);
-        if (child != GetChildren().end()) return child->second;
-
-        return nullptr;
-    }
+    virtual INode*      Lookup(const String& name) { return nullptr; }
     virtual ErrorOr<DirectoryEntry*> Lookup(DirectoryEntry* entry);
 
     virtual std::unordered_map<StringView, INode*>& GetChildren()

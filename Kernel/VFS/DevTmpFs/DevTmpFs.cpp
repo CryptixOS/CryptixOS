@@ -30,6 +30,9 @@ ErrorOr<INode*> DevTmpFs::Mount(INode* parent, INode* source, INode* target,
     m_Root           = maybeRoot.value();
     auto targetEntry = target->DirectoryEntry();
     targetEntry->SetMountGate(m_Root, entry);
+    m_RootEntry = entry;
+    entry->Bind(m_Root);
+    entry->SetParent(targetEntry->Parent());
 
     m_MountedOn = target;
     return m_Root;
