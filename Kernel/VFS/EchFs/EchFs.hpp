@@ -34,6 +34,7 @@ class EchFs final : public Filesystem
     {
         return nullptr;
     }
+    bool         Populate(EchFsINode* inode);
     virtual bool Populate(DirectoryEntry* dentry) override;
 
     isize ReadDirectoryEntry(EchFsDirectoryEntry& entry, u8* dest, isize offset,

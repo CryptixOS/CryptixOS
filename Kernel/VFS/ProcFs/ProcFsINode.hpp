@@ -64,16 +64,17 @@ struct ProcFsProperty
 class ProcFsINode : public INode
 {
   public:
-    ProcFsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode,
+    ProcFsINode(StringView name, class Filesystem* fs, mode_t mode,
                 ProcFsProperty* property = nullptr);
     virtual ~ProcFsINode() override
     {
         if (m_Property) delete m_Property;
     }
 
-    virtual const stat& GetStats() override;
+    virtual const stat& Stats() override;
     virtual ErrorOr<void>
-    TraverseDirectories(DirectoryIterator iterator) override;
+    TraverseDirectories(class DirectoryEntry* parent,
+                        DirectoryIterator     iterator) override;
 
     virtual const std::unordered_map<StringView, INode*>& Children() const
     {

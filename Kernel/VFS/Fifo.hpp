@@ -32,7 +32,7 @@ class Fifo : public INode
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
 
-    virtual const stat& GetStats() override
+    virtual const stat& Stats() override
     {
         LogTrace("Stats");
         return m_Stats;

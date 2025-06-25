@@ -408,7 +408,7 @@ namespace API::VFS
         auto inode = entry->INode();
         if (!entry) return Error(ENOENT);
 
-        auto fs     = inode->GetFilesystem();
+        auto fs     = inode->Filesystem();
         auto result = fs->Stats(*out);
 
         return !result ? result.error() : 0;
@@ -444,12 +444,12 @@ namespace API::VFS
             {
                 if (!cwd) return Error(ENOENT);
 
-                *out = cwd->GetStats();
+                *out = cwd->Stats();
                 return 0;
             }
             else if (!fd) return Error(EBADF);
 
-            *out = fd->INode()->GetStats();
+            *out = fd->INode()->Stats();
             return 0;
         }
 
@@ -476,7 +476,7 @@ namespace API::VFS
         auto inode = entry->INode();
         if (!inode) return Error(errno);
 
-        *out = inode->GetStats();
+        *out = inode->Stats();
         return 0;
     }
     ErrorOr<isize> UnlinkAt(isize dirFdNum, const char* path, isize flags)

@@ -37,7 +37,7 @@ class DirectoryEntry : public RefCounted
     void            InsertChild(class DirectoryEntry* entry);
 
     DirectoryEntry* FollowMounts();
-    DirectoryEntry* FollowSymlinks();
+    DirectoryEntry* FollowSymlinks(usize cnt = 0);
 
     DirectoryEntry* GetEffectiveParent() const;
     DirectoryEntry* Lookup(const String& name);

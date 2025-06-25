@@ -12,9 +12,8 @@
 
 #include <Time/Time.hpp>
 
-Ext2FsINode::Ext2FsINode(INode* parent, StringView name, Ext2Fs* fs,
-                         mode_t mode)
-    : INode(parent, name, fs)
+Ext2FsINode::Ext2FsINode(StringView name, Ext2Fs* fs, mode_t mode)
+    : INode(name, fs)
     , m_Fs(fs)
 {
     m_Stats.st_dev     = fs->DeviceID();
@@ -33,16 +32,16 @@ Ext2FsINode::Ext2FsINode(INode* parent, StringView name, Ext2Fs* fs,
     m_Stats.st_mtim    = Time::GetReal();
 }
 
-ErrorOr<void> Ext2FsINode::TraverseDirectories(DirectoryIterator iterator)
+ErrorOr<void> Ext2FsINode::TraverseDirectories(class DirectoryEntry* parent,
+                                               DirectoryIterator     iterator)
 {
-    auto inode = const_cast<Ext2FsINode*>(this);
-    m_Filesystem->Populate(inode->DirectoryEntry());
+    m_Filesystem->Populate(parent);
 
     usize offset = 0;
     for (const auto [name, inode] : Children())
     {
-        usize  ino  = inode->GetStats().st_ino;
-        mode_t mode = inode->GetStats().st_mode;
+        usize  ino  = inode->Stats().st_ino;
+        mode_t mode = inode->Stats().st_mode;
         auto   type = IF2DT(mode);
 
         if (!iterator(name, offset, ino, type)) break;
@@ -98,10 +97,10 @@ INode* Ext2FsINode::Lookup(const String& name)
                 break;
         }
 
-        Ext2FsINode* newNode    = new Ext2FsINode(this, nameBuffer, m_Fs, mode);
-        newNode->m_Stats.st_uid = inodeMeta.UID;
-        newNode->m_Stats.st_gid = inodeMeta.GID;
-        newNode->m_Stats.st_ino = entry->INodeIndex;
+        Ext2FsINode* newNode      = new Ext2FsINode(nameBuffer, m_Fs, mode);
+        newNode->m_Stats.st_uid   = inodeMeta.UID;
+        newNode->m_Stats.st_gid   = inodeMeta.GID;
+        newNode->m_Stats.st_ino   = entry->INodeIndex;
         newNode->m_Stats.st_size  = inodeMeta.GetSize();
         newNode->m_Stats.st_nlink = inodeMeta.HardLinkCount;
         newNode->m_Stats.st_blocks
@@ -116,7 +115,7 @@ INode* Ext2FsINode::Lookup(const String& name)
 
         newNode->m_Populated             = false;
         newNode->m_Meta                  = inodeMeta;
-        InsertChild(newNode, newNode->GetName());
+        InsertChild(newNode, newNode->Name());
 
         // TODO(v1tr10l7): Resolve symlink
         if (newNode->IsSymlink())
@@ -133,7 +132,6 @@ INode* Ext2FsINode::Lookup(const String& name)
 void Ext2FsINode::InsertChild(INode* node, StringView name)
 {
     ScopedLock guard(m_Lock);
-    DirectoryEntry()->InsertChild(node->DirectoryEntry());
     m_Children[name] = node;
 }
 isize Ext2FsINode::Read(void* buffer, off_t offset, usize bytes)

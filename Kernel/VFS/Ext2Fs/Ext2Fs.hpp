@@ -12,6 +12,7 @@
 #include <VFS/Filesystem.hpp>
 #include <VFS/INode.hpp>
 
+class Ext2FsINode;
 class Ext2Fs : public Filesystem
 {
   public:
@@ -36,6 +37,7 @@ class Ext2Fs : public Filesystem
     {
         return nullptr;
     }
+
     virtual bool             Populate(DirectoryEntry* dentry) override;
 
     inline Ext2FsSuperBlock* GetSuperBlock() const { return m_SuperBlock; }

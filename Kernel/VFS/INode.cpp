@@ -19,21 +19,20 @@ INode::INode(StringView name)
     : m_Name(name)
 {
 }
-INode::INode(INode* parent, StringView name, Filesystem* fs)
-    : m_Parent(parent)
-    , m_Name(name)
+INode::INode(StringView name, class Filesystem* fs)
+    : m_Name(name)
     , m_Filesystem(fs)
 {
     Thread*  thread  = CPU::GetCurrentThread();
     Process* process = thread ? thread->GetParent() : nullptr;
 
-    if (parent && parent->m_Stats.st_mode & S_ISUID)
-    {
-        m_Stats.st_uid = parent->m_Stats.st_uid;
-        m_Stats.st_gid = parent->m_Stats.st_gid;
-
-        return;
-    }
+    // if (parent && parent->m_Stats.st_mode & S_ISUID)
+    // {
+    //     m_Stats.st_uid = parent->m_Stats.st_uid;
+    //     m_Stats.st_gid = parent->m_Stats.st_gid;
+    //
+    //     return;
+    // }
 
     if (!process) return;
 
@@ -41,7 +40,7 @@ INode::INode(INode* parent, StringView name, Filesystem* fs)
     m_Stats.st_gid = process->m_Credentials.egid;
 }
 
-mode_t INode::GetMode() const { return m_Stats.st_mode & ~S_IFMT; }
+mode_t INode::Mode() const { return m_Stats.st_mode & ~S_IFMT; }
 bool   INode::IsFilesystemRoot() const
 {
     auto fsRootEntry = m_Filesystem->RootDirectoryEntry();
@@ -62,7 +61,7 @@ bool INode::IsEmpty()
             return !hasEntries;
         });
 
-    auto result = TraverseDirectories(iterator);
+    auto result = TraverseDirectories(nullptr, iterator);
     (void)result;
     return hasEntries;
 }
@@ -88,23 +87,6 @@ ErrorOr<isize> INode::ReadLink(UserBuffer& outBuffer)
     return static_cast<isize>(count);
 }
 
-INode* INode::Reduce(bool symlinks, bool automount, usize cnt)
-{
-    if (!m_Target.Empty() && symlinks)
-    {
-        if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
-
-        auto nextNode = VFS::ResolvePath(m_Parent->DirectoryEntry(),
-                                         m_Target.Raw(), automount)
-                            .Entry;
-        if (!nextNode) return_err(nullptr, ENOENT);
-
-        return nextNode->INode()->Reduce(symlinks, automount, ++cnt);
-    }
-
-    return this;
-}
-
 ErrorOr<DirectoryEntry*> INode::Lookup(class DirectoryEntry* entry)
 {
     auto node = Lookup(entry->Name());
@@ -114,19 +96,6 @@ ErrorOr<DirectoryEntry*> INode::Lookup(class DirectoryEntry* entry)
     node->m_DirectoryEntry = entry;
 
     return entry;
-}
-DirectoryEntry* INode::DirectoryEntry()
-{
-    if (!m_DirectoryEntry)
-    {
-        LogWarn("VFS: Allocating DirectoryEntry for: `{}`...", GetPath());
-        LogDebug("VFS: Showing backtrace:");
-        Stacktrace::Print(6);
-
-        auto parentEntry = m_Parent ? m_Parent->DirectoryEntry() : nullptr;
-        m_DirectoryEntry = new class DirectoryEntry(parentEntry, this);
-    }
-    return m_DirectoryEntry;
 }
 
 ErrorOr<void> INode::UpdateTimestamps(timespec atime, timespec mtime,
@@ -139,24 +108,4 @@ ErrorOr<void> INode::UpdateTimestamps(timespec atime, timespec mtime,
     // TODO(v1tr10l7): Verify permissions
     m_Dirty = true;
     return {};
-}
-
-Path INode::GetPath()
-{
-    StringBuilder pathBuilder;
-
-    auto          current            = this;
-    auto          rootDirectoryEntry = VFS::GetRootDirectoryEntry();
-    auto          rootINode          = rootDirectoryEntry->INode();
-
-    while (current && current != rootINode)
-    {
-        auto segment = "/"_s;
-        segment += current->m_Name;
-        pathBuilder.Insert(segment);
-
-        current = current->m_Parent;
-    }
-
-    return pathBuilder.Empty() ? "/"_s : pathBuilder.ToString();
 }

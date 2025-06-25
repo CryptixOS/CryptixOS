@@ -66,7 +66,7 @@ INode* DevTmpFs::Link(INode* parent, StringView name, INode* oldNode)
 ErrorOr<INode*> DevTmpFs::MkNod(INode* parent, DirectoryEntry* entry,
                                 mode_t mode, dev_t dev)
 {
-    auto inode = new DevTmpFsINode(parent, entry->Name(), this, mode);
+    auto inode = new DevTmpFsINode(entry->Name(), this, mode);
     if (!inode) return Error(ENOMEM);
     entry->Bind(inode);
 

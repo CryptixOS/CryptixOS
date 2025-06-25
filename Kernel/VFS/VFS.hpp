@@ -20,7 +20,7 @@ class FileDescriptor;
 
 namespace VFS
 {
-    Vector<std::pair<bool, StringView>>& GetFilesystems();
+    Vector<std::pair<bool, StringView>>& Filesystems();
 
     DirectoryEntry*                      GetRootDirectoryEntry();
     void                                 RecursiveDelete(INode* node);

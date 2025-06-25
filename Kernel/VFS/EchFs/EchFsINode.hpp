@@ -13,11 +13,11 @@ class EchFs;
 class EchFsINode : public INode
 {
   public:
-    EchFsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode,
+    EchFsINode(StringView name, class Filesystem* fs, mode_t mode,
                EchFsDirectoryEntry directoryEntry, usize directoryEntryOffset);
 
-    EchFsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode)
-        : EchFsINode(parent, name, fs, mode, {}, 0)
+    EchFsINode(StringView name, class Filesystem* fs, mode_t mode)
+        : EchFsINode(name, fs, mode, {}, 0)
     {
     }
 
@@ -32,7 +32,6 @@ class EchFsINode : public INode
         return_err(-1, EROFS);
     }
     virtual ErrorOr<isize> Truncate(usize size) override { return -1; }
-
     virtual ErrorOr<void>  ChMod(mode_t mode) override { return Error(ENOSYS); }
 
     friend class EchFs;

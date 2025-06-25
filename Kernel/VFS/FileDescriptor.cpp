@@ -123,7 +123,7 @@ ErrorOr<const stat*> FileDescriptor::Stat() const
     class INode* node = INode();
     if (!node) return std::unexpected(Error(ENOENT));
 
-    return &node->GetStats();
+    return &node->Stats();
 }
 
 ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
@@ -149,11 +149,11 @@ ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
         }
         case SEEK_END:
         {
-            usize size = INode()->GetStats().st_size;
+            usize size = INode()->Stats().st_size;
             if (static_cast<usize>(m_Description->Offset) + size
                 > std::numeric_limits<off_t>::max())
                 return Error(EOVERFLOW);
-            m_Description->Offset = INode()->GetStats().st_size + offset;
+            m_Description->Offset = INode()->Stats().st_size + offset;
             break;
         }
 
@@ -250,7 +250,7 @@ bool FileDescriptor::GenerateDirEntries()
     delegate.BindLambda(iterator);
 
     auto inode  = current->INode();
-    auto result = inode->TraverseDirectories(delegate);
+    auto result = inode->TraverseDirectories(current, delegate);
     CtosUnused(result);
 
     // . && ..
@@ -258,12 +258,12 @@ bool FileDescriptor::GenerateDirEntries()
     auto cwd = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), cwdPath).Entry;
     if (!cwd) return true;
 
-    auto stats = cwd->FollowMounts()->INode()->GetStats();
+    auto stats = cwd->FollowMounts()->INode()->Stats();
     dirEntries.Push(".", 0, stats.st_ino, IF2DT(stats.st_mode));
 
     if (!cwd->Parent()) return true;
 
-    stats = cwd->GetEffectiveParent()->INode()->GetStats();
+    stats = cwd->GetEffectiveParent()->INode()->Stats();
     dirEntries.Push("..", 0, stats.st_ino, IF2DT(stats.st_mode));
     return true;
 }

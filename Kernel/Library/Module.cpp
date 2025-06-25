@@ -29,8 +29,8 @@ static void LoadModuleFromFile(DirectoryEntry* entry)
 
     LogTrace("Module: Loading '{}'...", entry->Path());
     Vector<u8> elf;
-    elf.Resize(inode->GetStats().st_size);
-    inode->Read(elf.Raw(), 0, inode->GetStats().st_size);
+    elf.Resize(inode->Stats().st_size);
+    inode->Read(elf.Raw(), 0, inode->Stats().st_size);
 
     ELF::Image* image = new ELF::Image();
     if (!image->LoadFromMemory(elf.Raw(), elf.Size()))

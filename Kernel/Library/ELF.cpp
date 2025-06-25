@@ -159,7 +159,7 @@ namespace ELF
         auto file = entry->INode();
         if (!file) return_err(false, ENOENT);
 
-        isize fileSize = file->GetStats().st_size;
+        isize fileSize = file->Stats().st_size;
         // m_Image        = new u8[fileSize];
         m_Image.Resize(fileSize + 100);
 

@@ -41,7 +41,7 @@ ErrorOr<DirectoryEntry*> EchFs::Mount(StringView sourcePath, const void* data)
     m_IdentityTable = new EchFsIdentityTable;
     if (!m_IdentityTable) return nullptr;
     m_SourceDevice = source;
-    m_DeviceID     = source->GetStats().st_rdev;
+    m_DeviceID     = source->Stats().st_rdev;
 
     StringView signature;
     usize      totalBlockCount = 0;
@@ -88,8 +88,9 @@ ErrorOr<DirectoryEntry*> EchFs::Mount(StringView sourcePath, const void* data)
         = m_MainDirectoryStart + mainDirectoryLength * m_BlockSize;
 
     m_RootEntry  = new DirectoryEntry(nullptr, "/");
-    m_NativeRoot = new EchFsINode(nullptr, "/", this, 0644 | S_IFDIR);
-    m_Root       = m_NativeRoot;
+    m_NativeRoot = new EchFsINode("/", reinterpret_cast<Filesystem*>(this),
+                                  0644 | S_IFDIR);
+    m_Root       = reinterpret_cast<INode*>(m_NativeRoot);
 
     if (!m_NativeRoot) goto fail_free_id_table;
     m_RootEntry->Bind(m_Root);
@@ -109,7 +110,8 @@ ErrorOr<DirectoryEntry*> EchFs::Mount(StringView sourcePath, const void* data)
         goto fail_free_inode_and_id_table;
     }
 
-    m_NativeRoot->m_Stats.st_dev     = DeviceID();
+    m_NativeRoot->m_Stats.st_dev
+        = reinterpret_cast<Filesystem*>(this)->DeviceID();
     m_NativeRoot->m_Stats.st_ino     = 2;
     m_NativeRoot->m_Stats.st_mode    = 0644 | S_IFDIR;
     m_NativeRoot->m_Stats.st_nlink   = 2;
@@ -139,17 +141,17 @@ ErrorOr<INode*> EchFs::CreateNode(INode* parent, DirectoryEntry* entry,
     return nullptr;
 }
 
-bool EchFs::Populate(DirectoryEntry* dentry)
+bool EchFs::Populate(EchFsINode* native)
 {
-    EchFsINode*         inode = reinterpret_cast<EchFsINode*>(dentry->INode());
-    EchFsDirectoryEntry inodeEntry = inode->m_DirectoryEntry;
+    INode*              inode      = reinterpret_cast<INode*>(native);
+    EchFsDirectoryEntry inodeEntry = native->m_DirectoryEntry;
     ScopedLock          guard(m_Lock);
 
     // TODO(v1tr10l7): Traversing whole main directory, in order to read all
     // children is incredibely slow, so we should introduce some caching,
     // to make it a bit more efficient
     EchFsDirectoryEntry entry{};
-    for (usize offset = inode->m_DirectoryEntryOffset;
+    for (usize offset = native->m_DirectoryEntryOffset;
          offset < m_MainDirectoryEnd; offset += sizeof(EchFsDirectoryEntry))
     {
         m_SourceDevice->Read(&entry, offset, sizeof(EchFsDirectoryEntry));
@@ -169,10 +171,10 @@ bool EchFs::Populate(DirectoryEntry* dentry)
         }
         if (entry.ParentID != inodeDirectoryID) continue;
 
-        EchFsINode* child
-            = new EchFsINode(inode, name, this, mode, entry, offset);
-        child->m_Stats.st_dev     = DeviceID();
-        child->m_Stats.st_ino     = 2;
+        EchFsINode* child = new EchFsINode(
+            name, reinterpret_cast<Filesystem*>(this), mode, entry, offset);
+        child->m_Stats.st_dev = reinterpret_cast<Filesystem*>(this)->DeviceID();
+        child->m_Stats.st_ino = 2;
         child->m_Stats.st_mode    = mode;
         child->m_Stats.st_nlink   = 1;
         child->m_Stats.st_uid     = entry.OwnerID;
@@ -187,10 +189,17 @@ bool EchFs::Populate(DirectoryEntry* dentry)
         child->m_Stats.st_atim = Time::GetReal();
         child->m_Stats.st_mtim = Time::GetReal();
 
-        inode->InsertChild(child, name);
+        inode->InsertChild(reinterpret_cast<INode*>(child), name);
     }
 
-    return (inode->m_Populated = true);
+    return (native->m_Populated = true);
+}
+bool EchFs::Populate(DirectoryEntry* entry)
+{
+    if (!entry) return_err(false, ENOENT);
+    auto inode = entry->INode();
+
+    return Populate(reinterpret_cast<EchFsINode*>(inode));
 }
 
 isize EchFs::ReadDirectoryEntry(EchFsDirectoryEntry& entry, u8* dest,

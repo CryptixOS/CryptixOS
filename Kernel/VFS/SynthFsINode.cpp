@@ -30,9 +30,9 @@ SynthFsINode::SynthFsINode(INode* parent, StringView name,
     m_Stats.st_mtim    = Time::GetReal();
     m_Stats.st_ctim    = Time::GetReal();
 
-    if (parent && parent->GetStats().st_mode & S_ISGID)
+    if (parent && parent->Stats().st_mode & S_ISGID)
     {
-        m_Stats.st_gid = parent->GetStats().st_gid;
+        m_Stats.st_gid = parent->Stats().st_gid;
         m_Stats.st_mode |= S_ISGID;
     }
 

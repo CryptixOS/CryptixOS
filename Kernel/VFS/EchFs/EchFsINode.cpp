@@ -7,10 +7,10 @@
 #include <VFS/EchFs/EchFs.hpp>
 #include <VFS/EchFs/EchFsINode.hpp>
 
-EchFsINode::EchFsINode(INode* parent, StringView name, Filesystem* fs,
-                       mode_t mode, EchFsDirectoryEntry directoryEntry,
-                       usize directoryEntryOffset)
-    : INode(parent, name, fs)
+EchFsINode::EchFsINode(StringView name, class Filesystem* fs, mode_t mode,
+                       EchFsDirectoryEntry directoryEntry,
+                       usize               directoryEntryOffset)
+    : INode(name, fs)
     , m_DirectoryEntry(directoryEntry)
     , m_DirectoryEntryOffset(directoryEntryOffset)
 {
@@ -24,7 +24,7 @@ EchFsINode::EchFsINode(INode* parent, StringView name, Filesystem* fs,
 const std::unordered_map<StringView, INode*>& EchFsINode::Children() const
 {
     auto inode = const_cast<EchFsINode*>(this);
-    reinterpret_cast<EchFs*>(m_Filesystem)->Populate(inode->DirectoryEntry());
+    reinterpret_cast<EchFs*>(m_Filesystem)->Populate(inode);
     return m_Children;
 }
 

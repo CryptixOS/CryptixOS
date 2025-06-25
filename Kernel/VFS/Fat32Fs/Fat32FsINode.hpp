@@ -11,7 +11,7 @@
 class Fat32FsINode : public INode
 {
   public:
-    Fat32FsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode);
+    Fat32FsINode(StringView name, class Filesystem* fs, mode_t mode);
 
     virtual ~Fat32FsINode() {}
 

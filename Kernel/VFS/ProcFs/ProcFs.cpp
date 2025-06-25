@@ -38,7 +38,7 @@ struct ProcFsFilesystemsProperty : public ProcFsProperty
         Buffer.Clear();
         Buffer.Resize(PMM::PAGE_SIZE);
 
-        for (auto& [physical, fs] : VFS::GetFilesystems())
+        for (auto& [physical, fs] : VFS::Filesystems())
             Write("{} {}\n", physical ? "     " : "nodev", fs);
     }
 };
@@ -138,7 +138,7 @@ struct ProcFsStatusProperty : public ProcFsProperty
 {
     virtual void GenerateRecord() override
     {
-        StringView pidString = m_Parent->GetName();
+        StringView pidString = m_Parent->Name();
         pid_t      pid       = StringUtils::ToNumber<pid_t>(pidString, 10);
         auto       process   = ProcFs::GetProcess(pid);
         if (!process) return;
@@ -165,8 +165,7 @@ static ProcFsINode* CreateProcFsNode(INode* parent, StringView name,
                                      Filesystem* filesystem)
 {
     ProcFsProperty* property = CreateProcFsProperty(name);
-    auto            node
-        = new ProcFsINode(parent, name, filesystem, 0755 | S_IFREG, property);
+    auto node = new ProcFsINode(name, filesystem, 0755 | S_IFREG, property);
     property->m_Parent = node;
 
     return node;
@@ -197,7 +196,7 @@ void ProcFs::AddProcess(Process* process)
     //                                       0755 | S_IFREG, statusProperty);
     // statusEntry->Bind(statusNode);
 
-    // processNode->InsertChild(statusNode, statusNode->GetName());
+    // processNode->InsertChild(statusNode, statusNode->Name());
     // processEntry->InsertChild(statusEntry);
 }
 void ProcFs::RemoveProcess(pid_t pid)
@@ -235,7 +234,7 @@ ErrorOr<DirectoryEntry*> ProcFs::Mount(StringView sourcePath, const void* data)
 ErrorOr<INode*> ProcFs::CreateNode(INode* parent, DirectoryEntry* entry,
                                    mode_t mode, uid_t uid, gid_t gid)
 {
-    auto inode = new ProcFsINode(parent, entry->Name(), this, mode, nullptr);
+    auto inode = new ProcFsINode(entry->Name(), this, mode, nullptr);
     entry->Bind(inode);
 
     return inode;

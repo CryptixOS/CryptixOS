@@ -77,8 +77,7 @@ INode* TmpFs::Link(INode* parent, StringView name, INode* oldNode)
         return nullptr;
     }
 
-    return new TmpFsINode(parent, name, this,
-                          (oldNode->GetStats().st_mode & ~S_IFMT));
+    return new TmpFsINode(name, this, (oldNode->Stats().st_mode & ~S_IFMT));
 }
 
 ErrorOr<INode*> TmpFs::MkNod(INode* parent, DirectoryEntry* entry, mode_t mode,
@@ -88,7 +87,7 @@ ErrorOr<INode*> TmpFs::MkNod(INode* parent, DirectoryEntry* entry, mode_t mode,
         || (S_ISREG(mode) && m_Size + TmpFsINode::GetDefaultSize() > m_MaxSize))
         return Error(ENOSPC);
 
-    auto inode = new TmpFsINode(parent, entry->Name(), this, mode, 0, 0);
+    auto inode = new TmpFsINode(entry->Name(), this, mode, 0, 0);
     entry->Bind(inode);
 
     if (parent) parent->InsertChild(inode, entry->Name());

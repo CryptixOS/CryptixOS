@@ -79,7 +79,7 @@ ErrorOr<DirectoryEntry*> Fat32Fs::Mount(StringView sourcePath, const void* data)
     m_FatOffset
         = m_BootRecord.ReservedSectorCount * m_BootRecord.BytesPerSector;
     m_DataOffset   = dataSector * m_BootRecord.BytesPerSector;
-    m_ClusterCount = (m_Device->GetStats().st_blocks - dataSector)
+    m_ClusterCount = (m_Device->Stats().st_blocks - dataSector)
                    / m_BootRecord.SectorsPerCluster;
 
     UpdateFsInfo();
@@ -96,7 +96,7 @@ ErrorOr<DirectoryEntry*> Fat32Fs::Mount(StringView sourcePath, const void* data)
         = GetChainSize(m_BootRecord.RootDirectoryCluster);
     m_RootNode->m_Stats.st_size = m_RootNode->m_Stats.st_blocks * m_ClusterSize;
     m_RootNode->m_Stats.st_blksize = m_ClusterSize;
-    m_RootNode->m_Stats.st_dev     = m_Device->GetStats().st_rdev;
+    m_RootNode->m_Stats.st_dev     = m_Device->Stats().st_rdev;
 
     m_RootNode->m_Cluster          = m_BootRecord.RootDirectoryCluster;
 
@@ -112,7 +112,7 @@ ErrorOr<INode*> Fat32Fs::CreateNode(INode* parent, DirectoryEntry* entry,
     if (name.Size() > 255) return_err(nullptr, ENAMETOOLONG);
     if (!S_ISREG(mode) && !S_ISDIR(mode)) return_err(nullptr, EPERM);
 
-    return new Fat32FsINode(parent, name, this, mode);
+    return new Fat32FsINode(name, this, mode);
 }
 
 bool Fat32Fs::Populate(DirectoryEntry* dentry)
@@ -122,8 +122,7 @@ bool Fat32Fs::Populate(DirectoryEntry* dentry)
     nameBuffer.Resize(256);
 
     Fat32DirectoryEntry* directoryEntries
-        = reinterpret_cast<Fat32DirectoryEntry*>(
-            new u8[node->GetStats().st_size]);
+        = reinterpret_cast<Fat32DirectoryEntry*>(new u8[node->Stats().st_size]);
     if (!directoryEntries)
     {
         delete[] directoryEntries;
@@ -131,7 +130,7 @@ bool Fat32Fs::Populate(DirectoryEntry* dentry)
     }
 
     usize directoryEntryCount
-        = node->GetStats().st_size / sizeof(Fat32DirectoryEntry);
+        = node->Stats().st_size / sizeof(Fat32DirectoryEntry);
 
     Fat32FsINode* f32node = reinterpret_cast<Fat32FsINode*>(node);
     if (ReadWriteClusters(reinterpret_cast<u8*>(directoryEntries),
@@ -241,7 +240,7 @@ bool Fat32Fs::Populate(DirectoryEntry* dentry)
         name.Resize(nameLen);
 
         nameBuffer.Copy(name.Raw(), nameLen);
-        node->InsertChild(newNode, newNode->GetName());
+        node->InsertChild(newNode, newNode->Name());
 
         if (S_ISDIR(mode)) newNode->m_Populated = false;
     }

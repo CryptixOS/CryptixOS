@@ -12,12 +12,13 @@
 class Ext2FsINode : public INode
 {
   public:
-    Ext2FsINode(INode* parent, StringView name, class Ext2Fs* fs, mode_t mode);
+    Ext2FsINode(StringView name, class Ext2Fs* fs, mode_t mode);
 
     virtual ~Ext2FsINode() {}
 
     virtual ErrorOr<void>
-                   TraverseDirectories(DirectoryIterator iterator) override;
+                   TraverseDirectories(class DirectoryEntry* parent,
+                                       DirectoryIterator     iterator) override;
     virtual INode* Lookup(const String& name) override;
 
     virtual const std::unordered_map<StringView, INode*>& Children() const

@@ -31,7 +31,6 @@ namespace DeviceManager
         DevTmpFs::RegisterDevice(cdev);
 
         auto path          = "/dev/"_s + cdev->Name();
-        // (void)path;
         auto devTmpFsEntry = VFS::MkNod(path, 0666, cdev->ID());
         if (!devTmpFsEntry)
         {

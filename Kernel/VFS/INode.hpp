@@ -17,7 +17,6 @@
 #include <VFS/VFS.hpp>
 
 #include <errno.h>
-#include <unordered_map>
 
 class DirectoryEntry;
 class FileDescriptor;
@@ -38,20 +37,20 @@ class INode
     };
 
     INode(StringView name);
-    INode(INode* parent, StringView name, Filesystem* fs);
+    INode(StringView name, class Filesystem* fs);
     virtual ~INode() {}
 
     // virtual Ref<DirectoryEntry> Ref() { return nullptr; }
 
-    INode*     Reduce(bool symlinks, bool automount = true, usize cnt = 0);
-    StringView GetTarget() const { return m_Target; }
+    StringView               GetTarget() const { return m_Target; }
 
-    inline Filesystem*  GetFilesystem() { return m_Filesystem; }
-    virtual const stat& GetStats() { return m_Stats; }
+    inline class Filesystem* Filesystem() { return m_Filesystem; }
+    virtual const stat&      Stats() { return m_Stats; }
 
     using DirectoryIterator
         = Delegate<bool(StringView name, loff_t offset, usize ino, u64 type)>;
-    virtual ErrorOr<void> TraverseDirectories(DirectoryIterator iterator)
+    virtual ErrorOr<void> TraverseDirectories(class DirectoryEntry* parent,
+                                              DirectoryIterator     iterator)
     {
         return Error(ENOSYS);
     }
@@ -59,9 +58,8 @@ class INode
     virtual INode* Lookup(const String& name) { return nullptr; }
     virtual ErrorOr<DirectoryEntry*> Lookup(DirectoryEntry* entry);
 
-    inline StringView                GetName() { return m_Name; }
-    DirectoryEntry*                  DirectoryEntry();
-    mode_t                           GetMode() const;
+    inline StringView                Name() { return m_Name; }
+    mode_t                           Mode() const;
 
     bool                             IsFilesystemRoot() const;
     bool                             IsEmpty();
@@ -107,27 +105,25 @@ class INode
 
     inline bool           Populate()
     {
-        return (!m_Populated && IsDirectory())
-                 ? m_Filesystem->Populate(DirectoryEntry())
-                 : true;
+        return true;
+        // return (!m_Populated && IsDirectory()) ? m_Filesystem->Populate()
+        //                                        : true;
     }
 
     class DirectoryEntry* m_DirectoryEntry = nullptr;
 
   protected:
-    INode*      m_Parent;
-    String      m_Name;
-    String      m_Target;
-    Spinlock    m_Lock;
-    Attributes  m_Attributes = {};
+    INode*            m_Parent;
+    String            m_Name;
+    String            m_Target;
+    Spinlock          m_Lock;
+    Attributes        m_Attributes = {};
     // Ref<class DirectoryEntry>                       m_DirectoryEntry;
 
-    Filesystem* m_Filesystem;
-    stat        m_Stats;
-    bool        m_Populated = false;
-    bool        m_Dirty     = false;
-
-    Path        GetPath();
+    class Filesystem* m_Filesystem;
+    stat              m_Stats;
+    bool              m_Populated = false;
+    bool              m_Dirty     = false;
 };
 
 using INodeAttributes = INode::Attributes;

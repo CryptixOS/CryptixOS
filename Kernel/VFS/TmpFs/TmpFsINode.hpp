@@ -13,7 +13,7 @@
 class TmpFsINode final : public INode
 {
   public:
-    TmpFsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode,
+    TmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
                uid_t uid = 0, gid_t gid = 0);
 
     virtual ~TmpFsINode()
@@ -22,7 +22,8 @@ class TmpFsINode final : public INode
     }
 
     virtual ErrorOr<void>
-                   TraverseDirectories(DirectoryIterator iterator) override;
+                   TraverseDirectories(class DirectoryEntry* parent,
+                                       DirectoryIterator     iterator) override;
     virtual INode* Lookup(const String& name) override;
 
     inline static constexpr usize GetDefaultSize() { return 0x1000; }

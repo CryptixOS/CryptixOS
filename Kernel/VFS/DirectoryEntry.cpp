@@ -18,7 +18,7 @@
 DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, class INode* inode)
     : m_INode(inode)
 {
-    m_Name                    = inode->GetName();
+    m_Name                    = inode->Name();
     m_Parent                  = parent;
 
     m_INode->m_DirectoryEntry = this;
@@ -83,20 +83,18 @@ DirectoryEntry* DirectoryEntry::FollowMounts()
 
     return current;
 }
-DirectoryEntry* DirectoryEntry::FollowSymlinks()
+DirectoryEntry* DirectoryEntry::FollowSymlinks(usize cnt)
 {
-    String target = "";
-    target.Reserve(Limits::MAX_PATH_LENGTH);
-    auto bufferOr = UserBuffer::ForUserBuffer(target.Raw(), target.Capacity());
-    if (bufferOr && m_INode->ReadLink(bufferOr.value()))
-        ;
+    auto target = m_INode->GetTarget();
 
-    while (!target.Empty())
+    if (!target.Empty())
     {
-        auto next = VFS::ResolvePath(m_Parent, target.Raw());
-        if (!next.Entry) return_err(nullptr, ENOENT);
+        if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
 
-        return next.Entry->FollowSymlinks();
+        auto next = VFS::ResolvePath(m_Parent, target.Raw(), true).Entry;
+        if (!next) return_err(nullptr, ENOENT);
+
+        return next->FollowSymlinks(++cnt);
     }
 
     return this;
@@ -121,7 +119,9 @@ DirectoryEntry* DirectoryEntry::Lookup(const String& name)
     auto inode = m_INode->Lookup(name);
     if (!inode) return nullptr;
 
-    auto entry = inode->DirectoryEntry();
+    auto entry = new DirectoryEntry(this, inode->Name());
+    entry->Bind(inode);
+
     InsertChild(entry);
     return entry;
 }

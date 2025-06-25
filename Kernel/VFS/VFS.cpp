@@ -30,7 +30,7 @@ namespace VFS
     static DirectoryEntry*               s_RootDirectoryEntry = nullptr;
     static Spinlock                      s_Lock;
 
-    Vector<std::pair<bool, StringView>>& GetFilesystems()
+    Vector<std::pair<bool, StringView>>& Filesystems()
     {
         static Vector<std::pair<bool, StringView>> s_Filesystems = {
             {
@@ -172,14 +172,10 @@ namespace VFS
 
         auto parentEntry = resolver.ParentEntry();
         auto entry       = resolver.DirectoryEntry();
+        if (followLinks && entry) entry = entry->FollowSymlinks();
 
-        auto parentINode = parentEntry ? parentEntry->INode() : nullptr;
-        auto inode       = entry ? entry->INode() : nullptr;
-
-        if (followLinks && inode) inode = inode->Reduce(true);
-
-        res.Parent   = parentINode->DirectoryEntry();
-        res.Entry    = inode ? inode->DirectoryEntry() : nullptr;
+        res.Parent   = parentEntry;
+        res.Entry    = entry;
         res.BaseName = resolver.BaseName();
 
         return res;
@@ -318,7 +314,7 @@ namespace VFS
         auto parentINode = parent->INode();
 
         entry            = new DirectoryEntry(parent, pathRes.BaseName);
-        auto newNodeOr   = parentINode->GetFilesystem()->CreateNode(parentINode,
+        auto newNodeOr   = parentINode->Filesystem()->CreateNode(parentINode,
                                                                     entry, mode);
         if (!newNodeOr)
         {
@@ -336,7 +332,7 @@ namespace VFS
 
         auto entry       = new DirectoryEntry(parent, name);
         auto parentINode = parent->INode();
-        auto inodeOr     = parentINode->GetFilesystem()->CreateNode(parentINode,
+        auto inodeOr     = parentINode->Filesystem()->CreateNode(parentINode,
                                                                     entry, mode);
 
         if (!inodeOr)
@@ -366,7 +362,7 @@ namespace VFS
 
         auto entry       = new DirectoryEntry(parent, pathRes.BaseName);
         auto parentINode = parent->INode();
-        auto inodeOr = parentINode->GetFilesystem()->MkNod(parentINode, entry,
+        auto inodeOr = parentINode->Filesystem()->MkNod(parentINode, entry,
                                                            mode, dev);
         if (!inodeOr)
         {
@@ -403,7 +399,7 @@ namespace VFS
         auto parentINode = parent->INode();
 
         auto newNodeOr
-            = parentINode->GetFilesystem()->Symlink(parentINode, entry, target);
+            = parentINode->Filesystem()->Symlink(parentINode, entry, target);
         if (!newNodeOr) return_err(nullptr, newNodeOr.error());
 
         return entry;

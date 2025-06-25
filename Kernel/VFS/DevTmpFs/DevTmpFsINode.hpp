@@ -15,20 +15,21 @@
 class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
 {
   public:
-    DevTmpFsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode,
+    DevTmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
                   Device* device = nullptr);
     virtual ~DevTmpFsINode()
     {
         if (m_Capacity > 0) delete m_Data;
     }
 
-    virtual const stat& GetStats() override
+    virtual const stat& Stats() override
     {
         return m_Device ? m_Device->Stats() : m_Stats;
     }
 
     virtual ErrorOr<void>
-                   TraverseDirectories(DirectoryIterator iterator) override;
+                   TraverseDirectories(class DirectoryEntry* parent,
+                                       DirectoryIterator     iterator) override;
     virtual INode* Lookup(const String& name) override;
 
     const std::unordered_map<StringView, INode*>& Children() const
@@ -39,7 +40,6 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
     {
         ScopedLock guard(m_Lock);
         m_Children[name] = node;
-        DirectoryEntry()->InsertChild(node->DirectoryEntry());
     }
 
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;

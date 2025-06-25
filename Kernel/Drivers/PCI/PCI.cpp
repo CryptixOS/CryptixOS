@@ -68,7 +68,7 @@ namespace PCI
             return;
         }
 
-        usize fileSize = file->GetStats().st_size;
+        usize fileSize = file->Stats().st_size;
         assert(fileSize > 0);
 
         String buffer;

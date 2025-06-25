@@ -13,9 +13,9 @@
 #include <VFS/TmpFs/TmpFs.hpp>
 #include <VFS/TmpFs/TmpFsINode.hpp>
 
-TmpFsINode::TmpFsINode(INode* parent, StringView name, Filesystem* fs,
-                       mode_t mode, uid_t uid, gid_t gid)
-    : INode(parent, name, fs)
+TmpFsINode::TmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
+                       uid_t uid, gid_t gid)
+    : INode(name, fs)
 {
     m_Stats.st_dev     = fs->DeviceID();
     m_Stats.st_ino     = fs->NextINodeIndex();
@@ -32,11 +32,11 @@ TmpFsINode::TmpFsINode(INode* parent, StringView name, Filesystem* fs,
     m_Stats.st_mtim    = Time::GetReal();
     m_Stats.st_ctim    = Time::GetReal();
 
-    if (parent && parent->GetStats().st_mode & S_ISGID)
-    {
-        m_Stats.st_gid = parent->GetStats().st_gid;
-        m_Stats.st_mode |= S_ISGID;
-    }
+    // if (parent && parent->Stats().st_mode & S_ISGID)
+    // {
+    //     m_Stats.st_gid = parent->Stats().st_gid;
+    //     m_Stats.st_mode |= S_ISGID;
+    // }
 
     if (S_ISREG(mode))
     {
@@ -46,13 +46,14 @@ TmpFsINode::TmpFsINode(INode* parent, StringView name, Filesystem* fs,
     }
 }
 
-ErrorOr<void> TmpFsINode::TraverseDirectories(DirectoryIterator iterator)
+ErrorOr<void> TmpFsINode::TraverseDirectories(class DirectoryEntry* parent,
+                                              DirectoryIterator     iterator)
 {
     usize offset = 0;
     for (const auto [name, inode] : Children())
     {
-        usize  ino  = inode->GetStats().st_ino;
-        mode_t mode = inode->GetStats().st_mode;
+        usize  ino  = inode->Stats().st_ino;
+        mode_t mode = inode->Stats().st_mode;
         auto   type = IF2DT(mode);
 
         if (!iterator(name, offset, ino, type)) break;
@@ -161,7 +162,7 @@ ErrorOr<void> TmpFsINode::Rename(INode* newParent, StringView newName)
     // parent->m_Children.erase(m_Name);
 
     m_Name = newName;
-    newParent->InsertChild(this, GetName());
+    newParent->InsertChild(this, Name());
 
     return {};
 }
@@ -179,7 +180,7 @@ ErrorOr<void> TmpFsINode::MkDir(StringView name, mode_t mode, uid_t uid,
     auto inode = reinterpret_cast<TmpFsINode*>(inodeOr.value());
     if (!inode) return Error(errno);
 
-    InsertChild(inode, inode->GetName());
+    InsertChild(inode, inode->Name());
     return {};
 }
 ErrorOr<void> TmpFsINode::Link(PathView path)

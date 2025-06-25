@@ -13,9 +13,9 @@
 
 #include <cstdlib>
 
-DevTmpFsINode::DevTmpFsINode(INode* parent, StringView name, Filesystem* fs,
-                             mode_t mode, Device* device)
-    : INode(parent, name, fs)
+DevTmpFsINode::DevTmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
+                             Device* device)
+    : INode(name, fs)
 {
     m_Device           = device;
 
@@ -43,13 +43,14 @@ DevTmpFsINode::DevTmpFsINode(INode* parent, StringView name, Filesystem* fs,
     m_Stats.st_mtim = Time::GetReal();
 }
 
-ErrorOr<void> DevTmpFsINode::TraverseDirectories(DirectoryIterator iterator)
+ErrorOr<void> DevTmpFsINode::TraverseDirectories(class DirectoryEntry* parent,
+                                                 DirectoryIterator     iterator)
 {
     usize offset = 0;
     for (const auto [name, inode] : Children())
     {
-        usize  ino  = inode->GetStats().st_ino;
-        mode_t mode = inode->GetStats().st_mode;
+        usize  ino  = inode->Stats().st_ino;
+        mode_t mode = inode->Stats().st_mode;
         auto   type = IF2DT(mode);
 
         if (!iterator(name, offset, ino, type)) break;
