@@ -8,25 +8,27 @@
 #include <Prism/String/StringBuilder.hpp>
 
 #include <VFS/DirectoryEntry.hpp>
+#include <VFS/MountPoint.hpp>
 #include <VFS/VFS.hpp>
 
 // FIXME(v1tr10l7): Reference counting, and cleaning up
 // NOTE(v1tr10l7): Directories should only have one DirectoryEntry, regular
 // files might have multiple pointing to the same inode
 
-DirectoryEntry::DirectoryEntry(class INode* inode)
+DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, class INode* inode)
     : m_INode(inode)
 {
     m_Name                    = inode->GetName();
-    m_INode->m_DirectoryEntry = this;
+    m_Parent                  = parent;
 
-    auto parent               = inode->GetParent();
-    if (parent) m_Parent = parent->DirectoryEntry();
+    m_INode->m_DirectoryEntry = this;
+    if (parent) parent->InsertChild(this);
 }
 DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, StringView name)
     : m_Name(name)
     , m_Parent(parent)
 {
+    if (parent) parent->InsertChild(this);
 }
 
 Path DirectoryEntry::Path() const
@@ -101,16 +103,14 @@ DirectoryEntry* DirectoryEntry::FollowSymlinks()
 }
 DirectoryEntry* DirectoryEntry::GetEffectiveParent() const
 {
-    auto rootEntry = VFS::GetRootDirectoryEntry()->FollowMounts();
+    auto rootEntry  = VFS::GetRootDirectoryEntry()->FollowMounts();
+    auto mountPoint = MountPoint::Lookup(const_cast<DirectoryEntry*>(this));
 
-    if (this == rootEntry) return const_cast<DirectoryEntry*>(this);
-    else if (this == m_INode->GetFilesystem()->RootDirectoryEntry())
-        return m_INode->GetFilesystem()
-            ->MountedOn()
-            ->GetParent()
-            ->DirectoryEntry();
+    if (this == rootEntry || this == VFS::GetRootDirectoryEntry())
+        return const_cast<DirectoryEntry*>(this);
+    else if (mountPoint) return mountPoint->HostEntry()->Parent();
 
-    return m_INode->GetParent()->DirectoryEntry();
+    return Parent();
 }
 DirectoryEntry* DirectoryEntry::Lookup(const String& name)
 {

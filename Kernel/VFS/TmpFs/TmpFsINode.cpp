@@ -46,14 +46,34 @@ TmpFsINode::TmpFsINode(INode* parent, StringView name, Filesystem* fs,
     }
 }
 
+ErrorOr<void> TmpFsINode::TraverseDirectories(DirectoryIterator iterator)
+{
+    usize offset = 0;
+    for (const auto [name, inode] : Children())
+    {
+        usize  ino  = inode->GetStats().st_ino;
+        mode_t mode = inode->GetStats().st_mode;
+        auto   type = IF2DT(mode);
+
+        if (!iterator(name, offset, ino, type)) break;
+        ++offset;
+    }
+
+    return {};
+}
 INode* TmpFsINode::Lookup(const String& name)
 {
     ScopedLock guard(m_Lock);
 
-    auto       child = GetChildren().find(name);
-    if (child != GetChildren().end()) return child->second;
+    auto       child = Children().find(name);
+    if (child != Children().end()) return child->second;
 
     return nullptr;
+}
+void TmpFsINode::InsertChild(INode* inode, StringView name)
+{
+    ScopedLock guard(m_Lock);
+    m_Children[name] = inode;
 }
 
 isize TmpFsINode::Read(void* buffer, off_t offset, usize bytes)
@@ -135,8 +155,10 @@ ErrorOr<isize> TmpFsINode::Truncate(usize size)
 
 ErrorOr<void> TmpFsINode::Rename(INode* newParent, StringView newName)
 {
-    auto parent = reinterpret_cast<TmpFsINode*>(m_Parent);
-    parent->m_Children.erase(m_Name);
+    // TODO(v1tr10l7): Remove old inode
+
+    // auto parent = reinterpret_cast<TmpFsINode*>(m_Parent);
+    // parent->m_Children.erase(m_Name);
 
     m_Name = newName;
     newParent->InsertChild(this, GetName());
@@ -157,7 +179,7 @@ ErrorOr<void> TmpFsINode::MkDir(StringView name, mode_t mode, uid_t uid,
     auto inode = reinterpret_cast<TmpFsINode*>(inodeOr.value());
     if (!inode) return Error(errno);
 
-    m_Children[inode->GetName()] = inode;
+    InsertChild(inode, inode->GetName());
     return {};
 }
 ErrorOr<void> TmpFsINode::Link(PathView path)

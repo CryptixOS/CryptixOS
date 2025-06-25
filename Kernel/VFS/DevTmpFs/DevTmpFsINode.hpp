@@ -8,6 +8,8 @@
 
 #include <Drivers/Device.hpp>
 #include <Prism/Core/NonCopyable.hpp>
+
+#include <VFS/DirectoryEntry.hpp>
 #include <VFS/INode.hpp>
 
 class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
@@ -24,9 +26,16 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
     {
         return m_Device ? m_Device->GetStats() : m_Stats;
     }
+
+    virtual ErrorOr<void>
+                   TraverseDirectories(DirectoryIterator iterator) override;
     virtual INode* Lookup(const String& name) override;
 
-    virtual void   InsertChild(INode* node, StringView name) override
+    const std::unordered_map<StringView, INode*>& Children() const
+    {
+        return m_Children;
+    }
+    virtual void InsertChild(INode* node, StringView name) override
     {
         ScopedLock guard(m_Lock);
         m_Children[name] = node;
@@ -41,9 +50,10 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
     virtual ErrorOr<void>  ChMod(mode_t mode) override;
 
   private:
-    Device* m_Device   = nullptr;
-    u8*     m_Data     = nullptr;
-    usize   m_Capacity = 0;
+    Device*                                m_Device   = nullptr;
+    u8*                                    m_Data     = nullptr;
+    usize                                  m_Capacity = 0;
 
+    std::unordered_map<StringView, INode*> m_Children;
     friend class DevTmpFs;
 };

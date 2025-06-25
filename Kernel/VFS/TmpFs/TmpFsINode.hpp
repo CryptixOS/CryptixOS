@@ -21,16 +21,17 @@ class TmpFsINode final : public INode
         if (m_Capacity > 0) delete m_Data;
     }
 
-    virtual INode*                Lookup(const String& name) override;
+    virtual ErrorOr<void>
+                   TraverseDirectories(DirectoryIterator iterator) override;
+    virtual INode* Lookup(const String& name) override;
 
     inline static constexpr usize GetDefaultSize() { return 0x1000; }
 
-    virtual void InsertChild(INode* node, StringView name) override
+    virtual const std::unordered_map<StringView, INode*>& Children() const
     {
-        ScopedLock guard(m_Lock);
-        DirectoryEntry()->InsertChild(node->DirectoryEntry());
-        m_Children[name] = node;
+        return m_Children;
     }
+    virtual void  InsertChild(INode* node, StringView name) override;
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
@@ -42,8 +43,9 @@ class TmpFsINode final : public INode
     virtual ErrorOr<void> ChMod(mode_t mode) override;
 
   private:
-    u8*   m_Data     = nullptr;
-    usize m_Capacity = 0;
+    u8*                                    m_Data     = nullptr;
+    usize                                  m_Capacity = 0;
+    std::unordered_map<StringView, INode*> m_Children;
 
     friend class TmpFs;
 };

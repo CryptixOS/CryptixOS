@@ -43,12 +43,27 @@ DevTmpFsINode::DevTmpFsINode(INode* parent, StringView name, Filesystem* fs,
     m_Stats.st_mtim = Time::GetReal();
 }
 
+ErrorOr<void> DevTmpFsINode::TraverseDirectories(DirectoryIterator iterator)
+{
+    usize offset = 0;
+    for (const auto [name, inode] : Children())
+    {
+        usize  ino  = inode->GetStats().st_ino;
+        mode_t mode = inode->GetStats().st_mode;
+        auto   type = IF2DT(mode);
+
+        if (!iterator(name, offset, ino, type)) break;
+        ++offset;
+    }
+
+    return {};
+}
 INode* DevTmpFsINode::Lookup(const String& name)
 {
     ScopedLock guard(m_Lock);
 
-    auto       child = GetChildren().find(name);
-    if (child != GetChildren().end()) return child->second;
+    auto       child = Children().find(name);
+    if (child != Children().end()) return child->second;
 
     return nullptr;
 }

@@ -59,9 +59,10 @@ Fat32FsINode::Fat32FsINode(INode* parent, StringView name, Filesystem* fs,
     }
 }
 
-std::unordered_map<StringView, INode*>& Fat32FsINode::GetChildren()
+const std::unordered_map<StringView, INode*>& Fat32FsINode::Children() const
 {
-    if (!m_Populated) Populate();
+    auto inode = const_cast<Fat32FsINode*>(this);
+    if (!m_Populated) m_Filesystem->Populate(inode->DirectoryEntry());
     return m_Children;
 }
 void Fat32FsINode::InsertChild(INode* node, StringView name)

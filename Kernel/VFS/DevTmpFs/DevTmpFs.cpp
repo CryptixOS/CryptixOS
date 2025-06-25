@@ -6,6 +6,7 @@
  */
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/DevTmpFs/DevTmpFsINode.hpp>
+#include <VFS/DirectoryEntry.hpp>
 
 std::unordered_map<dev_t, Device*> DevTmpFs::s_Devices{};
 
@@ -14,9 +15,8 @@ DevTmpFs::DevTmpFs(u32 flags)
 {
 }
 
-ErrorOr<INode*> DevTmpFs::Mount(INode* parent, INode* source, INode* target,
-                                DirectoryEntry* entry, StringView name,
-                                const void* data)
+ErrorOr<DirectoryEntry*> DevTmpFs::Mount(StringView  sourcePath,
+                                         const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
@@ -24,26 +24,28 @@ ErrorOr<INode*> DevTmpFs::Mount(INode* parent, INode* source, INode* target,
 
     if (m_Root) VFS::RecursiveDelete(m_Root);
 
-    auto maybeRoot = CreateNode(parent, entry, 0755 | S_IFDIR);
-    if (!maybeRoot) return Error(maybeRoot.error());
+    m_RootEntry    = new DirectoryEntry(nullptr, "/");
+    auto maybeRoot = MkNod(nullptr, m_RootEntry, 0755 | S_IFDIR, 0);
+    if (!maybeRoot)
+    {
+        delete m_RootEntry;
+        return Error(maybeRoot.error());
+    }
 
-    m_Root           = maybeRoot.value();
-    auto targetEntry = target->DirectoryEntry();
-    targetEntry->SetMountGate(m_Root, entry);
-    m_RootEntry = entry;
-    entry->Bind(m_Root);
-    entry->SetParent(targetEntry->Parent());
+    m_Root = maybeRoot.value();
+    m_RootEntry->Bind(m_Root);
 
-    m_MountedOn = target;
-    return m_Root;
+    return m_RootEntry;
 }
 
 ErrorOr<INode*> DevTmpFs::CreateNode(INode* parent, DirectoryEntry* entry,
                                      mode_t mode, uid_t uid, gid_t gid)
 {
-    auto inode = new DevTmpFsINode(parent, entry->Name(), this, mode);
-    entry->Bind(inode);
+    auto inodeOr = MkNod(parent, entry, mode, 0);
+    auto inode   = inodeOr.value_or(nullptr);
+    if (!inode) return Error(inodeOr.error());
 
+    entry->Bind(inode);
     return inode;
 }
 
@@ -64,16 +66,16 @@ INode* DevTmpFs::Link(INode* parent, StringView name, INode* oldNode)
 ErrorOr<INode*> DevTmpFs::MkNod(INode* parent, DirectoryEntry* entry,
                                 mode_t mode, dev_t dev)
 {
+    auto inode = new DevTmpFsINode(parent, entry->Name(), this, mode);
+    if (!inode) return Error(ENOMEM);
+    entry->Bind(inode);
+
+    if (parent) parent->InsertChild(inode, entry->Name());
+
     auto it = s_Devices.find(dev);
-    if (it == s_Devices.end()) return_err(nullptr, EEXIST);
-    Device* device  = it->second;
+    if (it == s_Devices.end()) return inode;
 
-    auto    inodeOr = CreateNode(parent, entry, mode, 0, 0);
-    if (!inodeOr) return Error(inodeOr.error());
-
-    auto inode      = reinterpret_cast<DevTmpFsINode*>(inodeOr.value());
-    inode->m_Device = device;
-
+    inode->m_Device = it->second;
     return inode;
 }
 

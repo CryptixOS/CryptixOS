@@ -139,7 +139,7 @@ namespace MemoryDevices
             DevTmpFs::RegisterDevice(device);
             Path path(fmt::format("/dev/{}", device->GetName()).data());
 
-            VFS::MkNod(nullptr, PathView(path.View()), 0666, device->GetID());
+            VFS::MkNod(PathView(path.View()), 0666, device->GetID());
         }
     }
 }; // namespace MemoryDevices

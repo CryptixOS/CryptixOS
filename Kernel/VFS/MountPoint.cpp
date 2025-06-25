@@ -18,6 +18,22 @@ void MountPoint::Attach(MountPoint* mountPoint)
 {
     s_MountPoints.PushBack(mountPoint);
 }
+MountPoint* MountPoint::Lookup(DirectoryEntry* entry)
+{
+    auto current = Head();
+    while (current && current->HostEntry() != entry)
+        current = current->NextMountPoint();
+
+    return current;
+}
+
 MountPoint* MountPoint::Head() { return s_MountPoints.Head(); }
+MountPoint* MountPoint::Tail() { return s_MountPoints.Tail(); }
+void        MountPoint::Iterate(MountPointIterator iterator)
+{
+    auto current = Head();
+    for (; current; current = current->NextMountPoint())
+        if (iterator(current)) break;
+}
 
 MountPoint* MountPoint::NextMountPoint() const { return Hook.Next; }

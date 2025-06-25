@@ -20,7 +20,7 @@ Fifo::Fifo()
 FileDescriptor* Fifo::Open(Fifo::Direction direction)
 {
 
-    auto fd = new FileDescriptor(DirectoryEntry(), 0,
+    auto fd = new FileDescriptor(nullptr, 0,
                                  direction == Direction::eRead
                                      ? FileAccessMode::eRead
                                      : FileAccessMode::eWrite);

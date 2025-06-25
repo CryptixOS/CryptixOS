@@ -15,6 +15,7 @@
 #include <Prism/String/StringUtils.hpp>
 
 #include <VFS/INode.hpp>
+#include <VFS/DirectoryEntry.hpp>
 #include <VFS/VFS.hpp>
 
 #include <cctype>

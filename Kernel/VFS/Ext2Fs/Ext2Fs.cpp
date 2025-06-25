@@ -11,11 +11,12 @@
 #include <VFS/Ext2Fs/Ext2Fs.hpp>
 #include <VFS/Ext2Fs/Ext2FsINode.hpp>
 
-ErrorOr<INode*> Ext2Fs::Mount(INode* parent, INode* source, INode* target,
-                              DirectoryEntry* entry, StringView name,
-                              const void* data)
+ErrorOr<DirectoryEntry*> Ext2Fs::Mount(StringView sourcePath, const void* data)
 {
-    m_Device     = source;
+    auto sourceEntry = VFS::ResolvePath(nullptr, sourcePath).Entry;
+    if (!sourceEntry || !sourceEntry->INode()) return Error(ENODEV);
+
+    m_Device     = sourceEntry->INode();
 
     m_SuperBlock = new Ext2FsSuperBlock;
     ReadSuperBlock();
@@ -23,8 +24,7 @@ ErrorOr<INode*> Ext2Fs::Mount(INode* parent, INode* source, INode* target,
     constexpr usize EXT2_FS_SIGNATURE = 0xef53;
     if (m_SuperBlock->Signature != EXT2_FS_SIGNATURE)
     {
-        LogError("Ext2Fs: '{}' -> Invalid signature",
-                 source->DirectoryEntry()->Path());
+        LogError("Ext2Fs: '{}' -> Invalid signature", sourceEntry->Path());
         delete m_SuperBlock;
         return nullptr;
     }
@@ -32,7 +32,7 @@ ErrorOr<INode*> Ext2Fs::Mount(INode* parent, INode* source, INode* target,
     if (m_SuperBlock->VersionMajor < 1)
     {
         LogError("Ext2Fs: '{}' -> Unsupported ext2fs version: {}",
-                 source->DirectoryEntry()->Path(), m_SuperBlock->VersionMajor);
+                 sourceEntry->Path(), m_SuperBlock->VersionMajor);
         delete m_SuperBlock;
         return nullptr;
     }
@@ -46,11 +46,13 @@ ErrorOr<INode*> Ext2Fs::Mount(INode* parent, INode* source, INode* target,
     FlushSuperBlock();
 
     m_Allocator.Initialize(this);
-    auto* root = new Ext2FsINode(parent, name.Raw(), this, 0644 | S_IFDIR);
+
+    m_RootEntry = new DirectoryEntry(nullptr, "/");
+    auto* root  = new Ext2FsINode(nullptr, "/", this, 0644 | S_IFDIR);
     ReadINodeEntry(&root->m_Meta, 2);
 
     root->m_Stats.st_ino   = 2;
-    root->m_Stats.st_dev   = source->GetStats().st_rdev;
+    root->m_Stats.st_dev   = m_Device->GetStats().st_rdev;
     root->m_Stats.st_nlink = root->m_Meta.HardLinkCount;
     root->m_Stats.st_size  = root->m_Meta.SizeLow
                           | (static_cast<u64>(root->m_Meta.SizeHigh) << 32);
@@ -59,22 +61,14 @@ ErrorOr<INode*> Ext2Fs::Mount(INode* parent, INode* source, INode* target,
     if (!root)
     {
         LogError("Ext2Fs: '{}' -> Failed to create root node",
-                 source->DirectoryEntry()->Path());
+                 sourceEntry->Path());
         delete m_SuperBlock;
         return nullptr;
     }
 
-    entry->Bind(root);
-    m_MountedOn = target;
-    if (target)
-    {
-        auto targetEntry = target->DirectoryEntry();
-        entry->SetParent(targetEntry);
-        if (targetEntry) targetEntry->SetMountGate(root, entry);
-    }
-
-    m_RootEntry = entry;
-    return (m_Root = root);
+    m_RootEntry->Bind(root);
+    m_Root = root;
+    return m_RootEntry;
 }
 
 ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, DirectoryEntry* entry,
@@ -153,9 +147,9 @@ ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, DirectoryEntry* entry,
     return inode;
 }
 
-bool Ext2Fs::Populate(INode* node)
+bool Ext2Fs::Populate(DirectoryEntry* dentry)
 {
-    Ext2FsINode*    e2node = reinterpret_cast<Ext2FsINode*>(node);
+    Ext2FsINode*    e2node = reinterpret_cast<Ext2FsINode*>(dentry->INode());
     Ext2FsINodeMeta parentMeta;
     ReadINodeEntry(&parentMeta, e2node->m_Stats.st_ino);
 
@@ -207,13 +201,11 @@ bool Ext2Fs::Populate(INode* node)
                 break;
         }
 
-        DirectoryEntry* newEntry
-            = new DirectoryEntry(node->DirectoryEntry(), nameBuffer);
-
-        Ext2FsINode* newNode    = new Ext2FsINode(node, nameBuffer, this, mode);
-        newNode->m_Stats.st_uid = inodeMeta.UID;
-        newNode->m_Stats.st_gid = inodeMeta.GID;
-        newNode->m_Stats.st_ino = entry->INodeIndex;
+        DirectoryEntry* newEntry = new DirectoryEntry(dentry, nameBuffer);
+        Ext2FsINode* newNode = new Ext2FsINode(e2node, nameBuffer, this, mode);
+        newNode->m_Stats.st_uid    = inodeMeta.UID;
+        newNode->m_Stats.st_gid    = inodeMeta.GID;
+        newNode->m_Stats.st_ino    = entry->INodeIndex;
         newNode->m_Stats.st_size   = inodeMeta.GetSize();
         newNode->m_Stats.st_nlink  = inodeMeta.HardLinkCount;
         newNode->m_Stats.st_blocks = newNode->m_Stats.st_size / m_BlockSize;

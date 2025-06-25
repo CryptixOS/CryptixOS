@@ -10,6 +10,7 @@
 #include <Time/Time.hpp>
 #include <VFS/INode.hpp>
 
+#include <VFS/DirectoryEntry.hpp>
 #include <VFS/EchFs/EchFs.hpp>
 #include <VFS/EchFs/EchFsINode.hpp>
 
@@ -25,11 +26,13 @@ EchFs::~EchFs()
     }
 }
 
-ErrorOr<INode*> EchFs::Mount(INode* parent, INode* source, INode* target,
-                             DirectoryEntry* entry, StringView name,
-                             const void* data)
+ErrorOr<DirectoryEntry*> EchFs::Mount(StringView sourcePath, const void* data)
 {
-    if (!source) return nullptr;
+    auto pathResolution = VFS::ResolvePath(nullptr, sourcePath);
+
+    auto sourceEntry    = pathResolution.Entry;
+    if (!sourceEntry || !sourceEntry->INode()) return nullptr;
+    auto source = sourceEntry->INode();
 
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
@@ -84,10 +87,12 @@ ErrorOr<INode*> EchFs::Mount(INode* parent, INode* source, INode* target,
     m_MainDirectoryEnd
         = m_MainDirectoryStart + mainDirectoryLength * m_BlockSize;
 
-    m_NativeRoot = new EchFsINode(parent, "/", this, 0644 | S_IFDIR);
+    m_RootEntry  = new DirectoryEntry(nullptr, "/");
+    m_NativeRoot = new EchFsINode(nullptr, "/", this, 0644 | S_IFDIR);
     m_Root       = m_NativeRoot;
 
     if (!m_NativeRoot) goto fail_free_id_table;
+    m_RootEntry->Bind(m_Root);
 
     if (source->Read(&m_NativeRoot->m_DirectoryEntry, m_MainDirectoryStart,
                      sizeof(EchFsDirectoryEntry))
@@ -119,8 +124,7 @@ ErrorOr<INode*> EchFs::Mount(INode* parent, INode* source, INode* target,
     m_NativeRoot->m_Stats.st_atim    = Time::GetReal();
     m_NativeRoot->m_Stats.st_mtim    = Time::GetReal();
 
-    m_MountedOn                      = target;
-    return m_NativeRoot;
+    return m_RootEntry;
 fail_free_inode_and_id_table:
     delete m_NativeRoot;
 fail_free_id_table:
@@ -135,9 +139,9 @@ ErrorOr<INode*> EchFs::CreateNode(INode* parent, DirectoryEntry* entry,
     return nullptr;
 }
 
-bool EchFs::Populate(INode* node)
+bool EchFs::Populate(DirectoryEntry* dentry)
 {
-    EchFsINode*         inode      = reinterpret_cast<EchFsINode*>(node);
+    EchFsINode*         inode = reinterpret_cast<EchFsINode*>(dentry->INode());
     EchFsDirectoryEntry inodeEntry = inode->m_DirectoryEntry;
     ScopedLock          guard(m_Lock);
 

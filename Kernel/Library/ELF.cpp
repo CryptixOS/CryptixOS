@@ -7,7 +7,10 @@
 #include <Library/ELF.hpp>
 #include <Library/Module.hpp>
 
+#include <Memory/AddressSpace.hpp>
 #include <Memory/PMM.hpp>
+#include <Memory/Region.hpp>
+#include <Memory/VMM.hpp>
 
 #include <Prism/Containers/Array.hpp>
 #include <Prism/String/StringView.hpp>
@@ -164,7 +167,7 @@ namespace ELF
             return false;
 
         LoadSymbols();
-        for (auto& sym : m_Symbols) sym.address += loadBase;
+        for (auto& sym : m_Symbols) sym.Address += loadBase;
 
         for (const auto& current : m_ProgramHeaders)
         {

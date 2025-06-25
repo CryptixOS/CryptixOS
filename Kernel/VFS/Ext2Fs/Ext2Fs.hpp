@@ -21,9 +21,8 @@ class Ext2Fs : public Filesystem
     }
     virtual ~Ext2Fs() = default;
 
-    virtual ErrorOr<INode*> Mount(INode* parent, INode* source, INode* target,
-                                  DirectoryEntry* entry, StringView name,
-                                  const void* data = nullptr) override;
+    virtual ErrorOr<DirectoryEntry*> Mount(StringView  sourcePath,
+                                           const void* data = nullptr) override;
     virtual ErrorOr<INode*> CreateNode(INode* parent, DirectoryEntry* entry,
                                        mode_t mode, uid_t uid = 0,
                                        gid_t gid = 0) override;
@@ -37,7 +36,7 @@ class Ext2Fs : public Filesystem
     {
         return nullptr;
     }
-    virtual bool             Populate(INode* node) override;
+    virtual bool             Populate(DirectoryEntry* dentry) override;
 
     inline Ext2FsSuperBlock* GetSuperBlock() const { return m_SuperBlock; }
     inline usize             GetBlockSize() const { return m_BlockSize; }

@@ -321,7 +321,7 @@ void TTY::Initialize()
         DevTmpFs::RegisterDevice(tty);
 
         auto path = fmt::format("/dev/tty{}", tty->GetID());
-        VFS::MkNod(nullptr, path.data(), 0666, tty->GetID());
+        VFS::MkNod(path.data(), 0666, tty->GetID());
         minor++;
     }
 
@@ -333,10 +333,10 @@ void TTY::Initialize()
         DevTmpFs::RegisterDevice(tty);
 
         StringView path = "/dev/tty"_sv;
-        VFS::MkNod(nullptr, path, 0666, tty->GetID());
+        VFS::MkNod(path, 0666, tty->GetID());
     }
     if (!s_TTYs.Empty())
-        VFS::MkNod(nullptr, "/dev/tty"_sv, 0644 | S_IFCHR, s_TTYs[0]->GetID());
+        VFS::MkNod("/dev/tty"_sv, 0644 | S_IFCHR, s_TTYs[0]->GetID());
 
     LogInfo("TTY: Initialized");
 }

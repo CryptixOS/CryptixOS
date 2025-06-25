@@ -23,7 +23,7 @@ class EchFsINode : public INode
 
     virtual ~EchFsINode() {}
 
-    virtual std::unordered_map<StringView, INode*>& GetChildren() override;
+    virtual const std::unordered_map<StringView, INode*>& Children() const;
 
     virtual void  InsertChild(INode* node, StringView name) override;
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
@@ -38,11 +38,12 @@ class EchFsINode : public INode
     friend class EchFs;
 
   private:
-    EchFs*              m_NativeFs = nullptr;
-    EchFsDirectoryEntry m_DirectoryEntry;
-    usize               m_EntryIndex;
-    usize               m_DirectoryEntryOffset;
-    Atomic<usize>       m_NextIndex = 2;
+    EchFs*                                 m_NativeFs = nullptr;
+    EchFsDirectoryEntry                    m_DirectoryEntry;
+    usize                                  m_EntryIndex;
+    usize                                  m_DirectoryEntryOffset;
+    Atomic<usize>                          m_NextIndex = 2;
 
+    std::unordered_map<StringView, INode*> m_Children;
     friend class EchFs;
 };

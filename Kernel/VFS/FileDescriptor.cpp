@@ -14,21 +14,17 @@
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/FileDescriptor.hpp>
 
-void DirectoryEntries::Push(DirectoryEntry* dentry, StringView name)
+void DirectoryEntries::Push(StringView name, loff_t offset, usize ino,
+                            usize type)
 {
-    if (name.Empty()) name = dentry->Name();
-    dentry            = dentry->FollowMounts();
-    ino_t  inodeIndex = dentry->INode()->GetStats().st_ino;
-    mode_t mode       = dentry->INode()->GetStats().st_mode;
-
-    auto   reclen
+    auto reclen
         = Math::AlignUp(DIRENT_LENGTH + name.Size() + 1, alignof(dirent));
 
     auto* entry     = reinterpret_cast<dirent*>(malloc(reclen));
-    entry->d_ino    = inodeIndex;
+    entry->d_ino    = ino;
     entry->d_off    = reclen;
     entry->d_reclen = reclen;
-    entry->d_type   = IF2DT(mode);
+    entry->d_type   = type;
 
     name.Copy(entry->d_name, name.Size() + 1);
     reinterpret_cast<char*>(entry->d_name)[name.Size()] = 0;
@@ -243,25 +239,31 @@ bool FileDescriptor::GenerateDirEntries()
         current = next;
     }
 
-    auto inode = current->INode();
-    // for (const auto [name, child] : current->Children())
-    for (const auto [name, child] : inode->GetChildren())
+    auto iterator
+        = [&](StringView name, loff_t offset, usize ino, usize type) -> bool
     {
-        if (name.Empty()) continue;
-        dirEntries.Push(child->DirectoryEntry());
-    }
+        dirEntries.Push(name, offset, ino, type);
+        return true;
+    };
+    (void)iterator;
+    Delegate<bool(StringView, loff_t, usize, usize)> delegate;
+    delegate.BindLambda(iterator);
+
+    auto inode  = current->INode();
+    auto result = inode->TraverseDirectories(delegate);
+    CtosUnused(result);
 
     // . && ..
     StringView cwdPath = Process::GetCurrent()->GetCWD();
-    auto       cwdEntry
-        = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), cwdPath).Entry;
-    if (!cwdEntry) return true;
-
-    auto cwd = cwdEntry;
+    auto cwd = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), cwdPath).Entry;
     if (!cwd) return true;
 
-    dirEntries.Push(cwd, ".");
+    auto stats = cwd->FollowMounts()->INode()->GetStats();
+    dirEntries.Push(".", 0, stats.st_ino, IF2DT(stats.st_mode));
+
     if (!cwd->Parent()) return true;
-    dirEntries.Push(cwd->Parent(), "..");
+
+    stats = cwd->GetEffectiveParent()->INode()->GetStats();
+    dirEntries.Push("..", 0, stats.st_ino, IF2DT(stats.st_mode));
     return true;
 }

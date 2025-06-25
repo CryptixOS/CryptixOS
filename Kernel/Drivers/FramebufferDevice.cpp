@@ -69,7 +69,7 @@ FramebufferDevice::FramebufferDevice(limine_framebuffer* framebuffer)
     DevTmpFs::RegisterDevice(this);
 
     StringView path = fmt::format("/dev/{}", GetName()).data();
-    VFS::MkNod(nullptr, path, 0666, GetID());
+    VFS::MkNod(path, 0666, GetID());
 }
 
 ErrorOr<isize> FramebufferDevice::Read(void* dest, off_t offset, usize bytes)

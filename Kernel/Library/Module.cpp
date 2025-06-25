@@ -23,9 +23,11 @@ std::unordered_map<StringView, Module*>& GetModules() { return s_Modules; }
 
 static void LoadModuleFromFile(DirectoryEntry* entry)
 {
+    Assert(entry);
     auto inode = entry->INode();
+    Assert(inode);
 
-    LogTrace("Module: Loading '{}'...", inode->GetPath());
+    LogTrace("Module: Loading '{}'...", entry->Path());
     Vector<u8> elf;
     elf.Resize(inode->GetStats().st_size);
     inode->Read(elf.Raw(), 0, inode->GetStats().st_size);
@@ -33,7 +35,7 @@ static void LoadModuleFromFile(DirectoryEntry* entry)
     ELF::Image* image = new ELF::Image();
     if (!image->LoadFromMemory(elf.Raw(), elf.Size()))
     {
-        LogError("Module: Failed to load '{}'", inode->GetPath());
+        LogError("Module: Failed to load '{}'", entry->Path());
         return;
     }
     s_LoadedModules.PushBack(image);

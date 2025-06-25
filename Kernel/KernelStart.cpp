@@ -150,10 +150,19 @@ static void kernelThread()
     LogDebug("VFS: Testing directory entry caches...");
     auto pathRes = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), "/mnt");
     auto entry   = pathRes.Entry->FollowMounts();
-    for (const auto& [name, dentry] : entry->Children())
+    for (auto& [name, dentry] : entry->Children())
     {
         LogTrace("Found directory => {}", name);
         LogTrace("Full path => {}", dentry->Path());
+        LogTrace("Child entries =>");
+
+        auto entry      = dentry;
+        auto mountPoint = MountPoint::Lookup(entry);
+        if (mountPoint) entry = mountPoint->HostEntry();
+        entry->INode()->Populate();
+
+        for (const auto& [childName, child] : entry->Children())
+            LogTrace("\t- /{}", childName);
     }
 
     MountPoint* mountPoint = MountPoint::Head();

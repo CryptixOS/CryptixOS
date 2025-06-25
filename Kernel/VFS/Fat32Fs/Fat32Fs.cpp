@@ -18,33 +18,34 @@
 
 #include <cctype>
 
-constexpr const char* FAT32_IDENTIFIER_STRING       = "FAT32   ";
-constexpr usize       FAT32_FS_INFO_SIGNATURE       = 0x41615252;
-constexpr usize       FAT32_FS_INFO_OFFSET          = 484;
-constexpr usize       FAT32_REAL_FS_INFO_SIGNATURE  = 0x61417272;
-constexpr usize       FAT32_REAL_FS_INFO_SIGNATURE2 = 0xaa550000;
+constexpr const char*    FAT32_IDENTIFIER_STRING       = "FAT32   ";
+constexpr usize          FAT32_FS_INFO_SIGNATURE       = 0x41615252;
+constexpr usize          FAT32_FS_INFO_OFFSET          = 484;
+constexpr usize          FAT32_REAL_FS_INFO_SIGNATURE  = 0x61417272;
+constexpr usize          FAT32_REAL_FS_INFO_SIGNATURE2 = 0xaa550000;
 
-ErrorOr<INode*> Fat32Fs::Mount(INode* parent, INode* source, INode* target,
-                               DirectoryEntry* entry, StringView name,
-                               const void* data)
+ErrorOr<DirectoryEntry*> Fat32Fs::Mount(StringView sourcePath, const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
                : nullptr;
 
+    auto sourceEntry = VFS::ResolvePath(nullptr, sourcePath).Entry;
+    if (!sourceEntry || !sourceEntry->INode()) return nullptr;
+    auto source = sourceEntry->INode();
+
     source->Read(&m_BootRecord, 0, sizeof(Fat32BootRecord));
     if (m_BootRecord.Signature != 0x29)
     {
         LogError("Fat32: '{}' -> Bad boot record signature",
-                 source->DirectoryEntry()->Path());
+                 sourceEntry->Path());
         return nullptr;
     }
 
     if (std::strncmp(reinterpret_cast<char*>(m_BootRecord.IdentifierString),
                      FAT32_IDENTIFIER_STRING, 8))
     {
-        LogError("Fat32: '{}' -> Bad identifier string",
-                 source->DirectoryEntry()->Path());
+        LogError("Fat32: '{}' -> Bad identifier string", sourceEntry->Path());
         return nullptr;
     }
 
@@ -53,8 +54,7 @@ ErrorOr<INode*> Fat32Fs::Mount(INode* parent, INode* source, INode* target,
                  sizeof(Fat32FsInfo));
     if (m_FsInfo.Signature != FAT32_FS_INFO_SIGNATURE)
     {
-        LogError("Fat32: '{}' -> bad fsinfo signature",
-                 source->DirectoryEntry()->Path());
+        LogError("Fat32: '{}' -> bad fsinfo signature", sourceEntry->Path());
         return nullptr;
     }
 
@@ -66,8 +66,7 @@ ErrorOr<INode*> Fat32Fs::Mount(INode* parent, INode* source, INode* target,
     if (m_FsInfo.Signature != FAT32_REAL_FS_INFO_SIGNATURE
         || m_FsInfo.Signature2 != FAT32_REAL_FS_INFO_SIGNATURE2)
     {
-        LogError("Fat32: '{}' -> Bad fsinfo signature",
-                 source->DirectoryEntry()->Path());
+        LogError("Fat32: '{}' -> Bad fsinfo signature", sourceEntry->Path());
         return nullptr;
     }
 
@@ -85,12 +84,14 @@ ErrorOr<INode*> Fat32Fs::Mount(INode* parent, INode* source, INode* target,
 
     UpdateFsInfo();
 
-    auto rootOr = CreateNode(parent, entry, 0644 | S_IFDIR);
+    m_RootEntry = new DirectoryEntry(nullptr, "/");
+    auto rootOr = CreateNode(nullptr, m_RootEntry, 0644 | S_IFDIR);
     if (!rootOr) return Error(rootOr.error());
 
     m_Root     = rootOr.value();
     m_RootNode = reinterpret_cast<Fat32FsINode*>(m_Root);
 
+    m_RootEntry->Bind(m_Root);
     m_RootNode->m_Stats.st_blocks
         = GetChainSize(m_BootRecord.RootDirectoryCluster);
     m_RootNode->m_Stats.st_size = m_RootNode->m_Stats.st_blocks * m_ClusterSize;
@@ -99,9 +100,8 @@ ErrorOr<INode*> Fat32Fs::Mount(INode* parent, INode* source, INode* target,
 
     m_RootNode->m_Cluster          = m_BootRecord.RootDirectoryCluster;
 
-    if (m_RootNode) m_MountedOn = target;
-    m_Root = m_RootNode;
-    return m_RootNode;
+    m_Root                         = m_RootNode;
+    return m_RootEntry;
 }
 
 ErrorOr<INode*> Fat32Fs::CreateNode(INode* parent, DirectoryEntry* entry,
@@ -115,8 +115,9 @@ ErrorOr<INode*> Fat32Fs::CreateNode(INode* parent, DirectoryEntry* entry,
     return new Fat32FsINode(parent, name, this, mode);
 }
 
-bool Fat32Fs::Populate(INode* node)
+bool Fat32Fs::Populate(DirectoryEntry* dentry)
 {
+    auto   node = dentry->INode();
     String nameBuffer;
     nameBuffer.Resize(256);
 

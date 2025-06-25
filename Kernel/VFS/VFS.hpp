@@ -15,7 +15,9 @@
 
 class INode;
 class DirectoryEntry;
+class MountPoint;
 class FileDescriptor;
+
 namespace VFS
 {
     Vector<std::pair<bool, StringView>>& GetFilesystems();
@@ -36,22 +38,24 @@ namespace VFS
     PathResolution           ResolvePath(DirectoryEntry* parent, PathView path,
                                          bool followLinks = true);
 
-    bool                     MountRoot(StringView filesystemName);
-    bool Mount(DirectoryEntry* parent, PathView source, PathView target,
-               StringView fsName, i32 flags = 0, const void* data = nullptr);
+    ErrorOr<MountPoint*>     MountRoot(StringView filesystemName);
+    ErrorOr<MountPoint*>     Mount(DirectoryEntry* parent, PathView source,
+                                   PathView target, StringView fsName,
+                                   i32 flags = 0, const void* data = nullptr);
     bool Unmount(DirectoryEntry* parent, PathView path, i32 flags = 0);
 
-    DirectoryEntry* CreateNode(DirectoryEntry* parent, PathView path,
-                               mode_t mode);
-    ErrorOr<i32>    MkDir(INode* parent, mode_t mode);
+    DirectoryEntry*          CreateNode(DirectoryEntry* parent, PathView path,
+                                        mode_t mode);
+    ErrorOr<i32>             MkDir(INode* parent, mode_t mode);
 
-    DirectoryEntry* MkNod(DirectoryEntry* parent, PathView path, mode_t mode,
-                          dev_t dev);
-    DirectoryEntry* Symlink(DirectoryEntry* parent, PathView path,
-                            StringView target);
-    DirectoryEntry* Link(DirectoryEntry* oldParent, PathView oldPath,
-                         DirectoryEntry* newParent, PathView newPath,
-                         i32 flags = 0);
+    ErrorOr<DirectoryEntry*> MkNod(DirectoryEntry* parent, PathView name,
+                                   mode_t mode, dev_t dev);
+    ErrorOr<DirectoryEntry*> MkNod(PathView path, mode_t mode, dev_t dev);
+    DirectoryEntry*          Symlink(DirectoryEntry* parent, PathView path,
+                                     StringView target);
+    DirectoryEntry*          Link(DirectoryEntry* oldParent, PathView oldPath,
+                                  DirectoryEntry* newParent, PathView newPath,
+                                  i32 flags = 0);
 
     bool Unlink(DirectoryEntry* parent, PathView path, i32 flags = 0);
 }; // namespace VFS

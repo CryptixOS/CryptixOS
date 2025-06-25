@@ -21,9 +21,10 @@ EchFsINode::EchFsINode(INode* parent, StringView name, Filesystem* fs,
     m_NativeFs         = reinterpret_cast<EchFs*>(fs);
 }
 
-std::unordered_map<StringView, INode*>& EchFsINode::GetChildren()
+const std::unordered_map<StringView, INode*>& EchFsINode::Children() const
 {
-    reinterpret_cast<EchFs*>(m_Filesystem)->Populate(this);
+    auto inode = const_cast<EchFsINode*>(this);
+    reinterpret_cast<EchFs*>(m_Filesystem)->Populate(inode->DirectoryEntry());
     return m_Children;
 }
 

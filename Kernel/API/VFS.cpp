@@ -268,7 +268,7 @@ namespace API::VFS
         Process* current = Process::GetCurrent();
         CtosUnused(current);
 
-        bool success
+        auto success
             = ::VFS::Mount(nullptr, path, target, filesystemType, flags, data);
 
         if (!success) return Error(errno);

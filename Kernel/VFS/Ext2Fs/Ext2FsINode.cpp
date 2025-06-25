@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Posix/dirent.h>
 
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/Ext2Fs/Ext2Fs.hpp>
@@ -32,6 +33,24 @@ Ext2FsINode::Ext2FsINode(INode* parent, StringView name, Ext2Fs* fs,
     m_Stats.st_mtim    = Time::GetReal();
 }
 
+ErrorOr<void> Ext2FsINode::TraverseDirectories(DirectoryIterator iterator)
+{
+    auto inode = const_cast<Ext2FsINode*>(this);
+    m_Filesystem->Populate(inode->DirectoryEntry());
+
+    usize offset = 0;
+    for (const auto [name, inode] : Children())
+    {
+        usize  ino  = inode->GetStats().st_ino;
+        mode_t mode = inode->GetStats().st_mode;
+        auto   type = IF2DT(mode);
+
+        if (!iterator(name, offset, ino, type)) break;
+        ++offset;
+    }
+
+    return {};
+}
 INode* Ext2FsINode::Lookup(const String& name)
 {
     Ext2FsINodeMeta meta;

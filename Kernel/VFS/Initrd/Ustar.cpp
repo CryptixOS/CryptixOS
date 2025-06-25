@@ -7,48 +7,36 @@
 
 #include <API/UnixTypes.hpp>
 #include <Drivers/Device.hpp>
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
 
+#include <VFS/DirectoryEntry.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/Initrd/Ustar.hpp>
 
 #include <cstring>
 
-template <typename T>
-inline static T parseOctNumber(const char* str, usize len)
-    requires std::is_trivial_v<T>
-{
-    T value = 0;
-    while (*str && len > 0)
-    {
-        value = value * 8 + (*str++ - '0');
-        --len;
-    }
-
-    return value;
-}
-
 namespace Ustar
 {
-    bool Validate(uintptr_t address)
+    bool Validate(Pointer address)
     {
-        return std::strncmp(reinterpret_cast<FileHeader*>(address)->Signature,
-                            MAGIC.Raw(), MAGIC_LENGTH - 1)
+        auto file = address.As<FileHeader>();
+        return std::strncmp(file->Signature, MAGIC.Raw(), MAGIC_LENGTH - 1)
             == 0;
     }
 
-    void Load(uintptr_t address)
+    void Load(Pointer address)
     {
         LogTrace("USTAR: Loading at '{:#x}'...", address);
 
-        auto current = reinterpret_cast<FileHeader*>(address);
+        auto current = address.As<FileHeader>();
         auto getNextFile
             = [](FileHeader* current, usize fileSize) -> FileHeader*
         {
-            uintptr_t nextFile = reinterpret_cast<uintptr_t>(current) + 512
-                               + Math::AlignUp(fileSize, 512);
+            Pointer nextFile = reinterpret_cast<uintptr_t>(current) + 512
+                             + Math::AlignUp(fileSize, 512);
 
-            return reinterpret_cast<FileHeader*>(nextFile);
+            return nextFile.As<FileHeader>();
         };
 
         while (std::strncmp(current->Signature, MAGIC.Raw(), MAGIC_LENGTH - 1)
@@ -57,10 +45,8 @@ namespace Ustar
             PathView filename(current->FileName);
             PathView linkName(current->LinkName);
 
-            mode_t   mode
-                = parseOctNumber<mode_t>(current->Mode, sizeof(current->Mode));
-            usize size = parseOctNumber<usize>(current->FileSize,
-                                               sizeof(current->FileSize));
+            auto     mode = StringUtils::ToNumber<mode_t>(current->Mode, 8);
+            usize    size = StringUtils::ToNumber<usize>(current->FileSize, 8);
 
             if (filename == "./")
             {
@@ -68,19 +54,19 @@ namespace Ustar
                 continue;
             }
 
-            DirectoryEntry* vnode = nullptr;
+            DirectoryEntry* dentry = nullptr;
             switch (current->Type)
             {
                 case FILE_TYPE_NORMAL:
                 case FILE_TYPE_NORMAL_:
-                    vnode = VFS::CreateNode(nullptr, filename, mode | S_IFREG);
+                    dentry = VFS::CreateNode(nullptr, filename, mode | S_IFREG);
 
-                    if (!vnode)
+                    if (!dentry)
                         LogError(
                             "USTAR: Failed to create regular file!, path: "
                             "'{}'",
                             filename);
-                    else if (vnode->INode()->Write(
+                    else if (dentry->INode()->Write(
                                  reinterpret_cast<u8*>(
                                      reinterpret_cast<uintptr_t>(current)
                                      + 512),
@@ -103,12 +89,12 @@ namespace Ustar
                     break;
                 case FILE_TYPE_CHARACTER_DEVICE:
                 {
-                    u32 deviceMajor = parseOctNumber<u32>(
-                        current->DeviceMajor, sizeof(current->DeviceMajor));
-                    u32 deviceMinor = parseOctNumber<u32>(
-                        current->DeviceMinor, sizeof(current->DeviceMinor));
+                    u32 deviceMajor
+                        = StringUtils::ToNumber<u32>(current->DeviceMajor, 8);
+                    u32 deviceMinor
+                        = StringUtils::ToNumber<u32>(current->DeviceMinor, 8);
 
-                    if (!VFS::MkNod(nullptr, filename, mode | S_IFCHR,
+                    if (!VFS::MkNod(filename, mode | S_IFCHR,
                                     MakeDevice(deviceMajor, deviceMinor)))
                         LogError(
                             "USTAR: Failed to create character device! path: "
@@ -119,8 +105,8 @@ namespace Ustar
                 }
                 case FILE_TYPE_BLOCK_DEVICE: ToDo(); break;
                 case FILE_TYPE_DIRECTORY:
-                    vnode = VFS::CreateNode(nullptr, filename, mode | S_IFDIR);
-                    if (!vnode)
+                    dentry = VFS::CreateNode(nullptr, filename, mode | S_IFDIR);
+                    if (!dentry)
                         LogError(
                             "USTAR: Failed to create a directory! path: '{}'",
                             filename);

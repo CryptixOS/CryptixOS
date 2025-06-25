@@ -18,8 +18,9 @@
 #endif
 
 #include <Library/ELF.hpp>
-#include <Prism/Containers/Deque.hpp>
+#include <Memory/Region.hpp>
 
+#include <Prism/Containers/Deque.hpp>
 #include <Scheduler/Event.hpp>
 
 enum class ThreadState

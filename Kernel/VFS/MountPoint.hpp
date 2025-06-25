@@ -7,12 +7,15 @@
 #pragma once
 
 #include <Prism/Containers/IntrusiveList.hpp>
+#include <Prism/Delegate.hpp>
 
 class DirectoryEntry;
 class Filesystem;
 class MountPoint
 {
   public:
+    using MountPointIterator = Delegate<bool(MountPoint* mountPoint)>;
+
     MountPoint(DirectoryEntry* hostEntry  = nullptr,
                Filesystem*     filesystem = nullptr);
 
@@ -20,17 +23,23 @@ class MountPoint
     inline constexpr Filesystem*     Filesystem() const { return m_Filesystem; }
 
     static void                      Attach(MountPoint* mountPoint);
+    static MountPoint*               Lookup(DirectoryEntry* entry);
+
     static MountPoint*               Head();
+    static MountPoint*               Tail();
+    static void                      Iterate(MountPointIterator iterator);
 
     MountPoint*                      NextMountPoint() const;
-
-    IntrusiveListHook<MountPoint>    Hook;
 
   private:
     DirectoryEntry*   m_Root       = nullptr;
     class Filesystem* m_Filesystem = nullptr;
 
-    using List                     = IntrusiveList<MountPoint>;
+    friend class IntrusiveList<MountPoint>;
+    friend struct IntrusiveListHook<MountPoint>;
 
+    IntrusiveListHook<MountPoint> Hook;
+
+    using List = IntrusiveList<MountPoint>;
     static List s_MountPoints;
 };

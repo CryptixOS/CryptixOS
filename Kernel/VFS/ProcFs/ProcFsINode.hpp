@@ -72,14 +72,21 @@ class ProcFsINode : public INode
     }
 
     virtual const stat& GetStats() override;
+    virtual ErrorOr<void>
+    TraverseDirectories(DirectoryIterator iterator) override;
 
-    virtual void        InsertChild(INode* node, StringView name) override;
-    virtual isize       Read(void* buffer, off_t offset, usize bytes) override;
+    virtual const std::unordered_map<StringView, INode*>& Children() const
+    {
+        return m_Children;
+    }
+    virtual void  InsertChild(INode* node, StringView name) override;
+    virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
 
     virtual ErrorOr<void>  ChMod(mode_t mode) override { return Error(ENOSYS); }
 
   private:
-    ProcFsProperty* m_Property = nullptr;
+    ProcFsProperty*                        m_Property = nullptr;
+    std::unordered_map<StringView, INode*> m_Children;
 };

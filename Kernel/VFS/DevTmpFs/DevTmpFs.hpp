@@ -16,9 +16,8 @@ class DevTmpFs : public Filesystem
   public:
     DevTmpFs(u32 flags);
 
-    virtual ErrorOr<INode*> Mount(INode* parent, INode* source, INode* target,
-                                  DirectoryEntry* entry, StringView name,
-                                  const void* data = nullptr) override;
+    virtual ErrorOr<DirectoryEntry*> Mount(StringView  sourcePath,
+                                           const void* data = nullptr) override;
 
     virtual ErrorOr<INode*> CreateNode(INode* parent, DirectoryEntry* entry,
                                        mode_t mode, uid_t uid = 0,
@@ -28,7 +27,7 @@ class DevTmpFs : public Filesystem
                                     StringView target) override;
     virtual INode*          Link(INode* parent, StringView name,
                                  INode* oldNode) override;
-    virtual bool            Populate(INode* node) override { return true; }
+    virtual bool Populate(DirectoryEntry* dentry) override { return true; }
 
     virtual ErrorOr<INode*> MkNod(INode* parent, DirectoryEntry* entry,
                                   mode_t mode, dev_t dev) override;

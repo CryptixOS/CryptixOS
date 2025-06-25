@@ -6,7 +6,8 @@
  */
 #pragma once
 
-#include "Prism/Core/Types.hpp"
+#include <Prism/Core/Types.hpp>
+#include <Prism/String/String.hpp>
 
 #include <compare>
 
@@ -14,12 +15,12 @@ namespace Stacktrace
 {
     struct Symbol
     {
-        char*                          name;
-        uintptr_t                      address;
+        String                         Name;
+        uintptr_t                      Address;
 
         constexpr std::strong_ordering operator<=>(const Symbol& rhs) const
         {
-            return address <=> rhs.address;
+            return Address <=> rhs.Address;
         }
     };
 

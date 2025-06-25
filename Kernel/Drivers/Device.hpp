@@ -9,9 +9,9 @@
 #include <Common.hpp>
 
 #include <API/UnixTypes.hpp>
-#include <Prism/Utility/Atomic.hpp>
+#include <Library/UserBuffer.hpp>
 
-#include <VFS/FileDescriptor.hpp>
+#include <Prism/Utility/Atomic.hpp>
 
 using DeviceMajor = u32;
 using DeviceMinor = u32;

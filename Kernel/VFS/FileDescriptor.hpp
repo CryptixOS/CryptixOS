@@ -55,7 +55,7 @@ struct DirectoryEntries
     inline bool IsEmpty() const { return Entries.Empty(); }
 
     inline void Clear() { Entries.Clear(); }
-    void        Push(DirectoryEntry* dentry, StringView = "");
+    void        Push(StringView name, loff_t offset, usize ino, usize type);
 
     usize       CopyAndPop(u8* out, usize capacity);
 

@@ -6,11 +6,9 @@
  */
 #pragma once
 
-#include <Library/Stacktrace.hpp>
+#include <Common.hpp>
 
-#include <Memory/AddressSpace.hpp>
-#include <Memory/Region.hpp>
-#include <Memory/VMM.hpp>
+#include <Library/Stacktrace.hpp>
 
 #include <Prism/Containers/DoublyLinkedList.hpp>
 #include <Prism/Containers/Span.hpp>
@@ -21,6 +19,8 @@
 
 #include <unordered_map>
 
+class AddressSpace;
+class PageMap;
 namespace ELF
 {
     constexpr const char MAGIC[] = "\177ELF";
@@ -318,7 +318,7 @@ namespace ELF
 
         SectionHeader*                          m_SymbolSection = nullptr;
         SectionHeader*                          m_StringSection = nullptr;
-        u8*                                     m_StringTable   = nullptr;
+        CTOS_UNUSED u8*                         m_StringTable   = nullptr;
 
         Vector<Symbol>                          m_Symbols;
         std::unordered_map<StringView, Pointer> m_SymbolTable;

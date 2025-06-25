@@ -16,7 +16,7 @@ class DirectoryEntry : public RefCounted
         : m_Name(name)
     {
     }
-    DirectoryEntry(INode* inode);
+    DirectoryEntry(DirectoryEntry* parent, INode* inode);
     DirectoryEntry(DirectoryEntry* parent, StringView name);
     DirectoryEntry(const DirectoryEntry& other)
         : m_INode(other.m_INode)
