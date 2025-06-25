@@ -107,6 +107,7 @@ static void kernelThread()
 
     Scheduler::InitializeProcFs();
 
+    Arch::ProbeDevices();
     PCI::Initialize();
     if (ACPI::IsAvailable())
     {
@@ -227,6 +228,8 @@ kernelStart()
 
     Stacktrace::Initialize();
     CommandLine::Initialize();
+
+    Device::Initialize();
     DeviceTree::Initialize();
 
     ACPI::LoadTables();

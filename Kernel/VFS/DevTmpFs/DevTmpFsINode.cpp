@@ -25,7 +25,7 @@ DevTmpFsINode::DevTmpFsINode(INode* parent, StringView name, Filesystem* fs,
     m_Stats.st_mode    = mode;
     m_Stats.st_uid     = 0;
     m_Stats.st_gid     = 0;
-    m_Stats.st_rdev    = device ? device->GetID() : 0;
+    m_Stats.st_rdev    = device ? device->ID() : 0;
     m_Stats.st_size    = 0;
     m_Stats.st_blksize = 512;
     m_Stats.st_blocks  = 0;

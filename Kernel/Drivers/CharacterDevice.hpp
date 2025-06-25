@@ -11,4 +11,30 @@
 class CharacterDevice : public Device
 {
   public:
+    CharacterDevice(StringView name, dev_t id);
+
+    inline constexpr dev_t           ID() const { return m_ID; }
+    CharacterDevice*                 Next() const;
+
+    static ErrorOr<CharacterDevice*> Allocate(StringView  name,
+                                              DeviceMajor major,
+                                              DeviceMinor minorBase = 0,
+                                              usize       count     = 1);
+
+    static ErrorOr<void>    Register(dev_t id, CharacterDevice* device);
+    static CharacterDevice* Lookup(dev_t deviceID);
+
+    static CharacterDevice* Head();
+    static CharacterDevice* Tail();
+
+    using CharacterDeviceIterator = Delegate<bool(CharacterDevice* cdev)>;
+    static void Iterate(CharacterDeviceIterator iterator);
+
+    using List = IntrusiveList<CharacterDevice>;
+
+  private:
+    friend class IntrusiveList<CharacterDevice>;
+    friend struct IntrusiveListHook<CharacterDevice>;
+
+    IntrusiveListHook<CharacterDevice> Hook;
 };

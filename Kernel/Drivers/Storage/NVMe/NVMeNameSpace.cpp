@@ -52,9 +52,9 @@ namespace NVMe
         DevTmpFs::RegisterDevice(this);
 
         StringView path
-            = fmt::format("/dev/{}n{}", m_Controller->GetName(), m_ID).data();
+            = fmt::format("/dev/{}n{}", m_Controller->Name(), m_ID).data();
         LogTrace("NVMe: Creating device at '{}'", path);
-        VFS::MkNod(path, m_Stats.st_mode, GetID());
+        VFS::MkNod(path, m_Stats.st_mode, ID());
         DeviceManager::RegisterBlockDevice(this);
         // TODO(v1tr10l7): enumerate partitions
 
@@ -85,9 +85,9 @@ namespace NVMe
             DeviceManager::RegisterBlockDevice(partition);
 
             StringView partitionPath
-                = fmt::format("/dev/{}n{}p{}", m_Controller->GetName(), m_ID, i)
+                = fmt::format("/dev/{}n{}p{}", m_Controller->Name(), m_ID, i)
                       .data();
-            VFS::MkNod(partitionPath, m_Stats.st_mode, partition->GetID());
+            VFS::MkNod(partitionPath, m_Stats.st_mode, partition->ID());
 
             ++i;
         }
@@ -160,9 +160,9 @@ namespace NVMe
         return NameSpace::Write(in.Raw(), offset, count);
     }
 
-    StringView NameSpace::GetName() const noexcept
+    StringView NameSpace::Name() const noexcept
     {
-        auto name = fmt::format("{}n{}", m_Controller->GetName(), m_ID);
+        auto name = fmt::format("{}n{}", m_Controller->Name(), m_ID);
         return StringView(name.data(), name.size());
     }
 

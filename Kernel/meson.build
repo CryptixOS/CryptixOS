@@ -21,6 +21,8 @@ srcs += files(
   'Boot/CommandLine.cpp',
   'Debug/Panic.cpp',
 
+  'Drivers/CharacterDevice.cpp',
+  'Drivers/Device.cpp',
   'Drivers/DeviceManager.cpp',
   'Drivers/FramebufferDevice.cpp',
   'Drivers/GenericDriver.cpp',

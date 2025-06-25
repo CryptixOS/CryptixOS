@@ -24,7 +24,7 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
 
     virtual const stat& GetStats() override
     {
-        return m_Device ? m_Device->GetStats() : m_Stats;
+        return m_Device ? m_Device->Stats() : m_Stats;
     }
 
     virtual ErrorOr<void>

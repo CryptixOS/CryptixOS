@@ -7,7 +7,7 @@
 #pragma once
 
 #include <API/Posix/termios.h>
-#include <Drivers/Device.hpp>
+#include <Drivers/CharacterDevice.hpp>
 
 #include <Prism/Containers/CircularQueue.hpp>
 #include <Prism/Containers/Deque.hpp>
@@ -16,21 +16,21 @@
 
 #include <Scheduler/Event.hpp>
 
-class TTY : public Device
+class TTY : public CharacterDevice
 {
   public:
-    TTY(Terminal* terminal, usize minor);
+    TTY(StringView name, Terminal* terminal, usize minor);
 
-    inline static TTY* GetCurrent() { return s_CurrentTTY; }
+    inline static TTY*     GetCurrent() { return s_CurrentTTY; }
 
-    bool               GetCursorKeyMode() const;
-    void               SendBuffer(const char* string, usize bytes = 1);
+    bool                   GetCursorKeyMode() const;
+    void                   SendBuffer(const char* string, usize bytes = 1);
 
-    virtual StringView GetName() const noexcept override { return "tty"_sv; }
-    winsize            GetSize() const;
+    virtual StringView     Name() const noexcept override;
+    winsize                GetSize() const;
 
-    const termios2&    GetTermios() const { return m_Termios; }
-    void               SetTermios(const termios2& termios);
+    const termios2&        GetTermios() const { return m_Termios; }
+    void                   SetTermios(const termios2& termios);
 
     virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Write(const void* src, off_t offset,
@@ -49,6 +49,7 @@ class TTY : public Device
     static Vector<TTY*>     s_TTYs;
     static TTY*             s_CurrentTTY;
 
+    StringView              m_Name = "tty"_sv;
     Spinlock                m_RawLock;
     Spinlock                m_OutputLock;
 

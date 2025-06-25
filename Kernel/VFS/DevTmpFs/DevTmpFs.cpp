@@ -83,8 +83,8 @@ bool DevTmpFs::RegisterDevice(Device* device)
 {
     Assert(device);
 
-    if (s_Devices.contains(device->GetID())) return false;
+    if (s_Devices.contains(device->ID())) return false;
 
-    s_Devices[device->GetID()] = device;
+    s_Devices[device->ID()] = device;
     return true;
 }

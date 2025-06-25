@@ -72,7 +72,7 @@ namespace NVMe
 
         inline usize       GetMaxPhysRPgs() const { return m_MaxPhysRPages; }
 
-        virtual StringView GetName() const noexcept override;
+        virtual StringView Name() const noexcept override;
 
         virtual ErrorOr<isize> Read(void* dest, off_t offset,
                                     usize bytes) override;

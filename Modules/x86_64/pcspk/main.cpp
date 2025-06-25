@@ -25,7 +25,7 @@ class PCSpeakerDevice : public Device
     {
     }
 
-    virtual StringView GetName() const noexcept override { return "pcspk"_sv; }
+    virtual StringView     Name() const noexcept override { return "pcspk"_sv; }
 
     virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override
     {
@@ -78,7 +78,7 @@ namespace
     ErrorOr<void>   Probe()
     {
         if (!DevTmpFs::RegisterDevice(&s_PCSpeaker)) return Error(EEXIST);
-        if (!VFS::MkNod("/dev/pcspk", 0644, s_PCSpeaker.GetID()))
+        if (!VFS::MkNod("/dev/pcspk", 0644, s_PCSpeaker.ID()))
             return Error(errno);
 
         return {};

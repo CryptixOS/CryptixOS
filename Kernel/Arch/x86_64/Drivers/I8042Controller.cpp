@@ -12,6 +12,7 @@
 
 #include <Arch/x86_64/Drivers/I8042Controller.hpp>
 
+#include <Drivers/DeviceManager.hpp>
 #include <Drivers/HID/Ps2KeyboardDevice.hpp>
 #include <Firmware/ACPI/ACPI.hpp>
 
@@ -133,8 +134,7 @@ ErrorOr<void> I8042Controller::Initialize()
     handler->SetHandler(I8042Controller::HandleInterrupt);
     InterruptManager::Unmask(0x01);
 
-    while (!IsInputEmpty())
-        ;
+    while (!IsInputEmpty());
 
     LogInfo("I8042: Allocated IRQ handler for vector: {:#x}",
             handler->GetInterruptVector());
@@ -472,6 +472,7 @@ void I8042Controller::EnumerateDevices()
 
     s_Keyboard
         = CreateRef<Ps2KeyboardDevice>(this, DevicePort::ePort1, scancodeSet);
+    DeviceManager::RegisterCharDevice(s_Keyboard.Raw());
 }
 ErrorOr<Ps2DeviceType> I8042Controller::ScanPortForDevices(DevicePort port)
 {

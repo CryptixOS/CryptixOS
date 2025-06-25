@@ -21,6 +21,7 @@ class HardwareTimer;
 namespace Arch
 {
     void              Initialize();
+    void              ProbeDevices();
 
     [[noreturn]] void Halt();
     void              Pause();

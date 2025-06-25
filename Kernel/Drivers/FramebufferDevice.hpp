@@ -8,21 +8,16 @@
 
 #include <API/Posix/linux/fb.h>
 
-#include <Drivers/Device.hpp>
+#include <Drivers/CharacterDevice.hpp>
 #include <Library/Color.hpp>
 
-class FramebufferDevice : public Device
+class FramebufferDevice : public CharacterDevice
 {
   public:
-    FramebufferDevice(limine_framebuffer* framebuffer);
+    FramebufferDevice(StringView name, limine_framebuffer* framebuffer);
 
-    static bool        Initialize();
-
-    virtual StringView GetName() const noexcept override
-    {
-        auto name = fmt::format("fbdev{}", m_ID);
-        return StringView(name.data(), name.size());
-    }
+    static bool            Initialize();
+    virtual StringView     Name() const noexcept override;
 
     virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Write(const void* src, off_t offset,

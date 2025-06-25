@@ -81,11 +81,11 @@ struct ProcFsPartitionsProperty : public ProcFsProperty
         Write("major\tminor\t#blocks\tname\n");
         for (auto& partition : DeviceManager::GetBlockDevices())
         {
-            u16         major      = partition->GetID();
-            u16         minor      = partition->GetID();
-            const stat& stats      = partition->GetStats();
+            u16         major      = partition->ID();
+            u16         minor      = partition->ID();
+            const stat& stats      = partition->Stats();
             u64         blockCount = stats.st_blocks;
-            StringView  name       = partition->GetName();
+            StringView  name       = partition->Name();
 
             Write("{}\t{}\t{}\t{}\n", major, minor, blockCount, name);
         }
