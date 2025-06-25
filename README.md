@@ -75,28 +75,47 @@ To run the CryptixOS you will use the ./run.sh script with either uefi or bios o
 
 ## To Do
 
-### Drivers
+## Drivers
+### Base
 - [X] Kernel Module Loader
-- [X] TTY
-- [ ] PTY
-- [X] PCI
-- [X] PCIe
+### Storage
 - [X] NVMe
 - [ ] AHCI
-- [X] Serial
+- [ ] SCSI
+- [ ] Virtio
+### Time keeping
 - [X] PIT
 - [X] Local APIC Timer
+- [X] RTC
+- [ ] KVM clock
+- [X] HPET
+### Irq chips
 - [X] PIC
 - [X] I/O APIC
+### Hardware Abstraction & Buses
+- [X] PCI
+- [X] PCIe
+- [X] Device Tree
+- [X] ACPI
+- [ ] USB
+- [ ] Embedded Controller
+### Character Devices
+- [X] TTY
+- [ ] PTY
+- [X] Serial
 - [X] I8042 Controller
 - [X] PS/2 Keyboard
 - [X] PC Speaker
-- [X] RTC
-- [X] HPET
-- [ ] Device Tree
-- [X] ACPI
+- [ ] Virtio Console
+## Network
+- [ ] ARP
+- [ ] TCP
+- [ ] UDP
+### NICs
 - [X] Rtl8139
-
+- [ ] Virtio NIC
+## Virtual File System
+- [ ] Named Pipes
 ### File Systems
 - [X] DevTmpFs
 - [X] Ext2Fs
@@ -111,7 +130,7 @@ To run the CryptixOS you will use the ./run.sh script with either uefi or bios o
 - [ ] Iso9660Fs
 - [ ] EfiVarsFs
 
-### Syscall
+## Syscall
 - [ ] Signals
 - [ ] Thread API
 - [X] VFS
