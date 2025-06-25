@@ -34,6 +34,12 @@
     #define DebugSyscall(...)
 #endif
 
+#define TryOrRet(...)                                                          \
+    {                                                                          \
+        auto result = (__VA_ARGS__);                                           \
+        if (!result) return Error(result.error());                             \
+    }
+
 constexpr usize operator""_kib(unsigned long long count)
 {
     return count * 1024;
