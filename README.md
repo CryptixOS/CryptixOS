@@ -43,13 +43,13 @@ xbstrap install base # build and install the base packages
 ## Actual building
 Now you are able to build the actual kernel and generate an bootable .iso image
 first choose the architecture you want to build the kernel for and generate the meson cache 
-`./Meta/setup.sh <x86_64|aarch64>`
+`./Meta/setup.sh <x86_64|aarch64> <debug|release|dist>`
 next you can just build the image
-`./Meta/build.sh`
+`./Meta/build.sh <x86_64|aarch64> <debug|release|dist>`
 
 ## Running
 To run the CryptixOS you will use the ./run.sh script with either uefi or bios option(bios is only available for x86)
-`./Meta/run.sh <run_uefi|run_bios>`
+`./Meta/run.sh <run_uefi|run_bios> <release|debug|dist> <x86_64|aarch64>`
 
 ### References and Credits
 * [Meson](https://mesonbuild.com/) - Meson is an open source build system meant to be both extremely fast, and, even more importantly, as user friendly as possible.
@@ -70,7 +70,6 @@ To run the CryptixOS you will use the ./run.sh script with either uefi or bios o
 * [smart_ptr](https://github.com/ilobilo/smart_ptr.git) - ISO C++ 2011 smart pointer implementation
 * [string](https://github.com/ilobilo/string.git) - Single-header, almost fully complete C++20/23 std::string implementation with sso support.
 * [uacpi](https://github.com/UltraOS/uACPI.git) - A portable and easy-to-integrate implementation of the Advanced Configuration and Power Interface (ACPI).
-* [veque](https://github.com/Shmoopty/veque.git) - A very fast C++17 container combining the best features of std::vector and std::deque
 
 
 ## To Do
