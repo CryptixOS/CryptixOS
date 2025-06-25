@@ -9,7 +9,6 @@
 #include <Drivers/CharacterDevice.hpp>
 #include <Drivers/DeviceManager.hpp>
 
-#include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/VFS.hpp>
 
 #include <cerrno>
@@ -135,7 +134,6 @@ namespace MemoryDevices
 
         for (auto device : devices)
         {
-            DevTmpFs::RegisterDevice(device);
             auto result = DeviceManager::RegisterCharDevice(device);
             if (!result)
             {
