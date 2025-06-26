@@ -7,7 +7,7 @@
 #pragma once
 
 #include <Prism/Containers/IntrusiveList.hpp>
-#include <Prism/Delegate.hpp>
+#include <Prism/Utility/Delegate.hpp>
 
 class DirectoryEntry;
 class Filesystem;

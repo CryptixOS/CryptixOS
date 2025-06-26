@@ -15,7 +15,7 @@
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Memory/Buffer.hpp>
 #include <Prism/Memory/ByteStream.hpp>
-#include <Prism/PathView.hpp>
+#include <Prism/Utility/PathView.hpp>
 
 #include <unordered_map>
 

@@ -16,7 +16,7 @@
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 
-#include <Prism/Path.hpp>
+#include <Prism/Utility/Path.hpp>
 #include <Time/Time.hpp>
 
 #include <VFS/FileDescriptor.hpp>

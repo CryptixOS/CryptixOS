@@ -7,7 +7,7 @@
 #pragma once
 
 #include <Prism/Containers/Vector.hpp>
-#include <Prism/Delegate.hpp>
+#include <Prism/Utility/Delegate.hpp>
 
 #include <Prism/Memory/Buffer.hpp>
 #include <Prism/String/StringView.hpp>

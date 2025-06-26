@@ -11,8 +11,8 @@
 #include <Arch/CPU.hpp>
 
 #include <Prism/Core/TypeTraits.hpp>
-#include <Prism/Path.hpp>
-#include <Prism/PathView.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Utility/PathView.hpp>
 
 #include <magic_enum/magic_enum.hpp>
 #include <magic_enum/magic_enum_format.hpp>

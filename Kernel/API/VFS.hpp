@@ -13,7 +13,7 @@
 #include <API/Syscall.hpp>
 #include <API/UnixTypes.hpp>
 
-#include <Prism/PathView.hpp>
+#include <Prism/Utility/PathView.hpp>
 
 namespace API::VFS
 {

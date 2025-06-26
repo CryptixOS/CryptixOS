@@ -11,7 +11,7 @@
 #include <Library/Locking/Spinlock.hpp>
 #include <Library/UserBuffer.hpp>
 
-#include <Prism/Delegate.hpp>
+#include <Prism/Utility/Delegate.hpp>
 #include <Prism/Memory/Ref.hpp>
 
 #include <VFS/Filesystem.hpp>

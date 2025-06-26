@@ -10,7 +10,7 @@
 #include <Common.hpp>
 
 #include <Prism/Containers/Vector.hpp>
-#include <Prism/Path.hpp>
+#include <Prism/Utility/Path.hpp>
 #include <Prism/String/String.hpp>
 
 class INode;

@@ -13,7 +13,7 @@
 #include <Library/Locking/Spinlock.hpp>
 #include <Prism/Containers/Bitmap.hpp>
 #include <Prism/Core/Types.hpp>
-#include <Prism/Delegate.hpp>
+#include <Prism/Utility/Delegate.hpp>
 #include <Prism/String/String.hpp>
 
 #include <span>

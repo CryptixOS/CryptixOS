@@ -36,7 +36,7 @@
 
 #include <Prism/Containers/Array.hpp>
 #include <Prism/Containers/RedBlackTree.hpp>
-#include <Prism/Delegate.hpp>
+#include <Prism/Utility/Delegate.hpp>
 #include <Prism/Memory/Endian.hpp>
 #include <Prism/String/StringView.hpp>
 

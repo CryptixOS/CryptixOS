@@ -10,7 +10,7 @@
 #include <Drivers/PCI/Device.hpp>
 #include <Drivers/PCI/PCI.hpp>
 
-#include <Prism/Delegate.hpp>
+#include <Prism/Utility/Delegate.hpp>
 
 #include <functional>
 #include <unordered_map>

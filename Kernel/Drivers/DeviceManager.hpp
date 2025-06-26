@@ -9,7 +9,7 @@
 #include <API/Posix/sys/stat.h>
 
 #include <Prism/Containers/Vector.hpp>
-#include <Prism/Delegate.hpp>
+#include <Prism/Utility/Delegate.hpp>
 
 class CharacterDevice;
 class Device;
