@@ -13,27 +13,26 @@
 
 #include <VFS/FileDescriptor.hpp>
 #include <VFS/INode.hpp>
+#include <VFS/MountPoint.hpp>
 
 INode::INode(StringView name)
     : m_Name(name)
 {
-    // m_DirectoryEntry = new class DirectoryEntry(this);
 }
-INode::INode(INode* parent, StringView name, Filesystem* fs)
-    : m_Parent(parent)
-    , m_Name(name)
+INode::INode(StringView name, class Filesystem* fs)
+    : m_Name(name)
     , m_Filesystem(fs)
 {
     Thread*  thread  = CPU::GetCurrentThread();
     Process* process = thread ? thread->GetParent() : nullptr;
 
-    if (parent && parent->m_Stats.st_mode & S_ISUID)
-    {
-        m_Stats.st_uid = parent->m_Stats.st_uid;
-        m_Stats.st_gid = parent->m_Stats.st_gid;
-
-        return;
-    }
+    // if (parent && parent->m_Stats.st_mode & S_ISUID)
+    // {
+    //     m_Stats.st_uid = parent->m_Stats.st_uid;
+    //     m_Stats.st_gid = parent->m_Stats.st_gid;
+    //
+    //     return;
+    // }
 
     if (!process) return;
 
@@ -41,39 +40,30 @@ INode::INode(INode* parent, StringView name, Filesystem* fs)
     m_Stats.st_gid = process->m_Credentials.egid;
 }
 
-Path INode::GetPath()
-{
-    StringBuilder pathBuilder;
-
-    auto          current            = this;
-    auto          rootDirectoryEntry = VFS::GetRootDirectoryEntry();
-    auto          rootINode          = rootDirectoryEntry->INode();
-
-    while (current && current != rootINode)
-    {
-        auto segment = "/"_s;
-        segment += current->m_Name;
-        pathBuilder.Insert(segment);
-
-        current = current->m_Parent;
-    }
-
-    return pathBuilder.Empty() ? "/"_s : pathBuilder.ToString();
-}
-
-mode_t INode::GetMode() const { return m_Stats.st_mode & ~S_IFMT; }
+mode_t INode::Mode() const { return m_Stats.st_mode & ~S_IFMT; }
 bool   INode::IsFilesystemRoot() const
 {
-    auto fsRootEntry = m_Filesystem->MountedOn()->DirectoryEntry()->m_MountGate;
+    auto fsRootEntry = m_Filesystem->RootDirectoryEntry();
+    auto fsRootINode = fsRootEntry->INode();
 
-    return m_Filesystem->MountedOn() && fsRootEntry
-        && this == fsRootEntry->INode();
+    return this == fsRootINode;
 }
 
 bool INode::IsEmpty()
 {
-    m_Filesystem->Populate(this);
-    return m_Children.empty();
+    // m_Filesystem->Populate(this);
+    bool              hasEntries = false;
+    DirectoryIterator iterator;
+    iterator.BindLambda(
+        [&](StringView name, loff_t offset, usize ino, usize type) -> bool
+        {
+            if (name != "."_sv && name != ".."_sv) hasEntries = true;
+            return !hasEntries;
+        });
+
+    auto result = TraverseDirectories(nullptr, iterator);
+    (void)result;
+    return hasEntries;
 }
 bool INode::CanWrite(const Credentials& creds) const
 {
@@ -97,43 +87,13 @@ ErrorOr<isize> INode::ReadLink(UserBuffer& outBuffer)
     return static_cast<isize>(count);
 }
 
-INode* INode::Reduce(bool symlinks, bool automount, usize cnt)
-{
-    if (!m_Target.Empty() && symlinks)
-    {
-        if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
-
-        auto nextNode = VFS::ResolvePath(m_Parent->DirectoryEntry(),
-                                         m_Target.Raw(), automount)
-                            .Node;
-        if (!nextNode) return_err(nullptr, ENOENT);
-
-        return nextNode->INode()->Reduce(symlinks, automount, ++cnt);
-    }
-
-    return this;
-}
-
 ErrorOr<DirectoryEntry*> INode::Lookup(class DirectoryEntry* entry)
 {
     auto node = Lookup(entry->Name());
     if (!node) return Error(ENOENT);
 
-    entry->m_INode         = node;
-    node->m_DirectoryEntry = entry;
-
+    entry->m_INode = node;
     return entry;
-}
-DirectoryEntry* INode::DirectoryEntry()
-{
-    if (!m_DirectoryEntry)
-    {
-        LogWarn("VFS: Allocating DirectoryEntry for: `{}`...", GetPath());
-        LogDebug("VFS: Showing backtrace:");
-        Stacktrace::Print(6);
-        m_DirectoryEntry = new class DirectoryEntry(this);
-    }
-    return m_DirectoryEntry;
 }
 
 ErrorOr<void> INode::UpdateTimestamps(timespec atime, timespec mtime,

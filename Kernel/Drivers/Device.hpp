@@ -9,9 +9,13 @@
 #include <Common.hpp>
 
 #include <API/UnixTypes.hpp>
-#include <Prism/Utility/Atomic.hpp>
+#include <Library/UserBuffer.hpp>
 
-#include <VFS/FileDescriptor.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <VFS/File.hpp>
 
 using DeviceMajor = u32;
 using DeviceMinor = u32;
@@ -26,9 +30,14 @@ constexpr dev_t MakeDevice(DeviceMajor major, DeviceMinor minor)
     return dev;
 }
 
-class Device
+class Device : public File
 {
   public:
+    constexpr Device(StringView name, dev_t id)
+        : m_Name(name)
+        , m_ID(id)
+    {
+    }
     Device(DeviceMajor major, DeviceMinor minor)
         : m_ID(MakeDevice(major, minor))
     {
@@ -38,10 +47,10 @@ class Device
     {
     }
 
-    constexpr inline dev_t GetID() const noexcept { return m_ID; }
-    virtual StringView     GetName() const noexcept = 0;
+    constexpr inline dev_t ID() const noexcept { return m_ID; }
+    virtual StringView     Name() const noexcept = 0;
 
-    virtual const stat&    GetStats() { return m_Stats; }
+    virtual const stat&    Stats() { return m_Stats; }
 
     virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
                                 isize offset = -1)
@@ -55,16 +64,36 @@ class Device
 
     virtual i32 IoCtl(usize request, uintptr_t argp) = 0;
 
+    static void Initialize();
+
+    Device*     Next() const { return Hook.Next; }
+    using List = IntrusiveList<Device>;
+
   protected:
-    dev_t m_ID;
-    stat  m_Stats;
+    StringView                   m_Name = ""_sv;
+    dev_t                        m_ID;
+    stat                         m_Stats;
+
+    static Optional<DeviceMajor> s_LeastMajor;
+    static Bitmap                s_AllocatedMajors;
+
+    static Optional<DeviceMajor> AllocateMajor(usize hint = 0);
+    static void                  FreeMajor(DeviceMajor major);
 
   private:
-    static DeviceMinor AllocateMinor()
+    friend class IntrusiveList<Device>;
+    friend struct IntrusiveListHook<Device>;
+
+    IntrusiveListHook<Device> Hook;
+
+    static DeviceMinor        AllocateMinor()
     {
         // TODO(v1tr10l7): Allocate minor numbers per major
         static Atomic<DeviceMinor> s_Base = 1000;
 
         return s_Base++;
     }
+
+    static Optional<DeviceMajor> FindFreeMajor(isize start, isize end);
+    static Optional<DeviceMajor> FindFreeMajor(DeviceMajor hint);
 };

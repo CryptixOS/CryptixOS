@@ -6,14 +6,32 @@
  */
 #pragma once
 
-#include <Drivers/Device.hpp>
+#include <API/Posix/sys/stat.h>
 
 #include <Prism/Containers/Vector.hpp>
+#include <Prism/Delegate.hpp>
 
+class CharacterDevice;
+class Device;
 namespace DeviceManager
 {
-    void                   RegisterCharDevice(Device* device);
+    using DeviceIterator     = Delegate<bool(Device* device)>;
+    using CharDeviceIterator = Delegate<bool(CharacterDevice* cdev)>;
+
+    ErrorOr<void>          RegisterCharDevice(CharacterDevice* device);
     void                   RegisterBlockDevice(Device* device);
+
+    Device*                DevicesHead();
+    Device*                DevicesTail();
+
+    CharacterDevice*       CharDevicesHead();
+    CharacterDevice*       CharDevicesTail();
+
+    Device*                LookupDevice(dev_t id);
+    CharacterDevice*       LookupCharDevice(dev_t id);
+
+    void                   IterateDevices(DeviceIterator iterator);
+    void                   IterateCharDevices(CharDeviceIterator iterator);
 
     const Vector<Device*>& GetBlockDevices();
 }; // namespace DeviceManager

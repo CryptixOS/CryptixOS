@@ -41,6 +41,7 @@ namespace PCI
         u8              m_Bus;
 
         Vector<Device*> m_Devices;
+        Vector<Bus*>    m_ChildBridges;
 
         void            EnumerateFunction(DeviceAddress& address);
     };

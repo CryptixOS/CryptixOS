@@ -46,6 +46,7 @@
 
 #include <VFS/INode.hpp>
 #include <VFS/Initrd/Initrd.hpp>
+#include <VFS/MountPoint.hpp>
 #include <VFS/VFS.hpp>
 
 #include <magic_enum/magic_enum.hpp>
@@ -106,6 +107,7 @@ static void kernelThread()
 
     Scheduler::InitializeProcFs();
 
+    Arch::ProbeDevices();
     PCI::Initialize();
     if (ACPI::IsAvailable())
     {
@@ -145,6 +147,34 @@ static void kernelThread()
                                  stringTable))
         LogWarn("ELF: Could not find any builtin drivers");
     if (!Module::Load()) LogWarn("Module: Failed to find any modules");
+
+    LogDebug("VFS: Testing directory entry caches...");
+    auto pathRes = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), "/mnt");
+    auto entry   = pathRes.Entry->FollowMounts();
+    for (auto& [name, dentry] : entry->Children())
+    {
+        LogTrace("Found directory => {}", name);
+        LogTrace("Full path => {}", dentry->Path());
+        LogTrace("Child entries =>");
+
+        auto entry      = dentry;
+        auto mountPoint = MountPoint::Lookup(entry);
+        if (mountPoint) entry = mountPoint->HostEntry();
+        entry->INode()->Populate();
+
+        for (const auto& [childName, child] : entry->Children())
+            LogTrace("\t- /{}", childName);
+    }
+
+    MountPoint* mountPoint = MountPoint::Head();
+
+    LogTrace("Iterating mountpoints...");
+    while (mountPoint)
+    {
+        LogTrace("{} => {}", mountPoint->HostEntry()->Name(),
+                 mountPoint->Filesystem()->Name());
+        mountPoint = mountPoint->NextMountPoint();
+    }
 
     LogTrace("Loading init process...");
     auto initPath = CommandLine::GetString("init");
@@ -198,6 +228,8 @@ kernelStart()
 
     Stacktrace::Initialize();
     CommandLine::Initialize();
+
+    Device::Initialize();
     DeviceTree::Initialize();
 
     ACPI::LoadTables();

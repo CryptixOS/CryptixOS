@@ -46,6 +46,6 @@ namespace Ustar
     constexpr const u8   FILE_TYPE_FIFO             = '6';
     constexpr const u8   FILE_TYPE_CONTIGUOUS       = '7';
 
-    bool                 Validate(uintptr_t address);
-    void                 Load(uintptr_t address);
+    bool                 Validate(Pointer address);
+    void                 Load(Pointer address);
 } // namespace Ustar

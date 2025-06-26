@@ -10,6 +10,7 @@
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptGuard.hpp>
 
+#include <Drivers/DeviceManager.hpp>
 #include <Drivers/TTY.hpp>
 #include <Drivers/Terminal.hpp>
 
@@ -28,8 +29,9 @@
 Vector<TTY*> TTY::s_TTYs{};
 TTY*         TTY::s_CurrentTTY = nullptr;
 
-TTY::TTY(Terminal* terminal, usize minor)
-    : Device(4, minor)
+TTY::TTY(StringView name, Terminal* terminal, usize minor)
+    : CharacterDevice("tty", MakeDevice(4, minor))
+    , m_Name(name)
     , m_Terminal(terminal)
 {
     if (!s_CurrentTTY) s_CurrentTTY = this;
@@ -107,9 +109,10 @@ void TTY::SendBuffer(const char* string, usize bytes)
     m_RawEvent.Trigger();
 }
 
-winsize TTY::GetSize() const { return m_Terminal->GetSize(); }
+StringView TTY::Name() const noexcept { return m_Name; }
+winsize    TTY::GetSize() const { return m_Terminal->GetSize(); }
 
-void    TTY::SetTermios(const termios2& termios)
+void       TTY::SetTermios(const termios2& termios)
 {
     LogDebug("TTY: Setting termios to ->\n{}", termios);
     m_Termios = termios;
@@ -316,27 +319,25 @@ void TTY::Initialize()
     {
         LogTrace("TTY: Creating device /dev/tty{}...", minor);
 
-        auto tty = new TTY(terminal, minor);
+        auto tty = new TTY(fmt::format("tty{}", minor).data(), terminal, minor);
         s_TTYs.PushBack(tty);
-        DevTmpFs::RegisterDevice(tty);
 
-        auto path = fmt::format("/dev/tty{}", tty->GetID());
-        VFS::MkNod(nullptr, path.data(), 0666, tty->GetID());
+        auto result = DeviceManager::RegisterCharDevice(tty);
+        if (!result) delete tty;
         minor++;
     }
 
     if (s_TTYs.Empty())
     {
         LogTrace("TTY: Creating device /dev/tty...");
-        auto tty = new TTY(Terminal::GetPrimary(), 0);
+        auto tty = new TTY("tty", Terminal::GetPrimary(), 0);
         s_TTYs.PushBack(tty);
-        DevTmpFs::RegisterDevice(tty);
 
-        StringView path = "/dev/tty"_sv;
-        VFS::MkNod(nullptr, path, 0666, tty->GetID());
+        auto registered = DeviceManager::RegisterCharDevice(tty);
+        if (!registered) delete tty;
     }
     if (!s_TTYs.Empty())
-        VFS::MkNod(nullptr, "/dev/tty"_sv, 0644 | S_IFCHR, s_TTYs[0]->GetID());
+        VFS::MkNod("/dev/tty"_sv, 0644 | S_IFCHR, s_TTYs.Front()->ID());
 
     LogInfo("TTY: Initialized");
 }

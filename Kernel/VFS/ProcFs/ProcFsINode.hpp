@@ -64,22 +64,30 @@ struct ProcFsProperty
 class ProcFsINode : public INode
 {
   public:
-    ProcFsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode,
+    ProcFsINode(StringView name, class Filesystem* fs, mode_t mode,
                 ProcFsProperty* property = nullptr);
     virtual ~ProcFsINode() override
     {
         if (m_Property) delete m_Property;
     }
 
-    virtual const stat& GetStats() override;
+    virtual const stat& Stats() override;
+    virtual ErrorOr<void>
+    TraverseDirectories(class DirectoryEntry* parent,
+                        DirectoryIterator     iterator) override;
 
-    virtual void        InsertChild(INode* node, StringView name) override;
-    virtual isize       Read(void* buffer, off_t offset, usize bytes) override;
+    virtual const std::unordered_map<StringView, INode*>& Children() const
+    {
+        return m_Children;
+    }
+    virtual void  InsertChild(INode* node, StringView name) override;
+    virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
 
     virtual ErrorOr<void>  ChMod(mode_t mode) override { return Error(ENOSYS); }
 
   private:
-    ProcFsProperty* m_Property = nullptr;
+    ProcFsProperty*                        m_Property = nullptr;
+    std::unordered_map<StringView, INode*> m_Children;
 };

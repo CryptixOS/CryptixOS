@@ -5,26 +5,66 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <API/Limits.hpp>
+#include <Prism/String/StringBuilder.hpp>
+
 #include <VFS/DirectoryEntry.hpp>
+#include <VFS/MountPoint.hpp>
 #include <VFS/VFS.hpp>
 
 // FIXME(v1tr10l7): Reference counting, and cleaning up
 // NOTE(v1tr10l7): Directories should only have one DirectoryEntry, regular
 // files might have multiple pointing to the same inode
 
+DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, class INode* inode)
+    : m_INode(inode)
+{
+    m_Name   = inode->Name();
+    m_Parent = parent;
+
+    if (parent) parent->InsertChild(this);
+}
+DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, StringView name)
+    : m_Name(name)
+    , m_Parent(parent)
+{
+    if (parent) parent->InsertChild(this);
+}
+
+Path DirectoryEntry::Path() const
+{
+    StringBuilder pathBuilder;
+
+    auto          current   = this;
+    auto          rootEntry = VFS::GetRootDirectoryEntry();
+
+    while (current && current != rootEntry)
+    {
+        auto segment = "/"_s;
+        segment += current->m_Name;
+        pathBuilder.Insert(segment);
+
+        current = current->GetEffectiveParent();
+    }
+
+    return pathBuilder.Empty() ? "/"_s : pathBuilder.ToString();
+}
+const std::unordered_map<StringView, DirectoryEntry*>&
+DirectoryEntry::Children() const
+{
+    return m_Children;
+}
+
+void DirectoryEntry::SetParent(DirectoryEntry* entry) { m_Parent = entry; }
 void DirectoryEntry::SetMountGate(class INode*    inode,
                                   DirectoryEntry* mountPoint)
 {
     ScopedLock guard(m_Lock);
-    // m_INode                 = inode;
-    // inode->m_DirectoryEntry = this;
     m_MountGate = mountPoint;
 }
 void DirectoryEntry::Bind(class INode* inode)
 {
     ScopedLock guard(m_Lock);
-    m_INode                 = inode;
-    inode->m_DirectoryEntry = this;
+    m_INode = inode;
 }
 void DirectoryEntry::InsertChild(class DirectoryEntry* entry)
 {
@@ -39,25 +79,33 @@ DirectoryEntry* DirectoryEntry::FollowMounts()
 
     return current;
 }
-DirectoryEntry* DirectoryEntry::FollowSymlinks()
+DirectoryEntry* DirectoryEntry::FollowSymlinks(usize cnt)
 {
-    String target = "";
-    target.Reserve(Limits::MAX_PATH_LENGTH);
-    auto bufferOr = UserBuffer::ForUserBuffer(target.Raw(), target.Capacity());
-    if (bufferOr && m_INode->ReadLink(bufferOr.value()))
-        ;
+    auto target = m_INode->GetTarget();
 
-    while (!target.Empty())
+    if (!target.Empty())
     {
-        auto next = VFS::ResolvePath(m_Parent, target.Raw());
-        if (!next.Node) return_err(nullptr, ENOENT);
+        if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
 
-        return next.Node->FollowSymlinks();
+        auto next = VFS::ResolvePath(m_Parent, target.Raw(), true).Entry;
+        if (!next) return_err(nullptr, ENOENT);
+
+        return next->FollowSymlinks(++cnt);
     }
 
     return this;
 }
-DirectoryEntry* DirectoryEntry::GetEffectiveParent() { return m_Parent; }
+DirectoryEntry* DirectoryEntry::GetEffectiveParent() const
+{
+    auto rootEntry  = VFS::GetRootDirectoryEntry()->FollowMounts();
+    auto mountPoint = MountPoint::Lookup(const_cast<DirectoryEntry*>(this));
+
+    if (this == rootEntry || this == VFS::GetRootDirectoryEntry())
+        return const_cast<DirectoryEntry*>(this);
+    else if (mountPoint) return mountPoint->HostEntry()->Parent();
+
+    return Parent();
+}
 DirectoryEntry* DirectoryEntry::Lookup(const String& name)
 {
     auto entryIt = m_Children.find(name);
@@ -67,7 +115,9 @@ DirectoryEntry* DirectoryEntry::Lookup(const String& name)
     auto inode = m_INode->Lookup(name);
     if (!inode) return nullptr;
 
-    auto entry = inode->DirectoryEntry();
+    auto entry = new DirectoryEntry(this, inode->Name());
+    entry->Bind(inode);
+
     InsertChild(entry);
     return entry;
 }

@@ -86,7 +86,7 @@ namespace PCI
         eCardBusBridge = 0x02,
     };
 
-    struct DeviceHeader
+    struct [[gnu::packed]] DeviceHeader
     {
         u16        DeviceID;
         VendorID   VendorID;
@@ -100,5 +100,5 @@ namespace PCI
         HeaderType HeaderType;
         u8         LatencyTimer;
         u8         CacheLineSize;
-    } __attribute__((packed));
+    };
 }; // namespace PCI

@@ -14,24 +14,23 @@ class StorageDevicePartition : public Device
     StorageDevicePartition(StorageDevice& device, u64 firstBlock, u64 lastBlock,
                            u16 majorID, u16 minorID);
 
-    virtual StringView GetName() const noexcept override
+    virtual StringView Name() const noexcept override
     {
-        return m_Device.GetName();
+        return m_Device.Name();
     }
 
     virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override
     {
         // if (m_FirstBlock + offset >= m_LastBlock) return_err(-1, ENODEV);
         return m_Device.Read(
-            dest, m_Device.GetStats().st_blksize * m_FirstBlock + offset,
-            bytes);
+            dest, m_Device.Stats().st_blksize * m_FirstBlock + offset, bytes);
     }
     virtual ErrorOr<isize> Write(const void* src, off_t offset,
                                  usize bytes) override
     {
         // if (m_FirstBlock + offset >= m_LastBlock) return_err(-1, ENODEV);
         return m_Device.Write(
-            src, m_Device.GetStats().st_blksize * m_FirstBlock + offset, bytes);
+            src, m_Device.Stats().st_blksize * m_FirstBlock + offset, bytes);
     }
 
     virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,

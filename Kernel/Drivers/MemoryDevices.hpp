@@ -6,9 +6,9 @@
  */
 #pragma once
 
-#include "Drivers/Device.hpp"
+#include <Drivers/CharacterDevice.hpp>
+#include <Drivers/DeviceManager.hpp>
 
-#include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/VFS.hpp>
 
 #include <cerrno>
@@ -16,15 +16,14 @@
 namespace MemoryDevices
 {
 
-    class Null final : public Device
+    class Null final : public CharacterDevice
     {
       public:
         Null()
-            : Device(1, 0)
+            : CharacterDevice("null", MakeDevice(1, 0))
         {
         }
-
-        virtual StringView GetName() const noexcept override { return "null"; }
+        virtual StringView     Name() const noexcept override { return "null"; }
 
         virtual ErrorOr<isize> Read(void* dest, off_t offset,
                                     usize bytes) override
@@ -50,15 +49,14 @@ namespace MemoryDevices
         virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
     };
 
-    class Zero final : public Device
+    class Zero final : public CharacterDevice
     {
       public:
         Zero()
-            : Device(1, 5)
+            : CharacterDevice("zero", MakeDevice(1, 5))
         {
         }
-
-        virtual StringView GetName() const noexcept override { return "zero"; }
+        virtual StringView     Name() const noexcept override { return "zero"; }
 
         virtual ErrorOr<isize> Read(void* dest, off_t offset,
                                     usize bytes) override
@@ -87,15 +85,15 @@ namespace MemoryDevices
         virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
     };
 
-    class Full final : public Device
+    class Full final : public CharacterDevice
     {
       public:
         Full()
-            : Device(1, 7)
+            : CharacterDevice("full", MakeDevice(1, 7))
         {
         }
 
-        virtual StringView GetName() const noexcept override { return "full"; }
+        virtual StringView     Name() const noexcept override { return "full"; }
 
         virtual ErrorOr<isize> Read(void* dest, off_t offset,
                                     usize bytes) override
@@ -128,7 +126,7 @@ namespace MemoryDevices
 
     inline void Initialize()
     {
-        Device* devices[] = {
+        CharacterDevice* devices[] = {
             new Null,
             new Zero,
             new Full,
@@ -136,10 +134,12 @@ namespace MemoryDevices
 
         for (auto device : devices)
         {
-            DevTmpFs::RegisterDevice(device);
-            Path path(fmt::format("/dev/{}", device->GetName()).data());
-
-            VFS::MkNod(nullptr, PathView(path.View()), 0666, device->GetID());
+            auto result = DeviceManager::RegisterCharDevice(device);
+            if (!result)
+            {
+                delete device;
+                continue;
+            }
         }
     }
 }; // namespace MemoryDevices

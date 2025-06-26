@@ -4,7 +4,10 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Drivers/DeviceManager.hpp>
 #include <Drivers/FramebufferDevice.hpp>
+
+#include <Prism/String/StringUtils.hpp>
 
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/INode.hpp>
@@ -12,8 +15,9 @@
 
 static FramebufferDevice* s_PrimaryFramebuffer = nullptr;
 
-FramebufferDevice::FramebufferDevice(limine_framebuffer* framebuffer)
-    : Device(0, 0)
+FramebufferDevice::FramebufferDevice(StringView          name,
+                                     limine_framebuffer* framebuffer)
+    : CharacterDevice(name, MakeDevice(AllocateMajor().Value(), 0))
 {
     Assert(framebuffer && framebuffer->address);
     m_Framebuffer              = {.Address        = framebuffer->address,
@@ -65,12 +69,45 @@ FramebufferDevice::FramebufferDevice(limine_framebuffer* framebuffer)
     m_VariableScreenInfo.vmode    = FB_VMODE_NONINTERLACED;
     m_VariableScreenInfo.width    = -1;
     m_VariableScreenInfo.height   = -1;
-
-    DevTmpFs::RegisterDevice(this);
-
-    StringView path = fmt::format("/dev/{}", GetName()).data();
-    VFS::MkNod(nullptr, path, 0666, GetID());
 }
+
+bool FramebufferDevice::Initialize()
+{
+    usize framebufferCount = 0;
+    auto  framebuffers     = BootInfo::GetFramebuffers(framebufferCount);
+
+    if (framebufferCount == 0)
+    {
+        LogError("FbDev: Failed to acquire any framebuffers");
+        return false;
+    }
+
+    if (s_PrimaryFramebuffer)
+    {
+        LogError(
+            "FbDev: Using multiple framebuffer devices is currently not "
+            "supported.");
+        return false;
+    };
+
+    usize              index   = 0;
+    auto               name    = "fb"_s + StringUtils::ToString(index);
+    FramebufferDevice* primary = new FramebufferDevice(name, framebuffers[0]);
+    if (!primary) return_err(false, ENOMEM);
+    s_PrimaryFramebuffer = primary;
+
+    auto path            = fmt::format("/dev/{}", primary->Name());
+    LogTrace("FbDev: Successfully created framebuffer device at '{}'", path);
+
+    auto result = DeviceManager::RegisterCharDevice(primary);
+    if (!result)
+    {
+        delete primary;
+        return false;
+    }
+    return true;
+}
+StringView     FramebufferDevice::Name() const noexcept { return m_Name; }
 
 ErrorOr<isize> FramebufferDevice::Read(void* dest, off_t offset, usize bytes)
 {
@@ -125,31 +162,4 @@ i32 FramebufferDevice::IoCtl(usize request, uintptr_t argp)
 
     errno = ENOSYS;
     return -1;
-}
-
-bool FramebufferDevice::Initialize()
-{
-    usize framebufferCount = 0;
-    auto  framebuffers     = BootInfo::GetFramebuffers(framebufferCount);
-
-    if (framebufferCount == 0)
-    {
-        LogError("FbDev: Failed to acquire any framebuffers");
-        return false;
-    }
-
-    if (s_PrimaryFramebuffer)
-    {
-        LogError(
-            "FbDev: Using multiple framebuffer devices is currently not "
-            "supported.");
-        return false;
-    };
-    FramebufferDevice* primary = new FramebufferDevice(framebuffers[0]);
-    s_PrimaryFramebuffer       = primary;
-
-    auto path                  = fmt::format("/dev/{}", primary->GetName());
-    LogTrace("FbDev: Successfully created framebuffer device at '{}'", path);
-
-    return true;
 }

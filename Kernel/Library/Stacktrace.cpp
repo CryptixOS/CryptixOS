@@ -50,7 +50,7 @@ namespace Stacktrace
             for (const auto& symbol : s_Symbols)
             {
                 if ((&symbol + 1) == s_Symbols.end()) break;
-                if (address < (&symbol + 1)->address)
+                if (address < (&symbol + 1)->Address)
                 {
                     ret = &symbol;
                     break;
@@ -67,19 +67,18 @@ namespace Stacktrace
         limine_file* file = BootInfo::FindModule("ksyms");
         if (!file || !file->address) return false;
 
-        Pointer fileStart   = file->address;
-        Pointer fileEnd     = fileStart.Offset(file->size);
-        char*   current     = fileStart.As<char>();
-        char*   startOfName = nullptr;
+        Pointer fileStart = file->address;
+        Pointer fileEnd   = fileStart.Offset(file->size);
+        char*   current   = fileStart.As<char>();
 
-        Pointer address     = 0;
+        Pointer address   = 0;
         while (current < fileEnd.As<char>())
         {
             for (usize i = 0; i < sizeof(void*) * 2; ++i)
                 address = (address.Raw() << 4) | ParseHexDigit(*(current++));
             current += 3;
 
-            startOfName = current;
+            StringView name = current;
             while (*(++current))
                 if (*current == '\n') break;
 
@@ -87,15 +86,15 @@ namespace Stacktrace
             if (address < BootInfo::GetKernelVirtualAddress().Raw<>())
                 address += BootInfo::GetKernelVirtualAddress().Raw<>();
 
-            ksym.address = address;
-            ksym.name    = startOfName;
+            ksym.Address = address;
+            ksym.Name    = name.Substr(0, name.FindFirstOf('\n'));
             s_Symbols.PushBack(ksym);
 
             *current = '\0';
-            if (ksym.address < s_LowestKernelSymbolAddress)
-                s_LowestKernelSymbolAddress = ksym.address;
-            if (ksym.address > s_HighestKernelSymbolAddress)
-                s_HighestKernelSymbolAddress = ksym.address;
+            if (ksym.Address < s_LowestKernelSymbolAddress)
+                s_LowestKernelSymbolAddress = ksym.Address;
+            if (ksym.Address > s_HighestKernelSymbolAddress)
+                s_HighestKernelSymbolAddress = ksym.Address;
 
             ++current;
         }
@@ -119,7 +118,8 @@ namespace Stacktrace
             stackFrame           = stackFrame->Base;
             const Symbol* symbol = GetSymbol(rip);
 
-            auto demangledName   = symbol ? llvm::demangle(symbol->name) : "??";
+            auto          demangledName
+                = symbol ? llvm::demangle(symbol->Name.Raw()) : "??";
             LogMessage("[\u001b[33mStacktrace\u001b[0m]: {}. {} <{:#x}>\n",
                        i + 1, demangledName, rip.Raw());
         }

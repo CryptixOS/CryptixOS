@@ -13,9 +13,9 @@
 
 #include <cstdlib>
 
-DevTmpFsINode::DevTmpFsINode(INode* parent, StringView name, Filesystem* fs,
-                             mode_t mode, Device* device)
-    : INode(parent, name, fs)
+DevTmpFsINode::DevTmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
+                             Device* device)
+    : INode(name, fs)
 {
     m_Device           = device;
 
@@ -25,7 +25,7 @@ DevTmpFsINode::DevTmpFsINode(INode* parent, StringView name, Filesystem* fs,
     m_Stats.st_mode    = mode;
     m_Stats.st_uid     = 0;
     m_Stats.st_gid     = 0;
-    m_Stats.st_rdev    = device ? device->GetID() : 0;
+    m_Stats.st_rdev    = device ? device->ID() : 0;
     m_Stats.st_size    = 0;
     m_Stats.st_blksize = 512;
     m_Stats.st_blocks  = 0;
@@ -41,6 +41,32 @@ DevTmpFsINode::DevTmpFsINode(INode* parent, StringView name, Filesystem* fs,
     m_Stats.st_atim = Time::GetReal();
     m_Stats.st_ctim = Time::GetReal();
     m_Stats.st_mtim = Time::GetReal();
+}
+
+ErrorOr<void> DevTmpFsINode::TraverseDirectories(class DirectoryEntry* parent,
+                                                 DirectoryIterator     iterator)
+{
+    usize offset = 0;
+    for (const auto [name, inode] : Children())
+    {
+        usize  ino  = inode->Stats().st_ino;
+        mode_t mode = inode->Stats().st_mode;
+        auto   type = IF2DT(mode);
+
+        if (!iterator(name, offset, ino, type)) break;
+        ++offset;
+    }
+
+    return {};
+}
+INode* DevTmpFsINode::Lookup(const String& name)
+{
+    ScopedLock guard(m_Lock);
+
+    auto       child = Children().find(name);
+    if (child != Children().end()) return child->second;
+
+    return nullptr;
 }
 
 isize DevTmpFsINode::Read(void* buffer, off_t offset, usize bytes)

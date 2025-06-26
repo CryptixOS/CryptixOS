@@ -8,23 +8,34 @@
 
 #include <Drivers/Device.hpp>
 #include <Prism/Core/NonCopyable.hpp>
+
+#include <VFS/DirectoryEntry.hpp>
 #include <VFS/INode.hpp>
 
 class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
 {
   public:
-    DevTmpFsINode(INode* parent, StringView name, Filesystem* fs, mode_t mode,
+    DevTmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
                   Device* device = nullptr);
     virtual ~DevTmpFsINode()
     {
         if (m_Capacity > 0) delete m_Data;
     }
 
-    virtual const stat& GetStats() override
+    virtual const stat& Stats() override
     {
-        return m_Device ? m_Device->GetStats() : m_Stats;
+        return m_Device ? m_Device->Stats() : m_Stats;
     }
 
+    virtual ErrorOr<void>
+                   TraverseDirectories(class DirectoryEntry* parent,
+                                       DirectoryIterator     iterator) override;
+    virtual INode* Lookup(const String& name) override;
+
+    const std::unordered_map<StringView, INode*>& Children() const
+    {
+        return m_Children;
+    }
     virtual void InsertChild(INode* node, StringView name) override
     {
         ScopedLock guard(m_Lock);
@@ -39,9 +50,10 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
     virtual ErrorOr<void>  ChMod(mode_t mode) override;
 
   private:
-    Device* m_Device   = nullptr;
-    u8*     m_Data     = nullptr;
-    usize   m_Capacity = 0;
+    Device*                                m_Device   = nullptr;
+    u8*                                    m_Data     = nullptr;
+    usize                                  m_Capacity = 0;
 
+    std::unordered_map<StringView, INode*> m_Children;
     friend class DevTmpFs;
 };

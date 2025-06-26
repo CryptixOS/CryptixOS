@@ -23,13 +23,11 @@
 #include <Drivers/PCI/PCI.hpp>
 #include <Firmware/ACPI/ACPI.hpp>
 
-#include <Library/Mutex.hpp>
+#include <Library/Locking/Mutex.hpp>
 #include <Memory/MMIO.hpp>
 
-#include <Time/Time.hpp>
-
-#include <Library/Spinlock.hpp>
 #include <Prism/Utility/Math.hpp>
+#include <Time/Time.hpp>
 
 #include <uacpi/kernel_api.h>
 

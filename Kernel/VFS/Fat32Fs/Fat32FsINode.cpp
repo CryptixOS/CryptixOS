@@ -9,9 +9,8 @@
 
 #include <Time/Time.hpp>
 
-Fat32FsINode::Fat32FsINode(INode* parent, StringView name, Filesystem* fs,
-                           mode_t mode)
-    : INode(parent, name, fs)
+Fat32FsINode::Fat32FsINode(StringView name, class Filesystem* fs, mode_t mode)
+    : INode(name, fs)
     , m_Fat32Fs(reinterpret_cast<Fat32Fs*>(fs))
 {
     m_Stats.st_dev    = fs->DeviceID();
@@ -59,9 +58,9 @@ Fat32FsINode::Fat32FsINode(INode* parent, StringView name, Filesystem* fs,
     }
 }
 
-std::unordered_map<StringView, INode*>& Fat32FsINode::GetChildren()
+const std::unordered_map<StringView, INode*>& Fat32FsINode::Children() const
 {
-    if (!m_Populated) Populate();
+    // TODO(v1tr10l7): Populate records
     return m_Children;
 }
 void Fat32FsINode::InsertChild(INode* node, StringView name)

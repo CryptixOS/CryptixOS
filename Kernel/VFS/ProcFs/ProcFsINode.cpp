@@ -4,8 +4,9 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Memory/PMM.hpp>
+#include <API/Posix/dirent.h>
 
+#include <Memory/PMM.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
 
 isize ProcFsProperty::Read(u8* outBuffer, off_t offset, usize size)
@@ -19,9 +20,9 @@ isize ProcFsProperty::Read(u8* outBuffer, off_t offset, usize size)
     return bytesCopied;
 }
 
-ProcFsINode::ProcFsINode(INode* parent, StringView name, Filesystem* fs,
-                         mode_t mode, ProcFsProperty* property)
-    : INode(parent, name, fs)
+ProcFsINode::ProcFsINode(StringView name, class Filesystem* fs, mode_t mode,
+                         ProcFsProperty* property)
+    : INode(name, fs)
     , m_Property(property)
 {
     Assert(!S_ISDIR(mode) || !m_Property);
@@ -38,7 +39,7 @@ ProcFsINode::ProcFsINode(INode* parent, StringView name, Filesystem* fs,
     m_Stats.st_blocks  = 0;
 }
 
-const stat& ProcFsINode::GetStats()
+const stat& ProcFsINode::Stats()
 {
     if (m_Property)
     {
@@ -46,6 +47,22 @@ const stat& ProcFsINode::GetStats()
         m_Stats.st_size = m_Property->Buffer.Size();
     }
     return m_Stats;
+}
+ErrorOr<void> ProcFsINode::TraverseDirectories(class DirectoryEntry* parent,
+                                               DirectoryIterator     iterator)
+{
+    usize offset = 0;
+    for (const auto [name, inode] : Children())
+    {
+        usize  ino  = inode->Stats().st_ino;
+        mode_t mode = inode->Stats().st_mode;
+        auto   type = IF2DT(mode);
+
+        if (iterator(name, offset, ino, type)) break;
+        ++offset;
+    }
+
+    return {};
 }
 
 void ProcFsINode::InsertChild(INode* node, StringView name)

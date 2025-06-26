@@ -6,12 +6,10 @@
  */
 #pragma once
 
-#include <Library/Spinlock.hpp>
+#include <Library/Locking/Spinlock.hpp>
 
 #include <Prism/Containers/Deque.hpp>
 #include <Prism/Core/Types.hpp>
-
-#include <span>
 
 constexpr usize MAX_LISTENERS = 32;
 struct EventListener

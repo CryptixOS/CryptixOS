@@ -12,6 +12,7 @@
 
 #include <Time/Time.hpp>
 
+#include <VFS/MountPoint.hpp>
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
 
@@ -37,7 +38,7 @@ struct ProcFsFilesystemsProperty : public ProcFsProperty
         Buffer.Clear();
         Buffer.Resize(PMM::PAGE_SIZE);
 
-        for (auto& [physical, fs] : VFS::GetFilesystems())
+        for (auto& [physical, fs] : VFS::Filesystems())
             Write("{} {}\n", physical ? "     " : "nodev", fs);
     }
 };
@@ -58,9 +59,16 @@ struct ProcFsMountsProperty : public ProcFsProperty
         Buffer.Clear();
         Buffer.Resize(PMM::PAGE_SIZE);
 
-        for (const auto& [mountPath, fs] : VFS::GetMountPoints())
-            Write("{} {} {} {}\n", fs->DeviceName(), mountPath, fs->Name(),
+        auto mountPoint = MountPoint::Head();
+        while (mountPoint)
+        {
+            auto dentry = mountPoint->HostEntry();
+            auto fs     = mountPoint->Filesystem();
+
+            Write("{} {} {} {}\n", fs->DeviceName(), dentry->Path(), fs->Name(),
                   fs->MountFlagsString());
+            mountPoint = mountPoint->NextMountPoint();
+        }
     }
 };
 struct ProcFsPartitionsProperty : public ProcFsProperty
@@ -73,11 +81,11 @@ struct ProcFsPartitionsProperty : public ProcFsProperty
         Write("major\tminor\t#blocks\tname\n");
         for (auto& partition : DeviceManager::GetBlockDevices())
         {
-            u16         major      = partition->GetID();
-            u16         minor      = partition->GetID();
-            const stat& stats      = partition->GetStats();
+            u16         major      = partition->ID();
+            u16         minor      = partition->ID();
+            const stat& stats      = partition->Stats();
             u64         blockCount = stats.st_blocks;
-            StringView  name       = partition->GetName();
+            StringView  name       = partition->Name();
 
             Write("{}\t{}\t{}\t{}\n", major, minor, blockCount, name);
         }
@@ -130,7 +138,7 @@ struct ProcFsStatusProperty : public ProcFsProperty
 {
     virtual void GenerateRecord() override
     {
-        StringView pidString = m_Parent->GetName();
+        StringView pidString = m_Parent->Name();
         pid_t      pid       = StringUtils::ToNumber<pid_t>(pidString, 10);
         auto       process   = ProcFs::GetProcess(pid);
         if (!process) return;
@@ -157,8 +165,7 @@ static ProcFsINode* CreateProcFsNode(INode* parent, StringView name,
                                      Filesystem* filesystem)
 {
     ProcFsProperty* property = CreateProcFsProperty(name);
-    auto            node
-        = new ProcFsINode(parent, name, filesystem, 0755 | S_IFREG, property);
+    auto node = new ProcFsINode(name, filesystem, 0755 | S_IFREG, property);
     property->m_Parent = node;
 
     return node;
@@ -176,25 +183,28 @@ void ProcFs::AddProcess(Process* process)
     ScopedLock guard(m_Lock);
     Assert(!s_Processes.contains(process->GetPid()));
     s_Processes[process->GetPid()] = process;
-    auto  nodeName                 = std::to_string(process->GetPid());
-    auto* processNode
-        = new ProcFsINode(m_Root, nodeName.data(), this, 0755 | S_IFDIR);
+    auto name                      = StringUtils::ToString(process->GetPid());
+    auto entry                     = new DirectoryEntry(m_RootEntry, name);
 
-    auto statusProperty = new ProcFsStatusProperty();
-    auto statusNode     = new ProcFsINode(processNode, "status", this,
-                                          0755 | S_IFREG, statusProperty);
-    processNode->InsertChild(statusNode, statusNode->GetName());
+    auto maybeINode                = CreateNode(m_Root, entry, 0755 | S_IFDIR);
+    if (!maybeINode) return;
+    m_RootEntry->InsertChild(entry);
 
-    m_Root->InsertChild(processNode, processNode->GetName());
+    // auto statusProperty = new ProcFsStatusProperty();
+    // auto statusEntry    = new DirectoryEntry(processEntry, "status");
+    // auto statusNode     = new ProcFsINode(processNode, "status", this,
+    //                                       0755 | S_IFREG, statusProperty);
+    // statusEntry->Bind(statusNode);
+
+    // processNode->InsertChild(statusNode, statusNode->Name());
+    // processEntry->InsertChild(statusEntry);
 }
 void ProcFs::RemoveProcess(pid_t pid)
 {
     ScopedLock guard(m_Lock);
     s_Processes.erase(pid);
 }
-ErrorOr<INode*> ProcFs::Mount(INode* parent, INode* source, INode* target,
-                              DirectoryEntry* entry, StringView name,
-                              const void* data)
+ErrorOr<DirectoryEntry*> ProcFs::Mount(StringView sourcePath, const void* data)
 {
     ScopedLock guard(m_Lock);
     m_MountData
@@ -202,8 +212,13 @@ ErrorOr<INode*> ProcFs::Mount(INode* parent, INode* source, INode* target,
                : nullptr;
 
     if (m_Root) VFS::RecursiveDelete(m_Root);
-    m_Root = new ProcFsINode(parent, name, this, 0755 | S_IFDIR);
-    if (m_Root) m_MountedOn = target;
+
+    m_RootEntry    = new DirectoryEntry(nullptr, "/");
+    auto maybeRoot = CreateNode(nullptr, m_RootEntry, 0755 | S_IFDIR);
+    if (!maybeRoot) return Error(maybeRoot.error());
+
+    m_Root = maybeRoot.value();
+    m_RootEntry->Bind(m_Root);
 
     AddChild("cmdline");
     AddChild("filesystems");
@@ -214,14 +229,15 @@ ErrorOr<INode*> ProcFs::Mount(INode* parent, INode* source, INode* target,
     AddChild("version");
     AddChild("vm_regions");
 
-    m_MountedOn = target;
-
-    return m_Root;
+    return m_RootEntry;
 }
 ErrorOr<INode*> ProcFs::CreateNode(INode* parent, DirectoryEntry* entry,
                                    mode_t mode, uid_t uid, gid_t gid)
 {
-    return nullptr;
+    auto inode = new ProcFsINode(entry->Name(), this, mode, nullptr);
+    entry->Bind(inode);
+
+    return inode;
 }
 ErrorOr<INode*> ProcFs::Symlink(INode* parent, DirectoryEntry* entry,
                                 StringView target)
@@ -232,9 +248,17 @@ INode* ProcFs::Link(INode* parent, StringView name, INode* oldNode)
 {
     return nullptr;
 }
-bool ProcFs::Populate(INode* node) { return true; }
+bool ProcFs::Populate(DirectoryEntry* dentry) { return true; }
 
 void ProcFs::AddChild(StringView name)
 {
-    m_Root->InsertChild(CreateProcFsNode(m_Root, name, this), name);
+    auto entry = new DirectoryEntry(m_RootEntry, name);
+    auto inode = CreateProcFsNode(m_Root, name, this);
+    entry->Bind(inode);
+
+    if (inode)
+    {
+        m_Root->InsertChild(inode, name);
+        m_RootEntry->InsertChild(entry);
+    }
 }

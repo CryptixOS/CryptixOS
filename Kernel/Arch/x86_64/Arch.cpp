@@ -37,11 +37,16 @@ namespace Arch
         IO::Delay(1000);
         PCSpeaker::ToneOff();
 
-        I8042Controller::Probe();
-
         LogInfo("Date: {:02}/{:02}/{:04} {:02}:{:02}:{:02}", RTC::GetDay(),
                 RTC::GetMonth(), RTC::GetCentury() * 100 + RTC::GetYear(),
                 RTC::GetHour(), RTC::GetMinute(), RTC::GetSecond());
+    }
+    void ProbeDevices()
+    {
+        auto result = I8042Controller::Probe();
+        if (!result)
+            LogError("Arch({}): Failed to probe the i8042 controller",
+                     CTOS_ARCH_STRING);
     }
 
     __attribute__((noreturn)) void Halt()

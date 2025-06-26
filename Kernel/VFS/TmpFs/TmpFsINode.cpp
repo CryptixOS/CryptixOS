@@ -13,9 +13,9 @@
 #include <VFS/TmpFs/TmpFs.hpp>
 #include <VFS/TmpFs/TmpFsINode.hpp>
 
-TmpFsINode::TmpFsINode(INode* parent, StringView name, Filesystem* fs,
-                       mode_t mode, uid_t uid, gid_t gid)
-    : INode(parent, name, fs)
+TmpFsINode::TmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
+                       uid_t uid, gid_t gid)
+    : INode(name, fs)
 {
     m_Stats.st_dev     = fs->DeviceID();
     m_Stats.st_ino     = fs->NextINodeIndex();
@@ -32,11 +32,11 @@ TmpFsINode::TmpFsINode(INode* parent, StringView name, Filesystem* fs,
     m_Stats.st_mtim    = Time::GetReal();
     m_Stats.st_ctim    = Time::GetReal();
 
-    if (parent && parent->GetStats().st_mode & S_ISGID)
-    {
-        m_Stats.st_gid = parent->GetStats().st_gid;
-        m_Stats.st_mode |= S_ISGID;
-    }
+    // if (parent && parent->Stats().st_mode & S_ISGID)
+    // {
+    //     m_Stats.st_gid = parent->Stats().st_gid;
+    //     m_Stats.st_mode |= S_ISGID;
+    // }
 
     if (S_ISREG(mode))
     {
@@ -45,6 +45,38 @@ TmpFsINode::TmpFsINode(INode* parent, StringView name, Filesystem* fs,
         m_Data          = new u8[m_Capacity];
     }
 }
+
+ErrorOr<void> TmpFsINode::TraverseDirectories(class DirectoryEntry* parent,
+                                              DirectoryIterator     iterator)
+{
+    usize offset = 0;
+    for (const auto [name, inode] : Children())
+    {
+        usize  ino  = inode->Stats().st_ino;
+        mode_t mode = inode->Stats().st_mode;
+        auto   type = IF2DT(mode);
+
+        if (!iterator(name, offset, ino, type)) break;
+        ++offset;
+    }
+
+    return {};
+}
+INode* TmpFsINode::Lookup(const String& name)
+{
+    ScopedLock guard(m_Lock);
+
+    auto       child = Children().find(name);
+    if (child != Children().end()) return child->second;
+
+    return nullptr;
+}
+void TmpFsINode::InsertChild(INode* inode, StringView name)
+{
+    ScopedLock guard(m_Lock);
+    m_Children[name] = inode;
+}
+
 isize TmpFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
     ScopedLock guard(m_Lock);
@@ -124,11 +156,13 @@ ErrorOr<isize> TmpFsINode::Truncate(usize size)
 
 ErrorOr<void> TmpFsINode::Rename(INode* newParent, StringView newName)
 {
-    auto parent = reinterpret_cast<TmpFsINode*>(m_Parent);
-    parent->m_Children.erase(m_Name);
+    // TODO(v1tr10l7): Remove old inode
+
+    // auto parent = reinterpret_cast<TmpFsINode*>(m_Parent);
+    // parent->m_Children.erase(m_Name);
 
     m_Name = newName;
-    newParent->InsertChild(this, GetName());
+    newParent->InsertChild(this, Name());
 
     return {};
 }
@@ -146,7 +180,7 @@ ErrorOr<void> TmpFsINode::MkDir(StringView name, mode_t mode, uid_t uid,
     auto inode = reinterpret_cast<TmpFsINode*>(inodeOr.value());
     if (!inode) return Error(errno);
 
-    m_Children[inode->GetName()] = inode;
+    InsertChild(inode, inode->Name());
     return {};
 }
 ErrorOr<void> TmpFsINode::Link(PathView path)

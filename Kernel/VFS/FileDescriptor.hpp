@@ -13,9 +13,8 @@
 #include <Library/UserBuffer.hpp>
 #include <Prism/Containers/Deque.hpp>
 
-#include <VFS/File.hpp>
-#include <VFS/INode.hpp>
 #include <VFS/DirectoryEntry.hpp>
+#include <VFS/File.hpp>
 
 enum class FileAccessMode
 {
@@ -56,7 +55,7 @@ struct DirectoryEntries
     inline bool IsEmpty() const { return Entries.Empty(); }
 
     inline void Clear() { Entries.Clear(); }
-    void        Push(INode* node, StringView = "");
+    void        Push(StringView name, loff_t offset, usize ino, usize type);
 
     usize       CopyAndPop(u8* out, usize capacity);
 
@@ -68,7 +67,7 @@ struct FileDescription
     Spinlock         Lock;
     Atomic<usize>    RefCount = 0;
 
-    DirectoryEntry*           Node;
+    DirectoryEntry*  Entry;
     usize            Offset     = 0;
 
     i32              Flags      = 0;
@@ -91,12 +90,15 @@ class FileDescriptor : public File
     FileDescriptor(FileDescriptor* fd, i32 flags = 0);
     virtual ~FileDescriptor();
 
-    inline INode*    GetNode() const { return m_Description->Node->INode(); }
-    constexpr DirectoryEntry* DirectoryEntry() const { return m_Description->Node; }
-    inline usize     GetOffset() const { return m_Description->Offset; }
+    inline INode* INode() const { return m_Description->Entry->INode(); }
+    constexpr DirectoryEntry* DirectoryEntry() const
+    {
+        return m_Description->Entry;
+    }
+    inline usize GetOffset() const { return m_Description->Offset; }
 
-    inline i32       GetFlags() const { return m_Flags; }
-    inline void      SetFlags(i32 flags)
+    inline i32   GetFlags() const { return m_Flags; }
+    inline void  SetFlags(i32 flags)
     {
         ScopedLock guard(m_Lock);
         m_Flags = flags;
@@ -138,7 +140,7 @@ class FileDescriptor : public File
 
     // TODO(v1t10l7): verify whether the fd is blocking
     inline bool                  WouldBlock() const { return false; }
-    inline bool IsSocket() const override { return GetNode()->IsSocket(); }
+    inline bool IsSocket() const override { return INode()->IsSocket(); }
     inline bool IsPipe() const
     {
         // FIXME(v1tr10l7): implement this once pipes are supported

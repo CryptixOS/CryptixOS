@@ -15,7 +15,7 @@ StorageDevicePartition::StorageDevicePartition(StorageDevice& device,
     , m_FirstBlock(firstBlock)
     , m_LastBlock(lastBlock)
 {
-    m_Stats.st_blksize = m_Device.GetStats().st_blksize;
+    m_Stats.st_blksize = m_Device.Stats().st_blksize;
     m_Stats.st_size    = lastBlock - firstBlock;
     m_Stats.st_blocks  = m_Stats.st_size / m_Stats.st_blksize;
     m_Stats.st_rdev    = 0;

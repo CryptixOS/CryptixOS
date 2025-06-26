@@ -16,7 +16,7 @@ packages:
       - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CryptixUtils/reboot.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/reboot']
       #- args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CryptixUtils/vi.cpp', '-lncurses',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/vi']
       - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CryptixUtils/shutdown.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/shutdown']
-      - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/AwesomeShell/src/main.cpp', '-lncurses',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/awsh']
+      # - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/AwesomeShell/src/main.cpp', '-lncurses',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/awsh']
 
   - name: coreutils
     architecture: '@OPTION:arch@'

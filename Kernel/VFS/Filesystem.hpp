@@ -9,7 +9,7 @@
 #include <API/Posix/sys/statfs.h>
 #include <API/UnixTypes.hpp>
 
-#include <Library/Spinlock.hpp>
+#include <Library/Locking/Spinlock.hpp>
 
 #include <Prism/String/String.hpp>
 #include <Prism/Utility/Atomic.hpp>
@@ -49,61 +49,50 @@ class Filesystem
      *
      * @return StringView Name of the filesystem.
      */
-    inline StringView       Name() const { return m_Name; }
+    inline StringView      Name() const { return m_Name; }
     /**
-     * @brief Get the INode on which this filesystem is mounted.
+     * @brief Get the root DirectoryEntry of this filesystem.
      *
-     * @return INode* Pointer to the mount point inode.
+     * @return DirectoryEntry* Pointer to the root directory entry.
      * @ingroup Filesystem
      */
-    inline INode*           MountedOn() { return m_MountedOn; }
-    /**
-     * @brief Get the root INode of this filesystem.
-     *
-     * @return INode* Pointer to the root inode.
-     * @ingroup Filesystem
-     */
-    inline INode*           RootNode() { return m_Root; }
+    inline DirectoryEntry* RootDirectoryEntry() { return m_RootEntry; }
     /**
      * @brief Get the next available inode index.
      *
      * @return ino_t Next inode index (auto-incremented).
      */
-    inline ino_t            NextINodeIndex() { return m_NextInodeIndex++; }
+    inline ino_t           NextINodeIndex() { return m_NextInodeIndex++; }
     /**
      * @brief Get the device ID of the backing device.
      *
      * @return dev_t Device ID.
      */
-    inline dev_t            DeviceID() const { return m_DeviceID; }
+    inline dev_t           DeviceID() const { return m_DeviceID; }
     /**
      * @brief Get the name of the backing device.
      *
      * @return StringView Device name.
      */
-    virtual StringView      DeviceName() const { return m_Name; }
+    virtual StringView     DeviceName() const { return m_Name; }
     /**
      * @brief Get a string representation of mount flags.
      *
      * @return StringView Flags as a string (e.g. "rw,noatime").
      */
-    virtual StringView      MountFlagsString() const { return "rw,noatime"; }
+    virtual StringView     MountFlagsString() const { return "rw,noatime"; }
 
     /**
      * @brief Mount the filesystem.
      *
-     * @param parent Parent INode where mount occurs.
-     * @param source Optional source device INode.
-     * @param target Target INode to mount onto.
-     * @param entry Directory entry for the mount point.
-     * @param name Filesystem name.
+     * @param source Optional source device path.
      * @param data Optional filesystem-specific mount data.
      *
-     * @return ErrorOr<INode*> Root node of the mounted filesystem or error.
+     * @return ErrorOr<DirectoryEntry*> Root entry of the mounted filesystem or
+     * error.
      */
-    virtual ErrorOr<INode*> Mount(INode* parent, INode* source, INode* target,
-                                  DirectoryEntry* entry, StringView name,
-                                  const void* data = nullptr)
+    virtual ErrorOr<DirectoryEntry*> Mount(StringView  sourcePath,
+                                           const void* data = nullptr)
         = 0;
     /**
      * @brief Create a new inode (file or directory).
@@ -144,12 +133,11 @@ class Filesystem
     virtual INode* Link(INode* parent, StringView name, INode* oldNode) = 0;
     /**
      * @brief Populate directory contents, if lazy-loading is used.
-     *
-     * @param node Directory to populate.
+     * @param Directory entry to populate.
      *
      * @return true if successful or not needed, false on failure.
      */
-    virtual bool   Populate(INode* node)                                = 0;
+    virtual bool   Populate(DirectoryEntry* entry)                      = 0;
 
     /**
      * @brief Create a special or device file node.
@@ -162,9 +150,9 @@ class Filesystem
      * @return ErrorOr<INode*> Pointer to new node or error.
      */
     virtual ErrorOr<INode*> MkNod(INode* parent, DirectoryEntry* entry,
-                                  mode_t mode, dev_t dev)
+                                  mode_t mode, dev_t dev = 0)
     {
-        return nullptr;
+        return Error(ENOSYS);
     }
 
     /**
@@ -182,25 +170,25 @@ class Filesystem
 
   protected:
     // Synchronization lock for internal access
-    Spinlock      m_Lock;
+    Spinlock        m_Lock;
 
-    String        m_Name           = "NoFs";
-    dev_t         m_DeviceID       = -1;
-    usize         m_BlockSize      = 512;
-    usize         m_BytesLimit     = 0;
+    String          m_Name           = "NoFs";
+    dev_t           m_DeviceID       = -1;
+    usize           m_BlockSize      = 512;
+    usize           m_BytesLimit     = 0;
     ///> Filesystem specific flags for internal use
-    u32           m_Flags          = 0;
+    u32             m_Flags          = 0;
 
     ///> Backing device
-    INode*        m_SourceDevice   = nullptr;
+    INode*          m_SourceDevice   = nullptr;
+    ///> Root directory entry
+    DirectoryEntry* m_RootEntry      = nullptr;
     ///> Root inode
-    INode*        m_Root           = nullptr;
+    INode*          m_Root           = nullptr;
 
-    ///> Host inode
-    INode*        m_MountedOn      = nullptr;
     ///> Filesystem specific data
-    void*         m_MountData      = nullptr;
+    void*           m_MountData      = nullptr;
 
     ///> Counter for generating inode ids
-    Atomic<ino_t> m_NextInodeIndex = 2;
+    Atomic<ino_t>   m_NextInodeIndex = 2;
 };

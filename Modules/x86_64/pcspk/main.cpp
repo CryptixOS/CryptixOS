@@ -8,7 +8,8 @@
 #include <Arch/x86_64/Drivers/PCSpeaker.hpp>
 #include <Arch/x86_64/IO.hpp>
 
-#include <Drivers/Device.hpp>
+#include <Drivers/CharacterDevice.hpp>
+#include <Drivers/DeviceManager.hpp>
 #include <Drivers/GenericDriver.hpp>
 #include <Library/Module.hpp>
 
@@ -17,15 +18,15 @@
 
 #include <VFS/VFS.hpp>
 
-class PCSpeakerDevice : public Device
+class PCSpeakerDevice : public CharacterDevice
 {
   public:
     PCSpeakerDevice()
-        : Device(1)
+        : CharacterDevice("pcspk", MakeDevice(AllocateMajor().Value(), 0))
     {
     }
 
-    virtual StringView GetName() const noexcept override { return "pcspk"_sv; }
+    virtual StringView     Name() const noexcept override { return m_Name; }
 
     virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override
     {
@@ -74,13 +75,13 @@ class PCSpeakerDevice : public Device
 
 namespace
 {
-    PCSpeakerDevice s_PCSpeaker;
-    ErrorOr<void>   Probe()
+    static PCSpeakerDevice* s_PCSpeaker = nullptr;
+    ErrorOr<void>           Probe()
     {
-        if (!DevTmpFs::RegisterDevice(&s_PCSpeaker)) return Error(EEXIST);
-        if (!VFS::MkNod(nullptr, "/dev/pcspk", 0644, s_PCSpeaker.GetID()))
-            return Error(errno);
+        s_PCSpeaker = new PCSpeakerDevice();
+        if (!s_PCSpeaker) return Error(ENOMEM);
 
+        TryOrRet(DeviceManager::RegisterCharDevice(s_PCSpeaker));
         return {};
     }
 

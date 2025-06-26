@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Drivers/Device.hpp>
+#include <Drivers/CharacterDevice.hpp>
 #include <Drivers/HID/Ps2Controller.hpp>
 
 #include <Prism/Memory/Scope.hpp>
@@ -23,27 +23,27 @@ enum class KeyModifier
 
 constexpr inline KeyModifier operator~(KeyModifier lhs)
 {
-    auto result = ~std::to_underlying(lhs);
+    auto result = ~ToUnderlying(lhs);
     return static_cast<KeyModifier>(result);
 }
 constexpr inline bool operator&(KeyModifier lhs, KeyModifier rhs)
 {
-    return std::to_underlying(lhs) & std::to_underlying(rhs);
+    return ToUnderlying(lhs) & ToUnderlying(rhs);
 }
 constexpr inline KeyModifier& operator|=(KeyModifier& lhs, KeyModifier rhs)
 {
-    u64 result = std::to_underlying(lhs) | std::to_underlying(rhs);
+    u64 result = ToUnderlying(lhs) | ToUnderlying(rhs);
 
     return (lhs = static_cast<KeyModifier>(result));
 }
 constexpr inline KeyModifier& operator&=(KeyModifier& lhs, KeyModifier rhs)
 {
-    u64 result = std::to_underlying(lhs) & std::to_underlying(rhs);
+    u64 result = ToUnderlying(lhs) & ToUnderlying(rhs);
 
     return (lhs = static_cast<KeyModifier>(result));
 }
 
-class Ps2KeyboardDevice : public RefCounted, public Device
+class Ps2KeyboardDevice : public RefCounted, public CharacterDevice
 {
   public:
     enum class ScanCodeSet
@@ -55,7 +55,7 @@ class Ps2KeyboardDevice : public RefCounted, public Device
 
     Ps2KeyboardDevice(Ps2Controller* controller, PS2_DevicePort port,
                       ScanCodeSet scanCodeSet)
-        : Device(11, 0)
+        : CharacterDevice("atkbd", MakeDevice(AllocateMajor().Value(), 0))
         , m_Controller(controller)
         , m_Port(port)
         , m_ScanCodeSet(scanCodeSet)
@@ -64,12 +64,8 @@ class Ps2KeyboardDevice : public RefCounted, public Device
     }
     virtual ~Ps2KeyboardDevice() = default;
 
-    void               Initialize();
-
-    virtual StringView GetName() const noexcept override
-    {
-        return "PS/2 Keyboard"_sv;
-    }
+    void                   Initialize();
+    virtual StringView     Name() const noexcept override { return m_Name; }
 
     virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override
     {

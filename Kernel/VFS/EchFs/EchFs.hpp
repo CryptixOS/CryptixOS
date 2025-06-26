@@ -19,9 +19,8 @@ class EchFs final : public Filesystem
     }
     virtual ~EchFs();
 
-    virtual ErrorOr<INode*> Mount(INode* parent, INode* source, INode* target,
-                                  DirectoryEntry* entry, StringView name,
-                                  const void* data = nullptr) override;
+    virtual ErrorOr<DirectoryEntry*> Mount(StringView  sourcePath,
+                                           const void* data = nullptr) override;
     virtual ErrorOr<INode*> CreateNode(INode* parent, DirectoryEntry* entry,
                                        mode_t mode, uid_t uid = 0,
                                        gid_t gid = 0) override;
@@ -35,7 +34,8 @@ class EchFs final : public Filesystem
     {
         return nullptr;
     }
-    virtual bool Populate(INode* node) override;
+    bool         Populate(EchFsINode* inode);
+    virtual bool Populate(DirectoryEntry* dentry) override;
 
     isize ReadDirectoryEntry(EchFsDirectoryEntry& entry, u8* dest, isize offset,
                              usize bytes);

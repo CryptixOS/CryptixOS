@@ -7,15 +7,18 @@
 #include <Library/ELF.hpp>
 #include <Library/Module.hpp>
 
+#include <Memory/AddressSpace.hpp>
 #include <Memory/PMM.hpp>
+#include <Memory/Region.hpp>
+#include <Memory/VMM.hpp>
 
 #include <Prism/Containers/Array.hpp>
 #include <Prism/String/StringView.hpp>
 #include <Prism/Utility/Math.hpp>
 
+#include <VFS/DirectoryEntry.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
-#include <VFS/DirectoryEntry.hpp>
 
 #include <cstring>
 #include <magic_enum/magic_enum.hpp>
@@ -149,13 +152,14 @@ namespace ELF
     bool Image::Load(PathView path, PageMap* pageMap,
                      AddressSpace& addressSpace, uintptr_t loadBase)
     {
-        DirectoryEntry* vnode = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), path).Node;
-        if (!vnode) return false;
+        DirectoryEntry* entry
+            = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), path).Entry;
+        if (!entry) return false;
 
-        auto file = vnode->INode();
+        auto file = entry->INode();
         if (!file) return_err(false, ENOENT);
 
-        isize fileSize = file->GetStats().st_size;
+        isize fileSize = file->Stats().st_size;
         // m_Image        = new u8[fileSize];
         m_Image.Resize(fileSize + 100);
 
@@ -163,7 +167,7 @@ namespace ELF
             return false;
 
         LoadSymbols();
-        for (auto& sym : m_Symbols) sym.address += loadBase;
+        for (auto& sym : m_Symbols) sym.Address += loadBase;
 
         for (const auto& current : m_ProgramHeaders)
         {

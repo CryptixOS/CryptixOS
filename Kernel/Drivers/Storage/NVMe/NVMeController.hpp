@@ -177,7 +177,7 @@ namespace NVMe
 
         bool          CreateIoQueues(NameSpace& ns, Queue*& queues, u32 id);
 
-        virtual StringView GetName() const noexcept override { return m_Name; }
+        virtual StringView     Name() const noexcept override { return m_Name; }
 
         virtual ErrorOr<isize> Read(void* dest, off_t offset,
                                     usize bytes) override

@@ -26,8 +26,7 @@ namespace Initrd
             return false;
         }
 
-        uintptr_t address = ToHigherHalfAddress<uintptr_t>(
-            reinterpret_cast<uintptr_t>(initrd->address));
+        auto address = Pointer(initrd->address).ToHigherHalf();
 
         if (Ustar::Validate(address)) Ustar::Load(address);
         else
@@ -38,7 +37,7 @@ namespace Initrd
 
         size_t pageCount
             = (Math::AlignUp(initrd->size, 512) + 512) / PMM::PAGE_SIZE;
-        PhysicalMemoryManager::FreePages(FromHigherHalfAddress<void*>(address),
+        PhysicalMemoryManager::FreePages(address.FromHigherHalf<void*>(),
                                          pageCount);
 
         LogInfo("Initrd: Loaded successfully");

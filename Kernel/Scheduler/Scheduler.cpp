@@ -11,13 +11,14 @@
 #include <Arch/InterruptManager.hpp>
 #include <Arch/x86_64/Drivers/IoApic.hpp>
 
-#include <Library/Spinlock.hpp>
+#include <Library/Locking/Spinlock.hpp>
 #include <Memory/PMM.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 #include <Time/Time.hpp>
 
+#include <VFS/MountPoint.hpp>
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/VFS.hpp>
 
@@ -126,8 +127,8 @@ void Scheduler::InitializeProcFs()
 {
     VFS::CreateNode(nullptr, "/proc", 0755 | S_IFDIR);
     Assert(VFS::Mount(nullptr, "", "/proc", "procfs"));
-    s_ProcFs = reinterpret_cast<ProcFs*>(VFS::GetMountPoints()["/proc"]);
 
+    s_ProcFs = reinterpret_cast<ProcFs*>(MountPoint::Head()->Filesystem());
     s_ProcFs->AddProcess(s_KernelProcess);
 }
 void Scheduler::PrepareAP(bool start)

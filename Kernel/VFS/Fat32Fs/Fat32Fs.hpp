@@ -19,9 +19,8 @@ class Fat32Fs final : public Filesystem
     }
     virtual ~Fat32Fs() = default;
 
-    virtual ErrorOr<INode*> Mount(INode* parent, INode* source, INode* target,
-                                  DirectoryEntry* entry, StringView name,
-                                  const void* data = nullptr) override;
+    virtual ErrorOr<DirectoryEntry*> Mount(StringView  sourcePath,
+                                           const void* data = nullptr) override;
     virtual ErrorOr<INode*> CreateNode(INode* parent, DirectoryEntry* entry,
                                        mode_t mode, uid_t uid = 0,
                                        gid_t gid = 0) override;
@@ -35,7 +34,7 @@ class Fat32Fs final : public Filesystem
     {
         return nullptr;
     }
-    virtual bool          Populate(INode* node) override;
+    virtual bool          Populate(DirectoryEntry* dentry) override;
 
     virtual ErrorOr<void> Stats(statfs& stats) override;
 

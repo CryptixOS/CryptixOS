@@ -30,9 +30,8 @@ class ProcFs : public Filesystem
         return "rw,nosuid,nodev,noexec,relatime";
     }
 
-    virtual ErrorOr<INode*> Mount(INode* parent, INode* source, INode* target,
-                                  DirectoryEntry* entry, StringView name,
-                                  const void* data = nullptr) override;
+    virtual ErrorOr<DirectoryEntry*> Mount(StringView  sourcePath,
+                                           const void* data = nullptr) override;
     virtual ErrorOr<INode*> CreateNode(INode* parent, DirectoryEntry* entry,
                                        mode_t mode, uid_t uid = 0,
                                        gid_t gid = 0) override;
@@ -40,7 +39,7 @@ class ProcFs : public Filesystem
                                     StringView target) override;
     virtual INode*          Link(INode* parent, StringView name,
                                  INode* oldNode) override;
-    virtual bool            Populate(INode* node) override;
+    virtual bool            Populate(DirectoryEntry* dentry) override;
 
   private:
     static std::unordered_map<pid_t, Process*>      s_Processes;
