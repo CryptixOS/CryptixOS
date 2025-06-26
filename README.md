@@ -88,25 +88,22 @@ To run CryptixOS in QEMU:
 
 ### Tools & Docs
 
-- [Meson](https://mesonbuild.com/)
+- [Meson](https://mesonbuild.com/) - Meson is an open source build system meant to be both extremely fast, and, even more importantly, as user friendly as possible.
 - [Limine Boot Protocol](https://github.com/limine-bootloader/limine)
-- [OSDev Wiki](https://wiki.osdev.org/Main_Page)
-- [mlibc](https://github.com/managarm/mlibc.git)
+- [OSDev Wiki](https://wiki.osdev.org/Main_Page) – A comprehensive resource for operating system development.
+- [mlibc](https://github.com/managarm/mlibc.git) - mlibc is a fully featured C standard library designed with portability in mind.
 
 ### Third-Party Projects
 
-- [Limine](https://github.com/limine-bootloader/limine)
-- [compiler-rt builtins](https://compiler-rt.llvm.org/)
-- [demangler](https://github.com/voidlizard/demangler)
-- [fmt](https://github.com/fmtlib/fmt)
-- [libstdcxx-freestanding](https://github.com/managarm/libstdcxx-freestanding)
-- [magic_enum](https://github.com/Neargye/magic_enum)
-- [OVMF binaries](https://retrage.github.io/edk2-nightly/)
-- [parallel-hashmap](https://github.com/greg7mdp/parallel-hashmap)
-- [smart_ptr](https://github.com/kriswema/smart_ptr)
-- [string](https://github.com/elliotgoodrich/string)
-- [uACPI](https://github.com/acpica/uacpi)
-- [veque](https://github.com/brianc118/veque)
+- [Limine](https://github.com/limine-bootloader/limine.git) - Modern, advanced, portable, multiprotocol bootloader and boot manager, also used as the reference implementation for the Limine boot protocol.
+- [compiler-rt builtins](https://github.com/ilobilo/compiler-rt-builtins.git/) – Low-level runtime library for compiler support.
+- [demangler](https://github.com/ilobilo/demangler.git) - C++, Microsoft C++, Rust and DLang name demangler
+- [fmt](https://github.com/fmtlib/fmt) – Fast, type-safe formatting library (used instead of stdio or iostreams).
+- [libstdcxx-freestanding](https://github.com/ilobilo/libstdcxx-freestanding) - Headers from GCC's libstdc++ that can be used in a freestanding environment.
+- [magic_enum](https://github.com/Neargye/magic_enum) - Header-only C++17 library provides static reflection for enums, work with any enum type without any macro or boilerplate code.
+- [OVMF binaries](https://retrage.github.io/edk2-nightly/) - Unofficial EDK2 nightly build
+- [parallel-hashmap](https://github.com/greg7mdp/parallel-hashmap) - A set of excellent hash map implementations, as well as a btree alternative to std::map and std::set
+- [uACPI](https://github.com/acpica/uacpi) - A portable and easy-to-integrate implementation of the Advanced Configuration and Power Interface (ACPI).
 
 ---
 
