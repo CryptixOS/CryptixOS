@@ -9,7 +9,7 @@
 namespace Arch
 {
     void                           Initialize() {}
-    void                           ProbeDevices();
+    void                           ProbeDevices() {}
 
     __attribute__((noreturn)) void Halt()
     {
