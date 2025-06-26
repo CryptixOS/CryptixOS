@@ -11,7 +11,7 @@ namespace PCI
 {
     void Bus::DetectDevices()
     {
-        for (usize slot = 0; slot < 32; ++slot)
+        for (usize slot = 0; slot < 32; slot++)
         {
             DeviceAddress address;
             address.Domain   = m_Domain;
@@ -20,23 +20,23 @@ namespace PCI
             address.Function = 0;
 
             u16 vendorID     = m_HostController->Read<u16>(
-                address, std::to_underlying(RegisterOffset::eVendorID));
-            if (vendorID == PCI_INVALID) return;
+                address, ToUnderlying(RegisterOffset::eVendorID));
+            if (vendorID == PCI_INVALID) continue;
+            LogTrace("PCI: Segment => {:#04x}; Bus => {:#04x}; Slot => {:#04x}",
+                     address.Domain, address.Bus, address.Slot);
 
             u8 headerType = m_HostController->Read<u8>(
-                address, std::to_underlying(RegisterOffset::eHeaderType));
-            if (!(headerType & Bit(7))) EnumerateFunction(address);
-            else
+                address, ToUnderlying(RegisterOffset::eHeaderType));
+            EnumerateFunction(address);
+
+            if ((headerType & 0x80) == 0) continue;
+            for (u8 function = 1; function < 8; function++)
             {
-                for (u8 i = 0; i < 8; ++i)
-                {
-                    address.Function = i;
-                    if (m_HostController->Read<u16>(
-                            address,
-                            std::to_underlying(RegisterOffset::eVendorID))
-                        != PCI_INVALID)
-                        EnumerateFunction(address);
-                }
+                address.Function = function;
+                if (m_HostController->Read<u16>(
+                        address, ToUnderlying(RegisterOffset::eVendorID))
+                    != PCI_INVALID)
+                    EnumerateFunction(address);
             }
         }
     }
@@ -50,16 +50,26 @@ namespace PCI
 
     void Bus::EnumerateFunction(DeviceAddress& address)
     {
-        u16 vendorID = m_HostController->Read<u16>(
-            address, std::to_underlying(RegisterOffset::eVendorID));
-        u16 deviceID = m_HostController->Read<u16>(
-            address, std::to_underlying(RegisterOffset::eDeviceID));
-        if (vendorID == PCI_INVALID || deviceID == PCI_INVALID) return;
+        u8 classID = m_HostController->Read<u8>(
+            address, ToUnderlying(RegisterOffset::eClassID));
+        u8 subClassID = m_HostController->Read<u8>(
+            address, ToUnderlying(RegisterOffset::eSubClassID));
+        if (classID == 0x06 && subClassID == 0x04)
+            LogTrace(
+                "PCI: Discovered PCI-To-PCI Bridge => "
+                "{:#04x}.{:#04x}.{:#04x}.{:#04x}",
+                address.Domain, address.Bus, address.Slot, address.Function);
 
-        u8 headerType
-            = m_HostController->Read<u8>(
-                  address, std::to_underlying(RegisterOffset::eHeaderType))
-            & 0x7f;
+        u16 vendorID = m_HostController->Read<u16>(
+            address, ToUnderlying(RegisterOffset::eVendorID));
+        if (vendorID == PCI_INVALID) return;
+
+        u16 deviceID = m_HostController->Read<u16>(
+            address, ToUnderlying(RegisterOffset::eDeviceID));
+
+        u8 headerType = m_HostController->Read<u8>(
+                            address, ToUnderlying(RegisterOffset::eHeaderType))
+                      & 0x7f;
 
         if (headerType == 0x00)
         {
@@ -69,11 +79,39 @@ namespace PCI
         }
         else if (headerType == 0x01)
         {
-            [[maybe_unused]] u8 secondaryBus = m_HostController->Read<u8>(
-                address, std::to_underlying(RegisterOffset::eSecondaryBus));
+            u8 secondaryBus = m_HostController->Read<u8>(
+                address, ToUnderlying(RegisterOffset::eSecondaryBus));
+            u8 subordinateBus = m_HostController->Read<u8>(
+                address, ToUnderlying(RegisterOffset::eSubordinateBus));
+            LogTrace(
+                "PCI: Found PCI-To-PCI Bridge: {:#04x}:{:#04x} => "
+                "{:#04x}:{:#04x}",
+                vendorID, deviceID, secondaryBus, subordinateBus);
 
-            LogTrace("PCI: Found PCI-To-PCI Bridge: {:#04x}:{:#04x}", vendorID,
-                     deviceID);
+            for (u8 bus = secondaryBus; bus <= subordinateBus; ++bus)
+            {
+                if (m_HostController->Read<u16>(
+                        {0, 0, bus}, ToUnderlying(RegisterOffset::eVendorID))
+                    == PCI_INVALID)
+                    continue;
+
+                auto bridge = new Bus(m_HostController,
+                                      m_HostController->GetDomain().ID, bus);
+                m_ChildBridges.PushBack(bridge);
+                bridge->DetectDevices();
+            }
         }
+        else
+            LogTrace("PCI: Encountered CardBus Bridge: {:#04x}:{:#04x}",
+                     vendorID, deviceID);
+
+        auto command = m_HostController->Read<u16>(
+            address, ToUnderlying(RegisterOffset::eCommand));
+        if (command & Bit(0)) LogTrace("<< (Decodes IO)");
+        if (command & Bit(1)) LogTrace("<< (Decodes Memory)");
+        if (command & Bit(2)) LogTrace("<< (Bus Master)");
+        if (command & 0x400) LogTrace("<< (IRQs masked)");
+        m_HostController->Write<u16>(
+            address, ToUnderlying(RegisterOffset::eCommand), command | 0x400);
     }
 } // namespace PCI

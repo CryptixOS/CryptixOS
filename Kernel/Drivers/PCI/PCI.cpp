@@ -14,8 +14,8 @@
 #include <Prism/String/String.hpp>
 #include <Prism/String/StringUtils.hpp>
 
-#include <VFS/INode.hpp>
 #include <VFS/DirectoryEntry.hpp>
+#include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
 
 #include <cctype>
@@ -147,13 +147,13 @@ namespace PCI
             {
                 HostController* controller = s_HostControllers[addr.Domain];
                 u16             vendorID   = controller->Read<u16>(
-                    addr, std::to_underlying(RegisterOffset::eVendorID));
+                    addr, ToUnderlying(RegisterOffset::eVendorID));
                 u16 deviceID = controller->Read<u16>(
-                    addr, std::to_underlying(RegisterOffset::eDeviceID));
+                    addr, ToUnderlying(RegisterOffset::eDeviceID));
                 u8 classID = controller->Read<u8>(
-                    addr, std::to_underlying(RegisterOffset::eClassID));
+                    addr, ToUnderlying(RegisterOffset::eClassID));
                 u8 subclassID = controller->Read<u8>(
-                    addr, std::to_underlying(RegisterOffset::eSubClassID));
+                    addr, ToUnderlying(RegisterOffset::eSubClassID));
 
                 auto       vendor     = s_VendorIDs.find(vendorID);
                 StringView vendorName = vendor != s_VendorIDs.end()
@@ -167,11 +167,10 @@ namespace PCI
                     vendorName);
 
                 if (s_HostControllers[addr.Domain]->Read<u8>(
-                        addr, std::to_underlying(RegisterOffset::eClassID))
+                        addr, ToUnderlying(RegisterOffset::eClassID))
                         == 0x01
                     && s_HostControllers[addr.Domain]->Read<u8>(
-                           addr,
-                           std::to_underlying(RegisterOffset::eSubClassID))
+                           addr, ToUnderlying(RegisterOffset::eSubClassID))
                            == 0x08)
                 {
                     LogInfo(

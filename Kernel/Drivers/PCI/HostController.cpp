@@ -34,6 +34,13 @@ namespace PCI
                 uacpi_eval_integer(node, "_SEG", nullptr, &seg);
                 uacpi_eval_integer(node, "_BBN", nullptr, &bus);
 
+                uacpi_resources* resources = nullptr;
+                uacpi_get_current_resources(node, &resources);
+                uacpi_object_name name = uacpi_namespace_node_name(node);
+                LogTrace("PCI: Found pci device using ACPI => {:c}{:c}{:c}{:c}",
+                         name.text[0], name.text[1], name.text[2],
+                         name.text[3]);
+
                 uacpi_pci_routing_table* pciRoutes;
                 auto ret = uacpi_get_pci_routing_table(node, &pciRoutes);
 
@@ -129,26 +136,24 @@ namespace PCI
         }
         Assert(m_AccessMechanism);
 
-        if ((Read<u8>(DeviceAddress(),
-                      std::to_underlying(RegisterOffset::eHeaderType))
-             & Bit(7))
-            == 0)
+        auto address = PCI::DeviceAddress(m_Domain.ID, 0, 0, 0);
+        u8   headerType
+            = Read<u8>(address, ToUnderlying(RegisterOffset::eHeaderType));
+
+        if ((headerType & 0x80) == 0)
         {
             Bus* bus = new Bus(this, m_Domain.ID, 0);
             m_RootBuses.PushBack(bus);
+            return;
         }
-        else
+        for (u8 function = 0; function < 8; ++function)
         {
-            for (u8 i = 0; i < 8; ++i)
-            {
-                if (Read<u16>({0, 0, i},
-                              std::to_underlying(RegisterOffset::eVendorID))
-                    == PCI_INVALID)
-                    continue;
+            u16 vendorID = Read<u16>({m_Domain.ID, 0, function, 0},
+                                     ToUnderlying(RegisterOffset::eVendorID));
+            if (vendorID != PCI_INVALID) break;
 
-                auto bus = new Bus(this, m_Domain.ID, i);
-                m_RootBuses.PushBack(bus);
-            }
+            auto bus = new Bus(this, m_Domain.ID, function);
+            m_RootBuses.PushBack(bus);
         }
     }
 
