@@ -6,13 +6,12 @@
  */
 #pragma once
 
+#include <Prism/Containers/UnorderedMap.hpp>
 #include <VFS/FileDescriptor.hpp>
-
-#include <unordered_map>
 
 class FileDescriptorTable
 {
-    using TableType = std::unordered_map<i32, FileDescriptor*>;
+    using TableType = UnorderedMap<i32, FileDescriptor*>;
 
   public:
     FileDescriptorTable() = default;
@@ -23,19 +22,16 @@ class FileDescriptorTable
     void        OpenStdioStreams();
     void        Clear();
 
-    inline bool IsValid(i32 fd) const
-    {
-        return m_Table.find(fd) != m_Table.end();
-    }
+    inline bool IsValid(i32 fd) const { return m_Table.Contains(fd); }
     inline FileDescriptor* GetFd(i32 fd) const
     {
         if (!IsValid(fd)) return nullptr;
 
-        return m_Table.at(fd);
+        return m_Table.At(fd);
     }
 
-    TableType::iterator     begin() { return m_Table.begin(); }
-    TableType::iterator     end() { return m_Table.end(); }
+    auto                    begin() { return m_Table.begin(); }
+    auto                    end() { return m_Table.end(); }
 
     inline FileDescriptor*& operator[](usize i) { return m_Table[i]; }
 

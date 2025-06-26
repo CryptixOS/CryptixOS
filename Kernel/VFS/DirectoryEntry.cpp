@@ -18,10 +18,9 @@
 DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, class INode* inode)
     : m_INode(inode)
 {
-    m_Name                    = inode->Name();
-    m_Parent                  = parent;
+    m_Name   = inode->Name();
+    m_Parent = parent;
 
-    m_INode->m_DirectoryEntry = this;
     if (parent) parent->InsertChild(this);
 }
 DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, StringView name)
@@ -60,15 +59,12 @@ void DirectoryEntry::SetMountGate(class INode*    inode,
                                   DirectoryEntry* mountPoint)
 {
     ScopedLock guard(m_Lock);
-    // m_INode                 = inode;
-    // inode->m_DirectoryEntry = this;
     m_MountGate = mountPoint;
 }
 void DirectoryEntry::Bind(class INode* inode)
 {
     ScopedLock guard(m_Lock);
-    m_INode                 = inode;
-    inode->m_DirectoryEntry = this;
+    m_INode = inode;
 }
 void DirectoryEntry::InsertChild(class DirectoryEntry* entry)
 {

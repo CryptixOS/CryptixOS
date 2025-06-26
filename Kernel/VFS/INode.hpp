@@ -110,15 +110,12 @@ class INode
         //                                        : true;
     }
 
-    class DirectoryEntry* m_DirectoryEntry = nullptr;
-
   protected:
     INode*            m_Parent;
     String            m_Name;
     String            m_Target;
     Spinlock          m_Lock;
     Attributes        m_Attributes = {};
-    // Ref<class DirectoryEntry>                       m_DirectoryEntry;
 
     class Filesystem* m_Filesystem;
     stat              m_Stats;

@@ -92,9 +92,7 @@ ErrorOr<DirectoryEntry*> INode::Lookup(class DirectoryEntry* entry)
     auto node = Lookup(entry->Name());
     if (!node) return Error(ENOENT);
 
-    entry->m_INode         = node;
-    node->m_DirectoryEntry = entry;
-
+    entry->m_INode = node;
     return entry;
 }
 
