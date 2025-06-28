@@ -59,7 +59,7 @@ namespace EFI
             usize      phys       = descriptor->PhysicalStart;
             usize      virt       = descriptor->VirtualStart;
             usize      pageCount  = descriptor->PageCount;
-            auto       attributes = std::to_underlying(descriptor->Attribute);
+            auto       attributes = ToUnderlying(descriptor->Attribute);
 
             StringView typeString
                 = magic_enum::enum_name(type).data() ?: "Unknown";

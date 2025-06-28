@@ -77,28 +77,28 @@ namespace NVMe
     constexpr inline Configuration operator|(Configuration lhs,
                                              Configuration rhs)
     {
-        auto result = std::to_underlying(lhs) | std::to_underlying(rhs);
+        auto result = ToUnderlying(lhs) | ToUnderlying(rhs);
 
         return static_cast<Configuration>(result);
     }
     constexpr inline Configuration operator~(Configuration conf)
     {
-        auto result = ~std::to_underlying(conf);
+        auto result = ~ToUnderlying(conf);
 
         return static_cast<Configuration>(result);
     }
     constexpr inline Configuration& operator&=(Configuration& lhs,
                                                Configuration  rhs)
     {
-        auto result = std::to_underlying(lhs);
-        result &= std::to_underlying(rhs);
+        auto result = ToUnderlying(lhs);
+        result &= ToUnderlying(rhs);
 
         return lhs = static_cast<Configuration>(result);
     }
 
     constexpr inline bool operator&(Status lhs, Status rhs)
     {
-        auto result = std::to_underlying(lhs) & std::to_underlying(rhs);
+        auto result = ToUnderlying(lhs) & ToUnderlying(rhs);
 
         return result;
     }

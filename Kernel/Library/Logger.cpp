@@ -242,7 +242,7 @@ namespace Logger
             if (logLevel == LogLevel::eNone) return;
             Print("[");
 
-            LogChar(s_LogForegroundColors[std::to_underlying(logLevel)]);
+            LogChar(s_LogForegroundColors[ToUnderlying(logLevel)]);
             if (logLevel == LogLevel::eFatal) LogChar(BACKGROUND_COLOR_RED);
 
             Print(magic_enum::enum_name(logLevel).data() + 1);

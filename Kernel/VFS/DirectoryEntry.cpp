@@ -17,17 +17,27 @@
 
 DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, class INode* inode)
     : m_INode(inode)
+    , m_RefCount(1)
 {
     m_Name   = inode->Name();
     m_Parent = parent;
 
-    if (parent) parent->InsertChild(this);
+    if (parent)
+    {
+        ++parent->m_RefCount;
+        parent->InsertChild(this);
+    }
 }
 DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, StringView name)
-    : m_Name(name)
+    : m_RefCount(1)
+    , m_Name(name)
     , m_Parent(parent)
 {
-    if (parent) parent->InsertChild(this);
+    if (parent)
+    {
+        ++parent->m_RefCount;
+        parent->InsertChild(this);
+    }
 }
 
 Path DirectoryEntry::Path() const
@@ -48,7 +58,7 @@ Path DirectoryEntry::Path() const
 
     return pathBuilder.Empty() ? "/"_s : pathBuilder.ToString();
 }
-const std::unordered_map<StringView, DirectoryEntry*>&
+const std::unordered_map<StringView, Prism::Ref<DirectoryEntry>>&
 DirectoryEntry::Children() const
 {
     return m_Children;
@@ -66,7 +76,7 @@ void DirectoryEntry::Bind(class INode* inode)
     ScopedLock guard(m_Lock);
     m_INode = inode;
 }
-void DirectoryEntry::InsertChild(class DirectoryEntry* entry)
+void DirectoryEntry::InsertChild(Prism::Ref<class DirectoryEntry> entry)
 {
     ScopedLock guard(m_Lock);
     m_Children[entry->Name()] = entry;
@@ -111,7 +121,7 @@ DirectoryEntry* DirectoryEntry::GetEffectiveParent() const
 DirectoryEntry* DirectoryEntry::Lookup(const String& name)
 {
     auto entryIt = m_Children.find(name);
-    if (entryIt != m_Children.end()) return entryIt->second;
+    if (entryIt != m_Children.end()) return entryIt->second.Raw();
     if (!m_INode) return nullptr;
 
     auto inode = m_INode->Lookup(name);

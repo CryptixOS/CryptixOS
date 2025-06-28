@@ -227,7 +227,7 @@ namespace Syscall
                                std::function<ErrorOr<uintptr_t>(Arguments&)> handler,
                                String                                        name);
 #define RegisterSyscall(index, handler)                                        \
-    ::Syscall::RegisterHandler(std::to_underlying(index), handler, #handler)
+    ::Syscall::RegisterHandler(ToUnderlying(index), handler, #handler)
 #define RegisterSyscall2(id, handler)                                          \
     s_Syscalls[id] = new Wrapper<decltype(handler)>(#handler, handler);
 

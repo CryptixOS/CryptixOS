@@ -71,7 +71,7 @@ namespace Kasan
 
         auto* shadow     = va_to_shadow(address);
         auto  shadowSize = size >> SHADOW_SCALE_OFFSET;
-        std::memset(shadow, std::to_underlying(type), shadowSize);
+        std::memset(shadow, ToUnderlying(type), shadowSize);
     }
     void MarkRegion(Pointer address, usize validSize, usize totalSize,
                     ShadowType type)
@@ -84,7 +84,7 @@ namespace Kasan
 
         auto* shadow          = va_to_shadow(address);
         auto  validShadowSize = validSize >> SHADOW_SCALE_OFFSET;
-        std::memset(shadow, std::to_underlying(ShadowType::eUnpoisoned8Bytes),
+        std::memset(shadow, ToUnderlying(ShadowType::eUnpoisoned8Bytes),
                     validShadowSize);
         auto unalignedSize = validSize & SHADOW_MASK;
         if (unalignedSize)
@@ -95,7 +95,7 @@ namespace Kasan
             = (totalSize - Math::RoundUpToPowerOfTwo(validSize, SHADOW_SCALE))
            >> SHADOW_SCALE_OFFSET;
         std::memset(shadow + validShadowSize + (unalignedSize != 0),
-                    std::to_underlying(type), poisonedShadowSize);
+                    ToUnderlying(type), poisonedShadowSize);
     }
 
     static bool Check1ShadowByte(Pointer address, ShadowType& shadowType)
@@ -105,7 +105,7 @@ namespace Kasan
             = (address & Pointer(SHADOW_MASK)).Offset(1);
 
         if (shadow == ShadowType::eUnpoisoned8Bytes
-            || (minimalValidShadow <= std::to_underlying(shadow))) [[likely]]
+            || (minimalValidShadow <= ToUnderlying(shadow))) [[likely]]
             return true;
 
         shadowType = shadow;
@@ -123,7 +123,7 @@ namespace Kasan
             = (address.Offset<Pointer>(1) & SHADOW_MASK).Offset(1);
 
         if (shadow == ShadowType::eUnpoisoned8Bytes
-            || (minimalValidShadow <= std::to_underlying(shadow))) [[likely]]
+            || (minimalValidShadow <= ToUnderlying(shadow))) [[likely]]
             return true;
 
         shadowType = shadow;
@@ -141,7 +141,7 @@ namespace Kasan
             = (address.Offset<Pointer>(3) & SHADOW_MASK).Offset(1);
 
         if (shadow == ShadowType::eUnpoisoned8Bytes
-            || (minimalValidShadow <= std::to_underlying(shadow))) [[likely]]
+            || (minimalValidShadow <= ToUnderlying(shadow))) [[likely]]
             return true;
 
         shadowType = shadow;
@@ -159,7 +159,7 @@ namespace Kasan
             = (address.Offset<Pointer>(7) & SHADOW_MASK).Offset(1);
 
         if (shadow == ShadowType::eUnpoisoned8Bytes
-            || (minimalValidShadow <= std::to_underlying(shadow))) [[likely]]
+            || (minimalValidShadow <= ToUnderlying(shadow))) [[likely]]
             return true;
 
         shadowType = shadow;

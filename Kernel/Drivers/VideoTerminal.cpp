@@ -298,11 +298,11 @@ void VideoTerminal::SetTextForeground(AnsiColor color)
         return SetTextForegroundRgb(DEFAULT_TEXT_FOREGROUND_BRIGHT);
     else if (!magic_enum::enum_contains(color))
     {
-        LogWarn("VT100: Invalid color -> {:#x}", std::to_underlying(color));
+        LogWarn("VT100: Invalid color -> {:#x}", ToUnderlying(color));
         return;
     }
 
-    SetTextForegroundRgb(s_AnsiColors[std::to_underlying(color)]);
+    SetTextForegroundRgb(s_AnsiColors[ToUnderlying(color)]);
 }
 void VideoTerminal::SetTextBackground(AnsiColor color)
 {
@@ -312,11 +312,11 @@ void VideoTerminal::SetTextBackground(AnsiColor color)
         return SetTextBackgroundRgb(DEFAULT_TEXT_BACKGROUND_BRIGHT);
     else if (!magic_enum::enum_contains(color))
     {
-        LogWarn("VT100: Invalid color -> {:#x}", std::to_underlying(color));
+        LogWarn("VT100: Invalid color -> {:#x}", ToUnderlying(color));
         return;
     }
 
-    SetTextBackgroundRgb(s_AnsiColors[std::to_underlying(color)]);
+    SetTextBackgroundRgb(s_AnsiColors[ToUnderlying(color)]);
 }
 
 void VideoTerminal::SetTextForegroundRgb(Color rgb)

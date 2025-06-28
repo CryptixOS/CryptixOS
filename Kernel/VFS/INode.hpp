@@ -11,8 +11,8 @@
 #include <Library/Locking/Spinlock.hpp>
 #include <Library/UserBuffer.hpp>
 
-#include <Prism/Utility/Delegate.hpp>
 #include <Prism/Memory/Ref.hpp>
+#include <Prism/Utility/Delegate.hpp>
 
 #include <VFS/Filesystem.hpp>
 #include <VFS/VFS.hpp>
@@ -42,7 +42,6 @@ class INode
     virtual ~INode() {}
 
     // virtual Ref<DirectoryEntry> Ref() { return nullptr; }
-
     StringView               GetTarget() const { return m_Target; }
 
     inline class Filesystem* Filesystem() { return m_Filesystem; }
@@ -85,8 +84,8 @@ class INode
     {
         return Error(ENOSYS);
     }
-    virtual ErrorOr<void> MkDir(StringView name, mode_t mode, uid_t uid = 0,
-                                gid_t gid = 0)
+    virtual ErrorOr<Ref<DirectoryEntry>> MkDir(Ref<DirectoryEntry> entry,
+                                               mode_t              mode)
     {
         return Error(ENOSYS);
     }

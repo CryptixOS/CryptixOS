@@ -131,7 +131,7 @@ class I8042Controller : public Ps2Controller
     ErrorOr<void>         FlushReadBuffer();
     ErrorOr<void>         SendCommand(Command command);
     /*{
-        WriteBlocking(Port::eCommand, std::to_underlying(command));
+        WriteBlocking(Port::eCommand, ToUnderlying(command));
     }*/
 
     ErrorOr<u8>           ReadDevicePort(DevicePort port);
@@ -140,7 +140,7 @@ class I8042Controller : public Ps2Controller
     virtual ErrorOr<void> SendDeviceCommand(DevicePort    port,
                                             DeviceCommand command) override
     {
-        return WriteDevicePort(port, std::to_underlying(command));
+        return WriteDevicePort(port, ToUnderlying(command));
     }
     virtual ErrorOr<void>
     SendDeviceCommand(DevicePort port, DeviceCommand command, u8 data) override
@@ -195,27 +195,27 @@ using I8042Configuration = I8042Controller::Configuration;
 using I8042Response      = I8042Controller::Response;
 using PS2Port            = I8042Controller::DevicePort;
 
-inline u8 operator~(I8042Configuration lhs) { return ~std::to_underlying(lhs); }
+inline u8 operator~(I8042Configuration lhs) { return ~ToUnderlying(lhs); }
 inline u8 operator&(u8 lhs, const I8042Configuration rhs)
 {
-    return lhs & std::to_underlying(rhs);
+    return lhs & ToUnderlying(rhs);
 }
 inline I8042Configuration operator|(I8042Configuration       lhs,
                                     const I8042Configuration rhs)
 {
-    u8 config = std::to_underlying(lhs) | std::to_underlying(rhs);
+    u8 config = ToUnderlying(lhs) | ToUnderlying(rhs);
 
     return static_cast<I8042Configuration>(config);
 }
 inline u8& operator&=(u8& lhs, const I8042Configuration rhs)
 {
-    lhs &= std::to_underlying(rhs);
+    lhs &= ToUnderlying(rhs);
 
     return lhs;
 }
 inline u8& operator|=(u8& lhs, const I8042Configuration rhs)
 {
-    lhs |= std::to_underlying(rhs);
+    lhs |= ToUnderlying(rhs);
 
     return lhs;
 }

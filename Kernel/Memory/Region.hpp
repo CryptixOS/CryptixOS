@@ -29,7 +29,7 @@ namespace VirtualMemoryManager
     };
     inline constexpr Access& operator|=(Access& lhs, const Access rhs)
     {
-        auto result = std::to_underlying(lhs) | std::to_underlying(rhs);
+        auto result = ToUnderlying(lhs) | ToUnderlying(rhs);
         lhs         = static_cast<Access>(result);
 
         return lhs;
@@ -37,11 +37,11 @@ namespace VirtualMemoryManager
 
     constexpr bool operator&(const Access lhs, const Access rhs)
     {
-        return std::to_underlying(lhs) & std::to_underlying(rhs);
+        return ToUnderlying(lhs) & ToUnderlying(rhs);
     }
     constexpr Access operator|(const Access lhs, const Access rhs)
     {
-        auto result = std::to_underlying(lhs) | std::to_underlying(rhs);
+        auto result = ToUnderlying(lhs) | ToUnderlying(rhs);
 
         return static_cast<Access>(result);
     }

@@ -180,7 +180,7 @@ namespace Syscall
     }
     void Handle(Arguments& args)
     {
-        CPU::OnSyscallEnter(args.Index == std::to_underlying(ID::ePanic)
+        CPU::OnSyscallEnter(args.Index == ToUnderlying(ID::ePanic)
                                 ? CPU::GetCurrent()->LastSyscallID
                                 : args.Index);
 #define LOG_SYSCALLS false

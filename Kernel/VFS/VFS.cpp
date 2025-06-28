@@ -368,8 +368,8 @@ namespace VFS
 
         return CreateFile(parent, path, mode);
     }
-    ErrorOr<DirectoryEntry*> MkDir(DirectoryEntry* directory,
-                                   DirectoryEntry* entry, mode_t mode)
+    ErrorOr<Ref<DirectoryEntry>> MkDir(DirectoryEntry* directory,
+                                       DirectoryEntry* entry, mode_t mode)
     {
         Assert(directory);
         if (!directory->IsDirectory()) return Error(ENOTDIR);
@@ -380,14 +380,13 @@ namespace VFS
             return Error(EACCES);
 
         if (directory->Lookup(entry->Name())) return Error(EEXIST);
-        auto filesystem = directory->INode()->Filesystem();
-        auto inodeOr = filesystem->CreateNode(parentINode, entry, mode, 0, 0);
+        auto maybeEntry = parentINode->MkDir(entry, mode);
 
-        RetOnError(inodeOr);
-        return entry;
+        RetOnError(maybeEntry);
+        return maybeEntry;
     }
-    ErrorOr<DirectoryEntry*> MkDir(DirectoryEntry* directory, PathView path,
-                                   mode_t mode)
+    ErrorOr<Ref<DirectoryEntry>> MkDir(DirectoryEntry* directory, PathView path,
+                                       mode_t mode)
     {
         auto maybePathRes = ResolvePath(directory, path, true);
         auto err          = maybePathRes.error_or(EEXIST);

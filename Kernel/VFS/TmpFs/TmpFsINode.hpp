@@ -38,10 +38,10 @@ class TmpFsINode final : public INode
     virtual ErrorOr<isize> Truncate(usize size) override;
 
     virtual ErrorOr<void> Rename(INode* newParent, StringView newName) override;
-    virtual ErrorOr<void> MkDir(StringView name, mode_t mode, uid_t uid = 0,
-                                gid_t gid = 0) override;
-    virtual ErrorOr<void> Link(PathView path) override;
-    virtual ErrorOr<void> ChMod(mode_t mode) override;
+    virtual ErrorOr<Ref<DirectoryEntry>> MkDir(Ref<DirectoryEntry> entry,
+                                               mode_t mode) override;
+    virtual ErrorOr<void>                Link(PathView path) override;
+    virtual ErrorOr<void>                ChMod(mode_t mode) override;
 
   private:
     u8*                                    m_Data     = nullptr;

@@ -144,12 +144,12 @@ ErrorOr<void> I8042Controller::Initialize()
 bool I8042Controller::IsOutputEmpty()
 {
     return (ReadPort(Port::eStatus)
-            & std::to_underlying(Status::eOutBufferFull))
+            & ToUnderlying(Status::eOutBufferFull))
         == 0;
 }
 bool I8042Controller::IsInputEmpty()
 {
-    return (ReadPort(Port::eStatus) & std::to_underlying(Status::eInBufferFull))
+    return (ReadPort(Port::eStatus) & ToUnderlying(Status::eInBufferFull))
         == 0;
 }
 
@@ -199,7 +199,7 @@ ErrorOr<void> I8042Controller::FlushReadBuffer()
 }
 ErrorOr<void> I8042Controller::SendCommand(Command command)
 {
-    if (!TryWrite(Port::eCommand, std::to_underlying(command)))
+    if (!TryWrite(Port::eCommand, ToUnderlying(command)))
         return Error(EBUSY);
 
     return {};
@@ -430,8 +430,8 @@ bool I8042Controller::TestInterfaces()
 }
 bool I8042Controller::TestSingleInterface(DevicePort port)
 {
-    Assert(std::to_underlying(port) <= 2);
-    LogTrace("I8042: Testing port #{}...", std::to_underlying(port));
+    Assert(ToUnderlying(port) <= 2);
+    LogTrace("I8042: Testing port #{}...", ToUnderlying(port));
     if (!SendCommand(port == DevicePort::ePort1 ? Command::eTestPort1
                                                 : Command::eTestPort2))
         return false;
@@ -440,7 +440,7 @@ bool I8042Controller::TestSingleInterface(DevicePort port)
     if (status == Response::ePortTestSuccess)
     {
         LogTrace("I8042: Port #{} is working correctly",
-                 std::to_underlying(port));
+                 ToUnderlying(port));
 
         return true;
     }
@@ -499,10 +499,10 @@ ErrorOr<Ps2DeviceType> I8042Controller::ScanPortForDevices(DevicePort port)
     auto byte2 = TryRead();
 
     if (byte1)
-        LogInfo("I8042: Device #{} reply[0] = {:#x}", std::to_underlying(port),
+        LogInfo("I8042: Device #{} reply[0] = {:#x}", ToUnderlying(port),
                 byte1.value());
     if (byte2)
-        LogInfo("I8042: Device #{} reply[1] = {:#x}", std::to_underlying(port),
+        LogInfo("I8042: Device #{} reply[1] = {:#x}", ToUnderlying(port),
                 byte2.value());
 
     FlushReadBuffer();
@@ -510,7 +510,7 @@ ErrorOr<Ps2DeviceType> I8042Controller::ScanPortForDevices(DevicePort port)
     if (!status)
     {
         LogError("I8042: Failed to enable scanning on device #{}",
-                 std::to_underlying(port));
+                 ToUnderlying(port));
 
         return Error(status.error());
     }
@@ -556,9 +556,9 @@ ErrorOr<void> I8042Controller::WaitForWriteReady()
 
 u8 I8042Controller::ReadPort(Port port)
 {
-    return IO::In<byte>(std::to_underlying(port));
+    return IO::In<byte>(ToUnderlying(port));
 }
 void I8042Controller::WritePort(Port port, u8 data)
 {
-    IO::Out<byte>(std::to_underlying(port), data);
+    IO::Out<byte>(ToUnderlying(port), data);
 }

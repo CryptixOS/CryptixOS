@@ -36,7 +36,7 @@ enum class IoApicRedirectionFlags
 
 inline u64& operator|=(u64& lhs, const IoApicRedirectionFlags rhs)
 {
-    lhs |= std::to_underlying(rhs);
+    lhs |= ToUnderlying(rhs);
     return lhs;
 }
 
@@ -108,7 +108,7 @@ enum class IoApicRegister
 
 inline IoApicRegister operator+(u32 lhs, const IoApicRegister& rhs)
 {
-    lhs += std::to_underlying(rhs);
+    lhs += ToUnderlying(rhs);
 
     return static_cast<IoApicRegister>(lhs);
 }
@@ -172,7 +172,7 @@ class IoApic final
     {
         Assert(m_RegisterSelect);
         Assert(m_RegisterWindow);
-        *m_RegisterSelect = std::to_underlying(reg);
+        *m_RegisterSelect = ToUnderlying(reg);
 
         return *m_RegisterWindow;
     }
@@ -185,7 +185,7 @@ class IoApic final
                       && reg != IoApicRegister::eArbitrationID,
                   "Cannot write to read only register: '{}'",
                   magic_enum::enum_name(reg));
-        *m_RegisterSelect = std::to_underlying(reg);
+        *m_RegisterSelect = ToUnderlying(reg);
 
         *m_RegisterWindow = value;
     }

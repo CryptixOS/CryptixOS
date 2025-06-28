@@ -281,7 +281,7 @@ namespace ZLib
 
             default:
                 LogError("ZLib: Invalid block type, blockType: {}",
-                         std::to_underlying(blockType));
+                         ToUnderlying(blockType));
                 return false;
         }
 

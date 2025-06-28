@@ -42,12 +42,13 @@ class DirectoryEntry : public RefCounted
     inline DirectoryEntry* Parent() const { return m_Parent; }
 
     Path                   Path() const;
-    const std::unordered_map<StringView, DirectoryEntry*>& Children() const;
+    const std::unordered_map<StringView, Prism::Ref<DirectoryEntry>>&
+                    Children() const;
 
     void            SetParent(DirectoryEntry* entry);
     void            SetMountGate(class INode* inode, DirectoryEntry* mountGate);
     void            Bind(class INode* inode);
-    void            InsertChild(class DirectoryEntry* entry);
+    void            InsertChild(Prism::Ref<class DirectoryEntry> entry);
 
     DirectoryEntry* FollowMounts();
     DirectoryEntry* FollowSymlinks(usize cnt = 0);
@@ -67,12 +68,13 @@ class DirectoryEntry : public RefCounted
   private:
     friend class INode;
 
-    Spinlock                                        m_Lock;
-    class INode*                                    m_INode    = nullptr;
-    usize                                           m_RefCount = 0;
+    Spinlock        m_Lock;
+    class INode*    m_INode    = nullptr;
+    usize           m_RefCount = 0;
 
-    String                                          m_Name     = "";
+    String          m_Name     = "";
     // DirectoryEntry*                                 m_MountGate = nullptr;
-    DirectoryEntry*                                 m_Parent   = nullptr;
-    std::unordered_map<StringView, DirectoryEntry*> m_Children;
+
+    DirectoryEntry* m_Parent   = nullptr;
+    std::unordered_map<StringView, Prism::Ref<class DirectoryEntry>> m_Children;
 };

@@ -312,13 +312,13 @@ namespace ELF
             m_Sections.PushBack(sections[i]);
 
             if (sections[i].Type
-                == std::to_underlying(SectionType::eSymbolTable))
+                == ToUnderlying(SectionType::eSymbolTable))
             {
                 ElfDebugLog("ELF: Found symbol section at: {}", i);
                 m_SymbolSection = sections + i;
             }
             else if (sections[i].Type
-                         == std::to_underlying(SectionType::eStringTable)
+                         == ToUnderlying(SectionType::eStringTable)
                      && i != m_Header.SectionNamesIndex)
 
             {
@@ -404,7 +404,7 @@ namespace ELF
                     LogWarn(
                         "ELF: Unrecognized program header type at index '{}' "
                         "-> {}",
-                        i, std::to_underlying(phdr.Type));
+                        i, ToUnderlying(phdr.Type));
                     break;
             }
         }

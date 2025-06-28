@@ -74,8 +74,7 @@ static bool loadInitProcess(Path initPath)
         return false;
     PathView ldPath = program.GetLdPath();
     if (!ldPath.Empty()
-        && !ld.Load(ldPath, pageMap, userProcess->AddressSpace(),
-                    0x40000000))
+        && !ld.Load(ldPath, pageMap, userProcess->AddressSpace(), 0x40000000))
     {
         delete pageMap;
         return false;
@@ -160,7 +159,7 @@ static void kernelThread()
         LogTrace("Child entries =>");
 
         auto entry      = dentry;
-        auto mountPoint = MountPoint::Lookup(entry);
+        auto mountPoint = MountPoint::Lookup(entry.Raw());
         if (mountPoint) entry = mountPoint->HostEntry();
         entry->INode()->Populate();
 

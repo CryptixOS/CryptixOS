@@ -68,7 +68,7 @@ enum class Fat32Attribute : u8
 };
 constexpr bool operator&(Fat32Attribute lhs, Fat32Attribute rhs)
 {
-    return std::to_underlying(lhs) & std::to_underlying(rhs);
+    return ToUnderlying(lhs) & ToUnderlying(rhs);
 }
 
 struct [[gnu::packed]] Fat32DirectoryEntry

@@ -21,7 +21,7 @@ static Vector<ELF::Image*>                     s_LoadedModules;
 
 std::unordered_map<StringView, Module*>& GetModules() { return s_Modules; }
 
-static void LoadModuleFromFile(DirectoryEntry* entry)
+static void LoadModuleFromFile(Ref<DirectoryEntry> entry)
 {
     Assert(entry);
     auto inode = entry->INode();

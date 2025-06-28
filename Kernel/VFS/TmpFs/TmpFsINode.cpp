@@ -166,22 +166,20 @@ ErrorOr<void> TmpFsINode::Rename(INode* newParent, StringView newName)
 
     return {};
 }
-ErrorOr<void> TmpFsINode::MkDir(StringView name, mode_t mode, uid_t uid,
-                                gid_t gid)
+ErrorOr<Ref<DirectoryEntry>> TmpFsINode::MkDir(Ref<DirectoryEntry> entry,
+                                               mode_t              mode)
 {
-    if (m_Children.contains(name)) return Error(EEXIST);
+    if (m_Children.contains(entry->Name())) return Error(EEXIST);
     auto umask = Process::Current()->Umask();
     mode &= ~umask & 0777;
 
-    auto entry = new class DirectoryEntry(name);
-
     auto inodeOr
-        = m_Filesystem->CreateNode(this, entry, mode | S_IFDIR, uid, gid);
+        = m_Filesystem->CreateNode(this, entry.Raw(), mode | S_IFDIR, 0, 0);
     auto inode = reinterpret_cast<TmpFsINode*>(inodeOr.value());
     if (!inode) return Error(errno);
 
     InsertChild(inode, inode->Name());
-    return {};
+    return entry;
 }
 ErrorOr<void> TmpFsINode::Link(PathView path)
 {

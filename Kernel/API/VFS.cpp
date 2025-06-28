@@ -278,9 +278,8 @@ namespace API::VFS
     {
         auto process = Process::Current();
         if (!process->ValidateRead(pathname, 255)) return Error(EFAULT);
-        const auto& creds = process->Credentials();
 
-        auto        path  = CPU::AsUser(
+        auto path = CPU::AsUser(
             [&pathname]() -> Path
             {
                 if (!pathname || *pathname == 0) return "";
@@ -299,9 +298,15 @@ namespace API::VFS
         auto entry = pathRes.Entry;
 
         if (entry) return Error(EEXIST);
-        auto success
-            = parentINode->MkDir(pathRes.BaseName, mode, creds.uid, creds.gid);
-        if (!success) Error(success.error());
+
+        entry           = new DirectoryEntry(parentEntry, pathRes.BaseName);
+        auto maybeEntry = parentINode->MkDir(entry, mode);
+        if (!maybeEntry)
+        {
+            delete entry;
+            return Error(maybeEntry.error());
+        }
+
         return 0;
     }
     ErrorOr<isize> ReadLinkAt(isize dirFdNum, const char* pathView,

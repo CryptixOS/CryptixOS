@@ -133,7 +133,7 @@ ErrorOr<void> Lapic::Start(TimerMode tm, TimeStep interval)
     Write(LAPIC_TIMER_DIVIDER_REGISTER, 0x03);
     u64 value = Read(LAPIC_TIMER_REGISTER) & ~(3 << 17);
 
-    value |= std::to_underlying(mode) << 17;
+    value |= ToUnderlying(mode) << 17;
     value &= 0xffffff00;
     value |= vector;
     Write(LAPIC_TIMER_REGISTER, value);

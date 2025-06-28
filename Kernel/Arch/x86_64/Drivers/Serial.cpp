@@ -25,7 +25,7 @@ namespace Serial
 
         bool InitializePort(Port com)
         {
-            auto port = std::to_underlying(com);
+            auto port = ToUnderlying(com);
             // Disable all interrupts
             IO::Out<byte>(port + 1, 0x00);
             // Enable DLAB
@@ -77,7 +77,7 @@ namespace Serial
     void Write2(byte data)
     {
         ScopedLock guard(s_Lock);
-        word       port = std::to_underlying(Port::eCom1);
+        word       port = ToUnderlying(Port::eCom1);
         IO::Out<byte>(port, data);
     }
 }; // namespace Serial

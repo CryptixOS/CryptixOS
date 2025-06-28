@@ -70,7 +70,7 @@ namespace PNG
         auto ihdrCrcStart = stream.Raw() + stream.Offset();
         stream >> ih.Type;
 
-        if (ih.Type != std::to_underlying(ChunkType::eIHDR))
+        if (ih.Type != ToUnderlying(ChunkType::eIHDR))
         {
             LogError(
                 "PNG: First chunk should be 'IHDR' type, but it's not,"
@@ -327,7 +327,7 @@ namespace PNG
         if (m_CompressionMethod != CompressionMethod::eDeflate)
         {
             LogError("PNG: Bad compression method -> {}",
-                     std::to_underlying(m_CompressionMethod));
+                     ToUnderlying(m_CompressionMethod));
             return false;
         }
         stream >> m_Filter;
@@ -340,7 +340,7 @@ namespace PNG
         if (!magic_enum::enum_contains(m_Interlace))
         {
             LogError("PNG: Bad interlace method -> {}",
-                     std::to_underlying(m_Interlace));
+                     ToUnderlying(m_Interlace));
             return false;
         }
 

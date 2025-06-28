@@ -199,7 +199,7 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
 
             default:
                 LogError("Ext2Fs: Invalid directory entry type: {}",
-                         std::to_underlying(entry->Type));
+                         ToUnderlying(entry->Type));
                 break;
         }
 
