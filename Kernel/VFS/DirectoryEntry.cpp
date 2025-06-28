@@ -87,7 +87,9 @@ DirectoryEntry* DirectoryEntry::FollowSymlinks(usize cnt)
     {
         if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
 
-        auto next = VFS::ResolvePath(m_Parent, target.Raw(), true).Entry;
+        auto next = VFS::ResolvePath(m_Parent, target.Raw(), true)
+                        .value_or(VFS::PathResolution{})
+                        .Entry;
         if (!next) return_err(nullptr, ENOENT);
 
         return next->FollowSymlinks(++cnt);

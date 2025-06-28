@@ -153,7 +153,9 @@ namespace ELF
                      AddressSpace& addressSpace, uintptr_t loadBase)
     {
         DirectoryEntry* entry
-            = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), path).Entry;
+            = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), path)
+                  .value()
+                  .Entry;
         if (!entry) return false;
 
         auto file = entry->INode();

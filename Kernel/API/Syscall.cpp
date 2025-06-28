@@ -69,17 +69,17 @@ namespace Syscall
         {
             case ARCH_SET_GS:
                 thread->SetGsBase(addr);
-                CPU::SetKernelGSBase(thread->GetGsBase());
+                CPU::SetKernelGSBase(thread->GsBase());
                 break;
             case ARCH_SET_FS:
                 thread->SetFsBase(addr);
-                CPU::SetFSBase(thread->GetFsBase());
+                CPU::SetFSBase(thread->FsBase());
                 break;
             case ARCH_GET_FS:
-                *reinterpret_cast<uintptr_t*>(addr) = thread->GetFsBase();
+                *reinterpret_cast<uintptr_t*>(addr) = thread->FsBase();
                 break;
             case ARCH_GET_GS:
-                *reinterpret_cast<uintptr_t*>(addr) = thread->GetGsBase();
+                *reinterpret_cast<uintptr_t*>(addr) = thread->GsBase();
                 break;
 
             default: return_err(-1, EINVAL);
@@ -117,7 +117,7 @@ namespace Syscall
         RegisterSyscall2(ID::eDup, API::VFS::Dup);
         RegisterSyscall2(ID::eDup2, API::VFS::Dup2);
         RegisterSyscall(ID::eNanoSleep, SysNanoSleep);
-        RegisterSyscall2(ID::eGetPid, API::Process::GetPid);
+        RegisterSyscall2(ID::ePid, API::Process::Pid);
         RegisterSyscall(ID::eExit, Process::SysExit);
         RegisterSyscall(ID::eWait4, Process::SysWait4);
         RegisterSyscall(ID::eKill, Process::SysKill);
@@ -150,7 +150,7 @@ namespace Syscall
         RegisterSyscall(ID::eGetPgrp, Process::SysGetPgrp);
         RegisterSyscall(ID::eSetSid, Process::SysSetSid);
         RegisterSyscall(ID::eGet_pGid, Process::SysGet_pGid);
-        RegisterSyscall(ID::eGetSid, Process::SysGetSid);
+        RegisterSyscall(ID::eSid, Process::SysSid);
         RegisterSyscall2(ID::eUTime, API::VFS::UTime);
         RegisterSyscall2(ID::eStatFs, API::VFS::StatFs);
         RegisterSyscall(ID::eFork, Process::SysFork);

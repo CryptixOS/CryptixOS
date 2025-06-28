@@ -86,7 +86,7 @@ ErrorOr<isize> FileDescriptor::Read(const UserBuffer& out, usize count,
     if (WouldBlock())
     {
         if (IsNonBlocking()) return Error(IsSocket() ? EWOULDBLOCK : EAGAIN);
-        Thread* current = CPU::GetCurrentThread();
+        Thread* current = Thread::Current();
         Scheduler::Block(current);
 
         if (current->WasInterrupted()) return Error(EINTR);
@@ -233,7 +233,9 @@ bool FileDescriptor::GenerateDirEntries()
 
         auto parentEntry = current->Parent() ? current->Parent() : nullptr;
         auto target      = current->INode()->GetTarget();
-        auto next = VFS::ResolvePath(parentEntry, target.Raw(), true).Entry;
+        auto next        = VFS::ResolvePath(parentEntry, target.Raw(), true)
+                        .value_or(VFS::PathResolution{})
+                        .Entry;
 
         if (!next) break;
         current = next;
@@ -254,8 +256,10 @@ bool FileDescriptor::GenerateDirEntries()
     CtosUnused(result);
 
     // . && ..
-    StringView cwdPath = Process::GetCurrent()->GetCWD();
-    auto cwd = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), cwdPath).Entry;
+    StringView cwdPath = Process::Current()->CWD();
+    auto       cwd     = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), cwdPath)
+                   .value_or(VFS::PathResolution{})
+                   .Entry;
     if (!cwd) return true;
 
     auto stats = cwd->FollowMounts()->INode()->Stats();

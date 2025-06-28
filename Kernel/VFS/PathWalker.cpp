@@ -147,8 +147,9 @@ ErrorOr<DirectoryEntry*> PathWalker::FollowSymlink()
     if (target.Empty()) return m_DirectoryEntry;
 
     auto parentDirectoryEntry = m_DirectoryEntry->Parent();
-    auto next
-        = VFS::ResolvePath(parentDirectoryEntry, target.Raw(), false).Entry;
+
+    auto pathRes = VFS::ResolvePath(parentDirectoryEntry, target.Raw(), false);
+    auto next    = pathRes ? pathRes.value().Entry : nullptr;
 
     if (!next) return Error(ENOLINK);
     return next;

@@ -30,7 +30,9 @@ ErrorOr<DirectoryEntry*> Fat32Fs::Mount(StringView sourcePath, const void* data)
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
                : nullptr;
 
-    auto sourceEntry = VFS::ResolvePath(nullptr, sourcePath).Entry;
+    auto sourceEntry = VFS::ResolvePath(nullptr, sourcePath)
+                           .value_or(VFS::PathResolution{})
+                           .Entry;
     if (!sourceEntry || !sourceEntry->INode()) return nullptr;
     auto source = sourceEntry->INode();
 

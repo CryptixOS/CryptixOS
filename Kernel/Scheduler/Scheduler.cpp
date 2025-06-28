@@ -178,14 +178,14 @@ void Scheduler::DisablePreemption()
 
 void Scheduler::Block(Thread* thread)
 {
-    if (thread->GetState() == ThreadState::eBlocked) return;
+    if (thread->State() == ThreadState::eBlocked) return;
     thread->SetState(ThreadState::eBlocked);
 
-    if (thread == Thread::GetCurrent()) Yield(true);
+    if (thread == Thread::Current()) Yield(true);
 }
 void Scheduler::Unblock(Thread* thread)
 {
-    if (thread->GetState() != ThreadState::eBlocked) return;
+    if (thread->State() != ThreadState::eBlocked) return;
 
     thread->SetState(ThreadState::eReady);
     if (!thread->m_IsEnqueued) EnqueueThread(thread);
@@ -208,7 +208,7 @@ void Scheduler::Yield(bool saveCtx)
     Lapic::Instance()->Stop();
 #endif
 
-    Thread* currentThread = Thread::GetCurrent();
+    Thread* currentThread = Thread::Current();
     if (saveCtx) currentThread->YieldAwaitLock.Acquire();
     else
     {
@@ -242,7 +242,7 @@ Process* Scheduler::CreateProcess(Process* parent, StringView name,
     auto       proc = new Process(parent, name, creds);
 
     ScopedLock guard(s_ProcessListLock);
-    s_Processes[proc->GetPid()] = proc;
+    s_Processes[proc->Pid()] = proc;
     s_ProcFs->AddProcess(proc);
 
     return proc;
@@ -284,7 +284,7 @@ void Scheduler::EnqueueNotReady(Thread* thread)
     ScopedLock guard(s_Lock);
 
     thread->m_IsEnqueued = true;
-    if (thread->GetState() == ThreadState::eRunning)
+    if (thread->State() == ThreadState::eRunning)
         thread->SetState(ThreadState::eReady);
 
     s_ExecutionQueue.PushBack(thread);
@@ -319,7 +319,7 @@ Thread* Scheduler::GetNextThread(usize cpuID)
 Thread* Scheduler::PickReadyThread()
 {
     auto newThread = GetNextThread(CPU::GetCurrent()->ID);
-    for (; newThread && newThread->GetState() != ThreadState::eReady;)
+    for (; newThread && newThread->State() != ThreadState::eReady;)
     {
         if (newThread->IsDead())
         {
@@ -337,7 +337,7 @@ Thread* Scheduler::PickReadyThread()
         newThread = GetNextThread(CPU::GetCurrent()->ID);
     }
 
-    Thread* currentThread = Thread::GetCurrent();
+    Thread* currentThread = Thread::Current();
     if (!newThread)
         return currentThread ? currentThread : CPU::GetCurrent()->Idle;
 
@@ -377,5 +377,5 @@ void Scheduler::Tick(CPUContext* ctx)
         newThread->SetState(ThreadState::eRunning);
 
 reschedule:
-    CPU::Reschedule(newThread->GetParent()->m_Quantum * 1_ms);
+    CPU::Reschedule(newThread->Parent()->m_Quantum * 1_ms);
 }

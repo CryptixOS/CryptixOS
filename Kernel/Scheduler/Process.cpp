@@ -37,7 +37,8 @@ Credentials Credentials::s_Root = {
     .pgid = 0,
 };
 
-Process::Process(Process* parent, StringView name, const Credentials& creds)
+Process::Process(Process* parent, StringView name,
+                 const struct Credentials& creds)
     : m_Parent(parent)
     , m_Pid(AllocatePid())
     , m_Name(name.Raw())
@@ -154,14 +155,16 @@ void Process::SendGroupSignal(pid_t pgid, i32 signal)
 {
     auto& processMap = Scheduler::GetProcessMap();
     for (auto [pid, process] : processMap)
-        if (process->m_Credentials.pgid == pgid) process->SendSignal(signal);
+        if (process->Credentials().pgid == pgid) process->SendSignal(signal);
 }
 void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
 ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
     DirectoryEntry* parent
-        = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), m_CWD.Raw()).Entry;
+        = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), m_CWD.Raw())
+              .value()
+              .Entry;
     if (CPU::AsUser([path]() -> bool { return path.Absolute(); }))
         parent = VFS::GetRootDirectoryEntry();
     else if (dirFd != AT_FDCWD)
@@ -179,6 +182,29 @@ ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
     if (!descriptor) return Error(descriptor.error());
 
     return m_FdTable.Insert(descriptor.value());
+}
+ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
+{
+    if (oldFdNum == newFdNum) return Error(EINVAL);
+
+    auto oldFd = GetFileHandle(oldFdNum);
+    if (!oldFd) return Error(EBADF);
+
+    while (newFdNum < 0 || m_FdTable.IsValid(newFdNum)) ++newFdNum;
+    auto newFd = GetFileHandle(newFdNum);
+    if (newFd) CloseFd(newFdNum);
+
+    newFd = new FileDescriptor(oldFd, flags);
+    if (!newFd) return Error(ENOMEM);
+
+    newFdNum = m_FdTable.Insert(newFd, newFdNum);
+    if (newFdNum < 0)
+    {
+        delete newFd;
+        return Error(EBADF);
+    }
+
+    return newFdNum;
 }
 i32            Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
 
@@ -346,7 +372,7 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
         auto  it  = std::find_if(m_Children.begin(), m_Children.end(),
                                  [gid](Process* proc) -> bool
                                  {
-                                   if (proc->GetPGid() == gid) return true;
+                                   if (proc->PGid() == gid) return true;
                                    return false;
                                });
         if (it == m_Children.end()) return Error(ECHILD);
@@ -358,7 +384,7 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
         auto it = std::find_if(m_Children.begin(), m_Children.end(),
                                [process](Process* proc) -> bool
                                {
-                                   if (proc->GetPGid() == process->GetPGid())
+                                   if (proc->PGid() == process->PGid())
                                        return true;
                                    return false;
                                });
@@ -371,7 +397,7 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
         auto it = std::find_if(m_Children.begin(), m_Children.end(),
                                [pid](Process* proc) -> bool
                                {
-                                   if (proc->GetPid() == pid) return true;
+                                   if (proc->Pid() == pid) return true;
                                    return false;
                                });
 
@@ -389,18 +415,17 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
         if (!ret.has_value()) return Error(EINTR);
 
         auto which = procs[ret.value()];
-        if (!(flags & WUNTRACED) && WIFSTOPPED(which->GetStatus().value_or(0)))
+        if (!(flags & WUNTRACED) && WIFSTOPPED(which->Status().ValueOr(0)))
             continue;
-        if (!(flags & WCONTINUED)
-            && WIFCONTINUED(which->GetStatus().value_or(0)))
+        if (!(flags & WCONTINUED) && WIFCONTINUED(which->Status().ValueOr(0)))
             continue;
 
         if (wstatus)
             CPU::AsUser(
                 [wstatus, &which]()
-                { *wstatus = W_EXITCODE(which->GetStatus().value_or(0), 0); });
+                { *wstatus = W_EXITCODE(which->Status().ValueOr(0), 0); });
 
-        return which->GetPid();
+        return which->Pid();
     }
 }
 
@@ -480,7 +505,7 @@ i32 Process::Exit(i32 code)
     // FIXME(v1tr10l7): Do proper cleanup of all resources
     m_FdTable.Clear();
 
-    Thread* currentThread   = Thread::GetCurrent();
+    Thread* currentThread   = Thread::Current();
     currentThread->m_Parent = Scheduler::GetKernelProcess();
 
     Process* subreaper      = Scheduler::GetProcess(1);

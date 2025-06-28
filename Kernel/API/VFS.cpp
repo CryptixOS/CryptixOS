@@ -37,7 +37,7 @@ namespace API::VFS
             if (dirFdNum == AT_FDCWD)
             {
                 auto res = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(),
-                                              process->GetCWD());
+                                              process->CWD());
                 if (errno != no_error && errno != ENOENT) return Error(errno);
                 return res;
             }
@@ -59,7 +59,8 @@ namespace API::VFS
         {
             if (dirFdNum == AT_FDCWD)
                 base = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(),
-                                          process->GetCWD())
+                                          process->CWD())
+                           .value()
                            .Entry;
             else
             {
@@ -131,8 +132,12 @@ namespace API::VFS
         auto process = Process::GetCurrent();
         if (!process->ValidateRead(path, 4096)) return Error(EFAULT);
 
-        auto entry
-            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), path).Entry;
+        auto maybePathRes
+            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), path);
+        RetOnError(maybePathRes);
+        auto pathRes = maybePathRes.value();
+
+        auto entry   = pathRes.Entry;
         if (!entry) return Error(errno);
 
         auto inode = entry->INode();
@@ -143,40 +148,31 @@ namespace API::VFS
 
     ErrorOr<isize> Dup(isize oldFdNum)
     {
-        Process* process = Process::GetCurrent();
-        auto*    oldFd   = process->GetFileHandle(oldFdNum);
-        if (!oldFd) return Error(EBADF);
+        Process* process = Process::Current();
 
-        FileDescriptor* newFd = new FileDescriptor(oldFd);
-        if (!newFd) return Error(ENOMEM);
-
-        return process->m_FdTable.Insert(newFd);
+        return process->DupFd(oldFdNum, -1, 0);
     }
     ErrorOr<isize> Dup2(isize oldFdNum, isize newFdNum)
     {
-        Process* process = Process::GetCurrent();
-        auto*    oldFd   = process->GetFileHandle(oldFdNum);
-        if (!oldFd) return Error(EBADF);
+        Process* process = Process::Current();
 
-        auto* newFd = process->GetFileHandle(newFdNum);
-        if (newFd == oldFd) return newFdNum;
-
-        if (newFd) process->CloseFd(newFdNum);
-        newFd = new FileDescriptor(oldFd);
-
-        return process->m_FdTable.Insert(newFd, newFdNum);
+        return process->DupFd(oldFdNum, newFdNum, 0);
     }
 
     ErrorOr<isize> Truncate(PathView path, off_t length)
     {
-        Process* current = Process::GetCurrent();
+        Process* current = Process::Current();
         if (length < 0) return Error(EINVAL);
 
         if (!current->ValidateRead(path.Raw(), Limits::MAX_PATH_LENGTH))
             return Error(EFAULT);
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
-        auto pathRes = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), path);
+        auto maybePathRes
+            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), path);
+        RetOnError(maybePathRes);
+        auto pathRes = maybePathRes.value();
+
         auto entry   = pathRes.Entry;
         if (!entry) return Error(ENOENT);
 
@@ -201,7 +197,7 @@ namespace API::VFS
         if (!buffer || size == 0) return Error(EINVAL);
         if (!process->ValidateWrite(buffer, size)) return Error(EFAULT);
 
-        StringView cwd = process->GetCWD();
+        StringView cwd = process->CWD();
         if (size < cwd.Size()) return Error(ERANGE);
 
         CPU::UserMemoryProtectionGuard guard;
@@ -237,13 +233,16 @@ namespace API::VFS
         if (lastComponent == "."_sv) return Error(EINVAL);
         if (lastComponent == ".."_sv) return Error(ENOTEMPTY);
 
-        auto pathRes
+        auto maybePathRes
             = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), path, true);
+        RetOnError(maybePathRes);
+        auto pathRes = maybePathRes.value();
+
         if (!pathRes.Entry) return Error(ENOENT);
 
         auto dentry = pathRes.Entry;
         if (dentry->Parent()
-            && !dentry->Parent()->INode()->CanWrite(current->GetCredentials()))
+            && !dentry->Parent()->INode()->CanWrite(current->Credentials()))
             return Error(EACCES);
         if (!dentry->IsDirectory()) return Error(ENOTDIR);
         for (const auto& [name, child] : dentry->Children())
@@ -279,7 +278,7 @@ namespace API::VFS
     {
         auto process = Process::Current();
         if (!process->ValidateRead(pathname, 255)) return Error(EFAULT);
-        const auto& creds = process->GetCredentials();
+        const auto& creds = process->Credentials();
 
         auto        path  = CPU::AsUser(
             [&pathname]() -> Path
@@ -378,15 +377,18 @@ namespace API::VFS
 
     ErrorOr<isize> UTime(PathView path, const utimbuf* out)
     {
-        auto pathRes
+        auto maybePathRes
             = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), path, true);
-        auto entry = pathRes.Entry;
+        RetOnError(maybePathRes);
+        auto pathRes = maybePathRes.value();
+
+        auto entry   = pathRes.Entry;
         if (!entry) return Error(ENOENT);
         auto inode = entry->INode();
         if (!inode) return Error(ENOENT);
 
         Process* process = Process::GetCurrent();
-        if (!inode->CanWrite(process->GetCredentials())) return Error(EPERM);
+        if (!inode->CanWrite(process->Credentials())) return Error(EPERM);
         auto     utime      = CPU::AsUser([&out]() -> utimbuf { return *out; });
 
         timespec accessTime = {utime.actime, 0};
@@ -401,7 +403,11 @@ namespace API::VFS
     }
     ErrorOr<isize> StatFs(PathView path, statfs* out)
     {
-        auto pathRes = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), path);
+        auto maybePathRes
+            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), path);
+        RetOnError(maybePathRes);
+        auto pathRes = maybePathRes.value();
+
         auto entry   = pathRes.Entry;
         if (!entry) return Error(ENOENT);
 
@@ -430,9 +436,12 @@ namespace API::VFS
         auto* fd             = current->GetFileHandle(dirFdNum);
         bool  followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
 
-        auto  cwdEntry = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(),
-                                            current->GetCWD())
-                            .Entry;
+        auto  maybePathRes = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(),
+                                                current->CWD());
+        RetOnError(maybePathRes);
+        auto pathRes  = maybePathRes.value();
+
+        auto cwdEntry = pathRes.Entry;
         if (!cwdEntry) return Error(ENOENT);
         auto cwd = cwdEntry->INode();
 
@@ -470,7 +479,9 @@ namespace API::VFS
         }
 
         DirectoryEntry* entry
-            = ::VFS::ResolvePath(parentEntry, path, followSymlinks).Entry;
+            = ::VFS::ResolvePath(parentEntry, path, followSymlinks)
+                  .value()
+                  .Entry;
         if (!entry) return Error(errno);
 
         auto inode = entry->INode();
@@ -571,7 +582,7 @@ namespace API::VFS
         }
 
         if (!inode) return Error(ENOENT);
-        if (!inode->CanWrite(process->GetCredentials())) return Error(EPERM);
+        if (!inode->CanWrite(process->Credentials())) return Error(EPERM);
 
         auto result = inode->UpdateTimestamps(atime, mtime, ctime);
         if (!result) return Error(result.error());
@@ -585,23 +596,7 @@ namespace API::VFS
         if (oldFdNum == newFdNum) return Error(EINVAL);
 
         auto* process = Process::GetCurrent();
-        auto* oldFd   = process->GetFileHandle(oldFdNum);
-        if (!oldFd) return Error(EBADF);
-
-        auto* newFd = process->GetFileHandle(newFdNum);
-        if (newFd) process->CloseFd(newFdNum);
-
-        newFd = new FileDescriptor(oldFd, flags);
-        if (!newFd) return Error(ENOMEM);
-
-        isize retFd = process->m_FdTable.Insert(newFd, newFdNum);
-        if (retFd < 0)
-        {
-            delete newFd;
-            return Error(EBADF);
-        }
-
-        return retFd;
+        return process->DupFd(oldFdNum, newFdNum, flags);
     }
     ErrorOr<isize> RenameAt2(isize oldDirFdNum, const char* oldPath,
                              isize newDirFdNum, const char* newPath,
@@ -678,6 +673,7 @@ namespace Syscall::VFS
             [path]() -> DirectoryEntry*
             {
                 return VFS::ResolvePath(VFS::GetRootDirectoryEntry(), path)
+                    .value()
                     .Entry;
             });
         if (!entry) return Error(EPERM);
@@ -726,22 +722,26 @@ namespace Syscall::VFS
     }
     ErrorOr<i32> SysChDir(Arguments& args)
     {
-        const char*     path    = reinterpret_cast<const char*>(args.Args[0]);
-        Process*        current = Process::GetCurrent();
+        const char* path    = reinterpret_cast<const char*>(args.Args[0]);
+        Process*    current = Process::GetCurrent();
 
-        DirectoryEntry* cwd
-            = VFS::ResolvePath(current->GetRootNode(), current->GetCWD()).Entry;
+        auto        maybePathRes
+            = VFS::ResolvePath(current->RootNode(), current->CWD());
+        RetOnError(maybePathRes);
+        auto pathRes = maybePathRes.value();
+
+        auto cwd     = pathRes.Entry;
         if (!cwd) return Error(ENOENT);
 
         DirectoryEntry* entry = nullptr;
         {
             CPU::UserMemoryProtectionGuard guard;
-            entry = VFS::ResolvePath(cwd, path).Entry;
+            entry = VFS::ResolvePath(cwd, path).value().Entry;
         }
         if (!entry) return Error(ENOENT);
         if (!entry->IsDirectory()) return Error(ENOTDIR);
 
-        current->m_CWD = entry->Path().View();
+        current->SetCWD(entry->Path().View());
         return 0;
     }
     ErrorOr<i32> SysFChDir(Arguments& args)
@@ -756,7 +756,7 @@ namespace Syscall::VFS
         if (!entry) return Error(ENOENT);
 
         if (!entry->IsDirectory()) return Error(ENOTDIR);
-        current->m_CWD = entry->Path().View();
+        current->SetCWD(entry->Path().View());
 
         return 0;
     }

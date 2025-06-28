@@ -135,7 +135,7 @@ ErrorOr<isize> DevTmpFsINode::Truncate(usize size)
     ScopedLock guard(m_Lock);
     if (m_Device || size == m_Capacity) return 0;
 
-    const Credentials& creds = Process::GetCurrent()->GetCredentials();
+    const Credentials& creds = Process::GetCurrent()->Credentials();
     if (!CanWrite(creds)) return Error(EPERM);
 
     u8* newData = new u8[size];

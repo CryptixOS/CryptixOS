@@ -158,24 +158,44 @@ qemu_args = [
   '-d', 'int,guest_errors',
   '-smp', '4',
   '-d', 'cpu_reset',
+  # use 2G of memory
   '-m', '2G',
+  # set rtc to localtime
   '-rtc', 'base=localtime',
+  # don't reboot nor shutdown on triple fault
   #'-no-shutdown', '-no-reboot',
+  # output qemu logs to > qemu.log
   '-D', meson.project_source_root() / 'qemu.log',
+  # enable boot menu
   '-boot', 'order=d,menu=on,splash-time=100',
+  # setup audio backend
   '-audiodev', 'id=audio,driver=alsa',
+  # use acceleration if available
   '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
+  # add smbios table of type 1
   '-smbios', 'type=1',
-  '-device', 'nvme,id=nvme-ctrl1,serial=nvme',
+  # add rtl8139 nic card
   '-nic', 'user,model=rtl8139',
+  # add erst table
   '-object', 'memory-backend-file,id=erstnvram,mem-path=acpi-erst.backing,size=0x10000,share=on',
   '-device', 'acpi-erst,memdev=erstnvram',
   #'-device', 'virtio-mmio-device,dev=hd',
-  #'-device', 'virtio-blk-pci,dev=hd',
-  #'-drive', 'file=image.hdd,if=none,id=virtio-disk0,format=raw,cache=none,aio=native', '-device', 'virtio-blk-pci,scsi=off,drive=virtio-disk0,id=disk0',
-  #'-drive', 'file=mydisk,if=none,id=virtio-disk0,format=raw,cache=none,aio=native',
-  #'-device', 'virtio-blk-pci,drive=virtio-disk0,id=disk0',
-  #'-drive', 'file=mydisk,if=none,format=raw,id=hd', '-device', 'virtio-blk-device,drive=hd',
+
+  # image drives
+  '-drive', 'format=raw,file=image2.hdd,if=none,id=drive1', 
+  '-drive', 'format=raw,file=image.hdd,if=none,id=drive2', 
+
+  # nvme0 - nvme controller
+  '-device', 'nvme,id=nvme0,serial=nvme,bus=pcie.0',
+  # nvme0n1 - nvme namespace of controller nvme0
+  '-device', 'nvme-ns,drive=drive1,nsid=2,bus=nvme0,id=nvme0n1',
+
+  # pci-to-pci bridge
+  '-device', 'pci-bridge,id=pcie2,bus=pcie.0,addr=1e,chassis_nr=1',
+  # virtio drive
+  '-device', 'virtio-blk-pci,drive=drive2,id=virtio0,bus=pcie2,addr=0x6',
+
+
   #'-device', 'virtio-serial-pci,max_ports=2',
   #'-device', 'virtconsole,chardev=vcon,name=vcon0',
   #'-chardev', 'socket,id=vcon,ipv4=on,host=localhost,port=443,server,telnet=on,wait=off',
@@ -196,10 +216,15 @@ if arch == 'x86_64'
   qemu_args += [
     '-M', 'q35',
     '-device', 'isa-debug-exit',
+    # output port 0xe9 to the stdio
     '-debugcon', 'stdio',
+    # output serial to > debug.log
     '-serial', 'file:' + meson.project_source_root() / 'debug.log',
+    # enable kvm acceleration
     '-enable-kvm',
+    # enable pcspeaker
     '-machine', 'pcspk-audiodev=audio',
+    # use host cpu
     '-cpu', 'host',
   ]
   ovmf_id = 'X64'
@@ -356,7 +381,7 @@ run_bios = custom_target(
   'run_bios',
   input: [iso, echfs_image],
   output: 'run_bios',
-  command: [qemu, qemu_args, '-cdrom', '@INPUT0@', '-drive', 'format=raw,file=@INPUT1@,if=none,id=nvm1', '-device', 'nvme-ns,drive=nvm1,nsid=2,bus=nvme-ctrl1'],
+  command: [qemu, qemu_args, '-cdrom', '@INPUT0@'],
   build_by_default: true,
   console: true,
   install: false,
@@ -369,7 +394,7 @@ ovmf = ovmf_binaries.get_variable(ovmf_id)
 run_uefi = custom_target(
   input: [iso, echfs_image],
   output: 'run_uefi',
-  command: [qemu, qemu_args, '-cdrom', '@INPUT0@', '-drive', 'format=raw,file=@INPUT1@,if=none,id=nvm1', '-device', 'nvme-ns,drive=nvm1,nsid=2,bus=nvme-ctrl1', '-bios', ovmf],
+  command: [qemu, qemu_args, '-cdrom', '@INPUT0@', '-bios', ovmf],
   console: true,
   install: false,
   depends: [iso, echfs_image]
@@ -378,7 +403,7 @@ run_uefi = custom_target(
 run_uefi_vnc = custom_target(
   input: [iso, echfs_image],
   output: 'run_uefi_vnc',
-  command: [qemu, qemu_args, '-display', 'vnc=127.0.0.1:0', '-cdrom', '@INPUT0@', '-drive', 'format=raw,file=@INPUT1@,if=none,id=nvm1', '-device', 'nvme-ns,drive=nvm1,nsid=2,bus=nvme-ctrl1', '-bios', ovmf],
+  command: [qemu, qemu_args, '-display', 'vnc=127.0.0.1:0', '-cdrom', '@INPUT0@', '-bios', ovmf],
   console: true,
   install: false,
   depends: [iso, echfs_image]

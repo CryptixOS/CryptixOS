@@ -471,14 +471,14 @@ namespace CPU
             thread->Context.ds = thread->Context.es = thread->Context.ss;
 
             thread->Context.rsp                     = thread->GetStack();
-            current->FpuRestore(thread->GetFpuStorage());
+            current->FpuRestore(thread->FpuStorage());
 
             u16 defaultFcw = 0b1100111111;
             __asm__ volatile("fldcw %0" ::"m"(defaultFcw) : "memory");
             u32 defaultMxCsr = 0b1111110000000;
             asm volatile("ldmxcsr %0" ::"m"(defaultMxCsr) : "memory");
 
-            current->FpuSave(thread->GetFpuStorage());
+            current->FpuSave(thread->FpuStorage());
         }
         else
         {
@@ -486,8 +486,8 @@ namespace CPU
             thread->Context.ss = GDT::KERNEL_DATA_SELECTOR;
             thread->Context.ds = thread->Context.es = thread->Context.ss;
 
-            thread->Context.rsp                     = thread->GetKernelStack();
-            thread->SetStack(thread->GetKernelStack());
+            thread->Context.rsp                     = thread->KernelStack();
+            thread->SetStack(thread->KernelStack());
         }
     }
     void SaveThread(Thread* thread, CPUContext* ctx)
@@ -497,20 +497,20 @@ namespace CPU
         thread->SetGsBase(GetKernelGSBase());
         thread->SetFsBase(GetFSBase());
 
-        GetCurrent()->FpuSave(thread->GetFpuStorage());
+        GetCurrent()->FpuSave(thread->FpuStorage());
     }
     void LoadThread(Thread* thread, CPUContext* ctx)
     {
         thread->SetRunningOn(GetCurrent()->ID);
 
-        GetCurrent()->TSS.ist[1] = thread->GetPageFaultStack();
-        GetCurrent()->FpuRestore(thread->GetFpuStorage());
+        GetCurrent()->TSS.ist[1] = thread->PageFaultStack();
+        GetCurrent()->FpuRestore(thread->FpuStorage());
 
-        thread->GetParent()->PageMap->Load();
+        thread->Parent()->PageMap->Load();
 
         SetGSBase(reinterpret_cast<u64>(thread));
-        SetKernelGSBase(thread->GetGsBase());
-        SetFSBase(thread->GetFsBase());
+        SetKernelGSBase(thread->GsBase());
+        SetFSBase(thread->FsBase());
 
         *ctx = thread->Context;
     }

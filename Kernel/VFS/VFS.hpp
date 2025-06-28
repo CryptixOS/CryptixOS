@@ -10,8 +10,8 @@
 #include <Common.hpp>
 
 #include <Prism/Containers/Vector.hpp>
-#include <Prism/Utility/Path.hpp>
 #include <Prism/String/String.hpp>
+#include <Prism/Utility/Path.hpp>
 
 class INode;
 class DirectoryEntry;
@@ -35,7 +35,7 @@ namespace VFS
     ErrorOr<FileDescriptor*> Open(DirectoryEntry* parent, PathView path,
                                   i32 flags, mode_t mode);
 
-    PathResolution           ResolvePath(DirectoryEntry* parent, PathView path,
+    ErrorOr<PathResolution>  ResolvePath(DirectoryEntry* parent, PathView path,
                                          bool followLinks = true);
 
     ErrorOr<MountPoint*>     MountRoot(StringView filesystemName);
@@ -46,7 +46,10 @@ namespace VFS
 
     DirectoryEntry*          CreateNode(DirectoryEntry* parent, PathView path,
                                         mode_t mode);
-    ErrorOr<i32>             MkDir(INode* parent, mode_t mode);
+    ErrorOr<DirectoryEntry*> MkDir(DirectoryEntry* directory,
+                                   DirectoryEntry* entry, mode_t mode);
+    ErrorOr<DirectoryEntry*> MkDir(DirectoryEntry* directory, PathView path,
+                                   mode_t mode);
 
     ErrorOr<DirectoryEntry*> MkNod(DirectoryEntry* parent, PathView name,
                                    mode_t mode, dev_t dev);

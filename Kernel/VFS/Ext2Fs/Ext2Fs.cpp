@@ -13,7 +13,9 @@
 
 ErrorOr<DirectoryEntry*> Ext2Fs::Mount(StringView sourcePath, const void* data)
 {
-    auto sourceEntry = VFS::ResolvePath(nullptr, sourcePath).Entry;
+    auto sourceEntry = VFS::ResolvePath(nullptr, sourcePath)
+                           .value_or(VFS::PathResolution{})
+                           .Entry;
     if (!sourceEntry || !sourceEntry->INode()) return Error(ENODEV);
 
     m_Device     = sourceEntry->INode();

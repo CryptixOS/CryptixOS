@@ -24,7 +24,7 @@ INode::INode(StringView name, class Filesystem* fs)
     , m_Filesystem(fs)
 {
     Thread*  thread  = CPU::GetCurrentThread();
-    Process* process = thread ? thread->GetParent() : nullptr;
+    Process* process = thread ? thread->Parent() : nullptr;
 
     // if (parent && parent->m_Stats.st_mode & S_ISUID)
     // {
@@ -36,8 +36,8 @@ INode::INode(StringView name, class Filesystem* fs)
 
     if (!process) return;
 
-    m_Stats.st_uid = process->m_Credentials.euid;
-    m_Stats.st_gid = process->m_Credentials.egid;
+    m_Stats.st_uid = process->Credentials().euid;
+    m_Stats.st_gid = process->Credentials().egid;
 }
 
 mode_t INode::Mode() const { return m_Stats.st_mode & ~S_IFMT; }

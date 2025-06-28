@@ -34,7 +34,7 @@
     #define DebugSyscall(...)
 #endif
 
-#define TryOrRet(...)                                                          \
+#define RetOnError(...)                                                        \
     {                                                                          \
         auto result = (__VA_ARGS__);                                           \
         if (!result) return Error(result.error());                             \

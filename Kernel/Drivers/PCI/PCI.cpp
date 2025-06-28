@@ -57,7 +57,9 @@ namespace PCI
     {
         PathView        path = "/usr/share/hwdata/pci.ids";
         DirectoryEntry* entry
-            = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), path).Entry;
+            = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), path)
+                  .value()
+                  .Entry;
         if (!entry) return;
 
         auto file = entry->INode();

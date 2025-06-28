@@ -19,9 +19,9 @@ namespace API::Process
     ErrorOr<isize> SigProcMask(i32 how, const sigset_t* newSet,
                                sigset_t* oldSet)
     {
-        auto     process     = ::Process::GetCurrent();
-        Thread*  thread      = Thread::GetCurrent();
-        sigset_t currentMask = thread->GetSignalMask();
+        auto     process     = ::Process::Current();
+        Thread*  thread      = Thread::Current();
+        sigset_t currentMask = thread->SignalMask();
 
         if (oldSet)
         {
@@ -55,69 +55,68 @@ namespace API::Process
         return 0;
     }
 
-    ErrorOr<pid_t> GetPid()
+    ErrorOr<pid_t> Pid()
     {
-        auto process = ::Process::GetCurrent();
-        return process->GetPid();
+        auto process = ::Process::Current();
+        return process->Pid();
     }
     ErrorOr<mode_t> Umask(mode_t mask)
     {
-        auto process = ::Process::GetCurrent();
+        auto process = ::Process::Current();
         return process->Umask(mask);
     }
     ErrorOr<uid_t> GetUid()
     {
-        auto process = ::Process::GetCurrent();
-        return process->GetCredentials().uid;
+        auto process = ::Process::Current();
+        return process->Credentials().uid;
     }
     ErrorOr<gid_t> GetGid()
     {
-        auto process = ::Process::GetCurrent();
-        return process->GetCredentials().gid;
+        auto process = ::Process::Current();
+        return process->Credentials().gid;
     }
     ErrorOr<isize> SetUid(uid_t uid)
     {
-        // auto process = ::Process::GetCurrent();
+        // auto process = ::Process::Current();
         return Error(ENOSYS);
     }
     ErrorOr<isize> SetGid(gid_t gid)
     {
-        // auto process = ::Process::GetCurrent();
+        // auto process = ::Process::Current();
         return Error(ENOSYS);
     }
     ErrorOr<uid_t> GetEUid()
     {
-        auto process = ::Process::GetCurrent();
-        return process->GetCredentials().euid;
+        auto process = ::Process::Current();
+        return process->Credentials().euid;
     }
     ErrorOr<gid_t> GetEGid()
     {
-        auto process = ::Process::GetCurrent();
-        return process->GetCredentials().egid;
+        auto process = ::Process::Current();
+        return process->Credentials().egid;
     }
     ErrorOr<isize> SetPGid(pid_t pid, pid_t pgid);
     ErrorOr<pid_t> GetPPid()
     {
-        auto process = ::Process::GetCurrent();
-        return process->GetParentPid();
+        auto process = ::Process::Current();
+        return process->ParentPid();
     }
     ErrorOr<pid_t> GetPGrp();
     ErrorOr<pid_t> SetSid();
-    ErrorOr<pid_t> GetPGid();
-    ErrorOr<pid_t> GetSid(pid_t pid);
+    ErrorOr<pid_t> PGid();
+    ErrorOr<pid_t> Sid(pid_t pid);
 } // namespace API::Process
 
 namespace Syscall::Process
 {
     ErrorOr<pid_t> SysFork(Arguments&)
     {
-        class Process* process = ::Process::GetCurrent();
+        class Process* process = ::Process::Current();
 
         CPU::SetInterruptFlag(false);
         auto procOrError = process->Fork();
 
-        return procOrError ? procOrError.value()->GetPid()
-                           : procOrError.error();
+        return procOrError ? procOrError.value()->Pid() : procOrError.error();
     }
     ErrorOr<i32> SysExecve(Arguments& args)
     {
@@ -127,14 +126,14 @@ namespace Syscall::Process
 
         CPU::SetInterruptFlag(false);
 
-        return ::Process::GetCurrent()->Exec(
+        return ::Process::Current()->Exec(
             CPU::AsUser([path]() -> String { return path; }), argv, envp);
     }
     ErrorOr<i32> SysExit(Arguments& args)
     {
         i32   code    = args.Args[0];
 
-        auto* process = ::Process::GetCurrent();
+        auto* process = ::Process::Current();
 
         CPU::SetInterruptFlag(false);
         return process->Exit(code);
@@ -147,7 +146,7 @@ namespace Syscall::Process
         rusage*        rusage  = reinterpret_cast<struct rusage*>(args.Args[3]);
 
         Thread*        thread  = CPU::GetCurrentThread();
-        class Process* process = thread->GetParent();
+        class Process* process = thread->Parent();
 
         return process->WaitPid(pid, wstatus, flags, rusage);
     }
@@ -156,7 +155,7 @@ namespace Syscall::Process
         pid_t          pid     = args.Get<pid_t>(0);
         i32            sig     = args.Get<i32>(1);
 
-        class Process* current = ::Process::GetCurrent();
+        class Process* current = ::Process::Current();
         class Process* target  = nullptr;
         if (pid == 0) target = current;
         else if (pid > 0) target = Scheduler::GetProcess(pid);
@@ -181,9 +180,9 @@ namespace Syscall::Process
         const pid_t    pid     = static_cast<pid_t>(args.Args[0]);
         const pid_t    pgid    = static_cast<pid_t>(args.Args[1]);
 
-        class Process* current = ::Process::GetCurrent();
+        class Process* current = ::Process::Current();
         class Process* process
-            = pid ? Scheduler::GetProcess(pid) : ::Process::GetCurrent();
+            = pid ? Scheduler::GetProcess(pid) : ::Process::Current();
 
         if (!process) return Error(ESRCH);
         if ((process != current && !current->IsChild(process)))
@@ -194,14 +193,14 @@ namespace Syscall::Process
             if (pgid < 0) return Error(EINVAL);
 
             class Process* groupLeader = Scheduler::GetProcess(pgid);
-            if (!groupLeader || process->GetSid() != groupLeader->GetSid())
+            if (!groupLeader || process->Sid() != groupLeader->Sid())
                 return Error(EPERM);
 
             process->SetPGid(pgid);
             return 0;
         }
 
-        process->SetPGid(process->GetPid());
+        process->SetPGid(process->Pid());
         return 0;
     }
 
@@ -212,7 +211,7 @@ namespace Syscall::Process
     }
     ErrorOr<pid_t> SysSetSid(Arguments&)
     {
-        class Process* current = ::Process::GetCurrent();
+        class Process* current = ::Process::Current();
         if (current->IsGroupLeader()) return Error(EPERM);
 
         return current->SetSid();
@@ -223,28 +222,28 @@ namespace Syscall::Process
 
         // FIXME(v1tr10l7): validate whether pid is a child of the calling
         // process
-        class Process* currentProcess = ::Process::GetCurrent();
+        class Process* currentProcess = ::Process::Current();
 
-        if (pid == 0) return currentProcess->GetPGid();
+        if (pid == 0) return currentProcess->PGid();
         class Process* process = Scheduler::GetProcess(pid);
         if (!process
             || (process != currentProcess && !currentProcess->IsChild(process)))
             return Error(EPERM);
 
-        return process->GetPGid();
+        return process->PGid();
     }
-    ErrorOr<pid_t> SysGetSid(Arguments& args)
+    ErrorOr<pid_t> SysSid(Arguments& args)
     {
         pid_t          pid     = args.Get<pid_t>(0);
 
-        class Process* current = ::Process::GetCurrent();
-        if (pid == 0) return current->GetSid();
+        class Process* current = ::Process::Current();
+        if (pid == 0) return current->Sid();
 
         class Process* process = Scheduler::GetProcess(pid);
         if (!process) return Error(ESRCH);
 
-        if (current->GetSid() != process->GetSid()) return Error(EPERM);
-        return process->GetSid();
+        if (current->Sid() != process->Sid()) return Error(EPERM);
+        return process->Sid();
     }
     ErrorOr<i32> SysNanoSleep(Arguments& args)
     {

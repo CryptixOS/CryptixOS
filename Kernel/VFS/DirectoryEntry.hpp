@@ -23,6 +23,19 @@ class DirectoryEntry : public RefCounted
     {
     }
 
+    DirectoryEntry* Ref()
+    {
+        ++m_RefCount;
+
+        return this;
+    }
+    DirectoryEntry* Unref()
+    {
+        --m_RefCount;
+
+        return this;
+    }
+
     inline INode*          INode() const { return m_INode; }
     inline usize           RefCount() const { return m_RefCount; }
     inline StringView      Name() const { return m_Name; }

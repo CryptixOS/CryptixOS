@@ -36,9 +36,9 @@
 
 #include <Prism/Containers/Array.hpp>
 #include <Prism/Containers/RedBlackTree.hpp>
-#include <Prism/Utility/Delegate.hpp>
 #include <Prism/Memory/Endian.hpp>
 #include <Prism/String/StringView.hpp>
+#include <Prism/Utility/Delegate.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
@@ -70,11 +70,11 @@ static bool loadInitProcess(Path initPath)
 
     static ELF::Image program, ld;
     PageMap*          pageMap = new PageMap();
-    if (!program.Load(initPath, pageMap, userProcess->GetAddressSpace()))
+    if (!program.Load(initPath, pageMap, userProcess->AddressSpace()))
         return false;
     PathView ldPath = program.GetLdPath();
     if (!ldPath.Empty()
-        && !ld.Load(ldPath, pageMap, userProcess->GetAddressSpace(),
+        && !ld.Load(ldPath, pageMap, userProcess->AddressSpace(),
                     0x40000000))
     {
         delete pageMap;
@@ -149,8 +149,10 @@ static void kernelThread()
     if (!Module::Load()) LogWarn("Module: Failed to find any modules");
 
     LogDebug("VFS: Testing directory entry caches...");
-    auto pathRes = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), "/mnt");
-    auto entry   = pathRes.Entry->FollowMounts();
+    auto maybePathRes = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), "/mnt");
+    auto pathRes      = maybePathRes.value();
+
+    auto entry        = pathRes.Entry->FollowMounts();
     for (auto& [name, dentry] : entry->Children())
     {
         LogTrace("Found directory => {}", name);

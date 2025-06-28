@@ -19,8 +19,8 @@ SynthFsINode::SynthFsINode(INode* parent, StringView name,
     m_Stats.st_ino     = filesystem->GetNextINodeIndex();
     m_Stats.st_nlink   = 1;
     m_Stats.st_mode    = mode;
-    m_Stats.st_uid     = process ? process->GetCredentials().euid : 0;
-    m_Stats.st_gid     = process ? process->GetCredentials().egid : 0;
+    m_Stats.st_uid     = process ? process->Credentials().euid : 0;
+    m_Stats.st_gid     = process ? process->Credentials().egid : 0;
     m_Stats.st_rdev    = 0;
     m_Stats.st_size    = 0;
     m_Stats.st_blksize = 512;
@@ -84,7 +84,7 @@ ErrorOr<isize> SynthFsINode::Truncate(usize size)
     ScopedLock guard(m_Lock);
     if (size == m_Buffer.Size()) return 0;
 
-    const Credentials& creds = Process::GetCurrent()->GetCredentials();
+    const Credentials& creds = Process::GetCurrent()->Credentials();
     if (!CanWrite(creds)) return Error(EPERM);
 
     usize prevSize = m_Buffer.Size();

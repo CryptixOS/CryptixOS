@@ -128,7 +128,7 @@ struct ProcFsMemoryRegionsProperty : public ProcFsProperty
 
         Write("======================================================\n");
         Write("Base\t\tLength\t\tPhys\t\tProt\n");
-        for (const auto& [base, region] : process->GetAddressSpace())
+        for (const auto& [base, region] : process->AddressSpace())
             Write("{:#x}\t\t{:#x}\t\t{:#x}\t\t{:#b}\n", base, region->GetSize(),
                   region->GetPhysicalBase().Raw(), region->GetProt());
         Write("======================================================\n");
@@ -143,7 +143,7 @@ struct ProcFsStatusProperty : public ProcFsProperty
         auto       process   = ProcFs::GetProcess(pid);
         if (!process) return;
 
-        Write("Name: {}\n", process->GetName());
+        Write("Name: {}\n", process->Name());
     }
 };
 
@@ -181,9 +181,9 @@ Process* ProcFs::GetProcess(pid_t pid)
 void ProcFs::AddProcess(Process* process)
 {
     ScopedLock guard(m_Lock);
-    Assert(!s_Processes.contains(process->GetPid()));
-    s_Processes[process->GetPid()] = process;
-    auto name                      = StringUtils::ToString(process->GetPid());
+    Assert(!s_Processes.contains(process->Pid()));
+    s_Processes[process->Pid()] = process;
+    auto name                      = StringUtils::ToString(process->Pid());
     auto entry                     = new DirectoryEntry(m_RootEntry, name);
 
     auto maybeINode                = CreateNode(m_Root, entry, 0755 | S_IFDIR);

@@ -46,34 +46,33 @@ struct Thread
     ~Thread();
 
     static Thread*     Current();
-    static Thread*     GetCurrent();
 
     void               SetRunningOn(isize runningOn);
 
     Pointer            GetStack() const;
     void               SetStack(Pointer stack);
 
-    Pointer            GetPageFaultStack() const;
-    Pointer            GetKernelStack() const;
+    Pointer            PageFaultStack() const;
+    Pointer            KernelStack() const;
 
     void               SetPageFaultStack(Pointer pfstack);
     void               SetKernelStack(Pointer kstack);
 
-    Pointer            GetFpuStorage() const;
-    usize              GetFpuStoragePageCount() const;
+    Pointer            FpuStorage() const;
+    usize              FpuStoragePageCount() const;
 
     void               SetFpuStorage(Pointer fpuStorage, usize pageCount);
 
-    inline tid_t       GetTid() const { return m_Tid; }
-    inline ThreadState GetState() const { return m_State; }
+    inline tid_t       Tid() const { return m_Tid; }
+    inline ThreadState State() const { return m_State; }
     inline void        SetState(ThreadState state)
     {
         ScopedLock guard(m_Lock);
         m_State = state;
     }
-    inline ErrorCode& GetError() { return m_ErrorCode; }
+    inline ErrorCode& ErrorCode() { return m_ErrorCode; }
 
-    inline Process*   GetParent() const { return m_Parent; }
+    inline Process*   Parent() const { return m_Parent; }
     constexpr bool    IsUser() const { return m_IsUser; }
 
     inline bool       IsEnqueued() const { return m_IsEnqueued; }
@@ -90,7 +89,7 @@ struct Thread
 
     Thread*         Fork(Process* parent);
 
-    inline sigset_t GetSignalMask() const { return m_SignalMask; }
+    inline sigset_t SignalMask() const { return m_SignalMask; }
     inline void     SetSignalMask(sigset_t mask) { m_SignalMask = mask; }
 
     inline bool     ShouldIgnoreSignal(u8 signal) const
@@ -105,18 +104,18 @@ struct Thread
     bool        DispatchSignal(u8 signal);
 
 #ifdef CTOS_TARGET_X86_64
-    inline Pointer GetFsBase() const { return m_FsBase; }
-    inline Pointer GetGsBase() const { return m_GsBase; }
+    inline Pointer FsBase() const { return m_FsBase; }
+    inline Pointer GsBase() const { return m_GsBase; }
 
     inline void    SetFsBase(Pointer fs) { m_FsBase = fs; }
     inline void    SetGsBase(Pointer gs) { m_GsBase = gs; }
 #endif
 
-    inline Event&         GetEvent() { return m_Event; }
-    inline Deque<Event*>& GetEvents() { return m_Events; }
-    inline usize          GetWhich() const { return m_Which; }
+    inline Event&                Event() { return m_Event; }
+    inline Deque<struct Event*>& Events() { return m_Events; }
+    inline usize                 Which() const { return m_Which; }
 
-    inline void           SetWhich(usize which) { m_Which = which; }
+    inline void                  SetWhich(usize which) { m_Which = which; }
 
   private:
     ///// DON'T MOVE /////
@@ -154,13 +153,13 @@ struct Thread
     Pointer m_El0Base;
 #endif
 
-    bool          m_IsEnqueued     = false;
-    sigset_t      m_SignalMask     = 0;
-    sigset_t      m_PendingSignals = 0;
+    bool                 m_IsEnqueued     = false;
+    sigset_t             m_SignalMask     = 0;
+    sigset_t             m_PendingSignals = 0;
 
-    Event         m_Event;
-    Deque<Event*> m_Events;
-    usize         m_Which = 0;
+    struct Event         m_Event;
+    Deque<struct Event*> m_Events;
+    usize                m_Which = 0;
 
     friend class Process;
     friend class Scheduler;

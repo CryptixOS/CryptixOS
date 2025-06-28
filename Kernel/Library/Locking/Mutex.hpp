@@ -23,7 +23,7 @@ class Mutex : public NonCopyable<Mutex>
         if (!m_Locked)
         {
             m_Locked = true;
-            m_Holder = Thread::GetCurrent();
+            m_Holder = Thread::Current();
             return true;
         }
 
@@ -41,12 +41,12 @@ class Mutex : public NonCopyable<Mutex>
         }
 
     lock_success:
-        m_Holder = Thread::GetCurrent();
+        m_Holder = Thread::Current();
     }
     void Unlock()
     {
         ScopedLock guard(m_Lock);
-        Assert(m_Locked && Thread::GetCurrent() == m_Holder);
+        Assert(m_Locked && Thread::Current() == m_Holder);
 
         m_Locked = false;
         m_Holder = nullptr;

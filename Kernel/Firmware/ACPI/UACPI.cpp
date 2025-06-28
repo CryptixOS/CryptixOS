@@ -340,9 +340,8 @@ namespace uACPI
 
         uacpi_thread_id uacpi_kernel_get_thread_id(void)
         {
-            auto thread = Thread::GetCurrent();
-            if (thread)
-                return reinterpret_cast<uacpi_thread_id>(thread->GetTid());
+            auto thread = Thread::Current();
+            if (thread) return reinterpret_cast<uacpi_thread_id>(thread->Tid());
 
             return UACPI_THREAD_ID_NONE;
         }
@@ -363,10 +362,11 @@ namespace uACPI
 
         uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle handle, uacpi_u16)
         {
-            auto&      event = *reinterpret_cast<Event*>(handle);
+            auto& event = *reinterpret_cast<Event*>(handle);
 
-            std::array evs   = {&event};
-            Event::Await(evs);
+            Array evs   = ToArray({&event});
+            auto  which = Event::Await(evs);
+            CtosUnused(which);
 
             return true;
         }

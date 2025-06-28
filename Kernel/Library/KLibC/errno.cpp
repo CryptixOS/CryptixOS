@@ -14,5 +14,5 @@ static errno_t      error;
 extern "C" errno_t* __errno_location()
 {
     Thread* thread = CPU::GetCurrentThread();
-    return reinterpret_cast<errno_t*>(thread ? &thread->GetError() : &error);
+    return reinterpret_cast<errno_t*>(thread ? &thread->ErrorCode() : &error);
 }

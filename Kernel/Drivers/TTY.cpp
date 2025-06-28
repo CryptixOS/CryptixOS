@@ -196,7 +196,7 @@ ErrorOr<isize> TTY::Write(const UserBuffer& in, usize count, isize offset)
 i32 TTY::IoCtl(usize request, uintptr_t argp)
 {
     if (!argp) return_err(-1, EFAULT);
-    Process* current = Process::GetCurrent();
+    Process* current = Process::Current();
 
     switch (request)
     {
@@ -262,16 +262,16 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         case TIOCSETD: m_Termios.c_line = *reinterpret_cast<u32*>(argp); break;
         // Make the TTY the controlling terminal of the calling process
         case TIOCSCTTY:
-            if (current->GetSid() != current->GetPid() || current->GetTTY())
+            if (current->Sid() != current->Pid() || current->TTY())
                 return_err(-1, EINVAL);
-            if (m_ControlSid && current->GetCredentials().uid != 0)
+            if (m_ControlSid && current->Credentials().uid != 0)
                 return_err(-1, EPERM);
             current->SetTTY(this);
-            m_ControlSid = current->GetCredentials().sid;
+            m_ControlSid = current->Credentials().sid;
             break;
         case TIOCNOTTY:
-            if (current->GetTTY() != this
-                || m_ControlSid != current->GetCredentials().sid)
+            if (current->TTY() != this
+                || m_ControlSid != current->Credentials().sid)
                 return_err(-1, EINVAL);
 
             current->SetTTY(nullptr);
@@ -351,13 +351,12 @@ void TTY::SendSignal(i32 signal)
     Process::SendGroupSignal(m_Pgid, signal);
     return;
 
-    Process* current = Process::GetCurrent();
+    Process* current = Process::Current();
     if (signal == SIGINT) current->Exit(0);
 
     Process* groupLeader = Scheduler::GetProcess(m_Pgid);
     groupLeader->SendSignal(signal);
-    for (const auto& child : groupLeader->GetChildren())
-        child->SendSignal(signal);
+    for (const auto& child : groupLeader->Children()) child->SendSignal(signal);
 }
 
 bool TTY::OnCanonChar(char c)

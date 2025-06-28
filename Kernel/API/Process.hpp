@@ -16,7 +16,7 @@ namespace API::Process
                                 sigset_t* oldSet);
     ErrorOr<isize>  SchedYield();
 
-    ErrorOr<pid_t>  GetPid();
+    ErrorOr<pid_t>  Pid();
     ErrorOr<mode_t> Umask(mode_t mask);
 
     ErrorOr<uid_t>  GetUid();
@@ -32,8 +32,8 @@ namespace API::Process
 
     ErrorOr<pid_t>  GetPGrp();
     ErrorOr<pid_t>  SetSid();
-    ErrorOr<pid_t>  GetPGid();
-    ErrorOr<pid_t>  GetSid(pid_t pid);
+    ErrorOr<pid_t>  PGid();
+    ErrorOr<pid_t>  Sid(pid_t pid);
 } // namespace API::Process
 
 namespace Syscall::Process
@@ -48,7 +48,7 @@ namespace Syscall::Process
     ErrorOr<pid_t> SysGetPgrp(Syscall::Arguments& args);
     ErrorOr<pid_t> SysSetSid(Syscall::Arguments& args);
     ErrorOr<pid_t> SysGet_pGid(Syscall::Arguments& args);
-    ErrorOr<pid_t> SysGetSid(Syscall::Arguments& args);
+    ErrorOr<pid_t> SysSid(Syscall::Arguments& args);
 
     ErrorOr<i32>   SysNanoSleep(Syscall::Arguments& args);
 }; // namespace Syscall::Process

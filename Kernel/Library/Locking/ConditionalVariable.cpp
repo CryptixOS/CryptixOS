@@ -12,7 +12,7 @@ void ConditionalVariable::Wait(Mutex& mutex)
     {
         ScopedLock guard(m_Lock);
         m_Event.Listeners.EmplaceBack(thread, 0);
-        thread->GetEvents().PushBack(&m_Event);
+        thread->Events().PushBack(&m_Event);
     }
 
     mutex.Unlock();

@@ -58,7 +58,7 @@ namespace API::MM
         usize pageCount
             = Math::AlignUp(length, PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
 
-        auto&   addressSpace = current->GetAddressSpace();
+        auto&   addressSpace = current->AddressSpace();
         auto*   pageMap      = current->PageMap;
         Region* region       = nullptr;
 
@@ -149,7 +149,7 @@ namespace API::MM
         if (prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC)) return Error(EINVAL);
 
         auto  process      = Process::GetCurrent();
-        auto& addressSpace = process->GetAddressSpace();
+        auto& addressSpace = process->AddressSpace();
         auto  region       = addressSpace.Find(virt);
         if (!region) return Error(EFAULT);
 
@@ -162,7 +162,7 @@ namespace API::MM
     ErrorOr<isize> MUnMap(Pointer virt, usize length)
     {
         auto  process      = Process::GetCurrent();
-        auto& addressSpace = process->GetAddressSpace();
+        auto& addressSpace = process->AddressSpace();
         if (!addressSpace.Contains(virt)) return Error(EINVAL);
 
         auto        region    = addressSpace[virt];

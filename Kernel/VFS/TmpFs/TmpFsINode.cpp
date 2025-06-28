@@ -132,7 +132,7 @@ ErrorOr<isize> TmpFsINode::Truncate(usize size)
     ScopedLock guard(m_Lock);
     if (size == m_Capacity) return 0;
 
-    const Credentials& creds = Process::GetCurrent()->GetCredentials();
+    const Credentials& creds = Process::GetCurrent()->Credentials();
     if (!CanWrite(creds)) return Error(EPERM);
 
     u8* newData = new u8[size];
@@ -170,7 +170,7 @@ ErrorOr<void> TmpFsINode::MkDir(StringView name, mode_t mode, uid_t uid,
                                 gid_t gid)
 {
     if (m_Children.contains(name)) return Error(EEXIST);
-    auto umask = Process::Current()->GetUmask();
+    auto umask = Process::Current()->Umask();
     mode &= ~umask & 0777;
 
     auto entry = new class DirectoryEntry(name);

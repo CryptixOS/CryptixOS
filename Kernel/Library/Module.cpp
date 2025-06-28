@@ -43,7 +43,9 @@ static void LoadModuleFromFile(DirectoryEntry* entry)
 bool Module::Load()
 {
     auto moduleDirectory
-        = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), "/lib/modules/").Entry;
+        = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), "/lib/modules/")
+              .value_or(VFS::PathResolution{})
+              .Entry;
     if (!moduleDirectory) return false;
 
     for (const auto& [name, child] : moduleDirectory->Children())

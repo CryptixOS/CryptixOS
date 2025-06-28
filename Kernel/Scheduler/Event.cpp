@@ -9,7 +9,7 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-static std::optional<usize> CheckPending(std::span<Event*> events)
+static Optional<usize> CheckPending(std::span<Event*> events)
 {
     for (usize i = 0; auto& event : events)
     {
@@ -20,23 +20,23 @@ static std::optional<usize> CheckPending(std::span<Event*> events)
         }
         ++i;
     }
-    return std::nullopt;
+    return NullOpt;
 }
 
 static void AttachListeners(std::span<Event*> events, Thread* thread)
 {
-    thread->GetEvents().Clear();
+    thread->Events().Clear();
 
     for (usize i = 0; const auto& event : events)
     {
         event->Listeners.EmplaceBack(thread, i);
-        thread->GetEvents().PushBack(event);
+        thread->Events().PushBack(event);
         i++;
     }
 }
 static void DetachListeners(Thread* thread)
 {
-    for (const auto& event : thread->GetEvents())
+    for (const auto& event : thread->Events())
     {
         for (auto it = event->Listeners.begin(); it < event->Listeners.end();
              it++)
@@ -45,7 +45,7 @@ static void DetachListeners(Thread* thread)
             it = event->Listeners.Erase(it);
         }
     }
-    thread->GetEvents().Clear();
+    thread->Events().Clear();
 }
 
 static void LockEvents(std::span<Event*> events)
@@ -59,12 +59,12 @@ static void UnlockEvents(std::span<Event*> events)
 
 std::optional<usize> Event::Await(std::span<Event*> events, bool block)
 {
-    auto thread   = Thread::GetCurrent();
+    auto thread   = Thread::Current();
     bool intState = CPU::SwapInterruptFlag(false);
     LockEvents(events);
 
     auto i = CheckPending(events);
-    if (i.has_value())
+    if (i.HasValue())
     {
         UnlockEvents(events);
         CPU::SetInterruptFlag(intState);
@@ -91,7 +91,7 @@ std::optional<usize> Event::Await(std::span<Event*> events, bool block)
     UnlockEvents(events);
 
     CPU::SetInterruptFlag(intState);
-    return thread->GetWhich();
+    return thread->Which();
 }
 
 void Event::Trigger(Event* event, bool drop)

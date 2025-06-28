@@ -30,20 +30,19 @@ Thread::Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn)
 }
 
 Thread* Thread::Current() { return CPU::GetCurrentThread(); }
-Thread* Thread::GetCurrent() { return CPU::GetCurrentThread(); }
 
 void    Thread::SetRunningOn(isize runningOn) { m_RunningOn = runningOn; }
 
 Pointer Thread::GetStack() const { return m_Stack; }
 void    Thread::SetStack(Pointer stack) { m_Stack = stack; }
 
-Pointer Thread::GetPageFaultStack() const { return m_PageFaultStack; }
-Pointer Thread::GetKernelStack() const { return m_KernelStack; }
+Pointer Thread::PageFaultStack() const { return m_PageFaultStack; }
+Pointer Thread::KernelStack() const { return m_KernelStack; }
 
 void Thread::SetPageFaultStack(Pointer pfstack) { m_PageFaultStack = pfstack; }
 void Thread::SetKernelStack(Pointer kstack) { m_KernelStack = kstack; }
 
-Pointer Thread::GetFpuStorage() const { return m_FpuStorage; }
+Pointer Thread::FpuStorage() const { return m_FpuStorage; }
 void    Thread::SetFpuStorage(Pointer fpuStorage, usize pageCount)
 {
     m_FpuStorage          = fpuStorage;
