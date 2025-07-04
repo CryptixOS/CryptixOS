@@ -12,9 +12,14 @@
 #include <Scheduler/Thread.hpp>
 
 #include <VFS/FileDescriptor.hpp>
+#include <VFS/Filesystem.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/MountPoint.hpp>
 
+INode::INode(class Filesystem* fs)
+    : m_Filesystem(fs)
+{
+}
 INode::INode(StringView name)
     : m_Name(name)
 {
@@ -77,6 +82,33 @@ bool INode::ValidatePermissions(const Credentials& creds, u32 acc)
 {
     return true;
 }
+
+ErrorOr<Ref<DirectoryEntry>> INode::CreateNode(Ref<DirectoryEntry> entry,
+                                               mode_t mode, dev_t dev)
+{
+    auto newEntry = m_Filesystem->CreateNode(this, entry.Raw(), mode);
+    RetOnError(newEntry);
+
+    return entry;
+}
+ErrorOr<Ref<DirectoryEntry>> INode::CreateFile(Ref<DirectoryEntry> entry,
+                                               mode_t              mode)
+{
+    return Error(ENOSYS);
+}
+ErrorOr<Ref<DirectoryEntry>> INode::CreateDirectory(Ref<DirectoryEntry> entry,
+                                                    mode_t              mode)
+{
+    return Error(ENOSYS);
+}
+ErrorOr<Ref<DirectoryEntry>> INode::Link(Ref<DirectoryEntry> oldEntry,
+                                         Ref<DirectoryEntry> newEntry)
+{
+    return Error(ENOSYS);
+}
+
+ErrorOr<void> INode::Unlink(Ref<DirectoryEntry> entry) { return Error(ENOSYS); }
+
 ErrorOr<isize> INode::ReadLink(UserBuffer& outBuffer)
 {
     if (!m_Target.Raw() || m_Target.Size() == 0) return Error(EINVAL);
@@ -96,6 +128,22 @@ ErrorOr<DirectoryEntry*> INode::Lookup(class DirectoryEntry* entry)
     return entry;
 }
 
+ErrorOr<void> INode::SetOwner(uid_t uid, gid_t gid)
+{
+    if (uid == m_Attributes.UID && gid == m_Attributes.GID) return {};
+    m_Attributes.UID = uid;
+    m_Attributes.GID = gid;
+
+    m_Dirty          = true;
+    return {};
+}
+ErrorOr<void> INode::ChangeMode(mode_t mode)
+{
+    m_Attributes.Mode = mode;
+    m_Dirty           = true;
+
+    return {};
+}
 ErrorOr<void> INode::UpdateTimestamps(timespec atime, timespec mtime,
                                       timespec ctime)
 {

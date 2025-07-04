@@ -62,12 +62,6 @@ namespace Syscall
 
         return API::FTruncate(fdNum, length);
     }
-    ErrorOr<isize> SysRmDir(Arguments& args)
-    {
-        const char* path = args.Get<const char*>(0);
-
-        return API::RmDir(path);
-    }
     ErrorOr<isize> SysCreat(Arguments& args)
     {
         const char* path = args.Get<const char*>(0);

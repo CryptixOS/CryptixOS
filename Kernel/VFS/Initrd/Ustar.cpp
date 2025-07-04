@@ -54,7 +54,7 @@ namespace Ustar
                 continue;
             }
 
-            DirectoryEntry* dentry = nullptr;
+            Ref<DirectoryEntry> dentry = nullptr;
             switch (current->Type)
             {
                 case FILE_TYPE_NORMAL:

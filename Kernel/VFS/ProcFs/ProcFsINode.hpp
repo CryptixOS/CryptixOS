@@ -85,8 +85,6 @@ class ProcFsINode : public INode
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
 
-    virtual ErrorOr<void>  ChMod(mode_t mode) override { return Error(ENOSYS); }
-
   private:
     ProcFsProperty*                        m_Property = nullptr;
     std::unordered_map<StringView, INode*> m_Children;

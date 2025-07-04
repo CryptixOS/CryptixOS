@@ -13,6 +13,21 @@
 #include <VFS/TmpFs/TmpFs.hpp>
 #include <VFS/TmpFs/TmpFsINode.hpp>
 
+TmpFsINode::TmpFsINode(class Filesystem* fs)
+    : INode(fs)
+{
+    m_Stats.st_dev     = fs->DeviceID();
+    m_Stats.st_ino     = fs->NextINodeIndex();
+    m_Stats.st_nlink   = 1;
+    m_Stats.st_rdev    = 0;
+    m_Stats.st_size    = 0;
+    m_Stats.st_blksize = 512;
+    m_Stats.st_blocks  = 0;
+
+    m_Stats.st_atim    = Time::GetReal();
+    m_Stats.st_mtim    = Time::GetReal();
+    m_Stats.st_ctim    = Time::GetReal();
+}
 TmpFsINode::TmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
                        uid_t uid, gid_t gid)
     : INode(name, fs)
@@ -166,21 +181,112 @@ ErrorOr<void> TmpFsINode::Rename(INode* newParent, StringView newName)
 
     return {};
 }
-ErrorOr<Ref<DirectoryEntry>> TmpFsINode::MkDir(Ref<DirectoryEntry> entry,
-                                               mode_t              mode)
+
+ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateNode(Ref<DirectoryEntry> entry,
+                                                    mode_t mode, dev_t dev)
 {
     if (m_Children.contains(entry->Name())) return Error(EEXIST);
-    auto umask = Process::Current()->Umask();
-    mode &= ~umask & 0777;
 
-    auto inodeOr
-        = m_Filesystem->CreateNode(this, entry.Raw(), mode | S_IFDIR, 0, 0);
-    auto inode = reinterpret_cast<TmpFsINode*>(inodeOr.value());
-    if (!inode) return Error(errno);
+    auto maybeINode = m_Filesystem->AllocateNode();
+    RetOnError(maybeINode);
 
-    InsertChild(inode, inode->Name());
+    auto inode    = reinterpret_cast<TmpFsINode*>(maybeINode.value());
+    inode->m_Name = entry->Name();
+    inode->m_Attributes.Mode = mode;
+    inode->m_Stats.st_mode   = mode;
+    if (S_ISREG(mode))
+    {
+        inode->m_Capacity      = inode->GetDefaultSize();
+        inode->m_Stats.st_size = inode->GetDefaultSize();
+        inode->m_Data          = new u8[inode->m_Capacity];
+    }
+
+    // TODO(v1tr10l7): set dev
+
+    auto currentTime = Time::GetReal();
+    m_Attributes.Size += TmpFs::DIRECTORY_ENTRY_SIZE;
+
+    m_Attributes.ChangeTime       = currentTime;
+    m_Attributes.ModificationTime = currentTime;
+    entry->Bind(inode);
+
+    InsertChild(inode, entry->Name());
+    if (Mode() & S_ISGID)
+    {
+        inode->m_Attributes.GID = m_Attributes.GID;
+        if (S_ISDIR(mode)) inode->m_Attributes.Mode |= S_ISGID;
+    }
     return entry;
 }
+
+ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateFile(Ref<DirectoryEntry> entry,
+                                                    mode_t              mode)
+{
+    return CreateNode(entry, mode | S_IFREG, 0);
+}
+ErrorOr<Ref<DirectoryEntry>>
+TmpFsINode::CreateDirectory(Ref<DirectoryEntry> entry, mode_t mode)
+{
+
+    auto maybeEntry = CreateNode(entry, mode | S_IFDIR, 0);
+    RetOnError(maybeEntry);
+
+    ++m_Stats.st_nlink;
+    return entry;
+}
+ErrorOr<Ref<DirectoryEntry>> TmpFsINode::Link(Ref<DirectoryEntry> oldEntry,
+                                              Ref<DirectoryEntry> entry)
+{
+    auto inode = reinterpret_cast<TmpFsINode*>(oldEntry->INode());
+    if (inode->IsDirectory()) return Error(EPERM);
+
+    m_Stats.st_size += TmpFs::DIRECTORY_ENTRY_SIZE;
+
+    auto currentTime               = Time::GetReal();
+    m_Attributes.ChangeTime        = currentTime;
+    m_Attributes.ModificationTime  = currentTime;
+    inode->m_Attributes.ChangeTime = currentTime;
+    ++inode->m_Stats.st_nlink;
+
+    entry->Bind(inode);
+    return entry;
+}
+
+ErrorOr<void> TmpFsINode::Unlink(Ref<DirectoryEntry> entry)
+{
+    auto it = m_Children.find(entry->Name());
+    if (it == m_Children.end()) return {};
+
+    auto inode = reinterpret_cast<TmpFsINode*>(entry->INode());
+    m_Stats.st_size -= TmpFs::DIRECTORY_ENTRY_SIZE;
+
+    auto currentTime               = Time::GetReal();
+    m_Attributes.ChangeTime        = currentTime;
+    m_Attributes.ModificationTime  = currentTime;
+    inode->m_Attributes.ChangeTime = currentTime;
+    --inode->m_Stats.st_nlink;
+
+    ScopedLock guard(m_Lock);
+    if (inode->m_Stats.st_nlink == 0)
+    {
+        m_Children.erase(it);
+        delete entry->INode();
+    }
+
+    auto parent = entry->Parent();
+    parent->RemoveChild(entry);
+
+    LogTrace("VFS::TmpFs: Unlinked inode => `{}`, link count => {}",
+             entry->Name(), inode->m_Stats.st_nlink);
+    return {};
+}
+ErrorOr<void> TmpFsINode::RmDir(Ref<DirectoryEntry> entry)
+{
+    --m_Stats.st_nlink;
+
+    return Unlink(entry);
+}
+
 ErrorOr<void> TmpFsINode::Link(PathView path)
 {
     // auto pathRes = VFS::ResolvePath(VFS::GetRootNode(), path);
@@ -191,11 +297,4 @@ ErrorOr<void> TmpFsINode::Link(PathView path)
 
     // return {};
     return Error(ENOSYS);
-}
-ErrorOr<void> TmpFsINode::ChMod(mode_t mode)
-{
-    m_Stats.st_mode &= ~0777;
-    m_Stats.st_mode |= mode & 0777;
-
-    return {};
 }

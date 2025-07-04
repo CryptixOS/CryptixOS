@@ -26,6 +26,13 @@ namespace API::VFS
     ErrorOr<isize> FStat(isize fdNum, stat* out);
     ErrorOr<isize> LStat(const char* path, stat* out);
 
+    ErrorOr<isize> LSeek(isize fdNum, off_t offset, i32 whence);
+    ErrorOr<isize> IoCtl(isize fdNum, usize request, usize argument);
+
+    ErrorOr<isize> PRead(isize fdNum, void* out, usize count, off_t offset);
+    ErrorOr<isize> PWrite(isize fdNum, const void* in, usize count,
+                          off_t offset);
+
     ErrorOr<isize> Dup(isize oldFdNum);
     ErrorOr<isize> Dup2(isize oldFdNum, isize newFdNum);
 
@@ -35,7 +42,7 @@ namespace API::VFS
 
     ErrorOr<isize> Rename(const char* oldPath, const char* newPath);
     ErrorOr<isize> MkDir(const char* pathname, mode_t mode);
-    ErrorOr<isize> RmDir(PathView path);
+    ErrorOr<isize> RmDir(const char* pathname);
     ErrorOr<isize> Link(const char* oldPath, const char* newPath);
     ErrorOr<isize> Unlink(const char* path);
     ErrorOr<isize> Symlink(const char* target, const char* linkPath);
@@ -74,7 +81,6 @@ namespace API::VFS
 namespace Syscall::VFS
 {
     ErrorOr<off_t> SysLSeek(Syscall::Arguments& args);
-    ErrorOr<i32>   SysIoCtl(Syscall::Arguments& args);
 
     ErrorOr<i32>   SysAccess(Syscall::Arguments& args);
 

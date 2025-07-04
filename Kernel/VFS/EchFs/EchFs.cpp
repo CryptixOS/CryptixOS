@@ -26,7 +26,8 @@ EchFs::~EchFs()
     }
 }
 
-ErrorOr<DirectoryEntry*> EchFs::Mount(StringView sourcePath, const void* data)
+ErrorOr<Ref<DirectoryEntry>> EchFs::Mount(StringView  sourcePath,
+                                          const void* data)
 {
     auto pathResolution
         = VFS::ResolvePath(nullptr, sourcePath).value_or(VFS::PathResolution{});
@@ -136,7 +137,7 @@ fail_free_id_table:
     return nullptr;
 }
 
-ErrorOr<INode*> EchFs::CreateNode(INode* parent, DirectoryEntry* entry,
+ErrorOr<INode*> EchFs::CreateNode(INode* parent, Ref<DirectoryEntry> entry,
                                   mode_t mode, uid_t uid, gid_t gid)
 {
     return nullptr;

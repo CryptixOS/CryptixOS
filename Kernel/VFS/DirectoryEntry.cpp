@@ -17,28 +17,19 @@
 
 DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, class INode* inode)
     : m_INode(inode)
-    , m_RefCount(1)
 {
     m_Name   = inode->Name();
     m_Parent = parent;
 
-    if (parent)
-    {
-        ++parent->m_RefCount;
-        parent->InsertChild(this);
-    }
+    if (parent) parent->InsertChild(this);
 }
 DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, StringView name)
-    : m_RefCount(1)
-    , m_Name(name)
+    : m_Name(name)
     , m_Parent(parent)
 {
-    if (parent)
-    {
-        ++parent->m_RefCount;
-        parent->InsertChild(this);
-    }
+    if (parent) parent->InsertChild(this);
 }
+DirectoryEntry::~DirectoryEntry() {}
 
 Path DirectoryEntry::Path() const
 {
@@ -80,6 +71,15 @@ void DirectoryEntry::InsertChild(Prism::Ref<class DirectoryEntry> entry)
 {
     ScopedLock guard(m_Lock);
     m_Children[entry->Name()] = entry;
+}
+void DirectoryEntry::RemoveChild(Prism::Ref<class DirectoryEntry> entry)
+{
+    ScopedLock guard(m_Lock);
+
+    auto       it = m_Children.find(entry->Name());
+    if (it == m_Children.end()) return;
+
+    m_Children.erase(it);
 }
 
 DirectoryEntry* DirectoryEntry::FollowMounts()

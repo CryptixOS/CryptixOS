@@ -11,7 +11,8 @@
 #include <VFS/Ext2Fs/Ext2Fs.hpp>
 #include <VFS/Ext2Fs/Ext2FsINode.hpp>
 
-ErrorOr<DirectoryEntry*> Ext2Fs::Mount(StringView sourcePath, const void* data)
+ErrorOr<Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
+                                           const void* data)
 {
     auto sourceEntry = VFS::ResolvePath(nullptr, sourcePath)
                            .value_or(VFS::PathResolution{})
@@ -73,7 +74,7 @@ ErrorOr<DirectoryEntry*> Ext2Fs::Mount(StringView sourcePath, const void* data)
     return m_RootEntry;
 }
 
-ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, DirectoryEntry* entry,
+ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, Ref<DirectoryEntry> entry,
                                    mode_t mode, uid_t uid, gid_t gid)
 {
     usize inodeIndex = m_Allocator.AllocateINode();

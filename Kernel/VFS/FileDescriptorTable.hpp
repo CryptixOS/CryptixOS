@@ -11,7 +11,11 @@
 
 class FileDescriptorTable
 {
-    using TableType = UnorderedMap<i32, FileDescriptor*>;
+#if CTOS_USE_PRISM_HASHMAP != 0
+    using TableType = UnorderedMap<isize, FileDescriptor*>;
+#else
+    using TableType = std::unordered_map<isize, FileDescriptor*>;
+#endif
 
   public:
     FileDescriptorTable() = default;
@@ -22,12 +26,23 @@ class FileDescriptorTable
     void        OpenStdioStreams();
     void        Clear();
 
-    inline bool IsValid(i32 fd) const { return m_Table.Contains(fd); }
+    inline bool IsValid(i32 fd) const
+    {
+#if CTOS_USE_PRISM_HASHMAP != 0
+        return m_Table.Contains(fd);
+#else
+        return m_Table.contains(fd);
+#endif
+    }
     inline FileDescriptor* GetFd(i32 fd) const
     {
         if (!IsValid(fd)) return nullptr;
 
+#if CTOS_USE_PRISM_HASHMAP != 0
         return m_Table.At(fd);
+#else
+        return m_Table.at(fd);
+#endif
     }
 
     auto                    begin() { return m_Table.begin(); }
@@ -38,5 +53,6 @@ class FileDescriptorTable
   private:
     Spinlock    m_Lock;
     TableType   m_Table;
+
     Atomic<i32> m_NextIndex = 3;
 };

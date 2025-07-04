@@ -68,6 +68,14 @@ namespace CPU
 
         return value;
     }
+    template <typename T>
+        requires(!SameAs<T, void>)
+    inline constexpr void CopyToUser(T* userBuffer, const T& value)
+    {
+        UserMemoryProtectionGuard guard;
+
+        *userBuffer = value;
+    }
 
     template <typename F, typename... Args>
     inline static void AsUser(F&& f, Args&&... args)

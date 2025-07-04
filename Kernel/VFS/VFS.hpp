@@ -45,21 +45,21 @@ namespace VFS
                                    i32 flags = 0, const void* data = nullptr);
     bool Unmount(DirectoryEntry* parent, PathView path, i32 flags = 0);
 
-    DirectoryEntry* CreateNode(DirectoryEntry* parent, PathView path,
-                               mode_t mode);
-    ErrorOr<Ref<DirectoryEntry>> MkDir(DirectoryEntry* directory,
-                                       DirectoryEntry* entry, mode_t mode);
+    Ref<DirectoryEntry> CreateNode(Ref<DirectoryEntry> parent, PathView path,
+                                   mode_t mode);
+    ErrorOr<Ref<DirectoryEntry>> MkDir(Ref<DirectoryEntry> directory,
+                                       Ref<DirectoryEntry> entry, mode_t mode);
     ErrorOr<Ref<DirectoryEntry>> MkDir(DirectoryEntry* directory, PathView path,
                                        mode_t mode);
 
-    ErrorOr<DirectoryEntry*>     MkNod(DirectoryEntry* parent, PathView name,
-                                       mode_t mode, dev_t dev);
-    ErrorOr<DirectoryEntry*>     MkNod(PathView path, mode_t mode, dev_t dev);
-    DirectoryEntry*              Symlink(DirectoryEntry* parent, PathView path,
+    ErrorOr<Ref<DirectoryEntry>> MkNod(Ref<DirectoryEntry> parent,
+                                       PathView name, mode_t mode, dev_t dev);
+    ErrorOr<Ref<DirectoryEntry>> MkNod(PathView path, mode_t mode, dev_t dev);
+    Ref<DirectoryEntry>          Symlink(DirectoryEntry* parent, PathView path,
                                          StringView target);
-    DirectoryEntry* Link(DirectoryEntry* oldParent, PathView oldPath,
-                         DirectoryEntry* newParent, PathView newPath,
-                         i32 flags = 0);
+    Ref<DirectoryEntry> Link(DirectoryEntry* oldParent, PathView oldPath,
+                             DirectoryEntry* newParent, PathView newPath,
+                             i32 flags = 0);
 
     bool Unlink(DirectoryEntry* parent, PathView path, i32 flags = 0);
 }; // namespace VFS

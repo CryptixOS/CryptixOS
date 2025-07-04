@@ -183,10 +183,10 @@ void ProcFs::AddProcess(Process* process)
     ScopedLock guard(m_Lock);
     Assert(!s_Processes.contains(process->Pid()));
     s_Processes[process->Pid()] = process;
-    auto name                      = StringUtils::ToString(process->Pid());
-    auto entry                     = new DirectoryEntry(m_RootEntry, name);
+    auto name                   = StringUtils::ToString(process->Pid());
+    auto entry                  = new DirectoryEntry(m_RootEntry.Raw(), name);
 
-    auto maybeINode                = CreateNode(m_Root, entry, 0755 | S_IFDIR);
+    auto maybeINode             = CreateNode(m_Root, entry, 0755 | S_IFDIR);
     if (!maybeINode) return;
     m_RootEntry->InsertChild(entry);
 
@@ -204,7 +204,8 @@ void ProcFs::RemoveProcess(pid_t pid)
     ScopedLock guard(m_Lock);
     s_Processes.erase(pid);
 }
-ErrorOr<DirectoryEntry*> ProcFs::Mount(StringView sourcePath, const void* data)
+ErrorOr<Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
+                                           const void* data)
 {
     ScopedLock guard(m_Lock);
     m_MountData
@@ -231,7 +232,7 @@ ErrorOr<DirectoryEntry*> ProcFs::Mount(StringView sourcePath, const void* data)
 
     return m_RootEntry;
 }
-ErrorOr<INode*> ProcFs::CreateNode(INode* parent, DirectoryEntry* entry,
+ErrorOr<INode*> ProcFs::CreateNode(INode* parent, Ref<DirectoryEntry> entry,
                                    mode_t mode, uid_t uid, gid_t gid)
 {
     auto inode = new ProcFsINode(entry->Name(), this, mode, nullptr);
@@ -239,7 +240,7 @@ ErrorOr<INode*> ProcFs::CreateNode(INode* parent, DirectoryEntry* entry,
 
     return inode;
 }
-ErrorOr<INode*> ProcFs::Symlink(INode* parent, DirectoryEntry* entry,
+ErrorOr<INode*> ProcFs::Symlink(INode* parent, Ref<DirectoryEntry> entry,
                                 StringView target)
 {
     return nullptr;
@@ -252,7 +253,7 @@ bool ProcFs::Populate(DirectoryEntry* dentry) { return true; }
 
 void ProcFs::AddChild(StringView name)
 {
-    auto entry = new DirectoryEntry(m_RootEntry, name);
+    auto entry = new DirectoryEntry(m_RootEntry.Raw(), name);
     auto inode = CreateProcFsNode(m_Root, name, this);
     entry->Bind(inode);
 

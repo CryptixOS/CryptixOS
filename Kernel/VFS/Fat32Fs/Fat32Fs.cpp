@@ -18,13 +18,14 @@
 
 #include <cctype>
 
-constexpr const char*    FAT32_IDENTIFIER_STRING       = "FAT32   ";
-constexpr usize          FAT32_FS_INFO_SIGNATURE       = 0x41615252;
-constexpr usize          FAT32_FS_INFO_OFFSET          = 484;
-constexpr usize          FAT32_REAL_FS_INFO_SIGNATURE  = 0x61417272;
-constexpr usize          FAT32_REAL_FS_INFO_SIGNATURE2 = 0xaa550000;
+constexpr const char*        FAT32_IDENTIFIER_STRING       = "FAT32   ";
+constexpr usize              FAT32_FS_INFO_SIGNATURE       = 0x41615252;
+constexpr usize              FAT32_FS_INFO_OFFSET          = 484;
+constexpr usize              FAT32_REAL_FS_INFO_SIGNATURE  = 0x61417272;
+constexpr usize              FAT32_REAL_FS_INFO_SIGNATURE2 = 0xaa550000;
 
-ErrorOr<DirectoryEntry*> Fat32Fs::Mount(StringView sourcePath, const void* data)
+ErrorOr<Ref<DirectoryEntry>> Fat32Fs::Mount(StringView  sourcePath,
+                                            const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
@@ -106,7 +107,7 @@ ErrorOr<DirectoryEntry*> Fat32Fs::Mount(StringView sourcePath, const void* data)
     return m_RootEntry;
 }
 
-ErrorOr<INode*> Fat32Fs::CreateNode(INode* parent, DirectoryEntry* entry,
+ErrorOr<INode*> Fat32Fs::CreateNode(INode* parent, Ref<DirectoryEntry> entry,
                                     mode_t mode, uid_t uid, gid_t gid)
 {
     StringView name = entry->Name();

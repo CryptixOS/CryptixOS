@@ -157,7 +157,13 @@ class FileDescriptor : public File
     }
 
     inline bool IsNonBlocking() const { return m_Flags & O_NONBLOCK; }
+
     inline bool CloseOnExec() const { return m_Flags & O_CLOEXEC; }
+    inline void SetCloseOnExec(bool closeOnExec)
+    {
+        if (closeOnExec) m_Flags |= O_CLOEXEC;
+        else m_Flags &= ~O_CLOEXEC;
+    }
 
     [[clang::no_sanitize("alignment")]]
     ErrorOr<i32> GetDirEntries(dirent* const out, usize maxSize);

@@ -15,8 +15,8 @@ DevTmpFs::DevTmpFs(u32 flags)
 {
 }
 
-ErrorOr<DirectoryEntry*> DevTmpFs::Mount(StringView  sourcePath,
-                                         const void* data)
+ErrorOr<Ref<DirectoryEntry>> DevTmpFs::Mount(StringView  sourcePath,
+                                             const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
@@ -26,11 +26,7 @@ ErrorOr<DirectoryEntry*> DevTmpFs::Mount(StringView  sourcePath,
 
     m_RootEntry    = new DirectoryEntry(nullptr, "/");
     auto maybeRoot = MkNod(nullptr, m_RootEntry, 0755 | S_IFDIR, 0);
-    if (!maybeRoot)
-    {
-        delete m_RootEntry;
-        return Error(maybeRoot.error());
-    }
+    RetOnError(maybeRoot);
 
     m_Root = maybeRoot.value();
     m_RootEntry->Bind(m_Root);
@@ -38,10 +34,10 @@ ErrorOr<DirectoryEntry*> DevTmpFs::Mount(StringView  sourcePath,
     return m_RootEntry;
 }
 
-ErrorOr<INode*> DevTmpFs::CreateNode(INode* parent, DirectoryEntry* entry,
+ErrorOr<INode*> DevTmpFs::CreateNode(INode* parent, Ref<DirectoryEntry> entry,
                                      mode_t mode, uid_t uid, gid_t gid)
 {
-    auto inodeOr = MkNod(parent, entry, mode, 0);
+    auto inodeOr = MkNod(parent, entry.Raw(), mode, 0);
     auto inode   = inodeOr.value_or(nullptr);
     if (!inode) return Error(inodeOr.error());
 
@@ -49,7 +45,7 @@ ErrorOr<INode*> DevTmpFs::CreateNode(INode* parent, DirectoryEntry* entry,
     return inode;
 }
 
-ErrorOr<INode*> DevTmpFs::Symlink(INode* parent, DirectoryEntry* entry,
+ErrorOr<INode*> DevTmpFs::Symlink(INode* parent, Ref<DirectoryEntry> entry,
                                   StringView target)
 {
     ToDo();
@@ -63,7 +59,7 @@ INode* DevTmpFs::Link(INode* parent, StringView name, INode* oldNode)
     return nullptr;
 }
 
-ErrorOr<INode*> DevTmpFs::MkNod(INode* parent, DirectoryEntry* entry,
+ErrorOr<INode*> DevTmpFs::MkNod(INode* parent, Ref<DirectoryEntry> entry,
                                 mode_t mode, dev_t dev)
 {
     auto inode = new DevTmpFsINode(entry->Name(), this, mode);

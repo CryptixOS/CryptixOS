@@ -21,14 +21,20 @@ using blkcnt_t           = i64;
 using blkcnt64_t         = i64;
 using blksize_t          = i64;
 
-constexpr usize S_IFMT   = 0170000;
-constexpr usize S_IFBLK  = 0060000;
-constexpr usize S_IFCHR  = 0020000;
+// set-sticky
+constexpr usize S_ISVTX  = 0001000;
+// set-group-id
+constexpr usize S_ISGID  = 0002000;
+// set-user-id
+constexpr usize S_ISUID  = 0004000;
 constexpr usize S_IFIFO  = 0010000;
-constexpr usize S_IFREG  = 0100000;
+constexpr usize S_IFCHR  = 0020000;
 constexpr usize S_IFDIR  = 0040000;
+constexpr usize S_IFBLK  = 0060000;
+constexpr usize S_IFREG  = 0100000;
 constexpr usize S_IFLNK  = 0120000;
 constexpr usize S_IFSOCK = 0140000;
+constexpr usize S_IFMT   = 0170000;
 
 constexpr bool  S_ISBLK(mode_t mode) { return (mode & S_IFMT) == S_IFBLK; }
 constexpr bool  S_ISCHR(mode_t mode) { return (mode & S_IFMT) == S_IFCHR; }

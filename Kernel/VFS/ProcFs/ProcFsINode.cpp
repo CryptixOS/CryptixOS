@@ -5,8 +5,9 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <API/Posix/dirent.h>
-
 #include <Memory/PMM.hpp>
+
+#include <VFS/Filesystem.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
 
 isize ProcFsProperty::Read(u8* outBuffer, off_t offset, usize size)

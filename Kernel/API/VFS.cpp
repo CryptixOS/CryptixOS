@@ -20,6 +20,7 @@
 #include <Time/Time.hpp>
 
 #include <VFS/FileDescriptor.hpp>
+#include <VFS/Filesystem.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
 
@@ -126,6 +127,103 @@ namespace API::VFS
     {
         return API::VFS::FStatAt(AT_FDCWD, path, AT_SYMLINK_NOFOLLOW, out);
     }
+
+    ErrorOr<isize> LSeek(isize fdNum, off_t offset, i32 whence)
+    {
+        auto process = Process::Current();
+        auto fd      = process->GetFileHandle(fdNum);
+        if (!fd) return Error(EBADF);
+
+        return fd->Seek(whence, offset);
+    }
+    // TODO(v1tr10l7): FIBMAP, FIGETBSZ, FIONREAD
+    ErrorOr<isize> IoCtl(isize fdNum, usize request, usize argument)
+    {
+        auto process = Process::Current();
+        auto fd      = process->GetFileHandle(fdNum);
+        if (!fd) return Error(EBADF);
+
+        switch (request)
+        {
+            case FIOCLEX: fd->SetCloseOnExec(true); return 0;
+            case FIONCLEX: fd->SetCloseOnExec(false); return 0;
+            case FIONBIO:
+            {
+                i32 nonblocking
+                    = CPU::CopyFromUser(*reinterpret_cast<i32*>(argument));
+
+                auto flags = fd->GetDescriptionFlags();
+                if (nonblocking) flags |= O_NONBLOCK;
+                else flags &= ~O_NONBLOCK;
+
+                fd->SetDescriptionFlags(flags);
+                return 0;
+            }
+            case FIOASYNC:
+            {
+                i32 fasync
+                    = CPU::CopyFromUser(*reinterpret_cast<i32*>(argument));
+
+                auto flags = fd->GetDescriptionFlags();
+                if (fasync) flags |= FASYNC;
+                else flags &= ~FASYNC;
+
+                fd->SetDescriptionFlags(flags);
+                // TODO(v1tr10l7): fasync
+                return 0;
+            }
+            case FIOQSIZE:
+            {
+                if (!fd->IsDirectory() && !fd->IsRegular() && !fd->IsSymlink())
+                    return Error(ENOTTY);
+                // TODO(v1tr10l7): Add helper function for retrieving size in
+                // bytes to inode class
+                usize size = fd->INode()->Stats().st_size;
+
+                CPU::CopyToUser(reinterpret_cast<usize*>(argument), size);
+                return 0;
+            }
+
+            default: break;
+        }
+
+        // FIXME(v1tr10l7): shouldn't be here
+        CPU::UserMemoryProtectionGuard guard;
+        return fd->INode()->IoCtl(request, argument);
+    }
+
+    ErrorOr<isize> PRead(isize fdNum, void* out, usize count, off_t offset)
+    {
+        auto process = Process::Current();
+        auto fd      = process->GetFileHandle(fdNum);
+        if (!fd) return Error(EBADF);
+
+        if (!process->ValidateAddress(out, PROT_READ, count))
+            return Error(EFAULT);
+
+        auto maybeBuffer = UserBuffer::ForUserBuffer(out, count);
+        RetOnError(maybeBuffer);
+        auto outBuffer = maybeBuffer.value();
+
+        return fd->Read(outBuffer, count, offset);
+    }
+    ErrorOr<isize> PWrite(isize fdNum, const void* in, usize count,
+                          off_t offset)
+    {
+        auto process = Process::Current();
+        auto fd      = process->GetFileHandle(fdNum);
+        if (!fd) return Error(EBADF);
+
+        if (!process->ValidateAddress(in, PROT_WRITE, count))
+            return Error(EFAULT);
+
+        auto maybeBuffer = UserBuffer::ForUserBuffer(in, count);
+        RetOnError(maybeBuffer);
+        auto inBuffer = maybeBuffer.value();
+
+        return fd->Write(inBuffer, count, offset);
+    }
+
     ErrorOr<i32> Access(const char* path, mode_t mode)
     {
         if (mode != (mode & S_IRWXO)) return Error(EINVAL);
@@ -213,6 +311,45 @@ namespace API::VFS
     {
         return MkDirAt(AT_FDCWD, pathname, mode);
     }
+    ErrorOr<isize> RmDir(const char* pathname)
+    {
+        auto process = Process::Current();
+        if (!process->ValidateRead(pathname, 255)) return Error(EFAULT);
+
+        auto path = CPU::AsUser(
+            [&pathname]() -> Path
+            {
+                if (!pathname || *pathname == 0) return "";
+
+                return pathname;
+            });
+
+        auto cwdPath = process->CWD();
+        auto maybeCwdRes
+            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), cwdPath);
+        RetOnError(maybeCwdRes);
+
+        auto cwd = maybeCwdRes.value().Entry;
+        Assert(cwd);
+
+        auto maybePathRes = ::VFS::ResolvePath(cwd, path, true);
+        RetOnError(maybePathRes);
+
+        auto pathRes     = maybePathRes.value();
+
+        auto entry       = pathRes.Entry;
+        auto parentINode = pathRes.Parent->INode();
+
+        if (!parentINode->IsDirectory() || !entry->IsDirectory())
+            return Error(ENOTDIR);
+
+        // FIXME(v1tr10l7): error handling, posix compliance
+        auto status = parentINode->RmDir(entry);
+
+        RetOnError(status);
+
+        return 0;
+    }
     ErrorOr<isize> Link(const char* oldPath, const char* newPath)
     {
         return LinkAt(AT_FDCWD, oldPath, AT_FDCWD, newPath, 0);
@@ -221,35 +358,6 @@ namespace API::VFS
     ErrorOr<isize> Symlink(const char* target, const char* linkPath)
     {
         return Error(ENOSYS);
-    }
-    ErrorOr<isize> RmDir(PathView path)
-    {
-        Process* current = Process::GetCurrent();
-        if (!current->ValidateRead(path.Raw(), Limits::MAX_PATH_LENGTH))
-            return Error(EFAULT);
-        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
-
-        StringView lastComponent = path.GetLastComponent();
-        if (lastComponent == "."_sv) return Error(EINVAL);
-        if (lastComponent == ".."_sv) return Error(ENOTEMPTY);
-
-        auto maybePathRes
-            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), path, true);
-        RetOnError(maybePathRes);
-        auto pathRes = maybePathRes.value();
-
-        if (!pathRes.Entry) return Error(ENOENT);
-
-        auto dentry = pathRes.Entry;
-        if (dentry->Parent()
-            && !dentry->Parent()->INode()->CanWrite(current->Credentials()))
-            return Error(EACCES);
-        if (!dentry->IsDirectory()) return Error(ENOTDIR);
-        for (const auto& [name, child] : dentry->Children())
-            if (name != "."_sv && name != ".."_sv) return Error(ENOTEMPTY);
-
-        // TODO(v1tr10l7):  ::VFS::RecursiveDelete(node);
-        return 0;
     }
     ErrorOr<isize> ReadLink(PathView path, char* out, usize size)
     {
@@ -300,7 +408,7 @@ namespace API::VFS
         if (entry) return Error(EEXIST);
 
         entry           = new DirectoryEntry(parentEntry, pathRes.BaseName);
-        auto maybeEntry = parentINode->MkDir(entry, mode);
+        auto maybeEntry = parentINode->CreateDirectory(entry, mode);
         if (!maybeEntry)
         {
             delete entry;
@@ -339,15 +447,18 @@ namespace API::VFS
             = CPU::AsUser([pathView]() -> Path
                           { return Path(pathView.Raw(), pathView.Size()); });
         auto pathResOr = ResolveAtFd(dirFdNum, path, mode);
-        if (!pathResOr) return Error(pathResOr.error());
+        RetOnError(pathResOr);
         auto pathRes = pathResOr.value();
 
         auto entry   = pathRes.Entry;
         if (!entry) return Error(ENOENT);
 
         auto inode = entry->INode();
-        auto ret   = inode->ChMod(mode);
-        if (!ret) return Error(ret.error());
+        auto ret   = inode->ChangeMode(mode);
+
+        RetOnError(ret);
+        ret = inode->FlushMetadata();
+        RetOnError(ret);
 
         return 0;
     }
@@ -510,22 +621,11 @@ namespace API::VFS
         auto getPath = [](const char* path) -> Path
         { return CPU::AsUser([path]() -> Path { return path; }); };
 
-        auto oldPathResolutionOr
-            = ResolveAtFd(oldDirFdNum, getPath(oldPath), 0);
-        if (!oldPathResolutionOr) return Error(oldPathResolutionOr.error());
-        auto oldPathResolution = oldPathResolutionOr.value();
+        auto oldPathName = getPath(oldPath);
+        auto newPathName = getPath(newPath);
 
-        auto newPathResolutionOr
-            = ResolveAtFd(newDirFdNum, getPath(newPath), 0);
-        if (!newPathResolutionOr) return Error(newPathResolutionOr.error());
-        auto newPathResolution = newPathResolutionOr.value();
-
-        if (!oldPathResolution.Entry) return Error(ENOENT);
-        if (newPathResolution.Entry) return Error(EEXIST);
-
-        auto inode   = oldPathResolution.Entry->INode();
-        auto success = inode->Link(getPath(newPath));
-        if (!success) return Error(success.error());
+        auto entry = ::VFS::Link(nullptr, oldPathName, nullptr, newPathName, 0);
+        if (!entry) return Error(errno);
 
         return 0;
     }
@@ -642,32 +742,6 @@ namespace Syscall::VFS
     using Syscall::Arguments;
     using namespace ::VFS;
 
-    ErrorOr<off_t> SysLSeek(Arguments& args)
-    {
-        i32      fdNum   = static_cast<i32>(args.Args[0]);
-        off_t    offset  = static_cast<off_t>(args.Args[1]);
-        i32      whence  = static_cast<i32>(args.Args[2]);
-
-        Process* current = Process::GetCurrent();
-        auto     fd      = current->GetFileHandle(fdNum);
-        if (!fd) return Error(ENOENT);
-
-        return fd->Seek(whence, offset);
-    }
-
-    ErrorOr<i32> SysIoCtl(Arguments& args)
-    {
-        i32      fdNum   = static_cast<i32>(args.Args[0]);
-        usize    request = static_cast<usize>(args.Args[1]);
-        usize    arg     = static_cast<usize>(args.Args[2]);
-
-        Process* current = Process::GetCurrent();
-        auto     fd      = current->GetFileHandle(fdNum);
-        if (!fd) return Error(EBADF);
-
-        CPU::UserMemoryProtectionGuard guard;
-        return fd->INode()->IoCtl(request, arg);
-    }
     ErrorOr<i32> SysAccess(Arguments& args)
     {
         const char* path = reinterpret_cast<const char*>(args.Args[0]);

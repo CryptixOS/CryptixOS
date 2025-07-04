@@ -32,7 +32,6 @@ class EchFsINode : public INode
         return_err(-1, EROFS);
     }
     virtual ErrorOr<isize> Truncate(usize size) override { return -1; }
-    virtual ErrorOr<void>  ChMod(mode_t mode) override { return Error(ENOSYS); }
 
     friend class EchFs;
 

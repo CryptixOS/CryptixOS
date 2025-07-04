@@ -14,7 +14,6 @@
 #include <Prism/Memory/Ref.hpp>
 #include <Prism/Utility/Delegate.hpp>
 
-#include <VFS/Filesystem.hpp>
 #include <VFS/VFS.hpp>
 
 #include <errno.h>
@@ -37,6 +36,7 @@ class INode
         timespec ChangeTime       = {};
     };
 
+    INode(class Filesystem* fs);
     INode(StringView name);
     INode(StringView name, class Filesystem* fs);
     virtual ~INode() {}
@@ -84,8 +84,18 @@ class INode
     {
         return Error(ENOSYS);
     }
-    virtual ErrorOr<Ref<DirectoryEntry>> MkDir(Ref<DirectoryEntry> entry,
-                                               mode_t              mode)
+
+    virtual ErrorOr<Ref<DirectoryEntry>> CreateNode(Ref<DirectoryEntry> entry,
+                                                    mode_t mode, dev_t dev = 0);
+    virtual ErrorOr<Ref<DirectoryEntry>> CreateFile(Ref<DirectoryEntry> entry,
+                                                    mode_t              mode);
+    virtual ErrorOr<Ref<DirectoryEntry>>
+    CreateDirectory(Ref<DirectoryEntry> entry, mode_t mode);
+    virtual ErrorOr<Ref<DirectoryEntry>> Link(Ref<DirectoryEntry> oldEntry,
+                                              Ref<DirectoryEntry> entry);
+
+    virtual ErrorOr<void>                Unlink(Ref<DirectoryEntry> entry);
+    virtual ErrorOr<void>                RmDir(Ref<DirectoryEntry> entry)
     {
         return Error(ENOSYS);
     }
@@ -97,10 +107,11 @@ class INode
         return Error(ENOSYS);
     }
 
+    virtual ErrorOr<void> SetOwner(uid_t uid, gid_t gid);
+    virtual ErrorOr<void> ChangeMode(mode_t mode);
     virtual ErrorOr<void> UpdateTimestamps(timespec atime = {},
                                            timespec mtime = {},
                                            timespec ctime = {});
-    virtual ErrorOr<void> ChMod(mode_t mode) { return Error(ENOSYS); }
     virtual ErrorOr<void> FlushMetadata() { return Error(ENOSYS); }
 
     inline bool           Populate()

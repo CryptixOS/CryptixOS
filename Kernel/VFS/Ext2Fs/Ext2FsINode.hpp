@@ -33,8 +33,6 @@ class Ext2FsINode : public INode
     }
     virtual ErrorOr<isize> Truncate(usize size) override { return -1; }
 
-    virtual ErrorOr<void>  ChMod(mode_t mode) override;
-
     friend class Ext2Fs;
 
   private:

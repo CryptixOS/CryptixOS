@@ -150,6 +150,7 @@ isize Ext2FsINode::Read(void* buffer, off_t offset, usize bytes)
                            bytes);
 }
 
+/*
 ErrorOr<void> Ext2FsINode::ChMod(mode_t mode)
 {
     ScopedLock guard(m_Lock);
@@ -165,6 +166,7 @@ ErrorOr<void> Ext2FsINode::ChMod(mode_t mode)
 
     return {};
 }
+*/
 
 void Ext2FsINode::Initialize(ino_t index, mode_t mode, u16 type)
 {

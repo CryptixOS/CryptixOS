@@ -44,6 +44,7 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
+#include <VFS/Filesystem.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/Initrd/Initrd.hpp>
 #include <VFS/MountPoint.hpp>
