@@ -12,11 +12,10 @@
 
 #include <Library/Locking/Spinlock.hpp>
 #include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Containers/Span.hpp>
 #include <Prism/Core/Types.hpp>
 #include <Prism/Utility/Delegate.hpp>
 #include <Prism/String/String.hpp>
-
-#include <span>
 
 namespace PCI
 {
@@ -195,7 +194,7 @@ namespace PCI
 
         constexpr const DeviceID&   GetDeviceID() const { return m_ID; }
         inline const DeviceAddress& GetAddress() const { return m_Address; }
-        bool          MatchID(std::span<DeviceID> idTable, DeviceID& outID);
+        bool          MatchID(Span<DeviceID> idTable, DeviceID& outID);
 
         constexpr u16 GetVendorID() const
         {
@@ -260,7 +259,7 @@ namespace PCI
     struct Driver
     {
         String              Name;
-        std::span<DeviceID> MatchIDs;
+        Span<DeviceID> MatchIDs;
 
         using ProbeFn
             = ErrorOr<void> (*)(DeviceAddress& address, const DeviceID& id);

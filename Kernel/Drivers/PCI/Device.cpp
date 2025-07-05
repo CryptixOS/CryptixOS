@@ -63,7 +63,7 @@ namespace PCI
         Write<u16>(RegisterOffset::eCommand, value);
     }
 
-    bool Device::MatchID(std::span<DeviceID> idTable, DeviceID& outID)
+    bool Device::MatchID(Span<DeviceID> idTable, DeviceID& outID)
     {
         for (DeviceID& id : idTable)
         {

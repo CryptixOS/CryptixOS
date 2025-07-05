@@ -307,7 +307,7 @@ namespace E1000e
         template <UnsignedIntegral T>
         inline T Read(Register reg)
         {
-            const usize registerOffset  = std::to_underlying(reg);
+            const usize registerOffset  = ToUnderlying(reg);
             const auto  registerAddress = m_Bar0.Address.Offset(registerOffset);
 
             return MMIO::Read<T>(registerAddress);
@@ -315,7 +315,7 @@ namespace E1000e
         template <UnsignedIntegral T>
         inline void Write(Register reg, const T value)
         {
-            const usize registerOffset  = std::to_underlying(reg);
+            const usize registerOffset  = ToUnderlying(reg);
             const auto  registerAddress = m_Bar0.Address.Offset(registerOffset);
 
             return MMIO::Write<T>(registerAddress, value);
@@ -340,7 +340,7 @@ static void        RemoveDevice(PCI::Device& device) {}
 
 static PCI::Driver s_Driver = {
     .Name     = "e1000e",
-    .MatchIDs = std::span(E1000e::s_IdTable.begin(), E1000e::s_IdTable.end()),
+    .MatchIDs = Span(E1000e::s_IdTable.begin(), E1000e::s_IdTable.end()),
     .Probe    = ProbeDevice,
     .Remove   = RemoveDevice,
 };

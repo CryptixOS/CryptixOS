@@ -14,12 +14,12 @@
 
 namespace ACPI::Interpreter
 {
-    static NameSpace*        s_RootNameSpace = nullptr;
+    static NameSpace*       s_RootNameSpace = nullptr;
     static Vector<CodeBlock> s_ScopesToParse;
-    static ExecutionContext  s_Context;
-    static CodeBlock         s_CurrentBlock;
+    static ExecutionContext s_Context;
+    static CodeBlock        s_CurrentBlock;
 
-    inline byte              PeekNextByte()
+    inline byte             PeekNextByte()
     {
         auto& stream = s_Context.Stream;
 
@@ -257,18 +257,20 @@ namespace ACPI::Interpreter
             case OpCode::ePackage:
             {
                 auto pkgLength = DecodePkgLength();
-                auto length    = ParseTermArg();
+                auto length = ParseTermArg();
 
                 LogMessage(
                     "Created package object\npkgLength => {:#x}, length => "
                     "{:#x}\n",
-                    pkgLength);
+                    pkgLength,
+                    length->Type == ExpressionType::eConstant
+                        ? reinterpret_cast<ConstantExpression*>(length)->Value
+                        : 0x1337);
 
-                for (usize i = 0; i < length; i++)
+                if (IsNameSegment(PeekNextByte()))
                 {
-                    if (IsNameSegment(PeekNextByte()))
-                        LogMessage("Object => {}\n", DecodeName());
-                    else auto arg = ParseTermArg();
+                    LogMessage("Decoded name => {}", DecodeName());
+                    break;
                 }
                 break;
             }
@@ -313,25 +315,6 @@ namespace ACPI::Interpreter
                 nameSpace->m_Object = CreateNamedObject();
                 nameSpace->m_Type   = ObjectType::eName;
 
-                break;
-            }
-            case OpCode::ePackage:
-            {
-                auto pkgLength = DecodePkgLength();
-                auto length    = ParseTermArg();
-
-                LogMessage(
-                    "Created package object again\npkgLength => {:#x}, length "
-                    "=> "
-                    "{:#x}\n",
-                    pkgLength);
-
-                for (usize i = 0; i < length; i++)
-                {
-                    if (IsNameSegment(PeekNextByte()))
-                        LogMessage("Object => {}\n", DecodeName());
-                    else auto arg = ParseTermArg();
-                }
                 break;
             }
             case OpCode::eScope:

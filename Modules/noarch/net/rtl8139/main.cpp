@@ -270,7 +270,7 @@ namespace RTL8139
 
     static PCI::Driver s_Driver = {
         .Name     = "rtl8139",
-        .MatchIDs = std::span(s_IdTable.begin(), s_IdTable.end()),
+        .MatchIDs = Span(s_IdTable.begin(), s_IdTable.end()),
         .Probe    = ProbeDevice,
         .Remove   = RemoveDevice,
     };
