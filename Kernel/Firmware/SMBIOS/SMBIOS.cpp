@@ -48,7 +48,7 @@ namespace SMBIOS
             u16 SkuNumberStringID;
         };
 
-        struct EntryPoint32
+        struct [[gnu::packed]] EntryPoint32
         {
             u32 AnchorString;
             u8  Checksum;
@@ -64,8 +64,8 @@ namespace SMBIOS
             u32 StructureTableAddress;
             u16 StructureCount;
             u8  BcdRevision;
-        } __attribute__((packed));
-        struct EntryPoint64
+        };
+        struct [[gnu::packed]] EntryPoint64
         {
             u8  AnchorString[5];
             u8  Checksum;
@@ -77,14 +77,14 @@ namespace SMBIOS
             u8  Reserved;
             u32 StructureTableMaxSize;
             u64 StructureTableAddress;
-        } __attribute__((packed));
+        };
 
-        struct Header
+        struct [[gnu::packed]] Header
         {
             HeaderType Type;
             u8         Length;
             u16        Handle;
-        } __attribute__((packed));
+        };
 
         void ParseEntry(Header& header) {}
     }; // namespace
