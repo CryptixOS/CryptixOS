@@ -278,9 +278,9 @@ Thread* Thread::Fork(Process* process)
 
     for (const auto& stack : m_Stacks)
     {
-        auto    stackPhys    = stack.GetPhysicalBase();
-        usize   stackVirt    = stack.GetVirtualBase();
-        usize   stackSize    = stack.GetSize();
+        auto    stackPhys    = stack.PhysicalBase();
+        usize   stackVirt    = stack.VirtualBase();
+        usize   stackSize    = stack.Size();
 
         Pointer newStackPhys = PMM::CallocatePages<uintptr_t>(
             Math::AlignUp(stackSize, PMM::PAGE_SIZE) / PMM::PAGE_SIZE);

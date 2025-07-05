@@ -83,13 +83,13 @@ namespace CommandLine
     }
 
     using namespace Prism::StringViewLiterals;
-    std::optional<bool> GetBoolean(StringView key)
+    Optional<bool> GetBoolean(StringView key)
     {
         auto it = s_OptionMap.find(String(key));
         if (it != s_OptionMap.end())
             return it->second == "true"_sv || it->second == "1"_sv;
 
-        return std::nullopt;
+        return NullOpt;
     }
     StringView GetString(StringView key)
     {

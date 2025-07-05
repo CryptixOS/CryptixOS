@@ -449,31 +449,31 @@ ErrorOr<Process*> Process::Fork()
     for (const auto& [base, range] : m_AddressSpace)
     {
         usize pageCount
-            = Math::AlignUp(range->GetSize(), PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
+            = Math::AlignUp(range->Size(), PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
 
         uintptr_t physicalSpace = PMM::CallocatePages<uintptr_t>(pageCount);
         Assert(physicalSpace);
 
         std::memcpy(Pointer(physicalSpace).ToHigherHalf<void*>(),
-                    range->GetPhysicalBase().ToHigherHalf<void*>(),
-                    range->GetSize());
-        pageMap->MapRange(range->GetVirtualBase(), physicalSpace,
-                          range->GetSize(),
+                    range->PhysicalBase().ToHigherHalf<void*>(),
+                    range->Size());
+        pageMap->MapRange(range->VirtualBase(), physicalSpace,
+                          range->Size(),
                           PageAttributes::eRWXU | PageAttributes::eWriteBack);
 
-        auto newRegion = new Region(physicalSpace, range->GetVirtualBase(),
-                                    range->GetSize());
-        newRegion->SetProt(range->GetAccess(), range->GetProt());
-        newProcess->m_AddressSpace.Insert(range->GetVirtualBase().Raw(),
+        auto newRegion = new Region(physicalSpace, range->VirtualBase(),
+                                    range->Size());
+        newRegion->SetProt(range->Access(), range->Prot());
+        newProcess->m_AddressSpace.Insert(range->VirtualBase().Raw(),
                                           newRegion);
         continue;
         // auto newRegion = newProcess->m_AddressSpace.AllocateFixed(
-        //     range->GetVirtualBase(), range->GetSize());
+        //     range->VirtualBase(), range->Size());
         // if (!newRegion)
         //    newRegion
-        //        = newProcess->m_AddressSpace.AllocateRegion(range->GetSize());
+        //        = newProcess->m_AddressSpace.AllocateRegion(range->Size());
         newRegion->SetPhysicalBase(physicalSpace);
-        newRegion->SetProt(range->GetAccess(), range->GetProt());
+        newRegion->SetProt(range->Access(), range->Prot());
 
         // pageMap->MapRegion(newRegion);
         //  TODO(v1tr10l7): Free regions;

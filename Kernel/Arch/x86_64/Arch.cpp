@@ -26,7 +26,7 @@ namespace Arch
 {
     void Initialize()
     {
-        PIC::Remap(0x20, 0x28);
+        I8259A::Instance().Initialize();
         IoApic::Initialize();
         if (!HPET::DetectAndSetup()) LogError("HPET: Not Available");
 

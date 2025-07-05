@@ -129,8 +129,8 @@ struct ProcFsMemoryRegionsProperty : public ProcFsProperty
         Write("======================================================\n");
         Write("Base\t\tLength\t\tPhys\t\tProt\n");
         for (const auto& [base, region] : process->AddressSpace())
-            Write("{:#x}\t\t{:#x}\t\t{:#x}\t\t{:#b}\n", base, region->GetSize(),
-                  region->GetPhysicalBase().Raw(), region->GetProt());
+            Write("{:#x}\t\t{:#x}\t\t{:#x}\t\t{:#b}\n", base, region->Size(),
+                  region->PhysicalBase().Raw(), region->Prot());
         Write("======================================================\n");
     }
 };

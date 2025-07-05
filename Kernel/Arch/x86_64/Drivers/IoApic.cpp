@@ -102,7 +102,7 @@ void IoApic::Initialize()
     }
 
     LogTrace("IoApic: Initializing...");
-    PIC::MaskAllIRQs();
+    I8259A::Instance().MaskAllIRQs();
     LogTrace("IoApic: Legacy PIC disabled");
 
     LogTrace("IoApic: Enumerating controllers...");
