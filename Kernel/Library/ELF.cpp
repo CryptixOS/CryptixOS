@@ -198,7 +198,7 @@ namespace ELF
                     region->SetProt(Access::eReadWriteExecute | Access::eUser,
                                     PROT_READ | PROT_WRITE | PROT_EXEC);
 
-                    addressSpace.Insert(region->GetVirtualBase(), region);
+                    addressSpace.Insert(region->VirtualBase(), region);
 
                     Read(ToHigherHalfAddress<void*>(phys + misalign),
                          current.Offset, current.SegmentSizeInFile);

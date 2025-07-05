@@ -154,7 +154,7 @@ namespace PCI
                     addr, ToUnderlying(RegisterOffset::eDeviceID));
                 u8 classID = controller->Read<u8>(
                     addr, ToUnderlying(RegisterOffset::eClassID));
-                u8 subclassID = controller->Read<u8>(
+                u8 subClassID = controller->Read<u8>(
                     addr, ToUnderlying(RegisterOffset::eSubClassID));
 
                 auto       vendor     = s_VendorIDs.find(vendorID);
@@ -165,15 +165,10 @@ namespace PCI
                 LogInfo(
                     "PCI: {:#x}:{:#x}:{:#x}, ID: {:#x}:{:#x}:{:#x}:{:#x} - {}",
                     addr.Bus, addr.Slot, addr.Function,
-                    static_cast<u16>(vendorID), deviceID, classID, subclassID,
+                    static_cast<u16>(vendorID), deviceID, classID, subClassID,
                     vendorName);
 
-                if (s_HostControllers[addr.Domain]->Read<u8>(
-                        addr, ToUnderlying(RegisterOffset::eClassID))
-                        == 0x01
-                    && s_HostControllers[addr.Domain]->Read<u8>(
-                           addr, ToUnderlying(RegisterOffset::eSubClassID))
-                           == 0x08)
+                if (classID == 0x01 && subClassID == 0x08)
                 {
                     LogInfo(
                         "NVMe{}: {{ Domain: {}, Bus: {}, Slot: {}, Function: "

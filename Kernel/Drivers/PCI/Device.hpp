@@ -241,13 +241,13 @@ namespace PCI
             Write<u16>(RegisterOffset::eCommand, command);
         }
 
-        template <std::unsigned_integral T>
+        template <UnsignedIntegral T>
             requires(sizeof(T) <= 4)
         T Read(RegisterOffset offset) const
         {
             return ReadAt(ToUnderlying(offset), sizeof(T));
         }
-        template <std::unsigned_integral T>
+        template <UnsignedIntegral T>
         void Write(RegisterOffset offset, T value) const
             requires(sizeof(T) <= 4)
         {

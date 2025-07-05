@@ -80,7 +80,7 @@ void Ps2KeyboardDevice::HandleScanCodeSet1Key(u8 raw)
         auto tty           = TTY::GetCurrent();
         bool cursorKeyMode = tty ? tty->GetCursorKeyMode() : false;
         bool disableArrowKeys
-            = CommandLine::GetBoolean("disableArrowKeys").value_or(false);
+            = CommandLine::GetBoolean("disableArrowKeys").ValueOr(false);
 
         char cursorSequence[3];
         cursorSequence[0] = '\e';

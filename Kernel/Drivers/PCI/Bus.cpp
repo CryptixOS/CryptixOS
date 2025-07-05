@@ -22,8 +22,6 @@ namespace PCI
             u16 vendorID     = m_HostController->Read<u16>(
                 address, ToUnderlying(RegisterOffset::eVendorID));
             if (vendorID == PCI_INVALID) continue;
-            LogTrace("PCI: Segment => {:#04x}; Bus => {:#04x}; Slot => {:#04x}",
-                     address.Domain, address.Bus, address.Slot);
 
             u8 headerType = m_HostController->Read<u8>(
                 address, ToUnderlying(RegisterOffset::eHeaderType));
@@ -45,6 +43,9 @@ namespace PCI
     {
         for (const auto& device : m_Devices)
             if (enumerator(device->GetAddress())) return true;
+        for (const auto& bridge : m_ChildBridges)
+            if (enumerator(bridge->Address()))
+                return true;
         return false;
     }
 
@@ -74,6 +75,8 @@ namespace PCI
         if (headerType == 0x00)
         {
             auto device = new Device(address);
+            LogInfo("PCI: Device discovered => {:#04x}:{:#04x}:{:#04x}:{:#04x}, with class {:#04x}:{:#04x}",
+                    address.Domain, address.Bus, address.Slot, address.Function, classID, subClassID);
 
             m_Devices.PushBack(device);
         }
@@ -107,10 +110,6 @@ namespace PCI
 
         auto command = m_HostController->Read<u16>(
             address, ToUnderlying(RegisterOffset::eCommand));
-        if (command & Bit(0)) LogTrace("<< (Decodes IO)");
-        if (command & Bit(1)) LogTrace("<< (Decodes Memory)");
-        if (command & Bit(2)) LogTrace("<< (Bus Master)");
-        if (command & 0x400) LogTrace("<< (IRQs masked)");
         m_HostController->Write<u16>(
             address, ToUnderlying(RegisterOffset::eCommand), command | 0x400);
     }

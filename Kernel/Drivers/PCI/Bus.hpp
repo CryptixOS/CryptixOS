@@ -23,6 +23,10 @@ namespace PCI
             DetectDevices();
         }
 
+        inline DeviceAddress Address() const 
+        {
+            return { m_Domain, m_Bus, 0, 0 };
+        }
         inline HostController* GetController() const
         {
             return m_HostController;

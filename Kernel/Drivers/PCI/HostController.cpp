@@ -98,7 +98,7 @@ namespace PCI
                         uacpi_free_resources(resources);
                     }
 
-#if 0
+#if 1
                     LogInfo(
                         "PCI: Adding irq entry: {{ gsi: {}, device: {}, "
                         "function: {}, pin: {}, edge: {}, high: {} }}",
@@ -122,7 +122,7 @@ namespace PCI
 
     void HostController::Initialize()
     {
-        bool pciUseEcam = CommandLine::GetBoolean("pci.ecam").value_or(true);
+        bool pciUseEcam = CommandLine::GetBoolean("pci.ecam").ValueOr(true);
 
         if (pciUseEcam && m_Address)
         {
