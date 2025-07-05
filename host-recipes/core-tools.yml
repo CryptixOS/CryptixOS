@@ -12,10 +12,19 @@ tools:
         - '--prefix=@PREFIX@'
         - '--target=@OPTION:arch-triple@'
         - '--with-sysroot=@SYSROOT_DIR@'
-        - '--enable-languages=c,c++'
-        - '--disable-multilib'
+        # - '--disable-multilib'
+        # - '--enable-initfini-array'
+        - '--without-headers'
+        - '--without-newlib'
+        - '--enable-languages=c,c++,lto'
         - '--disable-shared'
-        - '--enable-initfini-array'
+        - '--disable-hosted-libstdcxx'
+        # libstdc++ can detect that wchar_t is supported by @SYSROOT_DIR@ and
+        # try to enable code we don't want for wchar handling.  just remove it.
+        - '--disable-wchar_t'
+        - '--disable-libssp'
+        - '--disable-libsanitizer'
+        - '--disable-libquadmath'
         # -g blows up GCC's binary size.
         - 'CFLAGS=-O2'
         - 'CXXFLAGS=-O2'
@@ -44,6 +53,14 @@ tools:
           - args: ['make', '-j@PARALLELISM@', 'inhibit_libc=true', 'all-target-libgcc']
         install:
           - args: ['make', 'install-target-libgcc']
+      - name: libstdc++-v3
+        tools_required:
+          - tool: bootstrap-system-gcc
+            stage_dependencies: [compiler]
+        compile:
+          - args: ['make', '-j@PARALLELISM@', 'all-target-libstdc++-v3']
+        install:
+          - args: ['make', 'install-target-libstdc++-v3']
 
   - name: cross-binutils
     labels: [aarch64]
@@ -388,7 +405,6 @@ tools:
       - args: ['make', 'install']
 
   - name: host-python
-    labels: [aarch64, riscv64]
     architecture: noarch
     from_source: python
     configure:
@@ -463,14 +479,14 @@ tools:
         - '--prefix=@PREFIX@'
         - '--target=@OPTION:arch-triple@'
         - '--with-sysroot=@SYSROOT_DIR@'
-        - '--enable-languages=c,c++'
-        - '--disable-multilib'
+        - '--enable-languages=c,c++,lto'
         - '--enable-initfini-array'
         - '--enable-libstdcxx-filesystem-ts'
-        - '--enable-libsupcxx'
+
+        # - '--disable-multilib'
         # -g blows up GCC's binary size.
         - 'CFLAGS=-O2'
-        - 'CXXFLAGS=-O2'
+        - 'CXXFLAGS="-O2"'
     stages:
       - name: compiler
         pkgs_required:
@@ -498,6 +514,7 @@ tools:
           - args: ['make', '-j@PARALLELISM@', 'all-target-libgcc']
         install:
           - args: ['make', 'install-target-libgcc']
+
       - name: libstdc++
         tools_required:
           - tool: system-gcc
@@ -529,7 +546,7 @@ packages:
         - '--enable-libsupcxx'
         # -g blows up GCC's binary size.
         - 'CFLAGS=-O2'
-        - 'CXXFLAGS=-O2'
+        - 'CXXFLAGS="$CXXFLAGS -fno-exceptions"' 
       - args:
         - '@THIS_SOURCE_DIR@/libstdc++-v3/configure'
         - '--target=@OPTION:arch-triple@'
@@ -538,8 +555,8 @@ packages:
         - '--enable-libstdcxx-filesystem-ts'
     build:
       # GCC complains if the include directory is non-existent.
-      - args: ['make', '-j@PARALLELISM@', '-C', 'include']
-      - args: ['make', '-j@PARALLELISM@', '-C', 'libsupc++']
+      - args: ['CXXFLAGS="$CXXFLAGS -fno-exceptions"', 'make', '-j@PARALLELISM@', '-C', 'include']
+      - args: ['CXXFLAGS="$CXXFLAGS -fno-exceptions"', 'make', '-j@PARALLELISM@', '-C', 'libsupc++']
     install:
       - args: ['make', 'install', '-C', 'include']
       - args: ['make', 'install', '-C', 'libsupc++']

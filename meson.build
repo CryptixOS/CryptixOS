@@ -159,7 +159,7 @@ qemu_args = [
   '-smp', '4',
   '-d', 'cpu_reset',
   # use 2G of memory
-  '-m', '2G',
+  '-m', '4G',
   # set rtc to localtime
   '-rtc', 'base=localtime',
   # don't reboot nor shutdown on triple fault
@@ -177,8 +177,8 @@ qemu_args = [
   # add rtl8139 nic card
   '-nic', 'user,model=rtl8139',
   # add erst table
-  '-object', 'memory-backend-file,id=erstnvram,mem-path=acpi-erst.backing,size=0x10000,share=on',
-  '-device', 'acpi-erst,memdev=erstnvram',
+  #'-object', 'memory-backend-file,id=erstnvram,mem-path=acpi-erst.backing,size=0x10000,share=on',
+  #'-device', 'acpi-erst,memdev=erstnvram',
   #'-device', 'virtio-mmio-device,dev=hd',
 
   # image drives
@@ -310,10 +310,24 @@ initrd = custom_target(
   install: false,
   depends: ext_mods
 )
+initrd_zlib = custom_target(
+  'initrd_zlib',
+  input: [initrd],
+  output: 'initrd.zlib',
+  command: [
+    meson.project_source_root() / 'Meta' / 'compress-initrd.sh', 
+    '@INPUT@', '@OUTPUT@',
+  ],
+  build_by_default: true,
+  console: true,
+  install: false,
+  depends: initrd,
+)
+
 iso = custom_target(
   'iso',
   input: [
-    kernel_elf, initrd, 
+    kernel_elf, initrd_zlib, 
     meson.project_source_root() / 'Meta' / 'limine.conf', 
     meson.project_source_root() / 'Meta' / 'images' / 'bg2.png', 
     meson.project_source_root() / 'Meta' / 'fonts' / 'font.bin'],
@@ -328,7 +342,7 @@ iso = custom_target(
     '&&',
     'cp',
     '@INPUT1@',
-    iso_dir / 'initrd.img.gz',
+    iso_dir / 'initrd.zlib',
     '&&',
     'cp',
     '@INPUT2@',

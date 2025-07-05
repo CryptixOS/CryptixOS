@@ -1,0 +1,39 @@
+tools:
+
+  - name: host-xorg-font-util
+    architecture: noarch
+    exports_aclocal: true
+    from_source: xorg-font-util
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+  - name: host-xorg-macros
+    architecture: noarch
+    exports_aclocal: true
+    from_source: xorg-util-macros
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
+  - name: host-xtrans
+    architecture: noarch
+    exports_aclocal: true
+    from_source: libxtrans
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']

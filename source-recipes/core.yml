@@ -103,6 +103,20 @@ sources:
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
+  - name: python
+    subdir: 'sources'
+    git: 'https://github.com/python/cpython.git'
+    tag: 'v3.10.12'
+    version: '3.10.12'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-libtool
+      - host-pkg-config
+      - host-autoconf-archive
+    regenerate:
+      - args: ['autoreconf', '-f', '-i']
+
   - name: util-linux
     subdir: 'sources'
     git: 'https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git'

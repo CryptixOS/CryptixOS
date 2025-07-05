@@ -6,16 +6,34 @@ packages:
       version: '1.0'
     tools_required:
       - system-gcc
+      - host-pkg-config
+      - virtual: pkgconfig-for-target
+        triple: "@OPTION:arch-triple@"
     pkgs_required:
       - base-files
       - mlibc
-    configure: []
+      - prism
+    configure: 
+      - args:
+        - 'meson'
+        - 'setup'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/@OPTION:arch-triple@-target.cross-file'
+        - '--prefix=/usr'
+        - '--libdir=/lib'
+        - '--buildtype=debugoptimized'
+        - '@THIS_SOURCE_DIR@'
     build:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/sbin']
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/root']
-      - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CryptixUtils/reboot.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/reboot']
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+      # - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CryptixUtils/reboot.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/reboot']
       #- args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CryptixUtils/vi.cpp', '-lncurses',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/vi']
-      - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CryptixUtils/shutdown.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/shutdown']
+      # - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CryptixUtils/shutdown.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/shutdown']
       # - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/AwesomeShell/src/main.cpp', '-lncurses',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/awsh']
 
   - name: coreutils

@@ -13,6 +13,7 @@ declare_options:
 
 imports:
   - file: host-recipes/core-tools.yml
+  - file: host-recipes/x11-tools.yml
 
   #- file: recipes/games.yml
   - file: recipes/misc.yml
@@ -22,8 +23,11 @@ imports:
   - file: recipes/sys-apps.yml
   - file: recipes/sys-libs.yml
   - file: recipes/text-editors.yml
+  - file: recipes/x11-base.yml
+  - file: recipes/x11-libs.yml
 
   - file: source-recipes/core.yml
+  - file: source-recipes/x11-base.yml
   #- file: source-recipes/rust-libs.yml
 
 packages:
