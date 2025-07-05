@@ -28,8 +28,8 @@ namespace VFS
 
     struct PathResolution
     {
-        DirectoryEntry* Parent   = nullptr;
-        DirectoryEntry* Entry    = nullptr;
+        Ref<DirectoryEntry> Parent   = nullptr;
+        Ref<DirectoryEntry> Entry    = nullptr;
         Path            BaseName = ""_s;
     };
 

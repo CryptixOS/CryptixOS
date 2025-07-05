@@ -11,11 +11,10 @@
 #include <VFS/MountPoint.hpp>
 #include <VFS/VFS.hpp>
 
-// FIXME(v1tr10l7): Reference counting, and cleaning up
 // NOTE(v1tr10l7): Directories should only have one DirectoryEntry, regular
 // files might have multiple pointing to the same inode
 
-DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, class INode* inode)
+DirectoryEntry::DirectoryEntry(::Ref<DirectoryEntry> parent, class INode* inode)
     : m_INode(inode)
 {
     m_Name   = inode->Name();
@@ -23,7 +22,7 @@ DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, class INode* inode)
 
     if (parent) parent->InsertChild(this);
 }
-DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, StringView name)
+DirectoryEntry::DirectoryEntry(::Ref<DirectoryEntry> parent, StringView name)
     : m_Name(name)
     , m_Parent(parent)
 {
@@ -44,7 +43,7 @@ Path DirectoryEntry::Path()
         segment += current->m_Name;
         pathBuilder.Insert(segment);
 
-        current = current->GetEffectiveParent();
+        current = current->GetEffectiveParent().Raw();
     }
 
     return pathBuilder.Empty() ? "/"_s : pathBuilder.ToString();
@@ -55,9 +54,9 @@ DirectoryEntry::Children() const
     return m_Children;
 }
 
-void DirectoryEntry::SetParent(DirectoryEntry* entry) { m_Parent = entry; }
+void DirectoryEntry::SetParent(::Ref<DirectoryEntry> entry) { m_Parent = entry; }
 void DirectoryEntry::SetMountGate(class INode*    inode,
-                                  DirectoryEntry* mountPoint)
+                                  ::Ref<DirectoryEntry> mountPoint)
 {
     ScopedLock guard(m_Lock);
     m_MountGate = mountPoint;
@@ -82,14 +81,14 @@ void DirectoryEntry::RemoveChild(Prism::Ref<class DirectoryEntry> entry)
     m_Children.erase(it);
 }
 
-DirectoryEntry* DirectoryEntry::FollowMounts()
+::Ref<DirectoryEntry> DirectoryEntry::FollowMounts()
 {
     auto current = this;
     while (current && current->m_MountGate) current = current->m_MountGate.Raw();
 
     return current;
 }
-DirectoryEntry* DirectoryEntry::FollowSymlinks(usize cnt)
+::Ref<DirectoryEntry> DirectoryEntry::FollowSymlinks(usize cnt)
 {
     auto target = m_INode->GetTarget();
 
@@ -107,12 +106,12 @@ DirectoryEntry* DirectoryEntry::FollowSymlinks(usize cnt)
 
     return this;
 }
-DirectoryEntry* DirectoryEntry::GetEffectiveParent() 
+WeakRef<DirectoryEntry> DirectoryEntry::GetEffectiveParent() 
 {
     auto rootEntry  = VFS::GetRootDirectoryEntry()->FollowMounts();
     auto mountPoint = MountPoint::Lookup(const_cast<DirectoryEntry*>(this));
 
-    if (this == rootEntry || this == VFS::GetRootDirectoryEntry().Raw())
+    if (this == rootEntry.Raw() || this == VFS::GetRootDirectoryEntry().Raw())
         return const_cast<DirectoryEntry*>(this);
     else if (mountPoint) return mountPoint->HostEntry()->Parent();
 

@@ -7,6 +7,8 @@
 
 #include <API/UnixTypes.hpp>
 #include <Drivers/Device.hpp>
+#include <Library/ZLib.hpp>
+
 #include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
 
@@ -25,9 +27,15 @@ namespace Ustar
             == 0;
     }
 
-    void Load(Pointer address)
+    void Load(Pointer address, usize size)
     {
         LogTrace("USTAR: Loading at '{:#x}'...", address);
+
+        // ZLib::Decompressor decompressor(address, size);
+        // Assert(decompressor.Decompress(size));
+        //
+        // address = decompressor.DecompressedData();
+        // size = decompressor.DecompressedSize();
 
         auto current = address.As<FileHeader>();
         auto getNextFile

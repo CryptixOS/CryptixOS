@@ -200,19 +200,15 @@ namespace ACPI::Interpreter
 
     void ParseField()
     {
-        byte next;
-        s_Context.Stream >> next;
+        byte next = ReadNext<byte>();
+        if (!IsNameSegment(next)) return;
 
-        if ((next >= 'A' && next <= 'Z') || next == 0x2e || next == 0x2f
-            || next == '\\' || next == '^')
-        {
-            s_Context.Stream.Seek(s_Context.Stream.Offset() - 1);
-            auto name = DecodeName();
-            LogMessage("\tNamed Field => {}\n", name);
+        s_Context.Stream.Seek(s_Context.Stream.Offset() - 1);
+        auto name = DecodeName();
+        LogMessage("\tNamed Field => {}\n", name);
 
-            auto pkgLength = DecodePkgLength();
-            LogMessage("\tPkgLength => {:#x}\n", pkgLength);
-        }
+        auto pkgLength = DecodePkgLength();
+        LogMessage("\tPkgLength => {:#x}\n", pkgLength);
     }
     
     NameSpace* CreateNameSpace(StringView name)

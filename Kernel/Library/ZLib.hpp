@@ -85,7 +85,7 @@ namespace ZLib
 
         bool         Decompress(usize initialSize = 0);
 
-        inline u8*   DecompressedData() const { return (u8*)m_OutputBuffer; }
+        inline u8*   DecompressedData() const { return reinterpret_cast<u8*>(m_OutputBuffer); }
         inline usize DecompressedSize() const
         {
             return m_OutputPointer - m_OutputBuffer;

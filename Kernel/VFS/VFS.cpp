@@ -178,7 +178,7 @@ namespace VFS
 
         auto parentEntry = resolver.ParentEntry().Raw();
         auto entry       = resolver.DirectoryEntry().Raw();
-        if (followLinks && entry) entry = entry->FollowSymlinks();
+        if (followLinks && entry) entry = entry->FollowSymlinks().Raw();
 
         res.Parent   = parentEntry;
         res.Entry    = entry;
@@ -245,7 +245,7 @@ namespace VFS
         bool                isRoot = (targetEntry == GetRootDirectoryEntry().Raw());
         Ref<DirectoryEntry> mountRoot = nullptr;
 
-        parent                        = targetParent;
+        parent                        = targetParent.Raw();
         if (!parent) parent = s_RootDirectoryEntry.Raw();
         INode*      targetINode = nullptr;
         MountPoint* mountPoint  = nullptr;
@@ -268,7 +268,7 @@ namespace VFS
             return Error(ENOTDIR);
         }
 
-        mountPoint       = new MountPoint(targetEntry, fs);
+        mountPoint       = new MountPoint(targetEntry.Raw(), fs);
         auto mountGateOr = fs->Mount(sourcePath, data);
         mountRoot        = mountGateOr.value();
 
@@ -432,7 +432,7 @@ namespace VFS
         if (!maybePathRes) return_err(nullptr, maybePathRes.error());
 
         auto pathRes = maybePathRes.value();
-        parent       = pathRes.Parent;
+        parent       = pathRes.Parent.Raw();
         auto entry   = pathRes.Entry;
 
         if (entry) return_err(nullptr, EEXIST);
@@ -463,7 +463,7 @@ namespace VFS
 
         auto oldEntry        = oldPathRes.Entry;
         Ref  newEntry        = newPathRes.Entry;
-        newParent            = newPathRes.Parent;
+        newParent            = newPathRes.Parent.Raw();
 
         if (newEntry) return_err(nullptr, EEXIST);
         if (!newParent) return_err(nullptr, ENOENT);

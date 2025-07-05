@@ -4,6 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Boot/CommandLine.hpp>
+
 #include <Firmware/ACPI/ACPI.hpp>
 #include <Firmware/ACPI/Interpreter/Interpreter.hpp>
 #include <Firmware/ACPI/MADT.hpp>
@@ -116,7 +118,8 @@ namespace ACPI
             usize len  = dsdt.Length;
             VMM::MapKernelRange(fadt->X_Dsdt + 4096, fadt->X_Dsdt + 4096, len);
 
-            Interpreter::ExecuteTable(dsdt);
+            if (CommandLine::GetBoolean("acpi.new-interpreter").value_or(false))
+                Interpreter::ExecuteTable(dsdt);
         }
 
     } // namespace

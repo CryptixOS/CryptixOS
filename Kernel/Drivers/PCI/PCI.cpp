@@ -56,7 +56,7 @@ namespace PCI
     void InitializeDatabase()
     {
         PathView        path = "/usr/share/hwdata/pci.ids";
-        DirectoryEntry* entry
+        Ref entry
             = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), path)
                   .value()
                   .Entry;

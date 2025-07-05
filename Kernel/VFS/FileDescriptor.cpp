@@ -227,18 +227,18 @@ bool FileDescriptor::GenerateDirEntries()
     {
         if (current->m_MountGate)
         {
-            current = current->FollowMounts();
+            current = current->FollowMounts().Raw();
             continue;
         }
 
         auto parentEntry = current->Parent() ? current->Parent() : nullptr;
         auto target      = current->INode()->GetTarget();
-        auto next        = VFS::ResolvePath(parentEntry, target.Raw(), true)
+        auto next        = VFS::ResolvePath(parentEntry.Raw(), target.Raw(), true)
                         .value_or(VFS::PathResolution{})
                         .Entry;
 
         if (!next) break;
-        current = next;
+        current = next.Raw();
     }
 
     auto iterator

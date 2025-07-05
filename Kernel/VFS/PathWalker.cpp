@@ -147,21 +147,21 @@ ErrorOr<DirectoryEntry*> PathWalker::FollowSymlink()
 
     auto parentDirectoryEntry = m_DirectoryEntry->Parent();
 
-    auto pathRes = VFS::ResolvePath(parentDirectoryEntry, target.Raw(), false);
+    auto pathRes = VFS::ResolvePath(parentDirectoryEntry.Raw(), target.Raw(), false);
     auto next    = pathRes ? pathRes.value().Entry : nullptr;
 
     if (!next) return Error(ENOLINK);
-    return next;
+    return next.Raw();
 }
 DirectoryEntry* PathWalker::FollowDots()
 {
     if (m_CurrentSegment.Type == PathSegmentType::eDotDot)
-        m_DirectoryEntry = m_DirectoryEntry->GetEffectiveParent();
+        m_DirectoryEntry = m_DirectoryEntry->GetEffectiveParent().Raw();
 
     if (m_CurrentSegment.IsLast)
     {
         m_State          = ResolutionState::eFinished;
-        m_Parent         = m_DirectoryEntry->GetEffectiveParent();
+        m_Parent         = m_DirectoryEntry->GetEffectiveParent().Raw();
         m_DirectoryEntry = m_DirectoryEntry->FollowMounts();
         m_BaseName       = m_DirectoryEntry->Name();
     }

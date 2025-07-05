@@ -7,6 +7,7 @@
 #pragma once
 
 #include <Prism/Memory/Ref.hpp>
+#include <Prism/Memory/WeakRef.hpp>
 #include <VFS/INode.hpp>
 
 class DirectoryEntry : public RefCounted
@@ -16,8 +17,8 @@ class DirectoryEntry : public RefCounted
         : m_Name(name)
     {
     }
-    DirectoryEntry(DirectoryEntry* parent, INode* inode);
-    DirectoryEntry(DirectoryEntry* parent, StringView name);
+    DirectoryEntry(::Ref<DirectoryEntry> parent, INode* inode);
+    DirectoryEntry(::Ref<DirectoryEntry> parent, StringView name);
     DirectoryEntry(const DirectoryEntry& other)
         : m_INode(other.m_INode)
     {
@@ -27,22 +28,22 @@ class DirectoryEntry : public RefCounted
 
     inline INode*          INode() const { return m_INode; }
     inline StringView      Name() const { return m_Name; }
-    inline DirectoryEntry* Parent()  { return m_Parent.Raw(); }
+    inline ::Ref<DirectoryEntry> Parent()  { return m_Parent; }
 
     Path                   Path();
     const std::unordered_map<StringView, ::Ref<DirectoryEntry>>&
                     Children() const;
 
-    void            SetParent(DirectoryEntry* entry);
-    void            SetMountGate(class INode* inode, DirectoryEntry* mountGate);
+    void            SetParent(::Ref<DirectoryEntry> entry);
+    void            SetMountGate(class INode* inode, ::Ref<DirectoryEntry> mountGate);
     void            Bind(class INode* inode);
     void            InsertChild(::Ref<class DirectoryEntry> entry);
     void            RemoveChild(::Ref<class DirectoryEntry> entry);
 
-    DirectoryEntry* FollowMounts();
-    DirectoryEntry* FollowSymlinks(usize cnt = 0);
+    ::Ref<DirectoryEntry> FollowMounts();
+    ::Ref<DirectoryEntry> FollowSymlinks(usize cnt = 0);
 
-    DirectoryEntry* GetEffectiveParent() ;
+    WeakRef<DirectoryEntry> GetEffectiveParent() ;
     ::Ref<DirectoryEntry> Lookup(const String& name);
 
     inline bool     IsCharDevice() const { return m_INode->IsCharDevice(); }

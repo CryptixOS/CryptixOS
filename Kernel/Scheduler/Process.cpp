@@ -161,7 +161,7 @@ void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
 ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
-    DirectoryEntry* parent
+    Ref parent
         = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), m_CWD.Raw())
               .value()
               .Entry;
@@ -178,7 +178,7 @@ ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 
     auto descriptor
         = CPU::AsUser([&]() -> ErrorOr<FileDescriptor*>
-                      { return VFS::Open(parent, path, flags, mode); });
+                      { return VFS::Open(parent.Raw(), path, flags, mode); });
     if (!descriptor) return Error(descriptor.error());
 
     return m_FdTable.Insert(descriptor.value());

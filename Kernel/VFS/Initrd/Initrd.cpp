@@ -28,7 +28,7 @@ namespace Initrd
 
         auto address = Pointer(initrd->address).ToHigherHalf();
 
-        if (Ustar::Validate(address)) Ustar::Load(address);
+        if (Ustar::Validate(address)) Ustar::Load(address, initrd->size);
         else
         {
             LogError("Initrd: Unknown archive format!");

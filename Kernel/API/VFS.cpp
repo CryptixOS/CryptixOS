@@ -47,14 +47,14 @@ namespace API::VFS
             if (!fd) return Error(EBADF);
             ::VFS::PathResolution res;
             res.Entry    = fd->DirectoryEntry();
-            res.Parent   = res.Entry->Parent();
+            res.Parent   = res.Entry->Parent().Raw();
             res.BaseName = res.Entry->Name();
 
             return res;
         }
 
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
-        DirectoryEntry* base = ::VFS::GetRootDirectoryEntry().Raw();
+        Ref<DirectoryEntry> base = ::VFS::GetRootDirectoryEntry();
 
         if (!path.Absolute())
         {
@@ -73,7 +73,7 @@ namespace API::VFS
         }
 
         const bool followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
-        auto       res = ::VFS::ResolvePath(base, path, followSymlinks);
+        auto       res = ::VFS::ResolvePath(base.Raw(), path, followSymlinks);
         if (errno != no_error && errno != ENOENT) return Error(errno);
 
         return res;
@@ -332,7 +332,7 @@ namespace API::VFS
         auto cwd = maybeCwdRes.value().Entry;
         Assert(cwd);
 
-        auto maybePathRes = ::VFS::ResolvePath(cwd, path, true);
+        auto maybePathRes = ::VFS::ResolvePath(cwd.Raw(), path, true);
         RetOnError(maybePathRes);
 
         auto pathRes     = maybePathRes.value();
@@ -410,10 +410,7 @@ namespace API::VFS
         entry           = new DirectoryEntry(parentEntry, pathRes.BaseName);
         auto maybeEntry = parentINode->CreateDirectory(entry, mode);
         if (!maybeEntry)
-        {
-            delete entry;
             return Error(maybeEntry.error());
-        }
 
         return 0;
     }
@@ -579,7 +576,7 @@ namespace API::VFS
         }
 
         auto parentEntry = PathView(path).Absolute()
-                             ? ::VFS::GetRootDirectoryEntry().Raw()
+                             ? ::VFS::GetRootDirectoryEntry()
                              : nullptr;
         if (!parentEntry)
         {
@@ -594,8 +591,8 @@ namespace API::VFS
             parentEntry = parentEntry->FollowMounts();
         }
 
-        DirectoryEntry* entry
-            = ::VFS::ResolvePath(parentEntry, path, followSymlinks)
+        Ref<DirectoryEntry> entry
+            = ::VFS::ResolvePath(parentEntry.Raw(), path, followSymlinks)
                   .value()
                   .Entry;
         if (!entry) return Error(errno);
@@ -748,8 +745,8 @@ namespace Syscall::VFS
         i32         mode = static_cast<i32>(args.Args[1]);
         (void)mode;
 
-        DirectoryEntry* entry = CPU::AsUser(
-            [path]() -> DirectoryEntry*
+        Ref<DirectoryEntry> entry = CPU::AsUser(
+            [path]() -> Ref<DirectoryEntry>
             {
                 return VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), path)
                     .value()
@@ -812,10 +809,10 @@ namespace Syscall::VFS
         auto cwd     = pathRes.Entry;
         if (!cwd) return Error(ENOENT);
 
-        DirectoryEntry* entry = nullptr;
+        Ref<DirectoryEntry> entry = nullptr;
         {
             CPU::UserMemoryProtectionGuard guard;
-            entry = VFS::ResolvePath(cwd, path).value().Entry;
+            entry = VFS::ResolvePath(cwd.Raw(), path).value().Entry;
         }
         if (!entry) return Error(ENOENT);
         if (!entry->IsDirectory()) return Error(ENOTDIR);

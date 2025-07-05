@@ -152,7 +152,7 @@ namespace ELF
     bool Image::Load(PathView path, PageMap* pageMap,
                      AddressSpace& addressSpace, uintptr_t loadBase)
     {
-        DirectoryEntry* entry
+        Ref entry
             = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), path)
                   .value()
                   .Entry;
