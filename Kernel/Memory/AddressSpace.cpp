@@ -23,7 +23,7 @@ bool AddressSpace::IsAvailable(Pointer base, usize length) const
     return true;
     for (auto& [base, region] : *const_cast<AddressSpace*>(this))
     {
-        auto range = region->GetVirtualRange();
+        auto range = region->VirtualRange();
         if (range.Contains(base) /*|| range.Contains(base.Offset(length - 1))*/)
             return false;
     }
@@ -51,7 +51,7 @@ Region* AddressSpace::AllocateRegion(usize size, usize alignment)
     ScopedLock guard(m_Lock);
     if (alignment == 0) alignment = sizeof(void*);
 
-    Pointer currentRegion = m_TotalRange.GetBase();
+    Pointer currentRegion = m_TotalRange.Base();
     Pointer regionStart;
     usize   regionSize;
     Pointer regionEnd;
@@ -66,7 +66,7 @@ Region* AddressSpace::AllocateRegion(usize size, usize alignment)
 
     auto region = new Region(0, regionStart, regionEnd - regionStart);
 
-    Insert(region->GetVirtualBase().Raw(), region);
+    Insert(region->VirtualBase().Raw(), region);
     return region;
 }
 Region* AddressSpace::AllocateFixed(Pointer virt, usize size)
@@ -77,7 +77,7 @@ Region* AddressSpace::AllocateFixed(Pointer virt, usize size)
     if (!IsAvailable(virt, size)) return nullptr;
 
     auto region = new Region(0, virt, size);
-    Insert(region->GetVirtualBase(), region);
+    Insert(region->VirtualBase(), region);
     return region;
 }
 

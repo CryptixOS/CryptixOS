@@ -20,8 +20,8 @@ class AddressRange final
     {
     }
 
-    inline Pointer GetBase() const { return m_Base; }
-    inline usize   GetSize() const { return m_Size; }
+    inline Pointer Base() const { return m_Base; }
+    inline usize   Size() const { return m_Size; }
 
     inline         operator bool() { return m_Base.operator bool(); }
 

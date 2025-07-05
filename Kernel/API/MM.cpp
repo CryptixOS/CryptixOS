@@ -75,7 +75,7 @@ namespace API::MM
             }
             region = addressSpace.AllocateRegion(length);
             region->SetPhysicalBase(phys);
-            auto virt = region->GetVirtualBase();
+            auto virt = region->VirtualBase();
 
             if (!fd->CanRead())
             {
@@ -128,10 +128,10 @@ namespace API::MM
         region->SetProt(access, prot);
         pageMap->MapRegion(region, pageSize);
 
-        return region->GetVirtualBase().Raw();
+        return region->VirtualBase().Raw();
 
     free_region:
-        addressSpace.Erase(region->GetVirtualBase());
+        addressSpace.Erase(region->VirtualBase());
     free_pages:
         PMM::FreePages(phys, pageCount);
     [[maybe_unused]] fail:
@@ -167,8 +167,8 @@ namespace API::MM
 
         auto        region    = addressSpace[virt];
 
-        const auto  phys      = region->GetPhysicalBase();
-        const usize pageCount = region->GetSize() / PMM::PAGE_SIZE;
+        const auto  phys      = region->PhysicalBase();
+        const usize pageCount = region->Size() / PMM::PAGE_SIZE;
         PMM::FreePages(phys, pageCount);
 
         addressSpace.Erase(virt);

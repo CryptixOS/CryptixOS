@@ -312,21 +312,21 @@ class PageMap
     }
     bool MapRegion(const Region* region, const usize pageSize = PMM::PAGE_SIZE)
     {
-        const auto           virt = region->GetVirtualBase();
-        const auto           phys = region->GetPhysicalBase();
-        const usize          size = region->GetSize();
+        const auto           virt = region->VirtualBase();
+        const auto           phys = region->PhysicalBase();
+        const usize          size = region->Size();
 
         const PageAttributes flags
-            = region->GetPageAttributes() | GetPageSizeFlags(pageSize);
+            = region->PageAttributes() | GetPageSizeFlags(pageSize);
         return MapRange(virt, phys, size, flags);
     }
     bool RemapRegion(const Region* region, Pointer newVirt = 0)
     {
-        Pointer              oldVirt = region->GetVirtualBase();
-        const usize          size    = region->GetSize();
-        const PageAttributes flags   = region->GetPageAttributes();
+        Pointer              oldVirt = region->VirtualBase();
+        const usize          size    = region->Size();
+        const PageAttributes flags   = region->PageAttributes();
 
-        if (!newVirt) newVirt = region->GetVirtualBase();
+        if (!newVirt) newVirt = region->VirtualBase();
         return RemapRange(oldVirt, newVirt, size, flags);
     }
 

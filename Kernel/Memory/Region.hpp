@@ -65,29 +65,26 @@ namespace VirtualMemoryManager
             return m_VirtualRange.Contains(address);
         }
 
-        inline const AddressRange& GetVirtualRange() const
+        inline const AddressRange& VirtualRange() const
         {
             return m_VirtualRange;
         }
-        inline Pointer GetPhysicalBase() const { return m_PhysicalBase; }
-        inline Pointer GetVirtualBase() const
-        {
-            return m_VirtualRange.GetBase();
-        }
+        inline Pointer PhysicalBase() const { return m_PhysicalBase; }
+        inline Pointer VirtualBase() const { return m_VirtualRange.Base(); }
         inline Pointer End() const
         {
-            return m_VirtualRange.GetBase().Offset(m_VirtualRange.GetSize());
+            return m_VirtualRange.Base().Offset(m_VirtualRange.Size());
         }
 
-        inline usize GetSize() const { return m_VirtualRange.GetSize(); }
-        inline FileDescriptor* GetFileDescriptor() const { return m_Fd; }
+        inline usize           Size() const { return m_VirtualRange.Size(); }
+        inline FileDescriptor* FileDescriptor() const { return m_Fd; }
 
-        inline Access          GetAccess() const { return m_Access; }
-        inline i32             GetProt() const { return m_Flags; }
-        PageAttributes         GetPageAttributes() const;
+        inline enum Access     Access() const { return m_Access; }
+        inline i32             Prot() const { return m_Flags; }
+        PageAttributes         PageAttributes() const;
 
         inline void SetPhysicalBase(Pointer phys) { m_PhysicalBase = phys; }
-        inline void SetProt(Access access, i32 prot)
+        inline void SetProt(enum Access access, i32 prot)
         {
             m_Access = access;
             m_Flags  = prot;
@@ -107,9 +104,9 @@ namespace VirtualMemoryManager
       private:
         AddressRange    m_VirtualRange;
         Pointer         m_PhysicalBase = nullptr;
-        Access          m_Access       = Access::eNone;
+        enum Access     m_Access       = Access::eNone;
         i32             m_Flags        = 0;
-        FileDescriptor* m_Fd           = nullptr;
+        class FileDescriptor* m_Fd           = nullptr;
     };
 }; // namespace VirtualMemoryManager
 using VirtualMemoryManager::Region;

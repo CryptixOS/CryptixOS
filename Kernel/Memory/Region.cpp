@@ -7,10 +7,10 @@
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
 
-PageAttributes Region::GetPageAttributes() const
+enum PageAttributes Region::PageAttributes() const
 {
     return PageAttributes::eRWXU | PageAttributes::eWriteBack;
-    PageAttributes flags = PageAttributes::eWriteBack;
+    enum PageAttributes flags = PageAttributes::eWriteBack;
 
     if (m_Access & Access::eRead) flags |= PageAttributes::eRead;
     if (m_Access & Access::eWrite) flags |= PageAttributes::eWrite;
