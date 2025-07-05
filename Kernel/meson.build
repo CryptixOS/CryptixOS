@@ -47,7 +47,8 @@ srcs += files(
   'Drivers/Storage/NVMe/NVMeQueue.cpp',
   
   'Firmware/ACPI/ACPI.cpp',
-  #'Firmware/ACPI/Interpreter.cpp',
+  'Firmware/ACPI/Interpreter/Interpreter.cpp',
+  'Firmware/ACPI/Interpreter/NameSpace.cpp',
   'Firmware/ACPI/MADT.cpp',
   'Firmware/ACPI/UACPI.cpp',
 

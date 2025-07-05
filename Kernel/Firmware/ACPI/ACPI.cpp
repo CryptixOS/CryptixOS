@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Firmware/ACPI/ACPI.hpp>
+#include <Firmware/ACPI/Interpreter/Interpreter.hpp>
 #include <Firmware/ACPI/MADT.hpp>
 
 #include <Boot/BootInfo.hpp>
@@ -109,6 +110,13 @@ namespace ACPI
             }
             if (!fadt->X_Dsdt) fadt->X_Dsdt = fadt->DSDT;
             LogTrace("ACPI: Found DSDT table");
+
+            VMM::MapKernelRange(fadt->X_Dsdt, fadt->X_Dsdt, sizeof(SDTHeader));
+            auto& dsdt = *reinterpret_cast<SDTHeader*>(fadt->X_Dsdt);
+            usize len  = dsdt.Length;
+            VMM::MapKernelRange(fadt->X_Dsdt + 4096, fadt->X_Dsdt + 4096, len);
+
+            Interpreter::ExecuteTable(dsdt);
         }
 
     } // namespace
