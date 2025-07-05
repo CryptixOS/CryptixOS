@@ -45,6 +45,9 @@ srcs += files(
   'Drivers/Storage/NVMe/NVMeController.cpp',
   'Drivers/Storage/NVMe/NVMeNameSpace.cpp',
   'Drivers/Storage/NVMe/NVMeQueue.cpp',
+
+  'Drivers/USB/UHCI/UHCiController.cpp',
+  'Drivers/USB/USB.cpp',
   
   'Firmware/ACPI/ACPI.cpp',
   'Firmware/ACPI/Interpreter/Interpreter.cpp',

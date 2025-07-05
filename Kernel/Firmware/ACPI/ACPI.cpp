@@ -118,7 +118,7 @@ namespace ACPI
             usize len  = dsdt.Length;
             VMM::MapKernelRange(fadt->X_Dsdt + 4096, fadt->X_Dsdt + 4096, len);
 
-            if (CommandLine::GetBoolean("acpi.new-interpreter").value_or(false))
+            if (CommandLine::GetBoolean("acpi.new-interpreter").ValueOr(true))
                 Interpreter::ExecuteTable(dsdt);
         }
 

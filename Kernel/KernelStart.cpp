@@ -20,6 +20,7 @@
 #include <Drivers/Serial.hpp>
 #include <Drivers/TTY.hpp>
 #include <Drivers/Terminal.hpp>
+#include <Drivers/USB/USB.hpp>
 
 #include <Firmware/ACPI/ACPI.hpp>
 #include <Firmware/DeviceTree/DeviceTree.hpp>
@@ -142,6 +143,8 @@ static void kernelThread()
     kernelImage.LoadFromMemory(reinterpret_cast<u8*>(header),
                                kernelExecutable->size);
 
+    USB::Initialize();
+
     LogTrace("Loading kernel drivers");
     if (!ELF::Image::LoadModules(header->SectionEntryCount, sections,
                                  stringTable))
@@ -149,8 +152,9 @@ static void kernelThread()
     if (!Module::Load()) LogWarn("Module: Failed to find any modules");
 
     LogDebug("VFS: Testing directory entry caches...");
-    auto maybePathRes = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), "/mnt");
-    auto pathRes      = maybePathRes.value();
+    auto maybePathRes
+        = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), "/mnt");
+    auto        pathRes    = maybePathRes.value();
 
     MountPoint* mountPoint = MountPoint::Head();
 
@@ -194,11 +198,11 @@ kernelStart()
     Serial::Initialize();
 
     if (CommandLine::GetBoolean("log.serial")
-            .value_or(SERIAL_LOG_ENABLE_DEFAULT))
+            .ValueOr(SERIAL_LOG_ENABLE_DEFAULT))
         Logger::EnableSink(LOG_SINK_SERIAL);
-    if (!CommandLine::GetBoolean("log.e9").value_or(true))
+    if (!CommandLine::GetBoolean("log.e9").ValueOr(true))
         Logger::DisableSink(LOG_SINK_E9);
-    // if (CommandLine::GetBoolean("log.boot.terminal").value_or(true))
+    // if (CommandLine::GetBoolean("log.boot.terminal").ValueOr(true))
     Logger::EnableSink(LOG_SINK_TERMINAL);
 
     LogInfo(

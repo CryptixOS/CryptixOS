@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Boot/CommandLine.hpp>
 #include <Firmware/ACPI/Interpreter/Interpreter.hpp>
 
 #include <Prism/Containers/Array.hpp>
@@ -13,16 +14,16 @@
 
 namespace ACPI::Interpreter
 {
-    static NameSpace* s_RootNameSpace = nullptr;
-    static Deque<CodeBlock> s_ScopesToParse;
-    static ExecutionContext s_Context;
-    static CodeBlock s_CurrentBlock;
+    static NameSpace*        s_RootNameSpace = nullptr;
+    static Vector<CodeBlock> s_ScopesToParse;
+    static ExecutionContext  s_Context;
+    static CodeBlock         s_CurrentBlock;
 
-    inline byte PeekNextByte()
+    inline byte              PeekNextByte()
     {
         auto& stream = s_Context.Stream;
 
-        byte value = 0;
+        byte  value  = 0;
         stream >> value;
 
         stream.Seek(stream.Offset() - 1);
@@ -30,7 +31,7 @@ namespace ACPI::Interpreter
     }
 
     template <UnsignedIntegral T>
-    inline T ReadNext() 
+    inline T ReadNext()
     {
         T value = 0;
         s_Context.Stream >> value;
@@ -55,7 +56,7 @@ namespace ACPI::Interpreter
 
     u32 DecodePkgLength()
     {
-        u8 leadByte = ReadNext<byte>();
+        u8  leadByte  = ReadNext<byte>();
 
         u8  byteCount = (leadByte >> 6) & 0x03;
         u32 length    = leadByte & 0x3f;
@@ -81,21 +82,19 @@ namespace ACPI::Interpreter
     }
     String DecodeName()
     {
-        String                 name;
+        String name;
 
-        if (PeekNextByte() == '\\')
-            name += ReadNext<byte>();
-        while (PeekNextByte() == '^')
-            name += ReadNext<byte>();
+        if (PeekNextByte() == '\\') name += ReadNext<byte>();
+        while (PeekNextByte() == '^') name += ReadNext<byte>();
         constexpr usize DUAL_PREFIX  = 0x2e;
         constexpr usize MULTI_PREFIX = 0x2f;
 
-        u8           segmentCount = 0;
+        u8              segmentCount = 0;
         if (PeekNextByte() == '\0')
         {
             segmentCount = 0;
             ReadNext<byte>();
-        }        
+        }
         else if (PeekNextByte() == DUAL_PREFIX)
         {
             segmentCount = 2;
@@ -106,8 +105,7 @@ namespace ACPI::Interpreter
             ReadNext<byte>();
             segmentCount = ReadNext<byte>();
         }
-        else 
-            segmentCount = 1;
+        else segmentCount = 1;
 
         while (segmentCount-- > 0)
         {
@@ -116,20 +114,20 @@ namespace ACPI::Interpreter
         }
         return name;
     }
-    
-    Expression* ParseSuperName() 
+
+    Expression* ParseSuperName()
     {
         auto opcode = GetNextOp();
         switch (opcode)
         {
-            case OpCode::eLocal0 ... OpCode::eLocal7:
-            case OpCode::eArg0 ... OpCode::eArg6:
+            case OpCode::eLocal0... OpCode::eLocal7:
+            case OpCode::eArg0... OpCode::eArg6:
             {
                 StringView argName = magic_enum::enum_name(opcode).data() + 1;
                 return new NameRefExpr(argName);
             }
 
-            default:  
+            default:
                 if (IsNameSegment(ToUnderlying(opcode)))
                 {
                     if (ToUnderlying(opcode) != 0)
@@ -143,13 +141,13 @@ namespace ACPI::Interpreter
     }
     Expression* ParseTermArg()
     {
-        byte op = ReadNext<byte>();
+        byte   op     = ReadNext<byte>();
         OpCode opcode = static_cast<OpCode>(op);
 
         switch (opcode)
         {
-            case OpCode::eLocal0 ... OpCode::eLocal7:
-            case OpCode::eArg0 ... OpCode::eArg6:
+            case OpCode::eLocal0... OpCode::eLocal7:
+            case OpCode::eArg0... OpCode::eArg6:
             {
                 StringView argName = magic_enum::enum_name(opcode).data() + 1;
                 return new NameRefExpr(argName);
@@ -165,21 +163,21 @@ namespace ACPI::Interpreter
                 return new ConstantExpression(ReadNext<dword>());
             case OpCode::eQWordPrefix:
                 return new ConstantExpression(ReadNext<qword>());
-            case OpCode::eSizeOf: 
+            case OpCode::eSizeOf:
             {
                 auto arg = ParseTermArg();
-                return Call("SizeOf", { arg });
+                return Call("SizeOf", {arg});
             }
-            case OpCode::eIndex: 
+            case OpCode::eIndex:
             {
-                auto src = ParseTermArg();
+                auto src   = ParseTermArg();
                 auto index = ParseTermArg();
-                return Call("Index", { src, index });
+                return Call("Index", {src, index});
             }
-            case OpCode::eDerefOf: 
+            case OpCode::eDerefOf:
             {
                 auto ref = ParseTermArg();
-                return Call("DerefOf", { ref });
+                return Call("DerefOf", {ref});
             }
             case OpCode::eLLess:
             {
@@ -190,8 +188,7 @@ namespace ACPI::Interpreter
 
             default:
             {
-                if (IsNameSegment(op))
-                    return new NameRefExpr(DecodeName());
+                if (IsNameSegment(op)) return new NameRefExpr(DecodeName());
 
                 return new ConstantExpression(op);
             }
@@ -210,13 +207,14 @@ namespace ACPI::Interpreter
         auto pkgLength = DecodePkgLength();
         LogMessage("\tPkgLength => {:#x}\n", pkgLength);
     }
-    
+
     NameSpace* CreateNameSpace(StringView name)
     {
         NameSpace* current = nullptr;
-        auto it = s_CurrentBlock.NameSpace->m_Children.find(name);
-        if (it != s_CurrentBlock.NameSpace->m_Children.end()) current = it->second;
-        else 
+        auto       it      = s_CurrentBlock.NameSpace->m_Children.find(name);
+        if (it != s_CurrentBlock.NameSpace->m_Children.end())
+            current = it->second;
+        else
         {
             current = new NameSpace(name, s_CurrentBlock.NameSpace);
             s_CurrentBlock.NameSpace->m_Children[name] = current;
@@ -231,31 +229,51 @@ namespace ACPI::Interpreter
         s_Context.Stream >> op;
 
         Optional<usize> initialValue = 0;
-        usize byteCount = 0;
+        usize           byteCount    = 0;
 
-        Object* object = nullptr;
+        Object*         object       = nullptr;
         switch (static_cast<OpCode>(op))
         {
-            case OpCode::eOne:
-                initialValue = 1;
-                break;
-            case OpCode::eZero:
-                initialValue = 0;
-                break;
-            case OpCode::eQWordPrefix:
-                byteCount = 4;
-            case OpCode::eDWordPrefix:
-                byteCount = 3;
-            case OpCode::eWordPrefix:
-                byteCount = 2;
-            case OpCode::eBytePrefix:
-                byteCount = 1;
-                break;
-                
+            case OpCode::eOne: initialValue = 1; break;
+            case OpCode::eZero: initialValue = 0; break;
+            case OpCode::eQWordPrefix: byteCount = 4;
+            case OpCode::eDWordPrefix: byteCount = 3;
+            case OpCode::eWordPrefix: byteCount = 2;
+            case OpCode::eBytePrefix: byteCount = 1; break;
+            case OpCode::eBuffer:
+            {
+                auto pkgLength = DecodePkgLength();
+                auto length    = ParseTermArg();
 
-          default:    
-            LogError("Failed to create object");
-            break;
+                LogMessage(
+                    "Created buffer object\npkgLength => {:#x}, length => "
+                    "{:#x}\n",
+                    pkgLength,
+                    length->Type == ExpressionType::eConstant
+                        ? reinterpret_cast<ConstantExpression*>(length)->Value
+                        : 0x1337);
+                break;
+            }
+            case OpCode::ePackage:
+            {
+                auto pkgLength = DecodePkgLength();
+                auto length    = ParseTermArg();
+
+                LogMessage(
+                    "Created package object\npkgLength => {:#x}, length => "
+                    "{:#x}\n",
+                    pkgLength);
+
+                for (usize i = 0; i < length; i++)
+                {
+                    if (IsNameSegment(PeekNextByte()))
+                        LogMessage("Object => {}\n", DecodeName());
+                    else auto arg = ParseTermArg();
+                }
+                break;
+            }
+
+            default: LogError("Failed to create object"); break;
         }
 
         for (usize i = 0; i < byteCount; ++i)
@@ -265,43 +283,67 @@ namespace ACPI::Interpreter
             byte next;
             s_Context.Stream >> next;
 
-            initialValue = initialValue.Value() | static_cast<u32>(next) << (4 + (i * 8));
+            initialValue = initialValue.Value()
+                         | static_cast<u32>(next) << (4 + (i * 8));
         }
-        
-        if (initialValue)
-            object = new IntegerObject(initialValue);
+
+        if (initialValue) object = new IntegerObject(initialValue);
+
+        auto str        = magic_enum::enum_name(static_cast<OpCode>(op));
+        auto opCodeName = StringView(str.data(), str.size());
 
         LogTrace("ACPI: Created named object with an opcode => `{}`",
-                 magic_enum::enum_name(static_cast<OpCode>(op)).data());
+                 opCodeName);
         return object;
     }
-    void ExecuteOpcode()
+    void ExecuteOpCode()
     {
         OpCode opcode = GetNextOp();
-        word op = ToUnderlying(opcode);
+        word   op     = ToUnderlying(opcode);
+        LogMessage("{:#x}\n", op);
 
         switch (opcode)
         {
             case OpCode::eName:
             {
                 auto name = DecodeName();
+                LogMessage("NameOp => {}\n", name);
 
-                auto nameSpace = CreateNameSpace(name);
+                auto nameSpace      = CreateNameSpace(name);
                 nameSpace->m_Object = CreateNamedObject();
-                nameSpace->m_Type = ObjectType::eName;
-                LogMessage("Name({}, ", name);
+                nameSpace->m_Type   = ObjectType::eName;
 
+                break;
+            }
+            case OpCode::ePackage:
+            {
+                auto pkgLength = DecodePkgLength();
+                auto length    = ParseTermArg();
+
+                LogMessage(
+                    "Created package object again\npkgLength => {:#x}, length "
+                    "=> "
+                    "{:#x}\n",
+                    pkgLength);
+
+                for (usize i = 0; i < length; i++)
+                {
+                    if (IsNameSegment(PeekNextByte()))
+                        LogMessage("Object => {}\n", DecodeName());
+                    else auto arg = ParseTermArg();
+                }
                 break;
             }
             case OpCode::eScope:
             {
-                usize start = s_Context.Stream.Offset();
-                u32  pkgLength = DecodePkgLength();
-                auto name      = DecodeName();
+                usize start     = s_Context.Stream.Offset();
+                u32   pkgLength = DecodePkgLength();
+                auto  name      = DecodeName();
 
-                auto current = CreateNameSpace(name);
+                auto  current   = CreateNameSpace(name);
                 current->m_Type = ObjectType::eScope;
-                CodeBlock codeBlock(current, s_Context.Stream.Offset(), start + pkgLength);
+                CodeBlock codeBlock(current, s_Context.Stream.Offset(),
+                                    start + pkgLength);
                 s_ScopesToParse.PushBack(codeBlock);
 
                 s_Context.Stream.Seek(codeBlock.End);
@@ -309,13 +351,14 @@ namespace ACPI::Interpreter
             }
             case OpCode::eMethod:
             {
-                usize start = s_Context.Stream.Offset();
-                auto pkgLength = DecodePkgLength();
-                auto name      = DecodeName();
+                usize start     = s_Context.Stream.Offset();
+                auto  pkgLength = DecodePkgLength();
+                auto  name      = DecodeName();
 
-                auto current = CreateNameSpace(name);
+                auto  current   = CreateNameSpace(name);
                 current->m_Type = ObjectType::eMethod;
-                CodeBlock codeBlock(current, s_Context.Stream.Offset(), start + pkgLength);
+                CodeBlock codeBlock(current, s_Context.Stream.Offset(),
+                                    start + pkgLength);
                 s_ScopesToParse.PushBack(codeBlock);
 
                 s_Context.Stream.Seek(codeBlock.End);
@@ -326,15 +369,11 @@ namespace ACPI::Interpreter
                 auto name = DecodeName();
                 word timeout;
                 s_Context.Stream >> timeout;
-
-                LogMessage("Acquire({}, {:#x})\n", name, timeout);
                 break;
             }
             case OpCode::eRelease:
             {
                 auto name = DecodeName();
-
-                LogMessage("Release({})\n", name);
                 break;
             }
             case OpCode::eOpRegion:
@@ -344,10 +383,10 @@ namespace ACPI::Interpreter
             }
             case OpCode::eField:
             {
-                CTOS_UNUSED usize start = s_Context.Stream.Offset();
-                CTOS_UNUSED u32  pkgLength = DecodePkgLength();
-                auto name      = DecodeName();
-                byte flags;
+                CTOS_UNUSED usize start     = s_Context.Stream.Offset();
+                CTOS_UNUSED u32   pkgLength = DecodePkgLength();
+                auto              name      = DecodeName();
+                byte              flags;
                 s_Context.Stream >> flags;
 
                 u8                    acc          = flags & 0b1111;
@@ -360,23 +399,27 @@ namespace ACPI::Interpreter
                     "Buffer",
                 });
 
-                u8 updateRules = flags & 0b1100000;
+                u8                    updateRules  = flags & 0b1100000;
                 ParseField();
 
                 CTOS_UNUSED auto current = CreateNameSpace(name);
-                LogMessage("Field({}, {}Acc, {}, {})\n",
-                           name, s_AccStrings[acc], flags & Bit(4) ? "Lock" : "NoLock",
-                           updateRules == 0 ? "Preserve" : (updateRules == 1 ? "WriteAsOnes" : "WriteAsZeroes"));
+                LogMessage(
+                    "Field({}, {}Acc, {}, {})\n", name, s_AccStrings[acc],
+                    flags & Bit(4) ? "Lock" : "NoLock",
+                    updateRules == 0
+                        ? "Preserve"
+                        : (updateRules == 1 ? "WriteAsOnes" : "WriteAsZeroes"));
                 break;
             }
             case OpCode::eDevice:
             {
-                usize start = s_Context.Stream.Offset();
-                u32 pkgLength = DecodePkgLength();
-                auto name = DecodeName();
+                usize     start     = s_Context.Stream.Offset();
+                u32       pkgLength = DecodePkgLength();
+                auto      name      = DecodeName();
 
-                auto current = CreateNameSpace(name);
-                CodeBlock codeBlock(current, s_Context.Stream.Offset(), start + pkgLength);
+                auto      current   = CreateNameSpace(name);
+                CodeBlock codeBlock(current, s_Context.Stream.Offset(),
+                                    start + pkgLength);
                 s_ScopesToParse.PushBack(codeBlock);
                 current->m_Type = ObjectType::eDevice;
 
@@ -388,18 +431,20 @@ namespace ACPI::Interpreter
             {
                 auto arg0 = ParseTermArg();
                 auto arg1 = ParseTermArg();
-                auto statement = new StoreStatement(Call("ToHexString", { arg0 }), arg1);
+                auto statement
+                    = new StoreStatement(Call("ToHexString", {arg0}), arg1);
                 statement->Dump();
 
                 break;
             }
             case OpCode::eWhile:
             {
-                usize start = s_Context.Stream.Offset();
-                auto pkgLength = DecodePkgLength();
+                usize     start     = s_Context.Stream.Offset();
+                auto      pkgLength = DecodePkgLength();
 
-                auto current = CreateNameSpace("while");
-                CodeBlock codeBlock(current, s_Context.Stream.Offset(), start + pkgLength);
+                auto      current   = CreateNameSpace("while");
+                CodeBlock codeBlock(current, s_Context.Stream.Offset(),
+                                    start + pkgLength);
                 s_ScopesToParse.PushBack(codeBlock);
                 current->m_Type = ObjectType::eWhile;
 
@@ -408,11 +453,11 @@ namespace ACPI::Interpreter
                 break;
             }
             default:
-                if (IsNameSegment(op))
+                if (IsNameSegment(op) && op)
                 {
                     s_Context.Stream.Seek(s_Context.Stream.Offset() - 1);
                     LogMessage("{}()\n", DecodeName());
-                
+
                     break;
                 }
                 LogMessage("{:#x}, {:c}\n", op, std::isalnum(op) ? op : '?');
@@ -420,45 +465,44 @@ namespace ACPI::Interpreter
         }
     }
 
-
     Statement* ParseStatement()
     {
         auto opcode = GetNextOp();
-        word op = ToUnderlying(opcode);
+        word op     = ToUnderlying(opcode);
 
-        switch (opcode) 
+        switch (opcode)
         {
-            case OpCode::eToHexString: 
+            case OpCode::eToHexString:
             {
                 auto arg0 = ParseTermArg();
                 auto arg1 = ParseTermArg();
-                return new StoreStatement(Call("ToHexString", { arg0 }), arg1);
+                return new StoreStatement(Call("ToHexString", {arg0}), arg1);
             }
 
-            case OpCode::eToBuffer: 
+            case OpCode::eToBuffer:
             {
                 auto arg0 = ParseTermArg();
                 auto arg1 = ParseTermArg();
-                return new StoreStatement(Call("ToBuffer", { arg0 }), arg1);
+                return new StoreStatement(Call("ToBuffer", {arg0}), arg1);
             }
 
-            case OpCode::eSubtract: 
+            case OpCode::eSubtract:
             {
                 auto lhs = ParseTermArg();
                 auto rhs = ParseTermArg();
-                auto dst = ParseTermArg(); 
+                auto dst = ParseTermArg();
                 return new StoreStatement(
-                    BinOp(BinaryOpcode::eSubtract, lhs, rhs),
-                    dst
-                );
+                    BinOp(BinaryOpcode::eSubtract, lhs, rhs), dst);
             }
             case OpCode::eIncrement:
             {
                 auto arg = ParseTermArg();
-                return new StoreStatement(BinOp(BinaryOpcode::eAdd, arg, new ConstantExpression(1)), arg);
+                return new StoreStatement(
+                    BinOp(BinaryOpcode::eAdd, arg, new ConstantExpression(1)),
+                    arg);
             }
 
-            case OpCode::eStore: 
+            case OpCode::eStore:
             {
                 auto src = ParseTermArg();
                 auto dst = ParseSuperName();
@@ -466,21 +510,21 @@ namespace ACPI::Interpreter
                 return new StoreStatement(src, dst);
             }
 
-            case OpCode::eWhile: 
+            case OpCode::eWhile:
             {
-                usize start = s_Context.Stream.Offset();
-                u32 pkgLength = DecodePkgLength();
-                auto cond = ParseTermArg();
+                usize start          = s_Context.Stream.Offset();
+                u32   pkgLength      = DecodePkgLength();
+                auto  cond           = ParseTermArg();
 
-                auto whileStatement = new WhileStatement(cond);
-                usize bodyEnd = start + pkgLength;
+                auto  whileStatement = new WhileStatement(cond);
+                usize bodyEnd        = start + pkgLength;
 
                 while (s_Context.Stream.Offset() < bodyEnd)
                     whileStatement->Body.EmplaceBack(ParseStatement());
                 return whileStatement;
             }
 
-            case OpCode::eReturn: 
+            case OpCode::eReturn:
             {
                 // auto val = ParseTermArg();
                 LogError("Return statement");
@@ -493,7 +537,7 @@ namespace ACPI::Interpreter
                     auto name = DecodeName();
                     return new CallStatement(new CallExpression(name));
                 }
-                
+
                 LogError("Unknown AML opcode: {:#x}", op);
                 return nullptr;
         }
@@ -503,15 +547,14 @@ namespace ACPI::Interpreter
         auto method = new MethodObject();
 
         s_Context.Stream.Seek(codeBlock.Start);
-        byte flags = ReadNext<byte>();
+        byte flags              = ReadNext<byte>();
         method->m_ArgumentCount = flags & 0b111;
 
-        auto end = codeBlock.End;
+        auto end                = codeBlock.End;
         while (s_Context.Stream.Offset() < end)
         {
             auto statement = ParseStatement();
-            if (statement)
-                method->m_Statements.PushBack(statement);
+            if (statement) method->m_Statements.PushBack(statement);
         }
 
         return method;
@@ -521,52 +564,60 @@ namespace ACPI::Interpreter
         if (!s_RootNameSpace)
         {
             s_RootNameSpace = new NameSpace("\\");
-            auto block = CodeBlock{s_RootNameSpace, sizeof(table), table.Length - sizeof(table)};
+            auto block      = CodeBlock{s_RootNameSpace, sizeof(table),
+                                   table.Length - sizeof(table)};
             s_ScopesToParse.PushBack(block);
         }
 
-        s_Context.Stream = ByteStream(reinterpret_cast<u8*>(&table),
-                          table.Length);
+        s_Context.Stream
+            = ByteStream(reinterpret_cast<u8*>(&table), table.Length);
 
         LogInfo("ACPI: DSDT Dump =>");
         [[maybe_unused]] static usize passes = 0;
 
-        usize tries = 0;
+        // usize tries = 0;
         while (!s_ScopesToParse.Empty())
-        { 
+        {
             auto scope = s_ScopesToParse.Back();
             s_ScopesToParse.PopBack();
-            if (scope.NameSpace->m_Type != ObjectType::eMethod && !s_ScopesToParse.Empty() && tries < 3)
-            {
-                s_ScopesToParse.PushFront(scope);
-                ++tries;
-                continue;
-            }
-            tries = 0;
-            
+            // if (scope.NameSpace->m_Type != ObjectType::eMethod &&
+            // !s_ScopesToParse.Empty() && tries < 3)
+            // {
+            //     s_ScopesToParse.PushFront(scope);
+            //     ++tries;
+            //     continue;
+            // }
+            // tries = 0;
+
             s_CurrentBlock = scope;
             s_Context.Stream.Seek(scope.Start);
 
-            LogMessage("ACPI: Parsing block =>\n");
-            LogMessage("{}({})\n{{}\n", magic_enum::enum_name(scope.NameSpace->m_Type).data() + 1, scope.NameSpace->m_Name);
+            // LogMessage("ACPI: Parsing block =>\n");
+            // LogMessage("{}({})\n{{}\n",
+            // magic_enum::enum_name(scope.NameSpace->m_Type).data() + 1,
+            // scope.NameSpace->m_Name);
 
-            
-            while (!s_Context.Stream.IsEndOfStream() && s_Context.Stream.Offset() <= scope.End && scope.NameSpace->m_Type != ObjectType::eMethod)
-            {
-                //
-                ExecuteOpcode();
-            }
-            if (scope.NameSpace->m_Type == ObjectType::eMethod)
-            {
-                LogTrace("ACPI: Parsing method...");
-                auto method = ParseMethod(scope);
-                LogTrace("ACPI: Finished parsing method.");
-                LogTrace("ACPI: Dumping method...");
-                method->Dump();
-            }
-            LogMessage("}}\n");
+            bool discardMethods
+                = CommandLine::GetBoolean("acpi.discard-methods").ValueOr(true);
+            if (scope.NameSpace->m_Type == ObjectType::eMethod
+                && discardMethods)
+                continue;
+            auto end = scope.End;
 
-            ++passes;
+            auto str = magic_enum::enum_name(scope.NameSpace->m_Type);
+            auto objectTypeString = StringView(str.data(), str.size());
+            LogTrace("ACPI::Interpreter: Parsing object `{}` of type => `{}`",
+                     scope.NameSpace->m_Name, objectTypeString);
+            while (s_Context.Stream.Offset() < end) ExecuteOpCode();
+            LogTrace("ACPI::Interpreter: Hit end of code block");
+            // LogTrace("ACPI: Parsing method...");
+            // auto method = ParseMethod(scope);
+            // LogTrace("ACPI: Finished parsing method.");
+            // LogTrace("ACPI: Dumping method...");
+            // method->Dump();
+            // LogMessage("}}\n");
+
+            // ++passes;
         }
 
         s_RootNameSpace->Dump();
