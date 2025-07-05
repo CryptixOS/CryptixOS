@@ -54,12 +54,13 @@ ErrorOr<Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
     auto* root  = new Ext2FsINode("/", this, 0644 | S_IFDIR);
     ReadINodeEntry(&root->m_Meta, 2);
 
-    root->m_Stats.st_ino   = 2;
-    root->m_Stats.st_dev   = m_Device->Stats().st_rdev;
-    root->m_Stats.st_nlink = root->m_Meta.HardLinkCount;
-    root->m_Stats.st_size  = root->m_Meta.SizeLow
+    root->m_Metadata.ID        = 2;
+    root->m_Metadata.DeviceID  = m_Device->Stats().st_rdev;
+    root->m_Metadata.LinkCount = root->m_Meta.HardLinkCount;
+    root->m_Metadata.Size      = root->m_Meta.SizeLow
                           | (static_cast<u64>(root->m_Meta.SizeHigh) << 32);
-    root->m_Stats.st_blocks = root->m_Stats.st_size / root->m_Stats.st_blksize;
+    root->m_Metadata.BlockCount
+        = root->m_Metadata.Size / root->m_Metadata.BlockSize;
 
     if (!root)
     {
@@ -115,7 +116,7 @@ ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, Ref<DirectoryEntry> entry,
         WriteINode(inode->m_Meta, buffer, inodeIndex, 0, m_BlockSize);
 
         usize bgdIndex
-            = (inode->m_Stats.st_ino - 1) / m_SuperBlock->INodesPerGroup;
+            = (inode->m_Metadata.ID - 1) / m_SuperBlock->INodesPerGroup;
         Ext2FsBlockGroupDescriptor blockGroup{};
         ReadBlockGroupDescriptor(&blockGroup, bgdIndex);
         ++blockGroup.DirectoryCount;
@@ -154,7 +155,7 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
 {
     Ext2FsINode*    e2node = reinterpret_cast<Ext2FsINode*>(dentry->INode());
     Ext2FsINodeMeta parentMeta;
-    ReadINodeEntry(&parentMeta, e2node->m_Stats.st_ino);
+    ReadINodeEntry(&parentMeta, e2node->m_Metadata.ID);
 
     u8* buffer = new u8[parentMeta.GetSize()];
     ReadINode(parentMeta, buffer, 0, parentMeta.GetSize());
@@ -204,24 +205,24 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
                 break;
         }
 
-        DirectoryEntry* newEntry   = new DirectoryEntry(dentry, nameBuffer);
-        Ext2FsINode*    newNode    = new Ext2FsINode(nameBuffer, this, mode);
-        newNode->m_Stats.st_uid    = inodeMeta.UID;
-        newNode->m_Stats.st_gid    = inodeMeta.GID;
-        newNode->m_Stats.st_ino    = entry->INodeIndex;
-        newNode->m_Stats.st_size   = inodeMeta.GetSize();
-        newNode->m_Stats.st_nlink  = inodeMeta.HardLinkCount;
-        newNode->m_Stats.st_blocks = newNode->m_Stats.st_size / m_BlockSize;
+        DirectoryEntry* newEntry      = new DirectoryEntry(dentry, nameBuffer);
+        Ext2FsINode*    newNode       = new Ext2FsINode(nameBuffer, this, mode);
+        newNode->m_Metadata.UID       = inodeMeta.UID;
+        newNode->m_Metadata.GID       = inodeMeta.GID;
+        newNode->m_Metadata.ID        = entry->INodeIndex;
+        newNode->m_Metadata.Size      = inodeMeta.GetSize();
+        newNode->m_Metadata.LinkCount = inodeMeta.HardLinkCount;
+        newNode->m_Metadata.BlockCount = newNode->m_Metadata.Size / m_BlockSize;
 
-        newNode->m_Stats.st_atim.tv_sec  = inodeMeta.AccessTime;
-        newNode->m_Stats.st_atim.tv_nsec = 0;
-        newNode->m_Stats.st_ctim.tv_sec  = inodeMeta.CreationTime;
-        newNode->m_Stats.st_ctim.tv_nsec = 0;
-        newNode->m_Stats.st_mtim.tv_sec  = inodeMeta.ModifiedTime;
-        newNode->m_Stats.st_mtim.tv_nsec = 0;
+        newNode->m_Metadata.AccessTime.tv_sec        = inodeMeta.AccessTime;
+        newNode->m_Metadata.AccessTime.tv_nsec       = 0;
+        newNode->m_Metadata.ChangeTime.tv_sec        = inodeMeta.CreationTime;
+        newNode->m_Metadata.ChangeTime.tv_nsec       = 0;
+        newNode->m_Metadata.ModificationTime.tv_sec  = inodeMeta.ModifiedTime;
+        newNode->m_Metadata.ModificationTime.tv_nsec = 0;
 
-        newNode->m_Populated             = false;
-        newNode->m_Meta                  = inodeMeta;
+        newNode->m_Populated                         = false;
+        newNode->m_Meta                              = inodeMeta;
 
         newEntry->Bind(newNode);
         e2node->InsertChild(newNode, newNode->Name());

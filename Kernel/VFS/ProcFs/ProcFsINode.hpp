@@ -71,7 +71,7 @@ class ProcFsINode : public INode
         if (m_Property) delete m_Property;
     }
 
-    virtual const stat& Stats() override;
+    virtual const stat Stats() override;
     virtual ErrorOr<void>
     TraverseDirectories(class DirectoryEntry* parent,
                         DirectoryIterator     iterator) override;

@@ -18,30 +18,30 @@ DevTmpFsINode::DevTmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
                              Device* device)
     : INode(name, fs)
 {
-    m_Device           = device;
+    m_Device                = device;
 
-    m_Stats.st_dev     = fs->DeviceID();
-    m_Stats.st_ino     = fs->NextINodeIndex();
-    m_Stats.st_nlink   = 1;
-    m_Stats.st_mode    = mode;
-    m_Stats.st_uid     = 0;
-    m_Stats.st_gid     = 0;
-    m_Stats.st_rdev    = device ? device->ID() : 0;
-    m_Stats.st_size    = 0;
-    m_Stats.st_blksize = 512;
-    m_Stats.st_blocks  = 0;
+    m_Metadata.DeviceID     = fs->DeviceID();
+    m_Metadata.ID           = fs->NextINodeIndex();
+    m_Metadata.LinkCount    = 1;
+    m_Metadata.Mode         = mode;
+    m_Metadata.UID          = 0;
+    m_Metadata.GID          = 0;
+    m_Metadata.RootDeviceID = device ? device->ID() : 0;
+    m_Metadata.Size         = 0;
+    m_Metadata.BlockSize    = 512;
+    m_Metadata.BlockCount   = 0;
 
     if (S_ISREG(mode))
     {
-        m_Capacity        = 0x1000;
-        m_Data            = new u8[m_Capacity];
-        m_Stats.st_size   = m_Capacity;
-        m_Stats.st_blocks = Math::AlignUp(m_Capacity, m_Stats.st_blksize);
+        m_Capacity            = 0x1000;
+        m_Data                = new u8[m_Capacity];
+        m_Metadata.Size       = m_Capacity;
+        m_Metadata.BlockCount = Math::AlignUp(m_Capacity, m_Metadata.BlockSize);
     }
 
-    m_Stats.st_atim = Time::GetReal();
-    m_Stats.st_ctim = Time::GetReal();
-    m_Stats.st_mtim = Time::GetReal();
+    m_Metadata.AccessTime       = Time::GetReal();
+    m_Metadata.ChangeTime       = Time::GetReal();
+    m_Metadata.ModificationTime = Time::GetReal();
 }
 
 ErrorOr<void> DevTmpFsINode::TraverseDirectories(class DirectoryEntry* parent,
@@ -60,14 +60,18 @@ ErrorOr<void> DevTmpFsINode::TraverseDirectories(class DirectoryEntry* parent,
 
     return {};
 }
-INode* DevTmpFsINode::Lookup(const String& name)
+ErrorOr<Ref<DirectoryEntry>> DevTmpFsINode::Lookup(Ref<DirectoryEntry> dentry)
 {
     ScopedLock guard(m_Lock);
 
-    auto       child = Children().find(name);
-    if (child != Children().end()) return child->second;
+    auto       child = Children().find(dentry->Name());
+    if (child != Children().end())
+    {
+        dentry->Bind(child->second);
+        return dentry;
+    }
 
-    return nullptr;
+    return Error(ENOENT);
 }
 
 isize DevTmpFsINode::Read(void* buffer, off_t offset, usize bytes)
@@ -81,12 +85,13 @@ isize DevTmpFsINode::Read(void* buffer, off_t offset, usize bytes)
 
     ScopedLock guard(m_Lock);
     usize      count = bytes;
-    if (static_cast<off_t>(offset + bytes) >= m_Stats.st_size)
-        count = bytes - ((offset + bytes) - m_Stats.st_size);
+    if (offset + bytes >= m_Metadata.Size)
+        count = bytes - ((offset + bytes) - m_Metadata.Size);
 
     std::memcpy(buffer, reinterpret_cast<u8*>(m_Data) + offset, count);
 
-    if (m_Filesystem->ShouldUpdateATime()) m_Stats.st_atim = Time::GetReal();
+    if (m_Filesystem->ShouldUpdateATime())
+        m_Metadata.AccessTime = Time::GetReal();
     return count;
 }
 isize DevTmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
@@ -113,15 +118,17 @@ isize DevTmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
 
     std::memcpy(m_Data + offset, buffer, bytes);
 
-    if (static_cast<off_t>(offset + bytes) >= m_Stats.st_size)
+    if (offset + bytes >= m_Metadata.Size)
     {
-        m_Stats.st_size = static_cast<off_t>(offset + bytes);
-        m_Stats.st_blocks
-            = Math::DivRoundUp(m_Stats.st_size, m_Stats.st_blksize);
+        m_Metadata.Size = static_cast<off_t>(offset + bytes);
+        m_Metadata.BlockCount
+            = Math::DivRoundUp(m_Metadata.Size, m_Metadata.BlockSize);
     }
 
-    if (m_Filesystem->ShouldUpdateMTime()) m_Stats.st_mtim = Time::GetReal();
-    if (m_Filesystem->ShouldUpdateATime()) m_Stats.st_atim = Time::GetReal();
+    if (m_Filesystem->ShouldUpdateMTime())
+        m_Metadata.ModificationTime = Time::GetReal();
+    if (m_Filesystem->ShouldUpdateATime())
+        m_Metadata.AccessTime = Time::GetReal();
     return bytes;
 }
 
@@ -149,10 +156,13 @@ ErrorOr<isize> DevTmpFsINode::Truncate(usize size)
     m_Data     = newData;
     m_Capacity = size;
 
-    if (m_Filesystem->ShouldUpdateCTime()) m_Stats.st_ctim = Time::GetReal();
-    if (m_Filesystem->ShouldUpdateMTime()) m_Stats.st_mtim = Time::GetReal();
+    if (m_Filesystem->ShouldUpdateCTime())
+        m_Metadata.ChangeTime = Time::GetReal();
+    if (m_Filesystem->ShouldUpdateMTime())
+        m_Metadata.ModificationTime = Time::GetReal();
 
-    m_Stats.st_size   = static_cast<off_t>(size);
-    m_Stats.st_blocks = Math::DivRoundUp(m_Stats.st_size, m_Stats.st_blksize);
+    m_Metadata.Size = static_cast<off_t>(size);
+    m_Metadata.BlockCount
+        = Math::DivRoundUp(m_Metadata.Size, m_Metadata.BlockSize);
     return 0;
 }

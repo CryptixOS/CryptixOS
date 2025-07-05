@@ -40,11 +40,31 @@ ErrorOr<Ref<DirectoryEntry>> TmpFs::Mount(StringView  sourcePath,
     return m_RootEntry;
 }
 
-ErrorOr<INode*> TmpFs::AllocateNode()
+ErrorOr<INode*> TmpFs::AllocateNode(StringView name, mode_t mode)
 {
     if (m_NextInodeIndex >= m_MaxInodeCount) return Error(ENOSPC);
+    auto inode = new TmpFsINode(name, this, mode);
+    if (!inode) return Error(ENOMEM);
+    // TODO(v1tr10l7): uid, gid
 
-    return new TmpFsINode(this);
+    inode->m_Metadata.ID               = NextINodeIndex();
+    inode->m_Metadata.BlockSize        = PMM::PAGE_SIZE;
+    inode->m_Metadata.BlockCount       = 0;
+    inode->m_Metadata.RootDeviceID     = 0;
+
+    auto currentTime                   = Time::GetReal();
+    inode->m_Metadata.AccessTime       = currentTime;
+    inode->m_Metadata.ModificationTime = currentTime;
+    inode->m_Metadata.ChangeTime       = currentTime;
+
+    if (S_ISDIR(mode))
+    {
+        ++inode->m_Metadata.LinkCount;
+        inode->m_Metadata.Size = 2 * DIRECTORY_ENTRY_SIZE;
+    }
+
+    --m_FreeINodeCount;
+    return inode;
 }
 ErrorOr<INode*> TmpFs::CreateNode(INode* parent, Ref<DirectoryEntry> entry,
                                   mode_t mode, uid_t uid, gid_t gid)
@@ -53,8 +73,8 @@ ErrorOr<INode*> TmpFs::CreateNode(INode* parent, Ref<DirectoryEntry> entry,
     if (!inodeOr) return Error(inodeOr.error());
 
     auto inode            = reinterpret_cast<TmpFsINode*>(inodeOr.value());
-    inode->m_Stats.st_uid = uid;
-    inode->m_Stats.st_gid = gid;
+    inode->m_Metadata.UID = uid;
+    inode->m_Metadata.GID = gid;
 
     return inode;
 }

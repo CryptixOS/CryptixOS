@@ -23,7 +23,8 @@ class TmpFs : public Filesystem
     virtual ErrorOr<Ref<DirectoryEntry>>
     Mount(StringView sourcePath, const void* data = nullptr) override;
 
-    virtual ErrorOr<INode*> AllocateNode() override;
+    virtual ErrorOr<INode*> AllocateNode(StringView name,
+                                         INodeMode  mode) override;
     virtual ErrorOr<INode*> CreateNode(INode* parent, Ref<DirectoryEntry> entry,
                                        mode_t mode, uid_t uid = 0,
                                        gid_t gid = 0) override;
@@ -40,6 +41,8 @@ class TmpFs : public Filesystem
     usize                  m_MaxSize            = 0;
 
     usize                  m_Size               = 0;
+    // FIXME(v1tr10l7): hardcoded for now
+    usize                  m_FreeINodeCount     = PMM::PAGE_SIZE << 2;
 
     constexpr static usize DIRECTORY_ENTRY_SIZE = 20;
     friend class TmpFsINode;

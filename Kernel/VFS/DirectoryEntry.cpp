@@ -31,14 +31,14 @@ DirectoryEntry::DirectoryEntry(DirectoryEntry* parent, StringView name)
 }
 DirectoryEntry::~DirectoryEntry() {}
 
-Path DirectoryEntry::Path() const
+Path DirectoryEntry::Path() 
 {
     StringBuilder pathBuilder;
 
     auto          current   = this;
     auto          rootEntry = VFS::GetRootDirectoryEntry();
 
-    while (current && current != rootEntry)
+    while (current && current != rootEntry.Raw())
     {
         auto segment = "/"_s;
         segment += current->m_Name;
@@ -85,7 +85,7 @@ void DirectoryEntry::RemoveChild(Prism::Ref<class DirectoryEntry> entry)
 DirectoryEntry* DirectoryEntry::FollowMounts()
 {
     auto current = this;
-    while (current && current->m_MountGate) current = current->m_MountGate;
+    while (current && current->m_MountGate) current = current->m_MountGate.Raw();
 
     return current;
 }
@@ -97,7 +97,7 @@ DirectoryEntry* DirectoryEntry::FollowSymlinks(usize cnt)
     {
         if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
 
-        auto next = VFS::ResolvePath(m_Parent, target.Raw(), true)
+        auto next = VFS::ResolvePath(m_Parent.Raw(), target.Raw(), true)
                         .value_or(VFS::PathResolution{})
                         .Entry;
         if (!next) return_err(nullptr, ENOENT);
@@ -107,18 +107,18 @@ DirectoryEntry* DirectoryEntry::FollowSymlinks(usize cnt)
 
     return this;
 }
-DirectoryEntry* DirectoryEntry::GetEffectiveParent() const
+DirectoryEntry* DirectoryEntry::GetEffectiveParent() 
 {
     auto rootEntry  = VFS::GetRootDirectoryEntry()->FollowMounts();
     auto mountPoint = MountPoint::Lookup(const_cast<DirectoryEntry*>(this));
 
-    if (this == rootEntry || this == VFS::GetRootDirectoryEntry())
+    if (this == rootEntry || this == VFS::GetRootDirectoryEntry().Raw())
         return const_cast<DirectoryEntry*>(this);
     else if (mountPoint) return mountPoint->HostEntry()->Parent();
 
     return Parent();
 }
-DirectoryEntry* DirectoryEntry::Lookup(const String& name)
+::Ref<DirectoryEntry> DirectoryEntry::Lookup(const String& name)
 {
     auto entryIt = m_Children.find(name);
     if (entryIt != m_Children.end()) return entryIt->second.Raw();
@@ -127,9 +127,9 @@ DirectoryEntry* DirectoryEntry::Lookup(const String& name)
     auto inode = m_INode->Lookup(name);
     if (!inode) return nullptr;
 
-    auto entry = new DirectoryEntry(this, inode->Name());
+    ::Ref entry = new DirectoryEntry(this, name);
     entry->Bind(inode);
 
     InsertChild(entry);
-    return entry;
+    return entry.Raw();
 }

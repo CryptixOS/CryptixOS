@@ -16,47 +16,47 @@
 TmpFsINode::TmpFsINode(class Filesystem* fs)
     : INode(fs)
 {
-    m_Stats.st_dev     = fs->DeviceID();
-    m_Stats.st_ino     = fs->NextINodeIndex();
-    m_Stats.st_nlink   = 1;
-    m_Stats.st_rdev    = 0;
-    m_Stats.st_size    = 0;
-    m_Stats.st_blksize = 512;
-    m_Stats.st_blocks  = 0;
+    m_Metadata.DeviceID         = fs->DeviceID();
+    m_Metadata.ID               = fs->NextINodeIndex();
+    m_Metadata.LinkCount        = 1;
+    m_Metadata.RootDeviceID     = 0;
+    m_Metadata.Size             = 0;
+    m_Metadata.BlockSize        = 512;
+    m_Metadata.BlockCount       = 0;
 
-    m_Stats.st_atim    = Time::GetReal();
-    m_Stats.st_mtim    = Time::GetReal();
-    m_Stats.st_ctim    = Time::GetReal();
+    m_Metadata.AccessTime       = Time::GetReal();
+    m_Metadata.ModificationTime = Time::GetReal();
+    m_Metadata.ChangeTime       = Time::GetReal();
 }
 TmpFsINode::TmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
                        uid_t uid, gid_t gid)
     : INode(name, fs)
 {
-    m_Stats.st_dev     = fs->DeviceID();
-    m_Stats.st_ino     = fs->NextINodeIndex();
-    m_Stats.st_nlink   = 1;
-    m_Stats.st_mode    = mode;
-    m_Stats.st_uid     = uid;
-    m_Stats.st_gid     = gid;
-    m_Stats.st_rdev    = 0;
-    m_Stats.st_size    = 0;
-    m_Stats.st_blksize = 512;
-    m_Stats.st_blocks  = 0;
+    m_Metadata.DeviceID         = fs->DeviceID();
+    m_Metadata.ID               = fs->NextINodeIndex();
+    m_Metadata.LinkCount        = 1;
+    m_Metadata.Mode             = mode;
+    m_Metadata.UID              = uid;
+    m_Metadata.GID              = gid;
+    m_Metadata.RootDeviceID     = 0;
+    m_Metadata.Size             = 0;
+    m_Metadata.BlockSize        = 512;
+    m_Metadata.BlockCount       = 0;
 
-    m_Stats.st_atim    = Time::GetReal();
-    m_Stats.st_mtim    = Time::GetReal();
-    m_Stats.st_ctim    = Time::GetReal();
+    m_Metadata.AccessTime       = Time::GetReal();
+    m_Metadata.ModificationTime = Time::GetReal();
+    m_Metadata.ChangeTime       = Time::GetReal();
 
-    // if (parent && parent->Stats().st_mode & S_ISGID)
+    // if (parent && parent->Stats().Mode & S_ISGID)
     // {
-    //     m_Stats.st_gid = parent->Stats().st_gid;
-    //     m_Stats.st_mode |= S_ISGID;
+    //     m_Metadata.GID = parent->Stats().st_gid;
+    //     m_Metadata.Mode |= S_ISGID;
     // }
 
     if (S_ISREG(mode))
     {
         m_Capacity      = GetDefaultSize();
-        m_Stats.st_size = GetDefaultSize();
+        m_Metadata.Size = GetDefaultSize();
         m_Data          = new u8[m_Capacity];
     }
 }
@@ -77,6 +77,20 @@ ErrorOr<void> TmpFsINode::TraverseDirectories(class DirectoryEntry* parent,
 
     return {};
 }
+
+ErrorOr<Ref<DirectoryEntry>> TmpFsINode::Lookup(Ref<DirectoryEntry> entry)
+{
+    ScopedLock guard(m_Lock);
+
+    auto       child = Children().find(entry->Name());
+    if (child != Children().end())
+    {
+        entry->Bind(child->second);
+        return entry;
+    }
+
+    return Error(ENOENT);
+}
 INode* TmpFsINode::Lookup(const String& name)
 {
     ScopedLock guard(m_Lock);
@@ -96,11 +110,12 @@ isize TmpFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
     ScopedLock guard(m_Lock);
 
-    if (static_cast<off_t>(offset + bytes) >= m_Stats.st_size)
-        bytes = bytes - ((offset + bytes) - m_Stats.st_size);
+    if (offset + bytes >= m_Metadata.Size)
+        bytes = bytes - ((offset + bytes) - m_Metadata.Size);
 
     Assert(buffer);
-    if (m_Filesystem->ShouldUpdateATime()) m_Stats.st_atim = Time::GetReal();
+    if (m_Filesystem->ShouldUpdateATime())
+        m_Metadata.AccessTime = Time::GetReal();
     std::memcpy(buffer, reinterpret_cast<u8*>(m_Data) + offset, bytes);
     return bytes;
 }
@@ -130,16 +145,18 @@ isize TmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
 
     memcpy(m_Data + offset, buffer, bytes);
 
-    if (off_t(offset + bytes) >= m_Stats.st_size)
+    if (offset + bytes >= m_Metadata.Size)
     {
-        m_Stats.st_size = off_t(offset + bytes);
-        m_Stats.st_blocks
-            = Math::DivRoundUp(m_Stats.st_size, m_Stats.st_blksize);
+        m_Metadata.Size = off_t(offset + bytes);
+        m_Metadata.BlockCount
+            = Math::DivRoundUp(m_Metadata.Size, m_Metadata.BlockSize);
     }
 
-    if (m_Filesystem->ShouldUpdateATime()) m_Stats.st_atim = Time::GetReal();
-    if (m_Filesystem->ShouldUpdateMTime()) m_Stats.st_mtim = Time::GetReal();
-    m_Stats.st_size = m_Capacity;
+    if (m_Filesystem->ShouldUpdateATime())
+        m_Metadata.AccessTime = Time::GetReal();
+    if (m_Filesystem->ShouldUpdateMTime())
+        m_Metadata.ModificationTime = Time::GetReal();
+    m_Metadata.Size = m_Capacity;
     return bytes;
 }
 ErrorOr<isize> TmpFsINode::Truncate(usize size)
@@ -160,11 +177,14 @@ ErrorOr<isize> TmpFsINode::Truncate(usize size)
     m_Data     = newData;
     m_Capacity = size;
 
-    if (m_Filesystem->ShouldUpdateCTime()) m_Stats.st_ctim = Time::GetReal();
-    if (m_Filesystem->ShouldUpdateMTime()) m_Stats.st_mtim = Time::GetReal();
+    if (m_Filesystem->ShouldUpdateCTime())
+        m_Metadata.ChangeTime = Time::GetReal();
+    if (m_Filesystem->ShouldUpdateMTime())
+        m_Metadata.ModificationTime = Time::GetReal();
 
-    m_Stats.st_size   = static_cast<off_t>(size);
-    m_Stats.st_blocks = Math::DivRoundUp(m_Stats.st_size, m_Stats.st_blksize);
+    m_Metadata.Size = static_cast<off_t>(size);
+    m_Metadata.BlockCount
+        = Math::DivRoundUp(m_Metadata.Size, m_Metadata.BlockSize);
 
     return 0;
 }
@@ -187,34 +207,33 @@ ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateNode(Ref<DirectoryEntry> entry,
 {
     if (m_Children.contains(entry->Name())) return Error(EEXIST);
 
-    auto maybeINode = m_Filesystem->AllocateNode();
+    auto maybeINode = m_Filesystem->AllocateNode(entry->Name(), mode);
     RetOnError(maybeINode);
 
-    auto inode    = reinterpret_cast<TmpFsINode*>(maybeINode.value());
-    inode->m_Name = entry->Name();
-    inode->m_Attributes.Mode = mode;
-    inode->m_Stats.st_mode   = mode;
+    auto inode             = reinterpret_cast<TmpFsINode*>(maybeINode.value());
+    inode->m_Name          = entry->Name();
+    inode->m_Metadata.Mode = mode;
     if (S_ISREG(mode))
     {
         inode->m_Capacity      = inode->GetDefaultSize();
-        inode->m_Stats.st_size = inode->GetDefaultSize();
+        inode->m_Metadata.Size = inode->GetDefaultSize();
         inode->m_Data          = new u8[inode->m_Capacity];
     }
 
     // TODO(v1tr10l7): set dev
 
     auto currentTime = Time::GetReal();
-    m_Attributes.Size += TmpFs::DIRECTORY_ENTRY_SIZE;
+    m_Metadata.Size += TmpFs::DIRECTORY_ENTRY_SIZE;
 
-    m_Attributes.ChangeTime       = currentTime;
-    m_Attributes.ModificationTime = currentTime;
+    m_Metadata.ChangeTime       = currentTime;
+    m_Metadata.ModificationTime = currentTime;
     entry->Bind(inode);
 
     InsertChild(inode, entry->Name());
     if (Mode() & S_ISGID)
     {
-        inode->m_Attributes.GID = m_Attributes.GID;
-        if (S_ISDIR(mode)) inode->m_Attributes.Mode |= S_ISGID;
+        inode->m_Metadata.GID = m_Metadata.GID;
+        if (S_ISDIR(mode)) inode->m_Metadata.Mode |= S_ISGID;
     }
     return entry;
 }
@@ -231,7 +250,7 @@ TmpFsINode::CreateDirectory(Ref<DirectoryEntry> entry, mode_t mode)
     auto maybeEntry = CreateNode(entry, mode | S_IFDIR, 0);
     RetOnError(maybeEntry);
 
-    ++m_Stats.st_nlink;
+    ++m_Metadata.LinkCount;
     return entry;
 }
 ErrorOr<Ref<DirectoryEntry>> TmpFsINode::Link(Ref<DirectoryEntry> oldEntry,
@@ -240,13 +259,13 @@ ErrorOr<Ref<DirectoryEntry>> TmpFsINode::Link(Ref<DirectoryEntry> oldEntry,
     auto inode = reinterpret_cast<TmpFsINode*>(oldEntry->INode());
     if (inode->IsDirectory()) return Error(EPERM);
 
-    m_Stats.st_size += TmpFs::DIRECTORY_ENTRY_SIZE;
+    m_Metadata.Size += TmpFs::DIRECTORY_ENTRY_SIZE;
 
-    auto currentTime               = Time::GetReal();
-    m_Attributes.ChangeTime        = currentTime;
-    m_Attributes.ModificationTime  = currentTime;
-    inode->m_Attributes.ChangeTime = currentTime;
-    ++inode->m_Stats.st_nlink;
+    auto currentTime             = Time::GetReal();
+    m_Metadata.ChangeTime        = currentTime;
+    m_Metadata.ModificationTime  = currentTime;
+    inode->m_Metadata.ChangeTime = currentTime;
+    ++inode->m_Metadata.LinkCount;
 
     entry->Bind(inode);
     return entry;
@@ -258,16 +277,16 @@ ErrorOr<void> TmpFsINode::Unlink(Ref<DirectoryEntry> entry)
     if (it == m_Children.end()) return {};
 
     auto inode = reinterpret_cast<TmpFsINode*>(entry->INode());
-    m_Stats.st_size -= TmpFs::DIRECTORY_ENTRY_SIZE;
+    m_Metadata.Size -= TmpFs::DIRECTORY_ENTRY_SIZE;
 
-    auto currentTime               = Time::GetReal();
-    m_Attributes.ChangeTime        = currentTime;
-    m_Attributes.ModificationTime  = currentTime;
-    inode->m_Attributes.ChangeTime = currentTime;
-    --inode->m_Stats.st_nlink;
+    auto currentTime             = Time::GetReal();
+    m_Metadata.ChangeTime        = currentTime;
+    m_Metadata.ModificationTime  = currentTime;
+    inode->m_Metadata.ChangeTime = currentTime;
+    --inode->m_Metadata.LinkCount;
 
     ScopedLock guard(m_Lock);
-    if (inode->m_Stats.st_nlink == 0)
+    if (inode->m_Metadata.LinkCount == 0)
     {
         m_Children.erase(it);
         delete entry->INode();
@@ -277,12 +296,12 @@ ErrorOr<void> TmpFsINode::Unlink(Ref<DirectoryEntry> entry)
     parent->RemoveChild(entry);
 
     LogTrace("VFS::TmpFs: Unlinked inode => `{}`, link count => {}",
-             entry->Name(), inode->m_Stats.st_nlink);
+             entry->Name(), inode->m_Metadata.LinkCount);
     return {};
 }
 ErrorOr<void> TmpFsINode::RmDir(Ref<DirectoryEntry> entry)
 {
-    --m_Stats.st_nlink;
+    --m_Metadata.LinkCount;
 
     return Unlink(entry);
 }

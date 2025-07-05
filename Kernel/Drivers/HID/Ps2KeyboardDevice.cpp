@@ -13,29 +13,31 @@
 
 #include <cctype>
 
-constexpr usize SCANCODE_MAX               = std::size(PS2_Set1_Keys);
-constexpr usize SCANCODE_CTRL_PRESS        = 0x1d;
-constexpr usize SCANCODE_CTRL_REL          = 0x9d;
-constexpr usize SCANCODE_SHIFT_RIGHT_PRESS = 0x36;
-constexpr usize SCANCODE_SHIFT_RIGHT_REL   = 0xb6;
-constexpr usize SCANCODE_SHIFT_LEFT_PRESS  = 0x2a;
-constexpr usize SCANCODE_SHIFT_LEFT_REL    = 0xaa;
-constexpr usize SCANCODE_ALT_LEFT_PRESS    = 0x38;
-constexpr usize SCANCODE_ALT_LEFT_REL      = 0xb8;
-constexpr usize SCANCODE_CAPSLOCK_TOGGLE   = 0x3a;
-constexpr usize SCANCODE_NUMLOCK           = 0x45;
-constexpr usize SCANCODE_ENTER             = 0x1c;
-constexpr usize SCANCODE_UP_ARROW          = 0x48;
-constexpr usize SCANCODE_DOWN_ARROW        = 0x50;
-constexpr usize SCANCODE_LEFT_ARROW        = 0x4b;
-constexpr usize SCANCODE_RIGHT_ARROW       = 0x4d;
-constexpr usize SCANCODE_HOME_PRESS        = 0x47;
-constexpr usize SCANCODE_END_PRESS         = 0x4f;
-constexpr usize SCANCODE_PAGE_UP_PRESS     = 0x49;
-constexpr usize SCANCODE_PAGE_DOWN_PRESS   = 0x51;
-constexpr usize SCANCODE_DELETE_PRESS      = 0x53;
+constexpr usize   SCANCODE_MAX               = std::size(PS2_Set1_Keys);
+constexpr usize   SCANCODE_CTRL_PRESS        = 0x1d;
+constexpr usize   SCANCODE_CTRL_REL          = 0x9d;
+constexpr usize   SCANCODE_SHIFT_RIGHT_PRESS = 0x36;
+constexpr usize   SCANCODE_SHIFT_RIGHT_REL   = 0xb6;
+constexpr usize   SCANCODE_SHIFT_LEFT_PRESS  = 0x2a;
+constexpr usize   SCANCODE_SHIFT_LEFT_REL    = 0xaa;
+constexpr usize   SCANCODE_ALT_LEFT_PRESS    = 0x38;
+constexpr usize   SCANCODE_ALT_LEFT_REL      = 0xb8;
+constexpr usize   SCANCODE_CAPSLOCK_TOGGLE   = 0x3a;
+constexpr usize   SCANCODE_NUMLOCK           = 0x45;
+constexpr usize   SCANCODE_ENTER             = 0x1c;
+constexpr usize   SCANCODE_UP_ARROW          = 0x48;
+constexpr usize   SCANCODE_DOWN_ARROW        = 0x50;
+constexpr usize   SCANCODE_LEFT_ARROW        = 0x4b;
+constexpr usize   SCANCODE_RIGHT_ARROW       = 0x4d;
+constexpr usize   SCANCODE_HOME_PRESS        = 0x47;
+constexpr usize   SCANCODE_END_PRESS         = 0x4f;
+constexpr usize   SCANCODE_PAGE_UP_PRESS     = 0x49;
+constexpr usize   SCANCODE_PAGE_DOWN_PRESS   = 0x51;
+constexpr usize   SCANCODE_DELETE_PRESS      = 0x53;
 
-void            Ps2KeyboardDevice::Initialize()
+extern AtomicBool g_LogSyscalls;
+
+void              Ps2KeyboardDevice::Initialize()
 {
     // TODO(v1tr10l7): initialize the keyboard device
     if (!m_Controller->ResetDevice(m_Port))
@@ -171,6 +173,9 @@ void Ps2KeyboardDevice::HandleScanCodeSet1Key(u8 raw)
     if (m_Modifiers & KeyModifier::eShift && m_Modifiers & KeyModifier::eAlt
         && c == '\r')
         PowerManager::Reboot();
+    else if (m_Modifiers & KeyModifier::eShift
+             && m_Modifiers & KeyModifier::eAlt)
+        g_LogSyscalls = !g_LogSyscalls;
     Emit(&c, 1);
 }
 void Ps2KeyboardDevice::HandleScanCodeSet2Key(u8 raw) {}

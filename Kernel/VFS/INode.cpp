@@ -41,12 +41,37 @@ INode::INode(StringView name, class Filesystem* fs)
 
     if (!process) return;
 
-    m_Stats.st_uid = process->Credentials().euid;
-    m_Stats.st_gid = process->Credentials().egid;
+    m_Metadata.UID = process->Credentials().euid;
+    m_Metadata.GID = process->Credentials().egid;
+    // m_Stats.st_uid = process->Credentials().euid;
+    // m_Stats.st_gid = process->Credentials().egid;
 }
 
-mode_t INode::Mode() const { return m_Stats.st_mode & ~S_IFMT; }
-bool   INode::IsFilesystemRoot() const
+const stat INode::Stats()
+{
+    stat stats{};
+    stats.st_dev     = m_Metadata.DeviceID;
+    stats.st_ino     = m_Metadata.ID;
+    stats.st_nlink   = m_Metadata.LinkCount;
+    stats.st_mode    = m_Metadata.Mode;
+    stats.st_uid     = m_Metadata.UID;
+    stats.st_gid     = m_Metadata.GID;
+    stats.st_rdev    = m_Metadata.RootDeviceID;
+    stats.st_size    = m_Metadata.Size;
+    stats.st_blksize = m_Metadata.BlockSize;
+    stats.st_blocks  = m_Metadata.BlockCount;
+    stats.st_atim    = m_Metadata.AccessTime;
+    stats.st_mtim    = m_Metadata.ModificationTime;
+    stats.st_ctim    = m_Metadata.ChangeTime;
+
+    return stats;
+}
+
+mode_t INode::Mode() const
+{
+    return /*m_Stats.st_mode*/ m_Metadata.Mode & ~S_IFMT;
+}
+bool INode::IsFilesystemRoot() const
 {
     auto fsRootEntry = m_Filesystem->RootDirectoryEntry();
     auto fsRootINode = fsRootEntry->INode();
@@ -72,10 +97,14 @@ bool INode::IsEmpty()
 }
 bool INode::CanWrite(const Credentials& creds) const
 {
-    if (creds.euid == 0 || m_Stats.st_mode & S_IWOTH) return true;
-    if (creds.euid == m_Stats.st_uid && m_Stats.st_mode & S_IWUSR) return true;
+    if (creds.euid == 0 || /*m_Stats.st_mode*/ m_Metadata.Mode & S_IWOTH)
+        return true;
+    if (creds.euid == /*m_Stats.st_uid*/ m_Metadata.UID
+        && /*m_Stats.st_mode*/ m_Metadata.Mode & S_IWUSR)
+        return true;
 
-    return m_Stats.st_gid == creds.egid && m_Stats.st_mode & S_IWGRP;
+    return /*m_Stats.st_gid*/ m_Metadata.GID == creds.egid
+        && /*m_Stats.st_mode*/ m_Metadata.Mode & S_IWGRP;
 }
 
 bool INode::ValidatePermissions(const Credentials& creds, u32 acc)
@@ -130,26 +159,26 @@ ErrorOr<DirectoryEntry*> INode::Lookup(class DirectoryEntry* entry)
 
 ErrorOr<void> INode::SetOwner(uid_t uid, gid_t gid)
 {
-    if (uid == m_Attributes.UID && gid == m_Attributes.GID) return {};
-    m_Attributes.UID = uid;
-    m_Attributes.GID = gid;
+    if (uid == m_Metadata.UID && gid == m_Metadata.GID) return {};
+    m_Metadata.UID = uid;
+    m_Metadata.GID = gid;
 
-    m_Dirty          = true;
+    m_Dirty        = true;
     return {};
 }
 ErrorOr<void> INode::ChangeMode(mode_t mode)
 {
-    m_Attributes.Mode = mode;
-    m_Dirty           = true;
+    m_Metadata.Mode = mode;
+    m_Dirty         = true;
 
     return {};
 }
 ErrorOr<void> INode::UpdateTimestamps(timespec atime, timespec mtime,
                                       timespec ctime)
 {
-    if (atime) m_Attributes.AccessTime = atime;
-    if (mtime) m_Attributes.ModificationTime = mtime;
-    if (ctime) m_Attributes.ChangeTime = ctime;
+    if (atime) m_Metadata.AccessTime = atime;
+    if (mtime) m_Metadata.ModificationTime = mtime;
+    if (ctime) m_Metadata.ChangeTime = ctime;
 
     // TODO(v1tr10l7): Verify permissions
     m_Dirty = true;

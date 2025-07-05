@@ -100,10 +100,16 @@ class Filesystem
 
     /**
      * @brief Allocate a new inode.
+     * @param name Name of the newly created inode
+     * @param mode File mode (type and permissions)
      *
      * @return ErrorOr<INode*> Pointer to the new inode or error.
      */
-    virtual ErrorOr<INode*> AllocateNode() { return Error(ENOSYS); }
+    virtual ErrorOr<INode*> AllocateNode(StringView name = "",
+                                         INodeMode  mode = 0)
+    {
+        return Error(ENOSYS);
+    }
     /**
      * @brief Create a new inode (file or directory).
      *

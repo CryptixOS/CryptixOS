@@ -43,7 +43,7 @@ void FileDescriptorTable::OpenStdioStreams()
 {
     // FIXME(v1tr10l7): Should we verify whether stdio fds are already open?
     DirectoryEntry* ttyNode
-        = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), "/dev/tty")
+        = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), "/dev/tty")
               .value()
               .Entry;
 

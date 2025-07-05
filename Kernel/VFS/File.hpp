@@ -28,8 +28,8 @@ class File
     {
         return Error(ENOSYS);
     }
-    virtual ErrorOr<const stat*> Stat() const { return Error(ENOSYS); }
-    virtual ErrorOr<isize>       Seek(i32 whence, off_t offset)
+    virtual ErrorOr<const stat> Stat() const { return Error(ENOSYS); }
+    virtual ErrorOr<isize>      Seek(i32 whence, off_t offset)
     {
         return Error(ENOSYS);
     }

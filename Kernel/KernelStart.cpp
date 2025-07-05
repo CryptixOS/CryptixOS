@@ -149,24 +149,8 @@ static void kernelThread()
     if (!Module::Load()) LogWarn("Module: Failed to find any modules");
 
     LogDebug("VFS: Testing directory entry caches...");
-    auto maybePathRes = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), "/mnt");
+    auto maybePathRes = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), "/mnt");
     auto pathRes      = maybePathRes.value();
-
-    auto entry        = pathRes.Entry->FollowMounts();
-    for (auto& [name, dentry] : entry->Children())
-    {
-        LogTrace("Found directory => {}", name);
-        LogTrace("Full path => {}", dentry->Path());
-        LogTrace("Child entries =>");
-
-        auto entry      = dentry;
-        auto mountPoint = MountPoint::Lookup(entry.Raw());
-        if (mountPoint) entry = mountPoint->HostEntry();
-        entry->INode()->Populate();
-
-        for (const auto& [childName, child] : entry->Children())
-            LogTrace("\t- /{}", childName);
-    }
 
     MountPoint* mountPoint = MountPoint::Head();
 

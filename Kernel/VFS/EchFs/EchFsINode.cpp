@@ -14,11 +14,11 @@ EchFsINode::EchFsINode(StringView name, class Filesystem* fs, mode_t mode,
     , m_DirectoryEntry(directoryEntry)
     , m_DirectoryEntryOffset(directoryEntryOffset)
 {
-    m_Stats.st_size    = m_Stats.st_blocks * sizeof(EchFsDirectoryEntry);
-    m_Stats.st_blksize = sizeof(EchFsDirectoryEntry);
-    m_EntryIndex       = m_NextIndex++;
+    m_Metadata.Size      = m_Metadata.BlockCount * sizeof(EchFsDirectoryEntry);
+    m_Metadata.BlockSize = sizeof(EchFsDirectoryEntry);
+    m_EntryIndex         = m_NextIndex++;
 
-    m_NativeFs         = reinterpret_cast<EchFs*>(fs);
+    m_NativeFs           = reinterpret_cast<EchFs*>(fs);
 }
 
 const std::unordered_map<StringView, INode*>& EchFsINode::Children() const

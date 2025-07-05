@@ -62,9 +62,9 @@ namespace VFS
         return s_Filesystems;
     }
 
-    DirectoryEntry* GetRootDirectoryEntry()
+    Ref<DirectoryEntry> GetRootDirectoryEntry()
     {
-        return s_RootDirectoryEntry.Raw();
+        return s_RootDirectoryEntry;
     }
 
     static Filesystem* CreateFilesystem(StringView name, u32 flags)
@@ -176,8 +176,8 @@ namespace VFS
         // RetOnError(resolutionResult);
         CtosUnused(resolutionResult);
 
-        auto parentEntry = resolver.ParentEntry();
-        auto entry       = resolver.DirectoryEntry();
+        auto parentEntry = resolver.ParentEntry().Raw();
+        auto entry       = resolver.DirectoryEntry().Raw();
         if (followLinks && entry) entry = entry->FollowSymlinks();
 
         res.Parent   = parentEntry;
@@ -242,7 +242,7 @@ namespace VFS
         RetOnError(maybePathRes);
 
         auto [targetParent, targetEntry, targetName] = maybePathRes.value();
-        bool                isRoot = (targetEntry == GetRootDirectoryEntry());
+        bool                isRoot = (targetEntry == GetRootDirectoryEntry().Raw());
         Ref<DirectoryEntry> mountRoot = nullptr;
 
         parent                        = targetParent;
@@ -351,12 +351,12 @@ namespace VFS
     }
     ErrorOr<Ref<DirectoryEntry>> CreateFile(PathView path, mode_t mode)
     {
-        PathWalker resolver(GetRootDirectoryEntry(), path);
+        PathWalker resolver(GetRootDirectoryEntry().Raw(), path);
         auto       maybeEntry = resolver.Resolve();
         if (!maybeEntry && maybeEntry.error() != ENOENT)
             return Error(maybeEntry.error());
 
-        auto parent = resolver.ParentEntry();
+        auto parent = resolver.ParentEntry().Raw();
         if (!parent) return Error(ENODEV);
 
         return CreateFile(parent, path, mode);
@@ -412,7 +412,7 @@ namespace VFS
     }
     ErrorOr<Ref<DirectoryEntry>> MkNod(PathView path, mode_t mode, dev_t dev)
     {
-        auto maybePathRes = ResolvePath(GetRootDirectoryEntry(), path);
+        auto maybePathRes = ResolvePath(GetRootDirectoryEntry().Raw(), path);
         RetOnError(maybePathRes);
 
         auto pathRes = maybePathRes.value();
@@ -425,7 +425,7 @@ namespace VFS
     Ref<DirectoryEntry> Symlink(DirectoryEntry* parent, PathView path,
                                 StringView target)
     {
-        if (!parent) parent = GetRootDirectoryEntry();
+        if (!parent) parent = GetRootDirectoryEntry().Raw();
         ScopedLock guard(s_Lock);
 
         auto       maybePathRes = ResolvePath(parent, path);
@@ -452,8 +452,8 @@ namespace VFS
                              DirectoryEntry* newParent, PathView newPath,
                              i32 flags)
     {
-        if (!oldParent) oldParent = GetRootDirectoryEntry();
-        if (!newParent) newParent = GetRootDirectoryEntry();
+        if (!oldParent) oldParent = GetRootDirectoryEntry().Raw();
+        if (!newParent) newParent = GetRootDirectoryEntry().Raw();
 
         auto maybeOldPathRes = ResolvePath(oldParent, oldPath);
         auto maybeNewPathRes = ResolvePath(newParent, newPath);
@@ -480,7 +480,7 @@ namespace VFS
 
     bool Unlink(DirectoryEntry* parent, PathView path, i32 flags)
     {
-        if (!parent) parent = GetRootDirectoryEntry();
+        if (!parent) parent = GetRootDirectoryEntry().Raw();
 
         ToDo();
         return false;

@@ -27,23 +27,23 @@ class DirectoryEntry : public RefCounted
 
     inline INode*          INode() const { return m_INode; }
     inline StringView      Name() const { return m_Name; }
-    inline DirectoryEntry* Parent() const { return m_Parent; }
+    inline DirectoryEntry* Parent()  { return m_Parent.Raw(); }
 
-    Path                   Path() const;
-    const std::unordered_map<StringView, Prism::Ref<DirectoryEntry>>&
+    Path                   Path();
+    const std::unordered_map<StringView, ::Ref<DirectoryEntry>>&
                     Children() const;
 
     void            SetParent(DirectoryEntry* entry);
     void            SetMountGate(class INode* inode, DirectoryEntry* mountGate);
     void            Bind(class INode* inode);
-    void            InsertChild(Prism::Ref<class DirectoryEntry> entry);
-    void            RemoveChild(Prism::Ref<class DirectoryEntry> entry);
+    void            InsertChild(::Ref<class DirectoryEntry> entry);
+    void            RemoveChild(::Ref<class DirectoryEntry> entry);
 
     DirectoryEntry* FollowMounts();
     DirectoryEntry* FollowSymlinks(usize cnt = 0);
 
-    DirectoryEntry* GetEffectiveParent() const;
-    DirectoryEntry* Lookup(const String& name);
+    DirectoryEntry* GetEffectiveParent() ;
+    ::Ref<DirectoryEntry> Lookup(const String& name);
 
     inline bool     IsCharDevice() const { return m_INode->IsCharDevice(); }
     inline bool     IsFifo() const { return m_INode->IsFifo(); }
@@ -52,7 +52,7 @@ class DirectoryEntry : public RefCounted
     inline bool     IsSymlink() const { return m_INode->IsSymlink(); }
     inline bool     IsSocket() const { return m_INode->IsSocket(); }
 
-    DirectoryEntry* m_MountGate = nullptr;
+    ::Ref<DirectoryEntry> m_MountGate = nullptr;
 
   private:
     friend class INode;
@@ -61,8 +61,7 @@ class DirectoryEntry : public RefCounted
     class INode*    m_INode  = nullptr;
 
     String          m_Name   = "";
-    // DirectoryEntry*                                 m_MountGate = nullptr;
 
-    DirectoryEntry* m_Parent = nullptr;
-    std::unordered_map<StringView, Prism::Ref<class DirectoryEntry>> m_Children;
+    ::Ref<DirectoryEntry> m_Parent = nullptr;
+    std::unordered_map<StringView, ::Ref<class DirectoryEntry>> m_Children;
 };

@@ -118,12 +118,12 @@ ErrorOr<isize> FileDescriptor::Write(const UserBuffer& in, usize count,
 
     return bytesWritten;
 }
-ErrorOr<const stat*> FileDescriptor::Stat() const
+ErrorOr<const stat> FileDescriptor::Stat() const
 {
     class INode* node = INode();
     if (!node) return std::unexpected(Error(ENOENT));
 
-    return &node->Stats();
+    return node->Stats();
 }
 
 ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
@@ -257,7 +257,7 @@ bool FileDescriptor::GenerateDirEntries()
 
     // . && ..
     StringView cwdPath = Process::Current()->CWD();
-    auto       cwd     = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), cwdPath)
+    auto       cwd     = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), cwdPath)
                    .value_or(VFS::PathResolution{})
                    .Entry;
     if (!cwd) return true;

@@ -13,7 +13,7 @@ constexpr usize FIFO_SIZE = 16 * PMM::PAGE_SIZE;
 Fifo::Fifo()
     : INode("Fifo")
 {
-    m_Stats.st_mode = 0644 | S_IFIFO;
+    m_Metadata.Mode = 0644 | S_IFIFO;
     m_Buffer.Reserve(FIFO_SIZE);
 }
 

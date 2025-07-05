@@ -95,15 +95,16 @@ ErrorOr<Ref<DirectoryEntry>> Fat32Fs::Mount(StringView  sourcePath,
     m_RootNode = reinterpret_cast<Fat32FsINode*>(m_Root);
 
     m_RootEntry->Bind(m_Root);
-    m_RootNode->m_Stats.st_blocks
+    m_RootNode->m_Metadata.BlockCount
         = GetChainSize(m_BootRecord.RootDirectoryCluster);
-    m_RootNode->m_Stats.st_size = m_RootNode->m_Stats.st_blocks * m_ClusterSize;
-    m_RootNode->m_Stats.st_blksize = m_ClusterSize;
-    m_RootNode->m_Stats.st_dev     = m_Device->Stats().st_rdev;
+    m_RootNode->m_Metadata.Size
+        = m_RootNode->m_Metadata.BlockCount * m_ClusterSize;
+    m_RootNode->m_Metadata.BlockSize = m_ClusterSize;
+    m_RootNode->m_Metadata.DeviceID  = m_Device->Stats().st_rdev;
 
-    m_RootNode->m_Cluster          = m_BootRecord.RootDirectoryCluster;
+    m_RootNode->m_Cluster            = m_BootRecord.RootDirectoryCluster;
 
-    m_Root                         = m_RootNode;
+    m_Root                           = m_RootNode;
     return m_RootEntry;
 }
 
@@ -137,7 +138,7 @@ bool Fat32Fs::Populate(DirectoryEntry* dentry)
 
     Fat32FsINode* f32node = reinterpret_cast<Fat32FsINode*>(node);
     if (ReadWriteClusters(reinterpret_cast<u8*>(directoryEntries),
-                          f32node->m_Cluster, f32node->m_Stats.st_blocks,
+                          f32node->m_Cluster, f32node->m_Metadata.BlockCount,
                           nullptr, false)
         == -1)
     {
@@ -225,13 +226,13 @@ bool Fat32Fs::Populate(DirectoryEntry* dentry)
 
         // TODO(v1tr10l7): atime, ctime, mtime
 
-        newNode->m_Cluster          = GetClusterForDirectoryEntry(entry);
-        newNode->m_Stats.st_blksize = m_ClusterSize;
-        newNode->m_Stats.st_size
+        newNode->m_Cluster            = GetClusterForDirectoryEntry(entry);
+        newNode->m_Metadata.BlockSize = m_ClusterSize;
+        newNode->m_Metadata.Size
             = S_ISDIR(mode) ? GetChainSize(newNode->m_Cluster) * m_ClusterSize
                             : entry->Size;
-        newNode->m_Stats.st_blocks
-            = Math::DivRoundUp(newNode->m_Stats.st_size, m_ClusterSize);
+        newNode->m_Metadata.BlockCount
+            = Math::DivRoundUp(newNode->m_Metadata.Size, m_ClusterSize);
         newNode->m_DirectoryOffset
             = reinterpret_cast<uintptr_t>(entry)
             - reinterpret_cast<uintptr_t>(directoryEntries);

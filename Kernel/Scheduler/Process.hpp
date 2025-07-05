@@ -122,7 +122,7 @@ class Process
         return false;
     }
 
-    inline DirectoryEntry* RootNode() const { return m_RootDirectoryEntry; }
+    inline Ref<DirectoryEntry> RootNode() const { return m_RootDirectoryEntry; }
     inline StringView      CWD() const { return m_CWD; }
     inline void            SetCWD(StringView cwd) { m_CWD = cwd; }
     inline mode_t          Umask() const { return m_Umask; }
@@ -166,7 +166,7 @@ class Process
     Vector<Process*>    m_Zombies;
     Vector<Thread*>     m_Threads;
 
-    DirectoryEntry*     m_RootDirectoryEntry = VFS::GetRootDirectoryEntry();
+    Ref<DirectoryEntry>     m_RootDirectoryEntry = VFS::GetRootDirectoryEntry();
     String              m_CWD                = "/";
     mode_t              m_Umask              = 0;
 

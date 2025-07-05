@@ -43,7 +43,7 @@ static void LoadModuleFromFile(Ref<DirectoryEntry> entry)
 bool Module::Load()
 {
     auto moduleDirectory
-        = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), "/lib/modules/")
+        = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), "/lib/modules/")
               .value_or(VFS::PathResolution{})
               .Entry;
     if (!moduleDirectory) return false;

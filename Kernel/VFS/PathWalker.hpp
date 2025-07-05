@@ -30,26 +30,20 @@ enum class ResolutionState
 class PathWalker
 {
   public:
-    struct Result
-    {
-        class INode*          INode          = nullptr;
-        class DirectoryEntry* DirectoryEntry = nullptr;
-    };
-
     inline PathWalker() = default;
-    explicit PathWalker(DirectoryEntry* const root, PathView path);
+    explicit PathWalker(Ref<DirectoryEntry> const root, PathView path);
 
-    ErrorOr<void> Initialize(DirectoryEntry* const root, PathView path);
+    ErrorOr<void> Initialize(Ref<DirectoryEntry> const root, PathView path);
     ErrorOr<DirectoryEntry*>  Resolve(bool followLinks = true);
 
     ErrorOr<void>             Step();
-    ErrorOr<DirectoryEntry*>  FollowMounts(DirectoryEntry* dentry = nullptr);
+    ErrorOr<Ref<DirectoryEntry>>  FollowMounts(Ref<DirectoryEntry> dentry = nullptr);
     ErrorOr<DirectoryEntry*>  FollowSymlinks();
     ErrorOr<DirectoryEntry*>  FollowSymlink();
     DirectoryEntry*           FollowDots();
     Error                     Terminate(ErrorCode code);
 
-    constexpr DirectoryEntry* RootDirectoryEntry() const { return m_Root; }
+    constexpr Ref<DirectoryEntry> RootDirectoryEntry() { return m_Root; }
     constexpr const Vector<String>& Segments() const { return m_Tokens; }
     constexpr isize                 Position() const { return m_Position; }
     constexpr StringView            CurrentSegment() const
@@ -58,15 +52,15 @@ class PathWalker
     }
 
     DirectoryEntry*           GetEffectiveParent(INode* node = nullptr);
-    constexpr DirectoryEntry* ParentEntry() const { return m_Parent; }
-    constexpr DirectoryEntry* DirectoryEntry() const
+    constexpr Ref<DirectoryEntry> ParentEntry() { return m_Parent; }
+    constexpr Ref<DirectoryEntry> DirectoryEntry() 
     {
         return m_DirectoryEntry;
     }
 
-    constexpr INode* ParentINode() const
+    constexpr INode* ParentINode() 
     {
-        return m_Parent ? m_Parent->INode() : nullptr;
+        return m_Parent.Raw() ? m_Parent->INode() : nullptr;
     }
     constexpr INode* INode() const
     {
@@ -79,7 +73,7 @@ class PathWalker
     constexpr const Path& BaseName() const { return m_BaseName; }
 
   private:
-    class DirectoryEntry* m_Root  = nullptr;
+    class Ref<::DirectoryEntry> m_Root  = nullptr;
 
     ResolutionState       m_State = ResolutionState::eUninitialized;
     PathView              m_Path  = "/"_s;
@@ -96,8 +90,8 @@ class PathWalker
 
     Segment               GetNextSegment();
 
-    class DirectoryEntry* m_Parent         = nullptr;
-    class DirectoryEntry* m_DirectoryEntry = nullptr;
+    class Ref<::DirectoryEntry> m_Parent         = nullptr;
+    class Ref<::DirectoryEntry> m_DirectoryEntry = nullptr;
 
     Path                  m_BaseName       = ""_s;
 };

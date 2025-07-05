@@ -131,15 +131,15 @@ class FileDescriptor : public File
 
         return Write(buffer, count, m_Description->Offset);
     }
-    virtual ErrorOr<const stat*> Stat() const override;
-    virtual ErrorOr<isize>       Seek(i32 whence, off_t offset) override;
-    virtual ErrorOr<isize>       Truncate(off_t size) override;
+    virtual ErrorOr<const stat> Stat() const override;
+    virtual ErrorOr<isize>      Seek(i32 whence, off_t offset) override;
+    virtual ErrorOr<isize>      Truncate(off_t size) override;
 
-    void                         Lock() { m_Description->Lock.Acquire(); }
-    void                         Unlock() { m_Description->Lock.Release(); }
+    void                        Lock() { m_Description->Lock.Acquire(); }
+    void                        Unlock() { m_Description->Lock.Release(); }
 
     // TODO(v1t10l7): verify whether the fd is blocking
-    inline bool                  WouldBlock() const { return false; }
+    inline bool                 WouldBlock() const { return false; }
     inline bool IsSocket() const override { return INode()->IsSocket(); }
     inline bool IsPipe() const
     {

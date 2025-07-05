@@ -37,7 +37,7 @@ namespace API::VFS
             if (!(flags & AT_EMPTY_PATH)) return Error(ENOENT);
             if (dirFdNum == AT_FDCWD)
             {
-                auto res = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(),
+                auto res = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry().Raw(),
                                               process->CWD());
                 if (errno != no_error && errno != ENOENT) return Error(errno);
                 return res;
@@ -54,12 +54,12 @@ namespace API::VFS
         }
 
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
-        DirectoryEntry* base = ::VFS::GetRootDirectoryEntry();
+        DirectoryEntry* base = ::VFS::GetRootDirectoryEntry().Raw();
 
         if (!path.Absolute())
         {
             if (dirFdNum == AT_FDCWD)
-                base = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(),
+                base = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry().Raw(),
                                           process->CWD())
                            .value()
                            .Entry;
@@ -231,7 +231,7 @@ namespace API::VFS
         if (!process->ValidateRead(path, 4096)) return Error(EFAULT);
 
         auto maybePathRes
-            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), path);
+            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry().Raw(), path);
         RetOnError(maybePathRes);
         auto pathRes = maybePathRes.value();
 
@@ -267,7 +267,7 @@ namespace API::VFS
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
         auto maybePathRes
-            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), path);
+            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry().Raw(), path);
         RetOnError(maybePathRes);
         auto pathRes = maybePathRes.value();
 
@@ -326,7 +326,7 @@ namespace API::VFS
 
         auto cwdPath = process->CWD();
         auto maybeCwdRes
-            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), cwdPath);
+            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry().Raw(), cwdPath);
         RetOnError(maybeCwdRes);
 
         auto cwd = maybeCwdRes.value().Entry;
@@ -494,7 +494,7 @@ namespace API::VFS
     ErrorOr<isize> UTime(PathView path, const utimbuf* out)
     {
         auto maybePathRes
-            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), path, true);
+            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry().Raw(), path, true);
         RetOnError(maybePathRes);
         auto pathRes = maybePathRes.value();
 
@@ -520,7 +520,7 @@ namespace API::VFS
     ErrorOr<isize> StatFs(PathView path, statfs* out)
     {
         auto maybePathRes
-            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(), path);
+            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry().Raw(), path);
         RetOnError(maybePathRes);
         auto pathRes = maybePathRes.value();
 
@@ -552,7 +552,7 @@ namespace API::VFS
         auto* fd             = current->GetFileHandle(dirFdNum);
         bool  followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
 
-        auto  maybePathRes = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry(),
+        auto  maybePathRes = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry().Raw(),
                                                 current->CWD());
         RetOnError(maybePathRes);
         auto pathRes  = maybePathRes.value();
@@ -579,7 +579,7 @@ namespace API::VFS
         }
 
         auto parentEntry = PathView(path).Absolute()
-                             ? ::VFS::GetRootDirectoryEntry()
+                             ? ::VFS::GetRootDirectoryEntry().Raw()
                              : nullptr;
         if (!parentEntry)
         {
@@ -751,7 +751,7 @@ namespace Syscall::VFS
         DirectoryEntry* entry = CPU::AsUser(
             [path]() -> DirectoryEntry*
             {
-                return VFS::ResolvePath(VFS::GetRootDirectoryEntry(), path)
+                return VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), path)
                     .value()
                     .Entry;
             });
@@ -805,7 +805,7 @@ namespace Syscall::VFS
         Process*    current = Process::GetCurrent();
 
         auto        maybePathRes
-            = VFS::ResolvePath(current->RootNode(), current->CWD());
+            = VFS::ResolvePath(current->RootNode().Raw(), current->CWD());
         RetOnError(maybePathRes);
         auto pathRes = maybePathRes.value();
 

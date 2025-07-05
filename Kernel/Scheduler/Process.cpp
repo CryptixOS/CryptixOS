@@ -162,11 +162,11 @@ void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
     DirectoryEntry* parent
-        = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), m_CWD.Raw())
+        = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), m_CWD.Raw())
               .value()
               .Entry;
     if (CPU::AsUser([path]() -> bool { return path.Absolute(); }))
-        parent = VFS::GetRootDirectoryEntry();
+        parent = VFS::GetRootDirectoryEntry().Raw();
     else if (dirFd != AT_FDCWD)
     {
         auto* descriptor = GetFileHandle(dirFd);

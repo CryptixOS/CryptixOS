@@ -23,7 +23,7 @@ namespace VFS
 {
     Vector<std::pair<bool, StringView>>& Filesystems();
 
-    DirectoryEntry*                      GetRootDirectoryEntry();
+    Ref<DirectoryEntry>                      GetRootDirectoryEntry();
     void                                 RecursiveDelete(INode* node);
 
     struct PathResolution

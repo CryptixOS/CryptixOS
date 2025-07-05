@@ -6,19 +6,19 @@
  */
 #include <VFS/PathWalker.hpp>
 
-PathWalker::PathWalker(class DirectoryEntry* const root, PathView path)
+PathWalker::PathWalker(class Ref<::DirectoryEntry> const root, PathView path)
 {
     auto result = Initialize(root, path);
     CtosUnused(result);
 }
 
-ErrorOr<void> PathWalker::Initialize(class DirectoryEntry* const root,
+ErrorOr<void> PathWalker::Initialize(Ref<class ::DirectoryEntry> const root,
                                      PathView                    path)
 {
     if (path.Empty()) return Terminate(EINVAL);
     m_Root           = root ?: VFS::GetRootDirectoryEntry();
 
-    m_Path           = path.Raw();
+    m_Path           = path;
     m_Tokens         = m_Path.SplitPath();
     m_Position       = 0;
 
@@ -47,7 +47,7 @@ ErrorOr<DirectoryEntry*> PathWalker::Resolve(bool followLinks)
     if (m_Path == "/"_sv || m_Path.Empty())
     {
         m_State = ResolutionState::eFinished;
-        return m_DirectoryEntry;
+        return m_DirectoryEntry.Raw();
     }
 
     for (; m_Position < static_cast<isize>(m_Tokens.Size());)
@@ -61,7 +61,7 @@ ErrorOr<DirectoryEntry*> PathWalker::Resolve(bool followLinks)
         if (segment.Type != PathSegmentType::eRegular)
         {
             FollowDots();
-            if (m_State == ResolutionState::eFinished) return m_DirectoryEntry;
+            if (m_State == ResolutionState::eFinished) return m_DirectoryEntry.Raw();
 
             continue;
         }
@@ -80,13 +80,13 @@ ErrorOr<DirectoryEntry*> PathWalker::Resolve(bool followLinks)
     }
 
     (void)followLinks;
-    return m_DirectoryEntry;
+    return m_DirectoryEntry.Raw();
 }
 
 ErrorOr<void> PathWalker::Step()
 {
     m_Parent         = m_DirectoryEntry;
-    m_DirectoryEntry = m_DirectoryEntry->Lookup(m_CurrentSegment.Name);
+    m_DirectoryEntry = m_DirectoryEntry->Lookup(m_CurrentSegment.Name).Raw();
     m_BaseName       = Path(m_CurrentSegment.Name);
     if (!m_DirectoryEntry) return Terminate(ENOENT);
 
@@ -112,8 +112,7 @@ ErrorOr<void> PathWalker::Step()
     return {};
 }
 
-using Result = PathWalker::Result;
-ErrorOr<DirectoryEntry*> PathWalker::FollowMounts(class DirectoryEntry* dentry)
+ErrorOr<Ref<DirectoryEntry>> PathWalker::FollowMounts(Ref<class DirectoryEntry> dentry)
 {
     if (!dentry && m_DirectoryEntry) dentry = m_DirectoryEntry;
     else if (!dentry) return nullptr;
@@ -135,7 +134,7 @@ ErrorOr<DirectoryEntry*> PathWalker::FollowSymlinks()
     }
 
     if (!m_DirectoryEntry) return Error(ENOLINK);
-    return m_DirectoryEntry;
+    return m_DirectoryEntry.Raw();
 }
 ErrorOr<DirectoryEntry*> PathWalker::FollowSymlink()
 {
@@ -144,7 +143,7 @@ ErrorOr<DirectoryEntry*> PathWalker::FollowSymlink()
 
     auto inode  = m_DirectoryEntry->INode();
     auto target = inode->GetTarget();
-    if (target.Empty()) return m_DirectoryEntry;
+    if (target.Empty()) return m_DirectoryEntry.Raw();
 
     auto parentDirectoryEntry = m_DirectoryEntry->Parent();
 
@@ -169,7 +168,7 @@ DirectoryEntry* PathWalker::FollowDots()
     else if (m_Position == static_cast<isize>(m_Tokens.Size() - 1))
         m_State = ResolutionState::eLast;
 
-    return m_DirectoryEntry;
+    return m_DirectoryEntry.Raw();
 }
 Error PathWalker::Terminate(ErrorCode code)
 {

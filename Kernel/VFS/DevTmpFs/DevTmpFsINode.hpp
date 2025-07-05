@@ -22,15 +22,32 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
         if (m_Capacity > 0) delete m_Data;
     }
 
-    virtual const stat& Stats() override
+    virtual const stat Stats() override
     {
-        return m_Device ? m_Device->Stats() : m_Stats;
+        if (m_Device) return m_Device->Stats();
+
+        stat stats{};
+        stats.st_dev     = m_Metadata.DeviceID;
+        stats.st_ino     = m_Metadata.ID;
+        stats.st_nlink   = m_Metadata.LinkCount;
+        stats.st_mode    = m_Metadata.Mode;
+        stats.st_uid     = m_Metadata.UID;
+        stats.st_gid     = m_Metadata.GID;
+        stats.st_rdev    = m_Metadata.RootDeviceID;
+        stats.st_size    = m_Metadata.Size;
+        stats.st_blksize = m_Metadata.BlockSize;
+        stats.st_blocks  = m_Metadata.BlockCount;
+        stats.st_atim    = m_Metadata.AccessTime;
+        stats.st_mtim    = m_Metadata.ModificationTime;
+        stats.st_ctim    = m_Metadata.ChangeTime;
+        return stats;
     }
 
     virtual ErrorOr<void>
-                   TraverseDirectories(class DirectoryEntry* parent,
-                                       DirectoryIterator     iterator) override;
-    virtual INode* Lookup(const String& name) override;
+    TraverseDirectories(class DirectoryEntry* parent,
+                        DirectoryIterator     iterator) override;
+    virtual ErrorOr<Ref<DirectoryEntry>>
+    Lookup(Ref<DirectoryEntry> dentry) override;
 
     const std::unordered_map<StringView, INode*>& Children() const
     {
