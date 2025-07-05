@@ -304,7 +304,7 @@ namespace E1000e
             }
         }
 
-        template <std::unsigned_integral T>
+        template <UnsignedIntegral T>
         inline T Read(Register reg)
         {
             const usize registerOffset  = std::to_underlying(reg);
@@ -312,7 +312,7 @@ namespace E1000e
 
             return MMIO::Read<T>(registerAddress);
         }
-        template <std::unsigned_integral T>
+        template <UnsignedIntegral T>
         inline void Write(Register reg, const T value)
         {
             const usize registerOffset  = std::to_underlying(reg);

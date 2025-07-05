@@ -318,7 +318,7 @@ namespace RTL8139
         inline T Read(Register reg) const
         {
             Pointer regAddr = m_Base.ToHigherHalf<Pointer>().Offset<Pointer>(
-                std::to_underlying(reg));
+                ToUnderlying(reg));
 
             return *regAddr.As<T>();
         }
@@ -326,7 +326,7 @@ namespace RTL8139
         inline void Write(Register reg, T data)
         {
             Pointer regAddr = m_Base.ToHigherHalf<Pointer>().Offset<Pointer>(
-                std::to_underlying(reg));
+                ToUnderlying(reg));
             *regAddr.As<T>() = data;
         }
     };

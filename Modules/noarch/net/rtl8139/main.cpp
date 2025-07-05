@@ -8,10 +8,11 @@
 
 #include <Arch/CPU.hpp>
 #include <Library/Module.hpp>
+#include <Prism/Containers/Array.hpp>
 
 namespace RTL8139
 {
-    static std::array s_IdTable = {
+    static Array s_IdTable = ToArray({
         PCI::DeviceID{0x10ec, 0x8139, PCI::DeviceID::ANY_ID,
                       PCI::DeviceID::ANY_ID, 2, 0},
         PCI::DeviceID{0x10ec, 0x8138, PCI::DeviceID::ANY_ID,
@@ -70,7 +71,7 @@ namespace RTL8139
         PCI::DeviceID{PCI::DeviceID::ANY_ID, 0x8139, 0x10ec, 0x8139, 2, 0},
         PCI::DeviceID{PCI::DeviceID::ANY_ID, 0x8139, 0x1186, 0x1300, 2, 0},
         PCI::DeviceID{PCI::DeviceID::ANY_ID, 0x8139, 0x13d1, 0xab06, 2, 0},
-    };
+    });
 
     bool AdapterCard::SendPacket(const u8* data, usize length)
     {
@@ -80,7 +81,7 @@ namespace RTL8139
             auto potentialBuffer = (m_TransmitNext + i) % 4;
             auto status          = Read<TransmitStatus>(static_cast<Register>(
                 potentialBuffer
-                + std::to_underlying(Register::eTransmitStatus0)));
+                + ToUnderlying(Register::eTransmitStatus0)));
             if (status.Own == 1)
             {
                 bufferIndex = potentialBuffer;
@@ -98,7 +99,7 @@ namespace RTL8139
             std::memset(transmit.Offset<Pointer>(length).As<void*>(), 0, left);
 
         Register transmitStatusReg = static_cast<Register>(
-            bufferIndex + std::to_underlying(Register::eTransmitStatus0));
+            bufferIndex + ToUnderlying(Register::eTransmitStatus0));
         auto status = Read<TransmitStatus>(transmitStatusReg);
         status.Size = length;
         status.Own  = 0;
@@ -169,16 +170,16 @@ namespace RTL8139
         receiverConfig.AcceptMulticast     = true;
         receiverConfig.AcceptBroadcast     = true;
         receiverConfig.Wrap                = true;
-        receiverConfig.MaxDma = std::to_underlying(DmaSize::e1024Bytes);
+        receiverConfig.MaxDma = ToUnderlying(DmaSize::e1024Bytes);
         receiverConfig.BufferLength
-            = std::to_underlying(ReceiverBufferLength::eK8P16);
+            = ToUnderlying(ReceiverBufferLength::eK8P16);
         receiverConfig.EarlyThreshold = 0b111;
         Write<ReceiveConfiguration>(Register::eReceiverConfig, receiverConfig);
 
         auto transmitConfig
             = Read<TransmitConfiguration>(Register::eTransmitConfig);
         transmitConfig.RetryCount = 0;
-        transmitConfig.MaxDma     = std::to_underlying(DmaSize::e1024Bytes);
+        transmitConfig.MaxDma     = ToUnderlying(DmaSize::e1024Bytes);
         transmitConfig.InterframeGapTime = 0b11;
         Write<TransmitConfiguration>(Register::eTransmitConfig, transmitConfig);
 
@@ -186,7 +187,7 @@ namespace RTL8139
         {
             buffer = new u8[TRANSMIT_BUFFER_SIZE];
             usize bufferRegister
-                = std::to_underlying(Register::eTransmitBuffer0) + i;
+                = ToUnderlying(Register::eTransmitBuffer0) + i;
 
             Write<u32>(
                 static_cast<Register>(bufferRegister),
