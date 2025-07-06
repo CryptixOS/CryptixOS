@@ -30,7 +30,7 @@ namespace USB::UHCI
     };
     struct [[gnu::packed]] TransferDescriptorNextDescriptor
     {
-        u32  PhsicalAddress : 28;
+        u32  PhysicalAddress : 28;
         bool Reserved       : 1;
         bool DepthFirst     : 1;
         bool QueueHead      : 1;
