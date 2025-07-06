@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <VFS/FileDescriptorTable.hpp>
+#include <VFS/VFS.hpp>
 
 i32 FileDescriptorTable::Insert(FileDescriptor* fd, i32 desired)
 {

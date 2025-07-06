@@ -19,6 +19,7 @@
 
 class INode;
 class DirectoryEntry;
+using INodeMode = mode_t;
 
 /**
  * @class Filesystem

@@ -140,7 +140,7 @@ class FileDescriptor : public File
 
     // TODO(v1t10l7): verify whether the fd is blocking
     inline bool                 WouldBlock() const { return false; }
-    inline bool IsSocket() const override { return INode()->IsSocket(); }
+    inline bool IsSocket() const override { return DirectoryEntry()->IsSocket(); }
     inline bool IsPipe() const
     {
         // FIXME(v1tr10l7): implement this once pipes are supported

@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <VFS/PathResolver.hpp>
+#include <VFS/VFS.hpp>
 
 PathResolver::PathResolver(class Ref<::DirectoryEntry> const root, PathView path)
 {

@@ -13,6 +13,8 @@
 #include <Prism/Utility/Math.hpp>
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/FileDescriptor.hpp>
+#include <VFS/INode.hpp>
+#include <VFS/VFS.hpp>
 
 void DirectoryEntries::Push(StringView name, loff_t offset, usize ino,
                             usize type)

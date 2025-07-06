@@ -16,6 +16,7 @@
 
 #include <VFS/Fifo.hpp>
 #include <VFS/FileDescriptor.hpp>
+#include <VFS/VFS.hpp>
 
 inline usize AllocatePid()
 {
@@ -455,14 +456,12 @@ ErrorOr<Process*> Process::Fork()
         Assert(physicalSpace);
 
         std::memcpy(Pointer(physicalSpace).ToHigherHalf<void*>(),
-                    range->PhysicalBase().ToHigherHalf<void*>(),
-                    range->Size());
-        pageMap->MapRange(range->VirtualBase(), physicalSpace,
-                          range->Size(),
+                    range->PhysicalBase().ToHigherHalf<void*>(), range->Size());
+        pageMap->MapRange(range->VirtualBase(), physicalSpace, range->Size(),
                           PageAttributes::eRWXU | PageAttributes::eWriteBack);
 
-        auto newRegion = new Region(physicalSpace, range->VirtualBase(),
-                                    range->Size());
+        auto newRegion
+            = new Region(physicalSpace, range->VirtualBase(), range->Size());
         newRegion->SetProt(range->Access(), range->Prot());
         newProcess->m_AddressSpace.Insert(range->VirtualBase().Raw(),
                                           newRegion);

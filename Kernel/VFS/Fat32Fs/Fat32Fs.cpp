@@ -10,6 +10,7 @@
 
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/INode.hpp>
+#include <VFS/VFS.hpp>
 
 #include <VFS/Fat32Fs/Fat32Fs.hpp>
 #include <VFS/Fat32Fs/Fat32FsINode.hpp>

@@ -9,6 +9,8 @@
 #include <Time/Time.hpp>
 
 #include <VFS/DirectoryEntry.hpp>
+#include <VFS/VFS.hpp>
+
 #include <VFS/TmpFs/TmpFs.hpp>
 #include <VFS/TmpFs/TmpFsINode.hpp>
 

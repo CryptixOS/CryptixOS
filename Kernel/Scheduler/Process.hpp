@@ -166,7 +166,7 @@ class Process
     Vector<Process*>    m_Zombies;
     Vector<Thread*>     m_Threads;
 
-    Ref<DirectoryEntry>     m_RootDirectoryEntry = VFS::GetRootDirectoryEntry();
+    Ref<DirectoryEntry>     m_RootDirectoryEntry = nullptr;
     String              m_CWD                = "/";
     mode_t              m_Umask              = 0;
 

@@ -14,11 +14,10 @@
 #include <Prism/Memory/Ref.hpp>
 #include <Prism/Utility/Delegate.hpp>
 
-#include <VFS/VFS.hpp>
+#include <VFS/DirectoryEntry.hpp>
 
 #include <errno.h>
 
-class DirectoryEntry;
 class FileDescriptor;
 
 using INodeID   = ino_t;

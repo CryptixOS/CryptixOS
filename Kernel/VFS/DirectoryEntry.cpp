@@ -8,6 +8,7 @@
 #include <Prism/String/StringBuilder.hpp>
 
 #include <VFS/DirectoryEntry.hpp>
+#include <VFS/INode.hpp>
 #include <VFS/MountPoint.hpp>
 #include <VFS/VFS.hpp>
 
@@ -30,7 +31,7 @@ DirectoryEntry::DirectoryEntry(::Ref<DirectoryEntry> parent, StringView name)
 }
 DirectoryEntry::~DirectoryEntry() {}
 
-Path DirectoryEntry::Path() 
+Path DirectoryEntry::Path()
 {
     StringBuilder pathBuilder;
 
@@ -54,8 +55,11 @@ DirectoryEntry::Children() const
     return m_Children;
 }
 
-void DirectoryEntry::SetParent(::Ref<DirectoryEntry> entry) { m_Parent = entry; }
-void DirectoryEntry::SetMountGate(class INode*    inode,
+void DirectoryEntry::SetParent(::Ref<DirectoryEntry> entry)
+{
+    m_Parent = entry;
+}
+void DirectoryEntry::SetMountGate(class INode*          inode,
                                   ::Ref<DirectoryEntry> mountPoint)
 {
     ScopedLock guard(m_Lock);
@@ -84,7 +88,8 @@ void DirectoryEntry::RemoveChild(Prism::Ref<class DirectoryEntry> entry)
 ::Ref<DirectoryEntry> DirectoryEntry::FollowMounts()
 {
     auto current = this;
-    while (current && current->m_MountGate) current = current->m_MountGate.Raw();
+    while (current && current->m_MountGate)
+        current = current->m_MountGate.Raw();
 
     return current;
 }
@@ -106,7 +111,7 @@ void DirectoryEntry::RemoveChild(Prism::Ref<class DirectoryEntry> entry)
 
     return this;
 }
-WeakRef<DirectoryEntry> DirectoryEntry::GetEffectiveParent() 
+WeakRef<DirectoryEntry> DirectoryEntry::GetEffectiveParent()
 {
     auto rootEntry  = VFS::GetRootDirectoryEntry()->FollowMounts();
     auto mountPoint = MountPoint::Lookup(const_cast<DirectoryEntry*>(this));
@@ -132,3 +137,10 @@ WeakRef<DirectoryEntry> DirectoryEntry::GetEffectiveParent()
     InsertChild(entry);
     return entry.Raw();
 }
+
+bool DirectoryEntry::IsCharDevice() const { return m_INode->IsCharDevice(); }
+bool DirectoryEntry::IsFifo() const { return m_INode->IsFifo(); }
+bool DirectoryEntry::IsDirectory() const { return m_INode->IsDirectory(); }
+bool DirectoryEntry::IsRegular() const { return m_INode->IsRegular(); }
+bool DirectoryEntry::IsSymlink() const { return m_INode->IsSymlink(); }
+bool DirectoryEntry::IsSocket() const { return m_INode->IsSocket(); }

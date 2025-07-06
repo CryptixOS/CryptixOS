@@ -14,6 +14,8 @@
 
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/INode.hpp>
+#include <VFS/VFS.hpp>
+
 #include <VFS/Initrd/Ustar.hpp>
 
 #include <cstring>

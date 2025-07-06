@@ -8,9 +8,10 @@
 #include <Prism/Utility/Math.hpp>
 
 #include <Time/Time.hpp>
-#include <VFS/INode.hpp>
-
 #include <VFS/DirectoryEntry.hpp>
+#include <VFS/INode.hpp>
+#include <VFS/VFS.hpp>
+
 #include <VFS/EchFs/EchFs.hpp>
 #include <VFS/EchFs/EchFsINode.hpp>
 

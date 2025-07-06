@@ -7,6 +7,7 @@
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/DevTmpFs/DevTmpFsINode.hpp>
 #include <VFS/DirectoryEntry.hpp>
+#include <VFS/VFS.hpp>
 
 std::unordered_map<dev_t, Device*> DevTmpFs::s_Devices{};
 

@@ -13,6 +13,8 @@
 #include <Time/Time.hpp>
 
 #include <VFS/MountPoint.hpp>
+#include <VFS/VFS.hpp>
+
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
 

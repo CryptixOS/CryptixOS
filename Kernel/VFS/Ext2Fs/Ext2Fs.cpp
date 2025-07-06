@@ -8,6 +8,8 @@
 #include <Time/Time.hpp>
 
 #include <VFS/DirectoryEntry.hpp>
+#include <VFS/VFS.hpp>
+
 #include <VFS/Ext2Fs/Ext2Fs.hpp>
 #include <VFS/Ext2Fs/Ext2FsINode.hpp>
 

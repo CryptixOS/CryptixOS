@@ -6,10 +6,14 @@
  */
 #pragma once
 
+#include <Library/Locking/Spinlock.hpp>
+
 #include <Prism/Memory/Ref.hpp>
 #include <Prism/Memory/WeakRef.hpp>
-#include <VFS/INode.hpp>
+#include <Prism/String/String.hpp>
+#include <Prism/Utility/Path.hpp>
 
+class INode;
 class DirectoryEntry : public RefCounted
 {
   public:
@@ -26,42 +30,42 @@ class DirectoryEntry : public RefCounted
 
     virtual ~DirectoryEntry();
 
-    inline INode*          INode() const { return m_INode; }
-    inline StringView      Name() const { return m_Name; }
-    inline ::Ref<DirectoryEntry> Parent()  { return m_Parent; }
+    inline INode*                INode() const { return m_INode; }
+    inline StringView            Name() const { return m_Name; }
+    inline ::Ref<DirectoryEntry> Parent() { return m_Parent; }
 
-    Path                   Path();
+    Path                         Path();
     const std::unordered_map<StringView, ::Ref<DirectoryEntry>>&
-                    Children() const;
+         Children() const;
 
-    void            SetParent(::Ref<DirectoryEntry> entry);
-    void            SetMountGate(class INode* inode, ::Ref<DirectoryEntry> mountGate);
-    void            Bind(class INode* inode);
-    void            InsertChild(::Ref<class DirectoryEntry> entry);
-    void            RemoveChild(::Ref<class DirectoryEntry> entry);
+    void SetParent(::Ref<DirectoryEntry> entry);
+    void SetMountGate(class INode* inode, ::Ref<DirectoryEntry> mountGate);
+    void Bind(class INode* inode);
+    void InsertChild(::Ref<class DirectoryEntry> entry);
+    void RemoveChild(::Ref<class DirectoryEntry> entry);
 
-    ::Ref<DirectoryEntry> FollowMounts();
-    ::Ref<DirectoryEntry> FollowSymlinks(usize cnt = 0);
+    ::Ref<DirectoryEntry>   FollowMounts();
+    ::Ref<DirectoryEntry>   FollowSymlinks(usize cnt = 0);
 
-    WeakRef<DirectoryEntry> GetEffectiveParent() ;
-    ::Ref<DirectoryEntry> Lookup(const String& name);
+    WeakRef<DirectoryEntry> GetEffectiveParent();
+    ::Ref<DirectoryEntry>   Lookup(const String& name);
 
-    inline bool     IsCharDevice() const { return m_INode->IsCharDevice(); }
-    inline bool     IsFifo() const { return m_INode->IsFifo(); }
-    inline bool     IsDirectory() const { return m_INode->IsDirectory(); }
-    inline bool     IsRegular() const { return m_INode->IsRegular(); }
-    inline bool     IsSymlink() const { return m_INode->IsSymlink(); }
-    inline bool     IsSocket() const { return m_INode->IsSocket(); }
+    bool                    IsCharDevice() const;
+    bool                    IsFifo() const;
+    bool                    IsDirectory() const;
+    bool                    IsRegular() const;
+    bool                    IsSymlink() const;
+    bool                    IsSocket() const;
 
-    ::Ref<DirectoryEntry> m_MountGate = nullptr;
+    ::Ref<DirectoryEntry>   m_MountGate = nullptr;
 
   private:
     friend class INode;
 
-    Spinlock        m_Lock;
-    class INode*    m_INode  = nullptr;
+    Spinlock              m_Lock;
+    class INode*          m_INode  = nullptr;
 
-    String          m_Name   = "";
+    String                m_Name   = "";
 
     ::Ref<DirectoryEntry> m_Parent = nullptr;
     std::unordered_map<StringView, ::Ref<class DirectoryEntry>> m_Children;
