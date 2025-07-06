@@ -18,7 +18,7 @@
 #include <VFS/Fat32Fs/Fat32Fs.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/MountPoint.hpp>
-#include <VFS/PathWalker.hpp>
+#include <VFS/PathResolver.hpp>
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/TmpFs/TmpFs.hpp>
 #include <VFS/VFS.hpp>
@@ -171,7 +171,7 @@ namespace VFS
         if (!parent || path.Absolute()) parent = s_RootDirectoryEntry.Raw();
         PathResolution res = {nullptr, nullptr, ""_sv};
 
-        PathWalker     resolver(parent, path);
+        PathResolver     resolver(parent, path);
         auto           resolutionResult = resolver.Resolve(followLinks);
         // RetOnError(resolutionResult);
         CtosUnused(resolutionResult);
@@ -351,7 +351,7 @@ namespace VFS
     }
     ErrorOr<Ref<DirectoryEntry>> CreateFile(PathView path, mode_t mode)
     {
-        PathWalker resolver(GetRootDirectoryEntry().Raw(), path);
+        PathResolver resolver(GetRootDirectoryEntry().Raw(), path);
         auto       maybeEntry = resolver.Resolve();
         if (!maybeEntry && maybeEntry.error() != ENOENT)
             return Error(maybeEntry.error());

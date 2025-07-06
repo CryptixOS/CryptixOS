@@ -27,11 +27,11 @@ enum class ResolutionState
 };
 
 // TODO(v1tr10l7): Allow backtracing the path
-class PathWalker
+class PathResolver
 {
   public:
-    inline PathWalker() = default;
-    explicit PathWalker(Ref<DirectoryEntry> const root, PathView path);
+    inline PathResolver() = default;
+    explicit PathResolver(Ref<DirectoryEntry> const root, PathView path);
 
     ErrorOr<void> Initialize(Ref<DirectoryEntry> const root, PathView path);
     ErrorOr<DirectoryEntry*>  Resolve(bool followLinks = true);
