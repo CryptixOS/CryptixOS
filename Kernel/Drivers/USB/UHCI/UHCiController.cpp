@@ -35,7 +35,7 @@ namespace USB::UHCI
         LogTrace("UHCI: Enabling bus mastering...");
         EnableBusMastering();
 
-        LogTrace("UHCI: Reseting the host controller...");
+        LogTrace("UHCI: Resetting the host controller...");
         auto status = Reset();
         RetOnError(status);
 
