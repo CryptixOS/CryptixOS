@@ -66,17 +66,24 @@ namespace USB::UHCI
         delegate.BindLambda([&]() { HandleInterrupt(); });
 
         LogTrace("UHCI: Registering the interrupt handler...");
+#ifdef CTOS_TARGET_X86_64
         if (!RegisterIrq(CPU::Current()->LapicID, delegate))
         {
             LogError("UHCI: Failed to register interrupt handler");
             return Error(EBUSY);
         }
+#else 
+        LogError("UHCI: Failed to register interrupt handler");
+        return Error(EBUSY);
+#endif
 
         LogInfo("UHCI: Successfully registered an interrupt handler");
         m_OnIrq.BindLambda([&]() { HandleInterrupt(); });
 
-        LogTrace("UHCI: MsiSupported => {}, MsiOffset => {:#x},\nMsixSupported => {}, MsixOffset => {:#x}",
-                m_MsiSupported, m_MsiOffset, m_MsixSupported, m_MsixOffset);
+        LogTrace(
+            "UHCI: MsiSupported => {}, MsiOffset => {:#x},\nMsixSupported => "
+            "{}, MsixOffset => {:#x}",
+            m_MsiSupported, m_MsiOffset, m_MsixSupported, m_MsixOffset);
 
         // TODO(v1tr10l7): Create Root Hub
 
