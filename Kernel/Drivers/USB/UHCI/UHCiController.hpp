@@ -128,20 +128,20 @@ namespace USB::UHCI
         constexpr u64 Read(Register reg) const
         {
             if (reg == Register::eStartOfFrameModify)
-                return m_IoRegisters.Read<byte>(ToUnderlying(reg));
+                return m_IoRegisters.Read<u8>(ToUnderlying(reg));
             else if (reg == Register::eFrameListBaseAddress)
-                return m_IoRegisters.Read<dword>(ToUnderlying(reg));
-            else return m_IoRegisters.Read<word>(ToUnderlying(reg));
+                return m_IoRegisters.Read<u32>(ToUnderlying(reg));
+            else return m_IoRegisters.Read<u16>(ToUnderlying(reg));
             LogError("UHCI: No access mechanism available for pci device");
         }
         constexpr void Write(Register reg, u64 value) const
         {
             if (reg == Register::eStartOfFrameModify)
-                m_IoRegisters.Write<byte>(ToUnderlying(reg), value & 0xff);
+                m_IoRegisters.Write<u8>(ToUnderlying(reg), value & 0xff);
             else if (reg == Register::eFrameListBaseAddress)
-                m_IoRegisters.Write<dword>(ToUnderlying(reg),
+                m_IoRegisters.Write<u32>(ToUnderlying(reg),
                                            value & 0xffffffff);
-            else m_IoRegisters.Write<word>(ToUnderlying(reg), value & 0xffff);
+            else m_IoRegisters.Write<u16>(ToUnderlying(reg), value & 0xffff);
         }
 
         template <typename T>

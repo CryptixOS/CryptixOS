@@ -47,8 +47,8 @@ class IoRegion
     void Initialize(usize start, usize count, IoSpace ioSpace)
     {
         m_IoSpace = ioSpace;
-        if (m_IoSpace == IoSpace::eSystemIO)
 #ifdef CTOS_TARGET_X86_64
+        if (m_IoSpace == IoSpace::eSystemIO)
             m_SystemIO = {start, count};
         else
 #else

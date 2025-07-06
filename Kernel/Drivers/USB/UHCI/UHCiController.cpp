@@ -28,7 +28,7 @@ namespace USB::UHCI
 
 #ifdef CTOS_TARGET_X86_64
         // Disable Legacy USB emulation
-        ::IO::Out<word>(m_Bar.Base.Offset(0xc0), 0x2000);
+        ::IO::Out<u16>(m_Bar.Base.Offset(0xc0), 0x2000);
         LogTrace("UHCI: Legacy USB emulation disabled.");
 #endif
 
