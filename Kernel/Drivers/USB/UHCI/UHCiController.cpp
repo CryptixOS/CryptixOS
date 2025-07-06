@@ -17,7 +17,12 @@ namespace USB::UHCI
         LogTrace("USB: Initializing the UHCI Controller...");
         LogTrace("UHCI: Acquiring PCI Bar4...");
         m_Bar = GetBar(4);
+
+#ifdef CTOS_TARGET_X86_64
         m_IoRegisters.Initialize(m_Bar.Base, m_Bar.Size, IoSpace::eSystemIO);
+#else
+        LogError("UHCI: SystemIO is not supported on this platform");
+#endif
 
         if (m_Bar.Base)
             LogInfo(
@@ -72,7 +77,7 @@ namespace USB::UHCI
             LogError("UHCI: Failed to register interrupt handler");
             return Error(EBUSY);
         }
-#else 
+#else
         LogError("UHCI: Failed to register interrupt handler");
         return Error(EBUSY);
 #endif
@@ -97,8 +102,10 @@ namespace USB::UHCI
         Write(Register::eCommand, Command::eHostControllerReset);
 
         // FIXME(v1tr10l7): Timeout?
+#ifdef CTOS_TARGET_X86_64
         while (Read(Register::eCommand) & Command::eHostControllerReset)
             IO::Delay(50);
+#endif
 
         // Enable interrupts
         Write(Register::eInterruptEnable,
@@ -119,8 +126,10 @@ namespace USB::UHCI
         auto command = Read(Register::eCommand);
 
         Write(Register::eCommand, command & ~Command::eRun);
+#ifdef CTOS_TARGET_X86_64
         while ((Read(Register::eStatus) & Status::eHalted) == 0)
             IO::Delay(1000);
+#endif
 
         LogTrace("UHCI: Controller halted successfully");
         return {};
@@ -129,9 +138,13 @@ namespace USB::UHCI
     ErrorOr<void> Controller::Reset()
     {
         Write(Register::eCommand, Command::eHostControllerReset);
+#ifdef CTOS_TARGET_X86_64
         IO::Delay(50);
+#endif
         Write(Register::eCommand, 0);
+#ifdef CTOS_TARGET_X86_64
         IO::Delay(10);
+#endif
 
         /*
         auto status = Stop();
