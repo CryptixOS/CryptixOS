@@ -18,7 +18,7 @@ namespace ACPI::Interpreter
     struct ExecutionContext 
     {
         ByteStream<Endian::eLittle> Stream;
-        word CurrentOpCode = 0;
+        u16 CurrentOpCode = 0;
     };
     struct CodeBlock
     {
