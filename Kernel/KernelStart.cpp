@@ -24,7 +24,7 @@
 
 #include <Firmware/ACPI/ACPI.hpp>
 #include <Firmware/DeviceTree/DeviceTree.hpp>
-#include <Firmware/SMBIOS/SMBIOS.hpp>
+#include <Firmware/DMI/SMBIOS.hpp>
 
 #include <Library/ELF.hpp>
 #include <Library/ICxxAbi.hpp>
@@ -227,7 +227,7 @@ kernelStart()
 
     if (!EFI::Initialize())
         LogError("EFI: Failed to initialize efi runtime services...");
-    SMBIOS::Initialize();
+    DMI::SMBIOS::Initialize();
 
     Scheduler::Initialize();
     auto process = Scheduler::GetKernelProcess();

@@ -9,6 +9,7 @@
 #include <Arch/CPU.hpp>
 #include <Library/Module.hpp>
 #include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/Span.hpp>
 
 namespace RTL8139
 {
@@ -270,7 +271,7 @@ namespace RTL8139
 
     static PCI::Driver s_Driver = {
         .Name     = "rtl8139",
-        .MatchIDs = Span(s_IdTable.begin(), s_IdTable.end()),
+        .MatchIDs = Span<PCI::DeviceID>(s_IdTable.begin(), s_IdTable.Size()),
         .Probe    = ProbeDevice,
         .Remove   = RemoveDevice,
     };

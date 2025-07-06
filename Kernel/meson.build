@@ -60,7 +60,7 @@ srcs += files(
 
   'Firmware/EFI/Initialize.cpp',
 
-  'Firmware/SMBIOS/SMBIOS.cpp',
+  'Firmware/DMI/SMBIOS.cpp',
 
   'Memory/AddressSpace.cpp',
   'Memory/KernelHeap.cpp',
@@ -97,7 +97,7 @@ srcs += files(
   'VFS/FileDescriptorTable.cpp',
   'VFS/INode.cpp',
   'VFS/MountPoint.cpp',
-  'VFS/PathWalker.cpp',
+  'VFS/PathResolver.cpp',
   #'VFS/SynthFsINode.cpp',
   'VFS/VFS.cpp',
 
