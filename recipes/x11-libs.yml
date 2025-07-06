@@ -26,7 +26,7 @@ packages:
       # Remove the test directory from the Makefile, as it tries to run (and fail on) the tests
       - args: 'sed -i s/"all: libbz2.a bzip2 bzip2recover test"/"all: libbz2.a bzip2 bzip2recover"/ @THIS_BUILD_DIR@/Makefile'
     build:
-      # Building Makefile-libbz2_so first makes all programs link agains libbz2.so
+      # Building Makefile-libbz2_so first makes all programs link against libbz2.so
       - args: ['make', 'CC=@OPTION:arch-triple@-gcc', 'CFLAGS=-fPIC', '-f', 'Makefile-libbz2_so']
       - args: ['make', 'clean']
       - args: ['make', 'CC=@OPTION:arch-triple@-gcc', 'CFLAGS=-fPIC', '-j@PARALLELISM@']
