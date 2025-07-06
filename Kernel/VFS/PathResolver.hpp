@@ -43,7 +43,7 @@ class PathResolver
     DirectoryEntry*           FollowDots();
     Error                     Terminate(ErrorCode code);
 
-    constexpr Ref<DirectoryEntry> RootDirectoryEntry() { return m_Root; }
+    inline Ref<DirectoryEntry> RootDirectoryEntry() { return m_Root; }
     constexpr const Vector<String>& Segments() const { return m_Tokens; }
     constexpr isize                 Position() const { return m_Position; }
     constexpr StringView            CurrentSegment() const
@@ -52,17 +52,17 @@ class PathResolver
     }
 
     DirectoryEntry*           GetEffectiveParent(INode* node = nullptr);
-    constexpr Ref<DirectoryEntry> ParentEntry() { return m_Parent; }
-    constexpr Ref<DirectoryEntry> DirectoryEntry() 
+    inline Ref<DirectoryEntry> ParentEntry() { return m_Parent; }
+    inline Ref<DirectoryEntry> DirectoryEntry() 
     {
         return m_DirectoryEntry;
     }
 
-    constexpr INode* ParentINode() 
+    inline INode* ParentINode() 
     {
         return m_Parent.Raw() ? m_Parent->INode() : nullptr;
     }
-    constexpr INode* INode() const
+    inline INode* INode() const
     {
         return m_DirectoryEntry ? m_DirectoryEntry->INode() : nullptr;
     }
