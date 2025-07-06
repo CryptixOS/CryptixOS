@@ -19,11 +19,11 @@ namespace ACPI::Interpreter
     static ExecutionContext s_Context;
     static CodeBlock        s_CurrentBlock;
 
-    inline byte             PeekNextByte()
+    inline u8             PeekNextByte()
     {
         auto& stream = s_Context.Stream;
 
-        byte  value  = 0;
+        u8  value  = 0;
         stream >> value;
 
         stream.Seek(stream.Offset() - 1);
@@ -40,12 +40,12 @@ namespace ACPI::Interpreter
     }
     inline OpCode GetNextOp()
     {
-        byte high;
+        u8 high;
         s_Context.Stream >> high;
 
         if (high == 0x5b)
         {
-            byte low;
+            u8 low;
             s_Context.Stream >> low;
 
             return static_cast<OpCode>((high << 8) | low);
@@ -56,20 +56,20 @@ namespace ACPI::Interpreter
 
     u32 DecodePkgLength()
     {
-        u8  leadByte  = ReadNext<byte>();
+        u8  leadByte  = ReadNext<u8>();
 
         u8  byteCount = (leadByte >> 6) & 0x03;
         u32 length    = leadByte & 0x3f;
 
         for (usize i = 0; i < byteCount; ++i)
         {
-            u8 nextByte = ReadNext<byte>();
+            u8 nextByte = ReadNext<u8>();
             length |= static_cast<u32>(nextByte) << (4 + (i * 8));
         }
         return length;
     }
 
-    constexpr bool IsNameSegment(byte op)
+    constexpr bool IsNameSegment(u8 op)
     {
         return op == 0x2e || op == 0x2f || op == '\\' || op == '^'
             || (op >= 'A' && op <= 'Z') || op == 0x00 || op == '_';
@@ -84,8 +84,8 @@ namespace ACPI::Interpreter
     {
         String name;
 
-        if (PeekNextByte() == '\\') name += ReadNext<byte>();
-        while (PeekNextByte() == '^') name += ReadNext<byte>();
+        if (PeekNextByte() == '\\') name += ReadNext<u8>();
+        while (PeekNextByte() == '^') name += ReadNext<u8>();
         constexpr usize DUAL_PREFIX  = 0x2e;
         constexpr usize MULTI_PREFIX = 0x2f;
 
@@ -93,17 +93,17 @@ namespace ACPI::Interpreter
         if (PeekNextByte() == '\0')
         {
             segmentCount = 0;
-            ReadNext<byte>();
+            ReadNext<u8>();
         }
         else if (PeekNextByte() == DUAL_PREFIX)
         {
             segmentCount = 2;
-            ReadNext<byte>();
+            ReadNext<u8>();
         }
         else if (PeekNextByte() == MULTI_PREFIX)
         {
-            ReadNext<byte>();
-            segmentCount = ReadNext<byte>();
+            ReadNext<u8>();
+            segmentCount = ReadNext<u8>();
         }
         else segmentCount = 1;
 
@@ -141,7 +141,7 @@ namespace ACPI::Interpreter
     }
     Expression* ParseTermArg()
     {
-        byte   op     = ReadNext<byte>();
+        u8   op     = ReadNext<u8>();
         OpCode opcode = static_cast<OpCode>(op);
 
         switch (opcode)
@@ -156,13 +156,13 @@ namespace ACPI::Interpreter
             case OpCode::eOne: return new ConstantExpression(1);
             case OpCode::eOnes: return new ConstantExpression(~0ull);
             case OpCode::eBytePrefix:
-                return new ConstantExpression(ReadNext<byte>());
+                return new ConstantExpression(ReadNext<u8>());
             case OpCode::eWordPrefix:
-                return new ConstantExpression(ReadNext<word>());
+                return new ConstantExpression(ReadNext<u16>());
             case OpCode::eDWordPrefix:
-                return new ConstantExpression(ReadNext<dword>());
+                return new ConstantExpression(ReadNext<u32>());
             case OpCode::eQWordPrefix:
-                return new ConstantExpression(ReadNext<qword>());
+                return new ConstantExpression(ReadNext<u64>());
             case OpCode::eSizeOf:
             {
                 auto arg = ParseTermArg();
@@ -197,7 +197,7 @@ namespace ACPI::Interpreter
 
     void ParseField()
     {
-        byte next = ReadNext<byte>();
+        u8 next = ReadNext<u8>();
         if (!IsNameSegment(next)) return;
 
         s_Context.Stream.Seek(s_Context.Stream.Offset() - 1);
@@ -225,7 +225,7 @@ namespace ACPI::Interpreter
 
     Object* CreateNamedObject()
     {
-        byte op;
+        u8 op;
         s_Context.Stream >> op;
 
         Optional<usize> initialValue = 0;
@@ -282,7 +282,7 @@ namespace ACPI::Interpreter
         {
             if (!initialValue) initialValue = 0;
 
-            byte next;
+            u8 next;
             s_Context.Stream >> next;
 
             initialValue = initialValue.Value()
@@ -301,7 +301,7 @@ namespace ACPI::Interpreter
     void ExecuteOpCode()
     {
         OpCode opcode = GetNextOp();
-        word   op     = ToUnderlying(opcode);
+        u16   op     = ToUnderlying(opcode);
         LogMessage("{:#x}\n", op);
 
         switch (opcode)
@@ -350,7 +350,7 @@ namespace ACPI::Interpreter
             case OpCode::eAcquire:
             {
                 auto name = DecodeName();
-                word timeout;
+                u16 timeout;
                 s_Context.Stream >> timeout;
                 break;
             }
@@ -369,7 +369,7 @@ namespace ACPI::Interpreter
                 CTOS_UNUSED usize start     = s_Context.Stream.Offset();
                 CTOS_UNUSED u32   pkgLength = DecodePkgLength();
                 auto              name      = DecodeName();
-                byte              flags;
+                u8              flags;
                 s_Context.Stream >> flags;
 
                 u8                    acc          = flags & 0b1111;
@@ -451,7 +451,7 @@ namespace ACPI::Interpreter
     Statement* ParseStatement()
     {
         auto opcode = GetNextOp();
-        word op     = ToUnderlying(opcode);
+        u16 op     = ToUnderlying(opcode);
 
         switch (opcode)
         {
@@ -530,7 +530,7 @@ namespace ACPI::Interpreter
         auto method = new MethodObject();
 
         s_Context.Stream.Seek(codeBlock.Start);
-        byte flags              = ReadNext<byte>();
+        u8 flags              = ReadNext<u8>();
         method->m_ArgumentCount = flags & 0b111;
 
         auto end                = codeBlock.End;
