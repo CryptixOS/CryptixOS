@@ -9,9 +9,7 @@
 #include <Boot/BootInfo.hpp>
 #include <Library/Locking/Spinlock.hpp>
 
-#include <Prism/Containers/Span.hpp>
 #include <Prism/Memory/Memory.hpp>
-#include <Prism/Utility/LockingPolicy.hpp>
 
 class PageFrameAllocator
 {
