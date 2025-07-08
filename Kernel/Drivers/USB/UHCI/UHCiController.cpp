@@ -15,6 +15,13 @@ namespace USB::UHCI
     ErrorOr<void> Controller::Initialize()
     {
         LogTrace("USB: Initializing the UHCI Controller...");
+        auto status = Enable();
+        if (!status)
+        {
+            LogError("UHCI: Failed to enable the device");
+            return Error(status.error());
+        }
+    
         LogTrace("UHCI: Acquiring PCI Bar4...");
         m_Bar = GetBar(4);
 
@@ -41,7 +48,7 @@ namespace USB::UHCI
         EnableBusMastering();
 
         LogTrace("UHCI: Resetting the host controller...");
-        auto status = Reset();
+        status = Reset();
         RetOnError(status);
 
         Pointer framelistPhys = PMM::CallocatePages(1);
@@ -92,7 +99,7 @@ namespace USB::UHCI
 
         // TODO(v1tr10l7): Create Root Hub
 
-        SendCommand(Bit(10), false);
+        EnableInterrupts();
         return {};
     };
 
