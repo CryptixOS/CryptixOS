@@ -23,8 +23,8 @@
 #include <Drivers/USB/USB.hpp>
 
 #include <Firmware/ACPI/ACPI.hpp>
-#include <Firmware/DeviceTree/DeviceTree.hpp>
 #include <Firmware/DMI/SMBIOS.hpp>
+#include <Firmware/DeviceTree/DeviceTree.hpp>
 
 #include <Library/ELF.hpp>
 #include <Library/ICxxAbi.hpp>
@@ -38,6 +38,7 @@
 #include <Prism/Containers/Array.hpp>
 #include <Prism/Containers/RedBlackTree.hpp>
 #include <Prism/Memory/Endian.hpp>
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/String/StringView.hpp>
 #include <Prism/Utility/Delegate.hpp>
 
@@ -50,8 +51,6 @@
 #include <VFS/Initrd/Initrd.hpp>
 #include <VFS/MountPoint.hpp>
 #include <VFS/VFS.hpp>
-
-#include <magic_enum/magic_enum.hpp>
 
 namespace EFI
 {
@@ -127,7 +126,7 @@ static void kernelThread()
     VFS::Mount(nullptr, "/dev/nvme0n2p2"_sv, "/mnt/fat32"_sv, "fat32fs"_sv);
     VFS::Mount(nullptr, "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv, "echfs"_sv);
 
-    auto    kernelExecutable = BootInfo::GetExecutableFile();
+    auto    kernelExecutable = BootInfo::ExecutableFile();
     Pointer imageAddress     = kernelExecutable->address;
 
     auto    header           = imageAddress.As<ELF::Header>();
@@ -185,18 +184,20 @@ kernelStart()
     __asm__ volatile("1: jmp 1b");
 #endif
 
+    // NOTE(v1tr10l7): It is important that these four calls happen at the very
+    // beginning of the kernel initialization, because we want to have a working
+    // Heap, serial logging and global constructors being called ASAP
     Assert(PMM::Initialize());
     icxxabi::Initialize();
+
+    VMM::Initialize();
+    Serial::Initialize();
 
 #ifdef CTOS_TARGET_X86_64
     #define SERIAL_LOG_ENABLE_DEFAULT false
 #else
     #define SERIAL_LOG_ENABLE_DEFAULT true
 #endif
-
-    VMM::Initialize();
-    Serial::Initialize();
-
     if (CommandLine::GetBoolean("log.serial")
             .ValueOr(SERIAL_LOG_ENABLE_DEFAULT))
         Logger::EnableSink(LOG_SINK_SERIAL);
@@ -207,14 +208,13 @@ kernelStart()
 
     LogInfo(
         "Boot: Kernel loaded with {}-{} -> firmware type: {}, boot time: {}s",
-        BootInfo::GetBootloaderName(), BootInfo::GetBootloaderVersion(),
-        magic_enum::enum_name(BootInfo::GetFirmwareType()),
-        BootInfo::GetDateAtBoot());
+        BootInfo::BootloaderName(), BootInfo::BootloaderVersion(),
+        ToString(BootInfo::FirmwareType()), BootInfo::DateAtBoot());
 
     LogInfo("Boot: Kernel Physical Address: {:#x}",
-            BootInfo::GetKernelPhysicalAddress().Raw<>());
+            BootInfo::KernelPhysicalAddress());
     LogInfo("Boot: Kernel Virtual Address: {:#x}",
-            BootInfo::GetKernelVirtualAddress().Raw<>());
+            BootInfo::KernelVirtualAddress());
 
     Stacktrace::Initialize();
     CommandLine::Initialize();

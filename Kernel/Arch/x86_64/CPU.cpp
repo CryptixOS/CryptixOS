@@ -164,7 +164,7 @@ namespace CPU
 
     void InitializeBSP()
     {
-        limine_mp_response* smp      = BootInfo::GetSMP_Response();
+        limine_mp_response* smp      = BootInfo::SMP_Response();
         usize               cpuCount = smp->cpu_count;
 
         s_CPUs.Resize(cpuCount);
@@ -228,7 +228,7 @@ namespace CPU
             Halt();
         };
 
-        auto smpResponse = BootInfo::GetSMP_Response();
+        auto smpResponse = BootInfo::SMP_Response();
         for (usize i = 0; i < smpResponse->cpu_count; i++)
         {
             auto cpu = smpResponse->cpus[i];

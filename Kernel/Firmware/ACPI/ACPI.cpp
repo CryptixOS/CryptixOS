@@ -118,20 +118,20 @@ namespace ACPI
             usize len  = dsdt.Length;
             VMM::MapKernelRange(fadt->X_Dsdt + 4096, fadt->X_Dsdt + 4096, len);
 
-            if (CommandLine::GetBoolean("acpi.new-interpreter").ValueOr(true))
+            if (CommandLine::GetBoolean("acpi.new-interpreter").ValueOr(false))
                 Interpreter::ExecuteTable(dsdt);
         }
 
     } // namespace
 
-    bool IsAvailable() { return BootInfo::GetRSDPAddress().operator bool(); }
+    bool IsAvailable() { return BootInfo::RSDPAddress().operator bool(); }
     bool LoadTables()
     {
         using namespace std::literals;
 
         LogTrace("ACPI: Initializing...");
         constexpr StringView RSDP_SIGNATURE = "RSD PTR"_sv;
-        auto                 rsdpPointer    = BootInfo::GetRSDPAddress();
+        auto                 rsdpPointer    = BootInfo::RSDPAddress();
         if (!rsdpPointer) return false;
 
         RSDP* rsdp = rsdpPointer.ToHigherHalf<Pointer>().As<RSDP>();
@@ -202,7 +202,7 @@ namespace ACPI
         uAcpiCall(uacpi_namespace_initialize(),
                   "ACPI: Failed to initialize namespace");
         // uAcpiCall(uacpi_finalize_gpe_initialization(),
-        //           "ACPI: Failed to finalize gpe initialization!");
+        //          "ACPI: Failed to finalize gpe initialization!");
     }
     void EnumerateDevices()
     {

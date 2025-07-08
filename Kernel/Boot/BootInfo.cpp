@@ -27,6 +27,7 @@ namespace BootInfo
     extern "C" __attribute__((no_sanitize("address"))) void Initialize();
 }
 
+#pragma region limine requests
 LIMINE_REQUEST limine_bootloader_info_request s_BootloaderInfoRequest = {
     .id       = LIMINE_BOOTLOADER_INFO_REQUEST,
     .revision = 0,
@@ -131,6 +132,7 @@ LIMINE_REQUEST limine_dtb_request s_DtbRequest = {
     .revision = 0,
     .response = nullptr,
 };
+#pragma endregion
 
 namespace
 {
@@ -144,9 +146,72 @@ namespace
         used,
         section(".limine_requests_end"))) volatile LIMINE_REQUESTS_END_MARKER;
 
-} // namespace
+    FirmwareType s_FirmwareType = FirmwareType::eUndefined;
+    MemoryMap    s_MemoryMap    = {};
 
-static FirmwareType s_FirmwareType = FirmwareType::eUndefined;
+    void         ParseMemoryMap()
+    {
+        if (!s_MemmapRequest.response
+            || s_MemmapRequest.response->entry_count == 0)
+            Panic("Boot: Failed to acquire limine memory map entries");
+
+        auto** memoryMap        = s_MemmapRequest.response->entries;
+        usize  memoryEntryCount = s_MemmapRequest.response->entry_count;
+        auto   allocateMemory   = [&](usize bytes) -> Pointer
+        {
+            for (usize i = 0; i < memoryEntryCount; i++)
+            {
+                bytes       = Math::AlignUp(bytes, PMM::PAGE_SIZE);
+                auto* entry = memoryMap[i];
+                if (entry->type != LIMINE_MEMMAP_USABLE || entry->length < bytes)
+                    continue;
+
+                Pointer address = entry->base;
+                entry->base += bytes;
+                entry->length -= bytes;
+
+                return address.ToHigherHalf();
+            }
+
+            return nullptr;
+        };
+        auto fromLimineMemoryType = [](u8 type) -> MemoryType
+        {
+            switch (type)
+            {
+                case LIMINE_MEMMAP_USABLE: return MemoryType::eUsable;
+                case LIMINE_MEMMAP_RESERVED: return MemoryType::eReserved;
+                case LIMINE_MEMMAP_ACPI_RECLAIMABLE:
+                    return MemoryType::eACPI_Reclaimable;
+                case LIMINE_MEMMAP_ACPI_NVS: return MemoryType::eACPI_NVS;
+                case LIMINE_MEMMAP_BAD_MEMORY: return MemoryType::eBadMemory;
+                case LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE:
+                    return MemoryType::eBootloaderReclaimable;
+                case LIMINE_MEMMAP_EXECUTABLE_AND_MODULES:
+                    return MemoryType::eKernelAndModules;
+                case LIMINE_MEMMAP_FRAMEBUFFER: return MemoryType::eFramebuffer;
+
+                default: break;
+            }
+
+            return MemoryType::eReserved;
+        };
+
+        s_MemoryMap.Entries = allocateMemory(
+            sizeof(MemoryRegion) * s_MemmapRequest.response->entry_count);
+        s_MemoryMap.EntryCount = s_MemmapRequest.response->entry_count;
+
+        for (usize i = 0; i < memoryEntryCount; i++)
+        {
+            auto*      current     = memoryMap[i];
+            u64        base        = current->base;
+            u64        length      = current->length;
+            MemoryType type        = fromLimineMemoryType(current->type);
+
+            s_MemoryMap.Entries[i] = MemoryRegion(base, length, type);
+        }
+    }
+} // namespace
 
 extern "C" CTOS_NO_KASAN [[noreturn]] void kernelStart();
 
@@ -158,8 +223,8 @@ namespace BootInfo
 {
     extern "C" __attribute__((no_sanitize("address"))) void Initialize()
     {
-        (void)s_StackSizeRequest.response;
-        (void)s_EntryPointRequest.response;
+        CtosUnused(s_StackSizeRequest.response);
+        CtosUnused(s_EntryPointRequest.response);
 
         Logger::EnableSink(LOG_SINK_E9);
 #if defined(CTOS_TARGET_X86_64) && defined(__aarch64__)
@@ -179,10 +244,7 @@ namespace BootInfo
             EarlyPanic("Boot: Failed to acquire the framebuffer!");
         Logger::EnableSink(LOG_SINK_TERMINAL);
 
-        if (!s_MemmapRequest.response
-            || s_MemmapRequest.response->entry_count == 0)
-            Panic("Boot: Failed to acquire limine memory map entries");
-
+        ParseMemoryMap();
         switch (s_FirmwareTypeRequest.response->firmware_type)
         {
             case LIMINE_FIRMWARE_TYPE_X86BIOS:
@@ -201,24 +263,25 @@ namespace BootInfo
 
         kernelStart();
     }
-    const char* GetBootloaderName()
+    StringView BootloaderName()
     {
-        VerifyExistenceOrRet(s_BootloaderInfoRequest);
+        VerifyExistenceOrRetValue(s_BootloaderInfoRequest, "");
         return s_BootloaderInfoRequest.response->name;
     }
-    const char* GetBootloaderVersion()
+    StringView BootloaderVersion()
     {
-        VerifyExistenceOrRet(s_BootloaderInfoRequest);
+        VerifyExistenceOrRetValue(s_BootloaderInfoRequest, "");
         return s_BootloaderInfoRequest.response->version;
     }
-    StringView GetKernelCommandLine()
+    StringView KernelCommandLine()
     {
         VerifyExistenceOrRetValue(s_ExecutableCmdlineRequest, "");
         return s_ExecutableCmdlineRequest.response->cmdline;
     }
-    FirmwareType GetFirmwareType()
+    enum FirmwareType FirmwareType()
     {
-        VerifyExistenceOrRetValue(s_FirmwareTypeRequest, FirmwareType(0));
+        VerifyExistenceOrRetValue(s_FirmwareTypeRequest,
+                                  static_cast<enum FirmwareType>(0));
 
         return s_FirmwareType;
     }
@@ -240,26 +303,19 @@ namespace BootInfo
         VerifyExistenceOrRet(s_FramebufferRequest);
         return s_FramebufferRequest.response->framebuffers[0];
     }
-    usize GetPagingMode()
+    usize PagingMode()
     {
         VerifyExistenceOrRetValue(s_PagingModeRequest, 0);
         return s_PagingModeRequest.response->mode;
     }
-    limine_mp_response* GetSMP_Response()
+    limine_mp_response* SMP_Response()
     {
         VerifyExistenceOrRet(s_SmpRequest);
 
         return s_SmpRequest.response;
     }
-    MemoryMap GetMemoryMap(u64& entryCount)
-    {
-        VerifyExistenceOrRet(s_MemmapRequest)
-
-            entryCount
-            = s_MemmapRequest.response->entry_count;
-        return s_MemmapRequest.response->entries;
-    }
-    limine_file* GetExecutableFile()
+    struct MemoryMap& MemoryMap() { return s_MemoryMap; }
+    limine_file*      ExecutableFile()
     {
         VerifyExistenceOrRet(s_ExecutableRequest);
 
@@ -276,7 +332,7 @@ namespace BootInfo
         }
         return nullptr;
     }
-    Pointer GetRSDPAddress()
+    Pointer RSDPAddress()
     {
         VerifyExistenceOrRet(s_RsdpRequest);
 
@@ -291,37 +347,37 @@ namespace BootInfo
                               s_SmbiosRequest.response->entry_64);
     }
 
-    Pointer GetEfiSystemTable()
+    Pointer EfiSystemTable()
     {
         VerifyExistenceOrRet(s_EfiSystemTableRequest);
 
         return s_EfiSystemTableRequest.response->address;
     }
-    limine_efi_memmap_response* GetEfiMemoryMap()
+    limine_efi_memmap_response* EfiMemoryMap()
     {
         VerifyExistenceOrRet(s_EfiMemmapRequest);
 
         return s_EfiMemmapRequest.response;
     }
-    u64 GetDateAtBoot()
+    u64 DateAtBoot()
     {
         VerifyExistenceOrRetValue(s_DateAtBootRequest, 0);
 
         return s_DateAtBootRequest.response->timestamp;
     }
-    Pointer GetKernelPhysicalAddress()
+    Pointer KernelPhysicalAddress()
     {
         VerifyExistenceOrRet(s_KernelAddressRequest);
 
         return s_KernelAddressRequest.response->physical_base;
     }
-    Pointer GetKernelVirtualAddress()
+    Pointer KernelVirtualAddress()
     {
         VerifyExistenceOrRet(s_KernelAddressRequest);
 
         return s_KernelAddressRequest.response->virtual_base;
     }
-    Pointer GetDeviceTreeBlobAddress()
+    Pointer DeviceTreeBlobAddress()
     {
         VerifyExistenceOrRet(s_DtbRequest);
 

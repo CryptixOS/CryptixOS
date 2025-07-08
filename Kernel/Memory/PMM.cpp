@@ -56,32 +56,35 @@ namespace PhysicalMemoryManager
 
     bool Initialize()
     {
-        usize     entryCount = 0;
-        MemoryMap memoryMap  = BootInfo::GetMemoryMap(entryCount);
+        usize entryCount = 0;
+
+        auto  memoryMap  = BootInfo::MemoryMap();
+        entryCount       = memoryMap.EntryCount;
         if (entryCount == 0) return false;
 
         EarlyLogTrace("PMM: Initializing...");
         for (usize i = 0; i < entryCount; i++)
         {
-            MemoryMapEntry* currentEntry = memoryMap[i];
-            Pointer         top = currentEntry->base + currentEntry->length;
-            s_MemoryTop         = std::max(s_MemoryTop.Raw(), top.Raw());
+            auto&   current = memoryMap.Entries[i];
 
-            switch (currentEntry->type)
+            Pointer top     = current.Base().Offset(current.Size());
+            s_MemoryTop     = std::max(s_MemoryTop.Raw(), top.Raw());
+
+            switch (current.Type())
             {
-                case MEMORY_MAP_USABLE:
-                    s_UsableMemorySize += currentEntry->length;
+                case MemoryType::eUsable:
+                    s_UsableMemorySize += current.Size();
                     s_UsableMemoryTop = std::max(s_UsableMemoryTop, top);
                     break;
-                case MEMORY_MAP_ACPI_RECLAIMABLE:
-                case MEMORY_MAP_BOOTLOADER_RECLAIMABLE:
-                case MEMORY_MAP_KERNEL_AND_MODULES:
-                    s_UsedMemory += currentEntry->length;
+                case MemoryType::eACPI_Reclaimable:
+                case MemoryType::eBootloaderReclaimable:
+                case MemoryType::eKernelAndModules:
+                    s_UsedMemory += current.Size();
                     break;
                 default: continue;
             }
 
-            s_TotalMemory += currentEntry->length;
+            s_TotalMemory += current.Size();
         }
 
         if (!s_MemoryTop) return false;
@@ -90,46 +93,24 @@ namespace PhysicalMemoryManager
         usize s_BitmapSize = Math::AlignUp(s_BitmapEntryCount / 8, PAGE_SIZE);
         s_BitmapEntryCount = s_BitmapSize * 8;
 
-        [[maybe_unused]]
-        auto entryTypeToString
-            = [](u64 type)
-        {
-            switch (type)
-            {
-                case LIMINE_MEMMAP_USABLE: return "Usable";
-                case LIMINE_MEMMAP_RESERVED: return "Reserved";
-                case LIMINE_MEMMAP_ACPI_RECLAIMABLE: return "ACPI Reclaimable";
-                case LIMINE_MEMMAP_ACPI_NVS: return "ACPI NVS";
-                case LIMINE_MEMMAP_BAD_MEMORY: return "Bad Memory";
-                case LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE:
-                    return "Bootloader Reclaimable";
-                case MEMORY_MAP_KERNEL_AND_MODULES: return "Kernel and Modules";
-                case LIMINE_MEMMAP_FRAMEBUFFER: return "Framebuffer";
-
-                default: break;
-            }
-
-            return "Undefined";
-        };
         for (usize i = 0; i < entryCount; i++)
         {
-            MemoryMapEntry* currentEntry = memoryMap[i];
-            Pointer         entryBase    = currentEntry->base;
-            usize           entryLength  = currentEntry->length;
-            auto entryTypeString = entryTypeToString(currentEntry->type);
+            auto&   current     = memoryMap.Entries[i];
+            Pointer entryBase   = current.Base();
+            usize   entryLength = current.Size();
 
             EarlyLogDebug(
                 "PMM: MemoryMap[%zu] = { .Base: %#p, .Length: %#x, .Type: "
                 "%s }",
-                i, entryBase.Raw(), entryLength, entryTypeString);
+                i, entryBase.Raw(), entryLength, "Unknown");
 
-            if (currentEntry->type != LIMINE_MEMMAP_USABLE
-                || currentEntry->length <= s_BitmapSize)
+            if (current.Type() != MemoryType::eUsable
+                || current.Size() <= s_BitmapSize)
                 continue;
             s_Bitmap.Initialize(entryBase.ToHigherHalf(), s_BitmapSize, 0xff);
 
-            currentEntry->base += s_BitmapSize;
-            currentEntry->length -= s_BitmapSize;
+            current.m_Base += s_BitmapSize;
+            current.m_Size -= s_BitmapSize;
 
             s_UsedMemory += s_BitmapSize;
             break;
@@ -138,12 +119,12 @@ namespace PhysicalMemoryManager
         Assert(s_Bitmap.GetSize() != 0);
         for (usize i = 0; i < entryCount; i++)
         {
-            MemoryMapEntry* currentEntry = memoryMap[i];
-            if (currentEntry->type != MEMORY_MAP_USABLE) continue;
+            auto& current = memoryMap.Entries[i];
+            if (current.Type() != MemoryType::eUsable) continue;
 
-            for (usize page = currentEntry->base == 0 ? 4096 : 0;
-                 page < currentEntry->length; page += PAGE_SIZE)
-                s_Bitmap.SetIndex((currentEntry->base + page) / PAGE_SIZE,
+            for (usize page = current.Base().Raw() == 0 ? 4096 : 0;
+                 page < current.Size(); page += PAGE_SIZE)
+                s_Bitmap.SetIndex((current.Base().Raw() + page) / PAGE_SIZE,
                                   false);
         }
 

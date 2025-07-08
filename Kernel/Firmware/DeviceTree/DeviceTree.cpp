@@ -49,9 +49,8 @@ namespace DeviceTree
                     break;
                 }
                 case FDT_TokenType::eEndNode:
-                    current = (current && current->GetParent())
-                                ? current->GetParent()
-                                : root;
+                    current = (current && current->Parent()) ? current->Parent()
+                                                             : root;
                     break;
                 case FDT_TokenType::eProperty:
                 {
@@ -94,7 +93,7 @@ namespace DeviceTree
 
     bool Initialize()
     {
-        auto        dtb    = BootInfo::GetDeviceTreeBlobAddress();
+        auto        dtb    = BootInfo::DeviceTreeBlobAddress();
         FDT_Header* header = dtb.As<FDT_Header>();
 
         if (!header)

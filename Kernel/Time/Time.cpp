@@ -68,7 +68,7 @@ namespace Time
 
     void Initialize()
     {
-        s_BootTime = BootInfo::GetDateAtBoot();
+        s_BootTime = BootInfo::DateAtBoot();
         DateTime dateAtBoot(s_BootTime);
         LogInfo("Time: Boot Date: {}", dateAtBoot);
 

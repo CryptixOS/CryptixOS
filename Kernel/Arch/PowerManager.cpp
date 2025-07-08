@@ -36,7 +36,7 @@ namespace PowerManager
 
         print("PowerManager: Trying to reboot via EFI Runtime Services...");
         EFI::SystemTable* systemTable
-            = BootInfo::GetEfiSystemTable().As<EFI::SystemTable>();
+            = BootInfo::EfiSystemTable().As<EFI::SystemTable>();
 
         Assert(systemTable);
         CTOS_UNUSED auto runtimeServices

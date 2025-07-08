@@ -37,7 +37,7 @@ namespace uACPI
     {
         uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr* outRsdp)
         {
-            uacpi_phys_addr rsdp = BootInfo::GetRSDPAddress().FromHigherHalf();
+            uacpi_phys_addr rsdp = BootInfo::RSDPAddress().FromHigherHalf();
 
             if (rsdp)
             {
@@ -281,16 +281,19 @@ namespace uACPI
         void uacpi_kernel_log(uacpi_log_level level, const uacpi_char* format,
                               ...)
         {
-            constexpr LogLevel uacpiToPrismLogLevels[] = {
-                LogLevel::eNone, LogLevel::eError, LogLevel::eWarn,
-                LogLevel::eInfo, LogLevel::eTrace, LogLevel::eDebug,
-            };
+            constexpr Array uacpiToPrismLogLevels = ToArray({
+                LogLevel::eNone,
+                LogLevel::eError,
+                LogLevel::eWarn,
+                LogLevel::eInfo,
+                LogLevel::eTrace,
+                LogLevel::eDebug,
+            });
 
-            Assert(level < std::size(uacpiToPrismLogLevels));
+            Assert(level < uacpiToPrismLogLevels.Size());
             LogLevel pLevel = uacpiToPrismLogLevels[level];
 
-            va_list  args;
-
+            va_list args;
             va_start(args, format);
             Logger::Logv(pLevel, format, args, false);
             va_end(args);
@@ -302,8 +305,10 @@ namespace uACPI
         }
         void uacpi_kernel_stall(uacpi_u8 usec)
         {
-            CtosUnused(usec);
-            ToDoWarn();
+            auto now      = Time::GetRealTime().Nanoseconds();
+            auto deadline = now + usec * 1000;
+
+            while (Time::GetRealTime().Nanoseconds() < deadline) Arch::Pause();
         }
         void uacpi_kernel_sleep(uacpi_u64 msec)
         {

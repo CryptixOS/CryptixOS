@@ -15,21 +15,21 @@
 #include <Prism/Utility/Math.hpp>
 #include <Scheduler/Process.hpp>
 
-extern "C" symbol           text_start_addr;
-extern "C" symbol           text_end_addr;
-extern "C" symbol           kernel_init_start_addr;
-extern "C" symbol           kernel_init_end_addr;
-extern "C" symbol           module_init_start_addr;
-extern "C" symbol           module_init_end_addr;
-extern "C" symbol           rodata_start_addr;
-extern "C" symbol           rodata_end_addr;
-extern "C" symbol           data_start_addr;
-extern "C" symbol           data_end_addr;
+extern "C" symbol      text_start_addr;
+extern "C" symbol      text_end_addr;
+extern "C" symbol      kernel_init_start_addr;
+extern "C" symbol      kernel_init_end_addr;
+extern "C" symbol      module_init_start_addr;
+extern "C" symbol      module_init_end_addr;
+extern "C" symbol      rodata_start_addr;
+extern "C" symbol      rodata_end_addr;
+extern "C" symbol      data_start_addr;
+extern "C" symbol      data_end_addr;
 
-static PageMap*             s_KernelPageMap;
-static Pointer              s_VirtualAddressSpace{};
+static PageMap*        s_KernelPageMap;
+static Pointer         s_VirtualAddressSpace{};
 
-static std::optional<usize> s_HigherHalfOffset = BootInfo::GetHHDMOffset();
+static Optional<usize> s_HigherHalfOffset = BootInfo::GetHHDMOffset();
 
 using namespace Arch::VMM;
 
@@ -66,23 +66,22 @@ namespace VirtualMemoryManager
                                          PageAttributes::eRW | flags
                                              | PageAttributes::eWriteBack));
 
-        usize entryCount    = 0;
-        auto  memoryEntries = BootInfo::GetMemoryMap(entryCount);
-        for (usize i = 0; i < entryCount; i++)
+        auto memoryMap = BootInfo::MemoryMap();
+        for (usize i = 0; i < memoryMap.EntryCount; i++)
         {
-            MemoryMapEntry* entry = memoryEntries[i];
+            auto&   entry = memoryMap.Entries[i];
 
-            Pointer         base  = Math::AlignDown(entry->base, GetPageSize());
-            Pointer         top
-                = Math::AlignUp(entry->base + entry->length, GetPageSize());
+            Pointer base  = Math::AlignDown(entry.Base(), GetPageSize());
+            Pointer top   = Math::AlignUp(entry.Base().Offset(entry.Size()),
+                                          GetPageSize());
 
-            auto size              = (top - base).Raw();
+            auto    size  = (top - base).Raw();
             auto [pageSize, flags] = s_KernelPageMap->RequiredSize(size);
 
             auto alignedSize       = Math::AlignDown(size, pageSize);
 
             flags |= PageAttributes::eWriteBack;
-            if (entry->type == MEMORY_MAP_FRAMEBUFFER)
+            if (entry.Type() == MemoryType::eFramebuffer)
                 flags |= PageAttributes::eWriteCombining;
 
             if (base < 4_gib) continue;
@@ -96,9 +95,9 @@ namespace VirtualMemoryManager
                 PageAttributes::eRW | PageAttributes::eWriteBack));
         }
 
-        auto kernelExecutable = BootInfo::GetExecutableFile();
-        auto kernelPhys       = BootInfo::GetKernelPhysicalAddress();
-        auto kernelVirt       = BootInfo::GetKernelVirtualAddress();
+        auto kernelExecutable = BootInfo::ExecutableFile();
+        auto kernelPhys       = BootInfo::KernelPhysicalAddress();
+        auto kernelVirt       = BootInfo::KernelVirtualAddress();
 
         Assert(s_KernelPageMap->MapRange(
             kernelVirt, kernelPhys, kernelExecutable->size,
@@ -129,7 +128,7 @@ namespace VirtualMemoryManager
     }
     usize GetHigherHalfOffset()
     {
-        return s_HigherHalfOffset.has_value() ? s_HigherHalfOffset.value() : 0;
+        return s_HigherHalfOffset.ValueOr(0);
     }
 
     Pointer AllocateSpace(usize increment, usize alignment, bool lowerHalf)

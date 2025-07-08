@@ -12,24 +12,43 @@
 
 #include <limine.h>
 
-#include <utility>
-
 constexpr u32 FRAMEBUFFER_MEMORY_MODEL_RGB = LIMINE_FRAMEBUFFER_RGB;
 
-constexpr u32 MEMORY_MAP_USABLE            = LIMINE_MEMMAP_USABLE;
-constexpr u32 MEMORY_MAP_RESERVED          = LIMINE_MEMMAP_RESERVED;
-constexpr u32 MEMORY_MAP_ACPI_RECLAIMABLE  = LIMINE_MEMMAP_ACPI_RECLAIMABLE;
-constexpr u32 MEMORY_MAP_ACPI_NVS          = LIMINE_MEMMAP_ACPI_NVS;
-constexpr u32 MEMORY_MAP_BAD_MEMORY        = LIMINE_MEMMAP_BAD_MEMORY;
-constexpr u32 MEMORY_MAP_BOOTLOADER_RECLAIMABLE
-    = LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE;
-constexpr u32 MEMORY_MAP_KERNEL_AND_MODULES
-    = LIMINE_MEMMAP_EXECUTABLE_AND_MODULES;
-constexpr u32 MEMORY_MAP_FRAMEBUFFER = LIMINE_MEMMAP_FRAMEBUFFER;
+using Framebuffer                          = limine_framebuffer;
+enum class MemoryType
+{
+    eUsable                = 0,
+    eReserved              = 1,
+    eACPI_Reclaimable      = 2,
+    eACPI_NVS              = 3,
+    eBadMemory             = 4,
+    eBootloaderReclaimable = 5,
+    eKernelAndModules      = 6,
+    eFramebuffer           = 7,
+};
+struct MemoryRegion
+{
+  public:
+    constexpr MemoryRegion(Pointer base, usize size, MemoryType type)
+        : m_Base(base)
+        , m_Size(size)
+        , m_Type(type)
+    {
+    }
 
-using MemoryMapEntry                 = limine_memmap_entry;
-using MemoryMap                      = MemoryMapEntry**;
-using Framebuffer                    = limine_framebuffer;
+    constexpr Pointer    Base() const { return m_Base; }
+    constexpr usize      Size() const { return m_Size; }
+    constexpr MemoryType Type() const { return m_Type; }
+
+    Pointer              m_Base = 0;
+    usize                m_Size = 0;
+    MemoryType           m_Type = MemoryType::eReserved;
+};
+struct MemoryMap
+{
+    MemoryRegion* Entries    = nullptr;
+    usize         EntryCount = 0;
+};
 
 enum class FirmwareType : i32
 {
@@ -42,24 +61,29 @@ enum class FirmwareType : i32
 
 namespace BootInfo
 {
-    const char*                 GetBootloaderName();
-    const char*                 GetBootloaderVersion();
-    StringView                  GetKernelCommandLine();
-    FirmwareType                GetFirmwareType();
+    StringView                  BootloaderName();
+    StringView                  BootloaderVersion();
+    StringView                  KernelCommandLine();
+    enum FirmwareType           FirmwareType();
+
     u64                         GetHHDMOffset();
     Framebuffer**               GetFramebuffers(usize& outCount);
     Framebuffer*                GetPrimaryFramebuffer();
-    usize                       GetPagingMode();
-    limine_mp_response*         GetSMP_Response();
-    MemoryMap                   GetMemoryMap(u64& entryCount);
-    limine_file*                GetExecutableFile();
+    usize                       PagingMode();
+    limine_mp_response*         SMP_Response();
+    MemoryMap&                  MemoryMap();
+
+    limine_file*                ExecutableFile();
     limine_file*                FindModule(const char* name);
-    Pointer                     GetRSDPAddress();
+
+    Pointer                     RSDPAddress();
     std::pair<Pointer, Pointer> GetSmBiosEntries();
-    Pointer                     GetEfiSystemTable();
-    limine_efi_memmap_response* GetEfiMemoryMap();
-    u64                         GetDateAtBoot();
-    Pointer                     GetKernelPhysicalAddress();
-    Pointer                     GetKernelVirtualAddress();
-    Pointer                     GetDeviceTreeBlobAddress();
+    Pointer                     EfiSystemTable();
+    limine_efi_memmap_response* EfiMemoryMap();
+
+    u64                         DateAtBoot();
+    Pointer                     KernelPhysicalAddress();
+    Pointer                     KernelVirtualAddress();
+
+    Pointer                     DeviceTreeBlobAddress();
 }; // namespace BootInfo

@@ -26,8 +26,8 @@ struct ProcFsCmdLineProperty : public ProcFsProperty
     {
         Buffer.Clear();
 
-        StringView kernelPath = BootInfo::GetExecutableFile()->path;
-        StringView cmdline    = BootInfo::GetKernelCommandLine();
+        StringView kernelPath = BootInfo::ExecutableFile()->path;
+        StringView cmdline    = BootInfo::KernelCommandLine();
 
         Buffer.Resize(kernelPath.Size() + cmdline.Size() + 10);
         Write("{} {}\n", kernelPath, cmdline);

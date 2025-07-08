@@ -17,13 +17,13 @@ namespace EFI
 {
     bool Initialize()
     {
-        auto firmwareType = BootInfo::GetFirmwareType();
+        auto firmwareType = BootInfo::FirmwareType();
         if (firmwareType != FirmwareType::eUefi32
             && firmwareType != FirmwareType::eUefi64)
             return false;
 
         LogTrace("EFI: Initializing...");
-        auto efiMemoryMapResponse = BootInfo::GetEfiMemoryMap();
+        auto efiMemoryMapResponse = BootInfo::EfiMemoryMap();
         if (!efiMemoryMapResponse)
         {
             LogError(

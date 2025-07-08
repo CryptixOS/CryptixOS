@@ -83,8 +83,8 @@ namespace Stacktrace
                 if (*current == '\n') break;
 
             Symbol ksym;
-            if (address < BootInfo::GetKernelVirtualAddress().Raw<>())
-                address += BootInfo::GetKernelVirtualAddress().Raw<>();
+            if (address < BootInfo::KernelVirtualAddress().Raw<>())
+                address += BootInfo::KernelVirtualAddress().Raw<>();
 
             ksym.Address = address;
             ksym.Name    = name.Substr(0, name.FindFirstOf('\n'));

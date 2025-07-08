@@ -250,7 +250,7 @@ namespace RTL8139
         ack.SystemError = true;
         Write<InterruptStatus>(Register::eInterruptStatus, ack);
 
-        SendCommand(Bit(10), false);
+        EnableInterrupts();
         LogInfo("RTL8139: MAC address: {}", m_MacAddress);
     }
 

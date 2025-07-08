@@ -68,7 +68,7 @@ namespace Arch::VMM
     void  DestroyPageMap(PageMap* pageMap)
     {
         DestroyLevel(pageMap, pageMap->GetTopLevel(), 0, 256,
-                     BootInfo::GetPagingMode() == 0 ? 4 : 5);
+                     BootInfo::PagingMode() == 0 ? 4 : 5);
     }
 
     PageAttributes FromNativeFlags(uintptr_t flags)
@@ -148,7 +148,7 @@ PageTableEntry* PageMap::Virt2Pte(PageTable* topLevel, uintptr_t virt,
     if (!topLevel) return nullptr;
 
     PageTable* pml4
-        = BootInfo::GetPagingMode() == LIMINE_PAGING_MODE_X86_64_5LVL
+        = BootInfo::PagingMode() == LIMINE_PAGING_MODE_X86_64_5LVL
             ? static_cast<PageTable*>(
                   GetNextLevel(topLevel->entries[pml5Entry], allocate))
             : topLevel;

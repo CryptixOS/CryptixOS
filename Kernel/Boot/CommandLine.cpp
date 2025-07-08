@@ -72,7 +72,7 @@ namespace CommandLine
 
     void Initialize()
     {
-        s_KernelCommandLine = BootInfo::GetKernelCommandLine();
+        s_KernelCommandLine = BootInfo::KernelCommandLine();
 
         LogInfo("CommandLine: Parsing '{}'...", s_KernelCommandLine);
         ParseArguments(s_KernelCommandLine);

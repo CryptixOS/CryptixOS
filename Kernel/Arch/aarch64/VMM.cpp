@@ -132,7 +132,7 @@ namespace Arch::VMM
         else if (mmfr0.tGran64 == 0b0000) pageSize = PAGE_SIZE_64KIB;
         else ::panic("VMM: Unknown page size");
 
-        if (BootInfo::GetPagingMode() == 1
+        if (BootInfo::PagingMode() == 1
             && (tcrEl1 & Bit(59) && featLpa
                 && ((pageSize == PAGE_SIZE_64KIB && featLva)
                     || (pageSize == PAGE_SIZE_16KIB && mmfr0.tGran16 == 0b0010)
@@ -255,7 +255,7 @@ PageTableEntry* PageMap::Virt2Pte(PageTable* topLevel, uintptr_t virt,
     if (!half) return nullptr;
 
     TTBR* pml4 = static_cast<TTBR*>(
-        (BootInfo::GetPagingMode() == 1)
+        (BootInfo::PagingMode() == 1)
             ? GetNextLevel(half->entries[pml5Entry], allocate)
             : half);
     if (!pml4) return nullptr;

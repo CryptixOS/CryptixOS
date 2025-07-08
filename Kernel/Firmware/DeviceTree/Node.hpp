@@ -8,6 +8,7 @@
 
 #include <Library/Logger.hpp>
 
+#include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/Memory/Endian.hpp>
 #include <Prism/String/String.hpp>
 
@@ -29,7 +30,7 @@ namespace DeviceTree
         Property() = default;
         Property(Node* parent, StringView name, u8* data, usize dataSize);
 
-        inline Node* GetParent() const { return m_Parent; }
+        inline Node* Parent() const { return m_Parent; }
 
         void         Print(usize depth);
 
@@ -52,8 +53,8 @@ namespace DeviceTree
             eEnd       = 9,
         };
 
-        Node*      GetParent() { return m_Parent; }
-        StringView GetName() { return m_Name; }
+        Node*      Parent() { return m_Parent; }
+        StringView Name() { return m_Name; }
 
         Node(Node* parent, StringView name)
             : m_Parent(parent)
@@ -64,18 +65,9 @@ namespace DeviceTree
         {
             m_Children[name] = node;
         }
-        void InsertProperty(StringView name, Property* property)
-        {
-            m_Properties[name] = property;
-        }
+        void InsertProperty(StringView name, Property* property);
 
-        void Print(u32 depth = 0)
-        {
-            LogMessage("- {}\n", m_Name);
-            for (const auto& [name, property] : m_Properties)
-                property->Print(depth);
-            for (const auto& [name, node] : m_Children) node->Print(depth + 4);
-        }
+        void Print(u32 depth = 0);
 
       private:
         Node*                                     m_Parent = nullptr;
