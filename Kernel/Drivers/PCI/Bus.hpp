@@ -23,10 +23,7 @@ namespace PCI
             DetectDevices();
         }
 
-        inline DeviceAddress Address() const 
-        {
-            return { m_Domain, m_Bus, 0, 0 };
-        }
+        inline DeviceAddress Address() const { return {m_Domain, m_Bus, 0, 0}; }
         inline HostController* GetController() const
         {
             return m_HostController;
@@ -37,6 +34,7 @@ namespace PCI
         inline const Vector<Device*>& GetDevices();
         void                          DetectDevices();
 
+        Device*                       FindDeviceByID(const DeviceID& id);
         bool                          Enumerate(Enumerator enumerator);
 
       private:

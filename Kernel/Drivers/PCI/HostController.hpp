@@ -55,9 +55,10 @@ namespace PCI
             return nullptr;
         }
 
-        bool EnumerateDevices(Enumerator enumerator);
+        Device* FindDeviceByID(const DeviceID& id);
+        bool    EnumerateDevices(Enumerator enumerator);
 
-        u32  Read(const DeviceAddress& dev, u32 offset, i32 accessSize)
+        u32     Read(const DeviceAddress& dev, u32 offset, i32 accessSize)
         {
             Assert(m_AccessMechanism);
             return m_AccessMechanism->Read(dev, offset, accessSize);

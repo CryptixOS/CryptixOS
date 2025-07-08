@@ -55,11 +55,10 @@ namespace PCI
     }
     void InitializeDatabase()
     {
-        PathView        path = "/usr/share/hwdata/pci.ids";
-        Ref entry
-            = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), path)
-                  .value()
-                  .Entry;
+        PathView path = "/usr/share/hwdata/pci.ids";
+        Ref entry = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), path)
+                        .value()
+                        .Entry;
         if (!entry) return;
 
         auto file = entry->INode();
@@ -224,5 +223,17 @@ namespace PCI
         }
 
         return false;
+    }
+
+    Device* FindDeviceByID(const DeviceID& id)
+    {
+        for (const auto& [domain, controller] : s_HostControllers)
+        {
+            auto device = controller->FindDeviceByID(id);
+
+            if (device) return device;
+        }
+
+        return nullptr;
     }
 }; // namespace PCI

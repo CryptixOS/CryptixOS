@@ -39,13 +39,24 @@ namespace PCI
         }
     }
 
+    Device* Bus::FindDeviceByID(const DeviceID& id)
+    {
+        for (const auto device : m_Devices)
+            if (device->GetDeviceID() == id) return device;
+        for (const auto& bridge : m_ChildBridges)
+        {
+            auto device = bridge->FindDeviceByID(id);
+            if (device) return device;
+        }
+
+        return nullptr;
+    }
     bool Bus::Enumerate(Enumerator enumerator)
     {
         for (const auto& device : m_Devices)
             if (enumerator(device->GetAddress())) return true;
         for (const auto& bridge : m_ChildBridges)
-            if (enumerator(bridge->Address()))
-                return true;
+            if (enumerator(bridge->Address())) return true;
         return false;
     }
 
@@ -75,8 +86,11 @@ namespace PCI
         if (headerType == 0x00)
         {
             auto device = new Device(address);
-            LogInfo("PCI: Device discovered => {:#04x}:{:#04x}:{:#04x}:{:#04x}, with class {:#04x}:{:#04x}",
-                    address.Domain, address.Bus, address.Slot, address.Function, classID, subClassID);
+            LogInfo(
+                "PCI: Device discovered => {:#04x}:{:#04x}:{:#04x}:{:#04x}, "
+                "with class {:#04x}:{:#04x}",
+                address.Domain, address.Bus, address.Slot, address.Function,
+                classID, subClassID);
 
             m_Devices.PushBack(device);
         }

@@ -115,6 +115,19 @@ namespace PCI
             },
             this);
     }
+
+    Device* HostController::FindDeviceByID(const DeviceID& id)
+    {
+        Device* device = nullptr;
+
+        for (const auto bus : m_RootBuses)
+        {
+            device = bus->FindDeviceByID(id);
+            if (device) break;
+        }
+
+        return device;
+    }
     bool HostController::EnumerateDevices(Enumerator enumerator)
     {
         return EnumerateRootBus(enumerator);
