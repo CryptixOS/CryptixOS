@@ -6,6 +6,8 @@
  */
 #pragma once
 
+#include <Common.hpp>
+
 #include <API/Posix/time.h>
 
 #include <Prism/Containers/Vector.hpp>
@@ -20,7 +22,9 @@
 class HardwareTimer;
 namespace Arch
 {
-    void              Initialize();
+    KERNEL_INIT_CODE
+    void Initialize();
+    KERNEL_INIT_CODE
     void              ProbeDevices();
 
     [[noreturn]] void Halt();
@@ -29,6 +33,7 @@ namespace Arch
     void              PowerOff();
     void              Reboot();
 
-    void              ProbeTimers(Vector<HardwareTimer*>& timers);
-    time_t            GetEpoch();
+    KERNEL_INIT_CODE
+    void   ProbeTimers(Vector<HardwareTimer*>& timers);
+    time_t GetEpoch();
 }; // namespace Arch

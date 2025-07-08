@@ -114,7 +114,9 @@ namespace CPU
         Thread*          CurrentThread;
     };
 
+    KERNEL_INIT_CODE
     void InitializeBSP();
+    KERNEL_INIT_CODE
     void StartAPs();
 
     struct ID final

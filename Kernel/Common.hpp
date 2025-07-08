@@ -6,8 +6,6 @@
  */
 #pragma once
 
-#include <Arch/Arch.hpp>
-
 #include <Debug/Assertions.hpp>
 #include <Library/Logger.hpp>
 #include <Library/Stacktrace.hpp>

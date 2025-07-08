@@ -55,7 +55,8 @@ namespace CPU
 
     extern "C" __attribute__((noreturn)) void syscall_entry();
 
-    static void                               InitializeFPU()
+    KERNEL_INIT_CODE
+    static void InitializeFPU()
     {
         if (!EnableSSE()) return;
         CPU* current = GetCurrent();
@@ -107,6 +108,7 @@ namespace CPU
         LogInfo("FPU: Initialized on cpu[{}]", current->ID);
     }
 
+    KERNEL_INIT_CODE
     static void InitializeCPU(limine_mp_info* cpu)
     {
         CPU* current = reinterpret_cast<CPU*>(cpu->extra_argument);
@@ -162,6 +164,7 @@ namespace CPU
         IDT::SetIST(14, 2);
     }
 
+    KERNEL_INIT_CODE
     void InitializeBSP()
     {
         limine_mp_response* smp      = BootInfo::SMP_Response();
@@ -208,6 +211,7 @@ namespace CPU
         IDT::SetIST(g_ScheduleVector, 1);
         LogInfo("BSP: Initialized");
     }
+    KERNEL_INIT_CODE
     void StartAPs()
     {
         LogTrace("SMP: Launching APs");

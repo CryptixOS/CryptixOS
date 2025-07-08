@@ -93,6 +93,8 @@ static bool loadInitProcess(Path initPath)
     Logger::DisableSink(LOG_SINK_TERMINAL);
     auto userThread = userProcess->CreateThread(address, argv, envp, program,
                                                 CPU::GetCurrent()->ID);
+    VMM::UnmapKernelInitCode();
+
     Scheduler::EnqueueThread(userThread);
 
     return true;

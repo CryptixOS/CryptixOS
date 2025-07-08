@@ -165,6 +165,7 @@ class PageTableEntry final
 namespace VirtualMemoryManager
 {
     void     Initialize();
+    void UnmapKernelInitCode();
 
     usize    GetHigherHalfOffset();
 

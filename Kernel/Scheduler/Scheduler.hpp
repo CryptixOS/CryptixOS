@@ -17,7 +17,9 @@ struct Thread;
 class Scheduler
 {
   public:
-    static void     Initialize();
+    KERNEL_INIT_CODE
+    static void Initialize();
+    KERNEL_INIT_CODE
     static void     InitializeProcFs();
     static void     PrepareAP(bool start = false);
 

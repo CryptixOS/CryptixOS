@@ -126,10 +126,14 @@ namespace VirtualMemoryManager
         s_KernelPageMap->Load();
         LogInfo("VMM: Loaded kernel page map");
     }
-    usize GetHigherHalfOffset()
+    void UnmapKernelInitCode()
     {
-        return s_HigherHalfOffset.ValueOr(0);
+        auto initVirt = Pointer(kernel_init_start_addr);
+        auto initSize = Pointer(kernel_init_end_addr) - initVirt;
+        s_KernelPageMap->UnmapRange(initVirt, initSize);
     }
+
+    usize   GetHigherHalfOffset() { return s_HigherHalfOffset.ValueOr(0); }
 
     Pointer AllocateSpace(usize increment, usize alignment, bool lowerHalf)
     {

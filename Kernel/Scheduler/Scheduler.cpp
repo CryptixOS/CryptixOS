@@ -107,7 +107,8 @@ ThreadQueue s_WaitQueue;
 ThreadQueue s_ReadyQueue;
 ThreadQueue s_BlockedQueue;
 
-void        Scheduler::Initialize()
+KERNEL_INIT_CODE
+void Scheduler::Initialize()
 {
     u64 cpuCount    = CPU::GetOnlineCPUsCount();
     s_CPULocalData  = new CPULocalData[cpuCount];
@@ -123,6 +124,7 @@ void        Scheduler::Initialize()
     LogInfo("Scheduler: Kernel process created");
     LogInfo("Scheduler: Initialized");
 }
+KERNEL_INIT_CODE
 void Scheduler::InitializeProcFs()
 {
     VFS::CreateNode(nullptr, "/proc", 0755 | S_IFDIR);
