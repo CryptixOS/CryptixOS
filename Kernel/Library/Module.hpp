@@ -7,13 +7,12 @@
  */
 #pragma once
 
+#include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/Core/Types.hpp>
 #include <Prism/String/StringView.hpp>
 
 #include <uacpi/resources.h>
 #include <uacpi/utilities.h>
-
-#include <unordered_map>
 
 #define CONCAT(a, b)       CONCAT_INNER(a, b)
 #define CONCAT_INNER(a, b) a##b
@@ -31,8 +30,8 @@ struct [[gnu::packed, gnu::aligned(8)]] Module
     static bool Load();
 };
 
-std::unordered_map<StringView, Module*>& GetModules();
-bool                                     LoadModule(Module* drv);
+UnorderedMap<StringView, Module*>& GetModules();
+bool                               LoadModule(Module* drv);
 
 #define MODULE_SECTION      ".module_init"
 #define MODULE_DATA_SECTION ".module_init.data"

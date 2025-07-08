@@ -43,6 +43,7 @@ namespace API::VFS
     ErrorOr<isize> Rename(const char* oldPath, const char* newPath);
     ErrorOr<isize> MkDir(const char* pathname, mode_t mode);
     ErrorOr<isize> RmDir(const char* pathname);
+    ErrorOr<isize> Creat(const char* pathname, mode_t mode);
     ErrorOr<isize> Link(const char* oldPath, const char* newPath);
     ErrorOr<isize> Unlink(const char* path);
     ErrorOr<isize> Symlink(const char* target, const char* linkPath);

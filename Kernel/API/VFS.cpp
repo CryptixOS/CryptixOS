@@ -37,8 +37,8 @@ namespace API::VFS
             if (!(flags & AT_EMPTY_PATH)) return Error(ENOENT);
             if (dirFdNum == AT_FDCWD)
             {
-                auto res = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry().Raw(),
-                                              process->CWD());
+                auto res = ::VFS::ResolvePath(
+                    ::VFS::GetRootDirectoryEntry().Raw(), process->CWD());
                 if (errno != no_error && errno != ENOENT) return Error(errno);
                 return res;
             }
@@ -350,6 +350,18 @@ namespace API::VFS
 
         return 0;
     }
+    ErrorOr<isize> Creat(const char* pathname, mode_t mode)
+    {
+        Process* current = Process::GetCurrent();
+        if (!current->ValidateRead(pathname, Limits::MAX_PATH_LENGTH))
+            return Error(EFAULT);
+
+        auto path = CPU::AsUser([pathname]() -> Path { return pathname; });
+        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
+
+        return current->OpenAt(AT_FDCWD, path, O_CREAT | O_WRONLY | O_TRUNC,
+                               mode);
+    }
     ErrorOr<isize> Link(const char* oldPath, const char* newPath)
     {
         return LinkAt(AT_FDCWD, oldPath, AT_FDCWD, newPath, 0);
@@ -409,8 +421,7 @@ namespace API::VFS
 
         entry           = new DirectoryEntry(parentEntry, pathRes.BaseName);
         auto maybeEntry = parentINode->CreateDirectory(entry, mode);
-        if (!maybeEntry)
-            return Error(maybeEntry.error());
+        if (!maybeEntry) return Error(maybeEntry.error());
 
         return 0;
     }
@@ -490,8 +501,8 @@ namespace API::VFS
 
     ErrorOr<isize> UTime(PathView path, const utimbuf* out)
     {
-        auto maybePathRes
-            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry().Raw(), path, true);
+        auto maybePathRes = ::VFS::ResolvePath(
+            ::VFS::GetRootDirectoryEntry().Raw(), path, true);
         RetOnError(maybePathRes);
         auto pathRes = maybePathRes.value();
 
@@ -549,8 +560,8 @@ namespace API::VFS
         auto* fd             = current->GetFileHandle(dirFdNum);
         bool  followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
 
-        auto  maybePathRes = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry().Raw(),
-                                                current->CWD());
+        auto  maybePathRes   = ::VFS::ResolvePath(
+            ::VFS::GetRootDirectoryEntry().Raw(), current->CWD());
         RetOnError(maybePathRes);
         auto pathRes  = maybePathRes.value();
 
@@ -748,7 +759,8 @@ namespace Syscall::VFS
         Ref<DirectoryEntry> entry = CPU::AsUser(
             [path]() -> Ref<DirectoryEntry>
             {
-                return VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), path)
+                return VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(),
+                                        path)
                     .value()
                     .Entry;
             });

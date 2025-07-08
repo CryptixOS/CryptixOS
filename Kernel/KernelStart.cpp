@@ -32,6 +32,7 @@
 #include <Library/Module.hpp>
 #include <Library/Stacktrace.hpp>
 
+#include <Memory/KernelHeap.hpp>
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
@@ -184,14 +185,24 @@ kernelStart()
     __asm__ volatile("1: jmp 1b");
 #endif
 
-    // NOTE(v1tr10l7): It is important that these four calls happen at the very
+    // DONT MOVE START
+    // -------------------------------------------------------------
+    // NOTE(v1tr10l7): It is important that these calls happen at the very
     // beginning of the kernel initialization, because we want to have a working
-    // Heap, serial logging and global constructors being called ASAP
+    // Heap and Serial logging be available ASAP, as every other subsystem
+    // depends on this
+
+    // Initialize early kernel heap
+    KernelHeap::Initialize();
+    // Initialize Physical Memory Manager
     Assert(PMM::Initialize());
+    // Call global constructors
     icxxabi::Initialize();
 
     VMM::Initialize();
     Serial::Initialize();
+    // DONT MOVE END
+    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 #ifdef CTOS_TARGET_X86_64
     #define SERIAL_LOG_ENABLE_DEFAULT false

@@ -9,7 +9,7 @@
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/VFS.hpp>
 
-std::unordered_map<dev_t, Device*> DevTmpFs::s_Devices{};
+UnorderedMap<dev_t, Device*> DevTmpFs::s_Devices{};
 
 DevTmpFs::DevTmpFs(u32 flags)
     : Filesystem("DevTmpFs", flags)
@@ -69,10 +69,10 @@ ErrorOr<INode*> DevTmpFs::MkNod(INode* parent, Ref<DirectoryEntry> entry,
 
     if (parent) parent->InsertChild(inode, entry->Name());
 
-    auto it = s_Devices.find(dev);
+    auto it = s_Devices.Find(dev);
     if (it == s_Devices.end()) return inode;
 
-    inode->m_Device = it->second;
+    inode->m_Device = it->Value;
     return inode;
 }
 
@@ -80,7 +80,7 @@ bool DevTmpFs::RegisterDevice(Device* device)
 {
     Assert(device);
 
-    if (s_Devices.contains(device->ID())) return false;
+    if (s_Devices.Contains(device->ID())) return false;
 
     s_Devices[device->ID()] = device;
     return true;

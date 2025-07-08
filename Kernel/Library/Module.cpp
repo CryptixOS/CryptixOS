@@ -14,12 +14,10 @@
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
 
-#include <magic_enum/magic_enum.hpp>
-
-static std::unordered_map<StringView, Module*> s_Modules;
+static UnorderedMap<StringView, Module*> s_Modules;
 static Vector<ELF::Image*>                     s_LoadedModules;
 
-std::unordered_map<StringView, Module*>& GetModules() { return s_Modules; }
+UnorderedMap<StringView, Module*>& GetModules() { return s_Modules; }
 
 static void LoadModuleFromFile(Ref<DirectoryEntry> entry)
 {
@@ -56,7 +54,7 @@ bool Module::Load()
 
 bool AddModule(Module* drv, StringView name)
 {
-    if (s_Modules.contains(name))
+    if (s_Modules.Contains(name))
     {
         LogError("Module: '{}' already exists, aborting...", name);
         return false;

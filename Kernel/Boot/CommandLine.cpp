@@ -5,21 +5,21 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Boot/CommandLine.hpp>
-
 #include <Library/Logger.hpp>
+
+#include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/String/String.hpp>
 
 #include <cctype>
-#include <unordered_map>
 
 namespace CommandLine
 {
     static StringView                         s_KernelCommandLine = "";
-    static std::unordered_map<String, String> s_OptionMap;
+    static UnorderedMap<String, String> s_OptionMap;
 
     void                                      ParseArguments(StringView args)
     {
-        std::unordered_map<String, String>& result = s_OptionMap;
+        UnorderedMap<String, String>& result = s_OptionMap;
         usize                               pos    = 0;
 
         while (pos < args.Size())
@@ -85,16 +85,16 @@ namespace CommandLine
     using namespace Prism::StringViewLiterals;
     Optional<bool> GetBoolean(StringView key)
     {
-        auto it = s_OptionMap.find(String(key));
+        auto it = s_OptionMap.Find(String(key));
         if (it != s_OptionMap.end())
-            return it->second == "true"_sv || it->second == "1"_sv;
+            return it->Value == "true"_sv || it->Value == "1"_sv;
 
         return NullOpt;
     }
     StringView GetString(StringView key)
     {
-        auto it = s_OptionMap.find(String(key));
-        if (it != s_OptionMap.end()) return it->second;
+        auto it = s_OptionMap.Find(String(key));
+        if (it != s_OptionMap.end()) return it->Value;
 
         return "";
     }

@@ -12,8 +12,6 @@
 #include <Prism/Memory/Endian.hpp>
 #include <Prism/String/String.hpp>
 
-#include <unordered_map>
-
 namespace DeviceTree
 {
     class PropertyHeader
@@ -70,9 +68,10 @@ namespace DeviceTree
         void Print(u32 depth = 0);
 
       private:
-        Node*                                     m_Parent = nullptr;
-        String                                    m_Name;
-        std::unordered_map<StringView, Node*>     m_Children;
-        std::unordered_map<StringView, Property*> m_Properties;
+        Node*                               m_Parent = nullptr;
+        String                              m_Name;
+
+        UnorderedMap<StringView, Node*>     m_Children;
+        UnorderedMap<StringView, Property*> m_Properties;
     };
 }; // namespace DeviceTree

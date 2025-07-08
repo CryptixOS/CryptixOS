@@ -68,6 +68,8 @@ srcs += files(
   'Memory/Region.cpp',
   'Memory/VMM.cpp',
 
+  'Memory/Allocators/BitmapAllocator.cpp',
+
   'Network/NetworkAdapter.cpp',
 
   'Scheduler/Event.cpp',

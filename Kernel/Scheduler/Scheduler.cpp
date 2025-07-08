@@ -32,12 +32,12 @@ namespace
     {
         Atomic<bool> PreemptionEnabled;
     };
-    CPULocalData*                       s_CPULocalData;
+    CPULocalData*                 s_CPULocalData;
 
-    Process*                            s_KernelProcess = nullptr;
-    Spinlock                            s_ProcessListLock;
-    std::unordered_map<pid_t, Process*> s_Processes;
-    ProcFs*                             s_ProcFs = nullptr;
+    Process*                      s_KernelProcess = nullptr;
+    Spinlock                      s_ProcessListLock;
+    UnorderedMap<pid_t, Process*> s_Processes;
+    ProcFs*                       s_ProcFs = nullptr;
 } // namespace
 
 struct ThreadQueue
@@ -250,20 +250,20 @@ Process* Scheduler::CreateProcess(Process* parent, StringView name,
 void Scheduler::RemoveProcess(pid_t pid)
 {
     ScopedLock guard(s_ProcessListLock);
-    s_Processes.erase(pid);
+    s_Processes.Erase(pid);
     s_ProcFs->RemoveProcess(pid);
 }
 
 bool Scheduler::ValidatePid(pid_t pid)
 {
     ScopedLock guard(s_ProcessListLock);
-    return s_Processes.contains(pid);
+    return s_Processes.Contains(pid);
 }
 Process* Scheduler::GetProcess(pid_t pid)
 {
     ScopedLock guard(s_ProcessListLock);
 
-    auto       it = s_Processes.find(pid);
+    auto       it = s_Processes.Find(pid);
 
     return it != s_Processes.end() ? s_Processes[pid] : nullptr;
 }
@@ -302,7 +302,7 @@ void Scheduler::DequeueThread(Thread* thread)
         }
 }
 
-std::unordered_map<pid_t, Process*>& Scheduler::GetProcessMap()
+UnorderedMap<pid_t, Process*>& Scheduler::GetProcessMap()
 {
     return s_Processes;
 }

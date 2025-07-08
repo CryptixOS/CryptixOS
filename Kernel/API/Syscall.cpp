@@ -139,7 +139,7 @@ namespace Syscall
         RegisterSyscall2(ID::eRename, API::VFS::Rename);
         RegisterSyscall2(ID::eMkDir, API::VFS::MkDir);
         RegisterSyscall2(ID::eRmDir, API::VFS::RmDir);
-        RegisterSyscall(ID::eCreat, SysCreat);
+        RegisterSyscall2(ID::eCreat, API::VFS::Creat);
         RegisterSyscall2(ID::eLink, API::VFS::Link);
         RegisterSyscall2(ID::eUnlink, API::VFS::Unlink);
         RegisterSyscall2(ID::eSymlink, API::VFS::Symlink);

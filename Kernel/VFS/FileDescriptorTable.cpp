@@ -12,11 +12,7 @@ i32 FileDescriptorTable::Insert(FileDescriptor* fd, i32 desired)
     ScopedLock guard(m_Lock);
     i32        fdNum = m_NextIndex;
 
-#if CTOS_USE_PRISM_HASHMAP != 0
     auto found = m_Table.Find(desired);
-#else
-    auto found = m_Table.find(desired);
-#endif
     if (desired >= 0 && found == m_Table.end()) fdNum = desired;
     m_Table[fdNum] = fd;
 
@@ -31,12 +27,7 @@ i32 FileDescriptorTable::Erase(i32 fdNum)
 
     delete fd;
 
-#if CTOS_USE_PRISM_HASHMAP != 0
     m_Table.Erase(fdNum);
-#else
-    m_Table.erase(fdNum);
-#endif
-
     return 0;
 }
 
@@ -56,10 +47,6 @@ void FileDescriptorTable::Clear()
 {
     for (const auto& [i, fd] : m_Table) delete fd;
 
-#if CTOS_USE_PRISM_HASHMAP != 0
     m_Table.Clear();
-#else
-    m_Table.clear();
-#endif
     m_NextIndex = 3;
 }

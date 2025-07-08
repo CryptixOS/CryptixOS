@@ -7,9 +7,9 @@
 #pragma once
 
 #include <Drivers/Device.hpp>
-#include <VFS/Filesystem.hpp>
 
-#include <unordered_map>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <VFS/Filesystem.hpp>
 
 class DevTmpFs : public Filesystem
 {
@@ -35,5 +35,5 @@ class DevTmpFs : public Filesystem
     static bool             RegisterDevice(Device* device);
 
   private:
-    static std::unordered_map<dev_t, Device*> s_Devices;
+    static UnorderedMap<dev_t, Device*> s_Devices;
 };
