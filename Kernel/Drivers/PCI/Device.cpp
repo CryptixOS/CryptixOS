@@ -60,23 +60,23 @@ namespace PCI
         if (!(status & Status::eCapabilityList)) return;
 
         ReadCapabilities();
-        for (const auto& capabiltity : m_Capabilities)
+        for (const auto& capability : m_Capabilities)
         {
-            CapabilityID capabilityID = capabiltity.ID;
+            CapabilityID capabilityID = capability.ID;
 
             switch (capabilityID)
             {
                 case CapabilityID::eMSI:
                     m_MsiSupported = true;
-                    m_MsiOffset    = capabiltity.Offset;
+                    m_MsiOffset    = capability.Offset;
                     break;
                 case CapabilityID::eMSIx:
                 {
                     m_MsixSupported = true;
-                    m_MsixOffset    = capabiltity.Offset;
-                    MsiXControl control(ReadAt(capabiltity.Offset + 0x02, 2));
-                    MsiXAddress table(ReadAt(capabiltity.Offset + 0x04, 4));
-                    MsiXAddress pending(ReadAt(capabiltity.Offset + 0x08, 4));
+                    m_MsixOffset    = capability.Offset;
+                    MsiXControl control(ReadAt(capability.Offset + 0x02, 2));
+                    MsiXAddress table(ReadAt(capability.Offset + 0x04, 4));
+                    MsiXAddress pending(ReadAt(capability.Offset + 0x08, 4));
 
                     usize       count = control.Irqs;
                     m_MsixMessages    = count;
