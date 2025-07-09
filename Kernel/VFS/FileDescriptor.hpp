@@ -13,6 +13,7 @@
 #include <Library/UserBuffer.hpp>
 #include <Prism/Containers/Deque.hpp>
 
+#include <Prism/Memory/Ref.hpp>
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/File.hpp>
 
@@ -64,15 +65,15 @@ struct DirectoryEntries
 };
 struct FileDescription
 {
-    Spinlock         Lock;
-    Atomic<usize>    RefCount = 0;
+    Spinlock            Lock;
+    Atomic<usize>       RefCount = 0;
 
-    Ref<DirectoryEntry>  Entry;
-    usize            Offset     = 0;
+    Ref<DirectoryEntry> Entry;
+    usize               Offset     = 0;
 
-    i32              Flags      = 0;
-    FileAccessMode   AccessMode = FileAccessMode::eRead;
-    DirectoryEntries DirEntries;
+    i32                 Flags      = 0;
+    FileAccessMode      AccessMode = FileAccessMode::eRead;
+    DirectoryEntries    DirEntries;
 
     inline ~FileDescription()
     {
@@ -83,15 +84,16 @@ struct FileDescription
     inline void DecRefCount() { --RefCount; }
 };
 
-class FileDescriptor : public File
+class FileDescriptor : public File, public RefCounted
 {
   public:
-    FileDescriptor(Ref<DirectoryEntry> node, i32 flags, FileAccessMode accMode);
-    FileDescriptor(FileDescriptor* fd, i32 flags = 0);
+    FileDescriptor(::Ref<DirectoryEntry> node, i32 flags,
+                   FileAccessMode accMode);
+    FileDescriptor(::Ref<FileDescriptor> fd, i32 flags = 0);
     virtual ~FileDescriptor();
 
     inline INode* INode() const { return m_Description->Entry->INode(); }
-    constexpr Ref<DirectoryEntry> DirectoryEntry() const
+    constexpr ::Ref<DirectoryEntry> DirectoryEntry() const
     {
         return m_Description->Entry;
     }
@@ -140,7 +142,10 @@ class FileDescriptor : public File
 
     // TODO(v1t10l7): verify whether the fd is blocking
     inline bool                 WouldBlock() const { return false; }
-    inline bool IsSocket() const override { return DirectoryEntry()->IsSocket(); }
+    inline bool                 IsSocket() const override
+    {
+        return DirectoryEntry()->IsSocket();
+    }
     inline bool IsPipe() const
     {
         // FIXME(v1tr10l7): implement this once pipes are supported

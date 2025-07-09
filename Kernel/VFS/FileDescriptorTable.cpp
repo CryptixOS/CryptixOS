@@ -7,7 +7,7 @@
 #include <VFS/FileDescriptorTable.hpp>
 #include <VFS/VFS.hpp>
 
-i32 FileDescriptorTable::Insert(FileDescriptor* fd, i32 desired)
+i32 FileDescriptorTable::Insert(Ref<FileDescriptor> fd, i32 desired)
 {
     ScopedLock guard(m_Lock);
     i32        fdNum = m_NextIndex;
@@ -22,10 +22,8 @@ i32 FileDescriptorTable::Insert(FileDescriptor* fd, i32 desired)
 i32 FileDescriptorTable::Erase(i32 fdNum)
 {
     ScopedLock      guard(m_Lock);
-    FileDescriptor* fd = GetFd(fdNum);
+    Ref<FileDescriptor> fd = GetFd(fdNum);
     if (!fd) return_err(-1, EBADF);
-
-    delete fd;
 
     m_Table.Erase(fdNum);
     return 0;
@@ -39,14 +37,12 @@ void FileDescriptorTable::OpenStdioStreams()
               .value()
               .Entry;
 
-    Insert(new FileDescriptor(ttyNode.Raw(), 0, FileAccessMode::eRead), 0);
-    Insert(new FileDescriptor(ttyNode.Raw(), 0, FileAccessMode::eWrite), 1);
-    Insert(new FileDescriptor(ttyNode.Raw(), 0, FileAccessMode::eWrite), 2);
+    Insert(CreateRef<FileDescriptor>(ttyNode.Raw(), 0, FileAccessMode::eRead), 0);
+    Insert(CreateRef<FileDescriptor>(ttyNode.Raw(), 0, FileAccessMode::eWrite), 1);
+    Insert(CreateRef<FileDescriptor>(ttyNode.Raw(), 0, FileAccessMode::eWrite), 2);
 }
 void FileDescriptorTable::Clear()
 {
-    for (const auto& [i, fd] : m_Table) delete fd;
-
     m_Table.Clear();
     m_NextIndex = 3;
 }

@@ -82,6 +82,8 @@ class INode
 
     bool                             IsFilesystemRoot() const;
     bool                             IsEmpty();
+    bool                             ReadOnly();
+    bool                             Immutable();
     bool                             CanWrite(const Credentials& creds) const;
 
     inline bool   IsCharDevice() const { return S_ISCHR(m_Metadata.Mode); }
@@ -121,19 +123,16 @@ class INode
     virtual ErrorOr<void>  Link(PathView path) { return Error(ENOSYS); }
     virtual ErrorOr<isize> ReadLink(UserBuffer& outBuffer);
 
-    virtual ErrorOr<isize> CheckPermissions(mode_t mask)
-    {
-        return Error(ENOSYS);
-    }
+    virtual ErrorOr<isize> CheckPermissions(mode_t mask);
 
-    virtual ErrorOr<void> SetOwner(uid_t uid, gid_t gid);
-    virtual ErrorOr<void> ChangeMode(mode_t mode);
-    virtual ErrorOr<void> UpdateTimestamps(timespec atime = {},
-                                           timespec mtime = {},
-                                           timespec ctime = {});
-    virtual ErrorOr<void> FlushMetadata() { return Error(ENOSYS); }
+    virtual ErrorOr<void>  SetOwner(uid_t uid, gid_t gid);
+    virtual ErrorOr<void>  ChangeMode(mode_t mode);
+    virtual ErrorOr<void>  UpdateTimestamps(timespec atime = {},
+                                            timespec mtime = {},
+                                            timespec ctime = {});
+    virtual ErrorOr<void>  FlushMetadata() { return Error(ENOSYS); }
 
-    inline bool           Populate()
+    inline bool            Populate()
     {
         return true;
         // return (!m_Populated && IsDirectory()) ? m_Filesystem->Populate()

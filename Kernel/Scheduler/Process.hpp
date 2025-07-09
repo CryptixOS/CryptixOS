@@ -136,7 +136,7 @@ class Process
     i32            CloseFd(i32 fd);
     ErrorOr<isize> OpenPipe(i32* pipeFds);
     inline bool    IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
-    inline FileDescriptor* GetFileHandle(i32 fd) { return m_FdTable.GetFd(fd); }
+    inline Ref<FileDescriptor> GetFileHandle(i32 fd) { return m_FdTable.GetFd(fd); }
 
     ErrorOr<pid_t>         WaitPid(pid_t pid, i32* wstatus, i32 flags,
                                    struct rusage* rusage);

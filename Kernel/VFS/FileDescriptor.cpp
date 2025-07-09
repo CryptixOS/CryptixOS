@@ -51,7 +51,7 @@ usize DirectoryEntries::CopyAndPop(u8* out, usize capacity)
     return entrySize;
 }
 
-FileDescriptor::FileDescriptor(class Ref<::DirectoryEntry> node, i32 flags,
+FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> node, i32 flags,
                                FileAccessMode accMode)
 {
     m_Description = new FileDescription;
@@ -64,7 +64,7 @@ FileDescriptor::FileDescriptor(class Ref<::DirectoryEntry> node, i32 flags,
     m_Description->AccessMode = accMode;
     m_Flags                   = flags & O_CLOEXEC;
 }
-FileDescriptor::FileDescriptor(FileDescriptor* fd, i32 flags)
+FileDescriptor::FileDescriptor(::Ref<FileDescriptor> fd, i32 flags)
     : m_Description(fd->m_Description)
     , m_Flags(flags)
 {

@@ -41,7 +41,7 @@ namespace API::VFS
                 return ::VFS::PathResolution{cwd->Parent(), cwd, cwd->Name()};
             }
 
-            auto* fd = process->GetFileHandle(dirFdNum);
+            Ref<FileDescriptor> fd = process->GetFileHandle(dirFdNum);
             if (!fd) return Error(EBADF);
             ::VFS::PathResolution res;
             res.Entry    = fd->DirectoryEntry();
@@ -59,7 +59,7 @@ namespace API::VFS
             if (dirFdNum == AT_FDCWD) base = process->CWD();
             else
             {
-                auto* fd = process->GetFileHandle(dirFdNum);
+                Ref<FileDescriptor> fd = process->GetFileHandle(dirFdNum);
                 if (!fd) return Error(EBADF);
                 base = fd->DirectoryEntry();
                 if (!base->IsDirectory()) return Error(ENOTDIR);
@@ -78,7 +78,7 @@ namespace API::VFS
         Process* current = Process::GetCurrent();
         if (!current->ValidateWrite(out, bytes)) return Error(EFAULT);
 
-        FileDescriptor* fd = current->GetFileHandle(fdNum);
+        Ref<FileDescriptor> fd = current->GetFileHandle(fdNum);
         if (!fd || !fd->CanRead()) return Error(EBADF);
 
         CPU::UserMemoryProtectionGuard guard;
@@ -89,7 +89,7 @@ namespace API::VFS
         Process* current = Process::GetCurrent();
         if (!current->ValidateRead(in, bytes)) return Error(EFAULT);
 
-        FileDescriptor* fd = current->GetFileHandle(fdNum);
+        Ref<FileDescriptor> fd = current->GetFileHandle(fdNum);
         if (!fd) return Error(EBADF);
 
         CPU::UserMemoryProtectionGuard guard;
@@ -278,8 +278,12 @@ namespace API::VFS
         if (!entry) return Error(ENOENT);
 
         if (entry->IsDirectory()) return Error(EISDIR);
+        else if (!entry->IsRegular()) return Error(EINVAL);
 
         auto inode = entry->INode();
+        auto status = inode->CheckPermissions(W_OK);
+        RetOnError(status);
+
         return inode->Truncate(length);
     }
     ErrorOr<isize> FTruncate(i32 fdNum, off_t length)
@@ -287,7 +291,7 @@ namespace API::VFS
         if (length < 0) return Error(EINVAL);
         Process*        current = Process::GetCurrent();
 
-        FileDescriptor* fd      = current->GetFileHandle(fdNum);
+        Ref<FileDescriptor> fd      = current->GetFileHandle(fdNum);
         if (!fd) return Error(EBADF);
         return fd->Truncate(length);
     }
@@ -599,7 +603,7 @@ namespace API::VFS
         CPU::UserMemoryProtectionGuard guard;
         if (!PathView(path).ValidateLength()) return Error(ENAMETOOLONG);
 
-        auto* fd             = current->GetFileHandle(dirFdNum);
+        Ref<FileDescriptor> fd             = current->GetFileHandle(dirFdNum);
         bool  followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
 
         auto  cwdEntry       = current->CWD();
@@ -794,7 +798,7 @@ namespace Syscall::VFS
         uintptr_t       arg     = reinterpret_cast<uintptr_t>(args.Args[2]);
 
         Process*        current = Process::GetCurrent();
-        FileDescriptor* fd      = current->GetFileHandle(fdNum);
+        Ref<FileDescriptor> fd      = current->GetFileHandle(fdNum);
         if (!fd) return Error(EBADF);
 
         bool cloExec = true;
@@ -839,7 +843,7 @@ namespace Syscall::VFS
             || !current->ValidateRead(outBuffer, Limits::MAX_PATH_LENGTH))
             return Error(EFAULT);
 
-        FileDescriptor* fd = current->GetFileHandle(fdNum);
+        Ref<FileDescriptor> fd = current->GetFileHandle(fdNum);
         if (!fd) return Error(EBADF);
 
         LogDebug("SysGetDents64: {{ Path: {} }}", fd->DirectoryEntry()->Path());

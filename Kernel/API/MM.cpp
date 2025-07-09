@@ -51,7 +51,7 @@ namespace API::MM
         if (flags & MAP_HUGE_2MB) pageSize = 2_mib;
         else if (flags & MAP_HUGE_1GB) pageSize = 1_gib;
 
-        FileDescriptor* fd = nullptr;
+        Ref<FileDescriptor> fd = nullptr;
         if (fdNum != -1) fd = current->GetFileHandle(fdNum);
 
         if (offset != 0) return Error(EINVAL);

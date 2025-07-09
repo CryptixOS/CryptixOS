@@ -95,6 +95,8 @@ bool INode::IsEmpty()
     (void)result;
     return hasEntries;
 }
+bool INode::ReadOnly() { return false; }
+bool INode::Immutable() { return false; }
 bool INode::CanWrite(const Credentials& creds) const
 {
     if (creds.euid == 0 || /*m_Stats.st_mode*/ m_Metadata.Mode & S_IWOTH)
@@ -146,6 +148,17 @@ ErrorOr<isize> INode::ReadLink(UserBuffer& outBuffer)
     outBuffer.Write(m_Target.Raw(), count);
 
     return static_cast<isize>(count);
+}
+ErrorOr<isize> INode::CheckPermissions(mode_t mask)
+{
+    if (mask & W_OK)
+    {
+        if (ReadOnly() && (IsRegular() || IsDirectory() || IsSymlink()))
+            return Error(EROFS);
+        if (Immutable()) return Error(EACCES);
+    }
+
+    return 0;
 }
 
 ErrorOr<DirectoryEntry*> INode::Lookup(class DirectoryEntry* entry)

@@ -167,7 +167,7 @@ ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
         parent = VFS::GetRootDirectoryEntry().Raw();
     else if (dirFd != AT_FDCWD)
     {
-        auto* descriptor = GetFileHandle(dirFd);
+        Ref<FileDescriptor> descriptor = GetFileHandle(dirFd);
         if (!descriptor) return Error(EBADF);
         auto entry = descriptor->DirectoryEntry();
 
@@ -175,7 +175,7 @@ ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
     }
 
     auto descriptor
-        = CPU::AsUser([&]() -> ErrorOr<FileDescriptor*>
+        = CPU::AsUser([&]() -> ErrorOr<Ref<FileDescriptor>>
                       { return VFS::Open(parent.Raw(), path, flags, mode); });
     if (!descriptor) return Error(descriptor.error());
 
@@ -185,22 +185,19 @@ ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
 {
     if (oldFdNum == newFdNum) return Error(EINVAL);
 
-    auto oldFd = GetFileHandle(oldFdNum);
+    Ref<FileDescriptor> oldFd = GetFileHandle(oldFdNum);
     if (!oldFd) return Error(EBADF);
 
     while (newFdNum < 0 || m_FdTable.IsValid(newFdNum)) ++newFdNum;
-    auto newFd = GetFileHandle(newFdNum);
+    Ref<FileDescriptor> newFd = GetFileHandle(newFdNum);
     if (newFd) CloseFd(newFdNum);
 
-    newFd = new FileDescriptor(oldFd, flags);
+    newFd = CreateRef<FileDescriptor>(oldFd, flags);
     if (!newFd) return Error(ENOMEM);
 
     newFdNum = m_FdTable.Insert(newFd, newFdNum);
     if (newFdNum < 0)
-    {
-        delete newFd;
         return Error(EBADF);
-    }
 
     return newFdNum;
 }
@@ -479,7 +476,7 @@ ErrorOr<Process*> Process::Fork()
     newProcess->m_NextTid.Store(m_NextTid.Load());
     for (const auto& [i, fd] : m_FdTable)
     {
-        FileDescriptor* newFd = new FileDescriptor(fd);
+        Ref<FileDescriptor> newFd = new FileDescriptor(fd);
         newProcess->m_FdTable.Insert(newFd, i);
     }
 
