@@ -38,13 +38,14 @@ namespace PCI
         bool                          Enumerate(Enumerator enumerator);
 
       private:
-        HostController* m_HostController = nullptr;
-        u16             m_Domain;
-        u8              m_Bus;
+        HostController*       m_HostController = nullptr;
+        u16                   m_Domain;
+        u8                    m_Bus;
 
-        Vector<Device*> m_Devices;
-        Vector<Bus*>    m_ChildBridges;
+        Vector<DeviceAddress> m_AvailableFunctions;
+        Vector<Bus*>          m_ChildBridges;
+        Vector<Device*>       m_Devices;
 
-        void            EnumerateFunction(DeviceAddress& address);
+        void                  EnumerateFunction(DeviceAddress& address);
     };
 }; // namespace PCI

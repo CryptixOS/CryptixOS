@@ -4,6 +4,7 @@ debug.log
 qemu.log
 serial.log
 .xbstrap/
+*.xbstrap
 subprojects/*/
 !subprojects/packagefiles/
 !subprojects/*.wrap

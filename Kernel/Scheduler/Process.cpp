@@ -192,9 +192,10 @@ ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
     Ref<FileDescriptor> newFd = GetFileHandle(newFdNum);
     if (newFd) CloseFd(newFdNum);
 
-    newFd = CreateRef<FileDescriptor>(oldFd, flags);
-    if (!newFd) return Error(ENOMEM);
+    // newFd = CreateRef<FileDescriptor>(oldFd, flags);
+    // if (!newFd) return Error(ENOMEM);
 
+    newFd = oldFd;
     newFdNum = m_FdTable.Insert(newFd, newFdNum);
     if (newFdNum < 0)
         return Error(EBADF);
@@ -476,8 +477,8 @@ ErrorOr<Process*> Process::Fork()
     newProcess->m_NextTid.Store(m_NextTid.Load());
     for (const auto& [i, fd] : m_FdTable)
     {
-        Ref<FileDescriptor> newFd = new FileDescriptor(fd);
-        newProcess->m_FdTable.Insert(newFd, i);
+        // Ref<FileDescriptor> newFd = new FileDescriptor(fd);
+        newProcess->m_FdTable.Insert(fd, i);
     }
 
     Thread* thread             = currentThread->Fork(newProcess);

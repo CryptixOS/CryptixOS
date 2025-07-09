@@ -63,41 +63,20 @@ struct DirectoryEntries
     auto        begin() { return Entries.begin(); }
     auto        end() { return Entries.end(); }
 };
-struct FileDescription
-{
-    Spinlock            Lock;
-    Atomic<usize>       RefCount = 0;
-
-    Ref<DirectoryEntry> Entry;
-    usize               Offset     = 0;
-
-    i32                 Flags      = 0;
-    FileAccessMode      AccessMode = FileAccessMode::eRead;
-    DirectoryEntries    DirEntries;
-
-    inline ~FileDescription()
-    {
-        // FIXME(v1t10l7): if (RefCount == 0) delete Node;
-    }
-
-    inline void IncRefCount() { ++RefCount; }
-    inline void DecRefCount() { --RefCount; }
-};
 
 class FileDescriptor : public File, public RefCounted
 {
   public:
     FileDescriptor(::Ref<DirectoryEntry> node, i32 flags,
                    FileAccessMode accMode);
-    FileDescriptor(::Ref<FileDescriptor> fd, i32 flags = 0);
     virtual ~FileDescriptor();
 
-    inline INode* INode() const { return m_Description->Entry->INode(); }
+    inline INode* INode() const { return m_DirectoryEntry->INode(); }
     constexpr ::Ref<DirectoryEntry> DirectoryEntry() const
     {
-        return m_Description->Entry;
+        return m_DirectoryEntry;
     }
-    inline usize GetOffset() const { return m_Description->Offset; }
+    inline usize GetOffset() const { return m_Offset; }
 
     inline i32   GetFlags() const { return m_Flags; }
     inline void  SetFlags(i32 flags)
@@ -106,11 +85,11 @@ class FileDescriptor : public File, public RefCounted
         m_Flags = flags;
     }
 
-    inline i32  GetDescriptionFlags() const { return m_Description->Flags; }
+    inline i32  GetDescriptionFlags() const { return m_Flags; }
     inline void SetDescriptionFlags(i32 flags)
     {
-        ScopedLock guard(m_Description->Lock);
-        m_Description->Flags = flags;
+        ScopedLock guard(m_Lock);
+        m_Flags = flags;
     }
 
     virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
@@ -121,7 +100,7 @@ class FileDescriptor : public File, public RefCounted
         if (!bufferOr) return Error(bufferOr.error());
         auto buffer = bufferOr.value();
 
-        return Read(buffer, count, m_Description->Offset);
+        return Read(buffer, count, m_Offset);
     }
     virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
                                  isize offset = -1) override;
@@ -131,14 +110,14 @@ class FileDescriptor : public File, public RefCounted
         if (!bufferOr) return Error(bufferOr.error());
         auto buffer = bufferOr.value();
 
-        return Write(buffer, count, m_Description->Offset);
+        return Write(buffer, count, m_Offset);
     }
     virtual ErrorOr<const stat> Stat() const override;
     virtual ErrorOr<isize>      Seek(i32 whence, off_t offset) override;
     virtual ErrorOr<isize>      Truncate(off_t size) override;
 
-    void                        Lock() { m_Description->Lock.Acquire(); }
-    void                        Unlock() { m_Description->Lock.Release(); }
+    void                        Lock() { m_Lock.Acquire(); }
+    void                        Unlock() { m_Lock.Release(); }
 
     // TODO(v1t10l7): verify whether the fd is blocking
     inline bool                 WouldBlock() const { return false; }
@@ -152,13 +131,10 @@ class FileDescriptor : public File, public RefCounted
 
         return false;
     }
-    inline bool CanRead() const
-    {
-        return m_Description->AccessMode & FileAccessMode::eRead;
-    }
+    inline bool CanRead() const { return m_AccessMode & FileAccessMode::eRead; }
     inline bool CanWrite() const
     {
-        return m_Description->AccessMode & FileAccessMode::eWrite;
+        return m_AccessMode & FileAccessMode::eWrite;
     }
 
     inline bool IsNonBlocking() const { return m_Flags & O_NONBLOCK; }
@@ -175,12 +151,16 @@ class FileDescriptor : public File, public RefCounted
 
   private:
     Spinlock                 m_Lock;
-    FileDescription*         m_Description = nullptr;
-    i32                      m_Flags       = 0;
+    ::Ref<::DirectoryEntry>  m_DirectoryEntry   = nullptr;
 
-    inline DirectoryEntries& GetDirEntries()
-    {
-        return m_Description->DirEntries;
-    }
-    bool GenerateDirEntries();
+    FileAccessMode           m_AccessMode       = FileAccessMode::eRead;
+    usize                    m_Offset           = 0;
+
+    i32                      m_Flags            = 0;
+    i32                      m_DescriptionFlags = 0;
+
+    DirectoryEntries         m_DirEntries;
+
+    inline DirectoryEntries& GetDirEntries() { return m_DirEntries; }
+    bool                     GenerateDirEntries();
 };

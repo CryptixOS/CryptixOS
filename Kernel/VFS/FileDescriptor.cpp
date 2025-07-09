@@ -54,32 +54,20 @@ usize DirectoryEntries::CopyAndPop(u8* out, usize capacity)
 FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> node, i32 flags,
                                FileAccessMode accMode)
 {
-    m_Description = new FileDescription;
-    m_Description->IncRefCount();
-    m_Description->Entry = node;
+    m_DirectoryEntry   = node;
 
-    m_Description->Flags = flags
-                         & ~(O_CREAT | O_DIRECTORY | O_EXCL | O_NOCTTY
-                             | O_NOFOLLOW | O_TRUNC | O_CLOEXEC);
-    m_Description->AccessMode = accMode;
-    m_Flags                   = flags & O_CLOEXEC;
+    m_DescriptionFlags = flags
+                       & ~(O_CREAT | O_DIRECTORY | O_EXCL | O_NOCTTY
+                           | O_NOFOLLOW | O_TRUNC | O_CLOEXEC);
+    m_AccessMode = accMode;
+    m_Flags      = flags & O_CLOEXEC;
 }
-FileDescriptor::FileDescriptor(::Ref<FileDescriptor> fd, i32 flags)
-    : m_Description(fd->m_Description)
-    , m_Flags(flags)
-{
-    m_Description->IncRefCount();
-}
-FileDescriptor::~FileDescriptor()
-{
-    m_Description->DecRefCount();
-    if (m_Description->RefCount == 0) delete m_Description;
-}
+FileDescriptor::~FileDescriptor() {}
 
 ErrorOr<isize> FileDescriptor::Read(const UserBuffer& out, usize count,
                                     isize offset)
 {
-    ScopedLock guard(m_Description->Lock);
+    ScopedLock guard(m_Lock);
 
     if (!CanRead()) return Error(EBADF);
     if (!DirectoryEntry()) return Error(ENOENT);
@@ -94,29 +82,29 @@ ErrorOr<isize> FileDescriptor::Read(const UserBuffer& out, usize count,
         if (current->WasInterrupted()) return Error(EINTR);
     }
 
-    if (offset < 0) offset = m_Description->Offset;
+    if (offset < 0) offset = m_Offset;
 
     isize bytesRead = INode()->Read(out.Raw(), offset, count);
     offset += bytesRead;
 
-    m_Description->Offset = offset;
+    m_Offset = offset;
     return bytesRead;
 }
 ErrorOr<isize> FileDescriptor::Write(const UserBuffer& in, usize count,
                                      isize offset)
 {
-    ScopedLock guard(m_Description->Lock);
+    ScopedLock guard(m_Lock);
 
     if (!CanWrite()) return Error(EBADF);
 
     class INode* node = INode();
     if (!node) return Error(ENOENT);
-    if (offset < 0) offset = m_Description->Offset;
+    if (offset < 0) offset = m_Offset;
 
     isize bytesWritten = node->Write(in.Raw(), offset, count);
     offset += bytesWritten;
 
-    m_Description->Offset = offset;
+    m_Offset = offset;
 
     return bytesWritten;
 }
@@ -130,7 +118,7 @@ ErrorOr<const stat> FileDescriptor::Stat() const
 
 ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
 {
-    ScopedLock guard(m_Description->Lock);
+    ScopedLock guard(m_Lock);
     auto       entry = DirectoryEntry();
     if (IsPipe() || entry->IsSocket() || entry->IsFifo()) return Error(ESPIPE);
 
@@ -138,37 +126,37 @@ ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
     {
         case SEEK_SET:
             if (offset < 0) return Error(EINVAL);
-            m_Description->Offset = offset;
+            m_Offset = offset;
             break;
         case SEEK_CUR:
         {
-            isize newOffset = m_Description->Offset + offset;
+            isize newOffset = m_Offset + offset;
             if (newOffset >= std::numeric_limits<off_t>::max())
                 return Error(EOVERFLOW);
             if (newOffset < 0) return Error(EINVAL);
-            m_Description->Offset += offset;
+            m_Offset += offset;
             break;
         }
         case SEEK_END:
         {
             usize size = INode()->Stats().st_size;
-            if (static_cast<usize>(m_Description->Offset) + size
+            if (static_cast<usize>(m_Offset) + size
                 > std::numeric_limits<off_t>::max())
                 return Error(EOVERFLOW);
-            m_Description->Offset = INode()->Stats().st_size + offset;
+            m_Offset = INode()->Stats().st_size + offset;
             break;
         }
 
         default: return Error(EINVAL);
     };
 
-    return m_Description->Offset;
+    return m_Offset;
 }
 
 ErrorOr<isize> FileDescriptor::Truncate(off_t size)
 {
     if (DirectoryEntry()->IsDirectory()) return Error(EISDIR);
-    if (!(m_Description->AccessMode & FileAccessMode::eWrite)
+    if (!(m_AccessMode & FileAccessMode::eWrite)
         || !DirectoryEntry()->IsRegular())
         return Error(EBADF);
 
@@ -178,7 +166,7 @@ ErrorOr<isize> FileDescriptor::Truncate(off_t size)
 [[clang::no_sanitize("alignment")]] ErrorOr<i32>
 FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
 {
-    ScopedLock guard(m_Description->Lock);
+    ScopedLock guard(m_Lock);
 
     auto       entry = DirectoryEntry();
     if (!entry) return Error(ENOENT);
@@ -217,7 +205,7 @@ FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
 }
 bool FileDescriptor::GenerateDirEntries()
 {
-    DebugWarnIf(m_Description->Lock.Test(),
+    DebugWarnIf(m_Lock.Test(),
                 "FileDescriptor::GenerateDirEntries called without "
                 "m_Description->Lock being acquired!");
 
@@ -235,7 +223,7 @@ bool FileDescriptor::GenerateDirEntries()
 
         auto parentEntry = current->Parent() ? current->Parent() : nullptr;
         auto target      = current->INode()->GetTarget();
-        auto next        = VFS::ResolvePath(parentEntry.Raw(), target.Raw(), true)
+        auto next = VFS::ResolvePath(parentEntry.Raw(), target.Raw(), true)
                         .value_or(VFS::PathResolution{})
                         .Entry;
 
