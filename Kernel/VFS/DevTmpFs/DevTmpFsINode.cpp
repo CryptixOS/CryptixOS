@@ -64,10 +64,10 @@ ErrorOr<Ref<DirectoryEntry>> DevTmpFsINode::Lookup(Ref<DirectoryEntry> dentry)
 {
     ScopedLock guard(m_Lock);
 
-    auto       child = Children().find(dentry->Name());
+    auto       child = Children().Find(dentry->Name());
     if (child != Children().end())
     {
-        dentry->Bind(child->second);
+        dentry->Bind(child->Value);
         return dentry;
     }
 
@@ -88,7 +88,7 @@ isize DevTmpFsINode::Read(void* buffer, off_t offset, usize bytes)
     if (offset + bytes >= m_Metadata.Size)
         count = bytes - ((offset + bytes) - m_Metadata.Size);
 
-    std::memcpy(buffer, reinterpret_cast<u8*>(m_Data) + offset, count);
+    Memory::Copy(buffer, reinterpret_cast<u8*>(m_Data) + offset, count);
 
     if (m_Filesystem->ShouldUpdateATime())
         m_Metadata.AccessTime = Time::GetReal();
@@ -116,7 +116,7 @@ isize DevTmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
         m_Capacity = newCapacity;
     }
 
-    std::memcpy(m_Data + offset, buffer, bytes);
+    Memory::Copy(m_Data + offset, buffer, bytes);
 
     if (offset + bytes >= m_Metadata.Size)
     {
@@ -147,10 +147,10 @@ ErrorOr<isize> DevTmpFsINode::Truncate(usize size)
     if (!CanWrite(creds)) return Error(EPERM);
 
     u8* newData = new u8[size];
-    std::memcpy(newData, m_Data, size > m_Capacity ? size : m_Capacity);
+    Memory::Copy(newData, m_Data, size > m_Capacity ? size : m_Capacity);
 
     if (m_Capacity < size)
-        std::memset(newData + m_Capacity, 0, size - m_Capacity);
+        Memory::Fill(newData + m_Capacity, 0, size - m_Capacity);
     delete m_Data;
 
     m_Data     = newData;

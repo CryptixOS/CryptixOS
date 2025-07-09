@@ -165,12 +165,16 @@ class PageTableEntry final
 namespace VirtualMemoryManager
 {
     void     Initialize();
-    void UnmapKernelInitCode();
+    void     UnmapKernelInitCode();
 
     usize    GetHigherHalfOffset();
 
     Pointer  AllocateSpace(usize increment = 0, usize alignment = 0,
                            bool lowerHalf = false);
+    Region*  AllocateDMACoherent(usize size, PageAttributes flags
+                                            = PageAttributes::eRW
+                                            | PageAttributes::eWriteThrough);
+    void     FreeDMA_Region(Region& region);
 
     PageMap* GetKernelPageMap();
     void     HandlePageFault(const PageFaultInfo& info);

@@ -4,6 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Prism/Memory/Memory.hpp>
+
 #include <VFS/Fat32Fs/Fat32Fs.hpp>
 #include <VFS/Fat32Fs/Fat32FsINode.hpp>
 
@@ -53,12 +55,12 @@ Fat32FsINode::Fat32FsINode(StringView name, class Filesystem* fs, mode_t mode)
     if (S_ISDIR(mode))
     {
         m_Populated = true;
-        std::memcpy(entry.Name, ".          ", 11);
+        Memory::Copy(entry.Name, ".          ", 11);
         //
     }
 }
 
-const std::unordered_map<StringView, INode*>& Fat32FsINode::Children() const
+const UnorderedMap<StringView, INode*>& Fat32FsINode::Children() const
 {
     // TODO(v1tr10l7): Populate records
     return m_Children;

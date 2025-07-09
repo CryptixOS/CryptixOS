@@ -37,7 +37,7 @@ struct ProcFsProperty
         if (Offset >= Buffer.Size()) Offset = 0;
         auto result
             = fmt::format_to_n(Buffer.Raw() + Offset, Buffer.Size() - Offset,
-                               format, std::forward<Args>(args)...);
+                               format, Forward<Args>(args)...);
         Offset += result.size;
     }
     isize Read(u8* outBuffer, off_t offset, usize count);
@@ -76,7 +76,7 @@ class ProcFsINode : public INode
     TraverseDirectories(class DirectoryEntry* parent,
                         DirectoryIterator     iterator) override;
 
-    virtual const std::unordered_map<StringView, INode*>& Children() const
+    virtual const UnorderedMap<StringView, INode*>& Children() const
     {
         return m_Children;
     }
@@ -87,5 +87,5 @@ class ProcFsINode : public INode
 
   private:
     ProcFsProperty*                        m_Property = nullptr;
-    std::unordered_map<StringView, INode*> m_Children;
+    UnorderedMap<StringView, INode*> m_Children;
 };

@@ -46,7 +46,7 @@ Process::Process(Process* parent, StringView name,
     , m_Credentials(creds)
     , m_Ring(PrivilegeLevel::eUnprivileged)
     , m_NextTid(m_Pid)
-    , m_CWD("/")
+    , m_CWD(VFS::GetRootDirectoryEntry())
 
 {
     m_FdTable.OpenStdioStreams();
@@ -109,8 +109,8 @@ Thread* Process::CreateThread(Pointer rip, bool isUser, i64 runOn)
     return thread;
 }
 Thread* Process::CreateThread(Pointer rip, Vector<StringView>& argv,
-                              Vector<StringView>& envp, ELF::Image& program,
-                              i64 runOn)
+                              Vector<StringView>& envp,
+                              ExecutableProgram& program, i64 runOn)
 {
     auto thread = new Thread(this, rip, argv, envp, program, runOn);
 
@@ -162,10 +162,7 @@ void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
 ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
-    Ref parent
-        = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), m_CWD.Raw())
-              .value()
-              .Entry;
+    Ref parent = CWD();
     if (CPU::AsUser([path]() -> bool { return path.Absolute(); }))
         parent = VFS::GetRootDirectoryEntry().Raw();
     else if (dirFd != AT_FDCWD)
@@ -315,7 +312,7 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
     }
     // if (!shellPath.Empty()) argvArr.PushBack(path);
 
-    static ELF::Image program, ld;
+    static ExecutableProgram program, ld;
     // if (!program.Load(shellPath.Empty() || !containsShebang ? path.Raw()
     // : argvArr[0].Raw(),
     // PageMap, m_AddressSpace))
@@ -324,9 +321,10 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
     if (!program.Load(path.Raw(), PageMap, m_AddressSpace))
         return Error(ENOEXEC);
 
-    auto ldPath = program.GetLdPath();
+    auto ldPath = program.Image().GetLdPath();
     if (!ldPath.Empty())
-        Assert(ld.Load(ldPath, PageMap, m_AddressSpace, 0x40000000));
+        Assert(ld.Load(ldPath, PageMap, m_AddressSpace,
+                       static_cast<uintptr_t>(0x40000000)));
     Thread* currentThread = CPU::GetCurrentThread();
     currentThread->SetState(ThreadState::eExited);
 
@@ -336,8 +334,8 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
         delete thread;
     }
 
-    uintptr_t address
-        = ldPath.Empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
+    uintptr_t address = ldPath.Empty() ? program.Image().GetEntryPoint()
+                                       : ld.Image().GetEntryPoint();
 
     {
         CPU::UserMemoryProtectionGuard guard;

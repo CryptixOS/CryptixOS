@@ -62,12 +62,9 @@ namespace VFS
         return s_Filesystems;
     }
 
-    Ref<DirectoryEntry> GetRootDirectoryEntry()
-    {
-        return s_RootDirectoryEntry;
-    }
+    Ref<DirectoryEntry> GetRootDirectoryEntry() { return s_RootDirectoryEntry; }
 
-    static Filesystem* CreateFilesystem(StringView name, u32 flags)
+    static Filesystem*  CreateFilesystem(StringView name, u32 flags)
     {
         Filesystem* fs = nullptr;
         if (name == "tmpfs") fs = new TmpFs(flags);
@@ -93,8 +90,9 @@ namespace VFS
         delete node;
     }
 
-    ErrorOr<FileDescriptor*> Open(DirectoryEntry* parent, PathView path,
-                                  i32 flags, mode_t mode)
+    ErrorOr<Ref<DirectoryEntry>> OpenDirectoryEntry(DirectoryEntry* parent,
+                                                    PathView path, isize flags,
+                                                    mode_t mode)
     {
         Process* current        = Process::GetCurrent();
         bool     followSymlinks = !(flags & O_NOFOLLOW);
@@ -104,31 +102,18 @@ namespace VFS
         // if (flags & ~VALID_OPEN_FLAGS || flags & (O_CREAT | O_DIRECTORY))
         //     return Error(EINVAL);
 
-        bool           didExist = true;
-
-        FileAccessMode accMode  = FileAccessMode::eNone;
-        switch (acc)
-        {
-            case O_RDONLY: accMode |= FileAccessMode::eRead; break;
-            case O_WRONLY: accMode |= FileAccessMode::eWrite; break;
-            case O_RDWR:
-                accMode |= FileAccessMode::eRead | FileAccessMode::eWrite;
-                break;
-
-            default: return Error(EINVAL);
-        }
+        bool didExist = true;
 
         if (flags & O_TMPFILE)
         {
             if (!(flags & O_DIRECTORY)) return Error(EINVAL);
-            if (!(accMode & FileAccessMode::eWrite)) return Error(EINVAL);
+            if (acc != O_WRONLY && acc != O_RDWR) return Error(EINVAL);
             return Error(ENOSYS);
         }
         if (flags & O_PATH)
         {
             if (flags & ~(O_DIRECTORY | O_NOFOLLOW | O_PATH | O_CLOEXEC))
                 return Error(EINVAL);
-            accMode = FileAccessMode::eNone;
         }
 
         auto maybePathRes = ResolvePath(parent, path, followSymlinks);
@@ -162,6 +147,29 @@ namespace VFS
         // TODO(v1tr10l7): check acc modes and truncate
         if (flags & O_TRUNC && dentry->IsRegular() && didExist)
             ;
+        return dentry;
+    }
+    ErrorOr<FileDescriptor*> Open(DirectoryEntry* parent, PathView path,
+                                  isize flags, mode_t mode)
+    {
+        auto maybeEntry = OpenDirectoryEntry(parent, path, flags, mode);
+        RetOnError(maybeEntry);
+
+        auto           acc     = flags & O_ACCMODE;
+        FileAccessMode accMode = FileAccessMode::eNone;
+        switch (acc)
+        {
+            case O_RDONLY: accMode |= FileAccessMode::eRead; break;
+            case O_WRONLY: accMode |= FileAccessMode::eWrite; break;
+            case O_RDWR:
+                accMode |= FileAccessMode::eRead | FileAccessMode::eWrite;
+                break;
+
+            default: return Error(EINVAL);
+        }
+        if (flags & O_PATH) accMode = FileAccessMode::eNone;
+
+        auto dentry = maybeEntry.value();
         return new FileDescriptor(dentry.Raw(), flags, accMode);
     }
 
@@ -171,7 +179,7 @@ namespace VFS
         if (!parent || path.Absolute()) parent = s_RootDirectoryEntry.Raw();
         PathResolution res = {nullptr, nullptr, ""_sv};
 
-        PathResolver     resolver(parent, path);
+        PathResolver   resolver(parent, path);
         auto           resolutionResult = resolver.Resolve(followLinks);
         // RetOnError(resolutionResult);
         CtosUnused(resolutionResult);
@@ -242,7 +250,7 @@ namespace VFS
         RetOnError(maybePathRes);
 
         auto [targetParent, targetEntry, targetName] = maybePathRes.value();
-        bool                isRoot = (targetEntry == GetRootDirectoryEntry().Raw());
+        bool isRoot = (targetEntry == GetRootDirectoryEntry().Raw());
         Ref<DirectoryEntry> mountRoot = nullptr;
 
         parent                        = targetParent.Raw();
@@ -352,7 +360,7 @@ namespace VFS
     ErrorOr<Ref<DirectoryEntry>> CreateFile(PathView path, mode_t mode)
     {
         PathResolver resolver(GetRootDirectoryEntry().Raw(), path);
-        auto       maybeEntry = resolver.Resolve();
+        auto         maybeEntry = resolver.Resolve();
         if (!maybeEntry && maybeEntry.error() != ENOENT)
             return Error(maybeEntry.error());
 

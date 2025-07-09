@@ -33,8 +33,10 @@ namespace VFS
         Path            BaseName = ""_s;
     };
 
+    ErrorOr<Ref<DirectoryEntry>> OpenDirectoryEntry(DirectoryEntry* parent, PathView path,
+                                  isize flags, mode_t mode);
     ErrorOr<FileDescriptor*> Open(DirectoryEntry* parent, PathView path,
-                                  i32 flags, mode_t mode);
+                                  isize flags, mode_t mode);
 
     ErrorOr<PathResolution>  ResolvePath(DirectoryEntry* parent, PathView path,
                                          bool followLinks = true);

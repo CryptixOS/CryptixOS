@@ -49,7 +49,7 @@ Path DirectoryEntry::Path()
 
     return pathBuilder.Empty() ? "/"_s : pathBuilder.ToString();
 }
-const std::unordered_map<StringView, Prism::Ref<DirectoryEntry>>&
+const UnorderedMap<StringView, Prism::Ref<DirectoryEntry>>&
 DirectoryEntry::Children() const
 {
     return m_Children;
@@ -79,10 +79,10 @@ void DirectoryEntry::RemoveChild(Prism::Ref<class DirectoryEntry> entry)
 {
     ScopedLock guard(m_Lock);
 
-    auto       it = m_Children.find(entry->Name());
+    auto       it = m_Children.Find(entry->Name());
     if (it == m_Children.end()) return;
 
-    m_Children.erase(it);
+    m_Children.Erase(it);
 }
 
 ::Ref<DirectoryEntry> DirectoryEntry::FollowMounts()
@@ -124,8 +124,8 @@ WeakRef<DirectoryEntry> DirectoryEntry::GetEffectiveParent()
 }
 ::Ref<DirectoryEntry> DirectoryEntry::Lookup(const String& name)
 {
-    auto entryIt = m_Children.find(name);
-    if (entryIt != m_Children.end()) return entryIt->second.Raw();
+    auto entryIt = m_Children.Find(name);
+    if (entryIt != m_Children.end()) return entryIt->Value.Raw();
     if (!m_INode) return nullptr;
 
     auto inode = m_INode->Lookup(name);

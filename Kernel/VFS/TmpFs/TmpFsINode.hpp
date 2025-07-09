@@ -23,16 +23,16 @@ class TmpFsINode final : public INode
     }
 
     virtual ErrorOr<void>
-                   TraverseDirectories(class DirectoryEntry* parent,
-                                       DirectoryIterator     iterator) override;
+    TraverseDirectories(class DirectoryEntry* parent,
+                        DirectoryIterator     iterator) override;
 
     virtual ErrorOr<Ref<DirectoryEntry>>
                                   Lookup(Ref<DirectoryEntry> dentry) override;
-    virtual INode* Lookup(const String& name) override;
+    virtual INode*                Lookup(const String& name) override;
 
     inline static constexpr usize GetDefaultSize() { return 0x1000; }
 
-    virtual const std::unordered_map<StringView, INode*>& Children() const
+    virtual const UnorderedMap<StringView, INode*>& Children() const
     {
         return m_Children;
     }
@@ -57,9 +57,9 @@ class TmpFsINode final : public INode
     virtual ErrorOr<void> Link(PathView path) override;
 
   private:
-    u8*                                    m_Data     = nullptr;
-    usize                                  m_Capacity = 0;
-    std::unordered_map<StringView, INode*> m_Children;
+    u8*                              m_Data     = nullptr;
+    usize                            m_Capacity = 0;
+    UnorderedMap<StringView, INode*> m_Children;
 
     friend class TmpFs;
 };

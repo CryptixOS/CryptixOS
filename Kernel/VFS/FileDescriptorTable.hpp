@@ -22,10 +22,7 @@ class FileDescriptorTable
     void        OpenStdioStreams();
     void        Clear();
 
-    inline bool IsValid(i32 fd) const
-    {
-        return m_Table.Contains(fd);
-    }
+    inline bool IsValid(i32 fd) const { return m_Table.Contains(fd); }
     inline FileDescriptor* GetFd(i32 fd) const
     {
         if (!IsValid(fd)) return nullptr;

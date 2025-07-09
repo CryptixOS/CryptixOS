@@ -6,12 +6,11 @@
  */
 #pragma once
 
+#include <Prism/Containers/UnorderedMap.hpp>
 #include <Scheduler/Process.hpp>
 
 #include <VFS/Filesystem.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
-
-#include <unordered_map>
 
 class ProcFs : public Filesystem
 {
@@ -42,9 +41,9 @@ class ProcFs : public Filesystem
     virtual bool            Populate(DirectoryEntry* dentry) override;
 
   private:
-    static std::unordered_map<pid_t, Process*>      s_Processes;
+    static UnorderedMap<pid_t, Process*>      s_Processes;
 
-    std::unordered_map<StringView, ProcFsProperty*> m_Properties;
+    UnorderedMap<StringView, ProcFsProperty*> m_Properties;
 
     void                                            AddChild(StringView name);
 };

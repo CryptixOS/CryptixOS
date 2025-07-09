@@ -7,6 +7,8 @@
 #pragma once
 
 #include <Drivers/Device.hpp>
+
+#include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/Core/NonCopyable.hpp>
 
 #include <VFS/DirectoryEntry.hpp>
@@ -49,7 +51,7 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
     virtual ErrorOr<Ref<DirectoryEntry>>
     Lookup(Ref<DirectoryEntry> dentry) override;
 
-    const std::unordered_map<StringView, INode*>& Children() const
+    const UnorderedMap<StringView, INode*>& Children() const
     {
         return m_Children;
     }
@@ -65,10 +67,10 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
     virtual ErrorOr<isize> Truncate(usize size) override;
 
   private:
-    Device*                                m_Device   = nullptr;
-    u8*                                    m_Data     = nullptr;
-    usize                                  m_Capacity = 0;
+    Device*                          m_Device   = nullptr;
+    u8*                              m_Data     = nullptr;
+    usize                            m_Capacity = 0;
 
-    std::unordered_map<StringView, INode*> m_Children;
+    UnorderedMap<StringView, INode*> m_Children;
     friend class DevTmpFs;
 };

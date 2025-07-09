@@ -12,12 +12,16 @@
 
 #include <Prism/Containers/DoublyLinkedList.hpp>
 #include <Prism/Containers/Span.hpp>
+#include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/Containers/Vector.hpp>
+
 #include <Prism/Memory/Buffer.hpp>
 #include <Prism/Memory/ByteStream.hpp>
+#include <Prism/Memory/Memory.hpp>
 #include <Prism/Utility/PathView.hpp>
 
-#include <unordered_map>
+#include <VFS/FileDescriptor.hpp>
+#include <VFS/INode.hpp>
 
 class AddressSpace;
 class PageMap;
@@ -175,6 +179,12 @@ namespace ELF
         u64       Alignment;
         u64       EntrySize;
     };
+    struct [[gnu::packed]] RelocationEntry
+    {
+        u64 Offset;
+        u64 Info;
+        i64 Addend;
+    };
 
     enum class HeaderType : u32
     {
@@ -278,15 +288,25 @@ namespace ELF
     class Image
     {
       public:
-        bool LoadFromMemory(u8* data, usize size);
-        bool ResolveSymbols(Span<Sym*> symbolTable);
+        bool                  LoadFromMemory(u8* data, usize size);
+        bool                  ResolveSymbols(Span<Sym*> symbolTable);
 
-        bool Load(PathView path, PageMap* pageMap, AddressSpace& addressSpace,
-                  uintptr_t loadBase = 0);
-        bool Load(Pointer image, usize size);
+        bool                  Load(FileDescriptor* file, PageMap* pageMap,
+                                   AddressSpace& addressSpace, Pointer loadBase = 0);
 
-        static bool LoadModules(const u64 sectionCount, SectionHeader* sections,
-                                char* stringTable);
+        Pointer               Raw() const { return m_Image.Raw(); }
+
+        usize                 ProgramHeaderCount();
+        struct ProgramHeader* ProgramHeader(usize index);
+        usize                 SectionHeaderCount();
+        struct SectionHeader* SectionHeader(usize index);
+
+        using ProgramHeaderEnumerator = Delegate<bool(struct ProgramHeader*)>;
+        void        ForEachProgramHeader(ProgramHeaderEnumerator enumerator);
+
+        static bool LoadModules(const u64             sectionCount,
+                                struct SectionHeader* sections,
+                                char*                 stringTable);
 
         inline uintptr_t GetEntryPoint() const
         {
@@ -309,23 +329,24 @@ namespace ELF
         inline StringView            GetLdPath() const { return m_LdPath; }
 
       private:
-        Buffer                                  m_Image;
+        Buffer                            m_Image;
+        Pointer                           m_LoadBase = nullptr;
 
-        Header                                  m_Header;
-        Vector<ProgramHeader>                   m_ProgramHeaders;
-        Vector<SectionHeader>                   m_Sections;
-        AuxiliaryVector                         m_AuxiliaryVector;
+        Header                            m_Header;
+        Vector<struct ProgramHeader>      m_ProgramHeaders;
+        Vector<struct SectionHeader>      m_Sections;
+        AuxiliaryVector                   m_AuxiliaryVector;
 
-        SectionHeader*                          m_SymbolSection = nullptr;
-        SectionHeader*                          m_StringSection = nullptr;
-        CTOS_UNUSED u8*                         m_StringTable   = nullptr;
+        struct SectionHeader*             m_SymbolSection = nullptr;
+        struct SectionHeader*             m_StringSection = nullptr;
+        CTOS_UNUSED u8*                   m_StringTable   = nullptr;
 
-        Vector<Symbol>                          m_Symbols;
-        std::unordered_map<StringView, Pointer> m_SymbolTable;
-        StringView                              m_LdPath;
+        Vector<Symbol>                    m_Symbols;
+        UnorderedMap<StringView, Pointer> m_SymbolTable;
+        StringView                        m_LdPath;
 
-        bool                                    Parse();
-        void                                    LoadSymbols();
+        ErrorOr<void>                     Parse();
+        void                              LoadSymbols();
 
         bool ParseProgramHeaders(ByteStream<Endian::eLittle>& stream);
         bool ParseSectionHeaders(ByteStream<Endian::eLittle>& stream);
@@ -333,7 +354,7 @@ namespace ELF
         template <typename T>
         void Read(T* buffer, isize offset, isize count = sizeof(T))
         {
-            std::memcpy(buffer, m_Image.Raw() + offset, count);
+            Memory::Copy(buffer, m_Image.Raw() + offset, count);
         }
     };
 }; // namespace ELF

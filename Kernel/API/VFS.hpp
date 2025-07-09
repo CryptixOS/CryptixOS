@@ -32,6 +32,7 @@ namespace API::VFS
     ErrorOr<isize> PRead(isize fdNum, void* out, usize count, off_t offset);
     ErrorOr<isize> PWrite(isize fdNum, const void* in, usize count,
                           off_t offset);
+    ErrorOr<isize> Access(const char* filename, mode_t mode);
 
     ErrorOr<isize> Dup(isize oldFdNum);
     ErrorOr<isize> Dup2(isize oldFdNum, isize newFdNum);
@@ -39,6 +40,8 @@ namespace API::VFS
     ErrorOr<isize> Truncate(PathView path, off_t length);
     ErrorOr<isize> FTruncate(i32 fdNum, off_t length);
     ErrorOr<isize> GetCwd(char* buffer, usize size);
+    ErrorOr<isize> ChDir(const char* filename);
+    ErrorOr<isize> FChDir(isize fdNum);
 
     ErrorOr<isize> Rename(const char* oldPath, const char* newPath);
     ErrorOr<isize> MkDir(const char* pathname, mode_t mode);
@@ -81,18 +84,10 @@ namespace API::VFS
 } // namespace API::VFS
 namespace Syscall::VFS
 {
-    ErrorOr<off_t> SysLSeek(Syscall::Arguments& args);
-
-    ErrorOr<i32>   SysAccess(Syscall::Arguments& args);
-
-    ErrorOr<i32>   SysFcntl(Syscall::Arguments& args);
-    ErrorOr<i32>   SysChDir(Syscall::Arguments& args);
-    ErrorOr<i32>   SysFChDir(Syscall::Arguments& args);
-    ErrorOr<i32>   SysMkDir(Syscall::Arguments& args);
+    ErrorOr<i32> SysFcntl(Syscall::Arguments& args);
 
     [[clang::no_sanitize("alignment")]] ErrorOr<i32>
                  SysGetDents64(Syscall::Arguments& args);
     ErrorOr<i32> SysOpenAt(Syscall::Arguments& args);
-    ErrorOr<i32> SysMkDirAt(Syscall::Arguments& args);
     ErrorOr<i32> SysFStatAt(Syscall::Arguments& args);
 } // namespace Syscall::VFS

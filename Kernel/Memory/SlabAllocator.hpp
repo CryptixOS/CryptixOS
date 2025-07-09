@@ -38,6 +38,8 @@ class SlabAllocator : public SlabAllocatorBase
         auto available
             = 0x1000 - Math::AlignUp(sizeof(SlabHeader), m_AllocationSize);
         auto slabPointer  = reinterpret_cast<SlabHeader*>(m_FirstFree);
+
+        ScopedLock guard(m_Lock);
         slabPointer->Slab = this;
         m_FirstFree += Math::AlignUp(sizeof(SlabHeader), m_AllocationSize);
 
@@ -51,9 +53,9 @@ class SlabAllocator : public SlabAllocatorBase
 
     void* Allocate() override
     {
-        ScopedLock guard(m_Lock);
         if (!m_FirstFree) Initialize();
 
+        ScopedLock guard(m_Lock);
         auto oldFree = reinterpret_cast<usize*>(m_FirstFree);
         m_FirstFree  = oldFree[0];
         std::memset(oldFree, 0, m_AllocationSize);

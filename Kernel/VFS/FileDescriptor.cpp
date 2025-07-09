@@ -258,10 +258,7 @@ bool FileDescriptor::GenerateDirEntries()
     CtosUnused(result);
 
     // . && ..
-    StringView cwdPath = Process::Current()->CWD();
-    auto       cwd     = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), cwdPath)
-                   .value_or(VFS::PathResolution{})
-                   .Entry;
+    auto cwd = Process::Current()->CWD();
     if (!cwd) return true;
 
     auto stats = cwd->FollowMounts()->INode()->Stats();

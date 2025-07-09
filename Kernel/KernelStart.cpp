@@ -26,7 +26,7 @@
 #include <Firmware/DMI/SMBIOS.hpp>
 #include <Firmware/DeviceTree/DeviceTree.hpp>
 
-#include <Library/ELF.hpp>
+#include <Library/ExecutableProgram.hpp>
 #include <Library/ICxxAbi.hpp>
 #include <Library/Image.hpp>
 #include <Library/Module.hpp>
@@ -70,20 +70,21 @@ static bool loadInitProcess(Path initPath)
     Vector<StringView> envp;
     envp.PushBack("TERM=linux");
 
-    static ELF::Image program, ld;
-    PageMap*          pageMap = new PageMap();
+    static ExecutableProgram program, ld;
+    PageMap*                 pageMap = new PageMap();
     if (!program.Load(initPath, pageMap, userProcess->AddressSpace()))
         return false;
-    PathView ldPath = program.GetLdPath();
+    PathView ldPath = program.Image().GetLdPath();
     if (!ldPath.Empty()
-        && !ld.Load(ldPath, pageMap, userProcess->AddressSpace(), 0x40000000))
+        && !ld.Load(ldPath, pageMap, userProcess->AddressSpace(),
+                    static_cast<uintptr_t>(0x40000000)))
     {
         delete pageMap;
         return false;
     }
     userProcess->PageMap = pageMap;
-    auto address
-        = ldPath.Empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
+    auto address         = ldPath.Empty() ? program.Image().GetEntryPoint()
+                                          : ld.Image().GetEntryPoint();
     if (!address)
     {
         delete pageMap;

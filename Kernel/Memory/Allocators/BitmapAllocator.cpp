@@ -6,9 +6,9 @@
  */
 #include <Memory/Allocators/BitmapAllocator.hpp>
 
-//TODO(v1tr10l7): Error code? 
-void BitmapAllocator::Initialize(MemoryMap& memoryMap, usize pageSize)
+ErrorOr<void> BitmapAllocator::Initialize(MemoryMap& memoryMap, usize pageSize)
 {
+    if (!Math::IsPowerOfTwo(pageSize)) return Error(EINVAL);
     m_PageSize = pageSize;
 
     for (usize i = 0; i < memoryMap.EntryCount; i++)
@@ -35,7 +35,7 @@ void BitmapAllocator::Initialize(MemoryMap& memoryMap, usize pageSize)
         m_TotalMemory += entry.Size();
     }
 
-    if (!m_MemoryTop) return;
+    if (!m_MemoryTop) return Error(ENOMEM);
 
     usize bitmapEntryCount = m_UsableMemoryTop.Raw() / pageSize;
     m_PageBitmap.Allocate(bitmapEntryCount);
@@ -52,6 +52,8 @@ void BitmapAllocator::Initialize(MemoryMap& memoryMap, usize pageSize)
             m_PageBitmap.SetIndex((current.Base().Raw() + page) / pageSize,
                                   false);
     }
+
+    return {};
 }
 void  BitmapAllocator::Shutdown() {}
 

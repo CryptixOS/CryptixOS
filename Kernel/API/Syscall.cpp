@@ -115,7 +115,7 @@ namespace Syscall
         RegisterSyscall2(ID::eIoCtl, API::VFS::IoCtl);
         RegisterSyscall2(ID::ePRead64, API::VFS::PRead);
         RegisterSyscall2(ID::ePWrite64, API::VFS::PWrite);
-        RegisterSyscall(ID::eAccess, VFS::SysAccess);
+        RegisterSyscall2(ID::eAccess, API::VFS::Access);
         RegisterSyscall(ID::ePipe, SysPipe);
         RegisterSyscall2(ID::eSchedYield, API::Process::SchedYield);
         RegisterSyscall2(ID::eDup, API::VFS::Dup);
@@ -134,8 +134,8 @@ namespace Syscall
         RegisterSyscall2(ID::eTruncate, API::VFS::Truncate);
         RegisterSyscall2(ID::eFTruncate, API::VFS::FTruncate);
         RegisterSyscall2(ID::eGetCwd, API::VFS::GetCwd);
-        RegisterSyscall(ID::eChDir, VFS::SysChDir);
-        RegisterSyscall(ID::eFChDir, VFS::SysFChDir);
+        RegisterSyscall2(ID::eChDir, API::VFS::ChDir);
+        RegisterSyscall2(ID::eFChDir, API::VFS::FChDir);
         RegisterSyscall2(ID::eRename, API::VFS::Rename);
         RegisterSyscall2(ID::eMkDir, API::VFS::MkDir);
         RegisterSyscall2(ID::eRmDir, API::VFS::RmDir);
@@ -190,6 +190,7 @@ namespace Syscall
 #define LOG_SYSCALLS false
         // #if LOG_SYSCALLS == true || true
         static isize previousSyscall = -1;
+        g_LogSyscalls = false;
 
         if (static_cast<isize>(args.Index) != previousSyscall && g_LogSyscalls)
             LogTrace(

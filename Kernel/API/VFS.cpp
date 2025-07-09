@@ -37,10 +37,8 @@ namespace API::VFS
             if (!(flags & AT_EMPTY_PATH)) return Error(ENOENT);
             if (dirFdNum == AT_FDCWD)
             {
-                auto res = ::VFS::ResolvePath(
-                    ::VFS::GetRootDirectoryEntry().Raw(), process->CWD());
-                if (errno != no_error && errno != ENOENT) return Error(errno);
-                return res;
+                auto cwd = process->CWD();
+                return ::VFS::PathResolution{cwd->Parent(), cwd, cwd->Name()};
             }
 
             auto* fd = process->GetFileHandle(dirFdNum);
@@ -58,11 +56,7 @@ namespace API::VFS
 
         if (!path.Absolute())
         {
-            if (dirFdNum == AT_FDCWD)
-                base = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry().Raw(),
-                                          process->CWD())
-                           .value()
-                           .Entry;
+            if (dirFdNum == AT_FDCWD) base = process->CWD();
             else
             {
                 auto* fd = process->GetFileHandle(dirFdNum);
@@ -224,11 +218,15 @@ namespace API::VFS
         return fd->Write(inBuffer, count, offset);
     }
 
-    ErrorOr<i32> Access(const char* path, mode_t mode)
+    ErrorOr<isize> Access(const char* filename, mode_t mode)
     {
+        auto process = Process::Current();
+        if (!process->ValidateRead(filename)) return Error(EFAULT);
+        Path path = CPU::AsUser([filename]() -> Path { return filename; });
+        return 0;
+
+        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
         if (mode != (mode & S_IRWXO)) return Error(EINVAL);
-        auto process = Process::GetCurrent();
-        if (!process->ValidateRead(path, 4096)) return Error(EFAULT);
 
         auto maybePathRes
             = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry().Raw(), path);
@@ -241,7 +239,12 @@ namespace API::VFS
         auto inode = entry->INode();
         if (!inode) return Error(errno);
 
-        return inode->CheckPermissions(mode);
+        auto status = inode->CheckPermissions(mode);
+        if (!status && (mode & S_IWOTH) /* && inode->ReadOnly()*/
+            && (inode->IsDirectory() || inode->IsRegular()))
+            return Error(EROFS);
+
+        return status;
     }
 
     ErrorOr<isize> Dup(isize oldFdNum)
@@ -295,11 +298,55 @@ namespace API::VFS
         if (!buffer || size == 0) return Error(EINVAL);
         if (!process->ValidateWrite(buffer, size)) return Error(EFAULT);
 
-        StringView cwd = process->CWD();
-        if (size < cwd.Size()) return Error(ERANGE);
+        auto cwd     = process->CWD();
+        auto cwdPath = cwd->Path();
+
+        if (size < cwdPath.Size()) return Error(ERANGE);
 
         CPU::UserMemoryProtectionGuard guard;
-        cwd.Copy(buffer, cwd.Size());
+        cwdPath.StrView().Copy(buffer, cwdPath.Size());
+        return 0;
+    }
+    ErrorOr<isize> ChDir(const char* filename)
+    {
+        auto process = Process::Current();
+        if (!process->ValidateRead(filename)) return Error(EFAULT);
+        Path path = CPU::AsUser([filename]() -> Path { return filename; });
+
+        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
+
+        auto cwd = process->CWD();
+        if (!cwd) return Error(ENOENT);
+
+        auto maybePathRes = ::VFS::ResolvePath(cwd.Raw(), path);
+        RetOnError(maybePathRes);
+        auto pathRes      = maybePathRes.value();
+
+        auto newDirectory = pathRes.Entry;
+        if (!newDirectory) return Error(ENOENT);
+        if (!newDirectory->IsDirectory()) return Error(ENOTDIR);
+
+        // auto inode = newDirectory->INode();
+        // if (!inode->CheckPermissions(S_IEXEC)) return Error(EACCES);
+        process->SetCWD(newDirectory);
+
+        return 0;
+    }
+    ErrorOr<isize> FChDir(isize fdNum)
+    {
+        auto process = Process::Current();
+        auto fd      = process->GetFileHandle(fdNum);
+        if (!fd) return Error(EBADF);
+
+        auto dentry = fd->DirectoryEntry();
+        if (!dentry) return Error(ENOENT);
+        auto inode = dentry->INode();
+        if (!inode) return Error(ENOENT);
+
+        if (!inode->IsDirectory()) return Error(ENOTDIR);
+        // if (!inode->CheckPermissions(S_IEXEC)) return Error(EACCES);
+        process->SetCWD(dentry);
+
         return 0;
     }
 
@@ -324,12 +371,7 @@ namespace API::VFS
                 return pathname;
             });
 
-        auto cwdPath = process->CWD();
-        auto maybeCwdRes
-            = ::VFS::ResolvePath(::VFS::GetRootDirectoryEntry().Raw(), cwdPath);
-        RetOnError(maybeCwdRes);
-
-        auto cwd = maybeCwdRes.value().Entry;
+        auto cwd = process->CWD();
         Assert(cwd);
 
         auto maybePathRes = ::VFS::ResolvePath(cwd.Raw(), path, true);
@@ -560,12 +602,7 @@ namespace API::VFS
         auto* fd             = current->GetFileHandle(dirFdNum);
         bool  followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
 
-        auto  maybePathRes   = ::VFS::ResolvePath(
-            ::VFS::GetRootDirectoryEntry().Raw(), current->CWD());
-        RetOnError(maybePathRes);
-        auto pathRes  = maybePathRes.value();
-
-        auto cwdEntry = pathRes.Entry;
+        auto  cwdEntry       = current->CWD();
         if (!cwdEntry) return Error(ENOENT);
         auto cwd = cwdEntry->INode();
 
@@ -750,25 +787,6 @@ namespace Syscall::VFS
     using Syscall::Arguments;
     using namespace ::VFS;
 
-    ErrorOr<i32> SysAccess(Arguments& args)
-    {
-        const char* path = reinterpret_cast<const char*>(args.Args[0]);
-        i32         mode = static_cast<i32>(args.Args[1]);
-        (void)mode;
-
-        Ref<DirectoryEntry> entry = CPU::AsUser(
-            [path]() -> Ref<DirectoryEntry>
-            {
-                return VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(),
-                                        path)
-                    .value()
-                    .Entry;
-            });
-        if (!entry) return Error(EPERM);
-
-        return 0;
-    }
-
     ErrorOr<i32> SysFcntl(Arguments& args)
     {
         i32             fdNum   = static_cast<i32>(args.Args[0]);
@@ -808,46 +826,7 @@ namespace Syscall::VFS
 
         return 0;
     }
-    ErrorOr<i32> SysChDir(Arguments& args)
-    {
-        const char* path    = reinterpret_cast<const char*>(args.Args[0]);
-        Process*    current = Process::GetCurrent();
 
-        auto        maybePathRes
-            = VFS::ResolvePath(current->RootNode().Raw(), current->CWD());
-        RetOnError(maybePathRes);
-        auto pathRes = maybePathRes.value();
-
-        auto cwd     = pathRes.Entry;
-        if (!cwd) return Error(ENOENT);
-
-        Ref<DirectoryEntry> entry = nullptr;
-        {
-            CPU::UserMemoryProtectionGuard guard;
-            entry = VFS::ResolvePath(cwd.Raw(), path).value().Entry;
-        }
-        if (!entry) return Error(ENOENT);
-        if (!entry->IsDirectory()) return Error(ENOTDIR);
-
-        current->SetCWD(entry->Path().View());
-        return 0;
-    }
-    ErrorOr<i32> SysFChDir(Arguments& args)
-    {
-        i32             fdNum   = static_cast<i32>(args.Args[0]);
-        Process*        current = Process::GetCurrent();
-
-        FileDescriptor* fd      = current->GetFileHandle(fdNum);
-        if (!fd) return Error(EBADF);
-
-        auto entry = fd->DirectoryEntry();
-        if (!entry) return Error(ENOENT);
-
-        if (!entry->IsDirectory()) return Error(ENOTDIR);
-        current->SetCWD(entry->Path().View());
-
-        return 0;
-    }
     [[clang::no_sanitize("alignment")]] ErrorOr<i32>
     SysGetDents64(Arguments& args)
     {
@@ -862,6 +841,8 @@ namespace Syscall::VFS
 
         FileDescriptor* fd = current->GetFileHandle(fdNum);
         if (!fd) return Error(EBADF);
+
+        LogDebug("SysGetDents64: {{ Path: {} }}", fd->DirectoryEntry()->Path());
 
         CPU::UserMemoryProtectionGuard guard;
         return fd->GetDirEntries(outBuffer, count);

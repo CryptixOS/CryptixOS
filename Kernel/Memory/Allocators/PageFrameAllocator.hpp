@@ -19,7 +19,7 @@ class PageFrameAllocator
 
     constexpr static usize DEFAULT_PAGE_SIZE = 0x1000;
 
-    virtual void           Initialize(MemoryMap& memoryMap,
+    virtual ErrorOr<void>  Initialize(MemoryMap& memoryMap,
                                       usize      pageSize = DEFAULT_PAGE_SIZE)
         = 0;
     virtual void    Shutdown()              = 0;

@@ -21,8 +21,6 @@
 #include <VFS/VFS.hpp>
 
 #include <cstring>
-#include <magic_enum/magic_enum.hpp>
-#include <utility>
 
 #if 0
     #define ElfDebugLog(...) LogDebug(__VA_ARGS__)
@@ -35,67 +33,131 @@ namespace ELF
     bool Image::LoadFromMemory(u8* data, usize size)
     {
         m_Image.Resize(size + 100);
-        std::memcpy(m_Image.Raw(), data, size);
+        Memory::Copy(m_Image.Raw(), data, size);
 
-        ByteStream<Endian::eNative> stream(data, size);
-        LogTrace("ELF: Kernel Executable Address -> '{:#x}'",
-                 Pointer(data).Raw());
+        auto status = Parse();
 
-        stream >> m_Header;
-        if (std::strncmp(reinterpret_cast<char*>(&m_Header.Magic), ELF::MAGIC,
-                         4)
-            != 0)
+        return status ? true : false;
+        Pointer loadAddress = VMM::AllocateSpace(size);
+        for (usize i = 0; i < m_Header.SectionEntryCount; ++i)
         {
-            LogError("ELF: Invalid magic");
-            return false;
-        }
-        if (m_Header.Bitness != Bitness::e64Bit)
-        {
-            LogError("ELF: Only 64-bit programs are supported");
-            return false;
-        }
-        if (m_Header.Endianness != Endianness::eLittle)
-        {
-            LogError("ELF: BigEndian programs are not supported!");
-            return false;
-        }
-        if (m_Header.HeaderVersion != CURRENT_ELF_HEADER_VERSION)
-        {
-            LogError("ELF: Invalid header version");
-            return false;
-        }
-        if (m_Header.Abi != ABI::eSystemV)
-        {
-            LogError(
-                "ELF: Header contains invalid abi ID, only SysV abi is "
-                "supported");
-            return false;
+            struct SectionHeader* sectionHeader
+                = reinterpret_cast<struct SectionHeader*>(
+                    loadAddress.Raw() + m_Image.Raw()
+                    + m_Header.SectionHeaderTableOffset
+                    + m_Header.SectionEntrySize * i);
+            if (sectionHeader->Type == ToUnderlying(SectionType::eNoBits))
+            {
+                sectionHeader->Address
+                    = VMM::AllocateSpace(sectionHeader->Size);
+                continue;
+            }
+
+            sectionHeader->Address = loadAddress.Raw() + sectionHeader->Offset;
+            if (sectionHeader->Alignment
+                && (sectionHeader->Address & (sectionHeader->Alignment - 1)))
+                LogWarn(
+                    "ELF: Module probably is not aligned correctly: %#zx %ld\n",
+                    sectionHeader->Address, sectionHeader->Alignment);
         }
 
-        constexpr auto EXECUTABLE_TYPE_STRINGS = ToArray({
-            "Relocatable",
-            "Executable",
-            "Shared",
-            "Core",
-        });
-        LogTrace("ELF: Executable type -> '{}'",
-                 m_Header.Type < 4 ? EXECUTABLE_TYPE_STRINGS[m_Header.Type]
-                                   : "Unknown");
-        if (m_Header.InstructionSet != InstructionSet::eAMDx86_64)
+        for (usize i = 0; i < m_Header.SectionEntryCount; ++i)
         {
-            LogError("ELF: Only x86_64 instruction set is supported");
-            return false;
-        }
-        if (m_Header.ElfVersion != CURRENT_ELF_HEADER_VERSION)
-        {
-            LogError("ELF: Invalid ELF version");
-            return false;
+            struct SectionHeader* sectionHeader
+                = reinterpret_cast<struct SectionHeader*>(
+                    loadAddress.Raw() + m_Image.Raw()
+                    + m_Header.SectionHeaderTableOffset
+                    + m_Header.SectionEntrySize * i);
+            if (sectionHeader->Type != ToUnderlying(SectionType::eSymbolTable))
+                continue;
+
+            struct SectionHeader* stringTable
+                = reinterpret_cast<struct SectionHeader*>(
+                    loadAddress.Raw() + m_Header.SectionHeaderTableOffset
+                    + m_Header.SectionEntrySize * sectionHeader->Link);
+            CTOS_UNUSED char* symbols
+                = reinterpret_cast<char*>(stringTable->Address);
+            Sym* symbolTable = reinterpret_cast<Sym*>(sectionHeader->Address);
+
+            for (usize symbolIndex = 0;
+                 symbolIndex < sectionHeader->Size / sizeof(Symbol);
+                 ++symbolIndex)
+            {
+                if (symbolTable[symbolIndex].SectionIndex > 0
+                    && usize(symbolTable[symbolIndex].SectionIndex)
+                           < ToUnderlying(HeaderType::eProcessorSpecificStart))
+                {
+                    struct SectionHeader* header
+                        = reinterpret_cast<struct SectionHeader*>(
+                            loadAddress.Raw()
+                            + m_Header.SectionHeaderTableOffset
+                            + m_Header.SectionEntrySize
+                                  * symbolTable[symbolIndex].SectionIndex);
+
+                    symbolTable[symbolIndex].Value
+                        = symbolTable[symbolIndex].Value + header->Address;
+                    continue;
+                }
+                else if (symbolTable[symbolIndex].Value
+                         == ToUnderlying(HeaderType::eNone))
+                    ; // TODO(v1tr10l7): Lookup symbols
+            }
         }
 
-        if (!ParseProgramHeaders(stream) || !ParseSectionHeaders(stream))
-            return false;
+        for (unsigned int i = 0; i < m_Header.SectionEntryCount; ++i)
+        {
+            struct SectionHeader* sectionHeader
+                = (struct SectionHeader*)(loadAddress.Raw()
+                                          + m_Header.SectionHeaderTableOffset
+                                          + m_Header.SectionEntrySize * i);
+            if (sectionHeader->Type != ToUnderlying(SectionType::eRelA))
+                continue;
 
-        if (m_SymbolSection && m_StringSection) LoadSymbols();
+            RelocationEntry* table = (RelocationEntry*)sectionHeader->Address;
+
+            // Get the section these relocations apply to //
+            struct SectionHeader* targetSection
+                = (struct SectionHeader*)(loadAddress.Raw()
+                                          + m_Header.SectionHeaderTableOffset
+                                          + m_Header.SectionEntrySize
+                                                * sectionHeader->Info);
+
+            // Get the symbol table //
+            struct SectionHeader* symbolSection
+                = (struct SectionHeader*)(loadAddress.Raw()
+                                          + m_Header.SectionHeaderTableOffset
+                                          + m_Header.SectionEntrySize
+                                                * sectionHeader->Link);
+            Sym* symbolTable = (Sym*)symbolSection->Address;
+
+#define S               (symbolTable[ELF64_R_SYM(table[rela].Info)].Value)
+#define A               (table[rela].Addend)
+#define T32             (*(uint32_t*)target)
+#define T64             (*(uint64_t*)target)
+#define P               (target)
+
+#define ELF64_R_TYPE(i) ((i) & 0xffffffff)
+#define ELF64_R_SYM(i)  ((i) >> 32)
+#define R_X86_64_64     1  /* Direct 64 bit  */
+#define R_X86_64_32     10 /* Direct 32 bit zero extended */
+#define R_X86_64_PC32   2  /* PC relative 32 bit signed */
+
+            for (unsigned int rela = 0;
+                 rela < sectionHeader->Size / sizeof(RelocationEntry); ++rela)
+            {
+                uintptr_t target = table[rela].Offset + targetSection->Address;
+                switch (ELF64_R_TYPE(table[rela].Info))
+                {
+                    case R_X86_64_64: T64 = S + A; break;
+                    case R_X86_64_32: T32 = S + A; break;
+                    case R_X86_64_PC32: T32 = S + A - P; break;
+                    default:
+                        AssertFmt(false,
+                                  "Module: Unsupported relocation {} found\n",
+                                  ELF64_R_TYPE(table[rela].Info));
+                }
+            }
+        }
 
         return true;
     }
@@ -118,7 +180,7 @@ namespace ELF
             auto stringTableHeader
                 = Pointer(m_Image.Raw() + m_Header.SectionHeaderTableOffset
                           + m_Header.SectionEntrySize * section.Link)
-                      .As<SectionHeader>();
+                      .As<struct SectionHeader>();
             char* symbolNames
                 = reinterpret_cast<char*>(stringTableHeader->Address);
             Sym* symbolTable = reinterpret_cast<Sym*>(section.Address);
@@ -129,7 +191,7 @@ namespace ELF
                 if (symbolTable[sym].SectionIndex > 0
                     && symbolTable[sym].SectionIndex < SHN_LOPROC)
                 {
-                    SectionHeader* shdr = Pointer(
+                    struct SectionHeader* shdr = Pointer(
                         m_Image.Raw() + m_Header.SectionHeaderTableOffset
                         + m_Header.SectionEntrySize
                               * symbolTable[sym].SectionIndex);
@@ -149,104 +211,50 @@ namespace ELF
         return true;
     }
 
-    bool Image::Load(PathView path, PageMap* pageMap,
-                     AddressSpace& addressSpace, uintptr_t loadBase)
+    bool Image::Load(FileDescriptor* file, PageMap* pageMap,
+                     AddressSpace& addressSpace, Pointer loadBase)
     {
-        Ref entry
-            = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), path)
-                  .value()
-                  .Entry;
-        if (!entry) return false;
+        if (!file) return false;
 
-        auto file = entry->INode();
-        if (!file) return_err(false, ENOENT);
-
-        isize fileSize = file->Stats().st_size;
-        // m_Image        = new u8[fileSize];
+        isize fileSize = file->INode()->Stats().st_size;
         m_Image.Resize(fileSize + 100);
 
-        if (file->Read(m_Image.Raw(), 0, fileSize) != fileSize || !Parse())
+        m_LoadBase = loadBase;
+        if (file->INode()->Read(m_Image.Raw(), 0, fileSize) != fileSize
+            || !Parse())
             return false;
 
-        LoadSymbols();
-        for (auto& sym : m_Symbols) sym.Address += loadBase;
-
-        for (const auto& current : m_ProgramHeaders)
-        {
-            switch (current.Type)
-            {
-                case HeaderType::eLoad:
-                {
-                    usize misalign
-                        = current.VirtualAddress & (PMM::PAGE_SIZE - 1);
-                    usize pageCount = Math::DivRoundUp(
-                        current.SegmentSizeInMemory + misalign, PMM::PAGE_SIZE);
-
-                    uintptr_t phys = PMM::CallocatePages<uintptr_t>(pageCount);
-                    Assert(phys);
-
-                    usize size = pageCount * PMM::PAGE_SIZE;
-
-                    Assert(pageMap->MapRange(
-                        current.VirtualAddress + loadBase, phys, size,
-                        PageAttributes::eRWXU | PageAttributes::eWriteBack));
-
-                    auto region = new Region(
-                        phys, current.VirtualAddress + loadBase, size);
-
-                    using VirtualMemoryManager::Access;
-                    region->SetProt(Access::eReadWriteExecute | Access::eUser,
-                                    PROT_READ | PROT_WRITE | PROT_EXEC);
-
-                    addressSpace.Insert(region->VirtualBase(), region);
-
-                    Read(ToHigherHalfAddress<void*>(phys + misalign),
-                         current.Offset, current.SegmentSizeInFile);
-                    ElfDebugLog(
-                        "Virtual Address: {:#x}, sizeInFile: {}, "
-                        "sizeInMemory: "
-                        "{}",
-                        current.VirtualAddress + loadBase,
-                        current.SegmentSizeInFile, current.SegmentSizeInMemory);
-                    break;
-                }
-                case HeaderType::eProgramHeader:
-                    m_AuxiliaryVector.ProgramHeadersAddress
-                        = current.VirtualAddress + loadBase;
-                    break;
-                case HeaderType::eInterp:
-                {
-                    char* path = new char[current.SegmentSizeInFile + 1];
-                    Read(path, current.Offset, current.SegmentSizeInFile);
-                    path[current.SegmentSizeInFile] = 0;
-
-                    m_LdPath = StringView(path, current.SegmentSizeInFile);
-                    break;
-                }
-
-                default: break;
-            }
-        }
-
-        m_AuxiliaryVector.Type       = AuxiliaryVectorType::eAtBase;
-        m_AuxiliaryVector.EntryPoint = m_Header.EntryPoint + loadBase;
-        m_AuxiliaryVector.ProgramHeaderEntrySize = m_Header.ProgramEntrySize;
-        m_AuxiliaryVector.ProgramHeaderCount     = m_Header.ProgramEntryCount;
-        ElfDebugLog("EntryPoint: {:#x}", m_AuxiliaryVector.EntryPoint);
         return true;
     }
-    bool Image::Load(Pointer image, usize size)
+
+    usize Image::ProgramHeaderCount() { return m_Header.ProgramEntryCount; }
+    struct ProgramHeader* Image::ProgramHeader(usize index)
     {
-        m_Image.Resize(size * 2);
-        std::memcpy(m_Image.Raw(), image.As<u8>(), size);
-        if (!Parse()) return false;
+        Pointer header = m_Image.Raw()
+                       + (m_Header.ProgramHeaderTableOffset
+                          + index * m_Header.ProgramEntrySize);
 
-        if (m_StringSection && m_SymbolSection) LoadSymbols();
-        return true;
+        return header.As<struct ProgramHeader>();
+    }
+    usize Image::SectionHeaderCount() { return m_Header.SectionEntryCount; }
+    struct SectionHeader* Image::SectionHeader(usize index)
+    {
+        Pointer header = m_Image.Raw()
+                       + (m_Header.SectionHeaderTableOffset
+                          + index * m_Header.SectionEntrySize);
+
+        return header.As<struct SectionHeader>();
     }
 
-    bool Image::LoadModules(const u64 sectionCount, SectionHeader* sections,
-                            char* stringTable)
+    void Image::ForEachProgramHeader(ProgramHeaderEnumerator enumerator)
+    {
+        usize entryCount = m_Header.ProgramEntryCount;
+        for (usize i = 0; i < entryCount; i++)
+            if (!enumerator(ProgramHeader(i))) break;
+    }
+
+    bool Image::LoadModules(const u64             sectionCount,
+                            struct SectionHeader* sections, char* stringTable)
     {
         bool found = false;
         for (usize i = 0; i < sectionCount; i++)
@@ -278,57 +286,101 @@ namespace ELF
         return found;
     }
 
-    bool Image::Parse()
+    ErrorOr<void> Image::Parse()
     {
-        Read(&m_Header, 0);
+        ByteStream<Endian::eNative> stream(m_Image.Raw(), m_Image.Size());
+        LogTrace("ELF: Kernel Executable Address -> '{:#x}'",
+                 Pointer(m_Image.Raw()).Raw());
 
-        ElfDebugLog("ELF: Verifying signature...");
-        if (std::memcmp(&m_Header.Magic, MAGIC, 4) != 0)
+        stream >> m_Header;
+        if (std::strncmp(reinterpret_cast<char*>(&m_Header.Magic), ELF::MAGIC,
+                         4)
+            != 0)
         {
             LogError("ELF: Invalid magic");
-            return false;
+            return Error(ENOEXEC);
+        }
+        if (m_Header.Bitness != Bitness::e64Bit)
+        {
+            LogError("ELF: Only 64-bit programs are supported");
+            return Error(ENOEXEC);
+        }
+        if (m_Header.Endianness != Endianness::eLittle)
+        {
+            LogError("ELF: BigEndian programs are not supported!");
+            return Error(ENOEXEC);
+        }
+        if (m_Header.HeaderVersion != CURRENT_ELF_HEADER_VERSION)
+        {
+            LogError("ELF: Invalid header version");
+            return Error(ENOEXEC);
+        }
+        if (m_Header.Abi != ABI::eSystemV)
+        {
+            LogError(
+                "ELF: Header contains invalid abi ID, only SysV abi is "
+                "supported");
+            return Error(ENOEXEC);
         }
 
-        ElfDebugLog("ELF: Parsing program headers...");
-        ProgramHeader current;
+        constexpr auto EXECUTABLE_TYPE_STRINGS = ToArray({
+            "Relocatable",
+            "Executable",
+            "Shared",
+            "Core",
+        });
+        LogTrace("ELF: Executable type -> '{}'",
+                 m_Header.Type < 4 ? EXECUTABLE_TYPE_STRINGS[m_Header.Type]
+                                   : "Unknown");
+        if (m_Header.InstructionSet != InstructionSet::eAMDx86_64)
+        {
+            LogError("ELF: Only x86_64 instruction set is supported");
+            return Error(ENOEXEC);
+        }
+        if (m_Header.ElfVersion != CURRENT_ELF_HEADER_VERSION)
+        {
+            LogError("ELF: Invalid ELF version");
+            return Error(ENOEXEC);
+        }
+
+        if (!ParseProgramHeaders(stream) || !ParseSectionHeaders(stream))
+            return Error(ENOEXEC);
+
+        if (m_SymbolSection && m_StringSection) LoadSymbols();
+
+        for (auto& sym : m_Symbols) sym.Address += m_LoadBase.Raw();
+
         for (usize i = 0; i < m_Header.ProgramEntryCount; i++)
         {
-            isize headerOffset = m_Header.ProgramHeaderTableOffset
-                               + i * m_Header.ProgramEntrySize;
-            Read(&current, headerOffset);
-            ElfDebugLog("ELF: Header[{}] = {}({})", i,
-                        static_cast<usize>(current.Type),
-                        magic_enum::enum_name(current.Type));
-
-            m_ProgramHeaders.PushBack(current);
-        }
-
-        m_Sections.Clear();
-        SectionHeader* sections = reinterpret_cast<SectionHeader*>(
-            m_Image.Raw() + m_Header.SectionHeaderTableOffset);
-        for (usize i = 0; i < m_Header.SectionEntryCount; i++)
-
-        {
-            m_Sections.PushBack(sections[i]);
-
-            if (sections[i].Type
-                == ToUnderlying(SectionType::eSymbolTable))
+            auto current = ProgramHeader(i);
+            switch (current->Type)
             {
-                ElfDebugLog("ELF: Found symbol section at: {}", i);
-                m_SymbolSection = sections + i;
-            }
-            else if (sections[i].Type
-                         == ToUnderlying(SectionType::eStringTable)
-                     && i != m_Header.SectionNamesIndex)
+                case HeaderType::eProgramHeader:
+                    m_AuxiliaryVector.ProgramHeadersAddress
+                        = current->VirtualAddress + m_LoadBase.Raw();
+                    break;
+                case HeaderType::eInterp:
+                {
+                    char* path = new char[current->SegmentSizeInFile + 1];
+                    Read(path, current->Offset, current->SegmentSizeInFile);
+                    path[current->SegmentSizeInFile] = 0;
 
-            {
-                ElfDebugLog("ELF: Found string section at: {}", i);
-                m_StringSection = sections + i;
+                    m_LdPath = StringView(path, current->SegmentSizeInFile);
+                    break;
+                }
+
+                default: break;
             }
         }
 
-        return true;
+        m_AuxiliaryVector.Type       = AuxiliaryVectorType::eAtBase;
+        m_AuxiliaryVector.EntryPoint = m_Header.EntryPoint + m_LoadBase.Raw();
+        m_AuxiliaryVector.ProgramHeaderEntrySize = m_Header.ProgramEntrySize;
+        m_AuxiliaryVector.ProgramHeaderCount     = m_Header.ProgramEntryCount;
+        ElfDebugLog("EntryPoint: {:#x}", m_AuxiliaryVector.EntryPoint);
+        return {};
     }
+
     void Image::LoadSymbols()
     {
         ElfDebugLog("ELF: Loading symbols...");
@@ -359,8 +411,8 @@ namespace ELF
         m_ProgramHeaders.Reserve(m_Header.ProgramEntryCount);
         for (usize i = 0; i < m_Header.ProgramEntryCount; i++)
         {
-            ProgramHeader& phdr         = m_ProgramHeaders.EmplaceBack();
-            isize          headerOffset = m_Header.ProgramHeaderTableOffset
+            struct ProgramHeader& phdr = m_ProgramHeaders.EmplaceBack();
+            isize headerOffset         = m_Header.ProgramHeaderTableOffset
                                + i * m_Header.ProgramEntrySize;
 
             stream.Seek(headerOffset);
@@ -456,8 +508,8 @@ namespace ELF
             + sections[m_Header.SectionNamesIndex].Offset);
         for (usize i = 0; i < m_Header.SectionEntryCount; i++)
         {
-            SectionHeader& shdr     = m_Sections.EmplaceBack();
-            u64 sectionHeaderOffset = m_Header.SectionHeaderTableOffset
+            struct SectionHeader& shdr = m_Sections.EmplaceBack();
+            u64 sectionHeaderOffset    = m_Header.SectionHeaderTableOffset
                                     + i * m_Header.SectionEntrySize;
             stream.Seek(sectionHeaderOffset);
             stream >> shdr;

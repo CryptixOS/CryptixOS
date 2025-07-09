@@ -8,8 +8,10 @@
 
 #include <Library/Locking/Spinlock.hpp>
 
+#include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/Memory/Ref.hpp>
 #include <Prism/Memory/WeakRef.hpp>
+
 #include <Prism/String/String.hpp>
 #include <Prism/Utility/Path.hpp>
 
@@ -35,7 +37,7 @@ class DirectoryEntry : public RefCounted
     inline ::Ref<DirectoryEntry> Parent() { return m_Parent; }
 
     Path                         Path();
-    const std::unordered_map<StringView, ::Ref<DirectoryEntry>>&
+    const UnorderedMap<StringView, ::Ref<DirectoryEntry>>&
          Children() const;
 
     void SetParent(::Ref<DirectoryEntry> entry);
@@ -68,5 +70,5 @@ class DirectoryEntry : public RefCounted
     String                m_Name   = "";
 
     ::Ref<DirectoryEntry> m_Parent = nullptr;
-    std::unordered_map<StringView, ::Ref<class DirectoryEntry>> m_Children;
+    UnorderedMap<StringView, ::Ref<class DirectoryEntry>> m_Children;
 };

@@ -51,7 +51,7 @@ void    Thread::SetFpuStorage(Pointer fpuStorage, usize pageCount)
 
 static Pointer prepareStack(uintptr_t _stack, uintptr_t sp,
                             Vector<StringView> argv, Vector<StringView> envp,
-                            ELF::Image& image)
+                            ExecutableProgram& image)
 {
     auto                           stack = reinterpret_cast<uintptr_t*>(_stack);
 
@@ -82,13 +82,13 @@ static Pointer prepareStack(uintptr_t _stack, uintptr_t sp,
     *(--stack)               = 0;
     *(--stack)               = 0;
     stack -= 2;
-    stack[0] = AT_ENTRY, stack[1] = image.GetEntryPoint();
+    stack[0] = AT_ENTRY, stack[1] = image.Image().GetEntryPoint();
     stack -= 2;
-    stack[0] = AT_PHDR, stack[1] = image.GetAtPhdr();
+    stack[0] = AT_PHDR, stack[1] = image.Image().GetAtPhdr();
     stack -= 2;
-    stack[0] = AT_PHENT, stack[1] = image.GetPhent();
+    stack[0] = AT_PHENT, stack[1] = image.Image().GetPhent();
     stack -= 2;
-    stack[0] = AT_PHNUM, stack[1] = image.GetPhNum();
+    stack[0] = AT_PHNUM, stack[1] = image.Image().GetPhNum();
 
     uintptr_t oldSp = sp;
     *(--stack)      = 0;
@@ -112,7 +112,7 @@ static Pointer prepareStack(uintptr_t _stack, uintptr_t sp,
 }
 
 Thread::Thread(Process* parent, Pointer pc, Vector<StringView>& argv,
-               Vector<StringView>& envp, ELF::Image& program, i64 runOn)
+               Vector<StringView>& envp, ExecutableProgram& program, i64 runOn)
     : m_RunningOn(CPU::GetCurrent()->ID)
     , m_Self(this)
     , m_State(ThreadState::eDequeued)

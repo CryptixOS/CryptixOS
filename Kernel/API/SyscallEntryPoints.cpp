@@ -62,13 +62,6 @@ namespace Syscall
 
         return API::FTruncate(fdNum, length);
     }
-    ErrorOr<isize> SysCreat(Arguments& args)
-    {
-        const char* path = args.Get<const char*>(0);
-        mode_t      mode = args.Get<mode_t>(1);
-
-        return API::Open(path, O_CREAT | O_WRONLY | O_TRUNC, mode);
-    }
     ErrorOr<isize> SysReadLink(Arguments& args)
     {
         const char* path = args.Get<const char*>(0);

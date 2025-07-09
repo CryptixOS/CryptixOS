@@ -17,7 +17,7 @@
     #include <Arch/aarch64/CPUContext.hpp>
 #endif
 
-#include <Library/ELF.hpp>
+#include <Library/ExecutableProgram.hpp>
 #include <Memory/Region.hpp>
 
 #include <Prism/Containers/Deque.hpp>
@@ -41,7 +41,8 @@ struct Thread
     Thread() = default;
     Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn = -1);
     Thread(Process* parent, Pointer pc, Vector<StringView>& arg,
-           Vector<StringView>& envp, ELF::Image& program, i64 runOn = -1);
+           Vector<StringView>& envp, ExecutableProgram& program,
+           i64 runOn = -1);
     Thread(Process* parent, Pointer pc, bool user = true);
     ~Thread();
 

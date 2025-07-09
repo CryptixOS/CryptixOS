@@ -16,7 +16,7 @@
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
 
-#include <Library/ELF.hpp>
+#include <Library/ExecutableProgram.hpp>
 #include <Prism/String/String.hpp>
 
 #include <VFS/FileDescriptorTable.hpp>
@@ -57,7 +57,7 @@ class Process
 
     Thread* CreateThread(Pointer rip, bool isUser = true, i64 runOn = -1);
     Thread* CreateThread(Pointer rip, Vector<StringView>& argv,
-                         Vector<StringView>& envp, ELF::Image& program,
+                         Vector<StringView>& envp, ExecutableProgram& program,
                          i64 runOn = -1);
 
     bool    ValidateAddress(const Pointer address, i32 accessMode, usize size);
@@ -123,13 +123,13 @@ class Process
     }
 
     inline Ref<DirectoryEntry> RootNode() const { return m_RootDirectoryEntry; }
-    inline StringView      CWD() const { return m_CWD; }
-    inline void            SetCWD(StringView cwd) { m_CWD = cwd; }
-    inline mode_t          Umask() const { return m_Umask; }
-    mode_t                 Umask(mode_t mask);
+    inline Ref<DirectoryEntry> CWD() const { return m_CWD; }
+    inline void                SetCWD(Ref<DirectoryEntry> cwd) { m_CWD = cwd; }
+    inline mode_t              Umask() const { return m_Umask; }
+    mode_t                     Umask(mode_t mask);
 
-    static void            SendGroupSignal(pid_t pgid, i32 signal);
-    void                   SendSignal(i32 signal);
+    static void                SendGroupSignal(pid_t pgid, i32 signal);
+    void                       SendSignal(i32 signal);
 
     ErrorOr<i32>   OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
     ErrorOr<isize> DupFd(isize oldFdNum, isize newFdNum, isize flags);
@@ -166,8 +166,8 @@ class Process
     Vector<Process*>    m_Zombies;
     Vector<Thread*>     m_Threads;
 
-    Ref<DirectoryEntry>     m_RootDirectoryEntry = nullptr;
-    String              m_CWD                = "/";
+    Ref<DirectoryEntry> m_RootDirectoryEntry = nullptr;
+    Ref<DirectoryEntry> m_CWD                = nullptr;
     mode_t              m_Umask              = 0;
 
     FileDescriptorTable m_FdTable;

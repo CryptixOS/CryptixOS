@@ -69,6 +69,7 @@ srcs += files(
   'Memory/VMM.cpp',
 
   'Memory/Allocators/BitmapAllocator.cpp',
+  #'Memory/Allocators/BuddyAllocator.cpp',
 
   'Network/NetworkAdapter.cpp',
 
@@ -80,6 +81,7 @@ srcs += files(
   'Time/Time.cpp',
 
   'Library/ELF.cpp',
+  'Library/ExecutableProgram.cpp',
   'Library/ICxxAbi.cpp',
   'Library/Image.cpp',
   'Library/Kasan.cpp',

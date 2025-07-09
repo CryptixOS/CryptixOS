@@ -82,10 +82,10 @@ ErrorOr<Ref<DirectoryEntry>> TmpFsINode::Lookup(Ref<DirectoryEntry> entry)
 {
     ScopedLock guard(m_Lock);
 
-    auto       child = Children().find(entry->Name());
+    auto       child = Children().Find(entry->Name());
     if (child != Children().end())
     {
-        entry->Bind(child->second);
+        entry->Bind(child->Value);
         return entry;
     }
 
@@ -95,8 +95,8 @@ INode* TmpFsINode::Lookup(const String& name)
 {
     ScopedLock guard(m_Lock);
 
-    auto       child = Children().find(name);
-    if (child != Children().end()) return child->second;
+    auto       child = Children().Find(name);
+    if (child != Children().end()) return child->Value;
 
     return nullptr;
 }
@@ -116,7 +116,7 @@ isize TmpFsINode::Read(void* buffer, off_t offset, usize bytes)
     Assert(buffer);
     if (m_Filesystem->ShouldUpdateATime())
         m_Metadata.AccessTime = Time::GetReal();
-    std::memcpy(buffer, reinterpret_cast<u8*>(m_Data) + offset, bytes);
+    Memory::Copy(buffer, reinterpret_cast<u8*>(m_Data) + offset, bytes);
     return bytes;
 }
 isize TmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
@@ -168,10 +168,10 @@ ErrorOr<isize> TmpFsINode::Truncate(usize size)
     if (!CanWrite(creds)) return Error(EPERM);
 
     u8* newData = new u8[size];
-    std::memcpy(newData, m_Data, size > m_Capacity ? size : m_Capacity);
+    Memory::Copy(newData, m_Data, size > m_Capacity ? size : m_Capacity);
 
     if (m_Capacity < size)
-        std::memset(newData + m_Capacity, 0, size - m_Capacity);
+        Memory::Fill(newData + m_Capacity, 0, size - m_Capacity);
 
     delete m_Data;
     m_Data     = newData;
@@ -194,7 +194,7 @@ ErrorOr<void> TmpFsINode::Rename(INode* newParent, StringView newName)
     // TODO(v1tr10l7): Remove old inode
 
     // auto parent = reinterpret_cast<TmpFsINode*>(m_Parent);
-    // parent->m_Children.erase(m_Name);
+    // parent->m_Children.Erase(m_Name);
 
     m_Name = newName;
     newParent->InsertChild(this, Name());
@@ -205,7 +205,7 @@ ErrorOr<void> TmpFsINode::Rename(INode* newParent, StringView newName)
 ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateNode(Ref<DirectoryEntry> entry,
                                                     mode_t mode, dev_t dev)
 {
-    if (m_Children.contains(entry->Name())) return Error(EEXIST);
+    if (m_Children.Contains(entry->Name())) return Error(EEXIST);
 
     auto maybeINode = m_Filesystem->AllocateNode(entry->Name(), mode);
     RetOnError(maybeINode);
@@ -273,7 +273,7 @@ ErrorOr<Ref<DirectoryEntry>> TmpFsINode::Link(Ref<DirectoryEntry> oldEntry,
 
 ErrorOr<void> TmpFsINode::Unlink(Ref<DirectoryEntry> entry)
 {
-    auto it = m_Children.find(entry->Name());
+    auto it = m_Children.Find(entry->Name());
     if (it == m_Children.end()) return {};
 
     auto inode = reinterpret_cast<TmpFsINode*>(entry->INode());
@@ -288,7 +288,7 @@ ErrorOr<void> TmpFsINode::Unlink(Ref<DirectoryEntry> entry)
     ScopedLock guard(m_Lock);
     if (inode->m_Metadata.LinkCount == 0)
     {
-        m_Children.erase(it);
+        m_Children.Erase(it);
         delete entry->INode();
     }
 

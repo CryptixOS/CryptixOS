@@ -18,7 +18,7 @@
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
 
-std::unordered_map<pid_t, Process*> ProcFs::s_Processes;
+UnorderedMap<pid_t, Process*> ProcFs::s_Processes;
 
 struct ProcFsCmdLineProperty : public ProcFsProperty
 {
@@ -175,15 +175,15 @@ static ProcFsINode* CreateProcFsNode(INode* parent, StringView name,
 
 Process* ProcFs::GetProcess(pid_t pid)
 {
-    auto it = s_Processes.find(pid);
+    auto it = s_Processes.Find(pid);
     if (it == s_Processes.end()) return nullptr;
 
-    return it->second;
+    return it->Value;
 }
 void ProcFs::AddProcess(Process* process)
 {
     ScopedLock guard(m_Lock);
-    Assert(!s_Processes.contains(process->Pid()));
+    Assert(!s_Processes.Contains(process->Pid()));
     s_Processes[process->Pid()] = process;
     auto name                   = StringUtils::ToString(process->Pid());
     auto entry                  = new DirectoryEntry(m_RootEntry.Raw(), name);
@@ -204,7 +204,7 @@ void ProcFs::AddProcess(Process* process)
 void ProcFs::RemoveProcess(pid_t pid)
 {
     ScopedLock guard(m_Lock);
-    s_Processes.erase(pid);
+    s_Processes.Erase(pid);
 }
 ErrorOr<Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
                                            const void* data)

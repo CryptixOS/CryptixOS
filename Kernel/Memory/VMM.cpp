@@ -148,6 +148,23 @@ namespace VirtualMemoryManager
         return lowerHalf ? virt.FromHigherHalf() : virt.ToHigherHalf<>();
     }
 
+    Region* AllocateDMACoherent(usize size, PageAttributes flags)
+    {
+        usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
+        auto  pages     = PMM::CallocatePages(pageCount);
+
+        auto  virt      = AllocateSpace(pageCount * PMM::PAGE_SIZE, 4_kib, true);
+        Assert(MapKernelRegion(virt, pages, pageCount, flags));
+        return new Region(pages, virt, pageCount * PMM::PAGE_SIZE,
+                          PROT_READ | PROT_WRITE);
+    }
+    void FreeDMA_Region(Region* region)
+    {
+        // TODO(v1tr10l7): we should keep track of mapped kernel addresses
+        s_KernelPageMap->UnmapRange(region->VirtualBase(), region->Size());
+        delete region;
+    }
+
     PageMap* GetKernelPageMap()
     {
         if (!s_Initialized) Initialize();

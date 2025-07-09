@@ -69,7 +69,8 @@ namespace Logger
         CTOS_NO_KASAN void
         LogNumber(va_list& args, int base, bool justifyLeft = false,
                   bool plusSign = false, bool spaceIfNoSign = false,
-                  bool zeroPadding = false, usize lengthSpecifier = 0)
+                  bool zeroPadding = false, usize lengthSpecifier = 0,
+                  usize precision = 1000)
         {
             char       buf[64];
             T          value    = va_arg(args, T);

@@ -36,8 +36,8 @@ namespace API::MM
     ErrorOr<intptr_t> MMap(Pointer addr, usize length, i32 prot, i32 flags,
                            i32 fdNum, off_t offset)
     {
-        Process*               current   = Process::GetCurrent();
-        std::optional<errno_t> errorCode = std::nullopt;
+        Process*          current   = Process::GetCurrent();
+        Optional<errno_t> errorCode = NullOpt;
 
         using VirtualMemoryManager::Access;
         Access access = Access::eUser;
@@ -135,7 +135,7 @@ namespace API::MM
     free_pages:
         PMM::FreePages(phys, pageCount);
     [[maybe_unused]] fail:
-        return Error(errorCode.value_or(ENOMEM));
+        return Error(errorCode.ValueOr(ENOMEM));
     }
     ErrorOr<isize> MProtect(Pointer virt, usize length, i32 prot)
     {

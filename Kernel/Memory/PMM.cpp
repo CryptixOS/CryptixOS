@@ -66,7 +66,15 @@ namespace PhysicalMemoryManager
                 i, entryBase.Raw(), entryLength, ToString(current.Type()));
         }
 
-        s_BitmapAllocator.Initialize(memoryMap, PAGE_SIZE);
+        auto status = s_BitmapAllocator.Initialize(memoryMap, PAGE_SIZE);
+        if (!status)
+        {
+            LogError(
+                "PMM: Failed to initialize bitmap allocator, the error code: "
+                "{}",
+                ToString(status.error()));
+            return false;
+        }
         EarlyLogInfo("PMM: Initialized");
 
         EarlyLogInfo(

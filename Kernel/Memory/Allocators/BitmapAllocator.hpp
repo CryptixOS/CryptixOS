@@ -12,17 +12,18 @@
 class BitmapAllocator : public PageFrameAllocator
 {
   public:
-    virtual void    Initialize(MemoryMap& memoryMap, usize pageSize) override;
-    virtual void    Shutdown() override;
+    virtual ErrorOr<void> Initialize(MemoryMap& memoryMap,
+                                     usize      pageSize) override;
+    virtual void          Shutdown() override;
 
-    virtual usize   MemoryTop() const override;
-    virtual usize   TotalMemorySize() const override;
-    virtual usize   FreeMemorySize() const override;
-    virtual usize   UsedMemorySize() const override;
-    virtual usize   PageSize() const override;
+    virtual usize         MemoryTop() const override;
+    virtual usize         TotalMemorySize() const override;
+    virtual usize         FreeMemorySize() const override;
+    virtual usize         UsedMemorySize() const override;
+    virtual usize         PageSize() const override;
 
-    virtual Pointer AllocatePages(usize pageCount) override;
-    virtual void    FreePages(Pointer page, usize pageCount) override;
+    virtual Pointer       AllocatePages(usize pageCount) override;
+    virtual void          FreePages(Pointer page, usize pageCount) override;
 
   private:
     Bitmap  m_PageBitmap;
