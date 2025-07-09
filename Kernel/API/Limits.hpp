@@ -11,5 +11,4 @@
 namespace Limits
 {
     constexpr usize MAX_PATH_LENGTH = 4096;
-
 } // namespace Limits
