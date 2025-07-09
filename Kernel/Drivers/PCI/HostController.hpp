@@ -12,9 +12,6 @@
 
 #include <Prism/Utility/Delegate.hpp>
 
-#include <functional>
-#include <unordered_map>
-
 #include <uacpi/resources.h>
 #include <uacpi/types.h>
 #include <uacpi/uacpi.h>
@@ -70,13 +67,13 @@ namespace PCI
             return m_AccessMechanism->Write(dev, offset, value, accessSize);
         }
 
-        template <std::unsigned_integral T>
+        template <UnsignedIntegral T>
             requires(sizeof(T) <= 4)
         T Read(const DeviceAddress& address, u32 offset)
         {
             return Read(address, offset, sizeof(T));
         }
-        template <std::unsigned_integral T>
+        template <UnsignedIntegral T>
             requires(sizeof(T) <= 4)
         void Write(const DeviceAddress& address, u32 offset, T value)
         {
@@ -84,16 +81,16 @@ namespace PCI
         }
 
       private:
-        Domain                                   m_Domain;
-        AccessMechanism*                         m_AccessMechanism = nullptr;
-        Vector<Bus*>                             m_RootBuses;
+        Domain                         m_Domain;
+        AccessMechanism*               m_AccessMechanism = nullptr;
+        Vector<Bus*>                   m_RootBuses;
 
-        Pointer                                  m_Address;
-        uacpi_namespace_node*                    m_RootNode;
+        Pointer                        m_Address;
+        uacpi_namespace_node*          m_RootNode;
 
-        static Vector<IrqRoute>                  s_IrqRoutes;
+        static Vector<IrqRoute>        s_IrqRoutes;
 
-        std::unordered_map<uintptr_t, uintptr_t> m_MappedBuses;
+        UnorderedMap<Pointer, Pointer> m_MappedBuses;
 
         uintptr_t GetAddress(const DeviceAddress& address, u64 offset);
 

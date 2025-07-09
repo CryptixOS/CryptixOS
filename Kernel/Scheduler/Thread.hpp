@@ -144,7 +144,7 @@ struct Thread
     Spinlock   YieldAwaitLock;
 
   private:
-    Vector<Region> m_Stacks;
+    Vector<Ref<Region>> m_Stacks;
     bool           m_IsUser = false;
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64

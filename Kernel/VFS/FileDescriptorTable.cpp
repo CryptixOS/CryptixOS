@@ -12,7 +12,7 @@ i32 FileDescriptorTable::Insert(FileDescriptor* fd, i32 desired)
     ScopedLock guard(m_Lock);
     i32        fdNum = m_NextIndex;
 
-    auto       found = m_Table.Find(desired);
+    auto found = m_Table.Find(desired);
     if (desired >= 0 && found == m_Table.end()) fdNum = desired;
     m_Table[fdNum] = fd;
 

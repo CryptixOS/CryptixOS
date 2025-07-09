@@ -19,12 +19,11 @@
 #include <VFS/VFS.hpp>
 
 #include <cctype>
-#include <magic_enum/magic_enum.hpp>
 #include <unordered_map>
 
 namespace PCI
 {
-    static std::unordered_map<u32, HostController*> s_HostControllers;
+    static UnorderedMap<u32, HostController*> s_HostControllers;
     struct Vendor
     {
         String                          Name;
@@ -135,7 +134,7 @@ namespace PCI
     void Initialize()
     {
         DetectControllers();
-        if (s_HostControllers.empty())
+        if (s_HostControllers.Empty())
         {
             Domain domain(0, 0, 32);
             s_HostControllers[0] = new HostController(domain, 0);
@@ -190,7 +189,7 @@ namespace PCI
 
     HostController* GetHostController(u32 domain)
     {
-        Assert(s_HostControllers.contains(domain));
+        Assert(s_HostControllers.Contains(domain));
         return s_HostControllers[domain];
     }
     bool RegisterDriver(struct Driver& driver)

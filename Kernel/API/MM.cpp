@@ -58,11 +58,11 @@ namespace API::MM
         usize pageCount
             = Math::AlignUp(length, PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
 
-        auto&   addressSpace = current->AddressSpace();
-        auto*   pageMap      = current->PageMap;
-        Region* region       = nullptr;
+        auto&       addressSpace = current->AddressSpace();
+        auto*       pageMap      = current->PageMap;
+        Ref<Region> region       = nullptr;
 
-        Pointer phys         = PMM::CallocatePages<uintptr_t>(pageCount);
+        Pointer     phys         = PMM::CallocatePages<uintptr_t>(pageCount);
         if (!phys) return Error(ENOMEM);
 
         // TODO(v1tr10l7): File mapping

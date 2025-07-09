@@ -90,7 +90,7 @@ namespace VFS
         delete node;
     }
 
-    ErrorOr<Ref<DirectoryEntry>> OpenDirectoryEntry(DirectoryEntry* parent,
+    ErrorOr<Ref<DirectoryEntry>> OpenDirectoryEntry(Ref<DirectoryEntry> parent,
                                                     PathView path, isize flags,
                                                     mode_t mode)
     {
@@ -149,7 +149,7 @@ namespace VFS
             ;
         return dentry;
     }
-    ErrorOr<FileDescriptor*> Open(DirectoryEntry* parent, PathView path,
+    ErrorOr<FileDescriptor*> Open(Ref<DirectoryEntry> parent, PathView path,
                                   isize flags, mode_t mode)
     {
         auto maybeEntry = OpenDirectoryEntry(parent, path, flags, mode);
@@ -173,7 +173,7 @@ namespace VFS
         return new FileDescriptor(dentry.Raw(), flags, accMode);
     }
 
-    ErrorOr<PathResolution> ResolvePath(DirectoryEntry* parent, PathView path,
+    ErrorOr<PathResolution> ResolvePath(Ref<DirectoryEntry> parent, PathView path,
                                         bool followLinks)
     {
         if (!parent || path.Absolute()) parent = s_RootDirectoryEntry.Raw();
@@ -233,7 +233,7 @@ namespace VFS
     }
 
     // TODO: flags
-    ErrorOr<MountPoint*> Mount(DirectoryEntry* parent, PathView sourcePath,
+    ErrorOr<MountPoint*> Mount(Ref<DirectoryEntry> parent, PathView sourcePath,
                                PathView target, StringView fsName, i32 flags,
                                const void* data)
     {
@@ -307,7 +307,7 @@ namespace VFS
         return Error(ENODEV);
     }
 
-    bool Unmount(DirectoryEntry* parent, PathView path, i32 flags)
+    bool Unmount(Ref<DirectoryEntry> parent, PathView path, i32 flags)
     {
         // TODO: Unmount
         ToDo();
@@ -430,7 +430,7 @@ namespace VFS
         return MkNod(parent, pathRes.BaseName, mode, dev);
     }
 
-    Ref<DirectoryEntry> Symlink(DirectoryEntry* parent, PathView path,
+    Ref<DirectoryEntry> Symlink(Ref<DirectoryEntry> parent, PathView path,
                                 StringView target)
     {
         if (!parent) parent = GetRootDirectoryEntry().Raw();
@@ -456,8 +456,8 @@ namespace VFS
         return entry;
     }
 
-    Ref<DirectoryEntry> Link(DirectoryEntry* oldParent, PathView oldPath,
-                             DirectoryEntry* newParent, PathView newPath,
+    Ref<DirectoryEntry> Link(Ref<DirectoryEntry> oldParent, PathView oldPath,
+                             Ref<DirectoryEntry> newParent, PathView newPath,
                              i32 flags)
     {
         if (!oldParent) oldParent = GetRootDirectoryEntry().Raw();
@@ -486,7 +486,7 @@ namespace VFS
         return maybeNewEntry.value();
     }
 
-    bool Unlink(DirectoryEntry* parent, PathView path, i32 flags)
+    bool Unlink(Ref<DirectoryEntry> parent, PathView path, i32 flags)
     {
         if (!parent) parent = GetRootDirectoryEntry().Raw();
 

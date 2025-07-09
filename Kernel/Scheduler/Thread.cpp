@@ -139,7 +139,7 @@ Thread::Thread(Process* parent, Pointer pc, Vector<StringView>& argv,
         auto stackRegion = new Region(pstack, vustack, CPU::USER_STACK_SIZE);
         stackRegion->SetProt(Access::eReadWriteExecute | Access::eUser,
                              PROT_READ | PROT_WRITE | PROT_EXEC);
-        m_Stacks.PushBack(*stackRegion);
+        m_Stacks.PushBack(stackRegion);
         m_Parent->m_AddressSpace.Insert(vustack, stackRegion);
 
         m_StackVirt              = vustack;
@@ -174,7 +174,7 @@ Thread::Thread(Process* parent, Pointer pc, bool user)
                                      PageAttributes::eRW | PageAttributes::eUser
                                          | PageAttributes::eWriteBack));
     parent->m_UserStackTop = vustack.Raw() - PMM::PAGE_SIZE;
-    m_Stacks.EmplaceBack(pstack, vustack, CPU::USER_STACK_SIZE);
+    m_Stacks.PushBack(CreateRef<Region>(pstack, vustack, CPU::USER_STACK_SIZE));
 
     Pointer stack1
         = pstack.Offset<Pointer>(CPU::USER_STACK_SIZE).ToHigherHalf();
@@ -278,9 +278,9 @@ Thread* Thread::Fork(Process* process)
 
     for (const auto& stack : m_Stacks)
     {
-        auto    stackPhys    = stack.PhysicalBase();
-        usize   stackVirt    = stack.VirtualBase();
-        usize   stackSize    = stack.Size();
+        auto    stackPhys    = stack->PhysicalBase();
+        usize   stackVirt    = stack->VirtualBase();
+        usize   stackSize    = stack->Size();
 
         Pointer newStackPhys = PMM::CallocatePages<uintptr_t>(
             Math::AlignUp(stackSize, PMM::PAGE_SIZE) / PMM::PAGE_SIZE);
@@ -291,7 +291,7 @@ Thread* Thread::Fork(Process* process)
         process->PageMap->MapRange(stackVirt, newStackPhys, stackSize,
                                    PageAttributes::eRWXU
                                        | PageAttributes::eWriteBack);
-        newThread->m_Stacks.EmplaceBack(newStackPhys, newStackPhys, stackSize);
+        newThread->m_Stacks.PushBack(CreateRef<Region>(newStackPhys, newStackPhys, stackSize));
     }
 
     newThread->m_FpuStoragePageCount = m_FpuStoragePageCount;

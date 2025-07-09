@@ -51,7 +51,7 @@ usize DirectoryEntries::CopyAndPop(u8* out, usize capacity)
     return entrySize;
 }
 
-FileDescriptor::FileDescriptor(class DirectoryEntry* node, i32 flags,
+FileDescriptor::FileDescriptor(class Ref<::DirectoryEntry> node, i32 flags,
                                FileAccessMode accMode)
 {
     m_Description = new FileDescription;
@@ -254,7 +254,7 @@ bool FileDescriptor::GenerateDirEntries()
     delegate.BindLambda(iterator);
 
     auto inode  = current->INode();
-    auto result = inode->TraverseDirectories(current, delegate);
+    auto result = inode->TraverseDirectories(current.Raw(), delegate);
     CtosUnused(result);
 
     // . && ..

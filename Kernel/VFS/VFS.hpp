@@ -33,35 +33,35 @@ namespace VFS
         Path            BaseName = ""_s;
     };
 
-    ErrorOr<Ref<DirectoryEntry>> OpenDirectoryEntry(DirectoryEntry* parent, PathView path,
+    ErrorOr<Ref<DirectoryEntry>> OpenDirectoryEntry(Ref<DirectoryEntry> parent, PathView path,
                                   isize flags, mode_t mode);
-    ErrorOr<FileDescriptor*> Open(DirectoryEntry* parent, PathView path,
+    ErrorOr<FileDescriptor*> Open(Ref<DirectoryEntry> parent, PathView path,
                                   isize flags, mode_t mode);
 
-    ErrorOr<PathResolution>  ResolvePath(DirectoryEntry* parent, PathView path,
+    ErrorOr<PathResolution>  ResolvePath(Ref<DirectoryEntry> parent, PathView path,
                                          bool followLinks = true);
 
     ErrorOr<MountPoint*>     MountRoot(StringView filesystemName);
-    ErrorOr<MountPoint*>     Mount(DirectoryEntry* parent, PathView source,
+    ErrorOr<MountPoint*>     Mount(Ref<DirectoryEntry> parent, PathView source,
                                    PathView target, StringView fsName,
                                    i32 flags = 0, const void* data = nullptr);
-    bool Unmount(DirectoryEntry* parent, PathView path, i32 flags = 0);
+    bool Unmount(Ref<DirectoryEntry> parent, PathView path, i32 flags = 0);
 
     Ref<DirectoryEntry> CreateNode(Ref<DirectoryEntry> parent, PathView path,
                                    mode_t mode);
     ErrorOr<Ref<DirectoryEntry>> MkDir(Ref<DirectoryEntry> directory,
                                        Ref<DirectoryEntry> entry, mode_t mode);
-    ErrorOr<Ref<DirectoryEntry>> MkDir(DirectoryEntry* directory, PathView path,
+    ErrorOr<Ref<DirectoryEntry>> MkDir(Ref<DirectoryEntry> directory, PathView path,
                                        mode_t mode);
 
     ErrorOr<Ref<DirectoryEntry>> MkNod(Ref<DirectoryEntry> parent,
                                        PathView name, mode_t mode, dev_t dev);
     ErrorOr<Ref<DirectoryEntry>> MkNod(PathView path, mode_t mode, dev_t dev);
-    Ref<DirectoryEntry>          Symlink(DirectoryEntry* parent, PathView path,
+    Ref<DirectoryEntry>          Symlink(Ref<DirectoryEntry> parent, PathView path,
                                          StringView target);
-    Ref<DirectoryEntry> Link(DirectoryEntry* oldParent, PathView oldPath,
-                             DirectoryEntry* newParent, PathView newPath,
+    Ref<DirectoryEntry> Link(Ref<DirectoryEntry> oldParent, PathView oldPath,
+                             Ref<DirectoryEntry> newParent, PathView newPath,
                              i32 flags = 0);
 
-    bool Unlink(DirectoryEntry* parent, PathView path, i32 flags = 0);
+    bool Unlink(Ref<DirectoryEntry> parent, PathView path, i32 flags = 0);
 }; // namespace VFS

@@ -10,6 +10,7 @@
 
 #include <API/Posix/sys/mman.h>
 #include <Memory/AddressRange.hpp>
+#include <Prism/Memory/Ref.hpp>
 
 class FileDescriptor;
 enum class PageAttributes : isize;
@@ -46,7 +47,7 @@ namespace VirtualMemoryManager
         return static_cast<Access>(result);
     }
 
-    class Region final
+    class Region final : public RefCounted
     {
       public:
         Region() = default;
@@ -102,10 +103,10 @@ namespace VirtualMemoryManager
         }
 
       private:
-        AddressRange    m_VirtualRange;
-        Pointer         m_PhysicalBase = nullptr;
-        enum Access     m_Access       = Access::eNone;
-        i32             m_Flags        = 0;
+        AddressRange          m_VirtualRange;
+        Pointer               m_PhysicalBase = nullptr;
+        enum Access           m_Access       = Access::eNone;
+        i32                   m_Flags        = 0;
         class FileDescriptor* m_Fd           = nullptr;
     };
 }; // namespace VirtualMemoryManager

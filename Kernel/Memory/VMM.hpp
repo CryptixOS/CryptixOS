@@ -164,39 +164,40 @@ class PageTableEntry final
 
 namespace VirtualMemoryManager
 {
-    void     Initialize();
-    void     UnmapKernelInitCode();
+    void        Initialize();
+    void        UnmapKernelInitCode();
 
-    usize    GetHigherHalfOffset();
+    usize       GetHigherHalfOffset();
 
-    Pointer  AllocateSpace(usize increment = 0, usize alignment = 0,
-                           bool lowerHalf = false);
-    Region*  AllocateDMACoherent(usize size, PageAttributes flags
-                                            = PageAttributes::eRW
-                                            | PageAttributes::eWriteThrough);
-    void     FreeDMA_Region(Region& region);
+    Pointer     AllocateSpace(usize increment = 0, usize alignment = 0,
+                              bool lowerHalf = false);
+    Ref<Region> AllocateDMACoherent(usize          size,
+                                    PageAttributes flags
+                                    = PageAttributes::eRW
+                                    | PageAttributes::eWriteThrough);
+    void        FreeDMA_Region(Region& region);
 
-    PageMap* GetKernelPageMap();
-    void     HandlePageFault(const PageFaultInfo& info);
+    PageMap*    GetKernelPageMap();
+    void        HandlePageFault(const PageFaultInfo& info);
 
-    void     SaveCurrentPageMap(PageMap& out);
-    void     LoadPageMap(PageMap& pageMap, bool);
+    void        SaveCurrentPageMap(PageMap& out);
+    void        LoadPageMap(PageMap& pageMap, bool);
 
-    bool     MapKernelRegion(Pointer virt, Pointer phys, usize pageCount = 1,
-                             PageAttributes attributes
-                             = PageAttributes::eWriteBack | PageAttributes::eRW);
+    bool        MapKernelRegion(Pointer virt, Pointer phys, usize pageCount = 1,
+                                PageAttributes attributes
+                                = PageAttributes::eWriteBack | PageAttributes::eRW);
 
-    bool     MapKernelRange(Pointer virt, Pointer phys, usize size,
-                            PageAttributes attributes
-                            = PageAttributes::eWriteBack | PageAttributes::eRW);
+    bool        MapKernelRange(Pointer virt, Pointer phys, usize size,
+                               PageAttributes attributes
+                               = PageAttributes::eWriteBack | PageAttributes::eRW);
 
-    bool     UnmapKernelRange(Pointer virt, usize size,
-                              PageAttributes flags
-                              = static_cast<PageAttributes>(0));
+    bool        UnmapKernelRange(Pointer virt, usize size,
+                                 PageAttributes flags
+                                 = static_cast<PageAttributes>(0));
 
-    Pointer  MapIoRegion(PhysAddr phys, usize size, bool write = true);
-    Pointer  MapIoRegion(PhysAddr phys, usize size, bool write,
-                         usize alignment = 0);
+    Pointer     MapIoRegion(PhysAddr phys, usize size, bool write = true);
+    Pointer     MapIoRegion(PhysAddr phys, usize size, bool write,
+                            usize alignment = 0);
     template <typename T>
     inline T* MapIoRegion(PhysAddr phys, bool write = true,
                           usize alignment = alignof(T))
@@ -315,7 +316,8 @@ class PageMap
         }
         return true;
     }
-    bool MapRegion(const Region* region, const usize pageSize = PMM::PAGE_SIZE)
+    bool MapRegion(const Ref<Region> region,
+                   const usize       pageSize = PMM::PAGE_SIZE)
     {
         const auto           virt = region->VirtualBase();
         const auto           phys = region->PhysicalBase();
@@ -325,7 +327,7 @@ class PageMap
             = region->PageAttributes() | GetPageSizeFlags(pageSize);
         return MapRange(virt, phys, size, flags);
     }
-    bool RemapRegion(const Region* region, Pointer newVirt = 0)
+    bool RemapRegion(const Ref<Region> region, Pointer newVirt = 0)
     {
         Pointer              oldVirt = region->VirtualBase();
         const usize          size    = region->Size();

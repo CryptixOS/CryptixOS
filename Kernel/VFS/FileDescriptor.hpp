@@ -67,7 +67,7 @@ struct FileDescription
     Spinlock         Lock;
     Atomic<usize>    RefCount = 0;
 
-    DirectoryEntry*  Entry;
+    Ref<DirectoryEntry>  Entry;
     usize            Offset     = 0;
 
     i32              Flags      = 0;
@@ -86,12 +86,12 @@ struct FileDescription
 class FileDescriptor : public File
 {
   public:
-    FileDescriptor(DirectoryEntry* node, i32 flags, FileAccessMode accMode);
+    FileDescriptor(Ref<DirectoryEntry> node, i32 flags, FileAccessMode accMode);
     FileDescriptor(FileDescriptor* fd, i32 flags = 0);
     virtual ~FileDescriptor();
 
     inline INode* INode() const { return m_Description->Entry->INode(); }
-    constexpr DirectoryEntry* DirectoryEntry() const
+    constexpr Ref<DirectoryEntry> DirectoryEntry() const
     {
         return m_Description->Entry;
     }

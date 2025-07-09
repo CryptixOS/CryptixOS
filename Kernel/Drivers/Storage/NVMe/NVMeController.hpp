@@ -13,8 +13,6 @@
 #include <Prism/String/String.hpp>
 #include <Prism/Utility/Atomic.hpp>
 
-#include <utility>
-
 namespace NVMe
 {
     enum class Configuration : u32
@@ -215,7 +213,7 @@ namespace NVMe
         Spinlock                            m_Lock;
         class Queue*                        m_AdminQueue    = nullptr;
         usize                               m_MaxTransShift = 0;
-        std::unordered_map<u32, NameSpace*> m_NameSpaces;
+        UnorderedMap<u32, NameSpace*> m_NameSpaces;
 
         static Atomic<usize>                s_ControllerCount;
 
