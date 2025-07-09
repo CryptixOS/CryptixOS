@@ -17,6 +17,7 @@
 #include <Prism/Utility/Math.hpp>
 
 #include <VFS/DirectoryEntry.hpp>
+#include <VFS/FileDescriptor.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
 
@@ -30,14 +31,15 @@
 
 namespace ELF
 {
-    bool Image::LoadFromMemory(u8* data, usize size)
+    ErrorOr<void> Image::LoadFromMemory(u8* data, usize size)
     {
         m_Image.Resize(size + 100);
         Memory::Copy(m_Image.Raw(), data, size);
 
         auto status = Parse();
+        RetOnError(status);
 
-        return status ? true : false;
+        return {};
         Pointer loadAddress = VMM::AllocateSpace(size);
         for (usize i = 0; i < m_Header.SectionEntryCount; ++i)
         {
@@ -80,8 +82,7 @@ namespace ELF
             Sym* symbolTable = reinterpret_cast<Sym*>(sectionHeader->Address);
 
             for (usize symbolIndex = 0;
-                 symbolIndex < sectionHeader->Size / sizeof(Symbol);
-                 ++symbolIndex)
+                 symbolIndex < sectionHeader->Size / sizeof(Sym); ++symbolIndex)
             {
                 if (symbolTable[symbolIndex].SectionIndex > 0
                     && usize(symbolTable[symbolIndex].SectionIndex)
@@ -159,16 +160,87 @@ namespace ELF
             }
         }
 
-        return true;
+        return {};
     }
-    bool Image::ResolveSymbols(Span<Sym*> symTab)
+
+    ErrorOr<void> Image::Load(FileDescriptor* file, Pointer loadBase)
+    {
+        if (!file) return Error(EBADF);
+        auto inode = file->INode();
+
+        if (!inode) return Error(ENOENT);
+        return Load(inode, loadBase);
+    }
+    ErrorOr<void> Image::Load(INode* inode, Pointer loadBase)
+    {
+        isize fileSize = inode->Stats().st_size;
+        m_Image.Resize(fileSize + 100);
+
+        m_LoadBase = loadBase;
+        if (inode->Read(m_Image.Raw(), 0, fileSize) != fileSize)
+            return Error(EIO);
+        if (!Parse()) return Error(ENOEXEC);
+
+        return {};
+    }
+
+    usize Image::ProgramHeaderCount() { return m_Header.ProgramEntryCount; }
+    struct ProgramHeader* Image::ProgramHeader(usize index)
+    {
+        Pointer header = m_Image.Raw()
+                       + (m_Header.ProgramHeaderTableOffset
+                          + index * m_Header.ProgramEntrySize);
+
+        return header.As<struct ProgramHeader>();
+    }
+    usize Image::SectionHeaderCount() { return m_Header.SectionEntryCount; }
+    struct SectionHeader* Image::SectionHeader(usize index)
+    {
+        Pointer header = m_Image.Raw()
+                       + (m_Header.SectionHeaderTableOffset
+                          + index * m_Header.SectionEntrySize);
+
+        return header.As<struct SectionHeader>();
+    }
+
+    void Image::ForEachProgramHeader(ProgramHeaderEnumerator enumerator)
+    {
+        usize entryCount = m_Header.ProgramEntryCount;
+        for (usize i = 0; i < entryCount; i++)
+            if (!enumerator(ProgramHeader(i))) break;
+    }
+    void Image::ForEachSectionHeader(SectionHeaderEnumerator enumerator)
+    {
+        usize entryCount = m_Header.SectionEntryCount;
+        for (usize i = 0; i < entryCount; i++)
+            if (!enumerator(SectionHeader(i))) break;
+    }
+
+    void Image::ForEachSymbol(SymbolEnumerator enumerator)
+    {
+        if (!m_SymbolSection || !m_StringSection) return;
+
+        char* stringTable
+            = reinterpret_cast<char*>(m_Image.Raw() + m_StringSection->Offset);
+        Sym* symbolTable
+            = reinterpret_cast<Sym*>(m_Image.Raw() + m_SymbolSection->Offset);
+
+        usize count = m_SymbolSection->Size / m_SymbolSection->EntrySize;
+        for (usize i = 0; i < count; i++)
+        {
+            StringView name = &stringTable[symbolTable[i].Name];
+            if (!enumerator(symbolTable[i], name)) break;
+        }
+    }
+
+    ErrorOr<void> Image::ResolveSymbols(Span<Sym*> symbolTable)
     {
         constexpr usize SHN_UNDEF    = 0;
         constexpr usize SHN_LOPROC   = 0xff00;
 
-        auto            lookupSymbol = [&symTab](char* name) -> u64
+        auto            lookupSymbol = [&symbolTable](char* name) -> u64
         {
-            (void)symTab;
+            (void)symbolTable;
             return 0;
         };
 
@@ -208,49 +280,51 @@ namespace ELF
             }
         }
 
-        return true;
+        return {};
     }
-
-    bool Image::Load(FileDescriptor* file, PageMap* pageMap,
-                     AddressSpace& addressSpace, Pointer loadBase)
+    Pointer Image::LookupSymbol(StringView symbolName)
     {
-        if (!file) return false;
+        SymbolEnumerator it;
+        Pointer          found = nullptr;
 
-        isize fileSize = file->INode()->Stats().st_size;
-        m_Image.Resize(fileSize + 100);
+        it.BindLambda(
+            [&](Sym& symbol, StringView name) -> bool
+            {
+                u64 value = symbol.Value;
+                if (name == symbolName)
+                {
+                    found = value;
+                    return false;
+                }
 
-        m_LoadBase = loadBase;
-        if (file->INode()->Read(m_Image.Raw(), 0, fileSize) != fileSize
-            || !Parse())
-            return false;
+                return true;
+            });
+        ForEachSymbol(it);
 
-        return true;
+        return found;
     }
-
-    usize Image::ProgramHeaderCount() { return m_Header.ProgramEntryCount; }
-    struct ProgramHeader* Image::ProgramHeader(usize index)
+    void Image::DumpSymbols()
     {
-        Pointer header = m_Image.Raw()
-                       + (m_Header.ProgramHeaderTableOffset
-                          + index * m_Header.ProgramEntrySize);
+        SymbolEnumerator it;
 
-        return header.As<struct ProgramHeader>();
-    }
-    usize Image::SectionHeaderCount() { return m_Header.SectionEntryCount; }
-    struct SectionHeader* Image::SectionHeader(usize index)
-    {
-        Pointer header = m_Image.Raw()
-                       + (m_Header.SectionHeaderTableOffset
-                          + index * m_Header.SectionEntrySize);
+        usize            i = 0;
+        it.BindLambda(
+            [&](Sym& symbol, StringView name) -> bool
+            {
+                u64             value        = symbol.Value;
+                auto            sectionIndex = symbol.SectionIndex;
+                constexpr usize SHN_UNDEF    = 0;
 
-        return header.As<struct SectionHeader>();
-    }
+                if (!name.Empty())
+                    LogInfo("ELF Raw Symbol[{}]: '{}' => `{}`", i, name,
+                            sectionIndex != SHN_UNDEF
+                                ? fmt::format("{:#x}", value)
+                                : "Undefined");
 
-    void Image::ForEachProgramHeader(ProgramHeaderEnumerator enumerator)
-    {
-        usize entryCount = m_Header.ProgramEntryCount;
-        for (usize i = 0; i < entryCount; i++)
-            if (!enumerator(ProgramHeader(i))) break;
+                ++i;
+                return true;
+            });
+        ForEachSymbol(it);
     }
 
     bool Image::LoadModules(const u64             sectionCount,
@@ -348,8 +422,6 @@ namespace ELF
 
         if (m_SymbolSection && m_StringSection) LoadSymbols();
 
-        for (auto& sym : m_Symbols) sym.Address += m_LoadBase.Raw();
-
         for (usize i = 0; i < m_Header.ProgramEntryCount; i++)
         {
             auto current = ProgramHeader(i);
@@ -378,6 +450,7 @@ namespace ELF
         m_AuxiliaryVector.ProgramHeaderEntrySize = m_Header.ProgramEntrySize;
         m_AuxiliaryVector.ProgramHeaderCount     = m_Header.ProgramEntryCount;
         ElfDebugLog("EntryPoint: {:#x}", m_AuxiliaryVector.EntryPoint);
+
         return {};
     }
 
@@ -389,18 +462,18 @@ namespace ELF
         if (m_StringSection->Size == 0 || m_StringSection->EntrySize == 0)
             return;
 
-        char* strtab
+        char* stringTable
             = reinterpret_cast<char*>(m_Image.Raw() + m_StringSection->Offset);
-        const Sym* symtab
+        const Sym* symbolTable
             = reinterpret_cast<Sym*>(m_Image.Raw() + m_SymbolSection->Offset);
 
         usize entryCount = m_SymbolSection->Size / m_SymbolSection->EntrySize;
         for (usize i = 0; i < entryCount; i++)
         {
-            auto    name = StringView(&strtab[symtab[i].Name]);
-            Pointer addr = symtab[i].Value;
+            auto    name = StringView(&stringTable[symbolTable[i].Name]);
+            Pointer addr = symbolTable[i].Value;
 
-            if (symtab[i].SectionIndex == 0x00 || name.Empty()) continue;
+            if (symbolTable[i].SectionIndex == 0x00 || name.Empty()) continue;
             LogDebug("ELF: Loaded symbol: '{}' => '{}'", name, addr);
             m_SymbolTable[name] = addr;
         }

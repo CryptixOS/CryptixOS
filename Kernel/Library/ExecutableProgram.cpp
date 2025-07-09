@@ -11,6 +11,10 @@
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
+#include <VFS/DirectoryEntry.hpp>
+#include <VFS/FileDescriptor.hpp>
+#include <VFS/VFS.hpp>
+
 ErrorOr<void> ExecutableProgram::Load(PathView path, PageMap* pageMap,
                                       AddressSpace& addressSpace,
                                       Pointer       loadBase)
@@ -31,8 +35,7 @@ ErrorOr<void> ExecutableProgram::Load(PathView path, PageMap* pageMap,
 
     // TODO(v1tr10l7): close the file
     auto file = maybeFile.value();
-    if (!m_Image.Load(file, pageMap, addressSpace, loadBase))
-        return Error(ENOEXEC);
+    if (!m_Image.Load(file, loadBase)) return Error(ENOEXEC);
 
     auto forEachProgramHeader = [&](ELF::ProgramHeader* header) -> bool
     {
@@ -63,11 +66,38 @@ ErrorOr<void> ExecutableProgram::Load(PathView path, PageMap* pageMap,
 
         return true;
     };
+    auto forEachSectionHeader = [&](ELF::SectionHeader* section) -> bool
+    {
+        if (section->Type == ToUnderlying(ELF::SectionType::eSymbolTable))
+        {
+            auto stringTableHeader
+                = Pointer(m_Image.Header().SectionHeaderTableOffset
+                          + m_Image.Header().SectionEntrySize * section->Link)
+                      .Offset<ELF::SectionHeader*>(loadBase);
+            char* symbolNames
+                = reinterpret_cast<char*>(stringTableHeader->Address);
+            ELF::Sym* symbolTable
+                = reinterpret_cast<ELF::Sym*>(section->Address);
+
+            for (usize symbol = 0; symbol < section->Size / sizeof(ELF::Sym);
+                 ++symbol)
+            {
+                char* name = (symbolNames + symbolTable[symbol].Name);
+                LogTrace("Symbol => {}", name);
+            }
+        }
+
+        return true;
+    };
 
     ELF::Image::ProgramHeaderEnumerator programHeaderIterator;
     programHeaderIterator.BindLambda(forEachProgramHeader);
 
+    ELF::Image::SectionHeaderEnumerator sectionHeaderIterator;
+    sectionHeaderIterator.BindLambda(forEachSectionHeader);
+
     m_Image.ForEachProgramHeader(programHeaderIterator);
+    // m_Image.ForEachSectionHeader(sectionHeaderIterator);
 
     delete file;
     return {};

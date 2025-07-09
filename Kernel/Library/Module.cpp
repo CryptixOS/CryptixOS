@@ -10,32 +10,50 @@
 #include <Library/Module.hpp>
 
 #include <Memory/VMM.hpp>
+#include <System/System.hpp>
+
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
 
-static UnorderedMap<StringView, Module*> s_Modules;
-static Vector<ELF::Image*>                     s_LoadedModules;
+static constexpr Pointer                 MODULE_LOAD_BASE = nullptr;
 
-UnorderedMap<StringView, Module*>& GetModules() { return s_Modules; }
+static UnorderedMap<StringView, Module*> s_Modules;
+static Vector<ELF::Image*>               s_LoadedModules;
+
+UnorderedMap<StringView, Module*>&       GetModules() { return s_Modules; }
 
 static void LoadModuleFromFile(Ref<DirectoryEntry> entry)
 {
     Assert(entry);
-    auto inode = entry->INode();
-    Assert(inode);
-
-    LogTrace("Module: Loading '{}'...", entry->Path());
-    Vector<u8> elf;
-    elf.Resize(inode->Stats().st_size);
-    inode->Read(elf.Raw(), 0, inode->Stats().st_size);
+    auto        inode = entry->INode();
 
     ELF::Image* image = new ELF::Image();
-    if (!image->LoadFromMemory(elf.Raw(), elf.Size()))
+    LogTrace("Module: Loading '{}'...", entry->Path());
+
+    if (!image->Load(inode, MODULE_LOAD_BASE))
     {
         LogError("Module: Failed to load '{}'", entry->Path());
         return;
     }
+
+    LogTrace("Module: Dumping symbols...");
+    image->DumpSymbols();
+
+    ELF::Image::SymbolEnumerator it;
+    it.BindLambda(
+        [&](ELF::Sym& symbol, StringView name) -> bool
+        {
+            if (symbol.SectionIndex != 0) return true;
+
+            u64 resolvedValue = System::LookupKernelSymbol(name).Raw();
+            LogTrace("Resolved symbol =>\n\tName: {}, Value: {:#x}", name,
+                     resolvedValue);
+
+            return true;
+        });
+    image->ForEachSymbol(it);
+
     s_LoadedModules.PushBack(image);
 }
 bool Module::Load()

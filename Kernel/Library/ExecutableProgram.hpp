@@ -7,7 +7,6 @@
 #pragma once
 
 #include <Library/ELF.hpp>
-#include <VFS/VFS.hpp>
 
 class ExecutableProgram
 {

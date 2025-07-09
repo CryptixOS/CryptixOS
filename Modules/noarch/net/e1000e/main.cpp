@@ -14,8 +14,8 @@
 #include <Network/NetworkAdapter.hpp>
 
 #include <Prism/Containers/Array.hpp>
-#include <Prism/PathView.hpp>
 #include <Prism/String/String.hpp>
+#include <Prism/Utility/PathView.hpp>
 
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
@@ -160,7 +160,7 @@ namespace E1000e
         {
             DetectEEProm();
             if (!ReadMacAddress()) return false;
-            StartLink();
+            // TODO(v1tr10l7): StartLink();
 
             for (u32 i = 0; i < 0x80; i++)
                 Write<u32>((Register)(0x5200 + i * 4), 0);
@@ -339,10 +339,11 @@ static ErrorOr<void> ProbeDevice(PCI::DeviceAddress&  address,
 static void        RemoveDevice(PCI::Device& device) {}
 
 static PCI::Driver s_Driver = {
-    .Name     = "e1000e",
-    .MatchIDs = Span(E1000e::s_IdTable.begin(), E1000e::s_IdTable.end()),
-    .Probe    = ProbeDevice,
-    .Remove   = RemoveDevice,
+    .Name = "e1000e",
+    .MatchIDs
+    = Span<PCI::DeviceID>(E1000e::s_IdTable.begin(), E1000e::s_IdTable.Size()),
+    .Probe  = ProbeDevice,
+    .Remove = RemoveDevice,
 };
 
 static bool ModuleInit() { return PCI::RegisterDriver(s_Driver); }

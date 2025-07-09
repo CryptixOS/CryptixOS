@@ -47,6 +47,9 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
+#include <System/System.hpp>
+#include <Time/Time.hpp>
+
 #include <VFS/Filesystem.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/Initrd/Initrd.hpp>
@@ -57,6 +60,17 @@ namespace EFI
 {
     bool Initialize();
 };
+
+static void eternal()
+{
+    for (;;)
+    {
+        auto status = Time::NanoSleep(1000 * 1000 * 5);
+        if (!status) LogError("Sleeping failed");
+
+        LogTrace("Kernel thread");
+    }
+}
 
 static bool loadInitProcess(Path initPath)
 {
@@ -96,6 +110,9 @@ static bool loadInitProcess(Path initPath)
                                                 CPU::GetCurrent()->ID);
     VMM::UnmapKernelInitCode();
 
+    auto colonel = Scheduler::GetKernelProcess();
+    auto newThread = colonel->CreateThread(reinterpret_cast<uintptr_t>(eternal), false, CPU::Current()->ID);
+    Scheduler::EnqueueThread(newThread);
     Scheduler::EnqueueThread(userThread);
 
     return true;
@@ -229,6 +246,8 @@ kernelStart()
             BootInfo::KernelPhysicalAddress());
     LogInfo("Boot: Kernel Virtual Address: {:#x}",
             BootInfo::KernelVirtualAddress());
+
+    Assert(System::LoadKernelSymbols());
 
     Stacktrace::Initialize();
     CommandLine::Initialize();

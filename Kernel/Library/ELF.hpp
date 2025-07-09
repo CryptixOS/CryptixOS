@@ -8,9 +8,6 @@
 
 #include <Common.hpp>
 
-#include <Library/Stacktrace.hpp>
-
-#include <Prism/Containers/DoublyLinkedList.hpp>
 #include <Prism/Containers/Span.hpp>
 #include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/Containers/Vector.hpp>
@@ -18,13 +15,15 @@
 #include <Prism/Memory/Buffer.hpp>
 #include <Prism/Memory/ByteStream.hpp>
 #include <Prism/Memory/Memory.hpp>
-#include <Prism/Utility/PathView.hpp>
 
-#include <VFS/FileDescriptor.hpp>
-#include <VFS/INode.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <Prism/Utility/PathView.hpp>
 
 class AddressSpace;
 class PageMap;
+class FileDescriptor;
+class INode;
+
 namespace ELF
 {
     constexpr const char MAGIC[] = "\177ELF";
@@ -288,25 +287,34 @@ namespace ELF
     class Image
     {
       public:
-        bool                  LoadFromMemory(u8* data, usize size);
-        bool                  ResolveSymbols(Span<Sym*> symbolTable);
+        ErrorOr<void> LoadFromMemory(u8* data, usize size);
+        ErrorOr<void> Load(FileDescriptor* file, Pointer loadBase = 0);
+        ErrorOr<void> Load(INode* inode, Pointer loadBase = 0);
 
-        bool                  Load(FileDescriptor* file, PageMap* pageMap,
-                                   AddressSpace& addressSpace, Pointer loadBase = 0);
+        Pointer       Raw() const { return m_Image.Raw(); }
+        inline const struct Header& Header() const { return m_Header; }
 
-        Pointer               Raw() const { return m_Image.Raw(); }
-
-        usize                 ProgramHeaderCount();
-        struct ProgramHeader* ProgramHeader(usize index);
-        usize                 SectionHeaderCount();
-        struct SectionHeader* SectionHeader(usize index);
+        usize                       ProgramHeaderCount();
+        struct ProgramHeader*       ProgramHeader(usize index);
+        usize                       SectionHeaderCount();
+        struct SectionHeader*       SectionHeader(usize index);
 
         using ProgramHeaderEnumerator = Delegate<bool(struct ProgramHeader*)>;
-        void        ForEachProgramHeader(ProgramHeaderEnumerator enumerator);
+        void ForEachProgramHeader(ProgramHeaderEnumerator enumerator);
 
-        static bool LoadModules(const u64             sectionCount,
-                                struct SectionHeader* sections,
-                                char*                 stringTable);
+        using SectionHeaderEnumerator = Delegate<bool(struct SectionHeader*)>;
+        void ForEachSectionHeader(SectionHeaderEnumerator enumerator);
+
+        using SymbolEnumerator = Delegate<bool(Sym& symbol, StringView name)>;
+        void             ForEachSymbol(SymbolEnumerator enumerator);
+
+        ErrorOr<void>    ResolveSymbols(Span<Sym*> symbolTable);
+        Pointer          LookupSymbol(StringView name);
+        void             DumpSymbols();
+
+        static bool      LoadModules(const u64             sectionCount,
+                                     struct SectionHeader* sections,
+                                     char*                 stringTable);
 
         inline uintptr_t GetEntryPoint() const
         {
@@ -325,14 +333,13 @@ namespace ELF
             return m_AuxiliaryVector.ProgramHeaderCount;
         }
 
-        inline const Vector<Symbol>& GetSymbols() const { return m_Symbols; }
-        inline StringView            GetLdPath() const { return m_LdPath; }
+        inline StringView GetLdPath() const { return m_LdPath; }
 
       private:
         Buffer                            m_Image;
         Pointer                           m_LoadBase = nullptr;
 
-        Header                            m_Header;
+        struct Header                     m_Header;
         Vector<struct ProgramHeader>      m_ProgramHeaders;
         Vector<struct SectionHeader>      m_Sections;
         AuxiliaryVector                   m_AuxiliaryVector;
@@ -341,7 +348,6 @@ namespace ELF
         struct SectionHeader*             m_StringSection = nullptr;
         CTOS_UNUSED u8*                   m_StringTable   = nullptr;
 
-        Vector<Symbol>                    m_Symbols;
         UnorderedMap<StringView, Pointer> m_SymbolTable;
         StringView                        m_LdPath;
 

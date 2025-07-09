@@ -78,6 +78,8 @@ srcs += files(
   'Scheduler/Scheduler.cpp',
   'Scheduler/Thread.cpp',
     
+  'System/System.cpp',
+
   'Time/Time.cpp',
 
   'Library/ELF.cpp',
