@@ -41,7 +41,7 @@ SECTIONS
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));
     module_init_start_addr = .;
-    .module_init : { *(.module_init .module_init.*) } :module_init
+    .module_init : { KEEP(*(.module_init .module_init.*)) } :module_init
     module_init_end_addr = .;
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));

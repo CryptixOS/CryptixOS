@@ -4,10 +4,10 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Memory/KernelHeap.hpp>
-
 #include <Memory/PMM.hpp>
-#include <Memory/SlabAllocator.hpp>
+
+#include <Memory/Allocator/KernelHeap.hpp>
+#include <Memory/Allocator/SlabAllocator.hpp>
 
 namespace KernelHeap
 {

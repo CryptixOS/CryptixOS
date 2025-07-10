@@ -31,8 +31,8 @@ static bool s_1GibPages = false;
 
 namespace Arch::VMM
 {
-    constexpr uintptr_t PTE_ADDRESS_MASK = 0x000ffffffffff000;
-    uintptr_t g_DefaultPteFlags = PTE_PRESENT | PTE_WRITEABLE | PTE_USER_SUPER;
+    constexpr u64 PTE_ADDRESS_MASK = 0x000ffffffffff000;
+    u64 g_DefaultPteFlags       = PTE_PRESENT | PTE_WRITEABLE | PTE_USER_SUPER;
 
     // 4KiB
     constexpr usize PAGE_SIZE   = 0x1000;
@@ -49,7 +49,7 @@ namespace Arch::VMM
         for (usize i = start; i < end; i++)
         {
             auto next = static_cast<PageTable*>(
-                pageMap->GetNextLevel(pml->entries[i], false));
+                pageMap->NextLevel(pml->entries[i], false));
             if (!next) continue;
 
             DestroyLevel(pageMap, next, 0, 512, level - 1);
@@ -67,7 +67,7 @@ namespace Arch::VMM
     void* AllocatePageTable() { return new PageTable; }
     void  DestroyPageMap(PageMap* pageMap)
     {
-        DestroyLevel(pageMap, pageMap->GetTopLevel(), 0, 256,
+        DestroyLevel(pageMap, pageMap->TopLevel(), 0, 256,
                      BootInfo::PagingMode() == 0 ? 4 : 5);
     }
 
@@ -136,58 +136,57 @@ using namespace Arch::VMM;
 bool            PageTableEntry::IsValid() { return GetFlag(PTE_PRESENT); }
 bool            PageTableEntry::IsLarge() { return GetFlag(PTE_LPAGE); }
 
-PageTableEntry* PageMap::Virt2Pte(PageTable* topLevel, uintptr_t virt,
+PageTableEntry* PageMap::Virt2Pte(PageTable* topLevel, Pointer virt,
                                   bool allocate, usize pageSize)
 {
-    usize pml5Entry = (virt >> 48) & 0x1ffull;
-    usize pml4Entry = (virt >> 39) & 0x1ffull;
-    usize pml3Entry = (virt >> 30) & 0x1ffull;
-    usize pml2Entry = (virt >> 21) & 0x1ffull;
-    usize pml1Entry = (virt >> 12) & 0x1ffull;
+    usize pml5Entry = (virt.Raw() >> 48) & 0x1ffull;
+    usize pml4Entry = (virt.Raw() >> 39) & 0x1ffull;
+    usize pml3Entry = (virt.Raw() >> 30) & 0x1ffull;
+    usize pml2Entry = (virt.Raw() >> 21) & 0x1ffull;
+    usize pml1Entry = (virt.Raw() >> 12) & 0x1ffull;
 
     if (!topLevel) return nullptr;
 
-    PageTable* pml4
-        = BootInfo::PagingMode() == LIMINE_PAGING_MODE_X86_64_5LVL
-            ? static_cast<PageTable*>(
-                  GetNextLevel(topLevel->entries[pml5Entry], allocate))
-            : topLevel;
+    PageTable* pml4 = BootInfo::PagingMode() == LIMINE_PAGING_MODE_X86_64_5LVL
+                        ? static_cast<PageTable*>(
+                              NextLevel(topLevel->entries[pml5Entry], allocate))
+                        : topLevel;
     if (!pml4) return nullptr;
 
     PageTable* pml3 = static_cast<PageTable*>(
-        GetNextLevel(pml4->entries[pml4Entry], allocate));
+        NextLevel(pml4->entries[pml4Entry], allocate));
     if (!pml3) return nullptr;
 
     if (pageSize == LLPAGE_SIZE || pml3->entries[pml3Entry].IsLarge())
         return &pml3->entries[pml3Entry];
 
     PageTable* pml2 = static_cast<PageTable*>(
-        GetNextLevel(pml3->entries[pml3Entry], allocate, virt));
+        NextLevel(pml3->entries[pml3Entry], allocate, virt));
     if (!pml2) return nullptr;
 
     if (pageSize == LPAGE_SIZE || (pml2->entries[pml2Entry].IsLarge()))
         return &pml2->entries[pml2Entry];
 
     PageTable* pml1 = static_cast<PageTable*>(
-        GetNextLevel(pml2->entries[pml2Entry], allocate, virt));
+        NextLevel(pml2->entries[pml2Entry], allocate, virt));
 
     if (!pml1) return nullptr;
 
     return &pml1->entries[pml1Entry];
 }
 
-uintptr_t PageMap::Virt2Phys(uintptr_t virt, PageAttributes flags)
+Pointer PageMap::Virt2Phys(Pointer virt, PageAttributes flags)
 {
     ScopedLock      guard(m_Lock);
 
     auto            pageSize = GetPageSize(flags);
-    PageTableEntry* pmlEntry = Virt2Pte(topLevel, virt, false, pageSize);
-    if (!pmlEntry || !pmlEntry->GetFlag(PTE_PRESENT)) return -1;
+    PageTableEntry* pmlEntry = Virt2Pte(m_TopLevel, virt, false, pageSize);
+    if (!pmlEntry || !pmlEntry->GetFlag(PTE_PRESENT)) return u64(-1);
 
-    return pmlEntry->GetAddress() + (virt % pageSize);
+    return pmlEntry->Address() + (virt % pageSize);
 }
 
-bool PageMap::InternalMap(uintptr_t virt, uintptr_t phys, PageAttributes flags)
+bool PageMap::InternalMap(Pointer virt, Pointer phys, PageAttributes flags)
 {
 
     auto pageSize = GetPageSize(flags);
@@ -197,11 +196,12 @@ bool PageMap::InternalMap(uintptr_t virt, uintptr_t phys, PageAttributes flags)
         flags |= PageAttributes::eLPage;
 
         for (usize i = 0; i < 1_gib; i += 2_mib)
-            if (!InternalMap(virt + i, phys + i, flags)) return false;
+            if (!InternalMap(virt.Offset(i), phys.Offset(i), flags))
+                return false;
         return true;
     }
 
-    PageTableEntry* pmlEntry = Virt2Pte(topLevel, virt, true, pageSize);
+    PageTableEntry* pmlEntry = Virt2Pte(m_TopLevel, virt, true, pageSize);
     if (!pmlEntry)
     {
         LogError("VMM: Could not get page map entry for address {:#x}", virt);
@@ -214,11 +214,11 @@ bool PageMap::InternalMap(uintptr_t virt, uintptr_t phys, PageAttributes flags)
     return true;
 }
 
-bool PageMap::InternalUnmap(uintptr_t virt, PageAttributes flags)
+bool PageMap::InternalUnmap(Pointer virt, PageAttributes flags)
 {
     auto unmapOne = [this](uintptr_t virt, usize pageSize)
     {
-        PageTableEntry* pmlEntry = Virt2Pte(topLevel, virt, false, pageSize);
+        PageTableEntry* pmlEntry = Virt2Pte(m_TopLevel, virt, false, pageSize);
         if (!pmlEntry)
         {
             LogError("VMM: Could not get page map entry for address {:#x}",
@@ -238,19 +238,19 @@ bool PageMap::InternalUnmap(uintptr_t virt, PageAttributes flags)
         flags |= PageAttributes::eLPage;
 
         for (usize i = 0; i < 1_gib; i += 2_mib)
-            if (!unmapOne(virt + i, 2_mib)) return false;
+            if (!unmapOne(virt.Offset(i), 2_mib)) return false;
         return true;
     }
 
     return unmapOne(virt, pageSize);
 }
 
-bool PageMap::SetFlags(uintptr_t virt, PageAttributes flags)
+bool PageMap::SetFlags(Pointer virt, PageAttributes flags)
 {
     ScopedLock      guard(m_Lock);
 
     auto            pageSize = GetPageSize(flags);
-    PageTableEntry* pmlEntry = Virt2Pte(topLevel, virt, true, pageSize);
+    PageTableEntry* pmlEntry = Virt2Pte(m_TopLevel, virt, true, pageSize);
     if (!pmlEntry)
     {
         LogError("VMM: Could not get page map entry for address {:#x}", virt);
@@ -258,7 +258,7 @@ bool PageMap::SetFlags(uintptr_t virt, PageAttributes flags)
     }
 
     auto nativeFlags = ToNativeFlags(flags);
-    auto addr        = pmlEntry->GetAddress();
+    auto addr        = pmlEntry->Address();
 
     pmlEntry->Clear();
     pmlEntry->SetAddress(addr);
@@ -266,7 +266,7 @@ bool PageMap::SetFlags(uintptr_t virt, PageAttributes flags)
     return true;
 }
 
-namespace VirtualMemoryManager
+namespace VMM
 {
     void SaveCurrentPageMap(PageMap& out)
     {
@@ -279,19 +279,19 @@ namespace VirtualMemoryManager
     void LoadPageMap(PageMap& pageMap, bool)
     {
         uintptr_t topLevel = FromHigherHalfAddress<uintptr_t>(
-            reinterpret_cast<uintptr_t>(pageMap.GetTopLevel()));
+            reinterpret_cast<uintptr_t>(pageMap.TopLevel()));
 
         __asm__ volatile("mov %0, %%cr3" ::"r"(topLevel));
     }
-}; // namespace VirtualMemoryManager
+}; // namespace VMM
 
 PageMap::PageMap()
-    : topLevel(new PageTable)
+    : m_TopLevel(new PageTable)
 {
     if (!VMM::GetKernelPageMap())
     {
         for (usize i = 256; i < 512; i++)
-            GetNextLevel(topLevel->entries[i], true);
+            NextLevel(m_TopLevel->entries[i], true);
 
         usize pat = (0x07ull << 56ull) | (0x06ull << 48ull) | (0x05ull << 40ull)
                   | (0x04ull << 32ull) | (0x01ull << 24ull)
@@ -305,5 +305,6 @@ PageMap::PageMap()
 
     // Map Kernel
     for (usize i = 256; i < 512; i++)
-        topLevel->entries[i] = VMM::GetKernelPageMap()->topLevel->entries[i];
+        m_TopLevel->entries[i]
+            = VMM::GetKernelPageMap()->m_TopLevel->entries[i];
 }

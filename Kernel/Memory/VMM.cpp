@@ -33,11 +33,9 @@ static Optional<usize> s_HigherHalfOffset = BootInfo::GetHHDMOffset();
 
 using namespace Arch::VMM;
 
-void* PageMap::GetNextLevel(PageTableEntry& entry, bool allocate,
-                            uintptr_t virt)
+void* PageMap::NextLevel(PageTableEntry& entry, bool allocate, uintptr_t virt)
 {
-    if (entry.IsValid())
-        return Pointer(entry.GetAddress()).ToHigherHalf<void*>();
+    if (entry.IsValid()) return Pointer(entry.Address()).ToHigherHalf<void*>();
     if (!allocate) return nullptr;
 
     Pointer newEntry = Arch::VMM::AllocatePageTable();
@@ -46,7 +44,7 @@ void* PageMap::GetNextLevel(PageTableEntry& entry, bool allocate,
     return newEntry;
 }
 
-namespace VirtualMemoryManager
+namespace VMM
 {
     static bool s_Initialized = false;
 
@@ -58,7 +56,7 @@ namespace VirtualMemoryManager
         Arch::VMM::Initialize();
 
         s_KernelPageMap = new PageMap();
-        Assert(s_KernelPageMap->GetTopLevel() != 0);
+        Assert(s_KernelPageMap->TopLevel() != 0);
 
         auto [pageSize, flags] = s_KernelPageMap->RequiredSize(4_gib);
 
@@ -155,8 +153,13 @@ namespace VirtualMemoryManager
 
         auto  virt = AllocateSpace(pageCount * PMM::PAGE_SIZE, 4_kib, true);
         Assert(MapKernelRegion(virt, pages, pageCount, flags));
-        return new Region(pages, virt, pageCount * PMM::PAGE_SIZE,
-                          PROT_READ | PROT_WRITE);
+
+        auto region
+            = CreateRef<Region>(pages, virt, pageCount * PMM::PAGE_SIZE);
+        if (!region) return nullptr;
+
+        region->SetAccessMode(Access::eReadWrite);
+        return region;
     }
     void FreeDMA_Region(Ref<Region> region)
     {
@@ -168,64 +171,6 @@ namespace VirtualMemoryManager
     {
         if (!s_Initialized) Initialize();
         return s_KernelPageMap;
-    }
-    void HandlePageFault(const PageFaultInfo& info)
-    {
-        auto message
-            = fmt::format("Page Fault occurred at '{:#x}'\nCaused by:\n",
-                          info.VirtualAddress().Raw());
-        auto reason = info.Reason();
-
-        if (reason & PageFaultReason::eNotPresent)
-            message += "\t- Non-present page\n";
-        if (reason & PageFaultReason::eWrite)
-            message += "\t- Write violation\n";
-        else message += "\t- Read violation\n";
-        if (reason & PageFaultReason::eUser) message += "\t- Reserved Write\n";
-        if (reason & PageFaultReason::eInstructionFetch)
-            message += "\t- Instruction Fetch\n";
-        if (reason & PageFaultReason::eProtectionKey)
-            message += "\t- Protection-Key violation\n";
-        if (reason & PageFaultReason::eShadowStack)
-            message += "\t- Shadow stack access\n";
-        if (reason & PageFaultReason::eSoftwareGuardExtension)
-            message += "\t- SGX violation\n";
-
-        bool kernelFault = !(reason & PageFaultReason::eUser);
-        message += fmt::format("In {} space", kernelFault ? "User" : "Kernel");
-
-        if (CPU::DuringSyscall())
-        {
-            usize      syscallID   = CPU::GetCurrent()->LastSyscallID;
-            StringView syscallName = Syscall::GetName(syscallID);
-            message += fmt::format(", and during syscall({}) => {}", syscallID,
-                                   syscallName);
-        }
-
-        message += '\n';
-        auto process = Process::Current();
-
-        if (process && !kernelFault)
-        {
-            auto tty = process->TTY();
-            LogError("{}: Segmentation Fault(core dumped)\n{}", process->Name(),
-                     message);
-            Stacktrace::Print();
-
-            auto bufferOr
-                = UserBuffer::ForUserBuffer(message.data(), message.size());
-            if (!bufferOr) return;
-            auto messageBuffer = bufferOr.value();
-            if (tty)
-            {
-                auto status = tty->Write(messageBuffer, 0, message.size());
-                (void)status;
-            }
-            process->Exit(-1);
-            return;
-        }
-
-        earlyPanic(message.data());
     }
 
     bool MapKernelRegion(Pointer virt, Pointer phys, usize pageCount,
@@ -258,4 +203,4 @@ namespace VirtualMemoryManager
 
         return virt;
     }
-} // namespace VirtualMemoryManager
+} // namespace VMM

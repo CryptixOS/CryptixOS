@@ -64,7 +64,7 @@ struct DirectoryEntries
     auto        end() { return Entries.end(); }
 };
 
-class FileDescriptor : public File, public RefCounted
+class FileDescriptor : public RefCounted
 {
   public:
     FileDescriptor(::Ref<DirectoryEntry> node, i32 flags,
@@ -93,7 +93,7 @@ class FileDescriptor : public File, public RefCounted
     }
 
     virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
-                                isize offset = -1) override;
+                                isize offset = -1);
     inline ErrorOr<isize>  Read(void* const outBuffer, usize count)
     {
         auto bufferOr = UserBuffer::ForUserBuffer(outBuffer, count);
@@ -103,7 +103,7 @@ class FileDescriptor : public File, public RefCounted
         return Read(buffer, count, m_Offset);
     }
     virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
-                                 isize offset = -1) override;
+                                 isize offset = -1);
     inline ErrorOr<isize>  Write(const void* inBuffer, usize count)
     {
         auto bufferOr = UserBuffer::ForUserBuffer(inBuffer, count);
@@ -112,20 +112,26 @@ class FileDescriptor : public File, public RefCounted
 
         return Write(buffer, count, m_Offset);
     }
-    virtual ErrorOr<const stat> Stat() const override;
-    virtual ErrorOr<isize>      Seek(i32 whence, off_t offset) override;
-    virtual ErrorOr<isize>      Truncate(off_t size) override;
+    virtual ErrorOr<const stat> Stat() const;
+    virtual ErrorOr<isize>      Seek(i32 whence, off_t offset);
+    virtual ErrorOr<isize>      Truncate(off_t size);
 
     void                        Lock() { m_Lock.Acquire(); }
     void                        Unlock() { m_Lock.Release(); }
 
     // TODO(v1t10l7): verify whether the fd is blocking
     inline bool                 WouldBlock() const { return false; }
-    inline bool                 IsSocket() const override
+
+    virtual bool                IsCharDevice() const
     {
-        return DirectoryEntry()->IsSocket();
+        return DirectoryEntry()->IsCharDevice();
     }
-    inline bool IsPipe() const
+    virtual bool IsFifo() const { return DirectoryEntry()->IsFifo(); }
+    virtual bool IsDirectory() const { return DirectoryEntry()->IsDirectory(); }
+    virtual bool IsRegular() const { return DirectoryEntry()->IsRegular(); }
+    virtual bool IsSymlink() const { return DirectoryEntry()->IsSymlink(); }
+    inline bool  IsSocket() const { return DirectoryEntry()->IsSocket(); }
+    inline bool  IsPipe() const
     {
         // FIXME(v1tr10l7): implement this once pipes are supported
 

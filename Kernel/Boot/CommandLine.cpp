@@ -14,13 +14,13 @@
 
 namespace CommandLine
 {
-    static StringView                         s_KernelCommandLine = "";
+    static StringView                   s_KernelCommandLine = ""_sv;
     static UnorderedMap<String, String> s_OptionMap;
 
-    void                                      ParseArguments(StringView args)
+    void                                ParseArguments(StringView args)
     {
         UnorderedMap<String, String>& result = s_OptionMap;
-        usize                               pos    = 0;
+        usize                         pos    = 0;
 
         while (pos < args.Size())
         {
@@ -82,7 +82,14 @@ namespace CommandLine
             LogInfo("CommandLine: {} -> {}", arg, value);
     }
 
-    using namespace Prism::StringViewLiterals;
+    StringView KernelCommandLine()
+    {
+        if (s_KernelCommandLine.Empty())
+            s_KernelCommandLine = BootInfo::KernelCommandLine();
+        return s_KernelCommandLine;
+    }
+
+    bool Contains(StringView key) { return s_OptionMap.Contains(key); }
     Optional<bool> GetBoolean(StringView key)
     {
         auto it = s_OptionMap.Find(String(key));

@@ -4,10 +4,10 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Memory/KernelHeap.hpp>
-#include <Scheduler/Process.hpp>
-
+#include <Memory/Allocator/KernelHeap.hpp>
 #include <Prism/Utility/Math.hpp>
+
+#include <Scheduler/Process.hpp>
 #include <Time/Time.hpp>
 
 #include <VFS/TmpFs/TmpFs.hpp>

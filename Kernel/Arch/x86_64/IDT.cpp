@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Arch/InterruptHandler.hpp>
 
 #include <Arch/x86_64/CPU.hpp>
 #include <Arch/x86_64/CPUContext.hpp>
@@ -11,27 +12,65 @@
 #include <Arch/x86_64/GDT.hpp>
 #include <Arch/x86_64/IDT.hpp>
 
-#include <Arch/InterruptHandler.hpp>
-
 #include <Firmware/ACPI/MADT.hpp>
+
 #include <Memory/PageFault.hpp>
+#include <Prism/Containers/Array.hpp>
 
-#include <Scheduler/Process.hpp>
-#include <Scheduler/Thread.hpp>
+#pragma region exception_names
+auto s_ExceptionNames = ToArray({
+    "Divide-by-zero"_sv,
+    "Debug"_sv,
+    "Non-Maskable Interrupt"_sv,
+    "Breakpoint"_sv,
+    "Overflow"_sv,
+    "Bound Range Exceeded"_sv,
+    "Invalid Opcode"_sv,
+    "Device not available"_sv,
+    "Double Fault"_sv,
+    "Coprocessor Segment Overrun"_sv,
+    "Invalid TSS"_sv,
+    "Segment Not Present"_sv,
+    "Stack-Segment Fault"_sv,
+    "General Protection Fault"_sv,
+    "Page Fault"_sv,
+    "Reserved"_sv,
+    "x87 Floating-Point Exception"_sv,
+    "Alignment Check"_sv,
+    "Machine Check"_sv,
+    "SIMD Floating-Point Exception"_sv,
+    "Control Protection Exception"_sv,
+    "Reserved"_sv,
+    "Reserved"_sv,
+    "Reserved"_sv,
+    ""_sv,
+    "Virtualization Exception"_sv,
+    "Reserved"_sv,
+    "Reserved"_sv,
+    "Hypervisor Injection Exception"_sv,
+    "VMM Communication Exception"_sv,
+    "Security Exception"_sv,
+    "Reserved"_sv,
+    "Triple Fault"_sv,
+    "FPU Error Interrupt"_sv,
+});
+#pragma endregion
 
-extern const char* s_ExceptionNames[];
+constexpr u32 MAX_IDT_ENTRIES     = 256;
+constexpr u32 IDT_ENTRY_PRESENT   = Bit(7);
 
-constexpr u32      MAX_IDT_ENTRIES     = 256;
-constexpr u32      IDT_ENTRY_PRESENT   = Bit(7);
-
-constexpr u32      GATE_TYPE_INTERRUPT = 0xe;
-constexpr u32      GATE_TYPE_TRAP      = 0xf;
+constexpr u32 GATE_TYPE_INTERRUPT = 0xe;
+constexpr u32 GATE_TYPE_TRAP      = 0xf;
 
 namespace Exception
 {
     constexpr u8 BREAKPOINT = 0x03;
     constexpr u8 PAGE_FAULT = 0x0e;
 }; // namespace Exception
+namespace MemoryManager
+{
+    void HandlePageFault(const PageFaultInfo& info);
+};
 
 struct [[gnu::packed]] IDTEntry
 {
@@ -133,7 +172,7 @@ static void pageFault(CPUContext* ctx)
              errorCode & PAGE_FAULT_PROTECTION_KEY,
              errorCode & PAGE_FAULT_SHADOW_STACK);
     PageFaultInfo faultInfo(faultAddress, faultReason, ctx);
-    VMM::HandlePageFault(faultInfo);
+    MemoryManager::HandlePageFault(faultInfo);
 }
 
 [[noreturn]] static void unhandledInterrupt(CPUContext* context)
@@ -228,42 +267,3 @@ namespace IDT
     void SetIST(u8 vector, u32 value) { s_IdtEntries[vector].IST = value; }
     void SetDPL(u8 vector, u8 dpl) { s_IdtEntries[vector].DPL = dpl; }
 } // namespace IDT
-
-#pragma region exception_names
-const char* s_ExceptionNames[] = {
-    "Divide-by-zero",
-    "Debug",
-    "Non-Maskable Interrupt",
-    "Breakpoint",
-    "Overflow",
-    "Bound Range Exceeded",
-    "Invalid Opcode",
-    "Device not available",
-    "Double Fault",
-    "Coprocessor Segment Overrun",
-    "Invalid TSS",
-    "Segment Not Present",
-    "Stack-Segment Fault",
-    "General Protection Fault",
-    "Page Fault",
-    "Reserved",
-    "x87 Floating-Point Exception",
-    "Alignment Check",
-    "Machine Check",
-    "SIMD Floating-Point Exception",
-    "Control Protection Exception",
-    "Reserved",
-    "Reserved",
-    "Reserved",
-    "",
-    "Virtualization Exception",
-    "Reserved",
-    "Reserved",
-    "Hypervisor Injection Exception",
-    "VMM Communication Exception",
-    "Security Exception",
-    "Reserved",
-    "Triple Fault",
-    "FPU Error Interrupt",
-};
-#pragma endregion

@@ -195,10 +195,9 @@ ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
     // newFd = CreateRef<FileDescriptor>(oldFd, flags);
     // if (!newFd) return Error(ENOMEM);
 
-    newFd = oldFd;
+    newFd    = oldFd;
     newFdNum = m_FdTable.Insert(newFd, newFdNum);
-    if (newFdNum < 0)
-        return Error(EBADF);
+    if (newFdNum < 0) return Error(EBADF);
 
     return newFdNum;
 }
@@ -319,7 +318,7 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
     if (!program.Load(path.Raw(), PageMap, m_AddressSpace))
         return Error(ENOEXEC);
 
-    auto ldPath = program.Image().GetLdPath();
+    auto ldPath = program.Image().InterpreterPath();
     if (!ldPath.Empty())
         Assert(ld.Load(ldPath, PageMap, m_AddressSpace,
                        static_cast<uintptr_t>(0x40000000)));
@@ -332,8 +331,8 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
         delete thread;
     }
 
-    uintptr_t address = ldPath.Empty() ? program.Image().GetEntryPoint()
-                                       : ld.Image().GetEntryPoint();
+    uintptr_t address = ldPath.Empty() ? program.Image().EntryPoint()
+                                       : ld.Image().EntryPoint();
 
     {
         CPU::UserMemoryProtectionGuard guard;
@@ -458,7 +457,7 @@ ErrorOr<Process*> Process::Fork()
 
         auto newRegion
             = new Region(physicalSpace, range->VirtualBase(), range->Size());
-        newRegion->SetProt(range->Access(), range->Prot());
+        newRegion->SetAccessMode(range->Access());
         newProcess->m_AddressSpace.Insert(range->VirtualBase().Raw(),
                                           newRegion);
         continue;
@@ -468,7 +467,7 @@ ErrorOr<Process*> Process::Fork()
         //    newRegion
         //        = newProcess->m_AddressSpace.AllocateRegion(range->Size());
         newRegion->SetPhysicalBase(physicalSpace);
-        newRegion->SetProt(range->Access(), range->Prot());
+        newRegion->SetAccessMode(range->Access());
 
         // pageMap->MapRegion(newRegion);
         //  TODO(v1tr10l7): Free regions;

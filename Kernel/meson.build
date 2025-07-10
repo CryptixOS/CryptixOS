@@ -63,12 +63,14 @@ srcs += files(
   'Firmware/DMI/SMBIOS.cpp',
 
   'Memory/AddressSpace.cpp',
-  'Memory/KernelHeap.cpp',
+  'Memory/MemoryManager.cpp',
+  'Memory/PageMap.cpp',
   'Memory/PMM.cpp',
   'Memory/Region.cpp',
   'Memory/VMM.cpp',
 
-  'Memory/Allocators/BitmapAllocator.cpp',
+  'Memory/Allocator/BitmapAllocator.cpp',
+  'Memory/Allocator/KernelHeap.cpp',
   #'Memory/Allocators/BuddyAllocator.cpp',
 
   'Network/NetworkAdapter.cpp',
@@ -88,7 +90,6 @@ srcs += files(
   'Library/Image.cpp',
   'Library/Kasan.cpp',
   'Library/Logger.cpp',
-  'Library/Module.cpp',
   'Library/Stacktrace.cpp',
   'Library/ZLib.cpp',
 

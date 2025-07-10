@@ -13,6 +13,7 @@
 #include <Library/UserBuffer.hpp>
 #include <Prism/Containers/Deque.hpp>
 
+class DirectoryEntry;
 class File
 {
   public:
@@ -42,5 +43,5 @@ class File
     virtual bool           IsSymlink() const { return false; }
     virtual bool           IsSocket() const { return false; }
 
-  private:
+    DirectoryEntry*        m_INode = nullptr;
 };

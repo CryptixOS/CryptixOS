@@ -27,8 +27,7 @@ namespace PCI
         if (!IsMMIO) return nullptr;
         if (Base) return Base;
 
-        if (VMM::GetKernelPageMap()->Virt2Phys(Address.ToHigherHalf<u64>())
-            == uintptr_t(-1))
+        if (VMM::GetKernelPageMap()->Virt2Phys(Address.ToHigherHalf<u64>()).Raw() == u64(-1))
         {
             usize   pageSize = PMM::PAGE_SIZE;
             Pointer base     = Math::AlignDown(Address.Raw(), pageSize);

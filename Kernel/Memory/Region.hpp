@@ -15,7 +15,7 @@
 class FileDescriptor;
 enum class PageAttributes : isize;
 
-namespace VirtualMemoryManager
+namespace VMM
 {
     enum class Access : u8
     {
@@ -52,10 +52,9 @@ namespace VirtualMemoryManager
       public:
         Region() = default;
         Region(Pointer phys, Pointer virt, usize size,
-               i32 flags = PROT_READ | PROT_WRITE, FileDescriptor* fd = nullptr)
+               FileDescriptor* fd = nullptr)
             : m_VirtualRange(virt, size)
             , m_PhysicalBase(phys)
-            , m_Flags(flags)
             , m_Fd(fd)
 
         {
@@ -81,20 +80,11 @@ namespace VirtualMemoryManager
         inline FileDescriptor* FileDescriptor() const { return m_Fd; }
 
         inline enum Access     Access() const { return m_Access; }
-        inline i32             Prot() const { return m_Flags; }
         PageAttributes         PageAttributes() const;
 
-        inline void SetPhysicalBase(Pointer phys) { m_PhysicalBase = phys; }
-        inline void SetProt(enum Access access, i32 prot)
-        {
-            m_Access = access;
-            m_Flags  = prot;
-        }
+        inline void    SetPhysicalBase(Pointer phys) { m_PhysicalBase = phys; }
+        inline void    SetAccessMode(enum Access access) { m_Access = access; }
 
-        constexpr bool ValidateFlags(i32 flags) const
-        {
-            return m_Flags & flags;
-        }
         constexpr bool IsReadable() const { return m_Access & Access::eRead; }
         constexpr bool IsWriteable() const { return m_Access & Access::eWrite; }
         constexpr bool IsExecutable() const
@@ -106,8 +96,7 @@ namespace VirtualMemoryManager
         AddressRange          m_VirtualRange;
         Pointer               m_PhysicalBase = nullptr;
         enum Access           m_Access       = Access::eNone;
-        i32                   m_Flags        = 0;
         class FileDescriptor* m_Fd           = nullptr;
     };
-}; // namespace VirtualMemoryManager
-using VirtualMemoryManager::Region;
+}; // namespace VMM
+using VMM::Region;

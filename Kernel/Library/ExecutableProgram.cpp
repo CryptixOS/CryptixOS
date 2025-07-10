@@ -54,9 +54,8 @@ ErrorOr<void> ExecutableProgram::Load(PathView path, PageMap* pageMap,
                 PageAttributes::eRWXU | PageAttributes::eWriteBack));
             auto region = new Region(
                 phys, header->VirtualAddress + loadBase.Raw(), size);
-            using VirtualMemoryManager::Access;
-            region->SetProt(Access::eReadWriteExecute | Access::eUser,
-                            PROT_READ | PROT_WRITE | PROT_EXEC);
+            using VMM::Access;
+            region->SetAccessMode(Access::eReadWriteExecute | Access::eUser);
 
             addressSpace.Insert(region->VirtualBase(), region);
             Memory::Copy(phys.Offset<Pointer>(misalign).ToHigherHalf(),
@@ -76,10 +75,10 @@ ErrorOr<void> ExecutableProgram::Load(PathView path, PageMap* pageMap,
                       .Offset<ELF::SectionHeader*>(loadBase);
             char* symbolNames
                 = reinterpret_cast<char*>(stringTableHeader->Address);
-            ELF::Sym* symbolTable
-                = reinterpret_cast<ELF::Sym*>(section->Address);
+            ELF::Symbol* symbolTable
+                = reinterpret_cast<ELF::Symbol*>(section->Address);
 
-            for (usize symbol = 0; symbol < section->Size / sizeof(ELF::Sym);
+            for (usize symbol = 0; symbol < section->Size / sizeof(ELF::Symbol);
                  ++symbol)
             {
                 char* name = (symbolNames + symbolTable[symbol].Name);

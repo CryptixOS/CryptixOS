@@ -9,9 +9,10 @@
 #include <Boot/BootInfo.hpp>
 #include <Library/Locking/Spinlock.hpp>
 
-#include <Memory/Allocators/BitmapAllocator.hpp>
-#include <Memory/KernelHeap.hpp>
 #include <Memory/PMM.hpp>
+
+#include <Memory/Allocator/BitmapAllocator.hpp>
+#include <Memory/Allocator/KernelHeap.hpp>
 
 #include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>

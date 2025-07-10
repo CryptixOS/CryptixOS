@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Memory/Allocators/PageFrameAllocator.hpp>
+#include <Memory/Allocator/PageFrameAllocator.hpp>
 #include <Prism/Containers/Bitmap.hpp>
 
 class BitmapAllocator : public PageFrameAllocator

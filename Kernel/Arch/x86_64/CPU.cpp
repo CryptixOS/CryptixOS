@@ -55,6 +55,37 @@ namespace CPU
 
     extern "C" __attribute__((noreturn)) void syscall_entry();
 
+    void                                      Identify()
+    {
+        ID  id(1);
+        u8  steppingID     = id.rax & 0x0f;
+        u32 model          = (id.rax >> 4) & 0x0f;
+        u32 family         = (id.rax >> 8) & 0x0f;
+        u32 type           = (id.rax >> 12) & 0x03;
+        u32 extendedModel  = (id.rax >> 16) & 0x0f;
+        u32 extendedFamily = (id.rax >> 20) & 0xff;
+
+        u64 displayFamily  = family;
+        u64 displayModel   = model;
+        if (family == 15)
+        {
+            displayFamily = family + extendedFamily;
+            displayModel  = model + (extendedModel << 4);
+        }
+        else if (family == 6)
+        {
+            displayFamily = family;
+            displayModel  = model + (extendedModel << 4);
+        }
+
+        LogInfo(
+            "CPU: Version Information =>\n\tType: {}\n\tFamily: {}\n\tModel: "
+            "{}\n\tSteppingID: {}\n\tExtended Family: {}\n\tExtended Model: "
+            "{}\n\tDisplayFamily: {}\n\tDisplay Model: {}",
+            type, family, model, steppingID, extendedFamily, extendedModel,
+            displayFamily, displayModel);
+    }
+
     KERNEL_INIT_CODE
     static void InitializeFPU()
     {
@@ -210,6 +241,8 @@ namespace CPU
 
         IDT::SetIST(g_ScheduleVector, 1);
         LogInfo("BSP: Initialized");
+
+        Identify();
     }
     KERNEL_INIT_CODE
     void StartAPs()

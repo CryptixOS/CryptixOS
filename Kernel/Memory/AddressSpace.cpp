@@ -73,12 +73,18 @@ Ref<Region> AddressSpace::AllocateFixed(Pointer virt, usize size)
     return region;
 }
 
-Ref<Region> AddressSpace::Find(Pointer virt)
+Ref<Region> AddressSpace::Find(Pointer address) const
 {
-    auto it = m_RegionTree.Find(virt);
-    if (!it) return nullptr;
+    for (const auto& [virt, region] : m_RegionTree)
+    {
+        auto size  = region->Size();
+        auto start = region->VirtualBase();
+        auto end   = start.Offset(size);
 
-    return it->Value;
+        if (address >= start && address < end) return region;
+    }
+
+    return nullptr;
 }
 
 void AddressSpace::Clear() { m_RegionTree.Clear(); }

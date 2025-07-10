@@ -7,9 +7,9 @@
 #include <API/System.hpp>
 
 #include <Drivers/DeviceManager.hpp>
-#include <Library/Module.hpp>
 #include <Prism/String/StringUtils.hpp>
 
+#include <System/System.hpp>
 #include <Time/Time.hpp>
 
 #include <VFS/MountPoint.hpp>
@@ -51,7 +51,7 @@ struct ProcFsModulesProperty : public ProcFsProperty
         Buffer.Clear();
         Buffer.Resize(PMM::PAGE_SIZE);
 
-        for (auto& [name, module] : GetModules()) Write("{}\n", name);
+        for (auto& module : System::Modules()) Write("{}\n", module.Name);
     }
 };
 struct ProcFsMountsProperty : public ProcFsProperty
@@ -129,10 +129,10 @@ struct ProcFsMemoryRegionsProperty : public ProcFsProperty
         auto process = Process::GetCurrent();
 
         Write("======================================================\n");
-        Write("Base\t\tLength\t\tPhys\t\tProt\n");
+        Write("Base\t\tLength\t\tPhys\t\tAccess\n");
         for (const auto& [base, region] : process->AddressSpace())
             Write("{:#x}\t\t{:#x}\t\t{:#x}\t\t{:#b}\n", base, region->Size(),
-                  region->PhysicalBase().Raw(), region->Prot());
+                  region->PhysicalBase().Raw(), ToString(region->Access()));
         Write("======================================================\n");
     }
 };

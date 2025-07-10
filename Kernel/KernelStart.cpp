@@ -32,9 +32,10 @@
 #include <Library/Module.hpp>
 #include <Library/Stacktrace.hpp>
 
-#include <Memory/KernelHeap.hpp>
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
+
+#include <Memory/Allocator/KernelHeap.hpp>
 
 #include <Prism/Containers/Array.hpp>
 #include <Prism/Containers/RedBlackTree.hpp>
@@ -88,7 +89,7 @@ static bool loadInitProcess(Path initPath)
     PageMap*                 pageMap = new PageMap();
     if (!program.Load(initPath, pageMap, userProcess->AddressSpace()))
         return false;
-    PathView ldPath = program.Image().GetLdPath();
+    PathView ldPath = program.Image().InterpreterPath();
     if (!ldPath.Empty()
         && !ld.Load(ldPath, pageMap, userProcess->AddressSpace(),
                     static_cast<uintptr_t>(0x40000000)))
@@ -97,8 +98,8 @@ static bool loadInitProcess(Path initPath)
         return false;
     }
     userProcess->PageMap = pageMap;
-    auto address         = ldPath.Empty() ? program.Image().GetEntryPoint()
-                                          : ld.Image().GetEntryPoint();
+    auto address         = ldPath.Empty() ? program.Image().EntryPoint()
+                                          : ld.Image().EntryPoint();
     if (!address)
     {
         delete pageMap;
@@ -110,8 +111,9 @@ static bool loadInitProcess(Path initPath)
                                                 CPU::GetCurrent()->ID);
     VMM::UnmapKernelInitCode();
 
-    auto colonel = Scheduler::GetKernelProcess();
-    auto newThread = colonel->CreateThread(reinterpret_cast<uintptr_t>(eternal), false, CPU::Current()->ID);
+    auto colonel   = Scheduler::GetKernelProcess();
+    auto newThread = colonel->CreateThread(reinterpret_cast<uintptr_t>(eternal),
+                                           false, CPU::Current()->ID);
     Scheduler::EnqueueThread(newThread);
     Scheduler::EnqueueThread(userThread);
 
@@ -147,29 +149,20 @@ static void kernelThread()
     VFS::Mount(nullptr, "/dev/nvme0n2p2"_sv, "/mnt/fat32"_sv, "fat32fs"_sv);
     VFS::Mount(nullptr, "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv, "echfs"_sv);
 
-    auto    kernelExecutable = BootInfo::ExecutableFile();
-    Pointer imageAddress     = kernelExecutable->address;
-
-    auto    header           = imageAddress.As<ELF::Header>();
-    auto    sections
-        = imageAddress.Offset<Pointer>(header->SectionHeaderTableOffset)
-              .As<ELF::SectionHeader>();
-
-    auto sectionNamesOffset = sections[header->SectionNamesIndex].Offset;
-    auto stringTable
-        = imageAddress.Offset<Pointer>(sectionNamesOffset).As<char>();
-
-    ELF::Image kernelImage;
-    kernelImage.LoadFromMemory(reinterpret_cast<u8*>(header),
-                               kernelExecutable->size);
-
     USB::Initialize();
 
-    LogTrace("Loading kernel drivers");
-    if (!ELF::Image::LoadModules(header->SectionEntryCount, sections,
-                                 stringTable))
+    if (!System::LoadModules())
         LogWarn("ELF: Could not find any builtin drivers");
-    if (!Module::Load()) LogWarn("Module: Failed to find any modules");
+
+    auto moduleDirectory
+        = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), "/lib/modules/")
+              .value_or(VFS::PathResolution{})
+              .Entry;
+    if (moduleDirectory)
+    {
+        for (const auto& [name, child] : moduleDirectory->Children())
+            System::LoadModule(child);
+    }
 
     LogDebug("VFS: Testing directory entry caches...");
     auto maybePathRes

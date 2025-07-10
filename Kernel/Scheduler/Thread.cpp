@@ -82,13 +82,13 @@ static Pointer prepareStack(uintptr_t _stack, uintptr_t sp,
     *(--stack)               = 0;
     *(--stack)               = 0;
     stack -= 2;
-    stack[0] = AT_ENTRY, stack[1] = image.Image().GetEntryPoint();
+    stack[0] = AT_ENTRY, stack[1] = image.Image().EntryPoint();
     stack -= 2;
-    stack[0] = AT_PHDR, stack[1] = image.Image().GetAtPhdr();
+    stack[0] = AT_PHDR, stack[1] = image.Image().ProgramHeaderAddress();
     stack -= 2;
-    stack[0] = AT_PHENT, stack[1] = image.Image().GetPhent();
+    stack[0] = AT_PHENT, stack[1] = image.Image().ProgramHeaderEntrySize();
     stack -= 2;
-    stack[0] = AT_PHNUM, stack[1] = image.Image().GetPhNum();
+    stack[0] = AT_PHNUM, stack[1] = image.Image().ProgramHeaderCount();
 
     uintptr_t oldSp = sp;
     *(--stack)      = 0;
@@ -135,10 +135,9 @@ Thread::Thread(Process* parent, Pointer pc, Vector<StringView>& argv,
             vustack, pstack, CPU::USER_STACK_SIZE,
             PageAttributes::eRWXU | PageAttributes::eWriteBack));
 
-        using VirtualMemoryManager::Access;
+        using VMM::Access;
         auto stackRegion = new Region(pstack, vustack, CPU::USER_STACK_SIZE);
-        stackRegion->SetProt(Access::eReadWriteExecute | Access::eUser,
-                             PROT_READ | PROT_WRITE | PROT_EXEC);
+        stackRegion->SetAccessMode(Access::eReadWriteExecute | Access::eUser);
         m_Stacks.PushBack(stackRegion);
         m_Parent->m_AddressSpace.Insert(vustack, stackRegion);
 
@@ -291,7 +290,8 @@ Thread* Thread::Fork(Process* process)
         process->PageMap->MapRange(stackVirt, newStackPhys, stackSize,
                                    PageAttributes::eRWXU
                                        | PageAttributes::eWriteBack);
-        newThread->m_Stacks.PushBack(CreateRef<Region>(newStackPhys, newStackPhys, stackSize));
+        newThread->m_Stacks.PushBack(
+            CreateRef<Region>(newStackPhys, newStackPhys, stackSize));
     }
 
     newThread->m_FpuStoragePageCount = m_FpuStoragePageCount;

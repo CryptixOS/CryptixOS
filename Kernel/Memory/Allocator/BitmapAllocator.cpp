@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Memory/Allocators/BitmapAllocator.hpp>
+#include <Memory/Allocator/BitmapAllocator.hpp>
 
 ErrorOr<void> BitmapAllocator::Initialize(MemoryMap& memoryMap, usize pageSize)
 {

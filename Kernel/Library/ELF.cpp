@@ -11,17 +11,15 @@
 #include <Memory/PMM.hpp>
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
+#include <Prism/Memory/ByteStream.hpp>
 
 #include <Prism/Containers/Array.hpp>
-#include <Prism/String/StringView.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/FileDescriptor.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
-
-#include <cstring>
 
 #if 0
     #define ElfDebugLog(...) LogDebug(__VA_ARGS__)
@@ -31,7 +29,10 @@
 
 namespace ELF
 {
-    ErrorOr<void> Image::LoadFromMemory(u8* data, usize size)
+    constexpr usize SHN_UNDEF  = 0;
+    constexpr usize SHN_LOPROC = 0xff00;
+
+    ErrorOr<void>   Image::LoadFromMemory(u8* data, usize size)
     {
         m_Image.Resize(size + 100);
         Memory::Copy(m_Image.Raw(), data, size);
@@ -79,10 +80,12 @@ namespace ELF
                     + m_Header.SectionEntrySize * sectionHeader->Link);
             CTOS_UNUSED char* symbols
                 = reinterpret_cast<char*>(stringTable->Address);
-            Sym* symbolTable = reinterpret_cast<Sym*>(sectionHeader->Address);
+            Symbol* symbolTable
+                = reinterpret_cast<Symbol*>(sectionHeader->Address);
 
             for (usize symbolIndex = 0;
-                 symbolIndex < sectionHeader->Size / sizeof(Sym); ++symbolIndex)
+                 symbolIndex < sectionHeader->Size / sizeof(Symbol);
+                 ++symbolIndex)
             {
                 if (symbolTable[symbolIndex].SectionIndex > 0
                     && usize(symbolTable[symbolIndex].SectionIndex)
@@ -129,7 +132,7 @@ namespace ELF
                                           + m_Header.SectionHeaderTableOffset
                                           + m_Header.SectionEntrySize
                                                 * sectionHeader->Link);
-            Sym* symbolTable = (Sym*)symbolSection->Address;
+            Symbol* symbolTable = (Symbol*)symbolSection->Address;
 
 #define S               (symbolTable[ELF64_R_SYM(table[rela].Info)].Value)
 #define A               (table[rela].Addend)
@@ -216,104 +219,220 @@ namespace ELF
             if (!enumerator(SectionHeader(i))) break;
     }
 
-    void Image::ForEachSymbol(SymbolEnumerator enumerator)
+    void Image::ForEachSymbolEntry(SymbolEntryEnumerator enumerator)
     {
-        if (!m_SymbolSection || !m_StringSection) return;
+        if (m_SymbolSection->Size == 0) return;
+        if (m_StringSection->Size == 0) return;
 
-        char* stringTable
-            = reinterpret_cast<char*>(m_Image.Raw() + m_StringSection->Offset);
-        Sym* symbolTable
-            = reinterpret_cast<Sym*>(m_Image.Raw() + m_SymbolSection->Offset);
+        Symbol* symbolTable = reinterpret_cast<Symbol*>(
+            m_Image.Raw() + m_SymbolSection->Offset);
 
         usize count = m_SymbolSection->Size / m_SymbolSection->EntrySize;
         for (usize i = 0; i < count; i++)
         {
-            StringView name = &stringTable[symbolTable[i].Name];
+            auto name = LookupString(symbolTable[i].Name);
             if (!enumerator(symbolTable[i], name)) break;
         }
     }
-
-    ErrorOr<void> Image::ResolveSymbols(Span<Sym*> symbolTable)
+    void Image::ForEachSymbol(SymbolEnumerator enumerator)
     {
-        constexpr usize SHN_UNDEF    = 0;
-        constexpr usize SHN_LOPROC   = 0xff00;
+        if (m_Symbols.IsEmpty() && !LoadSymbols()) return;
 
-        auto            lookupSymbol = [&symbolTable](char* name) -> u64
+        for (const auto& [name, value] : m_Symbols)
+            if (!enumerator(name, value)) break;
+    }
+
+    ErrorOr<void> Image::ApplyRelocations(SymbolLookup lookup)
+    {
+        for (usize i = 0; i < SectionHeaderCount(); ++i)
         {
-            (void)symbolTable;
-            return 0;
-        };
+            auto& relocSection = *SectionHeader(i);
+            if (relocSection.Type != ToUnderlying(SectionType::eRelA)) continue;
 
-        for (const auto& section : m_Sections)
-        {
-            auto type = static_cast<SectionType>(section.Type);
-            if (type != SectionType::eSymbolTable) continue;
+            // Target section that relocations apply to
+            u32 targetIndex = relocSection.Info;
+            if (targetIndex >= SectionHeaderCount()) return Error(ENOEXEC);
 
-            auto stringTableHeader
-                = Pointer(m_Image.Raw() + m_Header.SectionHeaderTableOffset
-                          + m_Header.SectionEntrySize * section.Link)
-                      .As<struct SectionHeader>();
-            char* symbolNames
-                = reinterpret_cast<char*>(stringTableHeader->Address);
-            Sym* symbolTable = reinterpret_cast<Sym*>(section.Address);
+            auto&       targetSection = *SectionHeader(targetIndex);
+            u8*         targetBase    = m_Image.Raw() + targetSection.Offset;
 
-            for (usize sym = 0; sym < section.Size / sizeof(Sym); ++sym)
+            // Symbol table and string table
+            const auto& symtabSection = *SectionHeader(relocSection.Link);
+            const auto& strtabSection = *SectionHeader(symtabSection.Link);
+
+            auto*       symbols       = reinterpret_cast<Symbol*>(m_Image.Raw()
+                                                                  + symtabSection.Offset);
+            auto*       strtab        = reinterpret_cast<const char*>(
+                m_Image.Raw() + strtabSection.Offset);
+            usize symCount = symtabSection.Size / sizeof(Symbol);
+
+            auto* relocs   = reinterpret_cast<RelocationEntry*>(
+                m_Image.Raw() + relocSection.Offset);
+            usize relocCount = relocSection.Size / sizeof(RelocationEntry);
+
+            for (usize r = 0; r < relocCount; ++r)
             {
+                const auto&    reloc = relocs[r];
+                RelocationType type
+                    = static_cast<RelocationType>(reloc.Info & 0xffffffff);
+                u32 symIndex = reloc.Info >> 32;
+                u8* patch    = targetBase + reloc.Offset;
 
-                if (symbolTable[sym].SectionIndex > 0
-                    && symbolTable[sym].SectionIndex < SHN_LOPROC)
+                u64 symAddr  = 0;
+                if (symIndex >= symCount) return Error(ENOEXEC);
+
+                const auto& sym     = symbols[symIndex];
+                const char* symName = strtab + sym.Name;
+
+                if (sym.SectionIndex != SHN_UNDEF)
                 {
-                    struct SectionHeader* shdr = Pointer(
-                        m_Image.Raw() + m_Header.SectionHeaderTableOffset
-                        + m_Header.SectionEntrySize
-                              * symbolTable[sym].SectionIndex);
-                    symbolTable[sym].Value += shdr->Address;
-                }
-                else if (symbolTable[sym].SectionIndex == SHN_UNDEF)
-                    symbolTable[sym].Value
-                        = lookupSymbol(symbolNames + symbolTable[sym].Name);
+                    if (sym.SectionIndex >= SectionHeaderCount())
+                        return Error(ENOEXEC);
 
-                // TODO(v1tr10l7): module data
-                if (symbolTable[sym].Name
-                    && !strcmp(symbolNames + symbolTable[sym].Name, "metadata"))
-                    ;
+                    const auto& defSection = *SectionHeader(sym.SectionIndex);
+                    symAddr                = reinterpret_cast<u64>(
+                        m_Image.Raw() + defSection.Offset + sym.Value);
+                }
+                else
+                {
+                    symAddr = lookup(symName);
+                    if (!symAddr)
+                    {
+                        LogError("ELF: Unresolved symbol: {}", symName);
+                        return Error(ENOEXEC);
+                    }
+                }
+
+                switch (type)
+                {
+                    case RelocationType::e64:
+                    {
+                        u64 value                      = symAddr + reloc.Addend;
+                        *reinterpret_cast<u64*>(patch) = value;
+                        break;
+                    }
+                    case RelocationType::ePC32:
+                    {
+                        i32 value
+                            = static_cast<i32>(symAddr + reloc.Addend
+                                               - reinterpret_cast<u64>(patch));
+                        *reinterpret_cast<i32*>(patch) = value;
+                        break;
+                    }
+                    case RelocationType::eRelative:
+                    {
+                        u64 value = reinterpret_cast<u64>(m_Image.Raw()
+                                                          + reloc.Addend);
+                        *reinterpret_cast<u64*>(patch) = value;
+                        break;
+                    }
+                    default:
+                        LogError("ELF: Unsupported relocation type: {}",
+                                 static_cast<u32>(type));
+                        return Error(ENOEXEC);
+                }
             }
         }
 
         return {};
     }
-    Pointer Image::LookupSymbol(StringView symbolName)
+
+    ErrorOr<void> Image::ResolveSymbols(SymbolLookup lookup)
     {
-        SymbolEnumerator it;
-        Pointer          found = nullptr;
+        for (usize i = 0; i < m_Header.SectionEntryCount; ++i)
+        {
+            struct SectionHeader& sectionHeader = *SectionHeader(i);
 
-        it.BindLambda(
-            [&](Sym& symbol, StringView name) -> bool
+            if (sectionHeader.Type == ToUnderlying(SectionType::eNoBits))
             {
-                u64 value = symbol.Value;
-                if (name == symbolName)
-                {
-                    found = value;
-                    return false;
-                }
+                usize pageCount
+                    = Math::DivRoundUp(sectionHeader.Size, PMM::PAGE_SIZE);
+                auto phys             = PMM::CallocatePages(pageCount);
+                sectionHeader.Address = VMM::AllocateSpace(sectionHeader.Size);
 
-                return true;
-            });
-        ForEachSymbol(it);
+                VMM::MapKernelRange(sectionHeader.Address, phys,
+                                    sectionHeader.Size, PageAttributes::eRWXU);
+            }
+            else
+            {
+                sectionHeader.Address
+                    = Pointer(m_Image.Raw() + sectionHeader.Offset).Raw();
+                if (sectionHeader.Alignment
+                    && (sectionHeader.Address & (sectionHeader.Alignment - 1)))
+                    LogWarn(
+                        "ELF: Section address is probably not aligned "
+                        "correctly: {:#x} {}",
+                        sectionHeader.Address, sectionHeader.Alignment);
+            }
+        }
 
-        return found;
+        for (usize i = 0; i < SectionHeaderCount(); i++)
+        {
+            auto& section = *SectionHeader(i);
+            auto  type    = static_cast<SectionType>(section.Type);
+            if (type != SectionType::eSymbolTable) continue;
+
+            auto status = ResolveSymbols(section, lookup);
+            if (!status) LogError("ELF: Failed to resolve some symbols");
+        }
+
+        return {};
+    }
+    ErrorOr<void> Image::ResolveSymbols(struct SectionHeader& section,
+                                        SymbolLookup          lookup)
+    {
+        auto stringTable
+            = Pointer(m_Image.Raw() + m_Header.SectionHeaderTableOffset
+                      + m_Header.SectionEntrySize * section.Link)
+                  .As<struct SectionHeader>();
+        char* strings
+            = reinterpret_cast<char*>(stringTable->Offset + m_Image.Raw());
+        Symbol* symbolTable
+            = Pointer(m_Image.Raw() + section.Offset).As<Symbol>();
+
+        usize symbolCount = section.Size / sizeof(Symbol);
+        for (usize symbol = 0; symbol < symbolCount; ++symbol)
+        {
+            if (symbolTable[symbol].SectionIndex > 0
+                && symbolTable[symbol].SectionIndex < SHN_LOPROC)
+            {
+                auto shdr = Pointer(m_Header.SectionHeaderTableOffset
+                                    + m_Header.SectionEntrySize
+                                          * symbolTable[symbol].SectionIndex
+                                    + m_Image.Raw())
+                                .As<struct SectionHeader>();
+                symbolTable[symbol].Value += shdr->Address;
+            }
+            else if (symbolTable[symbol].SectionIndex == SHN_UNDEF)
+                symbolTable[symbol].Value
+                    = lookup(strings + symbolTable[symbol].Name);
+
+            if (symbolTable[symbol].Name
+                && !std::strcmp(strings + symbolTable[symbol].Name, "metadata"))
+                LogTrace("ELF: Found module data => {:#x}",
+                         symbolTable[symbol].Value);
+        }
+
+        return {};
+    }
+
+    Pointer Image::LookupSymbol(StringView symbol)
+    {
+        auto it = m_Symbols.Find(symbol);
+        if (it == m_Symbols.end()) return nullptr;
+
+        return it->Value;
     }
     void Image::DumpSymbols()
     {
-        SymbolEnumerator it;
+        SymbolEntryEnumerator it;
 
-        usize            i = 0;
+        usize                 i = 0;
         it.BindLambda(
-            [&](Sym& symbol, StringView name) -> bool
+            [&](Symbol& symbol, StringView name) -> bool
             {
-                u64             value        = symbol.Value;
-                auto            sectionIndex = symbol.SectionIndex;
-                constexpr usize SHN_UNDEF    = 0;
+                u64  value        = symbol.Value;
+                auto sectionIndex = symbol.SectionIndex;
 
                 if (!name.Empty())
                     LogInfo("ELF Raw Symbol[{}]: '{}' => `{}`", i, name,
@@ -324,40 +443,7 @@ namespace ELF
                 ++i;
                 return true;
             });
-        ForEachSymbol(it);
-    }
-
-    bool Image::LoadModules(const u64             sectionCount,
-                            struct SectionHeader* sections, char* stringTable)
-    {
-        bool found = false;
-        for (usize i = 0; i < sectionCount; i++)
-        {
-            auto section = &sections[i];
-            if (section->Size != 0 && section->Size >= sizeof(Module)
-                && std::strncmp(MODULE_SECTION, stringTable + section->Name,
-                                std::strlen(MODULE_SECTION))
-                       == 0)
-            {
-                [[maybe_unused]] StringView modName
-                    = stringTable + section->Name + strlen(MODULE_SECTION) + 1;
-
-                for (auto offset = section->Address;
-                     offset < section->Address + section->Size;
-                     offset += sizeof(Module))
-                {
-                    auto module = reinterpret_cast<Module*>(offset);
-                    LogTrace("ELF: Loading module: {{ .Address: {:#x} }}",
-                             (uintptr_t)module);
-
-                    auto ret = LoadModule(module);
-                    if (!found) found = ret;
-                }
-                break;
-            }
-        }
-
-        return found;
+        ForEachSymbolEntry(it);
     }
 
     ErrorOr<void> Image::Parse()
@@ -417,9 +503,7 @@ namespace ELF
             return Error(ENOEXEC);
         }
 
-        if (!ParseProgramHeaders(stream) || !ParseSectionHeaders(stream))
-            return Error(ENOEXEC);
-
+        if (!ParseSectionHeaders()) return Error(ENOEXEC);
         if (m_SymbolSection && m_StringSection) LoadSymbols();
 
         for (usize i = 0; i < m_Header.ProgramEntryCount; i++)
@@ -428,7 +512,7 @@ namespace ELF
             switch (current->Type)
             {
                 case HeaderType::eProgramHeader:
-                    m_AuxiliaryVector.ProgramHeadersAddress
+                    m_AuxiliaryVector.ProgramHeaderAddress
                         = current->VirtualAddress + m_LoadBase.Raw();
                     break;
                 case HeaderType::eInterp:
@@ -437,7 +521,8 @@ namespace ELF
                     Read(path, current->Offset, current->SegmentSizeInFile);
                     path[current->SegmentSizeInFile] = 0;
 
-                    m_LdPath = StringView(path, current->SegmentSizeInFile);
+                    m_InterpreterPath
+                        = StringView(path, current->SegmentSizeInFile);
                     break;
                 }
 
@@ -454,147 +539,57 @@ namespace ELF
         return {};
     }
 
-    void Image::LoadSymbols()
+    StringView Image::LookupString(usize index)
     {
-        ElfDebugLog("ELF: Loading symbols...");
-        if (m_SymbolSection->Size == 0 || m_SymbolSection->EntrySize == 0)
-            return;
-        if (m_StringSection->Size == 0 || m_StringSection->EntrySize == 0)
-            return;
+        return &m_StringTable[index];
+    }
 
-        char* stringTable
-            = reinterpret_cast<char*>(m_Image.Raw() + m_StringSection->Offset);
-        const Sym* symbolTable
-            = reinterpret_cast<Sym*>(m_Image.Raw() + m_SymbolSection->Offset);
+    bool Image::ParseSectionHeaders()
+    {
+        for (usize i = 0; i < m_Header.SectionEntryCount; i++)
+        {
+            struct SectionHeader& shdr = *SectionHeader(i);
+            auto                  type = static_cast<SectionType>(shdr.Type);
+
+            if (type == SectionType::eSymbolTable) m_SymbolSection = &shdr;
+            else if (type == SectionType::eStringTable)
+            {
+                m_StringSection = &shdr;
+                m_StringTable   = reinterpret_cast<const char*>(m_Image.Raw()
+                                                                + shdr.Offset);
+            }
+
+#if 0
+            auto stringTable = reinterpret_cast<char*>(
+                m_Image.Raw()
+                + SectionHeader(m_Header.SectionNamesIndex)->Offset);
+            const char* sectionName = stringTable + shdr.Name;
+            ElfDebugLog(
+                "ELF: Section[{}] -> '{}': {}", i, sectionName,
+                sectionTypeToString(static_cast<SectionType>(shdr.Type)));
+#endif
+        }
+
+        return true;
+    }
+    bool Image::LoadSymbols()
+    {
+        if (m_SymbolSection->Size == 0) return false;
+        if (m_StringSection->Size == 0) return false;
+
+        ElfDebugLog("ELF: Loading symbols...");
+        const Symbol* symbolTable = reinterpret_cast<Symbol*>(
+            m_Image.Raw() + m_SymbolSection->Offset);
 
         usize entryCount = m_SymbolSection->Size / m_SymbolSection->EntrySize;
         for (usize i = 0; i < entryCount; i++)
         {
-            auto    name = StringView(&stringTable[symbolTable[i].Name]);
+            auto    name = LookupString(symbolTable[i].Name);
             Pointer addr = symbolTable[i].Value;
 
-            if (symbolTable[i].SectionIndex == 0x00 || name.Empty()) continue;
-            LogDebug("ELF: Loaded symbol: '{}' => '{}'", name, addr);
-            m_SymbolTable[name] = addr;
-        }
-    }
-
-    bool Image::ParseProgramHeaders(ByteStream<Endian::eLittle>& stream)
-    {
-        m_ProgramHeaders.Reserve(m_Header.ProgramEntryCount);
-        for (usize i = 0; i < m_Header.ProgramEntryCount; i++)
-        {
-            struct ProgramHeader& phdr = m_ProgramHeaders.EmplaceBack();
-            isize headerOffset         = m_Header.ProgramHeaderTableOffset
-                               + i * m_Header.ProgramEntrySize;
-
-            stream.Seek(headerOffset);
-            stream >> phdr;
-
-            switch (phdr.Type)
-            {
-                case HeaderType::eNone:
-                    ElfDebugLog("ELF: Program Header[{}] -> Unused Entry", i);
-                    break;
-                case HeaderType::eLoad:
-                    ElfDebugLog("ELF: Program Header[{}] -> Loadable Segment",
-                                i);
-                    break;
-                case HeaderType::eDynamic:
-                    ElfDebugLog(
-                        "ELF: Program Header[{}] -> Dynamic Linking "
-                        "Information",
-                        i);
-                    break;
-                case HeaderType::eInterp:
-                    ElfDebugLog(
-                        "ELF: Program Header[{}] -> Interpreter Information",
-                        i);
-                    break;
-                case HeaderType::eNote:
-                    ElfDebugLog(
-                        "ELF: Program Header[{}] -> Auxiliary Information", i);
-                    break;
-                case HeaderType::eProgramHeader:
-                    ElfDebugLog("ELF: Program Header[{}] -> Program Header", i);
-                    break;
-                case HeaderType::eTLS:
-                    ElfDebugLog(
-                        "ELF: Program Header[{}] -> Thread-Local Storage "
-                        "template",
-                        i);
-                    break;
-
-                default:
-                    LogWarn(
-                        "ELF: Unrecognized program header type at index '{}' "
-                        "-> {}",
-                        i, ToUnderlying(phdr.Type));
-                    break;
-            }
-        }
-        return true;
-    }
-    bool Image::ParseSectionHeaders(ByteStream<Endian::eLittle>& stream)
-    {
-        m_Sections.Reserve(m_Header.SectionEntryCount);
-
-        CTOS_UNUSED auto sectionTypeToString
-            = [](SectionType type) -> const char*
-        {
-            switch (type)
-            {
-                case SectionType::eNull:
-                    return "Unused section header table entry";
-                case SectionType::eProgBits: return "Program Data";
-                case SectionType::eSymbolTable: return "Symbol Table";
-                case SectionType::eStringTable: return "String Table";
-                case SectionType::eRelA:
-                    return "Relocation entries with addends";
-                case SectionType::eHash: return "Symbol Hash Table";
-                case SectionType::eDynamic:
-                    return "Dynamic Linking Information";
-                case SectionType::eNote: return "Notes";
-                case SectionType::eNoBits:
-                    return "Program Space with no data(.bss)";
-                case SectionType::eRel:
-                    return "Relocation entries (no addends)";
-                case SectionType::eDynSym: return "Dynamic Linker Symbol Table";
-                case SectionType::eInitArray: return "Array of Constructors";
-                case SectionType::eFiniArray: return "Array of Destructors";
-                case SectionType::ePreInitArray:
-                    return "Array of Pre-constructors";
-                case SectionType::eGroup: return "Section Group";
-                case SectionType::eExtendedSectionIndices:
-                    return "Extended Section Indices";
-
-                default: break;
-            }
-            return "Unrecognized";
-        };
-
-        auto sections = reinterpret_cast<ELF::SectionHeader*>(
-            reinterpret_cast<u64>(stream.Raw())
-            + m_Header.SectionHeaderTableOffset);
-        auto stringTable = reinterpret_cast<char*>(
-            reinterpret_cast<u64>(stream.Raw())
-            + sections[m_Header.SectionNamesIndex].Offset);
-        for (usize i = 0; i < m_Header.SectionEntryCount; i++)
-        {
-            struct SectionHeader& shdr = m_Sections.EmplaceBack();
-            u64 sectionHeaderOffset    = m_Header.SectionHeaderTableOffset
-                                    + i * m_Header.SectionEntrySize;
-            stream.Seek(sectionHeaderOffset);
-            stream >> shdr;
-            auto type = static_cast<SectionType>(shdr.Type);
-
-            if (type == SectionType::eSymbolTable) m_SymbolSection = &shdr;
-            else if (type == SectionType::eStringTable) m_StringSection = &shdr;
-
-            CTOS_UNUSED const char* sectionName = stringTable + shdr.Name;
-            ElfDebugLog(
-                "ELF: Section[{}] -> '{}': {}", i, sectionName,
-                sectionTypeToString(static_cast<SectionType>(shdr.Type)));
+            if (symbolTable[i].SectionIndex == SHN_UNDEF || name.Empty())
+                continue;
+            m_Symbols[name] = addr;
         }
 
         return true;

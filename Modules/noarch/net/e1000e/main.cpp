@@ -326,7 +326,7 @@ namespace E1000e
 static ErrorOr<void> ProbeDevice(PCI::DeviceAddress&  address,
                                  const PCI::DeviceID& id)
 {
-    LogTrace("RTL8139: Detected pci nic device");
+    LogTrace("E1000e: Detected pci nic device");
     auto nic = new E1000e::Adapter(address);
 
     if (!NetworkAdapter::RegisterNIC(nic))
@@ -346,6 +346,6 @@ static PCI::Driver s_Driver = {
     .Remove = RemoveDevice,
 };
 
-static bool ModuleInit() { return PCI::RegisterDriver(s_Driver); }
+extern "C" bool ModuleInit() { return PCI::RegisterDriver(s_Driver); }
 
 MODULE_INIT(e1000e, ModuleInit);

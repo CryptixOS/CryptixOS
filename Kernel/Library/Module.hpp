@@ -7,6 +7,9 @@
  */
 #pragma once
 
+#include <Library/ELF.hpp>
+
+#include <Prism/Containers/IntrusiveRefList.hpp>
 #include <Prism/Containers/UnorderedMap.hpp>
 
 #include <Prism/Core/Types.hpp>
@@ -19,32 +22,47 @@
 #define CONCAT_INNER(a, b) a##b
 #define UNIQUE_NAME(name)  CONCAT(_##name##__, CONCAT(__COUNTER__, __LINE__))
 
-struct [[gnu::packed, gnu::aligned(8)]] Module
+namespace ELF
 {
-    const char* Name;
-    bool        Initialized;
-    bool        Failed;
+    class Image;
+}
 
-    bool (*Initialize)();
-    void (*Terminate)();
+using ModuleInitProc      = bool (*)();
+using ModuleTerminateProc = void (*)();
+struct [[gnu::packed, gnu::aligned(8)]] ModuleHeader
+{
+    const char*         Name;
 
-    static bool Load();
+    ModuleInitProc      Initialize;
+    ModuleTerminateProc Terminate;
 };
+struct Module : public RefCounted
+{
+    StringView Name;
+    bool       Initialized;
+    bool       Failed;
 
-UnorderedMap<StringView, Module*>& GetModules();
-bool                               LoadModule(Module* drv);
+    friend class IntrusiveRefList<Module>;
+    friend struct IntrusiveRefListHook<Module>;
+
+    using List = IntrusiveRefList<Module>;
+    IntrusiveRefListHook<Module> Hook;
+
+    ::Ref<ELF::Image>            Image = nullptr;
+
+    ModuleInitProc               Initialize;
+    ModuleTerminateProc          Terminate;
+
+    static bool                  Load();
+};
 
 #define MODULE_SECTION      ".module_init"
 #define MODULE_DATA_SECTION ".module_init.data"
 
 #define MODULE_INIT(name, init)                                                \
-    extern "C" [[gnu::section(MODULE_SECTION), gnu::used]] const Module        \
+    extern "C" [[gnu::section(MODULE_SECTION), gnu::used]] const ModuleHeader  \
     CONCAT(kernel_module, UNIQUE_NAME(name))                                   \
-        = {.Name        = #name,                                               \
-           .Initialized = false,                                               \
-           .Failed      = false,                                               \
-           .Initialize  = init,                                                \
-           .Terminate   = nullptr}
+        = {.Name = #name, .Initialize = init, .Terminate = nullptr}
 
 #define MODULE_EXIT(name, exit)                                                \
     extern "C" [[gnu::section(MODULE_SECTION "." #name)], gnu::used]] \

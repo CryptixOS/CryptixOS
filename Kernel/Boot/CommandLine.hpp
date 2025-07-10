@@ -12,9 +12,10 @@
 
 namespace CommandLine
 {
-    void                Initialize();
+    void           Initialize();
 
-    bool                Contains(StringView key);
-    StringView          GetString(StringView key);
+    StringView     KernelCommandLine();
+    bool           Contains(StringView key);
     Optional<bool> GetBoolean(StringView key);
+    StringView     GetString(StringView key);
 }; // namespace CommandLine

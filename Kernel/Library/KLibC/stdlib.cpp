@@ -6,9 +6,8 @@
  */
 #include <stdlib.h>
 
-#include "Common.hpp"
-
-#include "Memory/KernelHeap.hpp"
+#include <Common.hpp>
+#include <Memory/Allocator/KernelHeap.hpp>
 
 extern "C"
 {
@@ -31,5 +30,5 @@ extern "C"
         return 0;
     }
 
-    void abort() throw() { Panic("Abort"); }
+    void abort() throw() { panic("Abort"); }
 } // extern "C"

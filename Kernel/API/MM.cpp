@@ -21,7 +21,7 @@
 
 namespace API::MM
 {
-    using VirtualMemoryManager::Access;
+    using VMM::Access;
     static Access Prot2AccessFlags(isize prot)
     {
         Access access = Access::eUser;
@@ -39,7 +39,12 @@ namespace API::MM
         Process*          current   = Process::GetCurrent();
         Optional<errno_t> errorCode = NullOpt;
 
-        using VirtualMemoryManager::Access;
+        if (addr.Raw() & ~Arch::VMM::GetAddressMask()) return MAP_FAILED;
+        flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
+        if (!(flags & MAP_ANONYMOUS)) return MAP_FAILED;
+
+        // TODO(v1tr10l7): Lazy mapping
+        using VMM::Access;
         Access access = Access::eUser;
         if (prot & PROT_READ) access |= Access::eRead;
         if (prot & PROT_WRITE) access |= Access::eWrite;
@@ -83,7 +88,7 @@ namespace API::MM
                 goto free_region;
             }
 
-            region->SetProt(access, prot);
+            region->SetAccessMode(access);
             pageMap->MapRegion(region, pageSize);
 
             ErrorOr<isize> sizeOr;
@@ -125,7 +130,7 @@ namespace API::MM
 
         if (!region) goto free_pages;
         region->SetPhysicalBase(phys);
-        region->SetProt(access, prot);
+        region->SetAccessMode(access);
         pageMap->MapRegion(region, pageSize);
 
         return region->VirtualBase().Raw();
@@ -154,7 +159,7 @@ namespace API::MM
         if (!region) return Error(EFAULT);
 
         auto accessFlags = Prot2AccessFlags(prot);
-        region->SetProt(accessFlags, prot);
+        region->SetAccessMode(accessFlags);
 
         process->PageMap->RemapRegion(region);
         return 0;

@@ -8,13 +8,12 @@
 
 #include <Common.hpp>
 
+#include <Prism/Containers/RedBlackTree.hpp>
 #include <Prism/Containers/Span.hpp>
-#include <Prism/Containers/UnorderedMap.hpp>
-#include <Prism/Containers/Vector.hpp>
 
 #include <Prism/Memory/Buffer.hpp>
-#include <Prism/Memory/ByteStream.hpp>
 #include <Prism/Memory/Memory.hpp>
+#include <Prism/Memory/Ref.hpp>
 
 #include <Prism/Utility/Delegate.hpp>
 #include <Prism/Utility/PathView.hpp>
@@ -178,6 +177,33 @@ namespace ELF
         u64       Alignment;
         u64       EntrySize;
     };
+
+    enum class RelocationType : u32
+    {
+        eNone      = 0,  // No relocation
+        e64        = 1,  // Direct 64-bit: *(u64*)patch = S + A
+        ePC32      = 2,  // PC-relative 32-bit signed: *(i32*)patch = S + A - P
+        eGOT32     = 3,  // GOT entry 32-bit
+        ePLT32     = 4,  // PLT entry 32-bit
+        eCopy      = 5,  // Runtime copy (dynamic linking)
+        eGlobDat   = 6,  // Set GOT entry to symbol address
+        eJumpSlot  = 7,  // Same as GlobDat
+        eRelative  = 8,  // Relative to base: *(u64*)patch = B + A
+        eGotOffset = 9,  // GOT offset
+        eGotPC     = 10, // PC-relative GOT offset
+        e32        = 10, // Direct 32-bit: *(u32*)patch = S + A
+        e32S       = 11, // Direct signed 32-bit
+        e16        = 12, // Direct 16-bit
+        ePC16      = 13, // PC-relative 16-bit
+        e8         = 14, // Direct 8-bit
+        ePC8       = 15, // PC-relative 8-bit
+        eDTPMod64  = 16, // TLS
+        eDTPOff64  = 17, // TLS
+        eTPOff64   = 18, // TLS
+        eTLSDESC   = 19, // TLS descriptor
+        eTLSDESC_CALL = 20, // TLS call
+        eIRELATIVE    = 37, // IFUNC-style relative relocation (PLT)
+    };
     struct [[gnu::packed]] RelocationEntry
     {
         u64 Offset;
@@ -237,7 +263,7 @@ namespace ELF
         u64               SegmentSizeInMemory;
         u64               Alignment;
     };
-    struct [[gnu::packed]] Sym
+    struct [[gnu::packed]] Symbol
     {
         u32 Name;
         u8  Info;
@@ -279,12 +305,12 @@ namespace ELF
     struct AuxiliaryVector
     {
         AuxiliaryVectorType Type;
-        uintptr_t           EntryPoint;
-        uintptr_t           ProgramHeadersAddress;
+        Pointer             EntryPoint;
+        Pointer             ProgramHeaderAddress;
         usize               ProgramHeaderEntrySize;
         usize               ProgramHeaderCount;
     };
-    class Image
+    class Image : public RefCounted
     {
       public:
         ErrorOr<void> LoadFromMemory(u8* data, usize size);
@@ -305,57 +331,55 @@ namespace ELF
         using SectionHeaderEnumerator = Delegate<bool(struct SectionHeader*)>;
         void ForEachSectionHeader(SectionHeaderEnumerator enumerator);
 
-        using SymbolEnumerator = Delegate<bool(Sym& symbol, StringView name)>;
-        void             ForEachSymbol(SymbolEnumerator enumerator);
+        using SymbolEntryEnumerator
+            = Delegate<bool(Symbol& symbol, StringView name)>;
+        void ForEachSymbolEntry(SymbolEntryEnumerator enumerator);
+        using SymbolEnumerator = Delegate<bool(StringView name, Pointer value)>;
+        void ForEachSymbol(SymbolEnumerator enumerator);
 
-        ErrorOr<void>    ResolveSymbols(Span<Sym*> symbolTable);
-        Pointer          LookupSymbol(StringView name);
-        void             DumpSymbols();
+        using SymbolLookup = Delegate<u64(StringView name)>;
+        ErrorOr<void>  ApplyRelocations(SymbolLookup lookup);
 
-        static bool      LoadModules(const u64             sectionCount,
-                                     struct SectionHeader* sections,
-                                     char*                 stringTable);
+        ErrorOr<void>  ResolveSymbols(SymbolLookup lookup);
+        ErrorOr<void>  ResolveSymbols(struct SectionHeader& section,
+                                      SymbolLookup          lookup);
+        Pointer        LookupSymbol(StringView name);
+        void           DumpSymbols();
 
-        inline uintptr_t GetEntryPoint() const
+        StringView     LookupString(usize index);
+
+        inline Pointer EntryPoint() const
         {
             return m_AuxiliaryVector.EntryPoint;
         }
-        inline uintptr_t GetAtPhdr() const
+        inline Pointer ProgramHeaderAddress() const
         {
-            return m_AuxiliaryVector.ProgramHeadersAddress;
+            return m_AuxiliaryVector.ProgramHeaderAddress;
         }
-        inline uintptr_t GetPhent() const
+        inline usize ProgramHeaderEntrySize() const
         {
             return m_AuxiliaryVector.ProgramHeaderEntrySize;
         }
-        inline uintptr_t GetPhNum() const
-        {
-            return m_AuxiliaryVector.ProgramHeaderCount;
-        }
 
-        inline StringView GetLdPath() const { return m_LdPath; }
+        inline PathView InterpreterPath() const { return m_InterpreterPath; }
 
       private:
-        Buffer                            m_Image;
-        Pointer                           m_LoadBase = nullptr;
+        Buffer                        m_Image;
+        Pointer                       m_LoadBase = nullptr;
 
-        struct Header                     m_Header;
-        Vector<struct ProgramHeader>      m_ProgramHeaders;
-        Vector<struct SectionHeader>      m_Sections;
-        AuxiliaryVector                   m_AuxiliaryVector;
+        struct Header                 m_Header;
+        AuxiliaryVector               m_AuxiliaryVector;
 
-        struct SectionHeader*             m_SymbolSection = nullptr;
-        struct SectionHeader*             m_StringSection = nullptr;
-        CTOS_UNUSED u8*                   m_StringTable   = nullptr;
+        struct SectionHeader*         m_SymbolSection = nullptr;
+        struct SectionHeader*         m_StringSection = nullptr;
+        const char*                   m_StringTable   = nullptr;
 
-        UnorderedMap<StringView, Pointer> m_SymbolTable;
-        StringView                        m_LdPath;
+        RedBlackTree<StringView, u64> m_Symbols;
+        StringView                    m_InterpreterPath;
 
-        ErrorOr<void>                     Parse();
-        void                              LoadSymbols();
-
-        bool ParseProgramHeaders(ByteStream<Endian::eLittle>& stream);
-        bool ParseSectionHeaders(ByteStream<Endian::eLittle>& stream);
+        ErrorOr<void>                 Parse();
+        bool                          ParseSectionHeaders();
+        bool                          LoadSymbols();
 
         template <typename T>
         void Read(T* buffer, isize offset, isize count = sizeof(T))

@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <Library/Module.hpp>
 #include <Library/Stacktrace.hpp>
 
 #include <Prism/Containers/RedBlackTree.hpp>
@@ -13,17 +14,29 @@
 #include <Prism/Containers/UnorderedMap.hpp>
 
 #include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Utility/PathView.hpp>
 
 namespace ELF
 {
     class Image;
 }
+
+class DirectoryEntry;
 namespace System
 {
     ErrorOr<void>                        LoadKernelSymbols();
+    ErrorOr<void>                        LoadModules();
+
+    ErrorOr<void>                        LoadModule(PathView path);
+    ErrorOr<void>                        LoadModule(Ref<DirectoryEntry> entry);
+    ErrorOr<void>                        LoadModule(Ref<Module> module);
+
+    Module::List&                        Modules();
+    Ref<Module>                          FindModule(StringView name);
 
     const ELF::Image&                    KernelImage();
     const RedBlackTree<StringView, u64>& KernelSymbols();
 
-    Pointer                              LookupKernelSymbol(StringView name);
+    u64                                  LookupKernelSymbol(StringView name);
 }; // namespace System
