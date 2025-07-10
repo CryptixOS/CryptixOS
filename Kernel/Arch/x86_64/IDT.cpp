@@ -165,12 +165,12 @@ static void pageFault(CPUContext* ctx)
     auto    errorCode    = ctx->errorCode;
     auto    faultReason  = pageFaultReason(errorCode);
 
-    LogError("P: {:b}, W: {:b}, U: {:b}, RW: {:b}, I: {:b}, PK: {:b}, SS: {:b}",
-             errorCode & PAGE_FAULT_PRESENT, errorCode & PAGE_FAULT_WRITE,
-             errorCode & PAGE_FAULT_USER, errorCode & PAGE_FAULT_RESERVED_WRITE,
-             errorCode & PAGE_FAULT_INSTRUCTION_FETCH,
-             errorCode & PAGE_FAULT_PROTECTION_KEY,
-             errorCode & PAGE_FAULT_SHADOW_STACK);
+    // LogError("P: {:b}, W: {:b}, U: {:b}, RW: {:b}, I: {:b}, PK: {:b}, SS: {:b}",
+    //          errorCode & PAGE_FAULT_PRESENT, errorCode & PAGE_FAULT_WRITE,
+    //          errorCode & PAGE_FAULT_USER, errorCode & PAGE_FAULT_RESERVED_WRITE,
+    //          errorCode & PAGE_FAULT_INSTRUCTION_FETCH,
+    //          errorCode & PAGE_FAULT_PROTECTION_KEY,
+    //          errorCode & PAGE_FAULT_SHADOW_STACK);
     PageFaultInfo faultInfo(faultAddress, faultReason, ctx);
     MemoryManager::HandlePageFault(faultInfo);
 }
@@ -187,7 +187,7 @@ extern "C" void raiseInterrupt(CPUContext* ctx)
     auto& handler = s_InterruptHandlers[ctx->interruptVector];
 
     if (ctx->interruptVector < 0x20)
-        exceptionHandlers[ctx->interruptVector](ctx);
+        return exceptionHandlers[ctx->interruptVector](ctx);
     else if (handler.IsUsed())
     {
         if (handler.eoiFirst) InterruptManager::SendEOI(ctx->interruptVector);
