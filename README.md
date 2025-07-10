@@ -99,7 +99,7 @@ To run CryptixOS in QEMU:
 - [compiler-rt builtins](https://github.com/ilobilo/compiler-rt-builtins.git/) – Low-level runtime library for compiler support.
 - [demangler](https://github.com/ilobilo/demangler.git) - C++, Microsoft C++, Rust and DLang name demangler
 - [fmt](https://github.com/fmtlib/fmt) – Fast, type-safe formatting library (used instead of stdio or iostreams).
-- [libstdcxx-freestanding](https://github.com/ilobilo/libstdcxx-freestanding) - Headers from GCC's libstdc++ that can be used in a freestanding environment.
+- [libstdcxx-freestanding](https://github.com/ilobilo/libstdcxx-headers.git) - Headers from GCC's libstdc++ that can be used in a freestanding environment.
 - [magic_enum](https://github.com/Neargye/magic_enum) - Header-only C++17 library provides static reflection for enums, work with any enum type without any macro or boilerplate code.
 - [OVMF binaries](https://retrage.github.io/edk2-nightly/) - Unofficial EDK2 nightly build
 - [parallel-hashmap](https://github.com/greg7mdp/parallel-hashmap) - A set of excellent hash map implementations, as well as a btree alternative to std::map and std::set
