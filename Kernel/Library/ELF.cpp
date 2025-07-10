@@ -530,7 +530,7 @@ namespace ELF
             }
         }
 
-        m_AuxiliaryVector.Type       = AuxiliaryVectorType::eAtBase;
+        m_AuxiliaryVector.Type       = AuxiliaryValueType::eInterpreterBase;
         m_AuxiliaryVector.EntryPoint = m_Header.EntryPoint + m_LoadBase.Raw();
         m_AuxiliaryVector.ProgramHeaderEntrySize = m_Header.ProgramEntrySize;
         m_AuxiliaryVector.ProgramHeaderCount     = m_Header.ProgramEntryCount;

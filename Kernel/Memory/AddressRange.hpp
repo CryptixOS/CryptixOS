@@ -21,6 +21,7 @@ class AddressRange final
     }
 
     constexpr inline Pointer Base() const { return m_Base; }
+    constexpr inline Pointer End() const { return Base().Offset(Size()); }
     constexpr inline usize   Size() const { return m_Size; }
 
     constexpr inline         operator bool() { return m_Base.operator bool(); }
@@ -28,6 +29,16 @@ class AddressRange final
     constexpr inline bool    Contains(Pointer address) const
     {
         return address >= m_Base && address < m_Base.Offset<Pointer>(m_Size);
+    }
+
+    bool Intersects(AddressRange const& other) const
+    {
+        auto a = *this;
+        auto b = other;
+
+        if (a.Base() > b.Base()) std::swap(a, b);
+
+        return a.Base() < b.End() && b.Base() < a.End();
     }
 
   private:

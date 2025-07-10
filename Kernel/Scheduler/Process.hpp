@@ -56,9 +56,8 @@ class Process
     static Process* CreateIdleProcess();
 
     Thread* CreateThread(Pointer rip, bool isUser = true, i64 runOn = -1);
-    Thread* CreateThread(Pointer rip, Vector<StringView>& argv,
-                         Vector<StringView>& envp, ExecutableProgram& program,
-                         i64 runOn = -1);
+    Thread* CreateThread(Vector<StringView>& argv, Vector<StringView>& envp,
+                         ExecutableProgram& program, i64 runOn = -1);
 
     bool    ValidateAddress(const Pointer address, i32 accessMode, usize size);
     inline bool ValidateRead(const Pointer address, usize size)
@@ -136,14 +135,17 @@ class Process
     i32            CloseFd(i32 fd);
     ErrorOr<isize> OpenPipe(i32* pipeFds);
     inline bool    IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
-    inline Ref<FileDescriptor> GetFileHandle(i32 fd) { return m_FdTable.GetFd(fd); }
+    inline Ref<FileDescriptor> GetFileHandle(i32 fd)
+    {
+        return m_FdTable.GetFd(fd);
+    }
 
-    ErrorOr<pid_t>         WaitPid(pid_t pid, i32* wstatus, i32 flags,
-                                   struct rusage* rusage);
+    ErrorOr<pid_t>    WaitPid(pid_t pid, i32* wstatus, i32 flags,
+                              struct rusage* rusage);
 
-    ErrorOr<Process*>      Fork();
-    ErrorOr<i32>           Exec(String path, char** argv, char** envp);
-    i32                    Exit(i32 code);
+    ErrorOr<Process*> Fork();
+    ErrorOr<i32>      Exec(String path, char** argv, char** envp);
+    i32               Exit(i32 code);
 
     friend struct Thread;
 

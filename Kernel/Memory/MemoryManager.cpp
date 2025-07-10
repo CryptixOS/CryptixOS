@@ -9,6 +9,8 @@
 #include <Memory/MemoryManager.hpp>
 #include <Scheduler/Process.hpp>
 
+#include <Prism/String/Formatter.hpp>
+
 namespace MemoryManager
 {
     namespace
@@ -100,10 +102,21 @@ namespace MemoryManager
 
     void HandlePageFault(const PageFaultInfo& info)
     {
-        auto message
-            = fmt::format("Page Fault occurred at '{:#x}'\nCaused by:\n",
-                          info.VirtualAddress().Raw());
-        auto reason = info.Reason();
+        auto message = Format("Page Fault occurred at '{:#x}'\nCaused by:\n",
+                              info.VirtualAddress().Raw());
+        auto reason  = info.Reason();
+
+        // LogTrace("Fault");
+        auto process = Process::Current();
+        auto region  = process
+                         ? process->AddressSpace().Find(info.VirtualAddress())
+                         : nullptr;
+        if (region)
+        {
+            auto pageMap = process->PageMap;
+            pageMap->MapRegion(region);
+            return;
+        }
 
         if (reason & PageFaultReason::eNotPresent)
             message += "\t- Non-present page\n";
@@ -121,19 +134,17 @@ namespace MemoryManager
             message += "\t- SGX violation\n";
 
         bool kernelFault = !(reason & PageFaultReason::eUser);
-        message += fmt::format("In {} space", kernelFault ? "User" : "Kernel");
+        message += Format("In {} space", kernelFault ? "User" : "Kernel");
 
         if (CPU::DuringSyscall())
         {
             usize      syscallID   = CPU::GetCurrent()->LastSyscallID;
             StringView syscallName = Syscall::GetName(syscallID);
-            message += fmt::format(", and during syscall({}) => {}", syscallID,
-                                   syscallName);
+            message += Format(", and during syscall({}) => {}", syscallID,
+                              syscallName);
         }
 
         message += '\n';
-        auto process = Process::Current();
-
         if (process && !kernelFault)
         {
             auto tty = process->TTY();

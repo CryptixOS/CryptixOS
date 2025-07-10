@@ -48,11 +48,11 @@ class AddressSpace
 
     inline PageMap* GetPageMap() const { return m_PageMap; }
 
+    RedBlackTree<uintptr_t, Ref<Region>> m_RegionTree;
   private:
     Spinlock                             m_Lock;
 
     PageMap*                             m_PageMap = nullptr;
-    RedBlackTree<uintptr_t, Ref<Region>> m_RegionTree;
 
     constexpr static Pointer             USERSPACE_VIRT_BASE{0x100000zu};
 

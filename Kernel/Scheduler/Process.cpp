@@ -108,11 +108,11 @@ Thread* Process::CreateThread(Pointer rip, bool isUser, i64 runOn)
     m_Threads.PushBack(thread);
     return thread;
 }
-Thread* Process::CreateThread(Pointer rip, Vector<StringView>& argv,
+Thread* Process::CreateThread(Vector<StringView>& argv,
                               Vector<StringView>& envp,
                               ExecutableProgram& program, i64 runOn)
 {
-    auto thread = new Thread(this, rip, argv, envp, program, runOn);
+    auto thread = new Thread(this, argv, envp, program, runOn);
 
     if (m_Threads.Empty()) m_MainThread = thread;
 
@@ -257,71 +257,17 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
     delete PageMap;
     PageMap = new class PageMap();
 
-    /*
-    auto nodeOr = CPU::AsUser([path]() -> auto
-                              { return VFS::ResolvePath(path.Raw()); });
-    if (!nodeOr) return nodeOr.error();
-
-    String shellPath;
-    char        shebang[2];
-    nodeOr.value()->Read(shebang, 0, 2);
-    bool containsShebang = false;
-    if (shebang[0] == '#' && shebang[1] == '!')
-    {
-        containsShebang = true;
-        String buffer;
-        buffer.Resize(20);
-        usize offset = 0;
-        usize index  = 0;
-        nodeOr.value()->Read(buffer.Raw(), offset + 2, 20);
-        for (;;)
-        {
-            if (index >= buffer.Size())
-            {
-                nodeOr.value()->Read(buffer.Raw(), offset + 2, 20);
-                index = 0;
-            }
-
-            if (buffer[index] == '\n' || buffer[index] == '\r') break;
-            ++index;
-            ++offset;
-        }
-
-        shellPath.Resize(offset + 1);
-        nodeOr.value()->Read(shellPath.Raw(), 2, offset);
-
-        shellPath[offset] = 0;
-        EarlyLogInfo("Shell: %s", shellPath.Raw());
-    }
-
-    shellPath.ShrinkToFit();
-    EarlyLogInfo("ShellPath: %s", shellPath.Raw() ?: "<NULL>");
-    EarlyLogInfo("Path: %s", path.Raw() ?: "<NULL>");
-    StringView     shPath = String(shellPath.Raw(), shellPath.Size());
-
-    Vector<String> args   = SplitArguments(
-        containsShebang && !shellPath.empty() ? shPath : StringView(path));
-    */
     Vector<StringView> argvArr;
     {
         CPU::UserMemoryProtectionGuard guard;
         // for (auto& arg : args) argvArr.EmplaceBack(arg.Raw(), arg.Size());
     }
-    // if (!shellPath.Empty()) argvArr.PushBack(path);
 
-    static ExecutableProgram program, ld;
-    // if (!program.Load(shellPath.Empty() || !containsShebang ? path.Raw()
-    // : argvArr[0].Raw(),
-    // PageMap, m_AddressSpace))
-    // return Error(ENOEXEC);
+    static ExecutableProgram program;
 
     if (!program.Load(path.Raw(), PageMap, m_AddressSpace))
         return Error(ENOEXEC);
 
-    auto ldPath = program.Image().InterpreterPath();
-    if (!ldPath.Empty())
-        Assert(ld.Load(ldPath, PageMap, m_AddressSpace,
-                       static_cast<uintptr_t>(0x40000000)));
     Thread* currentThread = CPU::GetCurrentThread();
     currentThread->SetState(ThreadState::eExited);
 
@@ -330,9 +276,6 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
         if (thread == currentThread) continue;
         delete thread;
     }
-
-    uintptr_t address = ldPath.Empty() ? program.Image().EntryPoint()
-                                       : ld.Image().EntryPoint();
 
     {
         CPU::UserMemoryProtectionGuard guard;
@@ -348,8 +291,8 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
         for (char** env = envp; *env; env++) envpArr.PushBack(*env);
     }
 
-    auto thread = CreateThread(address, argvArr, envpArr, program,
-                               CPU::GetCurrent()->ID);
+    auto thread
+        = CreateThread(argvArr, envpArr, program, CPU::GetCurrent()->ID);
     Scheduler::EnqueueThread(thread);
 
     Scheduler::Yield();

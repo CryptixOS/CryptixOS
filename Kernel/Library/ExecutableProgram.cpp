@@ -19,6 +19,108 @@ ErrorOr<void> ExecutableProgram::Load(PathView path, PageMap* pageMap,
                                       AddressSpace& addressSpace,
                                       Pointer       loadBase)
 {
+    m_LoadBase      = loadBase;
+    auto maybeImage = LoadImage(path, pageMap, addressSpace);
+    RetOnError(maybeImage);
+
+    m_Image      = maybeImage.value();
+    m_EntryPoint = m_Image->EntryPoint();
+
+    auto ldPath  = m_Image->InterpreterPath();
+    if (ldPath.Empty()) return {};
+
+    m_LoadBase = 0x40000000;
+    maybeImage = LoadImage(ldPath, pageMap, addressSpace, true);
+    RetOnError(maybeImage);
+
+    m_Interpreter = maybeImage.value();
+    m_EntryPoint  = m_Interpreter->EntryPoint();
+
+    return {};
+}
+
+Pointer ExecutableProgram::PrepareStack(Pointer            stackTopWritable,
+                                        Pointer            stackTopVirt,
+                                        Vector<StringView> argv,
+                                        Vector<StringView> envp)
+{
+    auto                           stack = stackTopWritable.As<uintptr_t>();
+
+    CPU::UserMemoryProtectionGuard guard;
+    for (auto env : envp)
+    {
+        stack = Pointer(stack).Offset<uintptr_t*>(-env.Size() - 1);
+        Memory::Copy(stack, env.Raw(), env.Size());
+    }
+    for (auto arg : argv)
+    {
+        stack = Pointer(stack).Offset<uintptr_t*>(-arg.Size() - 1);
+        Memory::Copy(stack, arg.Raw(), arg.Size());
+    }
+
+    stack = Pointer(Math::AlignDown(Pointer(stack), 16));
+    if ((argv.Size() + envp.Size() + 1) & 1) stack--;
+
+    *(--stack) = 0;
+    *(--stack) = 0;
+    stack -= 2;
+    stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eEntry),
+    stack[1] = Image().EntryPoint();
+    stack -= 2;
+    stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eProgramHeader),
+    stack[1] = Image().ProgramHeaderAddress();
+    stack -= 2;
+    stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eProgramHeaderEntrySize),
+    stack[1] = Image().ProgramHeaderEntrySize();
+    stack -= 2;
+    stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eProgramHeaderCount),
+    stack[1] = Image().ProgramHeaderCount();
+
+    // if (m_InterpreterBase)
+    // {
+    //     stack -= 2;
+    //     stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eInterpreterBase),
+    //     stack[1] = m_InterpreterBase;
+    // }
+    // stack -= 2;
+    // stack[0] = ToUnderlying(ELF::AuxiliaryValueType::ePageSize),
+    // stack[1] = PMM::PAGE_SIZE;
+    // stack -= 2;
+    // stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eUid), stack[1] = 0;
+    // stack -= 2;
+    // stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eEUid), stack[1] = 0;
+    // stack -= 2;
+    // stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eGid), stack[1] = 0;
+    // stack -= 2;
+    // stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eEGid), stack[1] = 0;
+    // stack -= 2;
+    // stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eExec), stack[1] = 0;
+
+    Pointer stackPointer = stackTopVirt;
+    *(--stack)           = 0;
+    stack -= envp.Size();
+    for (usize i = 0; auto env : envp)
+    {
+        stackPointer -= env.Size() + 1;
+        stack[i++] = stackPointer;
+    }
+
+    *(--stack) = 0;
+    stack -= argv.Size();
+    for (usize i = 0; auto arg : argv)
+    {
+        stackPointer -= arg.Size() + 1;
+        stack[i++] = stackPointer;
+    }
+
+    *(--stack) = argv.Size();
+    return stackTopVirt.Raw() - (stackTopWritable.Raw() - Pointer(stack).Raw());
+}
+
+ErrorOr<Ref<ELF::Image>>
+ExecutableProgram::LoadImage(PathView path, PageMap* pageMap,
+                             AddressSpace& addressSpace, bool interpreter)
+{
     Ref entry = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), path)
                     .value()
                     .Entry;
@@ -31,11 +133,9 @@ ErrorOr<void> ExecutableProgram::Load(PathView path, PageMap* pageMap,
         = VFS::Open(VFS::GetRootDirectoryEntry().Raw(), path, O_RDONLY, 0);
     RetOnError(maybeFile);
 
-    // TODO(v1tr10l7): add refcounting to file descriptors
-
-    // TODO(v1tr10l7): close the file
-    auto file = maybeFile.value();
-    if (!m_Image.Load(file, loadBase)) return Error(ENOEXEC);
+    Ref file  = maybeFile.value();
+    Ref image = CreateRef<ELF::Image>();
+    if (!image->Load(file.Raw(), m_LoadBase)) return Error(ENOEXEC);
 
     auto forEachProgramHeader = [&](ELF::ProgramHeader* header) -> bool
     {
@@ -48,42 +148,23 @@ ErrorOr<void> ExecutableProgram::Load(PathView path, PageMap* pageMap,
             Pointer phys = PMM::CallocatePages(pageCount);
             Assert(phys);
 
+            // auto  virt = header->VirtualAddress + m_LoadBase;
             usize size = pageCount * PMM::PAGE_SIZE;
             Assert(pageMap->MapRange(
-                header->VirtualAddress + loadBase.Raw(), phys, size,
+                header->VirtualAddress + m_LoadBase, phys, size,
                 PageAttributes::eRWXU | PageAttributes::eWriteBack));
-            auto region = new Region(
-                phys, header->VirtualAddress + loadBase.Raw(), size);
+            auto region
+                = new Region(phys, header->VirtualAddress + m_LoadBase, size);
             using VMM::Access;
             region->SetAccessMode(Access::eReadWriteExecute | Access::eUser);
 
             addressSpace.Insert(region->VirtualBase(), region);
             Memory::Copy(phys.Offset<Pointer>(misalign).ToHigherHalf(),
-                         m_Image.Raw().Offset(header->Offset),
+                         image->Raw().Offset(header->Offset),
                          header->SegmentSizeInFile);
-        }
 
-        return true;
-    };
-    auto forEachSectionHeader = [&](ELF::SectionHeader* section) -> bool
-    {
-        if (section->Type == ToUnderlying(ELF::SectionType::eSymbolTable))
-        {
-            auto stringTableHeader
-                = Pointer(m_Image.Header().SectionHeaderTableOffset
-                          + m_Image.Header().SectionEntrySize * section->Link)
-                      .Offset<ELF::SectionHeader*>(loadBase);
-            char* symbolNames
-                = reinterpret_cast<char*>(stringTableHeader->Address);
-            ELF::Symbol* symbolTable
-                = reinterpret_cast<ELF::Symbol*>(section->Address);
-
-            for (usize symbol = 0; symbol < section->Size / sizeof(ELF::Symbol);
-                 ++symbol)
-            {
-                char* name = (symbolNames + symbolTable[symbol].Name);
-                LogTrace("Symbol => {}", name);
-            }
+            // if (interpreter)
+            //     m_InterpreterBase = std::min(m_InterpreterBase, virt);
         }
 
         return true;
@@ -92,12 +173,6 @@ ErrorOr<void> ExecutableProgram::Load(PathView path, PageMap* pageMap,
     ELF::Image::ProgramHeaderEnumerator programHeaderIterator;
     programHeaderIterator.BindLambda(forEachProgramHeader);
 
-    ELF::Image::SectionHeaderEnumerator sectionHeaderIterator;
-    sectionHeaderIterator.BindLambda(forEachSectionHeader);
-
-    m_Image.ForEachProgramHeader(programHeaderIterator);
-    // m_Image.ForEachSectionHeader(sectionHeaderIterator);
-
-    delete file;
-    return {};
+    image->ForEachProgramHeader(programHeaderIterator);
+    return image;
 }

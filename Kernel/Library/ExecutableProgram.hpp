@@ -15,9 +15,23 @@ class ExecutableProgram
 
     ErrorOr<void> Load(PathView path, PageMap* pageMap,
                        AddressSpace& addressSpace, Pointer loadBase = 0);
+    Pointer PrepareStack(Pointer _stack, Pointer sp, Vector<StringView> argv,
+                         Vector<StringView> envp);
 
-    ELF::Image&   Image() { return m_Image; }
+    ELF::Image& Image() { return *m_Image.Raw(); }
+
+    Pointer     EntryPoint() const { return m_EntryPoint; }
+    Pointer     LoadBase() const { return m_LoadBase; }
 
   private:
-    ELF::Image m_Image;
+    Ref<ELF::Image>          m_Image;
+    Ref<ELF::Image>          m_Interpreter = nullptr;
+
+    u64                      m_EntryPoint  = 0;
+    u64                      m_LoadBase    = 0;
+    // u64                      m_InterpreterBase = 0;
+
+    ErrorOr<Ref<ELF::Image>> LoadImage(PathView path, PageMap* pageMap,
+                                       AddressSpace& addressSpace,
+                                       bool          interpreter = false);
 };

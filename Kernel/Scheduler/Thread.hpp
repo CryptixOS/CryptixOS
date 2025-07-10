@@ -40,9 +40,8 @@ struct Thread
 {
     Thread() = default;
     Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn = -1);
-    Thread(Process* parent, Pointer pc, Vector<StringView>& arg,
-           Vector<StringView>& envp, ExecutableProgram& program,
-           i64 runOn = -1);
+    Thread(Process* parent, Vector<StringView>& arg, Vector<StringView>& envp,
+           ExecutableProgram& program, i64 runOn = -1);
     Thread(Process* parent, Pointer pc, bool user = true);
     ~Thread();
 
@@ -145,7 +144,7 @@ struct Thread
 
   private:
     Vector<Ref<Region>> m_Stacks;
-    bool           m_IsUser = false;
+    bool                m_IsUser = false;
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
     Pointer m_GsBase;

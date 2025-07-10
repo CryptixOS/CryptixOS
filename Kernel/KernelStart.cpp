@@ -85,30 +85,15 @@ static bool loadInitProcess(Path initPath)
     Vector<StringView> envp;
     envp.PushBack("TERM=linux");
 
-    static ExecutableProgram program, ld;
+    static ExecutableProgram program;
     PageMap*                 pageMap = new PageMap();
     if (!program.Load(initPath, pageMap, userProcess->AddressSpace()))
         return false;
-    PathView ldPath = program.Image().InterpreterPath();
-    if (!ldPath.Empty()
-        && !ld.Load(ldPath, pageMap, userProcess->AddressSpace(),
-                    static_cast<uintptr_t>(0x40000000)))
-    {
-        delete pageMap;
-        return false;
-    }
-    userProcess->PageMap = pageMap;
-    auto address         = ldPath.Empty() ? program.Image().EntryPoint()
-                                          : ld.Image().EntryPoint();
-    if (!address)
-    {
-        delete pageMap;
-        return false;
-    }
 
+    userProcess->PageMap = pageMap;
     Logger::DisableSink(LOG_SINK_TERMINAL);
-    auto userThread = userProcess->CreateThread(address, argv, envp, program,
-                                                CPU::GetCurrent()->ID);
+    auto userThread
+        = userProcess->CreateThread(argv, envp, program, CPU::GetCurrent()->ID);
     VMM::UnmapKernelInitCode();
 
     auto colonel   = Scheduler::GetKernelProcess();
