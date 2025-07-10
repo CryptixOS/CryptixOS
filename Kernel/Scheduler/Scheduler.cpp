@@ -43,7 +43,7 @@ namespace
 struct ThreadQueue
 {
     mutable Spinlock Lock;
-    Deque<Thread*>   Queue;
+    Thread::List     Queue;
 
     constexpr usize  Size() const { return Queue.Size(); }
     constexpr bool   IsEmpty() const { return Queue.Empty(); }
@@ -51,25 +51,29 @@ struct ThreadQueue
     auto             begin() { return Queue.begin(); }
     auto             end() { return Queue.end(); }
 
-    inline Thread*   Front() const
+    inline Thread*   Front()
     {
         ScopedLock guard(Lock);
-        return Queue.Front();
+        return Queue.Head();
     }
-    inline Thread* Back() const
+    inline Thread* Back()
     {
         ScopedLock guard(Lock);
-        return Queue.Back();
+        return Queue.Tail();
     }
 
     inline void PushBack(Thread* t)
     {
         ScopedLock guard(Lock);
+
+        t->Hook.Unlink(t);
         Queue.PushBack(t);
     }
     inline void PushFront(Thread* t)
     {
         ScopedLock guard(Lock);
+
+        t->Hook.Unlink(t);
         Queue.PushFront(t);
     }
 
@@ -138,10 +142,10 @@ void Scheduler::PrepareAP(bool start)
     Process* process    = Process::CreateIdleProcess();
 
     auto     idleThread = process->CreateThread(
-        reinterpret_cast<uintptr_t>(Arch::Halt), false, CPU::GetCurrent()->ID);
+        reinterpret_cast<uintptr_t>(Arch::Halt), false, CPU::Current()->ID);
     idleThread->SetState(ThreadState::eReady);
 
-    CPU::GetCurrent()->Idle = idleThread;
+    CPU::Current()->Idle = idleThread;
 
     if (start)
     {
@@ -193,13 +197,13 @@ void Scheduler::Unblock(Thread* thread)
     if (!thread->m_IsEnqueued) EnqueueThread(thread);
 
     for (auto it = s_BlockedQueue.begin(); it != s_BlockedQueue.end(); it++)
-        if (*it == thread)
+        if (it.Current == thread)
         {
             s_BlockedQueue.Erase(it);
             break;
         }
 #ifdef CTOS_TARGET_X86_64
-    Lapic::Instance()->SendIpi(g_ScheduleVector, CPU::GetCurrent()->LapicID);
+    Lapic::Instance()->SendIpi(g_ScheduleVector, CPU::Current()->LapicID);
 #endif
 }
 
@@ -215,14 +219,13 @@ void Scheduler::Yield(bool saveCtx)
     else
     {
 #ifdef CTOS_TARGET_X86_64
-        CPU::SetGSBase(reinterpret_cast<uintptr_t>(CPU::GetCurrent()->Idle));
-        CPU::SetKernelGSBase(
-            reinterpret_cast<uintptr_t>(CPU::GetCurrent()->Idle));
+        CPU::SetGSBase(reinterpret_cast<uintptr_t>(CPU::Current()->Idle));
+        CPU::SetKernelGSBase(reinterpret_cast<uintptr_t>(CPU::Current()->Idle));
 #endif
     }
 
 #ifdef CTOS_TARGET_X86_64
-    Lapic::Instance()->SendIpi(g_ScheduleVector, CPU::GetCurrent()->LapicID);
+    Lapic::Instance()->SendIpi(g_ScheduleVector, CPU::Current()->LapicID);
 #endif
 
     CPU::SetInterruptFlag(true);
@@ -297,7 +300,7 @@ void Scheduler::DequeueThread(Thread* thread)
     ScopedLock guard(s_Lock);
 
     for (auto& current : s_ExecutionQueue)
-        if (current == thread)
+        if (&current == thread)
         {
             thread->m_IsEnqueued = false;
             thread->SetState(ThreadState::eDequeued);
@@ -320,7 +323,7 @@ Thread* Scheduler::GetNextThread(usize cpuID)
 }
 Thread* Scheduler::PickReadyThread()
 {
-    auto newThread = GetNextThread(CPU::GetCurrent()->ID);
+    auto newThread = GetNextThread(CPU::Current()->ID);
     for (; newThread && newThread->State() != ThreadState::eReady;)
     {
         if (newThread->IsDead())
@@ -331,17 +334,16 @@ Thread* Scheduler::PickReadyThread()
         else if (newThread->IsBlocked())
         {
             s_BlockedQueue.PushBack(newThread);
-            newThread = GetNextThread(CPU::GetCurrent()->ID);
+            newThread = GetNextThread(CPU::Current()->ID);
             continue;
         }
 
         EnqueueNotReady(newThread);
-        newThread = GetNextThread(CPU::GetCurrent()->ID);
+        newThread = GetNextThread(CPU::Current()->ID);
     }
 
     Thread* currentThread = Thread::Current();
-    if (!newThread)
-        return currentThread ? currentThread : CPU::GetCurrent()->Idle;
+    if (!newThread) return currentThread ? currentThread : CPU::Current()->Idle;
 
     newThread->DispatchAnyPendingSignal();
     return newThread;
@@ -353,7 +355,7 @@ void Scheduler::SwitchContext(Thread* newThread, CPUContext* oldContext)
 
     if (currentThread && !currentThread->IsDead())
     {
-        if (currentThread != CPU::GetCurrent()->Idle)
+        if (currentThread != CPU::Current()->Idle)
             EnqueueNotReady(currentThread);
 
         CPU::SaveThread(currentThread, oldContext);
@@ -362,20 +364,20 @@ void Scheduler::SwitchContext(Thread* newThread, CPUContext* oldContext)
     CPU::LoadThread(newThread, oldContext);
 
     if (currentThread && currentThread->IsDead()
-        && currentThread != CPU::GetCurrent()->Idle)
+        && currentThread != CPU::Current()->Idle)
         delete currentThread;
 }
 
 void Scheduler::Tick(CPUContext* ctx)
 {
     Thread* newThread = CPU::GetCurrentThread();
-    if (!newThread) newThread = CPU::GetCurrent()->Idle;
+    if (!newThread) newThread = CPU::Current()->Idle;
     if (!IsPreemptionEnabled()) goto reschedule;
 
     newThread = PickReadyThread();
     SwitchContext(newThread, ctx);
 
-    if (newThread != CPU::GetCurrent()->Idle)
+    if (newThread != CPU::Current()->Idle)
         newThread->SetState(ThreadState::eRunning);
 
 reschedule:

@@ -21,6 +21,7 @@
 #include <Memory/Region.hpp>
 
 #include <Prism/Containers/Deque.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
 #include <Scheduler/Event.hpp>
 
 enum class ThreadState
@@ -117,6 +118,8 @@ struct Thread
 
     inline void                  SetWhich(usize which) { m_Which = which; }
 
+    using List = IntrusiveList<Thread>;
+
   private:
     ///// DON'T MOVE /////
     isize       m_RunningOn = -1;
@@ -160,6 +163,12 @@ struct Thread
     struct Event         m_Event;
     Deque<struct Event*> m_Events;
     usize                m_Which = 0;
+
+    friend class IntrusiveList<Thread>;
+    friend struct IntrusiveListHook<Thread>;
+    friend struct ThreadQueue;
+
+    IntrusiveListHook<Thread> Hook;
 
     friend class Process;
     friend class Scheduler;
