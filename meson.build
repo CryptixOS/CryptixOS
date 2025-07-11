@@ -153,27 +153,44 @@ no_ext_mods = ext_mods.length() == 0
 # ==============================================================================
 ### Qemu args
 qemu_args = [
+  # CPU
+  # enable all host cpu features
   '-cpu', 'max',
-  '-net', 'none',
-  '-d', 'int,guest_errors',
+  # use acceleration if available
+  '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
+  # use 4 cores
   '-smp', '4',
-  '-d', 'cpu_reset',
+
+  # setup NUMA nodes
+  '-object', 'memory-backend-ram,id=ram0,size=1024M',
+  '-object', 'memory-backend-ram,id=ram1,size=1024M',
+  '-numa', 'node,cpus=0-1,memdev=ram0',
+  '-numa', 'node,cpus=2-3,memdev=ram1',
+
   # use 2G of memory
-  '-m', '4G',
-  # set rtc to localtime
-  '-rtc', 'base=localtime',
+  '-m', '2G',
+
+  # reset the cpu
+  '-d', 'cpu_reset',
+  # do a register dump on exception
+  '-d', 'int,guest_errors',
+
   # don't reboot nor shutdown on triple fault
-  #'-no-shutdown', '-no-reboot',
+  '-no-shutdown', '-no-reboot',
   # output qemu logs to > qemu.log
   '-D', meson.project_source_root() / 'qemu.log',
   # enable boot menu
   '-boot', 'order=d,menu=on,splash-time=100',
-  # setup audio backend
-  '-audiodev', 'id=audio,driver=alsa',
-  # use acceleration if available
-  '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
+
+  # set rtc to localtime
+  '-rtc', 'base=localtime',
+  # disable network
+  '-net', 'none',
   # add smbios table of type 1
   '-smbios', 'type=1',
+
+  # setup audio backend
+  '-audiodev', 'id=audio,driver=alsa',
   # add rtl8139 nic card
   '-nic', 'user,model=rtl8139',
   # add erst table
@@ -189,6 +206,8 @@ qemu_args = [
   '-device', 'nvme,id=nvme0,serial=nvme,bus=pcie.0',
   # nvme0n1 - nvme namespace of controller nvme0
   '-device', 'nvme-ns,drive=drive1,nsid=2,bus=nvme0,id=nvme0n1',
+
+  #'-usb', '-device', 'usb-ehci,id=ehci', '-device', 'usb-kbd,bus=usb-bus.0',  
 
   # pci-to-pci bridge
   '-device', 'pci-bridge,id=pcie2,bus=pcie.0,addr=1e,chassis_nr=1',
@@ -327,7 +346,7 @@ initrd_zlib = custom_target(
 iso = custom_target(
   'iso',
   input: [
-    kernel_elf, initrd_zlib, 
+    kernel_elf, initrd, 
     meson.project_source_root() / 'Meta' / 'limine.conf', 
     meson.project_source_root() / 'Meta' / 'images' / 'bg2.png', 
     meson.project_source_root() / 'Meta' / 'fonts' / 'font.bin'],
@@ -342,7 +361,7 @@ iso = custom_target(
     '&&',
     'cp',
     '@INPUT1@',
-    iso_dir / 'initrd.zlib',
+    iso_dir / 'initrd.img.gz',
     '&&',
     'cp',
     '@INPUT2@',
