@@ -23,19 +23,16 @@ class AddressSpace
     AddressSpace();
     ~AddressSpace();
 
-    bool           IsAvailable(Pointer base, usize length) const;
+    bool        IsAvailable(Pointer base, usize length) const;
 
-    void           Insert(Pointer, Ref<Region> region);
-    void           Erase(Pointer);
+    void        Insert(Pointer, Ref<Region> region);
+    void        Erase(Pointer);
 
-    Ref<Region>    AllocateRegion(usize size, usize alignment = 0);
-    Ref<Region>    AllocateFixed(Pointer requestedAddress, usize size);
+    Ref<Region> AllocateRegion(usize size, usize alignment = 0);
+    Ref<Region> AllocateFixed(Pointer requestedAddress, usize size);
 
-    Ref<Region>    Find(Pointer virt) const;
-    constexpr bool Contains(Pointer virt) const
-    {
-        return Find(virt) != nullptr;
-    }
+    Ref<Region> Find(Pointer virt) const;
+    bool        Contains(Pointer virt) const { return Find(virt) != nullptr; }
 
     inline Ref<Region> operator[](Pointer virt)
     {
@@ -49,14 +46,15 @@ class AddressSpace
     inline PageMap* GetPageMap() const { return m_PageMap; }
 
     RedBlackTree<uintptr_t, Ref<Region>> m_RegionTree;
+
   private:
-    Spinlock                             m_Lock;
+    Spinlock                 m_Lock;
 
-    PageMap*                             m_PageMap = nullptr;
+    PageMap*                 m_PageMap = nullptr;
 
-    constexpr static Pointer             USERSPACE_VIRT_BASE{0x100000zu};
+    constexpr static Pointer USERSPACE_VIRT_BASE{0x100000zu};
 
-    AddressRange                         m_TotalRange
+    AddressRange             m_TotalRange
         = {USERSPACE_VIRT_BASE,
            BootInfo::GetHHDMOffset() - USERSPACE_VIRT_BASE.Raw() - 0x1000000zu};
 };
