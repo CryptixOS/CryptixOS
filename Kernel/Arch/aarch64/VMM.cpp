@@ -4,6 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Boot/BootInfo.hpp>
+
 #include <Debug/Assertions.hpp>
 #include <Debug/Panic.hpp>
 
@@ -312,7 +314,7 @@ bool PageMap::InternalMap(Pointer virt, Pointer phys, PageAttributes flags)
 bool PageMap::InternalUnmap(Pointer virt, PageAttributes flags)
 {
     PageTableEntry* pmlEntry
-        = Virt2Pte(topLevel, virt, false, GetPageSize(flags));
+        = Virt2Pte(m_TopLevel, virt, false, GetPageSize(flags));
     if (!pmlEntry)
     {
         LogError("VMM: Could not get page map entry for address 0x{:X}", virt);
@@ -321,7 +323,7 @@ bool PageMap::InternalUnmap(Pointer virt, PageAttributes flags)
 
     pmlEntry->Clear();
 
-    usize addr = (0ull << 48ull) | (virt >> 12ul);
+    usize addr = (0ull << 48ull) | (virt.Raw() >> 12ul);
     __asm__ volatile(
         "dsb st; \n\t"
         "tlbi vale1, %0;\n\t"
@@ -333,7 +335,7 @@ bool PageMap::InternalUnmap(Pointer virt, PageAttributes flags)
 bool PageMap::SetFlags(Pointer virt, PageAttributes flags)
 {
     PageTableEntry* pmlEntry
-        = Virt2Pte(topLevel, virt, false, GetPageSize(flags));
+        = Virt2Pte(m_TopLevel, virt, false, GetPageSize(flags));
     if (!pmlEntry)
     {
         LogError("VMM: Could not get page map entry for address {:#x}", virt);
@@ -341,7 +343,7 @@ bool PageMap::SetFlags(Pointer virt, PageAttributes flags)
     }
 
     auto nativeFlags = ToNativeFlags(flags);
-    auto addr        = pmlEntry->GetAddress();
+    auto addr        = pmlEntry->Address();
 
     pmlEntry->Clear();
     pmlEntry->SetAddress(addr);
