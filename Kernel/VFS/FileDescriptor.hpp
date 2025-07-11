@@ -71,15 +71,12 @@ class FileDescriptor : public RefCounted
                    FileAccessMode accMode);
     virtual ~FileDescriptor();
 
-    inline INode* INode() const { return m_DirectoryEntry->INode(); }
-    constexpr ::Ref<DirectoryEntry> DirectoryEntry() const
-    {
-        return m_DirectoryEntry;
-    }
-    inline usize GetOffset() const { return m_Offset; }
+    inline INode*         INode() const { return m_DirectoryEntry->INode(); }
+    ::Ref<DirectoryEntry> DirectoryEntry() const { return m_DirectoryEntry; }
+    inline usize          GetOffset() const { return m_Offset; }
 
-    inline i32   GetFlags() const { return m_Flags; }
-    inline void  SetFlags(i32 flags)
+    inline i32            GetFlags() const { return m_Flags; }
+    inline void           SetFlags(i32 flags)
     {
         ScopedLock guard(m_Lock);
         m_Flags = flags;
