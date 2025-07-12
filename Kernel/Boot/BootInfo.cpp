@@ -354,7 +354,7 @@ namespace BootInfo
 #ifdef CTOS_TARGET_X86_64
         info.BspID = s_SmpRequest.response->bsp_lapic_id;
 #elifdef CTOS_TARGET_AARCH64
-        info.BspID = s_SmpRequest.response->mpidr;
+        info.BspID = s_SmpRequest.response->bsp_mpidr;
 #endif
         info.ProcessorCount = s_SmpRequest.response->cpu_count;
 
