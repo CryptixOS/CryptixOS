@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Boot/BootInfo.hpp>
+#include <Debug/Config.hpp>
 
 #include <Firmware/DeviceTree/DeviceTree.hpp>
 #include <Library/Logger.hpp>
@@ -114,7 +115,10 @@ namespace DeviceTree
         auto success = ParseFDT(header);
         if (!success) return false;
 
+#if CTOS_DUMP_DEVICE_TREE
         s_RootNode->Print();
+#endif
+
         LogInfo("DeviceTree: FDT parsed successfully");
         return success;
     }

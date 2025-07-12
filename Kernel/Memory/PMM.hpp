@@ -8,6 +8,8 @@
 
 #include <Common.hpp>
 
+#include <Prism/Memory/Pointer.hpp>
+
 namespace PhysicalMemoryManager
 {
     constexpr usize     PAGE_SIZE = 0x1000;

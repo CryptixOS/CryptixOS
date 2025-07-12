@@ -7,6 +7,7 @@
 #include <Common.hpp>
 
 #include <Boot/BootInfo.hpp>
+#include <Debug/Config.hpp>
 #include <Library/Locking/Spinlock.hpp>
 
 #include <Memory/PMM.hpp>
@@ -55,6 +56,7 @@ namespace PhysicalMemoryManager
         auto entryCount = memoryMap.EntryCount;
         if (entryCount == 0) return false;
 
+#if CTOS_PMM_DUMP_MEMORY_MAP
         for (usize i = 0; i < entryCount; i++)
         {
             auto&   current     = memoryMap.Entries[i];
@@ -66,6 +68,7 @@ namespace PhysicalMemoryManager
                 "%s }",
                 i, entryBase.Raw(), entryLength, ToString(current.Type()));
         }
+#endif
 
         auto status = s_BitmapAllocator.Initialize(memoryMap, PAGE_SIZE);
         if (!status)

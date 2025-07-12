@@ -5,13 +5,13 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Boot/BootInfo.hpp>
+#include <Debug/Config.hpp>
 
 #include <Firmware/EFI/Memory.hpp>
 #include <Library/Logger.hpp>
 
 #include <Memory/VMM.hpp>
-
-#include <magic_enum/magic_enum.hpp>
+#include <Prism/String/StringUtils.hpp>
 
 namespace EFI
 {
@@ -59,16 +59,19 @@ namespace EFI
             usize      phys       = descriptor->PhysicalStart;
             usize      virt       = descriptor->VirtualStart;
             usize      pageCount  = descriptor->PageCount;
-            auto       attributes = ToUnderlying(descriptor->Attribute);
 
-            StringView typeString
-                = magic_enum::enum_name(type).data() ?: "Unknown";
-            if (typeString.StartsWith("e")) typeString = typeString.Raw() + 1;
+            StringView typeString = ToString(type);
+            if (typeString.Empty()) typeString = "Unknown"_sv;
+            if (typeString.StartsWith("e")) typeString.RemovePrefix(1);
+
+#if CTOS_DUMP_EFI_MEMORY_MAP
+            auto attributes = ToUnderlying(descriptor->Attribute);
 
             LogTrace(
                 "EFI: MemoryMap[{}] => {{ .Type: {}, .PhysicalStart: {:#x}, "
                 ".VirtualStart: {:#x}, .PageCount: {}, .Attributes: {:#b} }}",
                 i, typeString, phys, virt, pageCount, attributes);
+#endif
 
             if (type != MemoryType::eRuntimeServicesCode
                 && type != MemoryType::eRuntimeServicesData)
