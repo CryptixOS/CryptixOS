@@ -13,7 +13,7 @@ tools:
         - '--target=@OPTION:arch-triple@'
         - '--with-sysroot=@SYSROOT_DIR@'
         # - '--disable-multilib'
-        # - '--enable-initfini-array'
+        - '--enable-initfini-array'
         - '--without-headers'
         - '--without-newlib'
         - '--enable-languages=c,c++,lto'
