@@ -16,7 +16,8 @@ tools:
         - '--enable-initfini-array'
         #- '--without-headers'
         #- '--without-newlib'
-        - '--enable-languages=c,c++,lto'
+        - '--enable-languages=c,c++'
+        - '--disable-multilib'
         - '--disable-shared'
         #- '--disable-hosted-libstdcxx'
         # libstdc++ can detect that wchar_t is supported by @SYSROOT_DIR@ and
