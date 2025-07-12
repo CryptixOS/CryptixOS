@@ -18,7 +18,7 @@ tools:
         - '--without-newlib'
         - '--enable-languages=c,c++,lto'
         - '--disable-shared'
-        - '--disable-hosted-libstdcxx'
+        #- '--disable-hosted-libstdcxx'
         # libstdc++ can detect that wchar_t is supported by @SYSROOT_DIR@ and
         # try to enable code we don't want for wchar handling.  just remove it.
         - '--disable-wchar_t'
