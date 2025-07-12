@@ -72,7 +72,7 @@ add_global_arguments(
     warnings,
     macros,
     '-ffreestanding',
-    # keep stack pointer in the appriopriate register
+    # keep stack pointer in the appropriate register
     '-fno-omit-frame-pointer',
     '-fno-lto',
     '-fsanitize=undefined',
