@@ -101,13 +101,14 @@ namespace VMM
             = Pointer(limine_requests_addr_end) - limineRequestsVirt;
         Assert(s_KernelPageMap->MapRange(
             limineRequestsVirt, limineRequestsPhys, limineRequestsSize,
-            PageAttributes::eRWX | PageAttributes::eWriteBack));
+            PageAttributes::eRead | PageAttributes::eWriteBack));
 
         auto textVirt = Pointer(text_start_addr);
         auto textPhys = Pointer(text_start_addr) - kernelVirt + kernelPhys;
         auto textSize = Pointer(text_end_addr) - textVirt;
         Assert(s_KernelPageMap->MapRange(textVirt, textPhys, textSize,
-                                         PageAttributes::eRWX
+                                         PageAttributes::eRead
+                                             | PageAttributes::eExecutable
                                              | PageAttributes::eWriteBack));
 
         {

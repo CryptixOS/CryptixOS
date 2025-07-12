@@ -29,6 +29,9 @@ namespace MemoryManager
     void        Initialize(const MemoryMap& memoryMap, Pointer kernelPhys,
                            Pointer kernelVirt, usize higherHalfOffset);
 
+    Pointer     KernelPhysicalAddress();
+    Pointer     KernelVirtualAddress();
+
     Ref<Region> AllocateRegion(const usize    bytes,
                                PageAttributes attributes = PageAttributes::eRW,
                                const MemoryUsage memoryUsage

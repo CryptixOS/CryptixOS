@@ -10,6 +10,7 @@
 
 #include <Library/Stacktrace.hpp>
 
+#include <Memory/MemoryManager.hpp>
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
@@ -83,8 +84,8 @@ namespace Stacktrace
                 if (*current == '\n') break;
 
             Symbol ksym;
-            if (address < BootInfo::KernelVirtualAddress().Raw<>())
-                address += BootInfo::KernelVirtualAddress().Raw<>();
+            if (address < MemoryManager::KernelVirtualAddress().Raw<>())
+                address += MemoryManager::KernelVirtualAddress().Raw<>();
 
             ksym.Address = address;
             ksym.Name    = name.Substr(0, name.FindFirstOf('\n'));

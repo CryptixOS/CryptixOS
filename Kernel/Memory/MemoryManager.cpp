@@ -19,11 +19,16 @@ namespace MemoryManager
     namespace
     {
         AddressSpace s_KernelAddressSpace;
-    };
+        Pointer      s_KernelPhysicalAddress = nullptr;
+        Pointer      s_KernelVirtualAddress  = nullptr;
+    }; // namespace
 
     void Initialize(const MemoryMap& memoryMap, Pointer kernelPhys,
                     Pointer kernelVirt, usize higherHalfOffset)
     {
+        s_KernelPhysicalAddress = kernelPhys;
+        s_KernelVirtualAddress  = kernelVirt;
+
         // Call global constructors
         icxxabi::Initialize();
         // Initialize early kernel heap
@@ -33,6 +38,9 @@ namespace MemoryManager
 
         VMM::Initialize(kernelPhys, kernelVirt, higherHalfOffset);
     }
+
+    Pointer     KernelPhysicalAddress() { return s_KernelPhysicalAddress; }
+    Pointer     KernelVirtualAddress() { return s_KernelVirtualAddress; }
 
     Ref<Region> AllocateRegion(const usize bytes, PageAttributes attributes,
                                const MemoryUsage memoryUsage)
