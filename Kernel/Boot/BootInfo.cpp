@@ -339,8 +339,12 @@ namespace BootInfo
         info.MemoryMap         = s_MemoryMap;
         info.HigherHalfOffset  = s_HhdmRequest.response->offset;
 
-        info.BspID             = s_SmpRequest.response->bsp_lapic_id;
-        info.ProcessorCount    = s_SmpRequest.response->cpu_count;
+#ifdef CTOS_TARGET_X86_64
+        info.BspID = s_SmpRequest.response->bsp_lapic_id;
+#elifdef CTOS_TARGET_AARCH64
+        info.BspID = s_SmpRequest.response->mpidr;
+#endif
+        info.ProcessorCount = s_SmpRequest.response->cpu_count;
 
         info.RSDP = Pointer(s_RsdpRequest.response->address).FromHigherHalf();
         info.DeviceTreeBlob
