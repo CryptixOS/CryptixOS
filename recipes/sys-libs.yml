@@ -295,7 +295,7 @@ packages:
         - '-Dbuild_tests=true'
         - '-Dposix_option=enabled'
         - '-Dlinux_option=enabled'
-   s     - '-Dglibc_option=enabled'
+        - '-Dglibc_option=enabled'
         - '-Dbsd_option=enabled'
         - '-Dlinux_kernel_headers=@BUILD_ROOT@/packages/linux-headers/usr/include'
         - '@THIS_SOURCE_DIR@'
