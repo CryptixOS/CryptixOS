@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/BootInfo.hpp>
+#include <Boot/BootModuleInfo.hpp>
 
 #include <Library/ELF.hpp>
 #include <Library/Module.hpp>
@@ -20,12 +20,13 @@ namespace System
 {
     namespace
     {
-        BootModuleInfo                s_KernelExecutable;
-        ELF::Image                    s_KernelImage;
-        RedBlackTree<StringView, u64> s_KernelSymbols;
+        BootModuleInfo                      s_KernelExecutable;
+        ELF::Image                          s_KernelImage;
+        RedBlackTree<StringView, u64>       s_KernelSymbols;
+        Span<BootModuleInfo, DynamicExtent> s_BootModules;
 
-        static constexpr Pointer      MODULE_LOAD_BASE = nullptr;
-        Module::List                  s_Modules;
+        static constexpr Pointer            MODULE_LOAD_BASE = nullptr;
+        Module::List                        s_Modules;
     }; // namespace
 
     ErrorOr<void> LoadKernelSymbols(const BootModuleInfo& kernelExecutable)
@@ -68,6 +69,18 @@ namespace System
 
         return {};
     }
+    void PrepareBootModules(Span<BootModuleInfo> bootModules)
+    {
+        s_BootModules = bootModules;
+    }
+    const BootModuleInfo* FindBootModule(StringView name)
+    {
+        for (const auto& module : s_BootModules)
+            if (module.Name == name) return &module;
+
+        return nullptr;
+    }
+
     ErrorOr<void> LoadModules()
     {
 

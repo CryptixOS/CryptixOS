@@ -178,7 +178,7 @@ qemu_args = [
   '-d', 'int,guest_errors',
 
   # don't reboot nor shutdown on triple fault
-  '-no-shutdown', '-no-reboot',
+  #'-no-shutdown', '-no-reboot',
   # output qemu logs to > qemu.log
   '-D', meson.project_source_root() / 'qemu.log',
   # enable boot menu

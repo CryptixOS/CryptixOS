@@ -26,18 +26,21 @@ class DirectoryEntry;
 struct BootModuleInfo;
 namespace System
 {
-    ErrorOr<void>     LoadKernelSymbols(const BootModuleInfo& kernelExecutable);
-    ErrorOr<void>     LoadModules();
+    ErrorOr<void> LoadKernelSymbols(const BootModuleInfo& kernelExecutable);
+    void          PrepareBootModules(Span<BootModuleInfo> bootModules);
+    const BootModuleInfo*                FindBootModule(StringView name);
 
-    ErrorOr<void>     LoadModule(PathView path);
-    ErrorOr<void>     LoadModule(Ref<DirectoryEntry> entry);
-    ErrorOr<void>     LoadModule(Ref<Module> module);
+    ErrorOr<void>                        LoadModules();
 
-    Module::List&     Modules();
-    Ref<Module>       FindModule(StringView name);
+    ErrorOr<void>                        LoadModule(PathView path);
+    ErrorOr<void>                        LoadModule(Ref<DirectoryEntry> entry);
+    ErrorOr<void>                        LoadModule(Ref<Module> module);
 
-    PathView          KernelExecutablePath();
-    const ELF::Image& KernelImage();
+    Module::List&                        Modules();
+    Ref<Module>                          FindModule(StringView name);
+
+    PathView                             KernelExecutablePath();
+    const ELF::Image&                    KernelImage();
     const RedBlackTree<StringView, u64>& KernelSymbols();
 
     u64                                  LookupKernelSymbol(StringView name);

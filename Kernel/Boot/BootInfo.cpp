@@ -146,10 +146,43 @@ namespace
         used,
         section(".limine_requests_end"))) volatile LIMINE_REQUESTS_END_MARKER;
 
-    FirmwareType s_FirmwareType = FirmwareType::eUndefined;
-    MemoryMap    s_MemoryMap    = {};
+    FirmwareType    s_FirmwareType    = FirmwareType::eUndefined;
+    MemoryMap       s_MemoryMap       = {};
+    BootModuleInfo* s_BootModules     = nullptr;
+    usize           s_BootModuleCount = 0;
 
-    void         ParseMemoryMap()
+    void            InitializeModule(BootModuleInfo& module, limine_file* file)
+    {
+        static auto extractUUID = [](const limine_uuid& uuid) -> UUID
+        {
+            u64 high = static_cast<u64>(uuid.a) << 32
+                     | static_cast<u64>(uuid.b) << 16
+                     | static_cast<u64>(uuid.c);
+
+            u64 low = 0;
+            Memory::Copy(&low, uuid.d, sizeof(u64));
+
+            return {high, low};
+        };
+
+        module.Name              = file->string;
+        module.Path              = file->path;
+        module.LoadAddress       = file->address;
+        module.Size              = file->size;
+        module.MediaType         = file->media_type == LIMINE_MEDIA_TYPE_TFTP
+                                     ? BootMediaType::eTFTP
+                                 : file->media_type == LIMINE_MEDIA_TYPE_OPTICAL
+                                     ? BootMediaType::eOptical
+                                     : BootMediaType::eGeneric;
+        module.TFTP_IPv4         = file->tftp_ip;
+        module.TFTP_Port         = file->tftp_port;
+        module.PartitionIndex    = file->partition_index;
+        module.MBR_DiskID        = file->mbr_disk_id;
+        module.GPT_DiskUUID      = extractUUID(file->gpt_disk_uuid);
+        module.GPT_PartitionUUID = extractUUID(file->gpt_part_uuid);
+        module.FilesystemUUID    = extractUUID(file->part_uuid);
+    }
+    void InitializeBootInfo()
     {
         if (!s_MemmapRequest.response
             || s_MemmapRequest.response->entry_count == 0)
@@ -202,6 +235,19 @@ namespace
             sizeof(MemoryRegion) * s_MemmapRequest.response->entry_count);
         s_MemoryMap.EntryCount = s_MemmapRequest.response->entry_count;
 
+        if (s_ModuleRequest.response)
+        {
+            s_BootModuleCount = s_ModuleRequest.response->module_count;
+            s_BootModules
+                = allocateMemory(sizeof(BootModuleInfo) * s_BootModuleCount);
+
+            for (usize i = 0; i < s_BootModuleCount; i++)
+            {
+                auto& module = s_BootModules[i];
+                auto  file   = s_ModuleRequest.response->modules[i];
+                InitializeModule(module, file);
+            }
+        }
         for (usize i = 0; i < memoryEntryCount; i++)
         {
             auto*      current     = memoryMap[i];
@@ -251,7 +297,7 @@ namespace BootInfo
         Logger::EnableSink(LOG_SINK_TERMINAL);
 
         BootInformation info;
-        ParseMemoryMap();
+        InitializeBootInfo();
         using namespace PhysicalMemoryManager;
         EarlyInitialize(s_MemoryMap);
 
@@ -295,43 +341,9 @@ namespace BootInfo
 
         auto  kernelFile       = s_ExecutableRequest.response->executable_file;
         auto& kernelModuleInfo = info.KernelExecutable;
-        kernelModuleInfo.Name  = kernelFile->string;
-        kernelModuleInfo.Path  = kernelFile->path;
+        InitializeModule(kernelModuleInfo, kernelFile);
 
-        kernelModuleInfo.LoadAddress = kernelFile->address;
-        kernelModuleInfo.Size        = kernelFile->size;
-
-        kernelModuleInfo.MediaType
-            = kernelFile->media_type == LIMINE_MEDIA_TYPE_TFTP
-                ? BootMediaType::eTFTP
-            : kernelFile->media_type == LIMINE_MEDIA_TYPE_OPTICAL
-                ? BootMediaType::eOptical
-                : BootMediaType::eGeneric;
-        kernelModuleInfo.TFTP_IPv4      = kernelFile->tftp_ip;
-        kernelModuleInfo.TFTP_Port      = kernelFile->tftp_port;
-
-        kernelModuleInfo.PartitionIndex = kernelFile->partition_index;
-        kernelModuleInfo.MBR_DiskID     = kernelFile->mbr_disk_id;
-
-        auto extractUUID                = [](const limine_uuid& uuid) -> UUID
-        {
-            u64 high = static_cast<u64>(uuid.a) << 32
-                     | static_cast<u64>(uuid.b) << 16
-                     | static_cast<u64>(uuid.c);
-
-            u64 low = 0;
-            Memory::Copy(&low, uuid.d, sizeof(u64));
-
-            return {high, low};
-        };
-
-        kernelModuleInfo.GPT_DiskUUID = extractUUID(kernelFile->gpt_disk_uuid);
-        kernelModuleInfo.GPT_PartitionUUID
-            = extractUUID(kernelFile->gpt_part_uuid);
-        kernelModuleInfo.FilesystemUUID = extractUUID(kernelFile->part_uuid);
-
-        info.KernelModules              = {s_ModuleRequest.response->modules,
-                                           s_ModuleRequest.response->module_count};
+        info.KernelModules = {s_BootModules, s_BootModuleCount};
         info.KernelPhysicalBase
             = s_KernelAddressRequest.response->physical_base;
         info.KernelVirtualBase = s_KernelAddressRequest.response->virtual_base;
@@ -347,8 +359,11 @@ namespace BootInfo
         info.ProcessorCount = s_SmpRequest.response->cpu_count;
 
         info.RSDP = Pointer(s_RsdpRequest.response->address).FromHigherHalf();
-        info.DeviceTreeBlob
-            = Pointer(s_DtbRequest.response->dtb_ptr).FromHigherHalf();
+
+        info.DeviceTreeBlob = s_DtbRequest.response
+                                ? Pointer(s_DtbRequest.response->dtb_ptr)
+                                      .FromHigherHalf<Pointer>()
+                                : nullptr;
         info.SmBios32Phys
             = Pointer(s_SmbiosRequest.response->entry_32).FromHigherHalf();
         info.SmBios64Phys
@@ -392,16 +407,5 @@ namespace BootInfo
         VerifyExistenceOrRet(s_SmpRequest);
 
         return s_SmpRequest.response;
-    }
-    limine_file* FindModule(const char* name)
-    {
-        VerifyExistenceOrRet(s_ModuleRequest);
-
-        for (usize i = 0; i < s_ModuleRequest.response->module_count; i++)
-        {
-            if (!strcmp(s_ModuleRequest.response->modules[i]->string, name))
-                return s_ModuleRequest.response->modules[i];
-        }
-        return nullptr;
     }
 } // namespace BootInfo

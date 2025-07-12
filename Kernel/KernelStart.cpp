@@ -216,6 +216,7 @@ kernelStart(const BootInformation& info)
     LogInfo("Boot: Kernel Virtual Address: {:#x}", info.KernelVirtualBase);
 
     Assert(System::LoadKernelSymbols(info.KernelExecutable));
+    System::PrepareBootModules(info.KernelModules);
 
     Stacktrace::Initialize();
     CommandLine::Initialize(info.KernelCommandLine);

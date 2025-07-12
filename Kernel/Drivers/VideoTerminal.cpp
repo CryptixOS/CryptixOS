@@ -8,6 +8,7 @@
 #include <Embed/Font.hpp>
 
 #include <Library/Logger.hpp>
+#include <System/System.hpp>
 
 #include <magic_enum/magic_enum.hpp>
 
@@ -36,15 +37,18 @@ bool            VideoTerminal::Initialize(const limine_framebuffer& framebuffer)
                         .BlueMaskShift  = framebuffer.blue_mask_shift};
 
     auto fontAddress = reinterpret_cast<uintptr_t>(&Meta_fonts_font_bin);
-    auto fontModule  = BootInfo::FindModule("font");
-    if (fontModule)
-        fontAddress = reinterpret_cast<uintptr_t>(fontModule->address);
+    const BootModuleInfo* fontModule = System::FindBootModule("font");
+    if (fontModule && fontModule->LoadAddress && fontModule->Size > 0)
+        fontAddress = fontModule->LoadAddress.Raw();
 
-    auto backgroundModule = BootInfo::FindModule("background");
-    if (!backgroundModule) LogError("Terminal background not found");
+    const BootModuleInfo* backgroundModule
+        = System::FindBootModule("background");
+    if (!backgroundModule || !backgroundModule->LoadAddress
+        || backgroundModule->Size == 0)
+        LogError("Terminal background not found");
     else
-        SetCanvas(reinterpret_cast<u8*>(backgroundModule->address),
-                  backgroundModule->size);
+        SetCanvas(backgroundModule->LoadAddress.As<u8>(),
+                  backgroundModule->Size);
 
     SetTextForeground(AnsiColor::eDefault);
     SetTextBackground(AnsiColor::eDefault);

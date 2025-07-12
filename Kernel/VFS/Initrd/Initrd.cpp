@@ -4,13 +4,14 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/BootInfo.hpp>
+#include <Boot/BootModuleInfo.hpp>
 #include <Library/Logger.hpp>
 
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
 #include <Prism/Utility/Math.hpp>
+#include <System/System.hpp>
 
 #include <VFS/Initrd/Initrd.hpp>
 #include <VFS/Initrd/Ustar.hpp>
@@ -20,16 +21,16 @@ namespace Initrd
     bool Initialize()
     {
         LogTrace("Initrd: Loading initial ramdisk...");
-        auto initrd = BootInfo::FindModule("initrd");
-        if (!initrd)
+        auto initrd = System::FindBootModule("initrd");
+        if (!initrd || !initrd->LoadAddress || initrd->Size == 0)
         {
             LogError("Initrd: Could not find initrd module!");
             return false;
         }
 
-        auto address = Pointer(initrd->address).ToHigherHalf();
+        auto address = Pointer(initrd->LoadAddress).ToHigherHalf();
 
-        if (Ustar::Validate(address)) Ustar::Load(address, initrd->size);
+        if (Ustar::Validate(address)) Ustar::Load(address, initrd->Size);
         else
         {
             LogError("Initrd: Unknown archive format!");
@@ -37,7 +38,7 @@ namespace Initrd
         }
 
         size_t pageCount
-            = (Math::AlignUp(initrd->size, 512) + 512) / PMM::PAGE_SIZE;
+            = (Math::AlignUp(initrd->Size, 512) + 512) / PMM::PAGE_SIZE;
         PhysicalMemoryManager::FreePages(address.FromHigherHalf<void*>(),
                                          pageCount);
 

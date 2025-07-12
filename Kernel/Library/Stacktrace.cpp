@@ -4,10 +4,9 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/BootInfo.hpp>
-
 #include <Common.hpp>
 
+#include <Boot/BootModuleInfo.hpp>
 #include <Library/Stacktrace.hpp>
 
 #include <Memory/MemoryManager.hpp>
@@ -16,6 +15,8 @@
 
 #include <Prism/String/String.hpp>
 #include <Prism/Utility/Math.hpp>
+
+#include <System/System.hpp>
 
 #include <demangler/Demangle.h>
 
@@ -65,14 +66,15 @@ namespace Stacktrace
     bool Initialize()
     {
         LogTrace("Stacktrace: Loading kernel s_Symbols...");
-        limine_file* file = BootInfo::FindModule("ksyms");
-        if (!file || !file->address) return false;
+        const BootModuleInfo* module = System::FindBootModule("ksyms");
+        if (!module || !module->LoadAddress || module->Size == 0) return false;
 
-        Pointer fileStart = file->address;
-        Pointer fileEnd   = fileStart.Offset(file->size);
-        char*   current   = fileStart.As<char>();
+        Pointer fileStart  = module->LoadAddress;
+        Pointer fileEnd    = fileStart.Offset(module->Size);
+        char*   current    = fileStart.As<char>();
 
-        Pointer address   = 0;
+        auto    kernelVirt = MemoryManager::KernelVirtualAddress();
+        Pointer address    = 0;
         while (current < fileEnd.As<char>())
         {
             for (usize i = 0; i < sizeof(void*) * 2; ++i)
@@ -84,8 +86,7 @@ namespace Stacktrace
                 if (*current == '\n') break;
 
             Symbol ksym;
-            if (address < MemoryManager::KernelVirtualAddress().Raw<>())
-                address += MemoryManager::KernelVirtualAddress().Raw<>();
+            if (address < kernelVirt) address += kernelVirt;
 
             ksym.Address = address;
             ksym.Name    = name.Substr(0, name.FindFirstOf('\n'));
@@ -100,7 +101,7 @@ namespace Stacktrace
             ++current;
         }
 
-        u64 filePageCount = Math::DivRoundUp(file->size, PMM::PAGE_SIZE);
+        u64 filePageCount = Math::DivRoundUp(module->Size, PMM::PAGE_SIZE);
         PMM::FreePages(fileStart.FromHigherHalf(), filePageCount);
         LogInfo("Stacktrace: kernel symbols loaded");
         return true;
