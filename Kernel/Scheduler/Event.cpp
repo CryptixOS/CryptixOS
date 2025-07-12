@@ -9,7 +9,7 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-static Optional<usize> CheckPending(std::span<Event*> events)
+static Optional<usize> CheckPending(Span<Event*> events)
 {
     for (usize i = 0; auto& event : events)
     {
@@ -23,7 +23,7 @@ static Optional<usize> CheckPending(std::span<Event*> events)
     return NullOpt;
 }
 
-static void AttachListeners(std::span<Event*> events, Thread* thread)
+static void AttachListeners(Span<Event*> events, Thread* thread)
 {
     thread->Events().Clear();
 
@@ -48,16 +48,16 @@ static void DetachListeners(Thread* thread)
     thread->Events().Clear();
 }
 
-static void LockEvents(std::span<Event*> events)
+static void LockEvents(Span<Event*> events)
 {
     for (auto& event : events) event->Lock.Acquire();
 }
-static void UnlockEvents(std::span<Event*> events)
+static void UnlockEvents(Span<Event*> events)
 {
     for (auto& event : events) event->Lock.Release();
 }
 
-std::optional<usize> Event::Await(std::span<Event*> events, bool block)
+Optional<usize> Event::Await(Span<Event*> events, bool block)
 {
     auto thread   = Thread::Current();
     bool intState = CPU::SwapInterruptFlag(false);
@@ -75,7 +75,7 @@ std::optional<usize> Event::Await(std::span<Event*> events, bool block)
     {
         UnlockEvents(events);
         CPU::SetInterruptFlag(intState);
-        return std::nullopt;
+        return NullOpt;
     }
 
     AttachListeners(events, thread);

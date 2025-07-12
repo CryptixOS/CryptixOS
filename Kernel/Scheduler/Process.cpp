@@ -350,10 +350,10 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
     bool block = !(flags & WNOHANG);
     for (;;)
     {
-        auto ret = Event::Await(std::span(events.begin(), events.end()), block);
-        if (!ret.has_value()) return Error(EINTR);
+        auto ret = Event::Await(Span(events.Raw(), events.Size()), block);
+        if (!ret.HasValue()) return Error(EINTR);
 
-        auto which = procs[ret.value()];
+        auto which = procs[ret.Value()];
         if (!(flags & WUNTRACED) && WIFSTOPPED(which->Status().ValueOr(0)))
             continue;
         if (!(flags & WCONTINUED) && WIFCONTINUED(which->Status().ValueOr(0)))
