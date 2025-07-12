@@ -7,9 +7,11 @@
 #pragma once
 
 #include <Common.hpp>
+
 #include <Prism/Containers/Vector.hpp>
 
-#include <magic_enum/magic_enum.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/String/StringUtils.hpp>
 
 enum class DeliveryMode
 {
@@ -183,8 +185,7 @@ class IoApic final
 
         AssertFmt(reg != IoApicRegister::eVersion
                       && reg != IoApicRegister::eArbitrationID,
-                  "Cannot write to read only register: '{}'",
-                  magic_enum::enum_name(reg));
+                  "Cannot write to read only register: '{}'", ToString(reg));
         *m_RegisterSelect = ToUnderlying(reg);
 
         *m_RegisterWindow = value;

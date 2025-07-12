@@ -5,10 +5,11 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/Arch.hpp>
+#include <Boot/BootInfo.hpp>
 #include <Debug/Assertions.hpp>
 
-#include <Library/Logger.hpp>
 #include <Library/Locking/Spinlock.hpp>
+#include <Library/Logger.hpp>
 
 #include <Prism/Containers/Deque.hpp>
 #include <Prism/Utility/Time.hpp>

@@ -107,6 +107,11 @@ void Lapic::Initialize()
     LogInfo("LAPIC: Initialized");
 };
 
+usize Lapic::InterruptVector() const
+{
+    return m_InterruptHandler->GetInterruptVector();
+}
+
 void Lapic::SendIpi(u32 flags, u32 m_ID)
 {
     if (!m_X2Apic)

@@ -7,6 +7,8 @@
 #pragma once
 
 #include <Memory/VMM.hpp>
+#include <Prism/Memory/Memory.hpp>
+
 #include <Time/TimeStep.hpp>
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64

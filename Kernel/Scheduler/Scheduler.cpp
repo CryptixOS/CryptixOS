@@ -22,7 +22,6 @@
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/VFS.hpp>
 
-u8 g_ScheduleVector = 48;
 namespace
 {
     Spinlock s_Lock{};
@@ -232,7 +231,8 @@ void Scheduler::Unblock(Thread* thread)
     }
 
 #ifdef CTOS_TARGET_X86_64
-    Lapic::Instance()->SendIpi(g_ScheduleVector, CPU::Current()->LapicID);
+    Lapic::Instance()->SendIpi(Time::GetSchedulerTimer()->InterruptVector(),
+                               CPU::Current()->LapicID);
 #endif
 }
 
@@ -254,7 +254,8 @@ void Scheduler::Yield(bool saveCtx)
     }
 
 #ifdef CTOS_TARGET_X86_64
-    Lapic::Instance()->SendIpi(g_ScheduleVector, CPU::Current()->LapicID);
+    Lapic::Instance()->SendIpi(Time::GetSchedulerTimer()->InterruptVector(),
+                               CPU::Current()->LapicID);
 #endif
 
     CPU::SetInterruptFlag(true);

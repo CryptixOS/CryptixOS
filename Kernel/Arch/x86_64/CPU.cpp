@@ -16,8 +16,7 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-extern u8 g_ScheduleVector;
-u8        g_PanicIpiVector = 255;
+u8 g_PanicIpiVector = 255;
 
 namespace CPU
 {
@@ -239,7 +238,7 @@ namespace CPU
             current->IsOnline = true;
         }
 
-        IDT::SetIST(g_ScheduleVector, 1);
+        IDT::SetIST(Lapic::Instance()->InterruptVector(), 1);
         LogInfo("BSP: Initialized");
 
         Identify();
@@ -353,10 +352,11 @@ namespace CPU
     void WakeUp(usize id, bool everyone)
     {
         if (everyone)
-            Lapic::Instance()->SendIpi(g_ScheduleVector | (0b10 << 18), 0);
+            Lapic::Instance()->SendIpi(
+                Lapic::Instance()->InterruptVector() | (0b10 << 18), 0);
         else
-            Lapic::Instance()->SendIpi(g_ScheduleVector | s_CPUs[id].LapicID,
-                                       0);
+            Lapic::Instance()->SendIpi(
+                Lapic::Instance()->InterruptVector() | s_CPUs[id].LapicID, 0);
     }
 
     void WriteMSR(u32 msr, u64 value)

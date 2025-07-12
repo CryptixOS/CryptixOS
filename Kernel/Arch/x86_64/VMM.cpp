@@ -6,6 +6,7 @@
  */
 #include <Common.hpp>
 
+#include <Boot/BootInfo.hpp>
 #include <Memory/VMM.hpp>
 
 constexpr usize                  PTE_PRESENT    = Bit(0);
