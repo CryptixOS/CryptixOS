@@ -14,7 +14,7 @@ tools:
         - '--with-sysroot=@SYSROOT_DIR@'
         # - '--disable-multilib'
         - '--enable-initfini-array'
-        - '--without-headers'
+        #- '--without-headers'
         - '--without-newlib'
         - '--enable-languages=c,c++,lto'
         - '--disable-shared'
