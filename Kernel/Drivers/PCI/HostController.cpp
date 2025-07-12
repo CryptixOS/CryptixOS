@@ -98,7 +98,7 @@ namespace PCI
                         uacpi_free_resources(resources);
                     }
 
-#if 1
+#if CTOS_DUMP_PCI_IRQ_ROUTES
                     LogInfo(
                         "PCI: Adding irq entry: {{ gsi: {}, device: {}, "
                         "function: {}, pin: {}, edge: {}, high: {} }}",

@@ -11,7 +11,6 @@
 #include <Library/ELF_Definitions.hpp>
 
 #include <Prism/Containers/RedBlackTree.hpp>
-#include <Prism/Containers/Span.hpp>
 
 #include <Prism/Memory/Buffer.hpp>
 #include <Prism/Memory/Memory.hpp>

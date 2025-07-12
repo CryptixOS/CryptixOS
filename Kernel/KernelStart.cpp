@@ -67,9 +67,14 @@ static void eternal()
     for (;;)
     {
         auto status = Time::NanoSleep(1000 * 1000 * 5);
-        if (!status) LogError("Sleeping failed");
+        if (!status)
+        {
+            LogError("Sleeping failed");
+            Process::Current()->Exit(-1);
+        }
 
         LogTrace("Kernel thread");
+        Arch::Pause();
     }
 }
 
@@ -96,12 +101,16 @@ static bool loadInitProcess(Path initPath)
         = userProcess->CreateThread(argv, envp, program, CPU::GetCurrent()->ID);
     VMM::UnmapKernelInitCode();
 
+    (void)eternal;
     auto colonel   = Scheduler::GetKernelProcess();
     auto newThread = colonel->CreateThread(reinterpret_cast<uintptr_t>(eternal),
                                            false, CPU::Current()->ID);
+
+    // auto current   = Thread::Current();
+    // current->SetState(ThreadState::eExited);
+
     Scheduler::EnqueueThread(newThread);
     Scheduler::EnqueueThread(userThread);
-
     return true;
 }
 
@@ -130,9 +139,12 @@ static void kernelThread()
     TTY::Initialize();
     MemoryDevices::Initialize();
 
-    VFS::Mount(nullptr, "/dev/nvme0n2p1"_sv, "/mnt/ext2"_sv, "ext2fs"_sv);
-    VFS::Mount(nullptr, "/dev/nvme0n2p2"_sv, "/mnt/fat32"_sv, "fat32fs"_sv);
-    VFS::Mount(nullptr, "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv, "echfs"_sv);
+    IgnoreUnused(
+        VFS::Mount(nullptr, "/dev/nvme0n2p1"_sv, "/mnt/ext2"_sv, "ext2fs"_sv));
+    IgnoreUnused(VFS::Mount(nullptr, "/dev/nvme0n2p2"_sv, "/mnt/fat32"_sv,
+                            "fat32fs"_sv));
+    IgnoreUnused(
+        VFS::Mount(nullptr, "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv, "echfs"_sv));
 
     USB::Initialize();
 

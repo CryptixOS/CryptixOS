@@ -199,8 +199,8 @@ qemu_args = [
   #'-device', 'virtio-mmio-device,dev=hd',
 
   # image drives
-  '-drive', 'format=raw,file=image2.hdd,if=none,id=drive1', 
-  '-drive', 'format=raw,file=image.hdd,if=none,id=drive2', 
+  '-drive', 'format=raw,file=image.hdd,if=none,id=drive1', 
+  # '-drive', 'format=raw,file=image2.hdd,if=none,id=drive2', 
 
   # nvme0 - nvme controller
   '-device', 'nvme,id=nvme0,serial=nvme,bus=pcie.0',
@@ -212,7 +212,7 @@ qemu_args = [
   # pci-to-pci bridge
   '-device', 'pci-bridge,id=pcie2,bus=pcie.0,addr=1e,chassis_nr=1',
   # virtio drive
-  '-device', 'virtio-blk-pci,drive=drive2,id=virtio0,bus=pcie2,addr=0x6',
+  # '-device', 'virtio-blk-pci,drive=drive2,id=virtio0,bus=pcie2,addr=0x6',
 
 
   #'-device', 'virtio-serial-pci,max_ports=2',

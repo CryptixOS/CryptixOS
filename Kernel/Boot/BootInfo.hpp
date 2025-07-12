@@ -6,9 +6,12 @@
  */
 #pragma once
 
+#include <Prism/Containers/Span.hpp>
 #include <Prism/Core/Types.hpp>
+
 #include <Prism/Memory/Pointer.hpp>
 #include <Prism/String/StringView.hpp>
+#include <Prism/Utility/Time.hpp>
 
 #include <limine.h>
 
@@ -57,6 +60,39 @@ enum class FirmwareType : i32
     eUefi32    = 1,
     eUefi64    = 2,
     eSbi       = 3,
+};
+
+struct BootInformation
+{
+    StringView        BootloaderName    = ""_sv;
+    StringView        BootloaderVersion = ""_sv;
+    StringView        KernelCommandLine = ""_sv;
+    enum FirmwareType FirmwareType;
+    DateTime          DateAtBoot         = 0;
+
+    limine_file*      KernelExecutable   = nullptr;
+    limine_file**     KernelModules      = nullptr;
+    Pointer           KernelPhysicalBase = nullptr;
+    Pointer           KernelVirtualBase  = nullptr;
+
+    MemoryMap         MemoryMap          = {nullptr, 0};
+    u8                PagingMode         = 0;
+    usize             HigherHalfOffset   = 0;
+
+    u64               BspID              = 0;
+    u64               ProcessorCount     = 0;
+    Span<Framebuffer> Framebuffers;
+
+    Pointer           RSDP                       = nullptr;
+    Pointer           DeviceTree                 = nullptr;
+    Pointer           SmBios32                   = nullptr;
+    Pointer           SmBios64                   = nullptr;
+
+    Pointer           EfiSystemTable             = nullptr;
+    Pointer           EfiMemoryMap               = nullptr;
+    usize             EfiMemoryMapSize           = 0;
+    usize             EfiMemoryDescriptorSize    = 0;
+    usize             EfiMemoryDescriptorVersion = 0;
 };
 
 namespace BootInfo

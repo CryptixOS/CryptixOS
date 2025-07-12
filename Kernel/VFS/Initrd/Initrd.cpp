@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Boot/BootInfo.hpp>
 #include <Library/Logger.hpp>
 
 #include <Memory/PMM.hpp>

@@ -173,8 +173,8 @@ namespace VFS
         return new FileDescriptor(dentry.Raw(), flags, accMode);
     }
 
-    ErrorOr<PathResolution> ResolvePath(Ref<DirectoryEntry> parent, PathView path,
-                                        bool followLinks)
+    ErrorOr<PathResolution> ResolvePath(Ref<DirectoryEntry> parent,
+                                        PathView path, bool followLinks)
     {
         if (!parent || path.Absolute()) parent = s_RootDirectoryEntry.Raw();
         PathResolution res = {nullptr, nullptr, ""_sv};

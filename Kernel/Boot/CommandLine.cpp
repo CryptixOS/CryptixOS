@@ -4,7 +4,9 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Boot/BootInfo.hpp>
 #include <Boot/CommandLine.hpp>
+
 #include <Library/Logger.hpp>
 
 #include <Prism/Containers/UnorderedMap.hpp>

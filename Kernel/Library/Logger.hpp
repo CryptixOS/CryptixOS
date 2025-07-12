@@ -6,8 +6,6 @@
  */
 #pragma once
 
-#include <Boot/BootInfo.hpp>
-
 #include <Prism/Core/Types.hpp>
 #include <Prism/Debug/Log.hpp>
 
