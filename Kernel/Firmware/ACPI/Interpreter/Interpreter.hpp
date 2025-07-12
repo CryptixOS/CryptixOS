@@ -6,25 +6,29 @@
  */
 #pragma once
 
-#include <Firmware/ACPI/Structures.hpp>
 #include <Firmware/ACPI/Interpreter/NameSpace.hpp>
 #include <Firmware/ACPI/Interpreter/OpCodes.hpp>
+#include <Firmware/ACPI/Structures.hpp>
 
 #include <Prism/Memory/ByteStream.hpp>
 #include <magic_enum/magic_enum.hpp>
 
 namespace ACPI::Interpreter
 {
-    struct ExecutionContext 
+    struct ExecutionContext
     {
         ByteStream<Endian::eLittle> Stream;
-        u16 CurrentOpCode = 0;
+        u16                         CurrentOpCode = 0;
     };
     struct CodeBlock
     {
-        NameSpace* NameSpace = nullptr;
-        usize Start = 0;
-        usize End = 0;
+        NameSpace* NameSpace     = nullptr;
+        usize      Start         = 0;
+        usize      End           = 0;
+
+        u16        OpCode        = 0;
+        String     Name          = ""_sv;
+        usize      PackageLength = 0;
     };
 
     void ExecuteTable(ACPI::SDTHeader& table);

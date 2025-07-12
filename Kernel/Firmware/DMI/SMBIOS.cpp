@@ -4,18 +4,17 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/BootInfo.hpp>
 #include <Common.hpp>
 
 #include <Firmware/DMI/SMBIOS.hpp>
 #include <Firmware/DMI/Tables.hpp>
 
 #include <Memory/PMM.hpp>
+#include <Memory/ScopedMapping.hpp>
 #include <Memory/VMM.hpp>
 
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
-
-#include <magic_enum/magic_enum.hpp>
 
 namespace DMI::SMBIOS
 {
@@ -79,21 +78,20 @@ namespace DMI::SMBIOS
         return header.Length + i + 1;
     }
 
-    void Initialize()
+    void Initialize(Pointer entry32, Pointer entry64)
     {
-        auto smbiosEntries = BootInfo::GetSmBiosEntries();
         // TODO(v1tr10l7): Verify which entry should we use
-        if (!smbiosEntries.first) return;
+        if (!entry32) return;
 
-        Pointer entryPointVirt   = smbiosEntries.first.ToHigherHalf<Pointer>();
-        EntryPoint32* entryPoint = entryPointVirt.As<EntryPoint32>();
-        if (std::strncmp(
-                reinterpret_cast<const char*>(&entryPoint->AnchorString),
-                "_SM_", 4)
-            != 0)
-            return;
+        LogTrace("DMI: 32 bit SMBIOS entry point => {:#x}", entry32);
+        LogTrace("DMI: 64 bit SMBIOS entry point => {:#x}", entry64);
+        ScopedMapping<EntryPoint32> entryPoint(
+            entry32, PageAttributes::eRW | PageAttributes::eWriteBack);
 
-        char* anchorString = reinterpret_cast<char*>(&entryPoint->AnchorString);
+        StringView anchorString(
+            reinterpret_cast<const char*>(&entryPoint->AnchorString), 4);
+        if (anchorString != "_SM_"_sv) return;
+
         LogTrace("AnchorString: {}{}{}{}", anchorString[0], anchorString[1],
                  anchorString[2], anchorString[3]);
         LogTrace("Checksum: {}", entryPoint->Checksum);
@@ -130,17 +128,80 @@ namespace DMI::SMBIOS
                      ToUnderlying(header->Type),
                      magic_enum::enum_name(header->Type));
 
+            LogTrace("DMI: Table[{:#02x}] =>", ToUnderlying(header->Type));
             switch (header->Type)
             {
                 case HeaderType::eBiosInformation:
                 {
+                    break;
                     auto firmwareInfo
                         = reinterpret_cast<FirmwareInformation*>(header);
 
-                    LogTrace("DMI: Table[{:#02x}] =>",
-                             ToUnderlying(header->Type));
-                    LogTrace("BIOS Vendor: {}",
+                    LogTrace("\tVendor: {}",
                              DmiString(header, firmwareInfo->Vendor));
+                    LogTrace("\tVersion: {}",
+                             DmiString(header, firmwareInfo->Version));
+                    LogTrace("\tBIOS Start Segment: {}",
+                             firmwareInfo->BiosStartSegment);
+                    LogTrace("\tRelease Date: {}",
+                             DmiString(header, firmwareInfo->ReleaseDate));
+                    LogTrace("\tROM Size: {}", firmwareInfo->RomSize);
+
+                    u8* raw
+                        = reinterpret_cast<u8*>(&firmwareInfo->Characteristics);
+                    LogTrace(
+                        "Raw: {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} "
+                        "{:02x}",
+                        raw[0], raw[1], raw[2], raw[3], raw[4], raw[5], raw[6],
+                        raw[7]);
+                    FirmwareCharacteristics& props
+                        = firmwareInfo->Characteristics;
+                    LogTrace("\tISA Supported: {}", (bool)props.ISA);
+                    LogTrace("\tMCA Supported: {}", (bool)props.MCA);
+                    LogTrace("\tEISA Supported: {}", (bool)props.EISA);
+                    LogTrace("\tPCI Supported: {}", (bool)props.PCI);
+                    LogTrace("\tPCMCIA Supported: {}", (bool)props.PCMCIA);
+                    LogTrace("\tPNP Supported: {}", (bool)props.PNP);
+                    LogTrace("\tAPM Supported: {}", (bool)props.APM);
+                    LogTrace("\tUpgradable: {}", (bool)props.Upgradeable);
+                    LogTrace("\tShadowing Supported: {}",
+                             (bool)props.ShadowingAllowed);
+                    LogTrace("\tVL-VESA Supported: {}", (bool)props.VLVESA);
+                    LogTrace("\tESCD Supported: {}", (bool)props.ESCD);
+                    LogTrace("\tBoot From CD Supported: {}",
+                             (bool)props.BootFromCd);
+                    LogTrace("\tSelectable Boot Supported: {}",
+                             (bool)props.SelectableBoot);
+                    LogTrace("\tROM Socketed: {}", (bool)props.ROMSocketed);
+                    LogTrace("\tBoot From PC Card Supported: {}",
+                             (bool)props.BootFromPCCard);
+                    LogTrace("\tEDD Supported: {}", (bool)props.EDD);
+                    LogTrace("\tNEC9800 Supported: {}", (bool)props.NEC9800);
+                    LogTrace("\tToshiba1_2Mib Supported: {}",
+                             (bool)props.Toshiba1_2MiB);
+                    LogTrace("\tFloppy 360KB Supported: {}",
+                             (bool)props.Floppy360KB);
+                    LogTrace("\tFloppy 1.2MB Supported: {}",
+                             (bool)props.Floppy1_2MB);
+                    LogTrace("\tFloppy 720KB Supported: {}",
+                             (bool)props.Floppy720KB);
+                    LogTrace("\tPrint Service Supported: {}",
+                             (bool)props.PrintService);
+                    LogTrace("\tI8042 Keyboard Supported: {}",
+                             (bool)props.I8042Keyboard);
+                    LogTrace("\tSerial Services Supported: {}",
+                             (bool)props.SerialServices);
+                    LogTrace("\tPrinter Services Supported: {}",
+                             (bool)props.PrinterServices);
+                    LogTrace("\tCGA Supported: {}", (bool)props.CGA);
+                    LogTrace("\tNECPC98 Supported: {}", (bool)props.NECPC98);
+                    LogTrace("\tMajor Release: {}", firmwareInfo->MajorRelease);
+                    LogTrace("\tMinor Release: {}", firmwareInfo->MinorRelease);
+                    LogTrace("\tEmbedded Controller Major Release: {}",
+                             firmwareInfo->EmbeddedControllerMajor);
+                    LogTrace("\tEmbedded Controller Minor Release: {}",
+                             firmwareInfo->EmbeddedControllerMinor);
+
                     break;
                 }
                 case HeaderType::eEndOfTable: goto end;

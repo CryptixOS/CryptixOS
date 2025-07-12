@@ -5,7 +5,6 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/PowerManager.hpp>
-#include <Boot/BootInfo.hpp>
 #ifdef CTOS_TARGET_X86_64
     #include <Arch/x86_64/IO.hpp>
 #endif
@@ -35,8 +34,7 @@ namespace PowerManager
         print("PowerManager: Rebooting via ACPI was unsuccessful");
 
         print("PowerManager: Trying to reboot via EFI Runtime Services...");
-        EFI::SystemTable* systemTable
-            = BootInfo::EfiSystemTable().As<EFI::SystemTable>();
+        EFI::SystemTable* systemTable = EFI::g_SystemTable;
 
         Assert(systemTable);
         CTOS_UNUSED auto runtimeServices

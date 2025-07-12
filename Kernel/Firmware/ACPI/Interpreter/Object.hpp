@@ -7,6 +7,7 @@
 #pragma once
 
 #include <Library/Logger.hpp>
+#include <Prism/String/String.hpp>
 
 namespace ACPI
 {

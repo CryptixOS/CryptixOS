@@ -6,27 +6,32 @@
  */
 #pragma once
 
+#include <Firmware/ACPI/Interpreter/Object.hpp>
 #include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/String/String.hpp>
-#include <Firmware/ACPI/Interpreter/Object.hpp>
 
-#include <unordered_map>
 #include <magic_enum/magic_enum.hpp>
+#include <unordered_map>
 
 namespace ACPI
 {
-    class NameSpace 
+    class NameSpace
     {
-      public:  
+      public:
         NameSpace(StringView name, NameSpace* parent = nullptr);
-        void Dump(usize tabs = 0);
+        void                                       Dump(usize tabs = 0);
 
-        NameSpace* Insert(StringView name);
+        NameSpace*                                 Insert(StringView name);
 
-        NameSpace* m_Parent = nullptr;
-        String m_Name = "\\";
+        NameSpace*                                 m_Parent = nullptr;
+        String                                     m_Name   = "\\";
         std::unordered_map<StringView, NameSpace*> m_Children;
-        Object* m_Object = nullptr;
+        Object*                                    m_Object = nullptr;
         ObjectType m_Type = ObjectType::eUndefined;
     };
-};
+
+    struct ControlMethod
+    {
+        // ByteStream<Endian::eLittle> Stream;
+    };
+}; // namespace ACPI

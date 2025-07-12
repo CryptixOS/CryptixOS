@@ -11,6 +11,7 @@
 #include <Drivers/CharacterDevice.hpp>
 #include <Library/Color.hpp>
 
+struct limine_framebuffer;
 class FramebufferDevice : public CharacterDevice
 {
   public:

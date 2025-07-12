@@ -163,7 +163,8 @@ namespace
             {
                 bytes       = Math::AlignUp(bytes, PMM::PAGE_SIZE);
                 auto* entry = memoryMap[i];
-                if (entry->type != LIMINE_MEMMAP_USABLE || entry->length < bytes)
+                if (entry->type != LIMINE_MEMMAP_USABLE
+                    || entry->length < bytes)
                     continue;
 
                 Pointer address = entry->base;
@@ -213,12 +214,17 @@ namespace
     }
 } // namespace
 
-extern "C" CTOS_NO_KASAN [[noreturn]] void kernelStart();
+extern "C" CTOS_NO_KASAN [[noreturn]] void kernelStart(const BootInformation&);
 
 #define VerifyExistenceOrRet(requestName)                                      \
     if (!requestName.response) return nullptr;
 #define VerifyExistenceOrRetValue(requestName, value)                          \
     if (!requestName.response) return value;
+
+namespace PhysicalMemoryManager
+{
+    void EarlyInitialize(const MemoryMap&);
+};
 namespace BootInfo
 {
     extern "C" __attribute__((no_sanitize("address"))) void Initialize()
@@ -244,7 +250,11 @@ namespace BootInfo
             EarlyPanic("Boot: Failed to acquire the framebuffer!");
         Logger::EnableSink(LOG_SINK_TERMINAL);
 
+        BootInformation info;
         ParseMemoryMap();
+        using namespace PhysicalMemoryManager;
+        EarlyInitialize(s_MemoryMap);
+
         switch (s_FirmwareTypeRequest.response->firmware_type)
         {
             case LIMINE_FIRMWARE_TYPE_X86BIOS:
@@ -261,29 +271,94 @@ namespace BootInfo
                 break;
         }
 
-        kernelStart();
-    }
-    StringView BootloaderName()
-    {
-        VerifyExistenceOrRetValue(s_BootloaderInfoRequest, "");
-        return s_BootloaderInfoRequest.response->name;
-    }
-    StringView BootloaderVersion()
-    {
-        VerifyExistenceOrRetValue(s_BootloaderInfoRequest, "");
-        return s_BootloaderInfoRequest.response->version;
-    }
-    StringView KernelCommandLine()
-    {
-        VerifyExistenceOrRetValue(s_ExecutableCmdlineRequest, "");
-        return s_ExecutableCmdlineRequest.response->cmdline;
-    }
-    enum FirmwareType FirmwareType()
-    {
-        VerifyExistenceOrRetValue(s_FirmwareTypeRequest,
-                                  static_cast<enum FirmwareType>(0));
+        info.BootloaderName    = s_BootloaderInfoRequest.response->name;
+        info.BootloaderVersion = s_BootloaderInfoRequest.response->version;
+        info.KernelCommandLine = s_ExecutableCmdlineRequest.response->cmdline;
+        switch (s_FirmwareTypeRequest.response->firmware_type)
+        {
+            case LIMINE_FIRMWARE_TYPE_X86BIOS:
+                info.FirmwareType = FirmwareType::eX86Bios;
+                break;
+            case LIMINE_FIRMWARE_TYPE_UEFI32:
+                info.FirmwareType = FirmwareType::eUefi32;
+                break;
+            case LIMINE_FIRMWARE_TYPE_UEFI64:
+                info.FirmwareType = FirmwareType::eUefi64;
+                break;
+            case LIMINE_FIRMWARE_TYPE_SBI:
+                info.FirmwareType = FirmwareType::eSbi;
+                break;
 
-        return s_FirmwareType;
+            default: info.FirmwareType = FirmwareType::eUndefined; break;
+        }
+        info.DateAtBoot        = s_DateAtBootRequest.response->timestamp;
+
+        auto  kernelFile       = s_ExecutableRequest.response->executable_file;
+        auto& kernelModuleInfo = info.KernelExecutable;
+        kernelModuleInfo.Name  = kernelFile->string;
+        kernelModuleInfo.Path  = kernelFile->path;
+
+        kernelModuleInfo.LoadAddress = kernelFile->address;
+        kernelModuleInfo.Size        = kernelFile->size;
+
+        kernelModuleInfo.MediaType
+            = kernelFile->media_type == LIMINE_MEDIA_TYPE_TFTP
+                ? BootMediaType::eTFTP
+            : kernelFile->media_type == LIMINE_MEDIA_TYPE_OPTICAL
+                ? BootMediaType::eOptical
+                : BootMediaType::eGeneric;
+        kernelModuleInfo.TFTP_IPv4      = kernelFile->tftp_ip;
+        kernelModuleInfo.TFTP_Port      = kernelFile->tftp_port;
+
+        kernelModuleInfo.PartitionIndex = kernelFile->partition_index;
+        kernelModuleInfo.MBR_DiskID     = kernelFile->mbr_disk_id;
+
+        auto extractUUID                = [](const limine_uuid& uuid) -> UUID
+        {
+            u64 high = static_cast<u64>(uuid.a) << 32
+                     | static_cast<u64>(uuid.b) << 16
+                     | static_cast<u64>(uuid.c);
+
+            u64 low = 0;
+            Memory::Copy(&low, uuid.d, sizeof(u64));
+
+            return {high, low};
+        };
+
+        kernelModuleInfo.GPT_DiskUUID = extractUUID(kernelFile->gpt_disk_uuid);
+        kernelModuleInfo.GPT_PartitionUUID
+            = extractUUID(kernelFile->gpt_part_uuid);
+        kernelModuleInfo.FilesystemUUID = extractUUID(kernelFile->part_uuid);
+
+        info.KernelModules              = {s_ModuleRequest.response->modules,
+                                           s_ModuleRequest.response->module_count};
+        info.KernelPhysicalBase
+            = s_KernelAddressRequest.response->physical_base;
+        info.KernelVirtualBase = s_KernelAddressRequest.response->virtual_base;
+
+        info.MemoryMap         = s_MemoryMap;
+        info.HigherHalfOffset  = s_HhdmRequest.response->offset;
+
+        info.BspID             = s_SmpRequest.response->bsp_lapic_id;
+        info.ProcessorCount    = s_SmpRequest.response->cpu_count;
+
+        info.RSDP = Pointer(s_RsdpRequest.response->address).FromHigherHalf();
+        info.DeviceTreeBlob
+            = Pointer(s_DtbRequest.response->dtb_ptr).FromHigherHalf();
+        info.SmBios32Phys
+            = Pointer(s_SmbiosRequest.response->entry_32).FromHigherHalf();
+        info.SmBios64Phys
+            = Pointer(s_SmbiosRequest.response->entry_64).FromHigherHalf();
+
+        info.EfiSystemTable       = s_EfiSystemTableRequest.response->address;
+        info.EfiMemoryMap.Address = s_EfiMemmapRequest.response->memmap;
+        info.EfiMemoryMap.Size    = s_EfiMemmapRequest.response->memmap_size;
+        info.EfiMemoryMap.DescriptorSize
+            = s_EfiMemmapRequest.response->desc_size;
+        info.EfiMemoryMap.DescriptorVersion
+            = s_EfiMemmapRequest.response->desc_version;
+
+        kernelStart(info);
     }
     u64 GetHHDMOffset()
     {
@@ -314,13 +389,6 @@ namespace BootInfo
 
         return s_SmpRequest.response;
     }
-    struct MemoryMap& MemoryMap() { return s_MemoryMap; }
-    limine_file*      ExecutableFile()
-    {
-        VerifyExistenceOrRet(s_ExecutableRequest);
-
-        return s_ExecutableRequest.response->executable_file;
-    }
     limine_file* FindModule(const char* name)
     {
         VerifyExistenceOrRet(s_ModuleRequest);
@@ -331,56 +399,5 @@ namespace BootInfo
                 return s_ModuleRequest.response->modules[i];
         }
         return nullptr;
-    }
-    Pointer RSDPAddress()
-    {
-        VerifyExistenceOrRet(s_RsdpRequest);
-
-        return reinterpret_cast<uintptr_t>(s_RsdpRequest.response->address);
-    }
-    std::pair<Pointer, Pointer> GetSmBiosEntries()
-    {
-        VerifyExistenceOrRetValue(s_SmbiosRequest,
-                                  std::make_pair(nullptr, nullptr));
-
-        return std::make_pair(s_SmbiosRequest.response->entry_32,
-                              s_SmbiosRequest.response->entry_64);
-    }
-
-    Pointer EfiSystemTable()
-    {
-        VerifyExistenceOrRet(s_EfiSystemTableRequest);
-
-        return s_EfiSystemTableRequest.response->address;
-    }
-    limine_efi_memmap_response* EfiMemoryMap()
-    {
-        VerifyExistenceOrRet(s_EfiMemmapRequest);
-
-        return s_EfiMemmapRequest.response;
-    }
-    u64 DateAtBoot()
-    {
-        VerifyExistenceOrRetValue(s_DateAtBootRequest, 0);
-
-        return s_DateAtBootRequest.response->timestamp;
-    }
-    Pointer KernelPhysicalAddress()
-    {
-        VerifyExistenceOrRet(s_KernelAddressRequest);
-
-        return s_KernelAddressRequest.response->physical_base;
-    }
-    Pointer KernelVirtualAddress()
-    {
-        VerifyExistenceOrRet(s_KernelAddressRequest);
-
-        return s_KernelAddressRequest.response->virtual_base;
-    }
-    Pointer DeviceTreeBlobAddress()
-    {
-        VerifyExistenceOrRet(s_DtbRequest);
-
-        return s_DtbRequest.response->dtb_ptr;
     }
 } // namespace BootInfo

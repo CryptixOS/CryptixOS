@@ -109,6 +109,81 @@ namespace ACPI
         bool CmosRtcNotPresent : 1;
         u16  Reserved          : 10;
     };
+    enum class FadtFlags : u32
+    {
+        eNone                  = 0,
+        // WBINVD instruction is operational
+        eWbinvd                = Bit(0),
+        // WBINVD flushes caches properly
+        eWbinvdFlush           = Bit(1),
+        // C1 power state available
+        eSupportsC1            = Bit(2),
+        // C2 power state available
+        eSupportsC2            = Bit(3),
+        // Power button is a control method device
+        ePowerButton           = Bit(4),
+        // Sleep button is a control method device
+        eSleepButton           = Bit(5),
+        // RTC can wake system
+        eFixedRtcWake          = Bit(6),
+        // RTC can wake from S4
+        eRtcCanWakeS4          = Bit(7),
+
+        // 32-bit PM timer
+        eTmrIs32Bit            = Bit(8),
+        // System supports docking
+        eDockingSupported      = Bit(9),
+        // Reset register is valid
+        eResetRegSupported     = Bit(10),
+        // System is sealed
+        eSealedCase            = Bit(11),
+        // Headless system
+        eHeadlessSystem        = Bit(12),
+        // Use software-based sleep control
+        eSoftwareSlp           = Bit(13),
+        // PCIe wake supported
+        ePciExpressWake        = Bit(14),
+        // Use platform-provided clock source
+        eUsePlatformClock      = Bit(15),
+
+        // RTC status valid for S4
+        eRtcStsValidOnS4       = Bit(16),
+        // Supports remote wake
+        eRemoteWakeSupported   = Bit(17),
+        // Force APIC cluster model
+        eForceApicClusterModel = Bit(18),
+        // Force physical destination mode
+        eForceApicPhysicalDest = Bit(19),
+
+        // Hardware-reduced ACPI model
+        eHardwareReducedAcpi   = Bit(20),
+        // Low Power S0 Idle (Modern Standby)
+        eLowPowerS0Idle        = Bit(21),
+    };
+
+    inline constexpr FadtFlags operator|(FadtFlags a, FadtFlags b)
+    {
+        return static_cast<FadtFlags>(static_cast<u32>(a)
+                                      | static_cast<u32>(b));
+    }
+
+    inline constexpr FadtFlags operator&(FadtFlags a, FadtFlags b)
+    {
+        return static_cast<FadtFlags>(static_cast<u32>(a)
+                                      & static_cast<u32>(b));
+    }
+    inline constexpr FadtFlags operator~(FadtFlags a)
+    {
+        return static_cast<FadtFlags>(~static_cast<u32>(a));
+    }
+    inline constexpr bool operator==(FadtFlags lhs, usize rhs)
+    {
+        return ToUnderlying(lhs) == rhs;
+    }
+    inline constexpr bool operator!=(FadtFlags lhs, usize rhs)
+    {
+        return ToUnderlying(lhs) != rhs;
+    }
 
     struct [[gnu::packed]] FADT
     {
@@ -153,7 +228,7 @@ namespace ACPI
         X86BootArchitectureFlags X86BootArchitectureFlags;
 
         u8                       Reserved2;
-        u32                      Flags;
+        FadtFlags                Flags;
 
         // 12 byte structure; see below for details
         GenericAddressStructure  ResetReg;

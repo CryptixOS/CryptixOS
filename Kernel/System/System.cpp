@@ -20,6 +20,7 @@ namespace System
 {
     namespace
     {
+        BootModuleInfo                s_KernelExecutable;
         ELF::Image                    s_KernelImage;
         RedBlackTree<StringView, u64> s_KernelSymbols;
 
@@ -27,25 +28,25 @@ namespace System
         Module::List                  s_Modules;
     }; // namespace
 
-    ErrorOr<void> LoadKernelSymbols()
+    ErrorOr<void> LoadKernelSymbols(const BootModuleInfo& kernelExecutable)
     {
         LogTrace("System: Loading kernel symbols...");
 
-        auto kernelExecutable = BootInfo::ExecutableFile();
-        if (!kernelExecutable || !kernelExecutable->address
-            || !kernelExecutable->size)
+        s_KernelExecutable    = kernelExecutable;
+        Pointer kernelAddress = kernelExecutable.LoadAddress;
+        usize   kernelSize    = kernelExecutable.Size;
+
+        if (!kernelAddress || !kernelSize)
         {
             LogTrace("System: Failed to locate the kernel executable");
             return Error(ENOENT);
         }
 
-        Pointer address = kernelExecutable->address;
-        usize   size    = kernelExecutable->size;
         LogTrace(
             "System: Loaded the kernel executable with size `{}`KiB at `{:#x}`",
-            size / 1024, address.Raw());
+            kernelSize / 1024, kernelAddress.Raw());
 
-        auto status = s_KernelImage.LoadFromMemory(address, size);
+        auto status = s_KernelImage.LoadFromMemory(kernelAddress, kernelSize);
         if (!status)
         {
             LogError("System: Failed to load the kernel image");
@@ -203,7 +204,8 @@ namespace System
         return nullptr;
     }
 
-    const ELF::Image&                    KernelImage() { return s_KernelImage; }
+    PathView          KernelExecutablePath() { return s_KernelExecutable.Path; }
+    const ELF::Image& KernelImage() { return s_KernelImage; }
     const RedBlackTree<StringView, u64>& KernelSymbols()
     {
         return s_KernelSymbols;

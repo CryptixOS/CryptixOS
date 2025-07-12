@@ -8,6 +8,7 @@
 #include <Debug/Config.hpp>
 
 #include <Firmware/EFI/Memory.hpp>
+#include <Firmware/EFI/SystemTable.hpp>
 #include <Library/Logger.hpp>
 
 #include <Memory/VMM.hpp>
@@ -15,31 +16,33 @@
 
 namespace EFI
 {
-    bool Initialize()
-    {
-        auto firmwareType = BootInfo::FirmwareType();
-        if (firmwareType != FirmwareType::eUefi32
-            && firmwareType != FirmwareType::eUefi64)
-            return false;
+    SystemTable* g_SystemTable = nullptr;
 
+    bool         Initialize(Pointer systemTable, const EfiMemoryMap& memoryMap)
+    {
         LogTrace("EFI: Initializing...");
-        auto efiMemoryMapResponse = BootInfo::EfiMemoryMap();
-        if (!efiMemoryMapResponse)
+        if (!systemTable)
         {
-            LogError(
-                "EFI: Couldn't retrieve "
-                "limine_efi_memmap_response");
+            LogTrace("EFI: System table not available, aborting");
             return false;
         }
 
-        Pointer memoryMap      = efiMemoryMapResponse->memmap;
-        auto    memoryMapSize  = efiMemoryMapResponse->memmap_size;
-        auto    descriptorSize = efiMemoryMapResponse->desc_size;
+        g_SystemTable = systemTable.As<SystemTable>();
+        if (!memoryMap.Address)
+        {
+            LogError(
+                "EFI: Couldn't retrieve "
+                "the memory map");
+            return false;
+        }
+
+        auto    memoryMapSize  = memoryMap.Size;
+        auto    descriptorSize = memoryMap.DescriptorSize;
         usize   entryCount     = memoryMapSize / descriptorSize;
 
-        Pointer current        = efiMemoryMapResponse->memmap;
-        Pointer end            = memoryMap.Offset(memoryMapSize);
-        if (!memoryMap || entryCount == 0)
+        Pointer current        = memoryMap.Address;
+        Pointer end            = current.Offset(memoryMapSize);
+        if (!current || entryCount == 0)
         {
             return false;
             LogError("EFI: Couldn't acquire efi memory map");

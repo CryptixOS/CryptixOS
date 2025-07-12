@@ -37,7 +37,7 @@ namespace uACPI
     {
         uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr* outRsdp)
         {
-            uacpi_phys_addr rsdp = BootInfo::RSDPAddress().FromHigherHalf();
+            uacpi_phys_addr rsdp = ACPI::RSDP().FromHigherHalf();
 
             if (rsdp)
             {
@@ -293,7 +293,7 @@ namespace uACPI
             Assert(level < uacpiToPrismLogLevels.Size());
             LogLevel pLevel = uacpiToPrismLogLevels[level];
 
-            va_list args;
+            va_list  args;
             va_start(args, format);
             Logger::Logv(pLevel, format, args, false);
             va_end(args);

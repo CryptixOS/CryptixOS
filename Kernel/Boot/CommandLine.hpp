@@ -12,7 +12,7 @@
 
 namespace CommandLine
 {
-    void           Initialize();
+    void           Initialize(StringView commandLine);
 
     StringView     KernelCommandLine();
     bool           Contains(StringView key);

@@ -323,8 +323,6 @@ namespace ELF
     ErrorOr<void> Image::Parse()
     {
         ByteStream<Endian::eNative> stream(m_Image.Raw(), m_Image.Size());
-        LogTrace("ELF: Kernel Executable Address -> '{:#x}'",
-                 Pointer(m_Image.Raw()).Raw());
 
         stream >> m_Header;
         if (std::strncmp(reinterpret_cast<char*>(&m_Header.Magic), ELF::MAGIC,
@@ -357,15 +355,6 @@ namespace ELF
             return Error(ENOEXEC);
         }
 
-        constexpr auto EXECUTABLE_TYPE_STRINGS = ToArray({
-            "Relocatable",
-            "Executable",
-            "Shared",
-            "Core",
-        });
-        LogTrace("ELF: Executable type -> '{}'",
-                 m_Header.Type < 4 ? EXECUTABLE_TYPE_STRINGS[m_Header.Type]
-                                   : "Unknown");
         if (m_Header.InstructionSet != InstructionSet::eAMDx86_64)
         {
             LogError("ELF: Only x86_64 instruction set is supported");

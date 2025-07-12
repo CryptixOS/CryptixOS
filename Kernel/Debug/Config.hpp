@@ -25,3 +25,11 @@
 #ifndef CTOS_DUMP_EFI_MEMORY_MAP
     #define CTOS_DUMP_EFI_MEMORY_MAP 0
 #endif
+
+#ifndef CTOS_TTY_LOG_TERMIOS
+    #define CTOS_TTY_LOG_TERMIOS 0
+#endif
+
+#ifndef CTOS_DEBUG_ECHFS
+    #define CTOS_DEBUG_ECHFS 0
+#endif

@@ -41,6 +41,7 @@ namespace API::MM
 
         if (addr.Raw() & ~Arch::VMM::GetAddressMask()) return MAP_FAILED;
         flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
+        // NOTE(v1tr10l7): Currently we don't support mapping the files
         if (!(flags & MAP_ANONYMOUS)) return MAP_FAILED;
 
         // TODO(v1tr10l7): Lazy mapping
@@ -60,15 +61,9 @@ namespace API::MM
         if (fdNum != -1) fd = current->GetFileHandle(fdNum);
 
         if (offset != 0) return Error(EINVAL);
-        usize pageCount
-            = Math::AlignUp(length, PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
 
         auto&       addressSpace = current->AddressSpace();
-        auto*       pageMap      = current->PageMap;
         Ref<Region> region       = nullptr;
-
-        Pointer     phys         = PMM::CallocatePages<uintptr_t>(pageCount);
-        if (!phys) return Error(ENOMEM);
 
         // TODO(v1tr10l7): File mapping
         if (fdNum != -1 && !(flags & MAP_ANONYMOUS))
@@ -76,10 +71,9 @@ namespace API::MM
             if (!fd)
             {
                 errorCode = EBADF;
-                goto free_pages;
+                goto fail;
             }
-            region = addressSpace.AllocateRegion(length);
-            region->SetPhysicalBase(phys);
+            region    = addressSpace.AllocateRegion(length);
             auto virt = region->VirtualBase();
 
             if (!fd->CanRead())
@@ -89,7 +83,6 @@ namespace API::MM
             }
 
             region->SetAccessMode(access);
-            pageMap->MapRegion(region, pageSize);
 
             ErrorOr<isize> sizeOr;
             if (offset) sizeOr = fd->Seek(SEEK_SET, offset);
@@ -111,12 +104,12 @@ namespace API::MM
         if (offset)
         {
             errorCode = EINVAL;
-            goto free_pages;
+            goto fail;
         }
         if (!(flags & MAP_ANONYMOUS))
         {
             errorCode = ENOSYS;
-            goto free_pages;
+            goto fail;
         }
 
         if (flags & MAP_FIXED)
@@ -128,17 +121,14 @@ namespace API::MM
         if (flags & MAP_SHARED)
             ;
 
-        if (!region) goto free_pages;
-        region->SetPhysicalBase(phys);
+        if (!region) goto fail;
         region->SetAccessMode(access);
-        pageMap->MapRegion(region, pageSize);
 
+        Assert(addressSpace.Find(region->VirtualBase()) == region);
         return region->VirtualBase().Raw();
 
     free_region:
         addressSpace.Erase(region->VirtualBase());
-    free_pages:
-        PMM::FreePages(phys, pageCount);
     [[maybe_unused]] fail:
         return Error(errorCode.ValueOr(ENOMEM));
     }

@@ -59,7 +59,8 @@ namespace Arch::VMM
 
 namespace VMM
 {
-    void        Initialize();
+    void        Initialize(Pointer kernelPhys, Pointer kernelVirt,
+                           usize higherHalfOffset);
     void        UnmapKernelInitCode();
 
     usize       GetHigherHalfOffset();

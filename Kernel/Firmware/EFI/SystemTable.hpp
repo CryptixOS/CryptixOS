@@ -39,4 +39,6 @@ namespace EFI
         Size                             NumberOfTableEntries;
         ConfigurationTable*              ConfigurationTable;
     };
+
+    extern SystemTable* g_SystemTable;
 }; // namespace EFI

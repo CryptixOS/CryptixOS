@@ -148,8 +148,6 @@ void Scheduler::Initialize()
             s_Queues[cpuID][queueIndex] = new ThreadQueue;
     }
 
-    Time::Initialize();
-
     for (usize i = 0; i < cpuCount; i++)
         s_CPULocalData[i].PreemptionEnabled.Store(true);
     s_SchedulerEnabled = true;

@@ -23,8 +23,12 @@ enum class MemoryUsage
     eUser       = 6,
 };
 
+struct MemoryMap;
 namespace MemoryManager
 {
+    void        Initialize(const MemoryMap& memoryMap, Pointer kernelPhys,
+                           Pointer kernelVirt, usize higherHalfOffset);
+
     Ref<Region> AllocateRegion(const usize    bytes,
                                PageAttributes attributes = PageAttributes::eRW,
                                const MemoryUsage memoryUsage

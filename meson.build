@@ -72,6 +72,7 @@ add_global_arguments(
     warnings,
     macros,
     '-ffreestanding',
+    # keep stack pointer in the appriopriate register
     '-fno-omit-frame-pointer',
     '-fno-lto',
     '-fsanitize=undefined',
@@ -88,6 +89,7 @@ add_global_arguments(
 
 add_global_arguments(
   [
+    # pass the size argument to delete operator
     '-fsized-deallocation',
     '-D__cplusplus=202302L',
     '-D__cpp_concepts=202207L',

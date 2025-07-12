@@ -4,7 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/BootInfo.hpp>
 #include <Boot/CommandLine.hpp>
 
 #include <Library/Logger.hpp>
@@ -72,9 +71,9 @@ namespace CommandLine
         LogTrace("CommandLine: Finished parsing the arguments");
     }
 
-    void Initialize()
+    void Initialize(StringView commandLine)
     {
-        s_KernelCommandLine = BootInfo::KernelCommandLine();
+        s_KernelCommandLine = commandLine;
 
         LogInfo("CommandLine: Parsing '{}'...", s_KernelCommandLine);
         ParseArguments(s_KernelCommandLine);
@@ -84,14 +83,9 @@ namespace CommandLine
             LogInfo("CommandLine: {} -> {}", arg, value);
     }
 
-    StringView KernelCommandLine()
-    {
-        if (s_KernelCommandLine.Empty())
-            s_KernelCommandLine = BootInfo::KernelCommandLine();
-        return s_KernelCommandLine;
-    }
+    StringView KernelCommandLine() { return s_KernelCommandLine; }
 
-    bool Contains(StringView key) { return s_OptionMap.Contains(key); }
+    bool       Contains(StringView key) { return s_OptionMap.Contains(key); }
     Optional<bool> GetBoolean(StringView key)
     {
         auto it = s_OptionMap.Find(String(key));

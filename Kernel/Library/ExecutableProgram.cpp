@@ -29,7 +29,7 @@ ErrorOr<void> ExecutableProgram::Load(PathView path, PageMap* pageMap,
     auto ldPath  = m_Image->InterpreterPath();
     if (ldPath.Empty()) return {};
 
-    m_LoadBase = 0x40000000;
+    m_LoadBase = 0x41000000;
     maybeImage = LoadImage(ldPath, pageMap, addressSpace, true);
     RetOnError(maybeImage);
 
@@ -135,6 +135,7 @@ ExecutableProgram::LoadImage(PathView path, PageMap* pageMap,
 
     Ref file  = maybeFile.value();
     Ref image = CreateRef<ELF::Image>();
+
     if (!image->Load(file.Raw(), m_LoadBase)) return Error(ENOEXEC);
 
     auto forEachProgramHeader = [&](ELF::ProgramHeader* header) -> bool
@@ -148,11 +149,11 @@ ExecutableProgram::LoadImage(PathView path, PageMap* pageMap,
             Pointer phys = PMM::CallocatePages(pageCount);
             Assert(phys);
 
-            // auto  virt = header->VirtualAddress + m_LoadBase;
+            auto  virt = header->VirtualAddress + m_LoadBase;
             usize size = pageCount * PMM::PAGE_SIZE;
-            Assert(pageMap->MapRange(
-                header->VirtualAddress + m_LoadBase, phys, size,
-                PageAttributes::eRWXU | PageAttributes::eWriteBack));
+            Assert(pageMap->MapRange(virt, phys, size,
+                                     PageAttributes::eRWXU
+                                         | PageAttributes::eWriteBack));
             auto region
                 = new Region(phys, header->VirtualAddress + m_LoadBase, size);
             using VMM::Access;

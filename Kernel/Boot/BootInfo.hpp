@@ -6,11 +6,16 @@
  */
 #pragma once
 
+#include <Memory/PMM.hpp>
+
 #include <Prism/Containers/Span.hpp>
 #include <Prism/Core/Types.hpp>
 
 #include <Prism/Memory/Pointer.hpp>
-#include <Prism/String/StringView.hpp>
+#include <Prism/Network/Ipv4Address.hpp>
+
+#include <Prism/Core/UUID.hpp>
+#include <Prism/Utility/PathView.hpp>
 #include <Prism/Utility/Time.hpp>
 
 #include <limine.h>
@@ -18,41 +23,6 @@
 constexpr u32 FRAMEBUFFER_MEMORY_MODEL_RGB = LIMINE_FRAMEBUFFER_RGB;
 
 using Framebuffer                          = limine_framebuffer;
-enum class MemoryType
-{
-    eUsable                = 0,
-    eReserved              = 1,
-    eACPI_Reclaimable      = 2,
-    eACPI_NVS              = 3,
-    eBadMemory             = 4,
-    eBootloaderReclaimable = 5,
-    eKernelAndModules      = 6,
-    eFramebuffer           = 7,
-};
-struct MemoryRegion
-{
-  public:
-    constexpr MemoryRegion(Pointer base, usize size, MemoryType type)
-        : m_Base(base)
-        , m_Size(size)
-        , m_Type(type)
-    {
-    }
-
-    constexpr Pointer    Base() const { return m_Base; }
-    constexpr usize      Size() const { return m_Size; }
-    constexpr MemoryType Type() const { return m_Type; }
-
-    Pointer              m_Base = 0;
-    usize                m_Size = 0;
-    MemoryType           m_Type = MemoryType::eReserved;
-};
-struct MemoryMap
-{
-    MemoryRegion* Entries    = nullptr;
-    usize         EntryCount = 0;
-};
-
 enum class FirmwareType : i32
 {
     eUndefined = -1,
@@ -61,65 +31,81 @@ enum class FirmwareType : i32
     eUefi64    = 2,
     eSbi       = 3,
 };
+struct EfiMemoryMap
+{
+    Pointer Address           = nullptr;
+    usize   Size              = 0;
+    usize   DescriptorSize    = 0;
+    u32     DescriptorVersion = 0;
+};
+
+enum class BootMediaType
+{
+    eGeneric = 0,
+    eOptical = 1,
+    eTFTP    = 2,
+};
+struct BootModuleInfo
+{
+    StringView    Name              = ""_sv;
+    PathView      Path              = ""_sv;
+
+    // Virtual address to where the module was loaded
+    Pointer       LoadAddress       = nullptr;
+    usize         Size              = 0;
+
+    BootMediaType MediaType         = BootMediaType::eGeneric;
+    IPv4Address   TFTP_IPv4         = "127.0.0.1"_sv;
+    u32           TFTP_Port         = 21;
+
+    usize         PartitionIndex    = 0;
+    usize         MBR_DiskID        = 0;
+    UUID          GPT_DiskUUID      = 0;
+    UUID          GPT_PartitionUUID = 0;
+    UUID          FilesystemUUID    = 0;
+};
 
 struct BootInformation
 {
-    StringView        BootloaderName    = ""_sv;
-    StringView        BootloaderVersion = ""_sv;
-    StringView        KernelCommandLine = ""_sv;
-    enum FirmwareType FirmwareType;
-    DateTime          DateAtBoot         = 0;
+    StringView                        BootloaderName    = ""_sv;
+    StringView                        BootloaderVersion = ""_sv;
+    StringView                        KernelCommandLine = ""_sv;
+    enum FirmwareType                 FirmwareType;
+    DateTime                          DateAtBoot = 0;
 
-    limine_file*      KernelExecutable   = nullptr;
-    limine_file**     KernelModules      = nullptr;
-    Pointer           KernelPhysicalBase = nullptr;
-    Pointer           KernelVirtualBase  = nullptr;
+    BootModuleInfo                    KernelExecutable{};
+    Span<limine_file*, DynamicExtent> KernelModules;
+    Pointer                           KernelPhysicalBase = nullptr;
+    Pointer                           KernelVirtualBase  = nullptr;
 
-    MemoryMap         MemoryMap          = {nullptr, 0};
-    u8                PagingMode         = 0;
-    usize             HigherHalfOffset   = 0;
+    MemoryMap                         MemoryMap          = {nullptr, 0};
+    u8                                PagingMode         = 0;
+    usize                             HigherHalfOffset   = 0;
 
-    u64               BspID              = 0;
-    u64               ProcessorCount     = 0;
-    Span<Framebuffer> Framebuffers;
+    u64                               BspID              = 0;
+    u64                               ProcessorCount     = 0;
+    Span<Framebuffer, DynamicExtent>  Framebuffers;
 
-    Pointer           RSDP                       = nullptr;
-    Pointer           DeviceTree                 = nullptr;
-    Pointer           SmBios32                   = nullptr;
-    Pointer           SmBios64                   = nullptr;
+    // Physical address of the RSDP structure
+    Pointer                           RSDP           = nullptr;
+    // Physical address of the Device Tree Blob
+    Pointer                           DeviceTreeBlob = nullptr;
+    // Physical address of the SMBIOS 32 bit EntryPoint structure
+    Pointer                           SmBios32Phys   = nullptr;
+    // Physical address of the SMBIOS 64 bit EntryPoint structure
+    Pointer                           SmBios64Phys   = nullptr;
 
-    Pointer           EfiSystemTable             = nullptr;
-    Pointer           EfiMemoryMap               = nullptr;
-    usize             EfiMemoryMapSize           = 0;
-    usize             EfiMemoryDescriptorSize    = 0;
-    usize             EfiMemoryDescriptorVersion = 0;
+    Pointer                           EfiSystemTable = nullptr;
+    struct EfiMemoryMap               EfiMemoryMap;
 };
 
 namespace BootInfo
 {
-    StringView                  BootloaderName();
-    StringView                  BootloaderVersion();
-    StringView                  KernelCommandLine();
-    enum FirmwareType           FirmwareType();
+    u64                 GetHHDMOffset();
+    Framebuffer**       GetFramebuffers(usize& outCount);
+    Framebuffer*        GetPrimaryFramebuffer();
+    usize               PagingMode();
+    limine_mp_response* SMP_Response();
 
-    u64                         GetHHDMOffset();
-    Framebuffer**               GetFramebuffers(usize& outCount);
-    Framebuffer*                GetPrimaryFramebuffer();
-    usize                       PagingMode();
-    limine_mp_response*         SMP_Response();
-    MemoryMap&                  MemoryMap();
-
-    limine_file*                ExecutableFile();
-    limine_file*                FindModule(const char* name);
-
-    Pointer                     RSDPAddress();
-    std::pair<Pointer, Pointer> GetSmBiosEntries();
-    Pointer                     EfiSystemTable();
-    limine_efi_memmap_response* EfiMemoryMap();
-
-    u64                         DateAtBoot();
-    Pointer                     KernelPhysicalAddress();
-    Pointer                     KernelVirtualAddress();
-
-    Pointer                     DeviceTreeBlobAddress();
+    limine_file*        FindModule(const char* name);
 }; // namespace BootInfo

@@ -23,11 +23,13 @@ SECTIONS
 {
     . = 0xffffffff80000000;
 
+    limine_requests_addr_start = .;
     .limine_requests : {
         KEEP(*(.limine_requests_start))
         KEEP(*(.limine_requests))
         KEEP(*(.limine_requests_end))
     } :limine_requests
+    limine_requests_addr_end = .;
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));
     text_start_addr = .;
@@ -47,7 +49,6 @@ SECTIONS
     . = ALIGN(CONSTANT(MAXPAGESIZE));
     rodata_start_addr = .;
     .rodata : { *(.rodata .rodata.*) } :rodata
-    rodata_end_addr = .;
 
     .init_array :
     {
@@ -57,6 +58,7 @@ SECTIONS
         PROVIDE_HIDDEN(__init_array_end = .);
     } :rodata
 
+    rodata_end_addr = .;
     . = ALIGN(CONSTANT(MAXPAGESIZE));
     data_start_addr = .;
     .data : { *(.data .data.*) } :data

@@ -10,20 +10,21 @@
 #include <Prism/Containers/Array.hpp>
 #include <Prism/Containers/Deque.hpp>
 #include <Prism/String/String.hpp>
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Optional.hpp>
 
 namespace ACPI::Interpreter
 {
-    static NameSpace*       s_RootNameSpace = nullptr;
+    static NameSpace*        s_RootNameSpace = nullptr;
     static Vector<CodeBlock> s_ScopesToParse;
-    static ExecutionContext s_Context;
-    static CodeBlock        s_CurrentBlock;
+    static ExecutionContext  s_Context;
+    static CodeBlock         s_CurrentBlock;
 
-    inline u8             PeekNextByte()
+    inline u8                PeekNextByte()
     {
         auto& stream = s_Context.Stream;
 
-        u8  value  = 0;
+        u8    value  = 0;
         stream >> value;
 
         stream.Seek(stream.Offset() - 1);
@@ -56,7 +57,34 @@ namespace ACPI::Interpreter
 
     u32 DecodePkgLength()
     {
-        u8  leadByte  = ReadNext<u8>();
+        /*
+        u8 markerLength = 1;
+        u8 lead = ReadNext<u8>();
+        markerLength += lead >> 6;
+
+        usize size = 0;
+        switch (markerLength)
+        {
+            case 1:
+                size = lead & 0b111111;
+            case 2:
+            case 3:
+            case 4:
+            {
+                u32 temp = 0;
+                size = lead & 0b1111;
+                memcpy(&temp, s_Context.Stream.Raw() +
+        s_Context.Stream.Offset(), markerLength - 1);
+                s_Context.Stream.Seek(s_Context.Stream.Offset() + markerLength);
+                size |= temp << 4;
+                break;
+            }
+        }
+        return size;
+        */
+        u8 leadByte = ReadNext<u8>();
+        LogTrace("Decoding package length");
+        LogDebug("\tLeadByte => {:#02x}", leadByte);
 
         u8  byteCount = (leadByte >> 6) & 0x03;
         u32 length    = leadByte & 0x3f;
@@ -64,8 +92,11 @@ namespace ACPI::Interpreter
         for (usize i = 0; i < byteCount; ++i)
         {
             u8 nextByte = ReadNext<u8>();
+            LogDebug("\tNextByte[{}] => {:#02x}", i, nextByte);
             length |= static_cast<u32>(nextByte) << (4 + (i * 8));
         }
+
+        LogTrace("End of decoding package length");
         return length;
     }
 
@@ -141,7 +172,7 @@ namespace ACPI::Interpreter
     }
     Expression* ParseTermArg()
     {
-        u8   op     = ReadNext<u8>();
+        u8     op     = ReadNext<u8>();
         OpCode opcode = static_cast<OpCode>(op);
 
         switch (opcode)
@@ -257,7 +288,7 @@ namespace ACPI::Interpreter
             case OpCode::ePackage:
             {
                 auto pkgLength = DecodePkgLength();
-                auto length = ParseTermArg();
+                auto length    = ParseTermArg();
 
                 LogMessage(
                     "Created package object\npkgLength => {:#x}, length => "
@@ -291,9 +322,8 @@ namespace ACPI::Interpreter
 
         if (initialValue) object = new IntegerObject(initialValue);
 
-        auto str        = magic_enum::enum_name(static_cast<OpCode>(op));
-        auto opCodeName = StringView(str.data(), str.size());
-
+        //TODO(v1tr10l7): we should have a function to ToStringView, which would not use heap allocation
+        auto opCodeName        = ToString(static_cast<OpCode>(op));
         LogTrace("ACPI: Created named object with an opcode => `{}`",
                  opCodeName);
         return object;
@@ -301,7 +331,7 @@ namespace ACPI::Interpreter
     void ExecuteOpCode()
     {
         OpCode opcode = GetNextOp();
-        u16   op     = ToUnderlying(opcode);
+        u16    op     = ToUnderlying(opcode);
         LogMessage("{:#x}\n", op);
 
         switch (opcode)
@@ -327,6 +357,10 @@ namespace ACPI::Interpreter
                 current->m_Type = ObjectType::eScope;
                 CodeBlock codeBlock(current, s_Context.Stream.Offset(),
                                     start + pkgLength);
+                codeBlock.PackageLength = pkgLength;
+                codeBlock.Name          = name;
+                codeBlock.OpCode        = op;
+
                 s_ScopesToParse.PushBack(codeBlock);
 
                 s_Context.Stream.Seek(codeBlock.End);
@@ -350,7 +384,7 @@ namespace ACPI::Interpreter
             case OpCode::eAcquire:
             {
                 auto name = DecodeName();
-                u16 timeout;
+                u16  timeout;
                 s_Context.Stream >> timeout;
                 break;
             }
@@ -369,7 +403,7 @@ namespace ACPI::Interpreter
                 CTOS_UNUSED usize start     = s_Context.Stream.Offset();
                 CTOS_UNUSED u32   pkgLength = DecodePkgLength();
                 auto              name      = DecodeName();
-                u8              flags;
+                u8                flags;
                 s_Context.Stream >> flags;
 
                 u8                    acc          = flags & 0b1111;
@@ -451,7 +485,7 @@ namespace ACPI::Interpreter
     Statement* ParseStatement()
     {
         auto opcode = GetNextOp();
-        u16 op     = ToUnderlying(opcode);
+        u16  op     = ToUnderlying(opcode);
 
         switch (opcode)
         {
@@ -530,7 +564,7 @@ namespace ACPI::Interpreter
         auto method = new MethodObject();
 
         s_Context.Stream.Seek(codeBlock.Start);
-        u8 flags              = ReadNext<u8>();
+        u8 flags                = ReadNext<u8>();
         method->m_ArgumentCount = flags & 0b111;
 
         auto end                = codeBlock.End;
@@ -542,7 +576,7 @@ namespace ACPI::Interpreter
 
         return method;
     }
-    void ExecuteTable(ACPI::SDTHeader& table)
+    void ExecuteTable(SDTHeader& table)
     {
         if (!s_RootNameSpace)
         {
@@ -585,14 +619,22 @@ namespace ACPI::Interpreter
             if (scope.NameSpace->m_Type == ObjectType::eMethod
                 && discardMethods)
                 continue;
-            auto end = scope.End;
+            auto end              = scope.End;
 
-            auto str = magic_enum::enum_name(scope.NameSpace->m_Type);
-            auto objectTypeString = StringView(str.data(), str.size());
+            auto objectTypeString              = ToString(scope.NameSpace->m_Type);
             LogTrace("ACPI::Interpreter: Parsing object `{}` of type => `{}`",
                      scope.NameSpace->m_Name, objectTypeString);
+
+            if (scope.NameSpace->m_Type == ObjectType::eScope)
+            {
+                LogDebug("ScopeOp - Begin({:#04x})", scope.OpCode);
+                LogDebug("\tPkgLength => {:#x}", scope.PackageLength);
+                LogDebug("\tName => {:#x}", scope.Name);
+            }
             while (s_Context.Stream.Offset() < end) ExecuteOpCode();
-            LogTrace("ACPI::Interpreter: Hit end of code block");
+            if (scope.NameSpace->m_Type == ObjectType::eScope)
+                LogDebug("ScopeOp - End({:#04x})", scope.OpCode);
+            else LogTrace("ACPI::Interpreter: Hit end of code block");
             // LogTrace("ACPI: Parsing method...");
             // auto method = ParseMethod(scope);
             // LogTrace("ACPI: Finished parsing method.");

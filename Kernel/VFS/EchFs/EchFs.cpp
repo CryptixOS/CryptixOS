@@ -4,6 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Debug/Config.hpp>
+
 #include <Memory/PMM.hpp>
 #include <Prism/Utility/Math.hpp>
 
@@ -65,6 +67,7 @@ ErrorOr<Ref<DirectoryEntry>> EchFs::Mount(StringView  sourcePath,
     uuid[0]             = m_IdentityTable->UUID[0];
     uuid[1]             = m_IdentityTable->UUID[1];
 
+#if CTOS_DEBUG_ECHFS
     EchFsDebug("EchFs", "", "IdentityTable =>");
     EchFsDebug("Signature", "", signature);
     EchFsDebug("TotalBlockCount", ":#x", totalBlockCount);
@@ -72,6 +75,7 @@ ErrorOr<Ref<DirectoryEntry>> EchFs::Mount(StringView  sourcePath,
     EchFsDebug("BytesPerBlock", ":#x", m_BlockSize);
     EchFsDebug("UUID0", ":#x", uuid[0]);
     EchFsDebug("UUID1", ":#x", uuid[1]);
+#endif
 
     if (signature != ECHFS_SIGNATURE)
     {

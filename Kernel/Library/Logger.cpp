@@ -8,8 +8,8 @@
 #include <Drivers/Serial.hpp>
 #include <Drivers/VideoTerminal.hpp>
 
-#include <Library/Logger.hpp>
 #include <Library/Locking/Spinlock.hpp>
+#include <Library/Logger.hpp>
 
 #include <Prism/Debug/LogSink.hpp>
 #include <Prism/String/StringUtils.hpp>
@@ -251,7 +251,7 @@ namespace Logger
             LogChar(FOREGROUND_COLOR_WHITE);
             LogChar(BACKGROUND_COLOR_BLACK);
             LogChar(RESET_COLOR);
-            Print("]: ");
+            Print("]:\t");
         }
     }; // namespace
 

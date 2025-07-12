@@ -6,8 +6,8 @@
  */
 #pragma once
 
-#include <Boot/BootInfo.hpp>
 #include <Library/Locking/Spinlock.hpp>
+#include <Memory/PMM.hpp>
 
 #include <Prism/Memory/Memory.hpp>
 

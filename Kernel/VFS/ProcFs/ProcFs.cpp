@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <API/System.hpp>
+#include <Boot/CommandLine.hpp>
 
 #include <Drivers/DeviceManager.hpp>
 #include <Prism/String/StringUtils.hpp>
@@ -26,8 +27,8 @@ struct ProcFsCmdLineProperty : public ProcFsProperty
     {
         Buffer.Clear();
 
-        StringView kernelPath = BootInfo::ExecutableFile()->path;
-        StringView cmdline    = BootInfo::KernelCommandLine();
+        StringView kernelPath = System::KernelExecutablePath();
+        StringView cmdline    = CommandLine::KernelCommandLine();
 
         Buffer.Resize(kernelPath.Size() + cmdline.Size() + 10);
         Write("{} {}\n", kernelPath, cmdline);

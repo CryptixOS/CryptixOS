@@ -7,14 +7,14 @@
 #include <API/Syscall.hpp>
 #include <Arch/CPU.hpp>
 
-#include <Boot/BootInfo.hpp>
-
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
 #include <Prism/Utility/Math.hpp>
 #include <Scheduler/Process.hpp>
 
+extern "C" symbol      limine_requests_addr_start;
+extern "C" symbol      limine_requests_addr_end;
 extern "C" symbol      text_start_addr;
 extern "C" symbol      text_end_addr;
 extern "C" symbol      kernel_init_start_addr;
@@ -29,7 +29,7 @@ extern "C" symbol      data_end_addr;
 static PageMap*        s_KernelPageMap;
 static Pointer         s_VirtualAddressSpace{};
 
-static Optional<usize> s_HigherHalfOffset = BootInfo::GetHHDMOffset();
+static Optional<usize> s_HigherHalfOffset = NullOpt;
 
 using namespace Arch::VMM;
 
@@ -48,10 +48,13 @@ namespace VMM
 {
     static bool s_Initialized = false;
 
-    void        Initialize()
+    void        Initialize(Pointer kernelPhys, Pointer kernelVirt,
+                           usize higherHalfOffset)
     {
         if (s_Initialized) return;
-        s_Initialized = true;
+        s_Initialized      = true;
+        s_HigherHalfOffset = higherHalfOffset;
+
         LogTrace("VMM: Initializing...");
         Arch::VMM::Initialize();
 
@@ -64,22 +67,20 @@ namespace VMM
                                          PageAttributes::eRW | flags
                                              | PageAttributes::eWriteBack));
 
-        auto memoryMap = BootInfo::MemoryMap();
-        for (usize i = 0; i < memoryMap.EntryCount; i++)
+        auto memoryMap = PMM::MemoryZones();
+        for (const auto& entry : memoryMap)
         {
-            auto&   entry = memoryMap.Entries[i];
+            Pointer base = Math::AlignDown(entry.Base, GetPageSize());
+            Pointer top
+                = Math::AlignUp(entry.Base.Offset(entry.Size), GetPageSize());
 
-            Pointer base  = Math::AlignDown(entry.Base(), GetPageSize());
-            Pointer top   = Math::AlignUp(entry.Base().Offset(entry.Size()),
-                                          GetPageSize());
-
-            auto    size  = (top - base).Raw();
+            auto size              = (top - base).Raw();
             auto [pageSize, flags] = s_KernelPageMap->RequiredSize(size);
 
             auto alignedSize       = Math::AlignDown(size, pageSize);
 
             flags |= PageAttributes::eWriteBack;
-            if (entry.Type() == MemoryType::eFramebuffer)
+            if (entry.Type == MemoryType::eFramebuffer)
                 flags |= PageAttributes::eWriteCombining;
 
             if (base < 4_gib) continue;
@@ -93,12 +94,13 @@ namespace VMM
                 PageAttributes::eRW | PageAttributes::eWriteBack));
         }
 
-        auto kernelExecutable = BootInfo::ExecutableFile();
-        auto kernelPhys       = BootInfo::KernelPhysicalAddress();
-        auto kernelVirt       = BootInfo::KernelVirtualAddress();
-
+        auto limineRequestsVirt = Pointer(limine_requests_addr_start);
+        auto limineRequestsPhys
+            = Pointer(limine_requests_addr_start) - kernelVirt + kernelPhys;
+        auto limineRequestsSize
+            = Pointer(limine_requests_addr_end) - limineRequestsVirt;
         Assert(s_KernelPageMap->MapRange(
-            kernelVirt, kernelPhys, kernelExecutable->size,
+            limineRequestsVirt, limineRequestsPhys, limineRequestsSize,
             PageAttributes::eRWX | PageAttributes::eWriteBack));
 
         auto textVirt = Pointer(text_start_addr);
@@ -114,11 +116,32 @@ namespace VMM
             s_VirtualAddressSpace = base.Offset(4_gib);
         }
 
-        auto modulesVirt = Pointer(module_init_start_addr);
-        auto modulesPhys = modulesVirt - kernelVirt + kernelPhys;
-        auto modulesSize = Pointer(module_init_end_addr) - modulesVirt;
+        Pointer initVirt = kernel_init_start_addr;
+        auto    initPhys = initVirt - kernelVirt + kernelPhys;
+        auto    initSize = Pointer(kernel_init_end_addr) - textVirt;
+        Assert(s_KernelPageMap->MapRange(initVirt, initPhys, initSize,
+                                         PageAttributes::eRWX
+                                             | PageAttributes::eWriteBack));
+
+        Pointer modulesVirt = module_init_start_addr;
+        auto    modulesPhys = modulesVirt - kernelVirt + kernelPhys;
+        auto    modulesSize = Pointer(module_init_end_addr) - modulesVirt;
         s_KernelPageMap->MapRange(modulesVirt, modulesPhys, modulesSize,
                                   PageAttributes::eRWX
+                                      | PageAttributes::eWriteBack);
+
+        Pointer rodataVirt = rodata_start_addr;
+        auto    rodataPhys = rodataVirt - kernelVirt + kernelPhys;
+        auto    rodataSize = Pointer(rodata_end_addr) - rodataVirt;
+        s_KernelPageMap->MapRange(rodataVirt, rodataPhys, rodataSize,
+                                  PageAttributes::eRead
+                                      | PageAttributes::eWriteBack);
+
+        Pointer dataVirt = data_start_addr;
+        auto    dataPhys = dataVirt - kernelVirt + kernelPhys;
+        auto    dataSize = Pointer(data_end_addr) - dataVirt;
+        s_KernelPageMap->MapRange(dataVirt, dataPhys, dataSize,
+                                  PageAttributes::eRW
                                       | PageAttributes::eWriteBack);
 
         s_KernelPageMap->Load();
@@ -169,7 +192,7 @@ namespace VMM
 
     PageMap* GetKernelPageMap()
     {
-        if (!s_Initialized) Initialize();
+        Assert(s_Initialized);
         return s_KernelPageMap;
     }
 

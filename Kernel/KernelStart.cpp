@@ -32,6 +32,7 @@
 #include <Library/Module.hpp>
 #include <Library/Stacktrace.hpp>
 
+#include <Memory/MemoryManager.hpp>
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
@@ -59,7 +60,7 @@
 
 namespace EFI
 {
-    bool Initialize();
+    bool Initialize(Pointer systemTable, const EfiMemoryMap& memoryMap);
 };
 
 static void eternal()
@@ -146,7 +147,7 @@ static void kernelThread()
     IgnoreUnused(
         VFS::Mount(nullptr, "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv, "echfs"_sv));
 
-    USB::Initialize();
+    if (!USB::Initialize()) LogWarn("USB: Failed to initialize");
 
     if (!System::LoadModules())
         LogWarn("ELF: Could not find any builtin drivers");
@@ -161,21 +162,6 @@ static void kernelThread()
             System::LoadModule(child);
     }
 
-    LogDebug("VFS: Testing directory entry caches...");
-    auto maybePathRes
-        = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), "/mnt");
-    auto        pathRes    = maybePathRes.value();
-
-    MountPoint* mountPoint = MountPoint::Head();
-
-    LogTrace("Iterating mountpoints...");
-    while (mountPoint)
-    {
-        LogTrace("{} => {}", mountPoint->HostEntry()->Name(),
-                 mountPoint->Filesystem()->Name());
-        mountPoint = mountPoint->NextMountPoint();
-    }
-
     LogTrace("Loading init process...");
     auto initPath = CommandLine::GetString("init");
     if (!loadInitProcess(initPath.Empty() ? "/usr/sbin/init" : initPath))
@@ -187,7 +173,7 @@ static void kernelThread()
 }
 
 extern "C" KERNEL_INIT_CODE __attribute__((no_sanitize("address"))) void
-kernelStart()
+kernelStart(const BootInformation& info)
 {
     InterruptManager::InstallExceptions();
 #define CTOS_GDB_ATTACHED 0
@@ -202,14 +188,8 @@ kernelStart()
     // Heap and Serial logging be available ASAP, as every other subsystem
     // depends on this
 
-    // Initialize early kernel heap
-    KernelHeap::Initialize();
-    // Initialize Physical Memory Manager
-    Assert(PMM::Initialize());
-    // Call global constructors
-    icxxabi::Initialize();
-
-    VMM::Initialize();
+    MemoryManager::Initialize(info.MemoryMap, info.KernelPhysicalBase,
+                              info.KernelVirtualBase, info.HigherHalfOffset);
     Serial::Initialize();
     // DONT MOVE END
     // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -229,29 +209,28 @@ kernelStart()
 
     LogInfo(
         "Boot: Kernel loaded with {}-{} -> firmware type: {}, boot time: {}s",
-        BootInfo::BootloaderName(), BootInfo::BootloaderVersion(),
-        ToString(BootInfo::FirmwareType()), BootInfo::DateAtBoot());
+        info.BootloaderName, info.BootloaderVersion,
+        ToString(info.FirmwareType), info.DateAtBoot);
 
-    LogInfo("Boot: Kernel Physical Address: {:#x}",
-            BootInfo::KernelPhysicalAddress());
-    LogInfo("Boot: Kernel Virtual Address: {:#x}",
-            BootInfo::KernelVirtualAddress());
+    LogInfo("Boot: Kernel Physical Address: {:#x}", info.KernelPhysicalBase);
+    LogInfo("Boot: Kernel Virtual Address: {:#x}", info.KernelVirtualBase);
 
-    Assert(System::LoadKernelSymbols());
+    Assert(System::LoadKernelSymbols(info.KernelExecutable));
 
     Stacktrace::Initialize();
-    CommandLine::Initialize();
+    CommandLine::Initialize(info.KernelCommandLine);
 
     Device::Initialize();
-    DeviceTree::Initialize();
+    DeviceTree::Initialize(info.DeviceTreeBlob);
 
-    ACPI::LoadTables();
+    ACPI::LoadTables(info.RSDP);
     Arch::Initialize();
 
-    if (!EFI::Initialize())
+    if (!EFI::Initialize(info.EfiSystemTable, info.EfiMemoryMap))
         LogError("EFI: Failed to initialize efi runtime services...");
-    DMI::SMBIOS::Initialize();
+    DMI::SMBIOS::Initialize(info.SmBios32Phys, info.SmBios64Phys);
 
+    Time::Initialize(info.DateAtBoot);
     Scheduler::Initialize();
     auto process = Scheduler::GetKernelProcess();
     auto thread

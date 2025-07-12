@@ -8,14 +8,48 @@
 
 #include <Common.hpp>
 
+#include <Prism/Containers/Span.hpp>
 #include <Prism/Memory/Pointer.hpp>
+
+enum class MemoryType
+{
+    eUsable                = 0,
+    eReserved              = 1,
+    eACPI_Reclaimable      = 2,
+    eACPI_NVS              = 3,
+    eBadMemory             = 4,
+    eBootloaderReclaimable = 5,
+    eKernelAndModules      = 6,
+    eFramebuffer           = 7,
+};
+struct MemoryRegion
+{
+    constexpr MemoryRegion() = default;
+    constexpr MemoryRegion(Pointer base, usize size, MemoryType type)
+        : Base(base)
+        , Size(size)
+        , Type(type)
+    {
+    }
+
+    Pointer    Base = 0;
+    usize      Size = 0;
+    MemoryType Type = MemoryType::eReserved;
+};
+struct MemoryMap
+{
+    MemoryRegion* Entries    = nullptr;
+    usize         EntryCount = 0;
+};
 
 namespace PhysicalMemoryManager
 {
     constexpr usize     PAGE_SIZE = 0x1000;
 
-    CTOS_NO_KASAN bool  Initialize();
+    CTOS_NO_KASAN bool  Initialize(const MemoryMap& memoryMap);
     bool                IsInitialized();
+
+    Span<MemoryRegion>  MemoryZones();
 
     CTOS_NO_KASAN void* AllocatePages(usize count = 1);
     CTOS_NO_KASAN void* CallocatePages(usize count = 1);
@@ -24,7 +58,7 @@ namespace PhysicalMemoryManager
     template <PointerHolder T>
     inline CTOS_NO_KASAN T AllocatePages(usize count = 1)
     {
-        if constexpr (std::is_same_v<T, Pointer>) return AllocatePages(count);
+        if constexpr (IsSameV<T, Pointer>) return AllocatePages(count);
 
         return reinterpret_cast<T>(AllocatePages(count));
     }

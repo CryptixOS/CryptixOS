@@ -10,6 +10,8 @@
 
 namespace DMI
 {
+    using StringID = u8;
+
     enum class HeaderType : u8
     {
         eBiosInformation         = 0,
@@ -34,21 +36,74 @@ namespace DMI
         u16        Handle;
     };
 
+    enum class RomSizeUnit : u8
+    {
+        eMebiBytes = 0b00,
+        eGibiBytes = 0b01,
+    };
+    struct [[gnu::packed]] FirmwareCharacteristics
+    {
+        union
+        {
+            u64 Value;
+            struct
+            {
+                u64 Reserved         : 2;
+                u64 Unknown          : 1;
+                u64 NotSupported     : 1;
+                u64 ISA              : 1;
+                u64 MCA              : 1;
+                u64 EISA             : 1;
+                u64 PCI              : 1;
+                u64 PCMCIA           : 1;
+                u64 PNP              : 1;
+                u64 APM              : 1;
+                u64 Upgradeable      : 1;
+                u64 ShadowingAllowed : 1;
+                u64 VLVESA           : 1;
+                u64 ESCD             : 1;
+                u64 BootFromCd       : 1;
+                u64 SelectableBoot   : 1;
+                u64 ROMSocketed      : 1;
+                u64 BootFromPCCard   : 1;
+                u64 EDD              : 1;
+                u64 NEC9800          : 1;
+                u64 Toshiba1_2MiB    : 1;
+                u64 Floppy360KB      : 1;
+                u64 Floppy1_2MB      : 1;
+                u64 Floppy720KB      : 1;
+                u64 Floppy2_88MB     : 1;
+                u64 PrintService     : 1;
+                u64 I8042Keyboard    : 1;
+                u64 SerialServices   : 1;
+                u64 PrinterServices  : 1;
+                u64 CGA              : 1;
+                u64 NECPC98          : 1;
+                u64 Reserved2        : 32;
+            };
+        };
+    };
+
+    static_assert(sizeof(FirmwareCharacteristics) == 8);
     // Type 0 — BIOS Information
     struct [[gnu::packed]] FirmwareInformation : Header
     {
-        u8  Vendor;
-        u8  Version;
-        u16 BiosStartSegment;
-        u8  ReleaseDate;
-        u8  RomSize;
-        u64 Characteristics;
-        u16 Reserved;
-        u8  MajorRelease;
-        u8  MinorRelease;
-        u8  EmbeddedControllerMajor;
-        u8  EmbeddedControllerMinor;
-        u16 ExtendedRomSize;
+        StringID                Vendor;
+        StringID                Version;
+        u16                     BiosStartSegment;
+        StringID                ReleaseDate;
+        u8                      RomSize;
+        FirmwareCharacteristics Characteristics;
+        u16                     Reserved;
+        u8                      MajorRelease;
+        u8                      MinorRelease;
+        u8                      EmbeddedControllerMajor;
+        u8                      EmbeddedControllerMinor;
+        struct [[gnu::packed]]
+        {
+            RomSizeUnit Unit : 2;
+            u16         Size : 14;
+        } ExtendedRomSize;
     };
 
     // Type 1 — System Information

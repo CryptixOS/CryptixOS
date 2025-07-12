@@ -14,25 +14,25 @@ ErrorOr<void> BitmapAllocator::Initialize(MemoryMap& memoryMap, usize pageSize)
     for (usize i = 0; i < memoryMap.EntryCount; i++)
     {
         auto&   entry = memoryMap.Entries[i];
-        Pointer top   = entry.Base().Offset(entry.Size());
+        Pointer top   = entry.Base.Offset(entry.Size);
         m_MemoryTop   = std::max(m_MemoryTop.Raw(), top.Raw());
 
-        switch (entry.Type())
+        switch (entry.Type)
         {
             case MemoryType::eUsable:
-                m_UsableMemorySize += entry.Size();
+                m_UsableMemorySize += entry.Size;
                 m_UsableMemoryTop = std::max(m_UsableMemoryTop, top);
 
                 break;
             case MemoryType::eACPI_Reclaimable:
             case MemoryType::eBootloaderReclaimable:
             case MemoryType::eKernelAndModules:
-                m_UsedMemory += entry.Size();
+                m_UsedMemory += entry.Size;
                 break;
             default: continue;
         }
 
-        m_TotalMemory += entry.Size();
+        m_TotalMemory += entry.Size;
     }
 
     if (!m_MemoryTop) return Error(ENOMEM);
@@ -45,11 +45,11 @@ ErrorOr<void> BitmapAllocator::Initialize(MemoryMap& memoryMap, usize pageSize)
     for (usize i = 0; i < memoryMap.EntryCount; i++)
     {
         auto& current = memoryMap.Entries[i];
-        if (current.Type() != MemoryType::eUsable) continue;
+        if (current.Type != MemoryType::eUsable) continue;
 
-        for (usize page = current.Base().Raw() == 0 ? 4096 : 0;
-             page < current.Size(); page += pageSize)
-            m_PageBitmap.SetIndex((current.Base().Raw() + page) / pageSize,
+        for (usize page = current.Base.Raw() == 0 ? 4096 : 0;
+             page < current.Size; page += pageSize)
+            m_PageBitmap.SetIndex((current.Base.Raw() + page) / pageSize,
                                   false);
     }
 

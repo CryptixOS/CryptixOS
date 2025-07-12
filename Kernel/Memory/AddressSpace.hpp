@@ -7,13 +7,14 @@
  */
 #pragma once
 
-#include <Boot/BootInfo.hpp>
+#include <Config.hpp>
 
+#include <Library/Locking/Spinlock.hpp>
 #include <Memory/Region.hpp>
-#include <Memory/VMM.hpp>
 
 #include <Prism/Containers/RedBlackTree.hpp>
 #include <Prism/Containers/Vector.hpp>
+#include <Prism/Memory/Memory.hpp>
 #include <Prism/Memory/Pointer.hpp>
 #include <Prism/Memory/Ref.hpp>
 
@@ -38,23 +39,15 @@ class AddressSpace
     {
         return m_RegionTree[virt.Raw()];
     }
-    void            Clear();
+    void Clear();
 
-    auto            begin() { return m_RegionTree.begin(); }
-    auto            end() { return m_RegionTree.end(); }
-
-    inline PageMap* GetPageMap() const { return m_PageMap; }
+    auto begin() { return m_RegionTree.begin(); }
+    auto end() { return m_RegionTree.end(); }
 
     RedBlackTree<uintptr_t, Ref<Region>> m_RegionTree;
 
   private:
-    Spinlock                 m_Lock;
+    Spinlock     m_Lock;
 
-    PageMap*                 m_PageMap = nullptr;
-
-    constexpr static Pointer USERSPACE_VIRT_BASE{0x100000zu};
-
-    AddressRange             m_TotalRange
-        = {USERSPACE_VIRT_BASE,
-           BootInfo::GetHHDMOffset() - USERSPACE_VIRT_BASE.Raw() - 0x1000000zu};
+    AddressRange m_TotalRange;
 };

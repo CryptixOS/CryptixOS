@@ -4,7 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/BootInfo.hpp>
 #include <Debug/Config.hpp>
 
 #include <Firmware/DeviceTree/DeviceTree.hpp>
@@ -92,10 +91,9 @@ namespace DeviceTree
     }
     bool ParseFDT(FDT_Header* header);
 
-    bool Initialize()
+    bool Initialize(Pointer dtb)
     {
-        auto        dtb    = BootInfo::DeviceTreeBlobAddress();
-        FDT_Header* header = dtb.As<FDT_Header>();
+        FDT_Header* header = dtb.ToHigherHalf<FDT_Header*>();
 
         if (!header)
 #ifdef CTOS_TARGET_AARCH64

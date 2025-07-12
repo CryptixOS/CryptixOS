@@ -6,10 +6,13 @@
  */
 #include <API/Syscall.hpp>
 
+#include <Memory/Allocator/KernelHeap.hpp>
 #include <Memory/MemoryManager.hpp>
 #include <Scheduler/Process.hpp>
 
 #include <Prism/String/Formatter.hpp>
+
+#include <icxxabi>
 
 namespace MemoryManager
 {
@@ -17,6 +20,19 @@ namespace MemoryManager
     {
         AddressSpace s_KernelAddressSpace;
     };
+
+    void Initialize(const MemoryMap& memoryMap, Pointer kernelPhys,
+                    Pointer kernelVirt, usize higherHalfOffset)
+    {
+        // Call global constructors
+        icxxabi::Initialize();
+        // Initialize early kernel heap
+        KernelHeap::Initialize();
+        // Initialize Physical Memory Manager
+        Assert(PMM::Initialize(memoryMap));
+
+        VMM::Initialize(kernelPhys, kernelVirt, higherHalfOffset);
+    }
 
     Ref<Region> AllocateRegion(const usize bytes, PageAttributes attributes,
                                const MemoryUsage memoryUsage)
@@ -106,16 +122,30 @@ namespace MemoryManager
                               info.VirtualAddress().Raw());
         auto reason  = info.Reason();
 
-        // LogTrace("Fault");
         auto process = Process::Current();
-        auto region  = process
-                         ? process->AddressSpace().Find(info.VirtualAddress())
-                         : nullptr;
+        Ref<Region> region = nullptr;
+
+        if (process)
+        {
+            auto& addressSpace = process->AddressSpace();
+            region             = addressSpace.Find(info.VirtualAddress());
+        }
+
         if (region)
         {
-            auto pageMap = process->PageMap;
-            pageMap->MapRegion(region);
-            return;
+            usize pageCount = Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE);
+            auto  phys      = PMM::CallocatePages(pageCount);
+
+            if (phys)
+            {
+                region->SetPhysicalBase(phys);
+
+                auto pageMap = process->PageMap;
+                pageMap->MapRegion(region);
+                return;
+            }
+
+            errno = ENOMEM;
         }
 
         if (reason & PageFaultReason::eNotPresent)

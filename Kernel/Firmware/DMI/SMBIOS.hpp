@@ -6,7 +6,9 @@
  */
 #pragma once
 
+#include <Prism/Memory/Pointer.hpp>
+
 namespace DMI::SMBIOS
 {
-    void Initialize();
+    void Initialize(Pointer entry32, Pointer entry64);
 };

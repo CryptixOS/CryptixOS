@@ -10,6 +10,7 @@
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptGuard.hpp>
 
+#include <Debug/Config.hpp>
 #include <Drivers/DeviceManager.hpp>
 #include <Drivers/TTY.hpp>
 #include <Drivers/Terminal.hpp>
@@ -114,7 +115,9 @@ winsize    TTY::GetSize() const { return m_Terminal->GetSize(); }
 
 void       TTY::SetTermios(const termios2& termios)
 {
+#if CTOS_TTY_LOG_TERMIOS
     LogDebug("TTY: Setting termios to ->\n{}", termios);
+#endif
     m_Termios = termios;
     m_RawBuffer.Clear();
 }
@@ -165,16 +168,16 @@ ErrorOr<isize> TTY::Read(void* buffer, off_t offset, usize bytes)
 }
 ErrorOr<isize> TTY::Write(const void* src, off_t offset, usize bytes)
 {
-    const char*           s = reinterpret_cast<const char*>(src);
-    static constexpr char MLIBC_LOG_SIGNATURE[] = "[mlibc]: ";
+    const char*                 s = reinterpret_cast<const char*>(src);
+    static constexpr StringView MLIBC_LOG_SIGNATURE = "[mlibc]: "_sv;
 
-    StringView            str(s, bytes);
+    StringView                  str(s, bytes);
 
     if (str.StartsWith(MLIBC_LOG_SIGNATURE))
     {
-        StringView errorMessage(s + sizeof(MLIBC_LOG_SIGNATURE) - 1 - 1);
+        str.RemovePrefix(MLIBC_LOG_SIGNATURE.Size());
         LogMessage("[{}mlibc{}]: {}", AnsiColor::FOREGROUND_MAGENTA,
-                   AnsiColor::FOREGROUND_WHITE, errorMessage);
+                   AnsiColor::FOREGROUND_WHITE, str);
 
         return bytes;
     }

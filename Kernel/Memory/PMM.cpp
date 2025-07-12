@@ -6,7 +6,6 @@
  */
 #include <Common.hpp>
 
-#include <Boot/BootInfo.hpp>
 #include <Debug/Config.hpp>
 #include <Library/Locking/Spinlock.hpp>
 
@@ -23,23 +22,25 @@ namespace PhysicalMemoryManager
     namespace
     {
         bool            s_Initialized = false;
+
+        MemoryMap       s_MemoryMap{};
         BitmapAllocator s_BitmapAllocator;
 
         Pointer         EarlyAllocatePages(usize count = 1)
         {
-            auto& memoryMap  = BootInfo::MemoryMap();
+            auto& memoryMap  = s_MemoryMap;
             usize entryCount = memoryMap.EntryCount;
 
             for (usize i = 0; i < entryCount; i++)
             {
                 auto& entry = memoryMap.Entries[i];
-                if (entry.Type() != MemoryType::eUsable
-                    || entry.Size() < count * PAGE_SIZE)
+                if (entry.Type != MemoryType::eUsable
+                    || entry.Size < count * PAGE_SIZE)
                     continue;
 
-                auto pages = entry.m_Base;
-                entry.m_Base += count * PAGE_SIZE;
-                entry.m_Size -= count * PAGE_SIZE;
+                auto pages = entry.Base;
+                entry.Base += count * PAGE_SIZE;
+                entry.Size -= count * PAGE_SIZE;
 
                 return pages;
             }
@@ -48,29 +49,33 @@ namespace PhysicalMemoryManager
         }
     } // namespace
 
-    bool Initialize()
+    void EarlyInitialize(const MemoryMap& memoryMap)
+    {
+        s_MemoryMap = memoryMap;
+    }
+    bool Initialize(const MemoryMap& memoryMap)
     {
         EarlyLogTrace("PMM: Initializing...");
 
-        auto memoryMap  = BootInfo::MemoryMap();
-        auto entryCount = memoryMap.EntryCount;
+        s_MemoryMap     = memoryMap;
+        auto entryCount = s_MemoryMap.EntryCount;
         if (entryCount == 0) return false;
 
 #if CTOS_PMM_DUMP_MEMORY_MAP
         for (usize i = 0; i < entryCount; i++)
         {
-            auto&   current     = memoryMap.Entries[i];
-            Pointer entryBase   = current.Base();
-            usize   entryLength = current.Size();
+            auto&   current     = s_MemoryMap.Entries[i];
+            Pointer entryBase   = current.Base;
+            usize   entryLength = current.Size;
 
             EarlyLogDebug(
                 "PMM: MemoryMap[%zu] = { .Base: %#p, .Length: %#x, .Type: "
                 "%s }",
-                i, entryBase.Raw(), entryLength, ToString(current.Type()));
+                i, entryBase.Raw(), entryLength, ToString(current.Type));
         }
 #endif
 
-        auto status = s_BitmapAllocator.Initialize(memoryMap, PAGE_SIZE);
+        auto status = s_BitmapAllocator.Initialize(s_MemoryMap, PAGE_SIZE);
         if (!status)
         {
             LogError(
@@ -89,7 +94,12 @@ namespace PhysicalMemoryManager
 
         return (s_Initialized = true);
     }
-    bool  IsInitialized() { return s_Initialized; }
+    bool               IsInitialized() { return s_Initialized; }
+
+    Span<MemoryRegion> MemoryZones()
+    {
+        return Span(s_MemoryMap.Entries, s_MemoryMap.EntryCount);
+    }
 
     void* AllocatePages(usize count)
     {

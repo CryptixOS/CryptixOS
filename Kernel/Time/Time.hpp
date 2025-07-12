@@ -15,7 +15,7 @@
 
 namespace Time
 {
-    void           Initialize();
+    void           Initialize(DateTime bootTime);
     HardwareTimer* GetSchedulerTimer();
 
     Timestep       GetBootTime();
