@@ -15,16 +15,16 @@ tools:
         # - '--disable-multilib'
         - '--enable-initfini-array'
         #- '--without-headers'
-        - '--without-newlib'
+        #- '--without-newlib'
         - '--enable-languages=c,c++,lto'
         - '--disable-shared'
         #- '--disable-hosted-libstdcxx'
         # libstdc++ can detect that wchar_t is supported by @SYSROOT_DIR@ and
         # try to enable code we don't want for wchar handling.  just remove it.
-        - '--disable-wchar_t'
-        - '--disable-libssp'
-        - '--disable-libsanitizer'
-        - '--disable-libquadmath'
+        #- '--disable-wchar_t'
+        #- '--disable-libssp'
+        #- '--disable-libsanitizer'
+        #@- '--disable-libquadmath'
         # -g blows up GCC's binary size.
         - 'CFLAGS=-O2'
         - 'CXXFLAGS=-O2'
@@ -53,14 +53,14 @@ tools:
           - args: ['make', '-j@PARALLELISM@', 'inhibit_libc=true', 'all-target-libgcc']
         install:
           - args: ['make', 'install-target-libgcc']
-      - name: libstdc++-v3
-        tools_required:
-          - tool: bootstrap-system-gcc
-            stage_dependencies: [compiler]
-        compile:
-          - args: ['make', '-j@PARALLELISM@', 'all-target-libstdc++-v3']
-        install:
-          - args: ['make', 'install-target-libstdc++-v3']
+      #- name: libstdc++-v3
+      #  tools_required:
+      #    - tool: bootstrap-system-gcc
+      #      stage_dependencies: [compiler]
+      #  compile:
+      #    - args: ['make', '-j@PARALLELISM@', 'all-target-libstdc++-v3']
+      #  install:
+      #    - args: ['make', 'install-target-libstdc++-v3']
 
   - name: cross-binutils
     labels: [aarch64]
