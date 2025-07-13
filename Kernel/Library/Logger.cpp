@@ -246,12 +246,18 @@ namespace Logger
             LogChar(s_LogForegroundColors[ToUnderlying(logLevel)]);
             if (logLevel == LogLevel::eFatal) LogChar(BACKGROUND_COLOR_RED);
 
-            Print(magic_enum::enum_name(logLevel).data() + 1);
+            auto logLevelString = StringUtils::ToString(logLevel);
+            logLevelString.RemovePrefix(1);
+            
+            Print(logLevelString);
 
             LogChar(FOREGROUND_COLOR_WHITE);
             LogChar(BACKGROUND_COLOR_BLACK);
             LogChar(RESET_COLOR);
-            Print("]:\t");
+            Print("]:");
+
+            for (usize i = 0; i < 8 - logLevelString.Size(); i++)
+                LogChar(' ');
         }
     }; // namespace
 
