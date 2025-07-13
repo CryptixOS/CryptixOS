@@ -359,6 +359,7 @@ packages:
     source:
       subdir: 'sources'
       git: 'https://github.com/CryptixOS/Prism.git'
+      branch: 'master'
     tools_required:
       - system-gcc
     pkgs_required:
