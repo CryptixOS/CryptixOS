@@ -73,18 +73,18 @@ namespace NVMe
             = new Queue(m_CrAddress, queueId, m_DoorbellStride, m_QueueSlots);
         // TODO(v1tr10l7): Set Msi-X irq
 
-        volatile uintptr_t asq
-            = reinterpret_cast<volatile uintptr_t>(m_AdminQueue->GetSubmit());
-        volatile uintptr_t acq
-            = reinterpret_cast<volatile uintptr_t>(m_AdminQueue->GetComplete());
+        Pointer asq
+            = m_AdminQueue->GetSubmit();
+        Pointer acq
+            = m_AdminQueue->GetComplete();
 
         m_Register->AdminQueueAttributes.SubmitQueueSize   = m_QueueSlots - 1;
         m_Register->AdminQueueAttributes.CompleteQueueSize = m_QueueSlots - 1;
 
         m_Register->AdminSubmissionQueue
-            = IsHigherHalfAddress(asq) ? asq - BootInfo::GetHHDMOffset() : asq;
+            = asq.FromHigherHalf();
         m_Register->AdminCompletionQueue
-            = IsHigherHalfAddress(acq) ? acq - BootInfo::GetHHDMOffset() : acq;
+            = acq.FromHigherHalf();
 
         m_Register->Configuration.IoSubmitQueueEntrySize   = 6;
         m_Register->Configuration.IoCompleteQueueEntrySize = 4;

@@ -90,7 +90,6 @@ namespace VMM
                                  PageAttributes flags
                                  = static_cast<PageAttributes>(0));
 
-    Pointer     MapIoRegion(PhysAddr phys, usize size, bool write = true);
     Pointer     MapIoRegion(PhysAddr phys, usize size, bool write,
                             usize alignment = 0);
     template <typename T>
