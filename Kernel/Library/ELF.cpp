@@ -355,9 +355,9 @@ namespace ELF
             return Error(ENOEXEC);
         }
 
-        if (m_Header.InstructionSet != InstructionSet::eAMDx86_64)
+        if (m_Header.InstructionSet != InstructionSet::eAMDx86_64 && m_Header.InstructionSet != InstructionSet::eArm64)
         {
-            LogError("ELF: Only x86_64 instruction set is supported");
+            LogError("ELF: Only x86_64 and AArch64 instruction sets are supported");
             return Error(ENOEXEC);
         }
         if (m_Header.ElfVersion != CURRENT_ELF_HEADER_VERSION)
