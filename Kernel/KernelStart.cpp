@@ -227,6 +227,7 @@ kernelStart(const BootInformation& info)
     ACPI::LoadTables(info.RSDP);
     Arch::Initialize();
 
+    System::InitializeNumaDomains();
     if (!EFI::Initialize(info.EfiSystemTable, info.EfiMemoryMap))
         LogError("EFI: Failed to initialize efi runtime services...");
     DMI::SMBIOS::Initialize(info.SmBios32Phys, info.SmBios64Phys);

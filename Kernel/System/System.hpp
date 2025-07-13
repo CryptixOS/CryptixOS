@@ -29,6 +29,7 @@ namespace System
     ErrorOr<void> LoadKernelSymbols(const BootModuleInfo& kernelExecutable);
     void          PrepareBootModules(Span<BootModuleInfo> bootModules);
     const BootModuleInfo*                FindBootModule(StringView name);
+    void InitializeNumaDomains();
 
     ErrorOr<void>                        LoadModules();
 
