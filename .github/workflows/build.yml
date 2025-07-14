@@ -25,7 +25,8 @@ jobs:
         with:
           python-version: '3.x'
       - name: Install dependencies
-        run: sudo apt update -y 
+        run: sudo add-apt-repository -y universe 
+          && sudo apt update -y 
           && sudo apt install -y meson ninja-build clang lld llvm git cmake python3 pipx fasm
           && sudo apt install -y build-essential qemu-system parted udev bison flex libgmp3-dev libmpc-dev libmpfr-dev
           && sudo apt install -y texinfo libisl-dev gperf gettext autopoint libreadline-dev help2man groff zsh xorriso bochs qpdf 
