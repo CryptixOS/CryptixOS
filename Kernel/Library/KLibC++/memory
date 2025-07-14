@@ -8,51 +8,12 @@
 
 #include_next <memory>
 
-#include <enable_shared_from_this.hpp>
 #include <new>
-#include <owner_less.hpp>
 
 namespace std
 {
-    using namespace smart_ptr;
     template<typename Alloc>
     struct allocator_traits;
-
-    namespace detail
-    {
-        template<typename T>
-        struct make_unique_t { using single_object = unique_ptr<T>; };
-
-        template<typename T>
-        struct make_unique_t<T[]> { using array = unique_ptr<T[]>; };
-
-        template<typename T, size_t Bound>
-        struct make_unique_t<T[Bound]> { struct invalid_type { }; };
-
-        template<typename T>
-        using unique_ptr_t = typename make_unique_t<T>::single_object;
-
-        template<typename T>
-        using unique_ptr_array_t = typename make_unique_t<T>::array;
-
-        template<typename T>
-        using invalid_make_unique_t = typename make_unique_t<T>::invalid_type;
-    } // namespace detail
-
-    template<typename T, typename ...Args>
-    inline constexpr detail::unique_ptr_t<T> make_unique(Args &&...args)
-    {
-        return unique_ptr<T>(new T(forward<Args>(args)...));
-    }
-
-    template<typename T>
-    inline constexpr detail::unique_ptr_array_t<T> make_unique(size_t num)
-    {
-        return unique_ptr<T>(new remove_extent_t<T>[num]());
-    }
-
-    template<typename T, typename ...Args>
-    inline constexpr detail::invalid_make_unique_t<T> make_unique(Args &&...) = delete;
 
     template<typename Allocator>
     struct deallocator
@@ -74,32 +35,6 @@ namespace std
 
     template<typename Allocator, typename U>
     using Rebind = typename allocator_traits<Allocator>::template rebind_alloc<U>;
-
-    template<typename T, typename Allocator, typename ...Args> requires (!is_array_v<T>)
-    inline constexpr unique_ptr<T, deallocator<Rebind<Allocator, T>>> allocate_unique(const Allocator &allocator, Args &&...args)
-    {
-        using Alloc = Rebind<Allocator, T>;
-        using Traits = allocator_traits<Alloc>;
-        Alloc alloc(allocator);
-        T *ptr = Traits::allocate(alloc, 1);
-        Traits::construct(alloc, ptr, forward<Args>(args)...);
-        deallocator<Alloc> dealloc(alloc, 1);
-        return unique_ptr<T, deallocator<Alloc>>(ptr, dealloc);
-    }
-
-    template<typename T, typename Allocator> requires (is_array_v<T> && extent_v<T> == 0)
-    inline constexpr unique_ptr<T, deallocator<Rebind<Allocator, remove_extent_t<T>>>> allocate_unique(const Allocator &allocator, size_t size)
-    {
-        using Elem = remove_extent_t<T>;
-        using Alloc = Rebind<Allocator, Elem>;
-        using Traits = allocator_traits<Alloc>;
-        Alloc alloc(allocator);
-        Elem *ptr = Traits::allocate(alloc, size);
-        for (size_t i = 0; i < size; ++i)
-            Traits::construct(alloc, ptr + i);
-        deallocator<Alloc> dealloc(alloc, size);
-        return unique_ptr<T, deallocator<Alloc>>(ptr, dealloc);
-    }
 
     template<typename T>
     struct allocator

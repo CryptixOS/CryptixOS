@@ -154,7 +154,8 @@ namespace ACPI::Interpreter
             case OpCode::eLocal0... OpCode::eLocal7:
             case OpCode::eArg0... OpCode::eArg6:
             {
-                StringView argName = magic_enum::enum_name(opcode).data() + 1;
+                StringView argName = StringUtils::ToString(opcode);
+                argName.RemovePrefix(1);
                 return new NameRefExpr(argName);
             }
 
@@ -180,7 +181,8 @@ namespace ACPI::Interpreter
             case OpCode::eLocal0... OpCode::eLocal7:
             case OpCode::eArg0... OpCode::eArg6:
             {
-                StringView argName = magic_enum::enum_name(opcode).data() + 1;
+                StringView argName = StringUtils::ToString(opcode);
+                argName.RemovePrefix(1);
                 return new NameRefExpr(argName);
             }
             case OpCode::eZero: return new ConstantExpression(0);
@@ -242,9 +244,9 @@ namespace ACPI::Interpreter
     NameSpace* CreateNameSpace(StringView name)
     {
         NameSpace* current = nullptr;
-        auto       it      = s_CurrentBlock.NameSpace->m_Children.find(name);
+        auto       it      = s_CurrentBlock.NameSpace->m_Children.Find(name);
         if (it != s_CurrentBlock.NameSpace->m_Children.end())
-            current = it->second;
+            current = it->Value;
         else
         {
             current = new NameSpace(name, s_CurrentBlock.NameSpace);
@@ -322,8 +324,9 @@ namespace ACPI::Interpreter
 
         if (initialValue) object = new IntegerObject(initialValue);
 
-        //TODO(v1tr10l7): we should have a function to ToStringView, which would not use heap allocation
-        auto opCodeName        = ToString(static_cast<OpCode>(op));
+        // TODO(v1tr10l7): we should have a function to ToStringView, which
+        // would not use heap allocation
+        auto opCodeName = ToString(static_cast<OpCode>(op));
         LogTrace("ACPI: Created named object with an opcode => `{}`",
                  opCodeName);
         return object;
@@ -621,7 +624,7 @@ namespace ACPI::Interpreter
                 continue;
             auto end              = scope.End;
 
-            auto objectTypeString              = ToString(scope.NameSpace->m_Type);
+            auto objectTypeString = ToString(scope.NameSpace->m_Type);
             LogTrace("ACPI::Interpreter: Parsing object `{}` of type => `{}`",
                      scope.NameSpace->m_Name, objectTypeString);
 

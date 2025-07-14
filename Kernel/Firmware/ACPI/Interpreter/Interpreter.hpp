@@ -11,7 +11,6 @@
 #include <Firmware/ACPI/Structures.hpp>
 
 #include <Prism/Memory/ByteStream.hpp>
-#include <magic_enum/magic_enum.hpp>
 
 namespace ACPI::Interpreter
 {

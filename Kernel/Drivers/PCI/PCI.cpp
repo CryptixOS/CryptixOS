@@ -19,7 +19,6 @@
 #include <VFS/VFS.hpp>
 
 #include <cctype>
-#include <unordered_map>
 
 namespace PCI
 {
@@ -27,10 +26,10 @@ namespace PCI
     struct Vendor
     {
         String                          Name;
-        std::unordered_map<u16, String> DeviceIDs;
+        UnorderedMap<u16, String> DeviceIDs;
     };
 
-    std::unordered_map<u16, Vendor> s_VendorIDs;
+    UnorderedMap<u16, Vendor> s_VendorIDs;
 
     void                            ParseVendorID(StringView line)
     {
@@ -155,9 +154,9 @@ namespace PCI
                 u8 subClassID = controller->Read<u8>(
                     addr, ToUnderlying(RegisterOffset::eSubClassID));
 
-                auto       vendor     = s_VendorIDs.find(vendorID);
+                auto       vendor     = s_VendorIDs.Find(vendorID);
                 StringView vendorName = vendor != s_VendorIDs.end()
-                                          ? vendor->second.Name.View()
+                                          ? vendor->Value.Name.View()
                                           : "Unrecognized"_sv;
 
                 LogInfo(

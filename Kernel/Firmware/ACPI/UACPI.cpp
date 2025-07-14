@@ -8,6 +8,8 @@
 #include <Arch/InterruptHandler.hpp>
 #include <Arch/InterruptManager.hpp>
 
+#include <mutex>
+
 #ifdef CTOS_TARGET_X86_64
     #include <Arch/x86_64/IO.hpp>
 

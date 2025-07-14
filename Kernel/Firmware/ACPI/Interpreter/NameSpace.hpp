@@ -10,24 +10,21 @@
 #include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/String/String.hpp>
 
-#include <magic_enum/magic_enum.hpp>
-#include <unordered_map>
-
 namespace ACPI
 {
     class NameSpace
     {
       public:
         NameSpace(StringView name, NameSpace* parent = nullptr);
-        void                                       Dump(usize tabs = 0);
+        void                                 Dump(usize tabs = 0);
 
-        NameSpace*                                 Insert(StringView name);
+        NameSpace*                           Insert(StringView name);
 
-        NameSpace*                                 m_Parent = nullptr;
-        String                                     m_Name   = "\\";
-        std::unordered_map<StringView, NameSpace*> m_Children;
-        Object*                                    m_Object = nullptr;
-        ObjectType m_Type = ObjectType::eUndefined;
+        NameSpace*                           m_Parent = nullptr;
+        String                               m_Name   = "\\";
+        UnorderedMap<StringView, NameSpace*> m_Children;
+        Object*                              m_Object = nullptr;
+        ObjectType                           m_Type   = ObjectType::eUndefined;
     };
 
     struct ControlMethod

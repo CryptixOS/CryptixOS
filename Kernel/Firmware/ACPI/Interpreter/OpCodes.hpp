@@ -6,6 +6,8 @@
  */
 #pragma once
 
+#include <Prism/Core/Types.hpp>
+
 namespace ACPI
 {
     enum class OpCode : u16

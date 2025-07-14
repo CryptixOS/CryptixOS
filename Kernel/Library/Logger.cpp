@@ -65,178 +65,225 @@ namespace Logger
             FOREGROUND_COLOR_WHITE,
         };
 
+        struct PrintfFormatSpec
+        {
+            bool  JustifyLeft = false;
+            bool  PrintSign   = false;
+            bool  Space       = false;
+            bool  PrintBase   = false;
+            bool  ZeroPad     = false;
+            char  Width       = 'd';
+            isize Length      = -1;
+            u64   Precision   = 999;
+        };
         template <typename T>
-        CTOS_NO_KASAN void
-        LogNumber(va_list& args, int base, bool justifyLeft = false,
-                  bool plusSign = false, bool spaceIfNoSign = false,
-                  bool zeroPadding = false, usize lengthSpecifier = 0,
-                  usize precision = 1000)
+        CTOS_NO_KASAN void LogNumber(va_list& args, int base,
+                                     PrintFormatSpec& spec)
         {
             char       buf[64];
             T          value    = va_arg(args, T);
             StringView strStart = ToString(value, buf, base);
             char*      str      = const_cast<char*>(strStart.Raw());
 
-            size_t     len      = strlen(str);
-            char       padding  = zeroPadding ? '0' : ' ';
-            if (plusSign && lengthSpecifier > 0) lengthSpecifier--;
-            if (!justifyLeft)
+            usize      len      = strStart.Size();
+            char       padding  = spec.ZeroPad ? '0' : ' ';
+            if (spec.PrintSign && spec.Length > 0) spec.Length--;
+            if (!spec.LeftJustify)
             {
-                while (len < lengthSpecifier)
+                while (len < spec.Length)
                 {
                     LogChar(padding);
-                    lengthSpecifier--;
+                    spec.Length--;
                 }
             }
             if (value >= 0)
             {
-                if (plusSign) LogChar('+');
-                else if (spaceIfNoSign) LogChar(' ');
+                if (spec.PrintSign) LogChar('+');
+                else if (spec.Space) LogChar(' ');
             }
             while (*str) LogChar(*str++);
-            if (justifyLeft)
+            if (spec.LeftJustify)
             {
-                while (len < lengthSpecifier)
+                while (len < spec.Length)
                 {
                     LogChar(padding);
-                    lengthSpecifier--;
+                    spec.Length--;
                 }
             }
         }
 
-        CTOS_NO_KASAN void PrintArg(const char*& fmt, va_list& args)
+        enum class State
         {
-            ++fmt;
-            bool  leftJustify    = false;
-            bool  plusSign       = false;
-            bool  spaceIfNoSign  = false;
-            bool  altConversion  = false;
-            bool  zeroPadding    = false;
-            char* precisionStart = nullptr;
-
-            while (true)
+            eBegin,
+            eFlags,
+            eAlign,
+            eSign,
+            eHash,
+            eZero,
+            eWidth,
+            ePrecision,
+            eEnd,
+        };
+        struct PrintfFormatParser
+        {
+            constexpr PrintfFormatSpec operator()(const char*& fmt,
+                                                  va_list&     args)
             {
-                switch (*fmt)
+                ++fmt;
+                PrintfFormatSpec spec;
+
+                struct
                 {
-                    case '\0': return;
-                    case '-': leftJustify = true; break;
-                    case '+': plusSign = true; break;
-                    case ' ': spaceIfNoSign = true; break;
-                    case '#': altConversion = true; break;
-                    case '0': zeroPadding = true; break;
-                    case '.':
-                        precisionStart = const_cast<char*>(fmt) + 1;
-                        break;
+                    enum State     State = State::eBegin;
+                    constexpr void operator()(enum State state)
+                    {
+                        if (State >= state) assert("invalid format specifier");
+                        State = state;
+                    }
+                } enterState;
 
-                    default: goto loop_end;
-                }
-                fmt++;
-            }
-        loop_end:
-
-            auto parseNumber = [](const char*& fmt) -> isize
-            {
-                char* start  = const_cast<char*>(fmt);
-                usize length = 0;
-
-                for (; StringUtils::IsDigit(*fmt); length++, fmt++);
-                StringView numberString(start, length);
-
-                return ToNumber<isize>(numberString, 10);
-            };
-
-            isize width     = 0;
-            isize precision = 1000;
-            if (fmt != precisionStart)
-            {
-                if (StringUtils::IsDigit(*fmt)) width = parseNumber(fmt);
-                else if (*fmt == '*') width = va_arg(args, i32);
-            }
-            if (*fmt == '*' && fmt == precisionStart)
-                precision = va_arg(args, i32);
-            else if (StringUtils::IsDigit(*fmt) && fmt == precisionStart)
-                precision = parseNumber(fmt);
-
-            enum class ArgLength
-            {
-                eInt,
-                eLong,
-                eLongLong,
-                eSizeT,
-                ePointer,
-            };
-
-            ArgLength argLength = ArgLength::eInt;
-            if (*fmt == 'l')
-            {
-                fmt++;
-                argLength = ArgLength::eLong;
-                if (*fmt == 'l')
+                char* precisionStart = nullptr;
+                for (;;)
                 {
-                    argLength = ArgLength::eLongLong;
+                    switch (*fmt)
+                    {
+                        case '\0': return spec;
+                        case '-':
+                            enterState(State::eFlags);
+                            spec.JustifyLeft = true;
+                            break;
+                        case '+':
+                            enterState(State::eFlags);
+                            spec.PrintSign = true;
+                            break;
+                        case ' ':
+                            enterState(State::eFlags);
+                            spec.Space = true;
+                            break;
+                        case '#':
+                            enterState(State::eFlags);
+                            spec.PrintBase = true;
+                            break;
+                        case '0':
+                            enterState(State::eFlags);
+                            spec.ZeroPad = true;
+                            break;
+                        case '.':
+                            enterState(State::eFlags);
+                            precisionStart = const_cast<char*>(fmt) + 1;
+                            break;
+
+                        default: goto loop_end;
+                    }
                     fmt++;
                 }
-            }
-            else if (*fmt == 'z')
-            {
-                argLength = ArgLength::eSizeT;
-                fmt++;
-            }
-            i32 base = 10;
+            loop_end:
 
-#define LogNum(type)                                                           \
-    LogNumber<type>(args, base, leftJustify, plusSign, spaceIfNoSign,          \
-                    zeroPadding, width)
-            switch (*fmt)
-            {
-                case 'b':
-                    base = 2;
-                    if (altConversion) Print("0b");
-                    goto print_unsigned;
-                case 'o':
-                    base = 8;
-                    if (altConversion) LogChar('0');
-                    goto print_unsigned;
-                case 'p': argLength = ArgLength::ePointer;
-                case 'X':
-                case 'x':
-                    base = 16;
-                    if (altConversion)
+                auto parseNumber = [](const char*& fmt) -> isize
+                {
+                    char* start  = const_cast<char*>(fmt);
+                    usize length = 0;
+
+                    for (; StringUtils::IsDigit(*fmt); length++, fmt++);
+                    StringView numberString(start, length);
+
+                    return ToNumber<isize>(numberString, 10);
+                };
+
+                isize precision = 1000;
+                if (fmt != precisionStart)
+                {
+                    if (StringUtils::IsDigit(*fmt))
+                        spec.Length = parseNumber(fmt);
+                    else if (*fmt == '*') spec.Length = va_arg(args, i32);
+                }
+                if (*fmt == '*' && fmt == precisionStart)
+                    precision = va_arg(args, i32);
+                else if (StringUtils::IsDigit(*fmt) && fmt == precisionStart)
+                    precision = parseNumber(fmt);
+
+                enum class ArgLength
+                {
+                    eInt,
+                    eLong,
+                    eLongLong,
+                    eSizeT,
+                    ePointer,
+                };
+
+                ArgLength argLength = ArgLength::eInt;
+                if (*fmt == 'l')
+                {
+                    fmt++;
+                    argLength = ArgLength::eLong;
+                    if (*fmt == 'l')
                     {
-                        LogChar('0');
-                        LogChar('x');
+                        argLength = ArgLength::eLongLong;
+                        fmt++;
                     }
-                case 'u':
+                }
+                else if (*fmt == 'z')
                 {
-                print_unsigned:
-                    if (argLength == ArgLength::eInt) LogNum(unsigned int);
-                    else if (argLength == ArgLength::eLong)
-                        LogNum(unsigned long);
-                    else if (argLength == ArgLength::eLongLong)
-                        LogNum(unsigned long long);
-                    else if (argLength == ArgLength::eSizeT) LogNum(size_t);
-                    else LogNum(uintptr_t);
+                    argLength = ArgLength::eSizeT;
+                    fmt++;
+                }
+                i32 base = 10;
+
+#define LogNum(type) LogNumber<type>(args, base, spec)
+                switch (*fmt)
+                {
+                    case 'b':
+                        base = 2;
+                        if (spec.PrintBase) Print("0b");
+                        goto print_unsigned;
+                    case 'o':
+                        base = 8;
+                        if (spec.PrintBase) LogChar('0');
+                        goto print_unsigned;
+                    case 'p': argLength = ArgLength::ePointer;
+                    case 'X':
+                    case 'x':
+                        base = 16;
+                        if (spec.PrintBase)
+                        {
+                            LogChar('0');
+                            LogChar('x');
+                        }
+                    case 'u':
+                    {
+                    print_unsigned:
+                        if (argLength == ArgLength::eInt) LogNum(unsigned int);
+                        else if (argLength == ArgLength::eLong)
+                            LogNum(unsigned long);
+                        else if (argLength == ArgLength::eLongLong)
+                            LogNum(unsigned long long);
+                        else if (argLength == ArgLength::eSizeT) LogNum(usize);
+                        else LogNum(uintptr_t);
+                        break;
+                    }
+                    case 'd':
+                    case 'i':
+                    {
+                        if (argLength == ArgLength::eInt) LogNum(int);
+                        else if (argLength == ArgLength::eLong)
+                            LogNum(long long);
+                        else if (argLength == ArgLength::eLongLong)
+                            LogNum(long);
+                        break;
+                    }
+                    case 'c': LogChar(*fmt); break;
+                    case 's':
+                    {
+                        char* str = va_arg(args, char*);
+                        for (; *str != '\0' && precision > 0; --precision)
+                            LogChar(*str++);
+                    }
                     break;
                 }
-                case 'd':
-                case 'i':
-                {
-                    if (argLength == ArgLength::eInt) LogNum(int);
-                    else if (argLength == ArgLength::eLong) LogNum(long long);
-                    else if (argLength == ArgLength::eLongLong) LogNum(long);
-                    break;
-                }
-                case 'c': LogChar(*fmt); break;
-                case 's':
-                {
-                    char* str = va_arg(args, char*);
-                    for (; *str != '\0' && precision > 0; --precision)
-                        LogChar(*str++);
-                }
-                break;
+                ++fmt;
+                return spec;
             }
-            ++fmt;
-        }
+        };
 
         CTOS_NO_KASAN void PrintLogLevel(LogLevel logLevel)
         {
@@ -248,7 +295,7 @@ namespace Logger
 
             auto logLevelString = StringUtils::ToString(logLevel);
             logLevelString.RemovePrefix(1);
-            
+
             Print(logLevelString);
 
             LogChar(FOREGROUND_COLOR_WHITE);
@@ -256,8 +303,7 @@ namespace Logger
             LogChar(RESET_COLOR);
             Print("]:");
 
-            for (usize i = 0; i < 8 - logLevelString.Size(); i++)
-                LogChar(' ');
+            for (usize i = 0; i < 8 - logLevelString.Size(); i++) LogChar(' ');
         }
     }; // namespace
 
@@ -305,7 +351,11 @@ namespace Logger
         PrintLogLevel(level);
         while (*fmt)
         {
-            if (*fmt == '%') PrintArg(fmt, args);
+            if (*fmt == '%')
+            {
+                PrintfFormatParser parser;
+                parser(fmt, args);
+            }
             else if (*fmt == '\n')
             {
                 LogChar('\r');

@@ -104,18 +104,6 @@ add_global_arguments(
 
 # ==============================================================================
 ### Dependencies
-cmake = import('cmake')
-phmap_opts = cmake.subproject_options()
-phmap_opts.add_cmake_defines(
-  {
-    'PHMAP_BUILD_EXAMPLES': false,
-    'PHMAP_BUILD_TESTS': false,
-    'PHMAP_INSTALL': false,
-    'CMAKE_TRY_COMPILE_TARGET_TYPE': 'STATIC_LIBRARY',
-    'CMAKE_CROSSCOMPILING': true,
-  },
-)
-
 limine = subproject('limine', default_options: 'arch=' + arch)
 deps = [
 
@@ -131,8 +119,6 @@ deps = [
   dependency('magic_enum', default_options: [
     'test=false',
   ]),
-  cmake.subproject('parallel_hashmap', options: phmap_opts).dependency('phmap'),
-  dependency('smart_ptr'),
   dependency('string'),
   dependency('uacpi'),
 ]
@@ -319,7 +305,7 @@ iso_files = [
 
 initrd = custom_target(
   'initrd',
-  input: [initrd_dir / 'usr' / 'sbin' / 'init', ext_mods],
+  input: [ext_mods],
   output: 'initrd.img.gz',
   command: [
     'rm', '-rf', initrd_dir / 'usr/lib/modules', '&&',

@@ -4,20 +4,17 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <API/SyscallEntryPoints.hpp>
-
 #include <API/MM.hpp>
 #include <API/Process.hpp>
+#include <API/SyscallEntryPoints.hpp>
 #include <API/System.hpp>
 #include <API/Time.hpp>
 #include <API/VFS.hpp>
-
 #include <Arch/CPU.hpp>
 
+#include <Prism/String/StringUtils.hpp>
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
-
-#include <array>
 
 AtomicBool g_LogSyscalls = false;
 
@@ -38,14 +35,14 @@ namespace Syscall
         }
         inline operator bool() { return Handler.operator bool(); }
     };
-    static Array<Syscall, 512>           syscalls;
+    static Array<Syscall, 512>     syscalls;
 
-    std::unordered_map<ID, WrapperBase*> s_Syscalls;
+    UnorderedMap<ID, WrapperBase*> s_Syscalls;
 
-    StringView                           GetName(usize index)
+    StringView                     GetName(usize index)
     {
         auto id = static_cast<ID>(index);
-        return magic_enum::enum_name(id).data();
+        return StringUtils::ToString(id);
     }
     void
     RegisterHandler(usize                                              index,
@@ -190,22 +187,28 @@ namespace Syscall
 #define LOG_SYSCALLS false
         // #if LOG_SYSCALLS == true || true
         static isize previousSyscall = -1;
-        g_LogSyscalls = false;
+        g_LogSyscalls                = false;
 
         if (static_cast<isize>(args.Index) != previousSyscall && g_LogSyscalls)
+        {
+            auto syscallID   = static_cast<ID>(args.Index);
+            auto syscallName = StringUtils::ToString(syscallID);
+            syscallName.RemovePrefix(1);
+
             LogTrace(
                 "Syscall[{}]: '{}'\nparams: {{ arg[0]: {}, arg[1]: {}, "
                 "arg[2]: {}, arg[3]: {}, arg[4]: {}, arg[5]: {}, }}",
-                args.Index, magic_enum::enum_name(static_cast<ID>(args.Index)),
-                args.Get<u64>(0), args.Get<u64>(1), args.Get<u64>(2),
-                args.Get<u64>(3), args.Get<u64>(4), args.Get<u64>(5));
+                args.Index, syscallName, args.Get<u64>(0), args.Get<u64>(1),
+                args.Get<u64>(2), args.Get<u64>(3), args.Get<u64>(4),
+                args.Get<u64>(5));
+        }
 
         previousSyscall = args.Index;
         // #endif
 
         if (args.Index >= 512
             || (!syscalls[args.Index]
-                && !s_Syscalls.contains(static_cast<ID>(args.Index))))
+                && !s_Syscalls.Contains(static_cast<ID>(args.Index))))
         {
             args.ReturnValue = -1;
             errno            = ENOSYS;
@@ -230,17 +233,18 @@ namespace Syscall
         //     #define SyscallError(...)
         // #endif
 
-        if (s_Syscalls.contains(static_cast<ID>(args.Index)))
+        if (s_Syscalls.Contains(static_cast<ID>(args.Index)))
         {
             auto ret = s_Syscalls[static_cast<ID>(args.Index)]->Run(arr);
 
             if (ret) args.ReturnValue = ret.value();
             else if (g_LogSyscalls)
             {
-                SyscallError(
-                    "Syscall: '{}' caused error",
-                    magic_enum::enum_name(static_cast<ID>(args.Index)).data()
-                        + 1);
+                auto syscallID   = static_cast<ID>(args.Index);
+                auto syscallName = StringUtils::ToString(syscallID);
+                syscallName.RemovePrefix(1);
+
+                SyscallError("Syscall: '{}' caused error", syscallName);
                 args.ReturnValue = -intptr_t(ret.error());
             }
             return;
@@ -250,10 +254,11 @@ namespace Syscall
         if (ret) args.ReturnValue = ret.value();
         else if (g_LogSyscalls)
         {
-            SyscallError(
-                "Syscall: '{}' caused error",
-                magic_enum::enum_name(static_cast<ID>(args.Index)).data() + 1);
-            args.ReturnValue = -intptr_t(ret.error());
+            auto syscallID   = static_cast<ID>(args.Index);
+            auto syscallName = StringUtils::ToString(syscallID);
+            syscallName.RemovePrefix(1);
+            SyscallError("Syscall: '{}' caused error", syscallName,
+                         args.ReturnValue = -intptr_t(ret.error()));
         }
         CPU::OnSyscallLeave();
     }
