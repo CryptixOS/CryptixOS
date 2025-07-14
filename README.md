@@ -39,6 +39,7 @@ Make sure the following tools are installed on your system:
 - QEMU (or Bochs) for emulation
 - Meson + Ninja (build system)
 - xbstrap + Python 3 (for sysroot management)
+- python-guestfs (for creating and formatting the root filesystem image)
 - xorriso (for ISO image creation)
 
 ## 📦 Setting Up the Sysroot

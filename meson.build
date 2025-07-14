@@ -283,11 +283,16 @@ ksyms = custom_target(
   depends: [kernel_elf],
 )
 
-echfs_image = custom_target(
-  'echfs_image',
+root_image = custom_target(
+  'root_image',
+  input: [initrd_dir / 'usr' / 'sbin' / 'init', ext_mods],
   output: 'image.hdd',
   command: [
-    './Meta/create_image.sh',
+    './Meta/create_image.py',
+    '--input', meson.project_source_root() / 'Kernel',
+    '--output', '@OUTPUT@',
+    '--partition-table', 'mbr',
+    '--size', '728MiB',
   ],
   build_by_default: true,
   console: true,
@@ -383,7 +388,7 @@ iso = custom_target(
   build_by_default: true,
   console: true,
   install: false,
-  depends: [kernel_elf, initrd, echfs_image],
+  depends: [kernel_elf, initrd, root_image],
 )
 
 acpi_dir = meson.project_source_root() / 'Meta' / 'firmware' / 'acpi-tables'
@@ -400,34 +405,34 @@ endif
 
 run_bios = custom_target(
   'run_bios',
-  input: [iso, echfs_image],
+  input: [iso, root_image],
   output: 'run_bios',
   command: [qemu, qemu_args, '-cdrom', '@INPUT0@'],
   build_by_default: true,
   console: true,
   install: false,
-  depends: [iso, echfs_image],
+  depends: [iso, root_image],
 )
 
 ovmf_binaries = subproject('ovmf_binaries')
 ovmf = ovmf_binaries.get_variable(ovmf_id)
 
 run_uefi = custom_target(
-  input: [iso, echfs_image],
+  input: [iso, root_image],
   output: 'run_uefi',
   command: [qemu, qemu_args, '-cdrom', '@INPUT0@', '-bios', ovmf],
   console: true,
   install: false,
-  depends: [iso, echfs_image]
+  depends: [iso, root_image]
 )
 
 run_uefi_vnc = custom_target(
-  input: [iso, echfs_image],
+  input: [iso, root_image],
   output: 'run_uefi_vnc',
   command: [qemu, qemu_args, '-display', 'vnc=127.0.0.1:0', '-cdrom', '@INPUT0@', '-bios', ovmf],
   console: true,
   install: false,
-  depends: [iso, echfs_image]
+  depends: [iso, root_image]
 )
 
 run_uefi_gdb = custom_target(
