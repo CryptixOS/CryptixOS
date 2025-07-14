@@ -4,7 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-
 #include <Drivers/Serial.hpp>
 #include <Drivers/VideoTerminal.hpp>
 
@@ -14,9 +13,6 @@
 #include <Prism/Debug/LogSink.hpp>
 #include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
-
-#include <cctype>
-#include <magic_enum/magic_enum.hpp>
 
 namespace E9
 {
@@ -78,19 +74,16 @@ namespace Logger
         };
         template <typename T>
         CTOS_NO_KASAN void LogNumber(va_list& args, int base,
-                                     PrintFormatSpec& spec)
+                                     PrintfFormatSpec& spec)
         {
-            char       buf[64];
-            T          value    = va_arg(args, T);
-            StringView strStart = ToString(value, buf, base);
-            char*      str      = const_cast<char*>(strStart.Raw());
+            T      value   = va_arg(args, T);
+            String str     = ToString(value, base);
 
-            usize      len      = strStart.Size();
-            char       padding  = spec.ZeroPad ? '0' : ' ';
+            char   padding = spec.ZeroPad ? '0' : ' ';
             if (spec.PrintSign && spec.Length > 0) spec.Length--;
-            if (!spec.LeftJustify)
+            if (!spec.JustifyLeft)
             {
-                while (len < spec.Length)
+                while (static_cast<isize>(str.Size()) < spec.Length)
                 {
                     LogChar(padding);
                     spec.Length--;
@@ -101,10 +94,10 @@ namespace Logger
                 if (spec.PrintSign) LogChar('+');
                 else if (spec.Space) LogChar(' ');
             }
-            while (*str) LogChar(*str++);
-            if (spec.LeftJustify)
+            for (const auto c : str) LogChar(c);
+            if (spec.JustifyLeft)
             {
-                while (len < spec.Length)
+                while (static_cast<isize>(str.Size()) < spec.Length)
                 {
                     LogChar(padding);
                     spec.Length--;

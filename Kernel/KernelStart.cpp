@@ -141,7 +141,7 @@ static void kernelThread()
     MemoryDevices::Initialize();
 
     IgnoreUnused(
-        VFS::Mount(nullptr, "/dev/nvme0n2p1"_sv, "/mnt/ext2"_sv, "ext2fs"_sv));
+        VFS::Mount(nullptr, "/dev/nvme0n2p2"_sv, "/mnt/ext2"_sv, "ext2fs"_sv));
     IgnoreUnused(VFS::Mount(nullptr, "/dev/nvme0n2p2"_sv, "/mnt/fat32"_sv,
                             "fat32fs"_sv));
     IgnoreUnused(
