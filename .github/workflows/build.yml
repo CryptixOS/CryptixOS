@@ -28,7 +28,7 @@ jobs:
         run: sudo apt update -y && sudo apt install -y meson ninja-build clang lld llvm git cmake python3 pipx fasm
           && sudo apt install build-essential qemu-system parted udev bison flex libgmp3-dev libmpc-dev libmpfr-dev
           && sudo apt install texinfo libisl-dev gperf gettext autopoint libreadline-dev help2man groff zsh xorriso bochs qpdf libguestfs-dev
-          && pipx install xbstrap 
+          && pipx install xbstrap && pip install guestfs
       - name: Create /usr/sbin/init
         run: mkdir -p build-sysroot/system-root/usr/sbin/ && touch sysroot/usr/sbin/init
       - name: Configure Project
