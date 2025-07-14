@@ -55,7 +55,7 @@ class Terminal
     void                  PutChar(u64 c);
     void                  PutCharImpl(u64 c);
 
-    void                  PrintString(StringView str);
+    isize                  PrintString(StringView str);
 
     void                  Bell();
 

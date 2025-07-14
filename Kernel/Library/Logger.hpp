@@ -39,21 +39,21 @@ class Terminal;
 using Prism::LogLevel;
 namespace Logger
 {
-    CTOS_NO_KASAN void EnableSink(usize sink);
-    CTOS_NO_KASAN void DisableSink(usize sink);
+    CTOS_NO_KASAN void  EnableSink(usize sink);
+    CTOS_NO_KASAN void  DisableSink(usize sink);
 
-    void               LogChar(u64 c);
-    CTOS_NO_KASAN void Print(StringView string);
-    CTOS_NO_KASAN i32  Printv(const char* format, va_list* args);
+    void                LogChar(u64 c);
+    CTOS_NO_KASAN isize Print(StringView string);
+    CTOS_NO_KASAN isize Printv(const char* format, va_list* args);
 
-    CTOS_NO_KASAN void Log(LogLevel logLevel, StringView str,
-                           bool printNewline = true);
-    CTOS_NO_KASAN void Logf(LogLevel logLevel, const char* format, ...);
-    CTOS_NO_KASAN void Logv(LogLevel logLevel, const char* format,
-                            va_list& args, bool printNewline = true);
+    CTOS_NO_KASAN isize Log(LogLevel logLevel, StringView str,
+                            bool printNewline = true);
+    CTOS_NO_KASAN isize Logf(LogLevel logLevel, const char* format, ...);
+    CTOS_NO_KASAN isize Logv(LogLevel logLevel, const char* format,
+                             va_list& args, bool printNewline = true);
 
-    Terminal&          GetTerminal();
-    void               Unlock();
+    Terminal&           GetTerminal();
+    void                Unlock();
 } // namespace Logger
 
 #define CTOS_BUILD_DEBUG

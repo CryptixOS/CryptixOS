@@ -101,12 +101,15 @@ void Terminal::PutCharImpl(u64 c)
     RawPutChar(0xfe);
 }
 
-void Terminal::PrintString(StringView str)
+isize Terminal::PrintString(StringView str)
 {
-    if (!m_Initialized) return;
+    if (!m_Initialized) return 0;
 
-    for (auto c : str) PutCharImpl(c);
+    isize nwritten = 0;
+    for (auto c : str) PutCharImpl(c), ++nwritten;
     Flush();
+
+    return nwritten;
 }
 
 void Terminal::Bell()

@@ -72,9 +72,9 @@ namespace PNG
     inline constexpr u8 PredictPaeth(u8 a, u8 b, u8 c)
     {
         i32 p  = a + b - c;
-        i32 pa = Math::Abs(p - a);
-        i32 pb = Math::Abs(p - b);
-        i32 pc = Math::Abs(p - c);
+        i32 pa = Math::Absolute(p - a);
+        i32 pb = Math::Absolute(p - b);
+        i32 pc = Math::Absolute(p - c);
 
         if (pa <= pb && pa <= pc) return a;
         if (pb <= pc) return b;
