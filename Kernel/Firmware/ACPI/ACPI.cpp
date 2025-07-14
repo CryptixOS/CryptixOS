@@ -242,8 +242,8 @@ namespace ACPI
                   "ACPI: Failed to set uACPI interrupt model");
         uAcpiCall(uacpi_namespace_initialize(),
                   "ACPI: Failed to initialize namespace");
-        // uAcpiCall(uacpi_finalize_gpe_initialization(),
-        //          "ACPI: Failed to finalize gpe initialization!");
+        uAcpiCall(uacpi_finalize_gpe_initialization(),
+                  "ACPI: Failed to finalize gpe initialization!");
     }
     void EnumerateDevices()
     {
