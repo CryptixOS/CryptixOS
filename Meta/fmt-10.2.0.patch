@@ -8923,22 +8923,3 @@ diff --color -Naur fmt-old/include/fmt/xchar.h fmt-10.2.0/include/fmt/xchar.h
  FMT_BEGIN_EXPORT
  
  using wstring_view = basic_string_view<wchar_t>;
-diff --color -Naur fmt-old/meson.build fmt-10.2.0/meson.build
---- fmt-old/meson.build	1970-01-01 01:00:00.000000000 +0100
-+++ fmt-10.2.0/meson.build	2025-04-27 21:04:51.157281783 +0200
-@@ -0,0 +1,15 @@
-+project('fmt', 'cpp', license: 'BSD', default_options: ['cpp_std=c++14'])
-+
-+args = [
-+    '-DFMT_STATIC_THOUSANDS_SEPARATOR=1',
-+    '-DFMT_USE_LONG_DOUBLE=0',
-+    '-DFMT_USE_DOUBLE=0',
-+    '-DFMT_USE_FLOAT=0',
-+    '-DFMT_HEADER_ONLY',
-+]
-+
-+fmt_dep = declare_dependency(compile_args : args, include_directories : include_directories('include'))
-+
-+if meson.version().version_compare('>=0.54.0')
-+    meson.override_dependency('fmt', fmt_dep)
-+endif
