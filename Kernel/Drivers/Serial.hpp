@@ -16,14 +16,14 @@ namespace Serial
     u8                 Read();
     void               Write(u8 data);
 
-    constexpr static isize Write(StringView str)
+    inline static isize Write(StringView str)
     {
         isize nwritten = 0;
         for (auto c : str) Write(c), ++nwritten;
 
         return nwritten;
     }
-    constexpr isize Write(u8* data, usize size)
+    inline isize Write(u8* data, usize size)
     {
         return Write(StringView(reinterpret_cast<char*>(data), size));
     }
