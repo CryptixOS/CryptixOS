@@ -14,7 +14,7 @@ project('CryptixOS', ['c', 'cpp'],
     'b_lundef=true',
     'b_pie=true',
     'c_std=c17',
-    'cpp_std=c++2c',
+    'cpp_std=c++26',
   ],
 )
 
@@ -99,7 +99,6 @@ add_global_arguments(
     '-fno-rtti',
     '-Wno-non-virtual-dtor',
     '-nostdinc++',
-    '-std=c++2c'
   ],
   language: 'cpp',
 )
