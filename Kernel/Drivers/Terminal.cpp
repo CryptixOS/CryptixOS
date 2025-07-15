@@ -143,7 +143,7 @@ const Vector<Terminal*>& Terminal::EnumerateTerminals()
 {
     if (s_Framebuffers.Empty())
     {
-        LogWarn("Terminal: Can't to enumerate, no availabe framebuffers");
+        LogWarn("Terminal: Can't to enumerate, no available framebuffers");
         return s_Terminals;
     }
     if (!s_Terminals.Empty()) return s_Terminals;

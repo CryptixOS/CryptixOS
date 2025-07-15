@@ -425,7 +425,7 @@ namespace
         InitializeBootModules(info.KernelModules);
         SetupFramebuffers(info.Framebuffers);
         // Parsing memory entries needs to happen last, so every allocation
-        // happens before thatt
+        // happens before that
         SetupMemoryInfo(info.MemoryInformation);
 
         auto smpResponse = s_SmpRequest.response;

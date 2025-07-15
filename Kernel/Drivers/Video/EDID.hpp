@@ -10,7 +10,7 @@
 
 enum class VideoInputType : u8
 {
-    eSeperateSync  = Bit(0),
+    eSeparateSync  = Bit(0),
     eCompositeSync = Bit(1),
     eSyncOnGreen   = Bit(2),
     eUnused        = Bit(3) | Bit(4),
