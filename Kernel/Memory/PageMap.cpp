@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Memory/PageMap.hpp>
+#include <Prism/Utility/Math.hpp>
 
 namespace Arch::VMM
 {
@@ -39,6 +40,17 @@ std::pair<usize, PageAttributes> PageMap::RequiredSize(usize size) const
     else if (size >= lPageSize) return {lPageSize, PageAttributes::eLPage};
 
     return {m_PageSize, static_cast<PageAttributes>(0)};
+}
+
+ErrorOr<Pointer> PageMap::MapIoRegion(Pointer phys, usize length,
+                                      PageAttributes flags, usize alignment)
+{
+    length    = Math::AlignUp(length, PMM::PAGE_SIZE);
+    auto virt = VMM::AllocateSpace(length, alignment, true);
+    phys      = Math::AlignDown(phys, PMM::PAGE_SIZE);
+
+    if (MapRange(virt, phys, length, flags)) return virt;
+    return Error(ENOMEM);
 }
 
 bool PageMap::Map(Pointer virt, Pointer phys, PageAttributes flags)

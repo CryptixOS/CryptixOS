@@ -14,7 +14,7 @@ project('CryptixOS', ['c', 'cpp'],
     'b_lundef=true',
     'b_pie=true',
     'c_std=c17',
-    'cpp_std=c++23',
+    'cpp_std=c++2c',
   ],
 )
 
@@ -46,6 +46,7 @@ warnings = [
   '-Wno-unused-parameter',
   '-Wno-frame-address',
   '-Wno-c23-extensions',
+  #'-Wglobal-constructors',
 ]
 
 macros = [
@@ -97,7 +98,8 @@ add_global_arguments(
     '-fno-exceptions',
     '-fno-rtti',
     '-Wno-non-virtual-dtor',
-    '-nostdinc++'
+    '-nostdinc++',
+    '-std=c++2c'
   ],
   language: 'cpp',
 )
@@ -294,6 +296,7 @@ root_image = custom_target(
     '--partition-table', 'mbr',
     '--size', '728MiB',
   ],
+  depends: ext_mods,
   build_by_default: true,
   console: true,
   install: false,
@@ -307,6 +310,8 @@ iso_files = [
   limine.get_variable('limine_binaries'),
   meson.project_source_root() / 'Meta' / 'qemu.dtb',
 ]
+c = run_command(['find', meson.project_source_root() / 'BaseFiles', '-type', 'f'], check: true)
+base_files = c.stdout().strip().split('\n')
 
 initrd = custom_target(
   'initrd',
@@ -318,6 +323,7 @@ initrd = custom_target(
     no_ext_mods ? [] : ['cp', '@INPUT@', initrd_dir / 'usr/lib/modules/', '&&'],
     'tar', '-cvf', '@OUTPUT@', '-C', initrd_dir, '.'],
   build_by_default: true,
+  depend_files: base_files,
   console: true,
   install: false,
   depends: ext_mods
@@ -385,7 +391,7 @@ iso = custom_target(
     'rm',
     '-rf', iso_dir,
   ],
-  build_by_default: true,
+  build_by_default: false,
   console: true,
   install: false,
   depends: [kernel_elf, initrd, root_image],

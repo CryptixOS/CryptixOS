@@ -7,35 +7,16 @@
 #pragma once
 
 #include <Prism/Core/Types.hpp>
+#include <Prism/Memory/Pointer.hpp>
 
 namespace KernelHeap
 {
-    void  Initialize();
-    void* Allocate(usize bytes);
-    void* Callocate(usize bytes);
-    void* Reallocate(void* ptr, usize size);
-    void  Free(void* memory);
+    void    Initialize();
 
-    template <typename T>
-    inline T Allocate(usize bytes)
-    {
-        return reinterpret_cast<T>(Allocate(bytes));
-    }
-    template <typename T>
-    inline T Callocate(size_t bytes)
-    {
-        return reinterpret_cast<T>(Callocate(bytes));
-    }
-    template <typename T>
-    T Reallocate(T ptr, size_t size)
-    {
-        return reinterpret_cast<T>(
-            Reallocate(reinterpret_cast<void*>(ptr), size));
-    }
+    // TODO(v1tr10l7): alignment
+    Pointer Allocate(usize bytes);
+    Pointer Callocate(usize bytes);
+    Pointer Reallocate(Pointer address, usize size);
 
-    template <typename T>
-    void Free(T memory)
-    {
-        return Free(reinterpret_cast<void*>(memory));
-    }
+    void    Free(Pointer memory);
 } // namespace KernelHeap

@@ -29,10 +29,10 @@ namespace MemoryManager
         s_KernelPhysicalAddress = kernelPhys;
         s_KernelVirtualAddress  = kernelVirt;
 
-        // Call global constructors
-        icxxabi::Initialize();
         // Initialize early kernel heap
         KernelHeap::Initialize();
+        // Call global constructors
+        icxxabi::Initialize();
         // Initialize Physical Memory Manager
         Assert(PMM::Initialize(memoryMap));
 

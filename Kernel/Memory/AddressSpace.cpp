@@ -7,6 +7,7 @@
 #include <Memory/AddressSpace.hpp>
 #include <Memory/PMM.hpp>
 
+#include <Prism/Utility/Math.hpp>
 #include <Prism/Utility/Optional.hpp>
 
 AddressSpace::AddressSpace()

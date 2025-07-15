@@ -16,3 +16,5 @@ sources
 *.log
 Meta/firmware/*
 compile_commands.json
+Meta/helix/__pycache__/*
+Meta/helix/__pycache__/

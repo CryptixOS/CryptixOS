@@ -35,30 +35,30 @@ class PageMap
 
     void* NextLevel(PageTableEntry& entry, bool allocate, uintptr_t virt = -1);
 
-    PageTableEntry* Virt2Pte(PageTable* topLevel, Pointer virt, bool allocate,
-                             u64 pageSize);
-    Pointer         Virt2Phys(Pointer        virt,
-                              PageAttributes flags = PageAttributes::eRead);
+    PageTableEntry*  Virt2Pte(PageTable* topLevel, Pointer virt, bool allocate,
+                              u64 pageSize);
+    Pointer          Virt2Phys(Pointer        virt,
+                               PageAttributes flags = PageAttributes::eRead);
 
-    bool            InternalMap(Pointer virt, Pointer phys,
-                                PageAttributes flags
-                                = PageAttributes::eRW | PageAttributes::eWriteBack);
+    bool             InternalMap(Pointer virt, Pointer phys,
+                                 PageAttributes flags
+                                 = PageAttributes::eRW | PageAttributes::eWriteBack);
 
-    bool            InternalUnmap(Pointer        virt,
-                                  PageAttributes flags = static_cast<PageAttributes>(0));
+    bool             InternalUnmap(Pointer        virt,
+                                   PageAttributes flags = static_cast<PageAttributes>(0));
 
+    ErrorOr<Pointer> MapIoRegion(Pointer phys, usize length,
+                                 PageAttributes flags
+                                 = PageAttributes::eRW
+                                 | PageAttributes::eWriteThrough,
+                                 usize alignment = 0);
     template <typename T>
     inline ErrorOr<T*> MapIoRegion(Pointer phys)
     {
-        usize   length = Math::AlignUp(sizeof(T), PMM::PAGE_SIZE);
-
-        Pointer virt   = VMM::AllocateSpace(length, alignof(u64), true);
-        phys           = Math::AlignDown(phys, PMM::PAGE_SIZE);
-
-        if (MapRange(virt, phys, length,
-                     PageAttributes::eRW | PageAttributes::eUncacheableStrong))
-            return virt.As<T>();
-        return Error(ENODEV);
+        auto maybeVirt = MapIoRegion(phys, sizeof(T));
+        if (!maybeVirt)
+            return Error(maybeVirt.error());
+        return maybeVirt.value();
     }
 
     bool        Map(Pointer virt, Pointer phys,

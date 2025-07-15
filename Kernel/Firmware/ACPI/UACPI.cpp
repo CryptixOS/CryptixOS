@@ -283,7 +283,7 @@ namespace uACPI
         void uacpi_kernel_log(uacpi_log_level level, const uacpi_char* format,
                               ...)
         {
-            constexpr Array uacpiToPrismLogLevels = ToArray({
+            constexpr Array uacpiToPrismLogLevels = ToArray<LogLevel>({
                 LogLevel::eNone,
                 LogLevel::eError,
                 LogLevel::eWarn,

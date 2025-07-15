@@ -11,6 +11,7 @@
 
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Debug/Assertions.hpp>
+#include <Prism/Utility/Math.hpp>
 
 namespace DeviceTree
 {

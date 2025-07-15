@@ -20,6 +20,10 @@
 
 #include <demangler/Demangle.h>
 
+using ConstructorFunction = void (*)();
+
+extern "C" ConstructorFunction __init_array_start[];
+extern "C" ConstructorFunction __init_array_end[];
 namespace Stacktrace
 {
     namespace
@@ -41,28 +45,27 @@ namespace Stacktrace
 
             return (digit - 'a') + 0xa;
         }
-
-        const Symbol* GetSymbol(Pointer address)
-        {
-            if (address < s_LowestKernelSymbolAddress
-                || address > s_HighestKernelSymbolAddress)
-                return nullptr;
-            const Symbol* ret = nullptr;
-
-            for (const auto& symbol : s_Symbols)
-            {
-                if ((&symbol + 1) == s_Symbols.end()) break;
-                if (address < (&symbol + 1)->Address)
-                {
-                    ret = &symbol;
-                    break;
-                }
-            }
-
-            return ret;
-        }
     }; // namespace
 
+    const Symbol* GetSymbol(Pointer address)
+    {
+        if (address < s_LowestKernelSymbolAddress
+            || address > s_HighestKernelSymbolAddress)
+            return nullptr;
+        const Symbol* ret = nullptr;
+
+        for (const auto& symbol : s_Symbols)
+        {
+            if ((&symbol + 1) == s_Symbols.end()) break;
+            if (address < (&symbol + 1)->Address)
+            {
+                ret = &symbol;
+                break;
+            }
+        }
+
+        return ret;
+    }
     bool Initialize()
     {
         LogTrace("Stacktrace: Loading kernel s_Symbols...");
@@ -104,6 +107,18 @@ namespace Stacktrace
         u64 filePageCount = Math::DivRoundUp(module->Size, PMM::PAGE_SIZE);
         PMM::FreePages(fileStart.FromHigherHalf(), filePageCount);
         LogInfo("Stacktrace: kernel symbols loaded");
+
+        LogTrace("System: Dumping init array =>");
+        for (ConstructorFunction* entry = __init_array_start;
+             entry < __init_array_end; entry++)
+        {
+            ConstructorFunction constructor = *entry;
+            auto sym = GetSymbol(constructor);
+            if (!sym) continue;
+            
+            LogTrace("\t{:#016p} => {}", Pointer(constructor).Raw(), sym->Name);
+        }
+
         return true;
     }
     void Print(usize maxFrames)

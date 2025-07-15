@@ -9,84 +9,118 @@
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
+#include <Library/Locking/Spinlock.hpp>
 #include <Prism/Core/Types.hpp>
 #include <Prism/Utility/Math.hpp>
-#include <Library/Locking/Spinlock.hpp>
 
-class SlabAllocatorBase
+class AllocatorBase
 {
   public:
-    virtual void* Allocate()          = 0;
-    virtual void  Free(void* memory)  = 0;
-    virtual usize GetAllocationSize() = 0;
+    AllocatorBase()          = default;
+    virtual ~AllocatorBase() = default;
+
+    virtual ErrorOr<void> Initialize(usize chunkSize, Pointer base = nullptr, usize length = 0)
+        = 0;
+    virtual void    Shutdown()             = 0;
+
+    virtual Pointer Allocate()             = 0;
+    virtual void    Free(Pointer memory)   = 0;
+
+    virtual usize   AllocationSize()       = 0;
+
+    virtual usize   TotalAllocated() const = 0;
+    virtual usize   TotalFreed() const     = 0;
+    virtual usize   Used() const           = 0;
 };
 
+struct SlabFrame
+{
+    SlabFrame* Next = nullptr;
+};
 struct SlabHeader
 {
-    SlabAllocatorBase* Slab;
+    AllocatorBase* Slab = nullptr;
 };
 
-template <usize Bytes>
-class SlabAllocator : public SlabAllocatorBase
+class SlabAllocator : public AllocatorBase
 {
   public:
-    SlabAllocator() = default;
-    void Initialize()
+    SlabAllocator() {}
+
+    virtual ErrorOr<void> Initialize(usize chunkSize, Pointer base   = nullptr,
+                                     usize   length = 0) override
     {
-        m_FirstFree = ToHigherHalfAddress<uintptr_t>(
-            PhysicalMemoryManager::CallocatePages(1));
+        if (base) Assert(length > 0);
+
+        Assert(Math::IsPowerOfTwo(chunkSize));
+        m_ChunkSize = chunkSize;
+
+        m_FirstFree = base ?: Pointer(PMM::CallocatePages(1)).ToHigherHalf();
+        if (!m_FirstFree) return Error(ENOMEM);
+
         auto available
-            = 0x1000 - Math::AlignUp(sizeof(SlabHeader), m_AllocationSize);
-        auto slabPointer  = reinterpret_cast<SlabHeader*>(m_FirstFree);
+            = PMM::PAGE_SIZE - Math::AlignUp(sizeof(SlabHeader), m_ChunkSize);
+        auto       slabHeader = m_FirstFree.As<SlabHeader>();
 
         ScopedLock guard(m_Lock);
-        slabPointer->Slab = this;
-        m_FirstFree += Math::AlignUp(sizeof(SlabHeader), m_AllocationSize);
+        slabHeader->Slab = this;
+        m_FirstFree += Math::AlignUp(sizeof(SlabHeader), m_ChunkSize);
 
-        auto array = reinterpret_cast<usize*>(m_FirstFree);
-        auto max   = available / m_AllocationSize - 1;
-        auto fact  = m_AllocationSize / 8;
-        for (usize i = 0; i < max; i++)
-            array[i * fact] = reinterpret_cast<usize>(&array[(i + 1) * fact]);
-        array[max * fact] = 0;
+        auto       count = available / m_ChunkSize;
+        SlabFrame* prev  = nullptr;
+        for (usize i = 0; i < count; i++)
+        {
+            auto frame  = m_FirstFree.Offset<SlabFrame*>(i * m_ChunkSize);
+            frame->Next = prev;
+            prev        = frame;
+        }
+        m_FirstFree = prev;
+        return {};
     }
+    virtual void    Shutdown() override { ToDoWarn(); }
 
-    void* Allocate() override
+    virtual Pointer Allocate() override
     {
-        if (!m_FirstFree) Initialize();
+        if (!m_FirstFree && !Initialize(m_ChunkSize)) return nullptr;
 
         ScopedLock guard(m_Lock);
-        auto oldFree = reinterpret_cast<usize*>(m_FirstFree);
-        m_FirstFree  = oldFree[0];
-        std::memset(oldFree, 0, m_AllocationSize);
+        auto       frame = m_FirstFree.As<SlabFrame>();
+        m_FirstFree      = frame->Next;
 
-        return oldFree;
+        m_TotalAllocated += m_ChunkSize;
+        return frame;
     }
-    void Free(void* memory) override
+    virtual void Free(Pointer memory) override
     {
-        ScopedLock guard(m_Lock);
         if (!memory) return;
 
-        auto newHead = static_cast<usize*>(memory);
+        ScopedLock guard(m_Lock);
+        auto       frame = memory.As<SlabFrame>();
+        frame->Next      = m_FirstFree;
+        m_FirstFree      = frame;
+
+        m_TotalFreed += m_ChunkSize;
+        return;
+
+        auto newHead = memory.As<usize>();
         newHead[0]   = m_FirstFree;
-        m_FirstFree  = reinterpret_cast<uintptr_t>(newHead);
+        m_FirstFree  = newHead;
     }
 
-    virtual usize GetAllocationSize() override { return m_AllocationSize; }
+    virtual usize AllocationSize() override { return m_ChunkSize; }
 
-    template <typename T>
-    T Allocate()
+    virtual usize TotalAllocated() const override { return m_TotalAllocated; }
+    virtual usize TotalFreed() const override { return m_TotalFreed; }
+    virtual usize Used() const override
     {
-        return reinterpret_cast<T>(Allocate());
-    }
-    template <typename T>
-    void Free(T memory)
-    {
-        return Free(reinterpret_cast<void*>(memory));
+        return TotalAllocated() - TotalFreed();
     }
 
   private:
-    uintptr_t m_FirstFree      = 0;
-    usize     m_AllocationSize = Bytes;
-    Spinlock  m_Lock;
+    Spinlock m_Lock;
+    Pointer  m_FirstFree;
+    usize    m_ChunkSize;
+
+    usize    m_TotalAllocated;
+    usize    m_TotalFreed;
 };

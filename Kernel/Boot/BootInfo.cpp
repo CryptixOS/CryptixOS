@@ -10,8 +10,7 @@
 #include <Boot/BootInfo.hpp>
 
 #include <Library/Logger.hpp>
-
-#include <cstring>
+#include <Prism/Memory/Memory.hpp>
 
 #define LIMINE_REQUEST                                                         \
     __attribute__((used, section(".limine_requests"))) volatile
@@ -134,6 +133,10 @@ LIMINE_REQUEST limine_dtb_request s_DtbRequest = {
 };
 #pragma endregion
 
+namespace KernelHeap
+{
+    void EarlyInitialize(Pointer base, usize length);
+};
 namespace
 {
 
@@ -248,6 +251,11 @@ namespace
                 InitializeModule(module, file);
             }
         }
+
+        auto earlyHeapSize = 64_mib;
+        auto earlyHeap     = allocateMemory(earlyHeapSize);
+        KernelHeap::EarlyInitialize(earlyHeap, earlyHeapSize);
+
         for (usize i = 0; i < memoryEntryCount; i++)
         {
             auto*      current     = memoryMap[i];
@@ -369,14 +377,18 @@ namespace BootInfo
         info.SmBios64Phys
             = Pointer(s_SmbiosRequest.response->entry_64).FromHigherHalf();
 
-        info.EfiSystemTable       = s_EfiSystemTableRequest.response->address;
-        info.EfiMemoryMap.Address = s_EfiMemmapRequest.response->memmap;
-        info.EfiMemoryMap.Size    = s_EfiMemmapRequest.response->memmap_size;
-        info.EfiMemoryMap.DescriptorSize
-            = s_EfiMemmapRequest.response->desc_size;
-        info.EfiMemoryMap.DescriptorVersion
-            = s_EfiMemmapRequest.response->desc_version;
-
+        info.EfiSystemTable = s_EfiSystemTableRequest.response
+                                ? s_EfiSystemTableRequest.response->address
+                                : 0;
+        if (s_EfiMemmapRequest.response)
+        {
+            info.EfiMemoryMap.Address = s_EfiMemmapRequest.response->memmap;
+            info.EfiMemoryMap.Size = s_EfiMemmapRequest.response->memmap_size;
+            info.EfiMemoryMap.DescriptorSize
+                = s_EfiMemmapRequest.response->desc_size;
+            info.EfiMemoryMap.DescriptorVersion
+                = s_EfiMemmapRequest.response->desc_version;
+        }
         kernelStart(info);
     }
     u64 GetHHDMOffset()

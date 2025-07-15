@@ -92,83 +92,98 @@ namespace System
         auto    srat      = ACPI::GetTable<SRAT>("SRAT");
         usize   length    = srat->Header.Length;
 
-        Pointer start = srat;
-        Pointer end = start.Offset(length);
+        Pointer start     = srat;
+        Pointer end       = start.Offset(length);
         Pointer current   = start.Offset(sizeof(SRAT));
 
-        usize nodeIndex = 0;
+        usize   nodeIndex = 0;
         while (current < end)
         {
             auto entry = current.As<EntryHeader>();
-            LogTrace("System: NUMA Node[{}] => `{}`", nodeIndex++, ToString(entry->Type));
+            LogTrace("System: NUMA Node[{}] => `{}`", nodeIndex++,
+                     ToString(entry->Type));
 
             switch (entry->Type)
             {
-                case EntryType::eCPUAffinity: 
+                case EntryType::eCPUAffinity:
                 {
-                    auto cpuEntry = current.As<ACPI::SRAT::CPU_Affinity>();
+                    auto  cpuEntry = current.As<ACPI::SRAT::CPU_Affinity>();
                     usize proximityDomain = 0;
                     for (usize i = 0; i < 3; i++)
-                        proximityDomain = (proximityDomain << (i<<3)) | cpuEntry->ProximityDomainHigh[i]; 
-                    proximityDomain = (proximityDomain << 8) | cpuEntry->ProximityDomainLow;
+                        proximityDomain = (proximityDomain << (i << 3))
+                                        | cpuEntry->ProximityDomainHigh[i];
+                    proximityDomain
+                        = (proximityDomain << 8) | cpuEntry->ProximityDomainLow;
 
                     LogMessage("\t\tProximity Domain: {}\n", proximityDomain);
                     LogMessage("\t\tAPIC ID: {}\n", cpuEntry->ApicID);
-                    LogMessage("\t\tLocal SAPIC EID: {}\n", cpuEntry->LocalSapicEID);
+                    LogMessage("\t\tLocal SAPIC EID: {}\n",
+                               cpuEntry->LocalSapicEID);
                     LogMessage("\t\tClock Domain: {}\n", cpuEntry->ClockDomain);
                     break;
                 }
-                case EntryType::eMemoryAffinity: 
-                { 
+                case EntryType::eMemoryAffinity:
+                {
                     auto memoryEntry = current.As<ACPI::SRAT::MemoryAffinity>();
-                    usize base = memoryEntry->BaseAddress;
-                    usize length = memoryEntry->Length;
+                    usize base       = memoryEntry->BaseAddress;
+                    usize length     = memoryEntry->Length;
 
-                    LogMessage("\t\tProximity Domain: {}\n", memoryEntry->ProximityDomain);
-                    LogMessage("\t\tMemory range: <{:#x}-{:#x}>\n", base, length);
+                    LogMessage("\t\tProximity Domain: {}\n",
+                               memoryEntry->ProximityDomain);
+                    LogMessage("\t\tMemory range: <{:#x}-{:#x}>\n", base,
+                               length);
                     break;
                 }
-                case EntryType::eX2ApicAffinity: 
+                case EntryType::eX2ApicAffinity:
                 {
                     auto x2apic = current.As<ACPI::SRAT::X2ApicAffinity>();
-                    LogMessage("\t\tProximity Domain: {}\n", x2apic->ProximityDomain);
+                    LogMessage("\t\tProximity Domain: {}\n",
+                               x2apic->ProximityDomain);
                     LogMessage("\t\tX2APIC ID: {}\n", x2apic->ApicID);
                     LogMessage("\t\tClock Domain: {}\n", x2apic->ClockDomain);
                     break;
                 }
-                case EntryType::eGiccAffinity: 
+                case EntryType::eGiccAffinity:
                 {
                     auto gicc = current.As<ACPI::SRAT::GiccAffinity>();
-                    LogMessage("\t\tProximity Domain: {}\n", gicc->ProximityDomain);
+                    LogMessage("\t\tProximity Domain: {}\n",
+                               gicc->ProximityDomain);
                     LogMessage("\t\tProcessor UID: {}\n", gicc->ProcessorUID);
                     LogMessage("\t\tClock Domain: {}\n", gicc->ClockDomain);
                     break;
                 }
-                case EntryType::eGicItsAffinity: 
+                case EntryType::eGicItsAffinity:
                 {
                     auto gicits = current.As<ACPI::SRAT::GicItsAffinity>();
-                    LogMessage("\t\tProximity Domain: {}\n", gicits->ProximityDomain);
+                    LogMessage("\t\tProximity Domain: {}\n",
+                               gicits->ProximityDomain);
                     LogMessage("\t\tItsID: {}\n", gicits->ItsID);
                     break;
                 }
-                case EntryType::eGenericAffinity: 
+                case EntryType::eGenericAffinity:
                 {
                     auto generic = current.As<ACPI::SRAT::GenericAffinity>();
-                    LogMessage("\t\tProximity Domain: {}\n", generic->ProximityDomain);
-                    LogMessage("\t\tDevice Handle Type: {}\n", generic->DeviceHandleType);
-                    // LogMessage("\t\tDevice Handle: {}\n", generic->DeviceHandle);
+                    LogMessage("\t\tProximity Domain: {}\n",
+                               generic->ProximityDomain);
+                    LogMessage("\t\tDevice Handle Type: {}\n",
+                               generic->DeviceHandleType);
+                    // LogMessage("\t\tDevice Handle: {}\n",
+                    // generic->DeviceHandle);
                     break;
                 }
                 case EntryType::eGenericPortAffinity:
                 {
-                    auto genericPort = current.As<ACPI::SRAT::GenericAffinity>();
-                    LogMessage("\t\tProximity Domain: {}\n", genericPort->ProximityDomain);
+                    auto genericPort
+                        = current.As<ACPI::SRAT::GenericAffinity>();
+                    LogMessage("\t\tProximity Domain: {}\n",
+                               genericPort->ProximityDomain);
                     break;
                 }
-                case EntryType::eRintcAffinity: 
+                case EntryType::eRintcAffinity:
                 {
                     auto rintc = current.As<ACPI::SRAT::RintcAffinity>();
-                    LogMessage("\t\tProximity Domain: {}\n", rintc->ProximityDomain);
+                    LogMessage("\t\tProximity Domain: {}\n",
+                               rintc->ProximityDomain);
                     LogMessage("\t\tProcessor UID: {}\n", rintc->ProcessorUID);
                     LogMessage("\t\tClock Domain: {}\n", rintc->ClockDomain);
                     break;

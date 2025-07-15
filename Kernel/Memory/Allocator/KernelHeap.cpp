@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Common.hpp>
 #include <Memory/PMM.hpp>
 
 #include <Memory/Allocator/KernelHeap.hpp>
@@ -13,140 +14,162 @@ namespace KernelHeap
 {
     namespace
     {
-        SlabAllocator<8>    s_Allocator8    = {};
-        SlabAllocator<16>   s_Allocator16   = {};
-        SlabAllocator<32>   s_Allocator32   = {};
-        SlabAllocator<64>   s_Allocator64   = {};
-        SlabAllocator<128>  s_Allocator128  = {};
-        SlabAllocator<256>  s_Allocator256  = {};
-        SlabAllocator<512>  s_Allocator512  = {};
-        SlabAllocator<1024> s_Allocator1024 = {};
+        constexpr usize MAX_BUCKET_SIZE = 1024;
+        constexpr usize BUCKET_COUNT    = Math::Log2CEval(MAX_BUCKET_SIZE) - 2;
+
+        bool            s_Initialized   = false;
+        Pointer         s_EarlyHeapBase = nullptr;
+        usize           s_EarlyHeapSize = 0;
+        usize           s_EarlyHeapAllocated = 0;
+        Pointer         s_EarlyHeapCurrent   = nullptr;
+
+        alignas(Array<SlabAllocator, BUCKET_COUNT>) static u8
+            s_BucketStorage[sizeof(Array<SlabAllocator, BUCKET_COUNT>)];
+        static Array<SlabAllocator, BUCKET_COUNT>* s_Buckets = nullptr;
 
         struct BigAllocMeta
         {
-            usize pages;
-            usize size;
+            usize PageCount;
+            usize Size;
         };
 
-        void* InternalAllocate(usize size)
+        Pointer EarlyHeapAllocate(usize size)
         {
-            if (size <= 8) return s_Allocator8.Allocate<void*>();
-            else if (size <= 16) return s_Allocator16.Allocate<void*>();
-            else if (size <= 32) return s_Allocator32.Allocate<void*>();
-            else if (size <= 64) return s_Allocator64.Allocate<void*>();
-            else if (size <= 128) return s_Allocator128.Allocate<void*>();
-            else if (size <= 256) return s_Allocator256.Allocate<void*>();
-            else if (size <= 512) return s_Allocator512.Allocate<void*>();
-            else if (size <= 1024) return s_Allocator1024.Allocate<void*>();
+            size = Math::AlignUp(size, sizeof(void*));
+            Assert(s_EarlyHeapSize - s_EarlyHeapAllocated > size);
 
-            usize pages = Math::AlignUp(size, 4096) / 4096;
-            auto  ptr
-                = PhysicalMemoryManager::CallocatePages<uintptr_t>(pages + 1);
-            if (ptr == 0) return nullptr;
+            auto memory = s_EarlyHeapCurrent;
+            s_EarlyHeapCurrent += size;
+            s_EarlyHeapAllocated += size;
 
-            auto meta = reinterpret_cast<BigAllocMeta*>(
-                ToHigherHalfAddress<void*>(ptr));
-            meta->pages = pages;
-            meta->size  = size;
-
-            return reinterpret_cast<void*>(ToHigherHalfAddress<uintptr_t>(ptr)
-                                           + PMM::PAGE_SIZE);
+            return memory;
         }
 
-        void InternalFree(void* ptr)
+        Pointer LargeAllocate(usize size)
         {
-            if ((reinterpret_cast<uintptr_t>(ptr) & 0xfff) == 0)
-            {
-                auto meta = reinterpret_cast<BigAllocMeta*>(
-                    reinterpret_cast<uintptr_t>(ptr) - PMM::PAGE_SIZE);
-                PhysicalMemoryManager::FreePages(
-                    FromHigherHalfAddress<void*>((uintptr_t)meta),
-                    meta->pages + 1);
+            usize   pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
+            Pointer memory    = PMM::CallocatePages(pageCount + 1);
+            if (!memory) return nullptr;
+
+            auto meta   = memory.ToHigherHalf<BigAllocMeta*>();
+            meta->PageCount = pageCount;
+            meta->Size  = size;
+
+            return memory.ToHigherHalf().Offset(PMM::PAGE_SIZE);
+        }
+        void LargeFree(Pointer memory)
+        {
+            if (!(memory.Raw() & 0xfff))
                 return;
+        
+            auto meta = memory.Offset<Pointer>(-PMM::PAGE_SIZE).As<BigAllocMeta>();
+            PMM::FreePages(Pointer(meta).FromHigherHalf(), meta->PageCount + 1);
+        }
+
+        Pointer InternalAllocate(usize size)
+        {
+            if (!s_Initialized) return EarlyHeapAllocate(size);
+            if (size > MAX_BUCKET_SIZE)
+            {
+                auto memory = LargeAllocate(size);
+                if (memory) return memory;
             }
-            reinterpret_cast<SlabHeader*>(reinterpret_cast<uintptr_t>(ptr)
-                                          & ~0xfff)
-                ->Slab->Free(ptr);
+
+            for (usize i = 0; i < BUCKET_COUNT; i++)
+                if (size <= (8zu << i)) return (*s_Buckets)[i].Allocate();
+
+            return nullptr;
+        }
+
+        void InternalFree(Pointer memory)
+        {
+            if ((memory.Raw() & 0xfff) == 0)
+            {
+                return LargeFree(memory);
+            }
+            auto allocator = Pointer(memory.Raw() & ~0xfff).As<SlabHeader>();
+            allocator->Slab->Free(memory);
         }
     } // namespace
-      //
+
+    void EarlyInitialize(Pointer base, usize length)
+    {
+        s_EarlyHeapBase    = base;
+        s_EarlyHeapSize    = length;
+        s_EarlyHeapCurrent = s_EarlyHeapBase;
+    }
     void Initialize()
     {
         EarlyLogTrace("KernelHeap: Initializing...");
 
-        s_Allocator8.Initialize();
-        s_Allocator16.Initialize();
-        s_Allocator32.Initialize();
-        s_Allocator64.Initialize();
-        s_Allocator128.Initialize();
-        s_Allocator256.Initialize();
-        s_Allocator512.Initialize();
-        s_Allocator1024.Initialize();
+        s_Buckets = new (&s_BucketStorage) Array<SlabAllocator, BUCKET_COUNT>();
+        for (usize index = 0; index < BUCKET_COUNT; index++)
+            Assert((*s_Buckets)[index].Initialize(8 << index));
 
-        LogInfo("KernelHeap: Initialized");
+        s_Initialized = true;
+        LogInfo("KernelHeap: Initialized `{}` slab buckets", BUCKET_COUNT);
     }
 
-    void* Allocate(usize bytes) { return InternalAllocate(bytes); }
-    void* Callocate(usize bytes)
+    Pointer Allocate(usize bytes) { return InternalAllocate(bytes); }
+    Pointer Callocate(usize bytes)
     {
-        void* ret = InternalAllocate(bytes);
-        if (!ret) return nullptr;
+        auto memory = InternalAllocate(bytes);
+        if (!memory) return nullptr;
 
-        std::memset(ret, 0, bytes);
-        return ret;
+        Memory::Fill(memory, 0, bytes);
+        return memory;
     }
-    void* Reallocate(void* ptr, usize size)
+    Pointer Reallocate(Pointer memory, usize size)
     {
-        if (!ptr) return Allocate(size);
-        if ((reinterpret_cast<uintptr_t>(ptr) & 0xfff) == 0)
+        if (!memory) return Allocate(size);
+        if ((memory.Raw() & 0xfff) == 0)
         {
-            BigAllocMeta* metadata = reinterpret_cast<BigAllocMeta*>(
-                reinterpret_cast<uintptr_t>(ptr) - 0x1000);
-            usize oldSize = metadata->size;
+            BigAllocMeta* metadata
+                = memory.Offset<BigAllocMeta*>(-PMM::PAGE_SIZE);
+            usize oldSize = metadata->Size;
 
-            if (Math::DivRoundUp(oldSize, 0x1000)
-                == Math::DivRoundUp(size, 0x1000))
+            if (Math::DivRoundUp(oldSize, PMM::PAGE_SIZE)
+                == Math::DivRoundUp(size, PMM::PAGE_SIZE))
             {
-                metadata->size = size;
-                return ptr;
+                metadata->Size = size;
+                return memory;
             }
 
             if (size == 0)
             {
-                Free(ptr);
+                Free(memory);
                 return nullptr;
             }
 
             if (size < oldSize) oldSize = size;
 
-            void* ret = Allocate(size);
-            if (!ret) return ptr;
+            auto newMemory = Allocate(size);
+            if (!newMemory) return memory;
 
-            std::memcpy(ret, ptr, oldSize);
-            Free(ptr);
-            return ret;
+            Memory::Copy(newMemory, memory, oldSize);
+            Free(memory);
+            return newMemory;
         }
 
-        SlabAllocatorBase* slab = reinterpret_cast<SlabHeader*>(
-                                      reinterpret_cast<uintptr_t>(ptr) & ~0xFFF)
-                                      ->Slab;
-        usize oldSize = slab->GetAllocationSize();
+        AllocatorBase* slab
+            = Pointer(memory.Raw() & ~0xfff).As<SlabHeader>()->Slab;
+        usize oldSize = slab->AllocationSize();
 
         if (size == 0)
         {
-            Free(ptr);
+            Free(memory);
             return nullptr;
         }
         if (size < oldSize) oldSize = size;
 
-        void* ret = Allocate(size);
-        if (!ret) return ptr;
+        auto newMemory = Allocate(size);
+        if (!newMemory) return memory;
 
-        memcpy(ret, ptr, oldSize);
-        Free(ptr);
-        return ptr;
+        Memory::Copy(newMemory, memory, oldSize);
+        Free(memory);
+        return newMemory;
     }
-    void Free(void* memory)
+    void Free(Pointer memory)
     {
         if (!memory) return;
         InternalFree(memory);
@@ -163,15 +186,18 @@ void* operator new[](usize size, std::align_val_t)
 {
     return KernelHeap::Callocate(size);
 }
-void operator delete(void* ptr) noexcept { KernelHeap::Free(ptr); }
-void operator delete(void* ptr, std::align_val_t) noexcept
+void operator delete(void* memory) noexcept { KernelHeap::Free(memory); }
+void operator delete(void* memory, std::align_val_t) noexcept
 {
-    KernelHeap::Free(ptr);
+    KernelHeap::Free(memory);
 }
-void operator delete(void* ptr, usize) noexcept { KernelHeap::Free(ptr); }
-void operator delete[](void* ptr) noexcept { KernelHeap::Free(ptr); }
-void operator delete[](void* ptr, std::align_val_t) noexcept
+void operator delete(void* memory, usize) noexcept { KernelHeap::Free(memory); }
+void operator delete[](void* memory) noexcept { KernelHeap::Free(memory); }
+void operator delete[](void* memory, std::align_val_t) noexcept
 {
-    KernelHeap::Free(ptr);
+    KernelHeap::Free(memory);
 }
-void operator delete[](void* ptr, usize) noexcept { KernelHeap::Free(ptr); }
+void operator delete[](void* memory, usize) noexcept
+{
+    KernelHeap::Free(memory);
+}
