@@ -10,7 +10,7 @@
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptGuard.hpp>
 
-#include <Debug/Config.hpp>
+#include <Debug/Debug.hpp>
 #include <Drivers/DeviceManager.hpp>
 #include <Drivers/TTY.hpp>
 #include <Drivers/Terminal.hpp>

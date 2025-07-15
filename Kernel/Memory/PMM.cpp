@@ -6,7 +6,7 @@
  */
 #include <Common.hpp>
 
-#include <Debug/Config.hpp>
+#include <Debug/Debug.hpp>
 #include <Library/Locking/Spinlock.hpp>
 
 #include <Memory/PMM.hpp>

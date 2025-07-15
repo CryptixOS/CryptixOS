@@ -7,6 +7,7 @@
 #include <Common.hpp>
 
 #include <Boot/BootModuleInfo.hpp>
+#include <Debug/Debug.hpp>
 #include <Library/Stacktrace.hpp>
 
 #include <Memory/MemoryManager.hpp>
@@ -108,6 +109,7 @@ namespace Stacktrace
         PMM::FreePages(fileStart.FromHigherHalf(), filePageCount);
         LogInfo("Stacktrace: kernel symbols loaded");
 
+        #if CTOS_DUMP_INIT_ARRAY != 0
         LogTrace("System: Dumping init array =>");
         for (ConstructorFunction* entry = __init_array_start;
              entry < __init_array_end; entry++)
@@ -118,6 +120,7 @@ namespace Stacktrace
             
             LogTrace("\t{:#016p} => {}", Pointer(constructor).Raw(), sym->Name);
         }
+        #endif
 
         return true;
     }

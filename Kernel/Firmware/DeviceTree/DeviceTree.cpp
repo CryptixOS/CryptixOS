@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Debug/Config.hpp>
+#include <Debug/Debug.hpp>
 
 #include <Firmware/DeviceTree/DeviceTree.hpp>
 #include <Library/Logger.hpp>

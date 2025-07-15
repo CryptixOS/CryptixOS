@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Boot/BootInfo.hpp>
-#include <Debug/Config.hpp>
+#include <Debug/Debug.hpp>
 
 #include <Firmware/EFI/Memory.hpp>
 #include <Firmware/EFI/SystemTable.hpp>
