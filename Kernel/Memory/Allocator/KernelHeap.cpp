@@ -8,30 +8,46 @@
 #include <Memory/PMM.hpp>
 
 #include <Memory/Allocator/KernelHeap.hpp>
-#include <Memory/Allocator/SlabAllocator.hpp>
+#include <Memory/Allocator/SlabPool.hpp>
 
 namespace KernelHeap
 {
+    struct PageAllocPolicy
+    {
+        static Pointer CallocatePages(usize pageCount = 1)
+        {
+            return Pointer(PMM::CallocatePages(pageCount)).ToHigherHalf();
+        }
+        static void FreePages(Pointer memory, usize pageCount = 1)
+        {
+            PMM::FreePages(memory.FromHigherHalf(), pageCount);
+        }
+    };
+    class SpinLockPolicy
+    {
+      public:
+        void                     Init() {}
+        [[nodiscard]] ScopedLock Lock() { return ScopedLock(m_Lock); }
+
+      private:
+        Spinlock m_Lock;
+    };
+
     namespace
     {
-        constexpr usize MAX_BUCKET_SIZE = 1024;
-        constexpr usize BUCKET_COUNT    = Math::Log2CEval(MAX_BUCKET_SIZE) - 2;
+        constexpr usize BUCKET_COUNT         = 8;
 
-        bool            s_Initialized   = false;
-        Pointer         s_EarlyHeapBase = nullptr;
-        usize           s_EarlyHeapSize = 0;
+        bool            s_Initialized        = false;
+        Pointer         s_EarlyHeapBase      = nullptr;
+        usize           s_EarlyHeapSize      = 0;
         usize           s_EarlyHeapAllocated = 0;
         Pointer         s_EarlyHeapCurrent   = nullptr;
 
-        alignas(Array<SlabAllocator, BUCKET_COUNT>) static u8
-            s_BucketStorage[sizeof(Array<SlabAllocator, BUCKET_COUNT>)];
-        static Array<SlabAllocator, BUCKET_COUNT>* s_Buckets = nullptr;
-
-        struct BigAllocMeta
-        {
-            usize PageCount;
-            usize Size;
-        };
+        alignas(SlabPool<8, PageAllocPolicy, SpinLockPolicy>) static u8
+            s_SlabPoolStorage[sizeof(
+                SlabPool<8, PageAllocPolicy, SpinLockPolicy>)];
+        static SlabPool<8, PageAllocPolicy, SpinLockPolicy>* s_SlabPool
+            = nullptr;
 
         Pointer EarlyHeapAllocate(usize size)
         {
@@ -44,52 +60,6 @@ namespace KernelHeap
 
             return memory;
         }
-
-        Pointer LargeAllocate(usize size)
-        {
-            usize   pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
-            Pointer memory    = PMM::CallocatePages(pageCount + 1);
-            if (!memory) return nullptr;
-
-            auto meta   = memory.ToHigherHalf<BigAllocMeta*>();
-            meta->PageCount = pageCount;
-            meta->Size  = size;
-
-            return memory.ToHigherHalf().Offset(PMM::PAGE_SIZE);
-        }
-        void LargeFree(Pointer memory)
-        {
-            if (!(memory.Raw() & 0xfff))
-                return;
-        
-            auto meta = memory.Offset<Pointer>(-PMM::PAGE_SIZE).As<BigAllocMeta>();
-            PMM::FreePages(Pointer(meta).FromHigherHalf(), meta->PageCount + 1);
-        }
-
-        Pointer InternalAllocate(usize size)
-        {
-            if (!s_Initialized) return EarlyHeapAllocate(size);
-            if (size > MAX_BUCKET_SIZE)
-            {
-                auto memory = LargeAllocate(size);
-                if (memory) return memory;
-            }
-
-            for (usize i = 0; i < BUCKET_COUNT; i++)
-                if (size <= (8zu << i)) return (*s_Buckets)[i].Allocate();
-
-            return nullptr;
-        }
-
-        void InternalFree(Pointer memory)
-        {
-            if ((memory.Raw() & 0xfff) == 0)
-            {
-                return LargeFree(memory);
-            }
-            auto allocator = Pointer(memory.Raw() & ~0xfff).As<SlabHeader>();
-            allocator->Slab->Free(memory);
-        }
     } // namespace
 
     void EarlyInitialize(Pointer base, usize length)
@@ -101,19 +71,22 @@ namespace KernelHeap
     void Initialize()
     {
         EarlyLogTrace("KernelHeap: Initializing...");
-
-        s_Buckets = new (&s_BucketStorage) Array<SlabAllocator, BUCKET_COUNT>();
-        for (usize index = 0; index < BUCKET_COUNT; index++)
-            Assert((*s_Buckets)[index].Initialize(8 << index));
+        s_SlabPool = new (&s_SlabPoolStorage)
+            SlabPool<8, PageAllocPolicy, SpinLockPolicy>();
+        s_SlabPool->Initialize();
 
         s_Initialized = true;
         LogInfo("KernelHeap: Initialized `{}` slab buckets", BUCKET_COUNT);
     }
 
-    Pointer Allocate(usize bytes) { return InternalAllocate(bytes); }
+    Pointer Allocate(usize bytes)
+    {
+        if (!s_Initialized) return EarlyHeapAllocate(bytes);
+        return s_SlabPool->Allocate(bytes);
+    }
     Pointer Callocate(usize bytes)
     {
-        auto memory = InternalAllocate(bytes);
+        auto memory = Allocate(bytes);
         if (!memory) return nullptr;
 
         Memory::Fill(memory, 0, bytes);
@@ -151,7 +124,7 @@ namespace KernelHeap
             return newMemory;
         }
 
-        AllocatorBase* slab
+        SlabAllocatorBase* slab
             = Pointer(memory.Raw() & ~0xfff).As<SlabHeader>()->Slab;
         usize oldSize = slab->AllocationSize();
 
@@ -172,7 +145,7 @@ namespace KernelHeap
     void Free(Pointer memory)
     {
         if (!memory) return;
-        InternalFree(memory);
+        return s_SlabPool->Free(memory);
     }
 } // namespace KernelHeap
 

@@ -13,56 +13,41 @@
 #include <Prism/Core/Types.hpp>
 #include <Prism/Utility/Math.hpp>
 
-class AllocatorBase
-{
-  public:
-    AllocatorBase()          = default;
-    virtual ~AllocatorBase() = default;
-
-    virtual ErrorOr<void> Initialize(usize chunkSize, Pointer base = nullptr, usize length = 0)
-        = 0;
-    virtual void    Shutdown()             = 0;
-
-    virtual Pointer Allocate()             = 0;
-    virtual void    Free(Pointer memory)   = 0;
-
-    virtual usize   AllocationSize()       = 0;
-
-    virtual usize   TotalAllocated() const = 0;
-    virtual usize   TotalFreed() const     = 0;
-    virtual usize   Used() const           = 0;
-};
-
 struct SlabFrame
 {
     SlabFrame* Next = nullptr;
 };
+
+class SlabAllocatorBase
+{
+  public:
+    virtual usize AllocationSize()     = 0;
+    virtual void  Free(Pointer memory) = 0;
+};
 struct SlabHeader
 {
-    AllocatorBase* Slab = nullptr;
+    SlabAllocatorBase* Slab = nullptr;
 };
 
-class SlabAllocator : public AllocatorBase
+template <typename PageAllocPolicy, typename LockPolicy>
+class SlabAllocator : public SlabAllocatorBase
 {
   public:
     SlabAllocator() {}
 
-    virtual ErrorOr<void> Initialize(usize chunkSize, Pointer base   = nullptr,
-                                     usize   length = 0) override
+    virtual ErrorOr<void> Initialize(usize chunkSize)
     {
-        if (base) Assert(length > 0);
-
         Assert(Math::IsPowerOfTwo(chunkSize));
         m_ChunkSize = chunkSize;
 
-        m_FirstFree = base ?: Pointer(PMM::CallocatePages(1)).ToHigherHalf();
+        m_FirstFree = PageAllocPolicy::CallocatePages(1);
         if (!m_FirstFree) return Error(ENOMEM);
 
         auto available
             = PMM::PAGE_SIZE - Math::AlignUp(sizeof(SlabHeader), m_ChunkSize);
-        auto       slabHeader = m_FirstFree.As<SlabHeader>();
+        auto slabHeader  = m_FirstFree.As<SlabHeader>();
 
-        ScopedLock guard(m_Lock);
+        auto guard       = m_Lock.Lock();
         slabHeader->Slab = this;
         m_FirstFree += Math::AlignUp(sizeof(SlabHeader), m_ChunkSize);
 
@@ -77,15 +62,15 @@ class SlabAllocator : public AllocatorBase
         m_FirstFree = prev;
         return {};
     }
-    virtual void    Shutdown() override { ToDoWarn(); }
+    virtual void    Shutdown() { ToDoWarn(); }
 
-    virtual Pointer Allocate() override
+    virtual Pointer Allocate()
     {
         if (!m_FirstFree && !Initialize(m_ChunkSize)) return nullptr;
 
-        ScopedLock guard(m_Lock);
-        auto       frame = m_FirstFree.As<SlabFrame>();
-        m_FirstFree      = frame->Next;
+        auto guard  = m_Lock.Lock();
+        auto frame  = m_FirstFree.As<SlabFrame>();
+        m_FirstFree = frame->Next;
 
         m_TotalAllocated += m_ChunkSize;
         return frame;
@@ -94,10 +79,10 @@ class SlabAllocator : public AllocatorBase
     {
         if (!memory) return;
 
-        ScopedLock guard(m_Lock);
-        auto       frame = memory.As<SlabFrame>();
-        frame->Next      = m_FirstFree;
-        m_FirstFree      = frame;
+        auto guard  = m_Lock.Lock();
+        auto frame  = memory.As<SlabFrame>();
+        frame->Next = m_FirstFree;
+        m_FirstFree = frame;
 
         m_TotalFreed += m_ChunkSize;
         return;
@@ -109,18 +94,15 @@ class SlabAllocator : public AllocatorBase
 
     virtual usize AllocationSize() override { return m_ChunkSize; }
 
-    virtual usize TotalAllocated() const override { return m_TotalAllocated; }
-    virtual usize TotalFreed() const override { return m_TotalFreed; }
-    virtual usize Used() const override
-    {
-        return TotalAllocated() - TotalFreed();
-    }
+    virtual usize TotalAllocated() const { return m_TotalAllocated; }
+    virtual usize TotalFreed() const { return m_TotalFreed; }
+    virtual usize Used() const { return TotalAllocated() - TotalFreed(); }
 
   private:
-    Spinlock m_Lock;
-    Pointer  m_FirstFree;
-    usize    m_ChunkSize;
+    LockPolicy m_Lock;
+    Pointer    m_FirstFree;
+    usize      m_ChunkSize;
 
-    usize    m_TotalAllocated;
-    usize    m_TotalFreed;
+    usize      m_TotalAllocated;
+    usize      m_TotalFreed;
 };
