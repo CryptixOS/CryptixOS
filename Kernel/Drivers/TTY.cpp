@@ -323,7 +323,7 @@ void TTY::Initialize()
     {
         LogTrace("TTY: Creating device /dev/tty{}...", minor);
 
-        auto tty = new TTY(Prism::Format1("tty{}", minor), terminal, minor);
+        auto tty = new TTY(Prism::FormatString("tty{}", minor), terminal, minor);
         s_TTYs.PushBack(tty);
 
         auto result = DeviceManager::RegisterCharDevice(tty);
