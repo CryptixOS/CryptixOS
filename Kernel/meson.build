@@ -7,128 +7,7 @@
 srcs += files(
   'KernelStart.cpp',
 
-  'API/MM.cpp',
-  'API/Process.cpp',
-  'API/Syscall.cpp',
-  'API/SyscallEntryPoints.cpp',
-  'API/System.cpp',
-  'API/Time.cpp',
-  'API/VFS.cpp',
-
-  'Arch/PowerManager.cpp',
-
-  'Boot/BootInfo.cpp',
-  'Boot/CommandLine.cpp',
-  'Debug/Panic.cpp',
-
-  'Drivers/CharacterDevice.cpp',
-  'Drivers/Device.cpp',
-  'Drivers/DeviceManager.cpp',
-  'Drivers/FramebufferDevice.cpp',
-  'Drivers/GenericDriver.cpp',
-  'Drivers/Terminal.cpp',
-  'Drivers/TTY.cpp',
-  'Drivers/VideoTerminal.cpp',
-
-  'Drivers/HID/Ps2KeyboardDevice.cpp',
-
-  'Drivers/PCI/Access.cpp',
-  'Drivers/PCI/Bus.cpp',
-  'Drivers/PCI/Device.cpp',
-  'Drivers/PCI/PCI.cpp',
-  'Drivers/PCI/HostController.cpp',
-
-  'Drivers/Storage/PartitionTable.cpp',
-  'Drivers/Storage/StorageDevice.cpp',
-  'Drivers/Storage/StorageDevicePartition.cpp',
-
-  'Drivers/Storage/NVMe/NVMeController.cpp',
-  'Drivers/Storage/NVMe/NVMeNameSpace.cpp',
-  'Drivers/Storage/NVMe/NVMeQueue.cpp',
-
-  'Drivers/USB/UHCI/UHCiController.cpp',
-  'Drivers/USB/USB.cpp',
-  
-  'Firmware/ACPI/ACPI.cpp',
-  'Firmware/ACPI/Interpreter/Interpreter.cpp',
-  'Firmware/ACPI/Interpreter/NameSpace.cpp',
-  'Firmware/ACPI/MADT.cpp',
-  'Firmware/ACPI/UACPI.cpp',
-
-  'Firmware/DeviceTree/DeviceTree.cpp',
-  'Firmware/DeviceTree/Node.cpp',
-
-  'Firmware/EFI/Initialize.cpp',
-
-  'Firmware/DMI/SMBIOS.cpp',
-
-  'Memory/AddressSpace.cpp',
-  'Memory/MemoryManager.cpp',
-  'Memory/PageMap.cpp',
-  'Memory/PMM.cpp',
-  'Memory/Region.cpp',
-  'Memory/VMM.cpp',
-
-  'Memory/Allocator/BitmapAllocator.cpp',
-  'Memory/Allocator/KernelHeap.cpp',
-  #'Memory/Allocators/BuddyAllocator.cpp',
-
   'Network/NetworkAdapter.cpp',
-
-  'Scheduler/Event.cpp',
-  'Scheduler/Process.cpp',
-  'Scheduler/Scheduler.cpp',
-  'Scheduler/Thread.cpp',
-    
-  'System/System.cpp',
-
-  'Time/Time.cpp',
-
-  'Library/ELF.cpp',
-  'Library/ExecutableProgram.cpp',
-  'Library/ICxxAbi.cpp',
-  'Library/Image.cpp',
-  'Library/Kasan.cpp',
-  'Library/Logger.cpp',
-  'Library/Stacktrace.cpp',
-  'Library/ZLib.cpp',
-
-  'Library/Locking/ConditionalVariable.cpp',
-  'Library/Locking/RecursiveMutex.cpp',
-  'Library/Locking/Semaphore.cpp',
-  'Library/Locking/Spinlock.cpp',
-
-  'VFS/DirectoryEntry.cpp',
-  'VFS/Fifo.cpp',
-  'VFS/FileDescriptor.cpp',
-  'VFS/FileDescriptorTable.cpp',
-  'VFS/INode.cpp',
-  'VFS/MountPoint.cpp',
-  'VFS/PathResolver.cpp',
-  #'VFS/SynthFsINode.cpp',
-  'VFS/VFS.cpp',
-
-  'VFS/DevTmpFs/DevTmpFs.cpp',
-  'VFS/DevTmpFs/DevTmpFsINode.cpp',
-
-  'VFS/EchFs/EchFs.cpp',
-  'VFS/EchFs/EchFsINode.cpp',
-
-  'VFS/Ext2Fs/Ext2Fs.cpp',
-  'VFS/Ext2Fs/Ext2FsAllocator.cpp',
-  'VFS/Ext2Fs/Ext2FsINode.cpp',
-
-  'VFS/Fat32Fs/Fat32Fs.cpp',
-  'VFS/Fat32Fs/Fat32FsINode.cpp',
-
-  'VFS/Initrd/Initrd.cpp',
-  'VFS/Initrd/Ustar.cpp',
-
-  'VFS/ProcFs/ProcFs.cpp',
-  'VFS/ProcFs/ProcFsINode.cpp',
-
-  'VFS/TmpFs/TmpFs.cpp',
-  'VFS/TmpFs/TmpFsINode.cpp',
 )
 
 c_args = []
@@ -147,13 +26,25 @@ args = []
 objs = []
 if arch == 'x86_64'
   cxx_args += ['-DCTOS_ARCH=CTOS_ARCH_X86_64', '-DCTOS_TARGET_X86_64']
-  subdir('Arch/x86_64')
 elif arch == 'aarch64'
-  subdir('Arch/aarch64')
   cxx_args += ['-DCTOS_ARCH=CTOS_ARCH_AARCH64', '-DCTOS_TARGET_AARCH64']
 else
   error('Unknown architecture: ' + arch)
 endif
+
+
+subdir('API')
+subdir('Arch')
+subdir('Boot')
+subdir('Debug')
+subdir('Drivers')
+subdir('Firmware')
+subdir('Library')
+subdir('Memory')
+subdir('Scheduler')
+subdir('System')
+subdir('Time')
+subdir('VFS')
 
 git_tag = run_command('git', 'rev-parse', 'HEAD').stdout().strip()
 
@@ -175,9 +66,6 @@ configure_file(
   input: 'Version.hpp.in', 
   output: 'Version.hpp',
   configuration: versionConf)
-
-subdir('Library/KLibC')
-subdir('Library/KLibC++')
 
 kernel_elf = executable(
   'Cryptix.elf',

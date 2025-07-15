@@ -10,8 +10,17 @@
 #define ALWAYS_INLINE            [[always_inline]]
 #define UNUSED                   [[maybe_unused]]
 #define FORCE_EMIT               [[gnu::used]]
+#define FALLTHROUGH              [[fallthrough]]
+#define NORETURN                 [[noreturn]]
+#define NODISCARD                [[nodiscard]]
+#define WEAK                     [[weak]]
 #define LIKELY                   [[likely]]
 #define UNLIKELY                 [[unlikely]]
+
+#define CDECL                    __attribute__(("cdecl"))
+#define FASTCALL                 __attribute__(("fastcall"))
+#define SYSVABI                  __attribute__(("sysv_abi"))
+#define NAKED                    __attribute__(("naked"))
 
 //--------------------------------------------------------------------------
 // Sections

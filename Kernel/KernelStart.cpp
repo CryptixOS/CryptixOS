@@ -188,8 +188,9 @@ kernelStart(const BootInformation& info)
     // Heap and Serial logging be available ASAP, as every other subsystem
     // depends on this
 
-    MemoryManager::Initialize(info.MemoryMap, info.KernelPhysicalBase,
-                              info.KernelVirtualBase, info.HigherHalfOffset);
+    auto& memoryInfo = info.MemoryInformation;
+    MemoryManager::Initialize(memoryInfo.MemoryMap, memoryInfo.KernelPhysicalBase,
+                              memoryInfo.KernelVirtualBase, memoryInfo.HigherHalfOffset);
     Serial::Initialize();
     // DONT MOVE END
     // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -212,8 +213,8 @@ kernelStart(const BootInformation& info)
         info.BootloaderName, info.BootloaderVersion,
         ToString(info.FirmwareType), info.DateAtBoot);
 
-    LogInfo("Boot: Kernel Physical Address: {:#x}", info.KernelPhysicalBase);
-    LogInfo("Boot: Kernel Virtual Address: {:#x}", info.KernelVirtualBase);
+    LogInfo("Boot: Kernel Physical Address: {:#x}", memoryInfo.KernelPhysicalBase);
+    LogInfo("Boot: Kernel Virtual Address: {:#x}", memoryInfo.KernelVirtualBase);
 
     Assert(System::LoadKernelSymbols(info.KernelExecutable));
     System::PrepareBootModules(info.KernelModules);
@@ -228,7 +229,7 @@ kernelStart(const BootInformation& info)
     Arch::Initialize();
 
     System::InitializeNumaDomains();
-    if (!EFI::Initialize(info.EfiSystemTable, info.EfiMemoryMap))
+    if (!EFI::Initialize(info.EfiSystemTable, memoryInfo.EfiMemoryMap))
         LogError("EFI: Failed to initialize efi runtime services...");
     DMI::SMBIOS::Initialize(info.SmBios32Phys, info.SmBios64Phys);
 

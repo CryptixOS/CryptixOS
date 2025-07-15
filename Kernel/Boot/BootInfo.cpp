@@ -137,6 +137,10 @@ namespace KernelHeap
 {
     void EarlyInitialize(Pointer base, usize length);
 };
+namespace PhysicalMemoryManager
+{
+    void EarlyInitialize(const MemoryMap&);
+};
 namespace
 {
 
@@ -149,12 +153,76 @@ namespace
         used,
         section(".limine_requests_end"))) volatile LIMINE_REQUESTS_END_MARKER;
 
-    FirmwareType    s_FirmwareType    = FirmwareType::eUndefined;
-    MemoryMap       s_MemoryMap       = {};
-    BootModuleInfo* s_BootModules     = nullptr;
-    usize           s_BootModuleCount = 0;
+    Pointer AllocateBootMemory(usize bytes)
+    {
+        auto response = s_MemmapRequest.response;
+        Assert(response);
+        usize entryCount = response->entry_count;
+        auto  entries    = response->entries;
 
-    void            InitializeModule(BootModuleInfo& module, limine_file* file)
+        for (usize i = 0; i < entryCount; i++)
+        {
+            bytes       = Math::AlignUp(bytes, PMM::PAGE_SIZE);
+            auto* entry = entries[i];
+            if (entry->type != LIMINE_MEMMAP_USABLE || entry->length < bytes)
+                continue;
+
+            Pointer address = entry->base;
+            entry->base += bytes;
+            entry->length -= bytes;
+
+            return address.ToHigherHalf();
+        }
+
+        return nullptr;
+    };
+    enum FirmwareType FirmwareType()
+    {
+        switch (s_FirmwareTypeRequest.response->firmware_type)
+        {
+            case LIMINE_FIRMWARE_TYPE_X86BIOS:
+                return FirmwareType::eX86Bios;
+                break;
+            case LIMINE_FIRMWARE_TYPE_UEFI32:
+                return FirmwareType::eUefi32;
+                break;
+            case LIMINE_FIRMWARE_TYPE_UEFI64:
+                return FirmwareType::eUefi64;
+                break;
+            case LIMINE_FIRMWARE_TYPE_SBI: return FirmwareType::eSbi; break;
+
+            default: break;
+        }
+
+        return FirmwareType::eUndefined;
+    }
+    enum BootPagingMode PagingMode()
+    {
+        auto response = s_PagingModeRequest.response;
+        if (!response) return BootPagingMode::eNone;
+
+        switch (response->mode)
+        {
+#ifdef CTOS_TARGET_X86_64
+            case LIMINE_PAGING_MODE_X86_64_4LVL:
+#elifdef CTOS_TARGET_AARCH64
+            case LIMINE_PAGING_MODE_AARCH64_4LVL:
+#endif
+                return BootPagingMode::eLevel4;
+#ifdef CTOS_TARGET_X86_64
+            case LIMINE_PAGING_MODE_X86_64_5LVL:
+#elifdef CTOS_TARGET_AARCH64
+            case LIMINE_PAGING_MODE_AARCH64_5LVL:
+#endif
+                return BootPagingMode::eLevel5;
+
+            default: break;
+        }
+
+        return BootPagingMode::eNone;
+    }
+
+    void InitializeModule(BootModuleInfo& module, limine_file* file)
     {
         static auto extractUUID = [](const limine_uuid& uuid) -> UUID
         {
@@ -185,33 +253,35 @@ namespace
         module.GPT_PartitionUUID = extractUUID(file->gpt_part_uuid);
         module.FilesystemUUID    = extractUUID(file->part_uuid);
     }
-    void InitializeBootInfo()
+    void InitializeBootModules(Span<BootModuleInfo, DynamicExtent>& modulesInfo)
     {
-        if (!s_MemmapRequest.response
-            || s_MemmapRequest.response->entry_count == 0)
-            Panic("Boot: Failed to acquire limine memory map entries");
+        auto bootModuleResponse = s_ModuleRequest.response;
+        if (!bootModuleResponse) return;
 
-        auto** memoryMap        = s_MemmapRequest.response->entries;
-        usize  memoryEntryCount = s_MemmapRequest.response->entry_count;
-        auto   allocateMemory   = [&](usize bytes) -> Pointer
+        usize moduleCount = bootModuleResponse->module_count;
+        auto  modules     = bootModuleResponse->modules;
+
+        usize bytes       = moduleCount * sizeof(BootModuleInfo);
+        auto  bootModules = AllocateBootMemory(bytes).As<BootModuleInfo>();
+
+        modulesInfo       = Span<BootModuleInfo>(bootModules, moduleCount);
+        for (usize i = 0; i < moduleCount; i++)
         {
-            for (usize i = 0; i < memoryEntryCount; i++)
-            {
-                bytes       = Math::AlignUp(bytes, PMM::PAGE_SIZE);
-                auto* entry = memoryMap[i];
-                if (entry->type != LIMINE_MEMMAP_USABLE
-                    || entry->length < bytes)
-                    continue;
+            auto& module = modulesInfo[i];
+            auto  file   = modules[i];
+            InitializeModule(module, file);
+        }
+    }
+    void SetupMemoryInfo(BootMemoryInfo& info)
+    {
+        auto response = s_MemmapRequest.response;
+        Assert(response);
+        auto kernelAddressResponse = s_KernelAddressRequest.response;
+        Assert(kernelAddressResponse);
 
-                Pointer address = entry->base;
-                entry->base += bytes;
-                entry->length -= bytes;
+        auto entries              = response->entries;
+        auto entryCount           = response->entry_count;
 
-                return address.ToHigherHalf();
-            }
-
-            return nullptr;
-        };
         auto fromLimineMemoryType = [](u8 type) -> MemoryType
         {
             switch (type)
@@ -234,37 +304,93 @@ namespace
             return MemoryType::eReserved;
         };
 
-        s_MemoryMap.Entries = allocateMemory(
-            sizeof(MemoryRegion) * s_MemmapRequest.response->entry_count);
-        s_MemoryMap.EntryCount = s_MemmapRequest.response->entry_count;
+        auto hhdmResponse = s_HhdmRequest.response;
+        Assert(hhdmResponse);
 
-        if (s_ModuleRequest.response)
-        {
-            s_BootModuleCount = s_ModuleRequest.response->module_count;
-            s_BootModules
-                = allocateMemory(sizeof(BootModuleInfo) * s_BootModuleCount);
+        info.KernelPhysicalBase = kernelAddressResponse->physical_base;
+        info.KernelVirtualBase  = kernelAddressResponse->virtual_base;
+        info.HigherHalfOffset   = hhdmResponse->offset;
+        info.PagingMode         = PagingMode();
 
-            for (usize i = 0; i < s_BootModuleCount; i++)
-            {
-                auto& module = s_BootModules[i];
-                auto  file   = s_ModuleRequest.response->modules[i];
-                InitializeModule(module, file);
-            }
-        }
+        info.MemoryMap.Entries
+            = AllocateBootMemory(sizeof(MemoryRegion) * entryCount);
+        info.MemoryMap.EntryCount = entryCount;
 
-        auto earlyHeapSize = 64_mib;
-        auto earlyHeap     = allocateMemory(earlyHeapSize);
+        auto earlyHeapSize        = 64_mib;
+        auto earlyHeap            = AllocateBootMemory(earlyHeapSize);
         KernelHeap::EarlyInitialize(earlyHeap, earlyHeapSize);
 
-        for (usize i = 0; i < memoryEntryCount; i++)
+        for (usize i = 0; i < entryCount; i++)
         {
-            auto*      current     = memoryMap[i];
-            u64        base        = current->base;
-            u64        length      = current->length;
-            MemoryType type        = fromLimineMemoryType(current->type);
+            auto*      current        = entries[i];
+            u64        base           = current->base;
+            u64        length         = current->length;
+            MemoryType type           = fromLimineMemoryType(current->type);
 
-            s_MemoryMap.Entries[i] = MemoryRegion(base, length, type);
+            info.MemoryMap.Entries[i] = MemoryRegion(base, length, type);
         }
+        PMM::EarlyInitialize(info.MemoryMap);
+
+        auto efiMemmapResponse = s_EfiMemmapRequest.response;
+        if (efiMemmapResponse)
+        {
+            info.EfiMemoryMap.Address        = efiMemmapResponse->memmap;
+            info.EfiMemoryMap.Size           = efiMemmapResponse->memmap_size;
+            info.EfiMemoryMap.DescriptorSize = efiMemmapResponse->desc_size;
+            info.EfiMemoryMap.DescriptorVersion
+                = efiMemmapResponse->desc_version;
+        }
+    }
+
+    void SetupBootInfo(BootInformation& info)
+    {
+        auto bootInfoResponse          = s_BootloaderInfoRequest.response;
+        auto executableCmdlineResponse = s_ExecutableCmdlineRequest.response;
+        auto dateAtBootResponse        = s_DateAtBootRequest.response;
+
+        if (bootInfoResponse)
+        {
+            info.BootloaderName    = bootInfoResponse->name;
+            info.BootloaderVersion = bootInfoResponse->version;
+        }
+        if (executableCmdlineResponse)
+            info.KernelCommandLine = executableCmdlineResponse->cmdline;
+
+        info.FirmwareType = FirmwareType();
+        if (dateAtBootResponse) info.DateAtBoot = dateAtBootResponse->timestamp;
+
+        auto executableResponse = s_ExecutableRequest.response;
+        if (executableResponse)
+            InitializeModule(info.KernelExecutable,
+                             executableResponse->executable_file);
+        InitializeBootModules(info.KernelModules);
+        SetupMemoryInfo(info.MemoryInformation);
+
+        auto smpResponse = s_SmpRequest.response;
+        if (smpResponse)
+        {
+#ifdef CTOS_TARGET_X86_64
+            info.BspID = smpResponse->bsp_lapic_id;
+#elifdef CTOS_TARGET_AARCH64
+            info.BspID = smpResponse->bsp_mpidr;
+#endif
+            info.ProcessorCount = smpResponse->cpu_count;
+        }
+
+        info.RSDP = Pointer(s_RsdpRequest.response->address).FromHigherHalf();
+
+        info.DeviceTreeBlob = s_DtbRequest.response
+                                ? Pointer(s_DtbRequest.response->dtb_ptr)
+                                      .FromHigherHalf<Pointer>()
+                                : nullptr;
+        info.SmBios32Phys
+            = Pointer(s_SmbiosRequest.response->entry_32).FromHigherHalf();
+        info.SmBios64Phys
+            = Pointer(s_SmbiosRequest.response->entry_64).FromHigherHalf();
+
+        info.EfiSystemTable = s_EfiSystemTableRequest.response
+                                ? s_EfiSystemTableRequest.response->address
+                                : 0;
     }
 } // namespace
 
@@ -275,10 +401,6 @@ extern "C" CTOS_NO_KASAN [[noreturn]] void kernelStart(const BootInformation&);
 #define VerifyExistenceOrRetValue(requestName, value)                          \
     if (!requestName.response) return value;
 
-namespace PhysicalMemoryManager
-{
-    void EarlyInitialize(const MemoryMap&);
-};
 namespace BootInfo
 {
     extern "C" __attribute__((no_sanitize("address"))) void Initialize()
@@ -299,96 +421,18 @@ namespace BootInfo
 
         if (!LIMINE_BASE_REVISION_SUPPORTED)
             EarlyPanic("Boot: Limine base revision is not supported");
+
+        if (!s_MemmapRequest.response
+            || s_MemmapRequest.response->entry_count == 0)
+            Panic("Boot: Failed to acquire limine memory map entries");
         if (!s_FramebufferRequest.response
             || s_FramebufferRequest.response->framebuffer_count < 1)
             EarlyPanic("Boot: Failed to acquire the framebuffer!");
         Logger::EnableSink(LOG_SINK_TERMINAL);
 
         BootInformation info;
-        InitializeBootInfo();
-        using namespace PhysicalMemoryManager;
-        EarlyInitialize(s_MemoryMap);
+        SetupBootInfo(info);
 
-        switch (s_FirmwareTypeRequest.response->firmware_type)
-        {
-            case LIMINE_FIRMWARE_TYPE_X86BIOS:
-                s_FirmwareType = FirmwareType::eX86Bios;
-                break;
-            case LIMINE_FIRMWARE_TYPE_UEFI32:
-                s_FirmwareType = FirmwareType::eUefi32;
-                break;
-            case LIMINE_FIRMWARE_TYPE_UEFI64:
-                s_FirmwareType = FirmwareType::eUefi64;
-                break;
-            case LIMINE_FIRMWARE_TYPE_SBI:
-                s_FirmwareType = FirmwareType::eSbi;
-                break;
-        }
-
-        info.BootloaderName    = s_BootloaderInfoRequest.response->name;
-        info.BootloaderVersion = s_BootloaderInfoRequest.response->version;
-        info.KernelCommandLine = s_ExecutableCmdlineRequest.response->cmdline;
-        switch (s_FirmwareTypeRequest.response->firmware_type)
-        {
-            case LIMINE_FIRMWARE_TYPE_X86BIOS:
-                info.FirmwareType = FirmwareType::eX86Bios;
-                break;
-            case LIMINE_FIRMWARE_TYPE_UEFI32:
-                info.FirmwareType = FirmwareType::eUefi32;
-                break;
-            case LIMINE_FIRMWARE_TYPE_UEFI64:
-                info.FirmwareType = FirmwareType::eUefi64;
-                break;
-            case LIMINE_FIRMWARE_TYPE_SBI:
-                info.FirmwareType = FirmwareType::eSbi;
-                break;
-
-            default: info.FirmwareType = FirmwareType::eUndefined; break;
-        }
-        info.DateAtBoot        = s_DateAtBootRequest.response->timestamp;
-
-        auto  kernelFile       = s_ExecutableRequest.response->executable_file;
-        auto& kernelModuleInfo = info.KernelExecutable;
-        InitializeModule(kernelModuleInfo, kernelFile);
-
-        info.KernelModules = {s_BootModules, s_BootModuleCount};
-        info.KernelPhysicalBase
-            = s_KernelAddressRequest.response->physical_base;
-        info.KernelVirtualBase = s_KernelAddressRequest.response->virtual_base;
-
-        info.MemoryMap         = s_MemoryMap;
-        info.HigherHalfOffset  = s_HhdmRequest.response->offset;
-
-#ifdef CTOS_TARGET_X86_64
-        info.BspID = s_SmpRequest.response->bsp_lapic_id;
-#elifdef CTOS_TARGET_AARCH64
-        info.BspID = s_SmpRequest.response->bsp_mpidr;
-#endif
-        info.ProcessorCount = s_SmpRequest.response->cpu_count;
-
-        info.RSDP = Pointer(s_RsdpRequest.response->address).FromHigherHalf();
-
-        info.DeviceTreeBlob = s_DtbRequest.response
-                                ? Pointer(s_DtbRequest.response->dtb_ptr)
-                                      .FromHigherHalf<Pointer>()
-                                : nullptr;
-        info.SmBios32Phys
-            = Pointer(s_SmbiosRequest.response->entry_32).FromHigherHalf();
-        info.SmBios64Phys
-            = Pointer(s_SmbiosRequest.response->entry_64).FromHigherHalf();
-
-        info.EfiSystemTable = s_EfiSystemTableRequest.response
-                                ? s_EfiSystemTableRequest.response->address
-                                : 0;
-        if (s_EfiMemmapRequest.response)
-        {
-            info.EfiMemoryMap.Address = s_EfiMemmapRequest.response->memmap;
-            info.EfiMemoryMap.Size = s_EfiMemmapRequest.response->memmap_size;
-            info.EfiMemoryMap.DescriptorSize
-                = s_EfiMemmapRequest.response->desc_size;
-            info.EfiMemoryMap.DescriptorVersion
-                = s_EfiMemmapRequest.response->desc_version;
-        }
         kernelStart(info);
     }
     u64 GetHHDMOffset()

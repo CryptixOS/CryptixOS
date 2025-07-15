@@ -33,3 +33,7 @@
 #ifndef CTOS_DEBUG_ECHFS
     #define CTOS_DEBUG_ECHFS 0
 #endif
+
+#ifndef CTOS_DUMP_INIT_ARRAY
+    #define CTOS_DUMP_INIT_ARRAY 0
+#endif

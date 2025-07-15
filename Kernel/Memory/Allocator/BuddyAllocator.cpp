@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Memory/Allocator/BuddyAllocator.hpp>
+#include <Prism/Utility/Math.hpp>
 
 ErrorOr<void> BuddyAllocator::Initialize(MemoryMap& memoryMap, usize pageSize)
 {

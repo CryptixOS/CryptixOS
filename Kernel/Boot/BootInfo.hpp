@@ -33,6 +33,21 @@ struct EfiMemoryMap
     u32     DescriptorVersion = 0;
 };
 
+enum class BootPagingMode
+{
+    eNone   = 0,
+    eLevel4 = 4,
+    eLevel5 = 5,
+};
+struct BootMemoryInfo
+{
+    Pointer             KernelPhysicalBase = nullptr;
+    Pointer             KernelVirtualBase  = nullptr;
+    usize               HigherHalfOffset   = 0;
+    BootPagingMode      PagingMode         = BootPagingMode::eNone;
+    MemoryMap           MemoryMap          = {nullptr, 0};
+    struct EfiMemoryMap EfiMemoryMap;
+};
 struct BootInformation
 {
     StringView                          BootloaderName    = ""_sv;
@@ -43,15 +58,10 @@ struct BootInformation
 
     BootModuleInfo                      KernelExecutable{};
     Span<BootModuleInfo, DynamicExtent> KernelModules;
-    Pointer                             KernelPhysicalBase = nullptr;
-    Pointer                             KernelVirtualBase  = nullptr;
 
-    MemoryMap                           MemoryMap          = {nullptr, 0};
-    u8                                  PagingMode         = 0;
-    usize                               HigherHalfOffset   = 0;
-
-    u64                                 BspID              = 0;
-    u64                                 ProcessorCount     = 0;
+    u64                                 BspID          = 0;
+    u64                                 ProcessorCount = 0;
+    BootMemoryInfo                      MemoryInformation{};
     Span<Framebuffer, DynamicExtent>    Framebuffers;
 
     // Physical address of the RSDP structure
@@ -64,7 +74,6 @@ struct BootInformation
     Pointer                             SmBios64Phys   = nullptr;
 
     Pointer                             EfiSystemTable = nullptr;
-    struct EfiMemoryMap                 EfiMemoryMap;
 };
 
 namespace BootInfo
