@@ -155,6 +155,7 @@ class FileDescriptor : public RefCounted
   private:
     Spinlock                 m_Lock;
     ::Ref<::DirectoryEntry>  m_DirectoryEntry   = nullptr;
+    File*                    m_File             = nullptr;
 
     FileAccessMode           m_AccessMode       = FileAccessMode::eRead;
     usize                    m_Offset           = 0;

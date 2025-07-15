@@ -7,6 +7,7 @@
 srcs += files(
   'DirectoryEntry.cpp',
   'Fifo.cpp',
+  'File.cpp',
   'FileDescriptor.cpp',
   'FileDescriptorTable.cpp',
   'INode.cpp',

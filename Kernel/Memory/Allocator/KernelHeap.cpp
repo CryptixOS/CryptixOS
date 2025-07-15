@@ -5,10 +5,13 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Common.hpp>
+
+#include <Library/Locking/Spinlock.hpp>
 #include <Memory/PMM.hpp>
 
 #include <Memory/Allocator/KernelHeap.hpp>
-#include <Memory/Allocator/SlabPool.hpp>
+// #include <Memory/Allocator/SlabPool.hpp>
+#include <Prism/Memory/SlabPool.hpp>
 
 namespace KernelHeap
 {
@@ -86,67 +89,14 @@ namespace KernelHeap
     }
     Pointer Callocate(usize bytes)
     {
-        auto memory = Allocate(bytes);
-        if (!memory) return nullptr;
-
-        Memory::Fill(memory, 0, bytes);
-        return memory;
+        return s_Initialized ? s_SlabPool->Callocate(bytes)
+                             : EarlyHeapAllocate(bytes);
     }
     Pointer Reallocate(Pointer memory, usize size)
     {
-        if (!memory) return Allocate(size);
-        if ((memory.Raw() & 0xfff) == 0)
-        {
-            BigAllocMeta* metadata
-                = memory.Offset<BigAllocMeta*>(-PMM::PAGE_SIZE);
-            usize oldSize = metadata->Size;
-
-            if (Math::DivRoundUp(oldSize, PMM::PAGE_SIZE)
-                == Math::DivRoundUp(size, PMM::PAGE_SIZE))
-            {
-                metadata->Size = size;
-                return memory;
-            }
-
-            if (size == 0)
-            {
-                Free(memory);
-                return nullptr;
-            }
-
-            if (size < oldSize) oldSize = size;
-
-            auto newMemory = Allocate(size);
-            if (!newMemory) return memory;
-
-            Memory::Copy(newMemory, memory, oldSize);
-            Free(memory);
-            return newMemory;
-        }
-
-        SlabAllocatorBase* slab
-            = Pointer(memory.Raw() & ~0xfff).As<SlabHeader>()->Slab;
-        usize oldSize = slab->AllocationSize();
-
-        if (size == 0)
-        {
-            Free(memory);
-            return nullptr;
-        }
-        if (size < oldSize) oldSize = size;
-
-        auto newMemory = Allocate(size);
-        if (!newMemory) return memory;
-
-        Memory::Copy(newMemory, memory, oldSize);
-        Free(memory);
-        return newMemory;
+        return s_SlabPool->Reallocate(memory, size);
     }
-    void Free(Pointer memory)
-    {
-        if (!memory) return;
-        return s_SlabPool->Free(memory);
-    }
+    void Free(Pointer memory) { return s_SlabPool->Free(memory); }
 } // namespace KernelHeap
 
 void* operator new(usize size) { return KernelHeap::Callocate(size); }
