@@ -8,6 +8,7 @@
 
 #include <Firmware/ACPI/HPET.hpp>
 #include <Prism/Containers/Vector.hpp>
+#include <Time/HardwareTimer.hpp>
 
 namespace HPET
 {

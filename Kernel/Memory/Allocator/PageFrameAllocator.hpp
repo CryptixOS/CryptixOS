@@ -9,6 +9,7 @@
 #include <Library/Locking/Spinlock.hpp>
 #include <Memory/PMM.hpp>
 
+#include <Prism/Core/Error.hpp>
 #include <Prism/Memory/Memory.hpp>
 
 class PageFrameAllocator

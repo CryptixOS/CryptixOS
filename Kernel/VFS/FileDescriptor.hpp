@@ -150,7 +150,7 @@ class FileDescriptor : public RefCounted
     }
 
     [[clang::no_sanitize("alignment")]]
-    ErrorOr<i32> GetDirEntries(dirent* const out, usize maxSize);
+    ErrorOr<isize> GetDirEntries(dirent* const out, usize maxSize);
 
   private:
     Spinlock                 m_Lock;

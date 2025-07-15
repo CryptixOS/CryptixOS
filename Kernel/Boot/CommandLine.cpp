@@ -22,6 +22,8 @@ namespace CommandLine
     {
         UnorderedMap<String, String>& result = s_OptionMap;
         usize                         pos    = 0;
+        if (args.StartsWith("\"")) args.RemovePrefix(1);
+        if (args.EndsWith("\"")) args.RemoveSuffix(1);
 
         while (pos < args.Size())
         {

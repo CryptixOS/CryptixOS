@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Drivers/Serial.hpp>
-#include <Drivers/VideoTerminal.hpp>
+#include <Drivers/Video/VideoTerminal.hpp>
 
 #include <Library/Locking/Spinlock.hpp>
 #include <Library/Logger.hpp>
@@ -162,7 +162,7 @@ namespace Logger
     {
         auto terminal = Terminal::GetPrimary();
         if (output == LOG_SINK_TERMINAL && terminal)
-            terminal->Initialize(*BootInfo::GetPrimaryFramebuffer());
+            terminal->Initialize(Terminal::PrimaryFramebuffer());
 
         s_EnabledSinks |= output;
     }

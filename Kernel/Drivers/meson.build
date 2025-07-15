@@ -8,14 +8,13 @@ srcs += files(
   'CharacterDevice.cpp',
   'Device.cpp',
   'DeviceManager.cpp',
-  'FramebufferDevice.cpp',
   'GenericDriver.cpp',
   'TTY.cpp',
   'Terminal.cpp',
-  'VideoTerminal.cpp',
 )
 
 subdir('HID')
 subdir('PCI')
 subdir('Storage')
 subdir('USB')
+subdir('Video')

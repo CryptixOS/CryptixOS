@@ -9,6 +9,7 @@
 #include <Prism/Core/Types.hpp>
 #include <Prism/String/StringView.hpp>
 #include <Prism/Utility/Delegate.hpp>
+#include <Prism/Core/Error.hpp>
 
 #include <Time/TimeStep.hpp>
 

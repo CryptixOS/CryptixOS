@@ -111,7 +111,7 @@ ErrorOr<isize> FileDescriptor::Write(const UserBuffer& in, usize count,
 ErrorOr<const stat> FileDescriptor::Stat() const
 {
     class INode* node = INode();
-    if (!node) return std::unexpected(Error(ENOENT));
+    if (!node) return Error(ENOENT);
 
     return node->Stats();
 }
@@ -163,7 +163,7 @@ ErrorOr<isize> FileDescriptor::Truncate(off_t size)
     return INode()->Truncate(size);
 }
 
-[[clang::no_sanitize("alignment")]] ErrorOr<i32>
+[[clang::no_sanitize("alignment")]] ErrorOr<isize>
 FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
 {
     ScopedLock guard(m_Lock);

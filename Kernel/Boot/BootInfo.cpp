@@ -133,17 +133,8 @@ LIMINE_REQUEST limine_dtb_request s_DtbRequest = {
 };
 #pragma endregion
 
-namespace KernelHeap
-{
-    void EarlyInitialize(Pointer base, usize length);
-};
-namespace PhysicalMemoryManager
-{
-    void EarlyInitialize(const MemoryMap&);
-};
 namespace
 {
-
     __attribute__((
         used,
         section(
@@ -153,6 +144,7 @@ namespace
         used,
         section(".limine_requests_end"))) volatile LIMINE_REQUESTS_END_MARKER;
 
+#define HigherHalfPointer(addr) addr.Offset(s_HhdmRequest.response->offset)
     Pointer AllocateBootMemory(usize bytes)
     {
         auto response = s_MemmapRequest.response;
@@ -171,7 +163,7 @@ namespace
             entry->base += bytes;
             entry->length -= bytes;
 
-            return address.ToHigherHalf();
+            return HigherHalfPointer(address);
         }
 
         return nullptr;
@@ -196,10 +188,10 @@ namespace
 
         return FirmwareType::eUndefined;
     }
-    enum BootPagingMode PagingMode()
+    enum PagingMode PagingMode()
     {
         auto response = s_PagingModeRequest.response;
-        if (!response) return BootPagingMode::eNone;
+        if (!response) return PagingMode::eNone;
 
         switch (response->mode)
         {
@@ -208,18 +200,18 @@ namespace
 #elifdef CTOS_TARGET_AARCH64
             case LIMINE_PAGING_MODE_AARCH64_4LVL:
 #endif
-                return BootPagingMode::eLevel4;
+                return PagingMode::eLevel4;
 #ifdef CTOS_TARGET_X86_64
             case LIMINE_PAGING_MODE_X86_64_5LVL:
 #elifdef CTOS_TARGET_AARCH64
             case LIMINE_PAGING_MODE_AARCH64_5LVL:
 #endif
-                return BootPagingMode::eLevel5;
+                return PagingMode::eLevel5;
 
             default: break;
         }
 
-        return BootPagingMode::eNone;
+        return PagingMode::eNone;
     }
 
     void InitializeModule(BootModuleInfo& module, limine_file* file)
@@ -279,29 +271,31 @@ namespace
         auto kernelAddressResponse = s_KernelAddressRequest.response;
         Assert(kernelAddressResponse);
 
-        auto entries              = response->entries;
-        auto entryCount           = response->entry_count;
+        auto entries                  = response->entries;
+        auto entryCount               = response->entry_count;
 
-        auto fromLimineMemoryType = [](u8 type) -> MemoryType
+        auto fromLimineMemoryZoneType = [](u8 type) -> MemoryZoneType
         {
             switch (type)
             {
-                case LIMINE_MEMMAP_USABLE: return MemoryType::eUsable;
-                case LIMINE_MEMMAP_RESERVED: return MemoryType::eReserved;
+                case LIMINE_MEMMAP_USABLE: return MemoryZoneType::eUsable;
+                case LIMINE_MEMMAP_RESERVED: return MemoryZoneType::eReserved;
                 case LIMINE_MEMMAP_ACPI_RECLAIMABLE:
-                    return MemoryType::eACPI_Reclaimable;
-                case LIMINE_MEMMAP_ACPI_NVS: return MemoryType::eACPI_NVS;
-                case LIMINE_MEMMAP_BAD_MEMORY: return MemoryType::eBadMemory;
+                    return MemoryZoneType::eACPI_Reclaimable;
+                case LIMINE_MEMMAP_ACPI_NVS: return MemoryZoneType::eACPI_NVS;
+                case LIMINE_MEMMAP_BAD_MEMORY:
+                    return MemoryZoneType::eBadMemory;
                 case LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE:
-                    return MemoryType::eBootloaderReclaimable;
+                    return MemoryZoneType::eBootloaderReclaimable;
                 case LIMINE_MEMMAP_EXECUTABLE_AND_MODULES:
-                    return MemoryType::eKernelAndModules;
-                case LIMINE_MEMMAP_FRAMEBUFFER: return MemoryType::eFramebuffer;
+                    return MemoryZoneType::eKernelAndModules;
+                case LIMINE_MEMMAP_FRAMEBUFFER:
+                    return MemoryZoneType::eFramebuffer;
 
                 default: break;
             }
 
-            return MemoryType::eReserved;
+            return MemoryZoneType::eReserved;
         };
 
         auto hhdmResponse = s_HhdmRequest.response;
@@ -313,23 +307,18 @@ namespace
         info.PagingMode         = PagingMode();
 
         info.MemoryMap.Entries
-            = AllocateBootMemory(sizeof(MemoryRegion) * entryCount);
+            = AllocateBootMemory(sizeof(MemoryZone) * entryCount);
         info.MemoryMap.EntryCount = entryCount;
-
-        auto earlyHeapSize        = 64_mib;
-        auto earlyHeap            = AllocateBootMemory(earlyHeapSize);
-        KernelHeap::EarlyInitialize(earlyHeap, earlyHeapSize);
 
         for (usize i = 0; i < entryCount; i++)
         {
-            auto*      current        = entries[i];
-            u64        base           = current->base;
-            u64        length         = current->length;
-            MemoryType type           = fromLimineMemoryType(current->type);
+            auto*          current    = entries[i];
+            u64            base       = current->base;
+            u64            length     = current->length;
+            MemoryZoneType type       = fromLimineMemoryZoneType(current->type);
 
-            info.MemoryMap.Entries[i] = MemoryRegion(base, length, type);
+            info.MemoryMap.Entries[i] = MemoryZone(base, length, type);
         }
-        PMM::EarlyInitialize(info.MemoryMap);
 
         auto efiMemmapResponse = s_EfiMemmapRequest.response;
         if (efiMemmapResponse)
@@ -339,6 +328,76 @@ namespace
             info.EfiMemoryMap.DescriptorSize = efiMemmapResponse->desc_size;
             info.EfiMemoryMap.DescriptorVersion
                 = efiMemmapResponse->desc_version;
+        }
+    }
+    void SetupFramebuffers(Span<Framebuffer, DynamicExtent>& out)
+    {
+        auto framebufferResponse = s_FramebufferRequest.response;
+        if (!framebufferResponse) return;
+
+        usize framebufferCount = framebufferResponse->framebuffer_count;
+        auto  framebuffers     = framebufferResponse->framebuffers;
+
+        usize framebuffersSize = framebufferCount * sizeof(Framebuffer);
+        out                    = Span<Framebuffer>(
+            AllocateBootMemory(framebuffersSize).As<Framebuffer>(),
+            framebufferCount);
+
+        auto setupVideoModes = [](Framebuffer& out, limine_framebuffer* current)
+        {
+            usize videoModeCount = current->mode_count;
+            if (videoModeCount == 0) return;
+
+            auto  videoModes     = current->modes;
+            usize videoModesSize = videoModeCount * sizeof(VideoMode);
+            out.VideoModes
+                = Span(AllocateBootMemory(videoModesSize).As<VideoMode>(),
+                       videoModeCount);
+            for (usize i = 0; i < videoModeCount; i++)
+            {
+                auto  videoMode      = videoModes[i];
+                auto& modeOut        = out.VideoModes[i];
+                modeOut.Pitch        = videoMode->pitch;
+                modeOut.Width        = videoMode->width;
+                modeOut.Height       = videoMode->height;
+                modeOut.BitsPerPixel = videoMode->bpp;
+                modeOut.MemoryModel
+                    = videoMode->memory_model == LIMINE_FRAMEBUFFER_RGB
+                        ? MemoryModel::eRGB
+                        : MemoryModel::eRGB;
+                modeOut.RedMaskSize    = videoMode->red_mask_size;
+                modeOut.RedMaskShift   = videoMode->red_mask_shift;
+                modeOut.GreenMaskSize  = videoMode->green_mask_size;
+                modeOut.GreenMaskShift = videoMode->green_mask_shift;
+                modeOut.BlueMaskSize   = videoMode->blue_mask_size;
+                modeOut.BlueMaskShift  = videoMode->blue_mask_shift;
+            }
+        };
+
+        for (usize i = 0; i < framebufferCount; i++)
+        {
+            auto  current           = framebuffers[i];
+            auto& currentOut        = out[i];
+
+            currentOut.Address      = current->address;
+            currentOut.Width        = current->width;
+            currentOut.Height       = current->height;
+            currentOut.Pitch        = current->pitch;
+            currentOut.BitsPerPixel = current->bpp;
+            currentOut.MemoryModel
+                = current->memory_model == LIMINE_FRAMEBUFFER_RGB
+                    ? MemoryModel::eRGB
+                    : MemoryModel::eRGB;
+            currentOut.RedMaskSize    = current->red_mask_size;
+            currentOut.RedMaskShift   = current->red_mask_shift;
+            currentOut.GreenMaskSize  = current->green_mask_size;
+            currentOut.GreenMaskShift = current->green_mask_shift;
+            currentOut.BlueMaskSize   = current->blue_mask_size;
+            currentOut.BlueMaskShift  = current->blue_mask_shift;
+            currentOut.EDID_Size      = current->edid_size;
+            currentOut.EDID           = current->edid;
+
+            setupVideoModes(currentOut, current);
         }
     }
 
@@ -364,6 +423,9 @@ namespace
             InitializeModule(info.KernelExecutable,
                              executableResponse->executable_file);
         InitializeBootModules(info.KernelModules);
+        SetupFramebuffers(info.Framebuffers);
+        // Parsing memory entries needs to happen last, so every allocation
+        // happens before thatt
         SetupMemoryInfo(info.MemoryInformation);
 
         auto smpResponse = s_SmpRequest.response;
@@ -377,20 +439,24 @@ namespace
             info.ProcessorCount = smpResponse->cpu_count;
         }
 
-        info.RSDP = Pointer(s_RsdpRequest.response->address).FromHigherHalf();
+#define ToPhysAddr(higher_half_address)                                        \
+    Pointer(higher_half_address).Offset(-s_HhdmRequest.response->offset)
+        auto rsdpResponse = s_RsdpRequest.response;
+        if (rsdpResponse) info.RSDP = ToPhysAddr(rsdpResponse->address);
 
-        info.DeviceTreeBlob = s_DtbRequest.response
-                                ? Pointer(s_DtbRequest.response->dtb_ptr)
-                                      .FromHigherHalf<Pointer>()
-                                : nullptr;
-        info.SmBios32Phys
-            = Pointer(s_SmbiosRequest.response->entry_32).FromHigherHalf();
-        info.SmBios64Phys
-            = Pointer(s_SmbiosRequest.response->entry_64).FromHigherHalf();
+        auto dtbResponse = s_DtbRequest.response;
+        if (dtbResponse) info.DeviceTreeBlob = ToPhysAddr(dtbResponse->dtb_ptr);
 
-        info.EfiSystemTable = s_EfiSystemTableRequest.response
-                                ? s_EfiSystemTableRequest.response->address
-                                : 0;
+        auto smbiosResponse = s_SmbiosRequest.response;
+        if (smbiosResponse)
+        {
+            info.SmBios32Phys = ToPhysAddr(smbiosResponse->entry_32);
+            info.SmBios64Phys = ToPhysAddr(smbiosResponse->entry_64);
+        }
+
+        auto efiSystemTableResponse = s_EfiSystemTableRequest.response;
+        if (efiSystemTableResponse)
+            info.EfiSystemTable = ToPhysAddr(efiSystemTableResponse->address);
     }
 } // namespace
 
@@ -434,29 +500,6 @@ namespace BootInfo
         SetupBootInfo(info);
 
         kernelStart(info);
-    }
-    u64 GetHHDMOffset()
-    {
-        VerifyExistenceOrRetValue(s_HhdmRequest, 0);
-
-        return s_HhdmRequest.response->offset;
-    }
-    Framebuffer** GetFramebuffers(usize& outCount)
-    {
-        VerifyExistenceOrRet(s_FramebufferRequest);
-
-        outCount = s_FramebufferRequest.response->framebuffer_count;
-        return s_FramebufferRequest.response->framebuffers;
-    }
-    Framebuffer* GetPrimaryFramebuffer()
-    {
-        VerifyExistenceOrRet(s_FramebufferRequest);
-        return s_FramebufferRequest.response->framebuffers[0];
-    }
-    usize PagingMode()
-    {
-        VerifyExistenceOrRetValue(s_PagingModeRequest, 0);
-        return s_PagingModeRequest.response->mode;
     }
     limine_mp_response* SMP_Response()
     {

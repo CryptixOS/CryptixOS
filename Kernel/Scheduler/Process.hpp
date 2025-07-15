@@ -130,7 +130,7 @@ class Process
     static void                SendGroupSignal(pid_t pgid, i32 signal);
     void                       SendSignal(i32 signal);
 
-    ErrorOr<i32>   OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
+    ErrorOr<isize> OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
     ErrorOr<isize> DupFd(isize oldFdNum, isize newFdNum, isize flags);
     i32            CloseFd(i32 fd);
     ErrorOr<isize> OpenPipe(i32* pipeFds);

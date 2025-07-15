@@ -12,6 +12,8 @@
 #include <Memory/PageTableEntry.hpp>
 #include <Memory/Region.hpp>
 
+#include <Prism/Core/Error.hpp>
+
 class PageMap;
 namespace VMM
 {

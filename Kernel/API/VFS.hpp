@@ -84,10 +84,10 @@ namespace API::VFS
 } // namespace API::VFS
 namespace Syscall::VFS
 {
-    ErrorOr<i32> SysFcntl(Syscall::Arguments& args);
+    ErrorOr<isize> SysFcntl(Syscall::Arguments& args);
 
-    [[clang::no_sanitize("alignment")]] ErrorOr<i32>
+    [[clang::no_sanitize("alignment")]] ErrorOr<isize>
                  SysGetDents64(Syscall::Arguments& args);
-    ErrorOr<i32> SysOpenAt(Syscall::Arguments& args);
-    ErrorOr<i32> SysFStatAt(Syscall::Arguments& args);
+    ErrorOr<isize> SysOpenAt(Syscall::Arguments& args);
+    ErrorOr<isize> SysFStatAt(Syscall::Arguments& args);
 } // namespace Syscall::VFS

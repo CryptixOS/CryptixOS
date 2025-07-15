@@ -77,7 +77,7 @@ namespace GDT
 
     void Initialize()
     {
-        memset(&s_GdtEntries.Null, 0, sizeof(SegmentDescriptor));
+        Memory::Fill(&s_GdtEntries.Null, 0, sizeof(SegmentDescriptor));
 
         u8 userCodeAccess = GDT_RING3 | GDT_CODE_OR_DATA | GDT_CODE_SEGMENT
                           | GDT_CODE_READABLE;
@@ -102,10 +102,10 @@ namespace GDT
         struct [[gnu::packed]]
         {
             u16       Limit;
-            uintptr_t Base;
+            upointer Base;
         } gdtr;
         gdtr.Limit = sizeof(s_GdtEntries) - 1;
-        gdtr.Base  = reinterpret_cast<uintptr_t>(&s_GdtEntries);
+        gdtr.Base  = reinterpret_cast<upointer>(&s_GdtEntries);
 
         __asm__ volatile(
             "lgdt %0\n"
@@ -135,8 +135,8 @@ namespace GDT
         ScopedLock guard(s_Lock);
         Assert(tss);
 
-        TSSWriteEntry(&s_GdtEntries.TSS, reinterpret_cast<uintptr_t>(tss));
-        __asm__ volatile("ltr %0" : : "rm"((uint16_t)TSS_SELECTOR) : "memory");
+        TSSWriteEntry(&s_GdtEntries.TSS, reinterpret_cast<upointer>(tss));
+        __asm__ volatile("ltr %0" : : "rm"(static_cast<u16>(TSS_SELECTOR)) : "memory");
     }
 
 }; // namespace GDT

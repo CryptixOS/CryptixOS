@@ -7,6 +7,7 @@
 #pragma once
 
 #include <Arch/InterruptHandler.hpp>
+#include <Prism/Core/Error.hpp>
 
 class InterruptController 
 {

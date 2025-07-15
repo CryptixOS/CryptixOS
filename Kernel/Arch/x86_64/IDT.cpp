@@ -161,16 +161,10 @@ inline PageFaultReason pageFaultReason(u64 errorCode)
 
 static void pageFault(CPUContext* ctx)
 {
-    Pointer faultAddress = CPU::ReadCR2();
-    auto    errorCode    = ctx->errorCode;
-    auto    faultReason  = pageFaultReason(errorCode);
+    Pointer       faultAddress = CPU::ReadCR2();
+    auto          errorCode    = ctx->errorCode;
+    auto          faultReason  = pageFaultReason(errorCode);
 
-    // LogError("P: {:b}, W: {:b}, U: {:b}, RW: {:b}, I: {:b}, PK: {:b}, SS: {:b}",
-    //          errorCode & PAGE_FAULT_PRESENT, errorCode & PAGE_FAULT_WRITE,
-    //          errorCode & PAGE_FAULT_USER, errorCode & PAGE_FAULT_RESERVED_WRITE,
-    //          errorCode & PAGE_FAULT_INSTRUCTION_FETCH,
-    //          errorCode & PAGE_FAULT_PROTECTION_KEY,
-    //          errorCode & PAGE_FAULT_SHADOW_STACK);
     PageFaultInfo faultInfo(faultAddress, faultReason, ctx);
     MemoryManager::HandlePageFault(faultInfo);
 }
@@ -226,11 +220,11 @@ namespace IDT
     {
         struct [[gnu::packed]]
         {
-            u16       Limit;
-            uintptr_t Base;
+            u16      Limit;
+            upointer Base;
         } idtr;
         idtr.Limit = sizeof(s_IdtEntries) - 1;
-        idtr.Base  = reinterpret_cast<uintptr_t>(s_IdtEntries);
+        idtr.Base  = reinterpret_cast<upointer>(s_IdtEntries);
         __asm__ volatile("lidt %0" : : "m"(idtr));
     }
 

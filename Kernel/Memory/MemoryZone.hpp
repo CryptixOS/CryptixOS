@@ -32,6 +32,17 @@ class MemoryZone
     {
     }
 
+    constexpr Pointer Allocate(usize bytes)
+    {
+        if (bytes > Length() || Type() != MemoryZoneType::eUsable)
+            return nullptr;
+        auto memory = Base();
+
+        m_Base += bytes;
+        m_Length -= bytes;
+        return memory;
+    }
+
     constexpr Pointer        Base() const { return m_Base; }
     constexpr usize          Length() const { return m_Length; }
     constexpr MemoryZoneType Type() const { return m_Type; }

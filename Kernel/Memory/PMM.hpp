@@ -7,40 +7,10 @@
 #pragma once
 
 #include <Common.hpp>
+#include <Boot/BootMemoryInfo.hpp>
 
 #include <Prism/Containers/Span.hpp>
 #include <Prism/Memory/Pointer.hpp>
-
-enum class MemoryType
-{
-    eUsable                = 0,
-    eReserved              = 1,
-    eACPI_Reclaimable      = 2,
-    eACPI_NVS              = 3,
-    eBadMemory             = 4,
-    eBootloaderReclaimable = 5,
-    eKernelAndModules      = 6,
-    eFramebuffer           = 7,
-};
-struct MemoryRegion
-{
-    constexpr MemoryRegion() = default;
-    constexpr MemoryRegion(Pointer base, usize size, MemoryType type)
-        : Base(base)
-        , Size(size)
-        , Type(type)
-    {
-    }
-
-    Pointer    Base = 0;
-    usize      Size = 0;
-    MemoryType Type = MemoryType::eReserved;
-};
-struct MemoryMap
-{
-    MemoryRegion* Entries    = nullptr;
-    usize         EntryCount = 0;
-};
 
 namespace PhysicalMemoryManager
 {
@@ -49,7 +19,7 @@ namespace PhysicalMemoryManager
     CTOS_NO_KASAN bool  Initialize(const MemoryMap& memoryMap);
     bool                IsInitialized();
 
-    Span<MemoryRegion>  MemoryZones();
+    Span<MemoryZone>  MemoryZones();
 
     CTOS_NO_KASAN void* AllocatePages(usize count = 1);
     CTOS_NO_KASAN void* CallocatePages(usize count = 1);

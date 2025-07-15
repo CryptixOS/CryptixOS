@@ -390,6 +390,8 @@ namespace VFS
                                        PathView path, mode_t mode)
     {
         auto maybePathRes = ResolvePath(directory.Raw(), path, true);
+
+        #define error_or(code) ErrorOr(code)
         auto err          = maybePathRes.error_or(EEXIST);
         if (err && err != ENOENT) return Error(err);
 

@@ -6,7 +6,11 @@
  */
 #pragma once
 
+#include <Boot/BootMemoryInfo.hpp>
 #include <Boot/BootModuleInfo.hpp>
+#include <Drivers/Video/Framebuffer.hpp>
+
+#include <Library/Color.hpp>
 #include <Memory/PMM.hpp>
 
 #include <Prism/Containers/Span.hpp>
@@ -14,9 +18,6 @@
 
 #include <limine.h>
 
-constexpr u32 FRAMEBUFFER_MEMORY_MODEL_RGB = LIMINE_FRAMEBUFFER_RGB;
-
-using Framebuffer                          = limine_framebuffer;
 enum class FirmwareType : i32
 {
     eUndefined = -1,
@@ -25,29 +26,7 @@ enum class FirmwareType : i32
     eUefi64    = 2,
     eSbi       = 3,
 };
-struct EfiMemoryMap
-{
-    Pointer Address           = nullptr;
-    usize   Size              = 0;
-    usize   DescriptorSize    = 0;
-    u32     DescriptorVersion = 0;
-};
 
-enum class BootPagingMode
-{
-    eNone   = 0,
-    eLevel4 = 4,
-    eLevel5 = 5,
-};
-struct BootMemoryInfo
-{
-    Pointer             KernelPhysicalBase = nullptr;
-    Pointer             KernelVirtualBase  = nullptr;
-    usize               HigherHalfOffset   = 0;
-    BootPagingMode      PagingMode         = BootPagingMode::eNone;
-    MemoryMap           MemoryMap          = {nullptr, 0};
-    struct EfiMemoryMap EfiMemoryMap;
-};
 struct BootInformation
 {
     StringView                          BootloaderName    = ""_sv;
@@ -78,7 +57,6 @@ struct BootInformation
 
 namespace BootInfo
 {
-    u64                 GetHHDMOffset();
     Framebuffer**       GetFramebuffers(usize& outCount);
     Framebuffer*        GetPrimaryFramebuffer();
     usize               PagingMode();

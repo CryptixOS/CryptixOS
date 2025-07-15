@@ -6,7 +6,7 @@
  */
 #include <Common.hpp>
 
-#include <Boot/BootInfo.hpp>
+#include <Memory/MemoryManager.hpp>
 #include <Memory/VMM.hpp>
 
 constexpr usize                  PTE_PRESENT    = Bit(0);
@@ -69,7 +69,7 @@ namespace Arch::VMM
     void  DestroyPageMap(PageMap* pageMap)
     {
         DestroyLevel(pageMap, pageMap->TopLevel(), 0, 256,
-                     BootInfo::PagingMode() == 0 ? 4 : 5);
+                     MM::PagingMode() == PagingMode::eLevel4 ? 4 : 5);
     }
 
     PageAttributes FromNativeFlags(uintptr_t flags)
@@ -148,7 +148,7 @@ PageTableEntry* PageMap::Virt2Pte(PageTable* topLevel, Pointer virt,
 
     if (!topLevel) return nullptr;
 
-    PageTable* pml4 = BootInfo::PagingMode() == LIMINE_PAGING_MODE_X86_64_5LVL
+    PageTable* pml4 = MM::PagingMode() == PagingMode::eLevel5
                         ? static_cast<PageTable*>(
                               NextLevel(topLevel->entries[pml5Entry], allocate))
                         : topLevel;

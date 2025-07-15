@@ -4,10 +4,9 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/BootInfo.hpp>
-
 #include <Drivers/DeviceManager.hpp>
-#include <Drivers/FramebufferDevice.hpp>
+#include <Drivers/Terminal.hpp>
+#include <Drivers/Video/FramebufferDevice.hpp>
 
 #include <Prism/String/StringUtils.hpp>
 
@@ -18,21 +17,10 @@
 static FramebufferDevice* s_PrimaryFramebuffer = nullptr;
 
 FramebufferDevice::FramebufferDevice(StringView          name,
-                                     limine_framebuffer* framebuffer)
+                                     Framebuffer& framebuffer)
     : CharacterDevice(name, MakeDevice(AllocateMajor().Value(), 0))
 {
-    Assert(framebuffer && framebuffer->address);
-    m_Framebuffer              = {.Address        = framebuffer->address,
-                                  .Width          = framebuffer->width,
-                                  .Height         = framebuffer->height,
-                                  .Pitch          = framebuffer->pitch,
-                                  .BitsPerPixel   = framebuffer->bpp,
-                                  .RedMaskSize    = framebuffer->red_mask_size,
-                                  .RedMaskShift   = framebuffer->red_mask_shift,
-                                  .GreenMaskSize  = framebuffer->green_mask_size,
-                                  .GreenMaskShift = framebuffer->green_mask_shift,
-                                  .BlueMaskSize   = framebuffer->blue_mask_size,
-                                  .BlueMaskShift  = framebuffer->blue_mask_shift};
+    m_Framebuffer              = framebuffer;
 
     m_Stats.st_size            = 0;
     m_Stats.st_blocks          = 0;
@@ -75,10 +63,9 @@ FramebufferDevice::FramebufferDevice(StringView          name,
 
 bool FramebufferDevice::Initialize()
 {
-    usize framebufferCount = 0;
-    auto  framebuffers     = BootInfo::GetFramebuffers(framebufferCount);
+    auto  framebuffers     = Terminal::Framebuffers();
 
-    if (framebufferCount == 0)
+    if (framebuffers.Empty())
     {
         LogError("FbDev: Failed to acquire any framebuffers");
         return false;
@@ -117,7 +104,7 @@ ErrorOr<isize> FramebufferDevice::Read(void* dest, off_t offset, usize bytes)
     if (offset + bytes > m_FixedScreenInfo.smem_len)
         bytes = bytes - ((offset + bytes) - m_FixedScreenInfo.smem_len);
 
-    std::memcpy(dest, m_Framebuffer.Address.Offset<void*>(offset), bytes);
+    Memory::Copy(dest, m_Framebuffer.Address.Offset<void*>(offset), bytes);
     return bytes;
 }
 ErrorOr<isize> FramebufferDevice::Write(const void* src, off_t offset,
@@ -127,7 +114,7 @@ ErrorOr<isize> FramebufferDevice::Write(const void* src, off_t offset,
     if (offset + bytes > m_FixedScreenInfo.smem_len)
         bytes = bytes - ((offset + bytes) - m_FixedScreenInfo.smem_len);
 
-    std::memcpy(m_Framebuffer.Address.Offset<u8*>(offset), src, bytes);
+    Memory::Copy(m_Framebuffer.Address.Offset<u8*>(offset), src, bytes);
     return bytes;
 }
 
@@ -148,12 +135,12 @@ i32 FramebufferDevice::IoCtl(usize request, uintptr_t argp)
     {
         case FBIOGET_VSCREENINFO:
             // TODO(v1tr10l7): should we validate those pointers here?
-            std::memcpy(reinterpret_cast<u8*>(argp), &m_VariableScreenInfo,
+            Memory::Copy(reinterpret_cast<u8*>(argp), &m_VariableScreenInfo,
                         sizeof(m_VariableScreenInfo));
             return 0;
         case FBIOGET_FSCREENINFO:
             // TODO(v1tr10l7): >>>>
-            std::memcpy(reinterpret_cast<u8*>(argp), &m_FixedScreenInfo,
+            Memory::Copy(reinterpret_cast<u8*>(argp), &m_FixedScreenInfo,
                         sizeof(m_FixedScreenInfo));
             return 0;
         case FBIOPUT_VSCREENINFO:

@@ -280,7 +280,7 @@ namespace API::VFS
         if (entry->IsDirectory()) return Error(EISDIR);
         else if (!entry->IsRegular()) return Error(EINVAL);
 
-        auto inode = entry->INode();
+        auto inode  = entry->INode();
         auto status = inode->CheckPermissions(W_OK);
         RetOnError(status);
 
@@ -289,7 +289,7 @@ namespace API::VFS
     ErrorOr<isize> FTruncate(i32 fdNum, off_t length)
     {
         if (length < 0) return Error(EINVAL);
-        Process*        current = Process::GetCurrent();
+        Process*            current = Process::GetCurrent();
 
         Ref<FileDescriptor> fd      = current->GetFileHandle(fdNum);
         if (!fd) return Error(EBADF);
@@ -604,9 +604,9 @@ namespace API::VFS
         if (!PathView(path).ValidateLength()) return Error(ENAMETOOLONG);
 
         Ref<FileDescriptor> fd             = current->GetFileHandle(dirFdNum);
-        bool  followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
+        bool                followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
 
-        auto  cwdEntry       = current->CWD();
+        auto                cwdEntry       = current->CWD();
         if (!cwdEntry) return Error(ENOENT);
         auto cwd = cwdEntry->INode();
 
@@ -791,13 +791,13 @@ namespace Syscall::VFS
     using Syscall::Arguments;
     using namespace ::VFS;
 
-    ErrorOr<i32> SysFcntl(Arguments& args)
+    ErrorOr<isize> SysFcntl(Arguments& args)
     {
-        i32             fdNum   = static_cast<i32>(args.Args[0]);
-        i32             op      = static_cast<i32>(args.Args[1]);
-        uintptr_t       arg     = reinterpret_cast<uintptr_t>(args.Args[2]);
+        i32                 fdNum   = static_cast<i32>(args.Args[0]);
+        i32                 op      = static_cast<i32>(args.Args[1]);
+        uintptr_t           arg     = reinterpret_cast<uintptr_t>(args.Args[2]);
 
-        Process*        current = Process::GetCurrent();
+        Process*            current = Process::GetCurrent();
         Ref<FileDescriptor> fd      = current->GetFileHandle(fdNum);
         if (!fd) return Error(EBADF);
 
@@ -831,7 +831,7 @@ namespace Syscall::VFS
         return 0;
     }
 
-    [[clang::no_sanitize("alignment")]] ErrorOr<i32>
+    [[clang::no_sanitize("alignment")]] ErrorOr<isize>
     SysGetDents64(Arguments& args)
     {
         u32           fdNum     = static_cast<u32>(args.Args[0]);
@@ -852,7 +852,7 @@ namespace Syscall::VFS
         return fd->GetDirEntries(outBuffer, count);
     }
 
-    ErrorOr<i32> SysOpenAt(Arguments& args)
+    ErrorOr<isize> SysOpenAt(Arguments& args)
     {
         Process* current = Process::GetCurrent();
 

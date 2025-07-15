@@ -69,6 +69,7 @@ namespace System
         s_KernelImage.ForEachSymbol(it);
         LogTrace("System: Successfully loaded the kernel symbols");
 
+        Stacktrace::Initialize();
         return {};
     }
     void PrepareBootModules(Span<BootModuleInfo> bootModules)

@@ -14,29 +14,37 @@
 
 #include <Prism/Utility/Math.hpp>
 
+namespace MemoryManager
+{
+    usize HigherHalfOffset();
+};
+
 template <typename Address>
 inline static constexpr bool IsHigherHalfAddress(Address addr)
 {
-    return reinterpret_cast<uintptr_t>(addr) >= BootInfo::GetHHDMOffset();
+    using namespace MemoryManager;
+    return reinterpret_cast<usize>(addr) >= HigherHalfOffset();
 }
 
 template <typename T, typename U>
 inline static constexpr T ToHigherHalfAddress(U addr)
 {
+    using namespace MemoryManager;
     T ret = IsHigherHalfAddress(addr)
               ? reinterpret_cast<T>(addr)
               : reinterpret_cast<T>(reinterpret_cast<uintptr_t>(addr)
-                                    + BootInfo::GetHHDMOffset());
+                                    + HigherHalfOffset());
     return ret;
 }
 
 template <typename T, typename U>
 inline static constexpr T FromHigherHalfAddress(U addr)
 {
+    using namespace MemoryManager;
     T ret = !IsHigherHalfAddress(addr)
               ? reinterpret_cast<T>(addr)
               : reinterpret_cast<T>(reinterpret_cast<uintptr_t>(addr)
-                                    - BootInfo::GetHHDMOffset());
+                                    - HigherHalfOffset());
     return ret;
 }
 

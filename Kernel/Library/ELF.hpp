@@ -10,6 +10,7 @@
 
 #include <Library/ELF_Definitions.hpp>
 
+#include <Prism/Core/Error.hpp>
 #include <Prism/Containers/RedBlackTree.hpp>
 
 #include <Prism/Memory/Buffer.hpp>

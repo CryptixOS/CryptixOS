@@ -13,37 +13,88 @@
 #include <Prism/String/Formatter.hpp>
 
 #include <icxxabi>
+#include <limine.h>
 
+namespace KernelHeap
+{
+    void EarlyInitialize(Pointer base, usize length);
+};
+namespace PhysicalMemoryManager
+{
+    void EarlyInitialize(const MemoryMap&);
+};
 namespace MemoryManager
 {
     namespace
     {
-        AddressSpace s_KernelAddressSpace;
-        Pointer      s_KernelPhysicalAddress = nullptr;
-        Pointer      s_KernelVirtualAddress  = nullptr;
+        AddressSpace    s_KernelAddressSpace;
+        Pointer         s_KernelPhysicalAddress = nullptr;
+        Pointer         s_KernelVirtualAddress  = nullptr;
+        usize           s_HigherHalfOffset      = 0;
+        enum PagingMode s_PagingMode            = PagingMode::eNone;
+        MemoryMap       s_MemoryMap;
+        EfiMemoryMap    s_EfiMemoryMap;
     }; // namespace
 
-    void Initialize(const MemoryMap& memoryMap, Pointer kernelPhys,
-                    Pointer kernelVirt, usize higherHalfOffset)
+    void PrepareInitialHeap(const BootMemoryInfo& memoryInfo)
     {
-        s_KernelPhysicalAddress = kernelPhys;
-        s_KernelVirtualAddress  = kernelVirt;
+        s_KernelPhysicalAddress = memoryInfo.KernelPhysicalBase;
+        s_KernelVirtualAddress  = memoryInfo.KernelVirtualBase;
+        s_HigherHalfOffset      = memoryInfo.HigherHalfOffset;
+        s_PagingMode            = memoryInfo.PagingMode;
+        s_MemoryMap             = memoryInfo.MemoryMap;
+        s_EfiMemoryMap          = memoryInfo.EfiMemoryMap;
+
+        auto allocate           = [&](usize bytes) -> Pointer
+        {
+            for (usize i = 0; i < s_MemoryMap.EntryCount; i++)
+            {
+                auto& entry = s_MemoryMap.Entries[i];
+                if (entry.Type() == MemoryZoneType::eUsable
+                    && entry.Length() > bytes)
+                    return entry.Allocate(bytes);
+            }
+
+            return nullptr;
+        };
 
         // Initialize early kernel heap
+        auto earlyHeapSize = 64_mib;
+        auto earlyHeapBase = allocate(earlyHeapSize);
+
+        KernelHeap::EarlyInitialize(earlyHeapBase, earlyHeapSize);
+        PMM::EarlyInitialize(s_MemoryMap);
         KernelHeap::Initialize();
+
+        auto pagingModeString = ToString(s_PagingMode);
+        pagingModeString.RemovePrefix(1);
+
+        LogTrace(
+            "MemoryManager: Memory Information =>\n"
+            "\tKernel Physical Address => {:#p}\n"
+            "\tKernel Virtual Address => {:#p}\n"
+            "\tHigher Half Direct Mapping Offset => {:#p}\n",
+            "\tPaging Mode => {}\n", s_KernelPhysicalAddress,
+            s_KernelVirtualAddress, s_HigherHalfOffset, pagingModeString);
+    }
+    void Initialize()
+    {
         // Call global constructors
         icxxabi::Initialize();
         // Initialize Physical Memory Manager
-        Assert(PMM::Initialize(memoryMap));
+        Assert(PMM::Initialize(s_MemoryMap));
 
-        VMM::Initialize(kernelPhys, kernelVirt, higherHalfOffset);
+        VMM::Initialize(s_KernelPhysicalAddress, s_KernelVirtualAddress,
+                        s_HigherHalfOffset);
     }
 
-    Pointer     KernelPhysicalAddress() { return s_KernelPhysicalAddress; }
-    Pointer     KernelVirtualAddress() { return s_KernelVirtualAddress; }
+    Pointer         KernelPhysicalAddress() { return s_KernelPhysicalAddress; }
+    Pointer         KernelVirtualAddress() { return s_KernelVirtualAddress; }
+    usize           HigherHalfOffset() { return s_HigherHalfOffset; }
+    enum PagingMode PagingMode() { return s_PagingMode; }
 
-    Ref<Region> AllocateRegion(const usize bytes, PageAttributes attributes,
-                               const MemoryUsage memoryUsage)
+    Ref<Region>     AllocateRegion(const usize bytes, PageAttributes attributes,
+                                   const MemoryUsage memoryUsage)
     {
         switch (memoryUsage)
         {
@@ -182,6 +233,7 @@ namespace MemoryManager
                               syscallName);
         }
 
+        //TODO(v1tr10l7): Dump thread's stacktrace, if symbols are available
         message += '\n';
         if (process && !kernelFault)
         {

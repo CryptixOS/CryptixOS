@@ -160,7 +160,7 @@ void Process::SendGroupSignal(pid_t pgid, i32 signal)
 }
 void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
-ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
+ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
     Ref parent = CWD();
     if (CPU::AsUser([path]() -> bool { return path.Absolute(); }))

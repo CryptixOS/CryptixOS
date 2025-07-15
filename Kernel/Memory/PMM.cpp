@@ -34,14 +34,11 @@ namespace PhysicalMemoryManager
             for (usize i = 0; i < entryCount; i++)
             {
                 auto& entry = memoryMap.Entries[i];
-                if (entry.Type != MemoryType::eUsable
-                    || entry.Size < count * PAGE_SIZE)
+                if (entry.Type() != MemoryZoneType::eUsable
+                    || entry.Length() < count * PAGE_SIZE)
                     continue;
 
-                auto pages = entry.Base;
-                entry.Base += count * PAGE_SIZE;
-                entry.Size -= count * PAGE_SIZE;
-
+                auto pages = entry.Allocate(count * PAGE_SIZE);
                 return pages;
             }
 
@@ -65,13 +62,13 @@ namespace PhysicalMemoryManager
         for (usize i = 0; i < entryCount; i++)
         {
             auto&   current     = s_MemoryMap.Entries[i];
-            Pointer entryBase   = current.Base;
-            usize   entryLength = current.Size;
+            Pointer entryBase   = current.Base();
+            usize   entryLength = current.Length();
 
             EarlyLogDebug(
                 "PMM: MemoryMap[%zu] = { .Base: %#p, .Length: %#x, .Type: "
                 "%s }",
-                i, entryBase.Raw(), entryLength, ToString(current.Type));
+                i, entryBase.Raw(), entryLength, ToString(current.Type()));
         }
 #endif
 
@@ -81,7 +78,7 @@ namespace PhysicalMemoryManager
             LogError(
                 "PMM: Failed to initialize bitmap allocator, the error code: "
                 "{}",
-                ToString(status.error()));
+                ToString(status.Error()));
             return false;
         }
         EarlyLogInfo("PMM: Initialized");
@@ -94,9 +91,9 @@ namespace PhysicalMemoryManager
 
         return (s_Initialized = true);
     }
-    bool               IsInitialized() { return s_Initialized; }
+    bool             IsInitialized() { return s_Initialized; }
 
-    Span<MemoryRegion> MemoryZones()
+    Span<MemoryZone> MemoryZones()
     {
         return Span(s_MemoryMap.Entries, s_MemoryMap.EntryCount);
     }
@@ -111,7 +108,7 @@ namespace PhysicalMemoryManager
         Pointer pages = AllocatePages(count);
         if (!pages) return nullptr;
 
-        memset(pages.ToHigherHalf(), 0, PAGE_SIZE * count);
+        Memory::Fill(pages.ToHigherHalf(), 0, PAGE_SIZE * count);
         return pages;
     }
 

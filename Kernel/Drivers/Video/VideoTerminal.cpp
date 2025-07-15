@@ -4,7 +4,9 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Drivers/VideoTerminal.hpp>
+#include <Boot/BootModuleInfo.hpp>
+
+#include <Drivers/Video/VideoTerminal.hpp>
 #include <Embed/Font.hpp>
 
 #include <Library/Logger.hpp>
@@ -19,22 +21,16 @@ constexpr Color DEFAULT_BACKDROP    = 0x00'00'00'00;
 constexpr usize BUILTIN_FONT_WIDTH  = 8;
 constexpr usize BUILTIN_FONT_HEIGHT = 16;
 
-bool            VideoTerminal::Initialize(const limine_framebuffer& framebuffer)
+VideoTerminal* VideoTerminal::Create(Framebuffer& framebuffer)
 {
-    if (!framebuffer.address) return false;
+    return new VideoTerminal(framebuffer);
+}
+bool            VideoTerminal::Initialize(const ::Framebuffer& framebuffer)
+{
+    if (!framebuffer.Address) return false;
     else if (m_Initialized) return true;
 
-    m_Framebuffer    = {.Address        = framebuffer.address,
-                        .Width          = framebuffer.width,
-                        .Height         = framebuffer.height,
-                        .Pitch          = framebuffer.pitch,
-                        .BitsPerPixel   = framebuffer.bpp,
-                        .RedMaskSize    = framebuffer.red_mask_size,
-                        .RedMaskShift   = framebuffer.red_mask_shift,
-                        .GreenMaskSize  = framebuffer.green_mask_size,
-                        .GreenMaskShift = framebuffer.green_mask_shift,
-                        .BlueMaskSize   = framebuffer.blue_mask_size,
-                        .BlueMaskShift  = framebuffer.blue_mask_shift};
+    m_Framebuffer    = framebuffer;
 
     auto fontAddress = reinterpret_cast<uintptr_t>(&Meta_fonts_font_bin);
     const BootModuleInfo* fontModule = System::FindBootModule("font");
@@ -273,7 +269,7 @@ void VideoTerminal::RestoreState() { m_CurrentState = m_SavedState; }
 
 void VideoTerminal::SwapPalette()
 {
-    std::swap(m_CurrentState.TextForeground, m_CurrentState.TextBackground);
+    Swap(m_CurrentState.TextForeground, m_CurrentState.TextBackground);
 }
 
 inline constexpr Color s_AnsiColors[]
@@ -400,7 +396,7 @@ void VideoTerminal::DrawCursor()
     if (q) c = q->Character;
     else c = m_Grid[i];
 
-    std::swap(c.Foreground, c.Background);
+    Swap(c.Foreground, c.Background);
     PlotChar(&c, m_CurrentState.CursorX, m_CurrentState.CursorY);
     if (q)
     {

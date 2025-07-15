@@ -11,6 +11,7 @@
 
 #include <Library/Locking/Spinlock.hpp>
 
+#include <Prism/Core/Error.hpp>
 #include <Prism/Memory/Ref.hpp>
 #include <Prism/String/String.hpp>
 #include <Prism/Utility/Atomic.hpp>

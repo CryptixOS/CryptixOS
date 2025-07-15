@@ -5,8 +5,6 @@
  * SPDX-License-Identifier: GPL-3
  */
 #pragma once
-
-#include <Boot/BootInfo.hpp>
 #include <Drivers/Terminal.hpp>
 
 #include <Library/Image.hpp>
@@ -30,15 +28,13 @@ struct Rectangle
 class VideoTerminal final : public Terminal
 {
   public:
-    VideoTerminal() = default;
-    VideoTerminal(const limine_framebuffer& framebuffer)
-    {
-        Initialize(framebuffer);
-    }
-
-    bool Initialize(const limine_framebuffer& framebuffer) override;
+    static VideoTerminal* Create(Framebuffer& framebuffer);
+    bool                  Initialize(const Framebuffer& framebuffer) override;
 
   protected:
+    VideoTerminal() = default;
+    VideoTerminal(const Framebuffer& framebuffer) { Initialize(framebuffer); }
+
     virtual void Clear(u32 = 0xffffffff, bool clear = true) override;
 
     virtual void RawPutChar(u8 c) override;
@@ -73,32 +69,7 @@ class VideoTerminal final : public Terminal
     virtual void Destroy() override;
 
   private:
-    struct Framebuffer
-    {
-        Pointer     Address;
-        u64         Width;
-        u64         Height;
-        u64         Pitch;
-        u16         BitsPerPixel;
-        u8          RedMaskSize;
-        u8          RedMaskShift;
-        u8          GreenMaskSize;
-        u8          GreenMaskShift;
-        u8          BlueMaskSize;
-        u8          BlueMaskShift;
-
-        inline void PutPixel(usize x, usize y, Color color) const
-        {
-            u32   red    = color.Red() << RedMaskShift;
-            u32   green  = color.Green() << GreenMaskShift;
-            u32   blue   = color.Blue() << BlueMaskShift;
-
-            u32   rgb    = red | green | blue;
-            usize offset = y * (Pitch / sizeof(u32)) + x;
-            Address.As<volatile u32>()[offset] = rgb;
-        }
-
-    } m_Framebuffer = {};
+    Framebuffer m_Framebuffer = {};
 
     struct Font
     {

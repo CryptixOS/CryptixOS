@@ -4,13 +4,12 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/BootInfo.hpp>
-
 #include <Debug/Assertions.hpp>
 #include <Debug/Panic.hpp>
 
 #include <Library/Locking/Spinlock.hpp>
 #include <Memory/VMM.hpp>
+#include <Memory/MemoryManager.hpp>
 
 struct [[gnu::packed]] TTBR
 {
@@ -134,7 +133,7 @@ namespace Arch::VMM
         else if (mmfr0.tGran64 == 0b0000) pageSize = PAGE_SIZE_64KIB;
         else ::panic("VMM: Unknown page size");
 
-        if (BootInfo::PagingMode() == 1
+        if (MM::PagingMode() == PagingMode::eLevel5
             && (tcrEl1 & Bit(59) && featLpa
                 && ((pageSize == PAGE_SIZE_64KIB && featLva)
                     || (pageSize == PAGE_SIZE_16KIB && mmfr0.tGran16 == 0b0010)
@@ -258,7 +257,7 @@ PageTableEntry* PageMap::Virt2Pte(PageTable* topLevel, Pointer virt,
     if (!half) return nullptr;
 
     TTBR* pml4
-        = static_cast<TTBR*>((BootInfo::PagingMode() == 1)
+        = static_cast<TTBR*>((MM::PagingMode() == PagingMode::eLevel5)
                                  ? NextLevel(half->entries[pml5Entry], allocate)
                                  : half);
     if (!pml4) return nullptr;

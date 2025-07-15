@@ -7,7 +7,7 @@
 #pragma once
 
 #include <API/Posix/termios.h>
-#include <Boot/BootInfo.hpp>
+#include <Drivers/Video/Framebuffer.hpp>
 
 #include <Library/Color.hpp>
 #include <Library/Locking/Spinlock.hpp>
@@ -40,10 +40,12 @@ namespace AnsiColor
 
 class Terminal
 {
-  public:
+  protected:
     Terminal();
 
-    virtual bool          Initialize(const Framebuffer& m_Framebuffer) = 0;
+  public:
+    static Terminal*      Create(const Framebuffer& framebuffer);
+    virtual bool          Initialize(const Framebuffer& framebuffer) = 0;
 
     inline const winsize& GetSize() const { return m_Size; }
 
@@ -55,11 +57,17 @@ class Terminal
     void                  PutChar(u64 c);
     void                  PutCharImpl(u64 c);
 
-    isize                  PrintString(StringView str);
+    isize                 PrintString(StringView str);
 
     void                  Bell();
 
-    static Terminal*      GetPrimary();
+    static void
+    SetupFramebuffers(Span<Framebuffer, DynamicExtent> framebuffers);
+
+    static Framebuffer&             PrimaryFramebuffer();
+    static Span<Framebuffer>        Framebuffers();
+
+    static Terminal*                GetPrimary();
     static const Vector<Terminal*>& EnumerateTerminals();
 
   protected:

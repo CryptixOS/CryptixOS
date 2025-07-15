@@ -70,9 +70,9 @@ namespace VMM
         auto memoryMap = PMM::MemoryZones();
         for (const auto& entry : memoryMap)
         {
-            Pointer base = Math::AlignDown(entry.Base, GetPageSize());
+            Pointer base = Math::AlignDown(entry.Base(), GetPageSize());
             Pointer top
-                = Math::AlignUp(entry.Base.Offset(entry.Size), GetPageSize());
+                = Math::AlignUp(entry.Base().Offset(entry.Length()), GetPageSize());
 
             auto size              = (top - base).Raw();
             auto [pageSize, flags] = s_KernelPageMap->RequiredSize(size);
@@ -80,7 +80,7 @@ namespace VMM
             auto alignedSize       = Math::AlignDown(size, pageSize);
 
             flags |= PageAttributes::eWriteBack;
-            if (entry.Type == MemoryType::eFramebuffer)
+            if (entry.Type() == MemoryZoneType::eFramebuffer)
                 flags |= PageAttributes::eWriteCombining;
 
             if (base < 4_gib) continue;

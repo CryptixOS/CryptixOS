@@ -6,6 +6,8 @@
  */
 #pragma once
 
+#include <Boot/BootMemoryInfo.hpp>
+
 #include <Memory/PageFault.hpp>
 #include <Memory/PageTableEntry.hpp>
 #include <Memory/Region.hpp>
@@ -26,19 +28,23 @@ enum class MemoryUsage
 struct MemoryMap;
 namespace MemoryManager
 {
-    void        Initialize(const MemoryMap& memoryMap, Pointer kernelPhys,
-                           Pointer kernelVirt, usize higherHalfOffset);
+    void            PrepareInitialHeap(const BootMemoryInfo& memoryInfo);
+    void            Initialize();
 
-    Pointer     KernelPhysicalAddress();
-    Pointer     KernelVirtualAddress();
+    Pointer         KernelPhysicalAddress();
+    Pointer         KernelVirtualAddress();
+    usize           HigherHalfOffset();
+    enum PagingMode PagingMode();
 
-    Ref<Region> AllocateRegion(const usize    bytes,
-                               PageAttributes attributes = PageAttributes::eRW,
-                               const MemoryUsage memoryUsage
-                               = MemoryUsage::eGeneric);
-    Ref<Region> AllocateUserRegion(const usize bytes, PageAttributes flags);
+    Ref<Region>     AllocateRegion(const usize    bytes,
+                                   PageAttributes attributes = PageAttributes::eRW,
+                                   const MemoryUsage memoryUsage
+                                   = MemoryUsage::eGeneric);
+    Ref<Region>     AllocateUserRegion(const usize bytes, PageAttributes flags);
 
-    void        FreeRegion(Ref<Region> region);
+    void            FreeRegion(Ref<Region> region);
 
-    void        HandlePageFault(const PageFaultInfo& info);
+    void            HandlePageFault(const PageFaultInfo& info);
 }; // namespace MemoryManager
+
+namespace MM = MemoryManager;

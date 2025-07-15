@@ -16,6 +16,7 @@
 #include <Drivers/Terminal.hpp>
 
 #include <Prism/String/StringView.hpp>
+#include <Prism/String/Formatter.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
@@ -322,7 +323,7 @@ void TTY::Initialize()
     {
         LogTrace("TTY: Creating device /dev/tty{}...", minor);
 
-        auto tty = new TTY(fmt::format("tty{}", minor).data(), terminal, minor);
+        auto tty = new TTY(Prism::Format1("tty{}", minor), terminal, minor);
         s_TTYs.PushBack(tty);
 
         auto result = DeviceManager::RegisterCharDevice(tty);

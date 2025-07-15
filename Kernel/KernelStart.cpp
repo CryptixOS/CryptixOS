@@ -12,15 +12,16 @@
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptManager.hpp>
 
+#include <Boot/BootInfo.hpp>
 #include <Boot/CommandLine.hpp>
 
-#include <Drivers/FramebufferDevice.hpp>
 #include <Drivers/MemoryDevices.hpp>
 #include <Drivers/PCI/PCI.hpp>
 #include <Drivers/Serial.hpp>
 #include <Drivers/TTY.hpp>
 #include <Drivers/Terminal.hpp>
 #include <Drivers/USB/USB.hpp>
+#include <Drivers/Video/FramebufferDevice.hpp>
 
 #include <Firmware/ACPI/ACPI.hpp>
 #include <Firmware/DMI/SMBIOS.hpp>
@@ -127,7 +128,7 @@ static void kernelThread()
 
     Arch::ProbeDevices();
     PCI::Initialize();
-    if (ACPI::IsAvailable())
+    if (CommandLine::GetBoolean("acpi.enable").ValueOr(true) && ACPI::IsAvailable())
     {
         ACPI::Enable();
         ACPI::LoadNameSpace();
@@ -142,7 +143,7 @@ static void kernelThread()
 
     IgnoreUnused(
         VFS::Mount(nullptr, "/dev/nvme0n2p2"_sv, "/mnt/ext2"_sv, "ext2fs"_sv));
-    IgnoreUnused(VFS::Mount(nullptr, "/dev/nvme0n2p2"_sv, "/mnt/fat32"_sv,
+    IgnoreUnused(VFS::Mount(nullptr, "/dev/nvme0n2p1"_sv, "/mnt/fat32"_sv,
                             "fat32fs"_sv));
     IgnoreUnused(
         VFS::Mount(nullptr, "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv, "echfs"_sv));
@@ -172,10 +173,34 @@ static void kernelThread()
     for (;;) Arch::Halt();
 }
 
+static void setupLogging(Span<Framebuffer, DynamicExtent> framebuffers)
+{
+#ifdef CTOS_TARGET_X86_64
+    #define SERIAL_LOG_ENABLE_DEFAULT false
+#else
+    #define SERIAL_LOG_ENABLE_DEFAULT true
+#endif
+
+    Logger::EnableSink(LOG_SINK_E9);
+    Logger::EnableSink(LOG_SINK_TERMINAL);
+
+    bool enabledSinks[3] = {
+        CommandLine::GetBoolean("log.e9").ValueOr(true),
+        CommandLine::GetBoolean("log.serial")
+            .ValueOr(SERIAL_LOG_ENABLE_DEFAULT),
+        CommandLine::GetBoolean("log.terminal").ValueOr(true),
+    };
+
+    Terminal::SetupFramebuffers(framebuffers);
+    for (usize i = 0; i < sizeof(enabledSinks) / sizeof(enabledSinks[0]); i++)
+    {
+        if (enabledSinks[i]) Logger::EnableSink(Bit(i));
+        else Logger::DisableSink(Bit(i));
+    }
+}
 extern "C" KERNEL_INIT_CODE __attribute__((no_sanitize("address"))) void
 kernelStart(const BootInformation& info)
 {
-    InterruptManager::InstallExceptions();
 #define CTOS_GDB_ATTACHED 0
 #if CTOS_GDB_ATTACHED == 1
     __asm__ volatile("1: jmp 1b");
@@ -187,45 +212,36 @@ kernelStart(const BootInformation& info)
     // beginning of the kernel initialization, because we want to have a working
     // Heap and Serial logging be available ASAP, as every other subsystem
     // depends on this
-
     auto& memoryInfo = info.MemoryInformation;
-    MemoryManager::Initialize(memoryInfo.MemoryMap, memoryInfo.KernelPhysicalBase,
-                              memoryInfo.KernelVirtualBase, memoryInfo.HigherHalfOffset);
-    Serial::Initialize();
-    // DONT MOVE END
-    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    MemoryManager::PrepareInitialHeap(memoryInfo);
+    InterruptManager::InstallExceptions();
+    CommandLine::Initialize(info.KernelCommandLine);
 
-#ifdef CTOS_TARGET_X86_64
-    #define SERIAL_LOG_ENABLE_DEFAULT false
-#else
-    #define SERIAL_LOG_ENABLE_DEFAULT true
-#endif
-    if (CommandLine::GetBoolean("log.serial")
-            .ValueOr(SERIAL_LOG_ENABLE_DEFAULT))
-        Logger::EnableSink(LOG_SINK_SERIAL);
-    if (!CommandLine::GetBoolean("log.e9").ValueOr(true))
-        Logger::DisableSink(LOG_SINK_E9);
-    // if (CommandLine::GetBoolean("log.boot.terminal").ValueOr(true))
-    Logger::EnableSink(LOG_SINK_TERMINAL);
+    LogTrace("Kernel: Available framebuffers => {}", info.Framebuffers.Size());
+    setupLogging(info.Framebuffers);
 
     LogInfo(
         "Boot: Kernel loaded with {}-{} -> firmware type: {}, boot time: {}s",
         info.BootloaderName, info.BootloaderVersion,
         ToString(info.FirmwareType), info.DateAtBoot);
 
-    LogInfo("Boot: Kernel Physical Address: {:#x}", memoryInfo.KernelPhysicalBase);
-    LogInfo("Boot: Kernel Virtual Address: {:#x}", memoryInfo.KernelVirtualBase);
+    LogInfo("Boot: Kernel Physical Address: {:#p}",
+            memoryInfo.KernelPhysicalBase);
+    LogInfo("Boot: Kernel Virtual Address: {:#p}",
+            memoryInfo.KernelVirtualBase);
 
     Assert(System::LoadKernelSymbols(info.KernelExecutable));
+    MemoryManager::Initialize();
+    Serial::Initialize();
+    // DONT MOVE END
+    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     System::PrepareBootModules(info.KernelModules);
-
-    Stacktrace::Initialize();
-    CommandLine::Initialize(info.KernelCommandLine);
 
     Device::Initialize();
     DeviceTree::Initialize(info.DeviceTreeBlob);
 
-    ACPI::LoadTables(info.RSDP);
+    if (CommandLine::GetBoolean("acpi.enable").ValueOr(true))
+        ACPI::LoadTables(info.RSDP);
     Arch::Initialize();
 
     System::InitializeNumaDomains();
