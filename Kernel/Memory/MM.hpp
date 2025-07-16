@@ -26,7 +26,7 @@ enum class MemoryUsage
 };
 
 struct MemoryMap;
-namespace MemoryManager
+namespace MM
 {
     void            PrepareInitialHeap(const BootMemoryInfo& memoryInfo);
     void            Initialize();
@@ -45,6 +45,5 @@ namespace MemoryManager
     void            FreeRegion(Ref<Region> region);
 
     void            HandlePageFault(const PageFaultInfo& info);
-}; // namespace MemoryManager
+}; // namespace MM
 
-namespace MM = MemoryManager;

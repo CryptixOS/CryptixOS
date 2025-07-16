@@ -55,10 +55,3 @@ struct BootInformation
     Pointer                             EfiSystemTable = nullptr;
 };
 
-namespace BootInfo
-{
-    Framebuffer**       GetFramebuffers(usize& outCount);
-    Framebuffer*        GetPrimaryFramebuffer();
-    usize               PagingMode();
-    limine_mp_response* SMP_Response();
-}; // namespace BootInfo

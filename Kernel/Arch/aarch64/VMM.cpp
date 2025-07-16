@@ -9,7 +9,7 @@
 
 #include <Library/Locking/Spinlock.hpp>
 #include <Memory/VMM.hpp>
-#include <Memory/MemoryManager.hpp>
+#include <Memory/MM.hpp>
 
 struct [[gnu::packed]] TTBR
 {

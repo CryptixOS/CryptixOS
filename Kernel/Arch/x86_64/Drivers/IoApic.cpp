@@ -20,9 +20,9 @@ IoApic::IoApic(Pointer baseAddress, u32 gsiBase)
     , m_GsiBase(gsiBase)
 {
     m_BaseAddressVirt = m_BaseAddressPhys.ToHigherHalf<>();
-    VMM::GetKernelPageMap()->Map(m_BaseAddressPhys, m_BaseAddressVirt,
+    VMM::GetKernelPageMap()->Map(m_BaseAddressVirt, m_BaseAddressPhys,
                                  PageAttributes::eRW
-                                     | PageAttributes::eWriteBack);
+                                     | PageAttributes::eWriteThrough);
 
     m_RegisterSelect = m_BaseAddressVirt.As<volatile u32>();
     m_RegisterWindow = m_BaseAddressVirt.Offset<volatile u32*>(0x10);

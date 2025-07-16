@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Memory/AddressSpace.hpp>
-#include <Memory/MemoryManager.hpp>
+#include <Memory/MM.hpp>
 #include <Memory/PMM.hpp>
 
 #include <Prism/Utility/Math.hpp>
@@ -16,7 +16,7 @@ AddressSpace::AddressSpace()
 {
     auto memoryTop = PMM::GetMemoryTop();
     auto base      = Pointer(Math::AlignUp(memoryTop, 1_gib));
-    m_TotalRange   = {base.Offset(4_gib), MemoryManager::HigherHalfOffset()};
+    m_TotalRange   = {base.Offset(4_gib), MM::HigherHalfOffset()};
 }
 AddressSpace::~AddressSpace() { m_RegionTree.Clear(); }
 

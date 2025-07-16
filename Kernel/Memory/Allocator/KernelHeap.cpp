@@ -8,11 +8,15 @@
 
 #include <Library/Locking/Spinlock.hpp>
 #include <Memory/PMM.hpp>
+#include <Memory/PageMap.hpp>
 
 #include <Memory/Allocator/KernelHeap.hpp>
-// #include <Memory/Allocator/SlabPool.hpp>
 #include <Prism/Memory/SlabPool.hpp>
 
+namespace VMM
+{
+    PageMap* GetKernelPageMap();
+}
 namespace KernelHeap
 {
     struct PageAllocPolicy
@@ -71,6 +75,23 @@ namespace KernelHeap
         s_EarlyHeapSize    = length;
         s_EarlyHeapCurrent = s_EarlyHeapBase;
     }
+    void MapEarlyHeap()
+    {
+        auto  baseVirt  = s_EarlyHeapBase;
+        usize pageCount = Math::DivRoundUp(s_EarlyHeapSize, PMM::PAGE_SIZE);
+
+        auto  pageMap   = VMM::GetKernelPageMap();
+        for (usize i = 0; i < pageCount; i++)
+        {
+            auto offset = i * PMM::PAGE_SIZE;
+            auto virt   = baseVirt.Offset<Pointer>(offset);
+            auto phys   = virt.FromHigherHalf();
+
+            if (pageMap->Virt2Phys(virt)) continue;
+            Assert(pageMap->Map(virt, phys));
+        }
+    }
+
     void Initialize()
     {
         EarlyLogTrace("KernelHeap: Initializing...");

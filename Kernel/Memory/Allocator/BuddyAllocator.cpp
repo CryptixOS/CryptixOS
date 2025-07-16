@@ -12,6 +12,10 @@ ErrorOr<void> BuddyAllocator::Initialize(MemoryMap& memoryMap, usize pageSize)
     if (!Math::IsPowerOfTwo(pageSize)) return Error(EINVAL);
     m_PageSize = pageSize;
 
+    auto memoryZones = Span(memoryMap.Entries, memoryMap.EntryCount);
+    for (const auto& zone : memoryZones)
+        IgnoreUnused(zone);
+
     return {};
 }
 void  BuddyAllocator::Shutdown() {}

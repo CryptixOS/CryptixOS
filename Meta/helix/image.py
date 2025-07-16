@@ -31,7 +31,7 @@ class Image:
         run(['parted', '-s', self.image_path, 'mkpart', type, 'fat32', f'{start}', f'{end}'])
 
     def setup_loop(self):
-        self.loop = run(['losetup', '-fP', '--show', self.image_path]).stdout
+        self.loop = run(['losetup', '-fP', '--show', self.image_path]).stdout.decode()
         info(f'loopback device created at => `{self.loop}`')
     def mkfs(self, index: int, fs: str):
         device = f'/dev/sda{index}'

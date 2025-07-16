@@ -13,11 +13,11 @@
 #include <Prism/Utility/Math.hpp>
 #include <Prism/String/StringUtils.hpp>
 
-namespace MemoryManager
+namespace MM
 {
     usize HigherHalfOffset();
 };
-using MemoryManager::HigherHalfOffset;
+using MM::HigherHalfOffset;
 
 namespace Kasan
 {

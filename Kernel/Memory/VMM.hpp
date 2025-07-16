@@ -14,7 +14,7 @@
 
 #include <Prism/Utility/Math.hpp>
 
-namespace MemoryManager
+namespace MM
 {
     usize HigherHalfOffset();
 };
@@ -22,14 +22,14 @@ namespace MemoryManager
 template <typename Address>
 inline static constexpr bool IsHigherHalfAddress(Address addr)
 {
-    using namespace MemoryManager;
+    using namespace MM;
     return reinterpret_cast<usize>(addr) >= HigherHalfOffset();
 }
 
 template <typename T, typename U>
 inline static constexpr T ToHigherHalfAddress(U addr)
 {
-    using namespace MemoryManager;
+    using namespace MM;
     T ret = IsHigherHalfAddress(addr)
               ? reinterpret_cast<T>(addr)
               : reinterpret_cast<T>(reinterpret_cast<uintptr_t>(addr)
@@ -40,7 +40,7 @@ inline static constexpr T ToHigherHalfAddress(U addr)
 template <typename T, typename U>
 inline static constexpr T FromHigherHalfAddress(U addr)
 {
-    using namespace MemoryManager;
+    using namespace MM;
     T ret = !IsHigherHalfAddress(addr)
               ? reinterpret_cast<T>(addr)
               : reinterpret_cast<T>(reinterpret_cast<uintptr_t>(addr)

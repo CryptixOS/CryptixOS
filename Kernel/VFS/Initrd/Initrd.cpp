@@ -39,7 +39,7 @@ namespace Initrd
 
         size_t pageCount
             = (Math::AlignUp(initrd->Size, 512) + 512) / PMM::PAGE_SIZE;
-        PhysicalMemoryManager::FreePages(address.FromHigherHalf<void*>(),
+        PMM::FreePages(address.FromHigherHalf<void*>(),
                                          pageCount);
 
         LogInfo("Initrd: Loaded successfully");

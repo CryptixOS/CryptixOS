@@ -10,6 +10,7 @@
 
 #include <Library/ELF.hpp>
 #include <Library/Module.hpp>
+#include <Memory/VMM.hpp>
 
 #include <System/System.hpp>
 #include <VFS/DirectoryEntry.hpp>
@@ -75,6 +76,14 @@ namespace System
     void PrepareBootModules(Span<BootModuleInfo> bootModules)
     {
         s_BootModules = bootModules;
+
+        // TODO(v1tr10l7): Map modules
+
+        // auto pageMap  = VMM::GetKernelPageMap();
+        // for (const auto& module : s_BootModules)
+        //     Assert(pageMap->MapRange(module.LoadAddress,
+        //                              module.LoadAddress.FromHigherHalf(),
+        //                              module.Size));
     }
     const BootModuleInfo* FindBootModule(StringView name)
     {

@@ -12,7 +12,7 @@
 #include <Prism/Containers/Span.hpp>
 #include <Prism/Memory/Pointer.hpp>
 
-namespace PhysicalMemoryManager
+namespace PMM
 {
     constexpr usize     PAGE_SIZE = 0x1000;
 
@@ -53,6 +53,4 @@ namespace PhysicalMemoryManager
     usize     GetTotalMemory();
     usize     GetFreeMemory();
     usize     GetUsedMemory();
-}; // namespace PhysicalMemoryManager
-
-namespace PMM = PhysicalMemoryManager;
+}; // namespace PMM

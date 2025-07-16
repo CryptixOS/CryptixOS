@@ -6,7 +6,7 @@
  */
 #include <Common.hpp>
 
-#include <Memory/MemoryManager.hpp>
+#include <Memory/MM.hpp>
 #include <Memory/VMM.hpp>
 
 constexpr usize                  PTE_PRESENT    = Bit(0);

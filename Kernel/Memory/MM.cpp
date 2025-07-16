@@ -7,7 +7,7 @@
 #include <API/Syscall.hpp>
 
 #include <Memory/Allocator/KernelHeap.hpp>
-#include <Memory/MemoryManager.hpp>
+#include <Memory/MM.hpp>
 #include <Scheduler/Process.hpp>
 
 #include <Prism/String/Formatter.hpp>
@@ -18,12 +18,13 @@
 namespace KernelHeap
 {
     void EarlyInitialize(Pointer base, usize length);
-};
-namespace PhysicalMemoryManager
+    void MapEarlyHeap();
+}; // namespace KernelHeap
+namespace PMM
 {
     void EarlyInitialize(const MemoryMap&);
 };
-namespace MemoryManager
+namespace MM
 {
     namespace
     {
@@ -70,7 +71,7 @@ namespace MemoryManager
         pagingModeString.RemovePrefix(1);
 
         LogTrace(
-            "MemoryManager: Memory Information =>\n"
+            "MM: Memory Information =>\n"
             "\tKernel Physical Address => {:#p}\n"
             "\tKernel Virtual Address => {:#p}\n"
             "\tHigher Half Direct Mapping Offset => {:#p}\n",
@@ -86,6 +87,8 @@ namespace MemoryManager
 
         VMM::Initialize(s_KernelPhysicalAddress, s_KernelVirtualAddress,
                         s_HigherHalfOffset);
+
+        KernelHeap::MapEarlyHeap();
     }
 
     Pointer         KernelPhysicalAddress() { return s_KernelPhysicalAddress; }
@@ -233,7 +236,7 @@ namespace MemoryManager
                               syscallName);
         }
 
-        //TODO(v1tr10l7): Dump thread's stacktrace, if symbols are available
+        // TODO(v1tr10l7): Dump thread's stacktrace, if symbols are available
         message += '\n';
         if (process && !kernelFault)
         {
@@ -257,4 +260,4 @@ namespace MemoryManager
 
         earlyPanic(message.data());
     }
-}; // namespace MemoryManager
+}; // namespace MM

@@ -10,13 +10,16 @@
 #include <Boot/BootInfo.hpp>
 #include <Debug/Panic.hpp>
 
+#include <Memory/MM.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-u8 g_PanicIpiVector = 255;
+u8                         g_PanicIpiVector = 255;
+
+extern limine_mp_response* SMP_Response();
 
 namespace CPU
 {
@@ -85,8 +88,7 @@ namespace CPU
             displayFamily, displayModel);
     }
 
-    KERNEL_INIT_CODE
-    static void InitializeFPU()
+    KERNEL_INIT_CODE static void InitializeFPU()
     {
         if (!EnableSSE()) return;
         CPU* current = GetCurrent();
@@ -197,7 +199,7 @@ namespace CPU
     KERNEL_INIT_CODE
     void InitializeBSP()
     {
-        limine_mp_response* smp      = BootInfo::SMP_Response();
+        limine_mp_response* smp      = SMP_Response();
         usize               cpuCount = smp->cpu_count;
 
         s_CPUs.Resize(cpuCount);
@@ -264,7 +266,7 @@ namespace CPU
             Halt();
         };
 
-        auto smpResponse = BootInfo::SMP_Response();
+        auto smpResponse = SMP_Response();
         for (usize i = 0; i < smpResponse->cpu_count; i++)
         {
             auto cpu = smpResponse->cpus[i];

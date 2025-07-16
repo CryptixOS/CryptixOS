@@ -67,7 +67,7 @@ namespace Exception
     constexpr u8 BREAKPOINT = 0x03;
     constexpr u8 PAGE_FAULT = 0x0e;
 }; // namespace Exception
-namespace MemoryManager
+namespace MM
 {
     void HandlePageFault(const PageFaultInfo& info);
 };
@@ -166,7 +166,7 @@ static void pageFault(CPUContext* ctx)
     auto          faultReason  = pageFaultReason(errorCode);
 
     PageFaultInfo faultInfo(faultAddress, faultReason, ctx);
-    MemoryManager::HandlePageFault(faultInfo);
+    MM::HandlePageFault(faultInfo);
 }
 
 [[noreturn]] static void unhandledInterrupt(CPUContext* context)

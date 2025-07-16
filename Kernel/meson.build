@@ -67,6 +67,21 @@ configure_file(
   output: 'Version.hpp',
   configuration: versionConf)
 
+config = configuration_data()
+config.set('KERNEL_VIRTUAL_RANGE_BASE', '0xffff\'0000\'0000\'0000zu')
+config.set('KERNEL_VIRTUAL_RANGE_TOP', '0x6a9e\'7f5c\'8000\'0000zu')
+
+config.set('USER_VIRTUAL_RANGE_BASE', '0x0000\'0000\'0010\'0000zu')
+config.set('USER_VIRTUAL_RANGE_TOP', '0x0000\'7fff\'ffff\'ffffzu')
+
+config.set('CTOS_ACPI_DISABLE', '0')
+
+configure_file(
+  input: 'Config.hpp.in',
+  output: 'Config.hpp',
+  configuration: config
+)
+
 kernel_elf = executable(
   'Cryptix.elf',
   [srcs, objs],

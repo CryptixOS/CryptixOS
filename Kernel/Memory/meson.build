@@ -6,7 +6,7 @@
 #*/
 srcs += files(
   'AddressSpace.cpp',
-  'MemoryManager.cpp',
+  'MM.cpp',
   'PMM.cpp',
   'PageMap.cpp',
   'Region.cpp',

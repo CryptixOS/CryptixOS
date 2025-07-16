@@ -17,7 +17,7 @@
 #include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
 
-namespace PhysicalMemoryManager
+namespace PMM
 {
     namespace
     {
@@ -121,4 +121,4 @@ namespace PhysicalMemoryManager
     u64       GetTotalMemory() { return s_BitmapAllocator.TotalMemorySize(); }
     u64       GetFreeMemory() { return GetTotalMemory() - GetUsedMemory(); }
     u64       GetUsedMemory() { return s_BitmapAllocator.UsedMemorySize(); }
-} // namespace PhysicalMemoryManager
+} // namespace PMM

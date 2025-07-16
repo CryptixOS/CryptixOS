@@ -33,8 +33,9 @@
 #include <Library/Module.hpp>
 #include <Library/Stacktrace.hpp>
 
-#include <Memory/MemoryManager.hpp>
+#include <Memory/MM.hpp>
 #include <Memory/PMM.hpp>
+#include <Memory/ScopedMapping.hpp>
 #include <Memory/VMM.hpp>
 
 #include <Memory/Allocator/KernelHeap.hpp>
@@ -107,12 +108,9 @@ static bool loadInitProcess(Path initPath)
     auto colonel   = Scheduler::GetKernelProcess();
     auto newThread = colonel->CreateThread(reinterpret_cast<uintptr_t>(eternal),
                                            false, CPU::Current()->ID);
-
-    // auto current   = Thread::Current();
-    // current->SetState(ThreadState::eExited);
-
     Scheduler::EnqueueThread(newThread);
     Scheduler::EnqueueThread(userThread);
+
     return true;
 }
 
@@ -128,13 +126,17 @@ static void kernelThread()
 
     Arch::ProbeDevices();
     PCI::Initialize();
-    if (CommandLine::GetBoolean("acpi.enable").ValueOr(true) && ACPI::IsAvailable())
+
+#if CTOS_ACPI_DISABLE == 0
+    if (CommandLine::GetBoolean("acpi.enable").ValueOr(true)
+        && ACPI::IsAvailable())
     {
         ACPI::Enable();
         ACPI::LoadNameSpace();
         ACPI::EnumerateDevices();
     }
     PCI::InitializeIrqRoutes();
+#endif
 
     if (!FramebufferDevice::Initialize())
         LogError("kernel: Failed to initialize fbdev");
@@ -198,6 +200,7 @@ static void setupLogging(Span<Framebuffer, DynamicExtent> framebuffers)
         else Logger::DisableSink(Bit(i));
     }
 }
+
 extern "C" KERNEL_INIT_CODE __attribute__((no_sanitize("address"))) void
 kernelStart(const BootInformation& info)
 {
@@ -213,7 +216,7 @@ kernelStart(const BootInformation& info)
     // Heap and Serial logging be available ASAP, as every other subsystem
     // depends on this
     auto& memoryInfo = info.MemoryInformation;
-    MemoryManager::PrepareInitialHeap(memoryInfo);
+    MM::PrepareInitialHeap(memoryInfo);
     InterruptManager::InstallExceptions();
     CommandLine::Initialize(info.KernelCommandLine);
 
@@ -231,7 +234,7 @@ kernelStart(const BootInformation& info)
             memoryInfo.KernelVirtualBase);
 
     Assert(System::LoadKernelSymbols(info.KernelExecutable));
-    MemoryManager::Initialize();
+    MM::Initialize();
     Serial::Initialize();
     // DONT MOVE END
     // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -240,8 +243,11 @@ kernelStart(const BootInformation& info)
     Device::Initialize();
     DeviceTree::Initialize(info.DeviceTreeBlob);
 
-    if (CommandLine::GetBoolean("acpi.enable").ValueOr(true))
+#if CTOS_ACPI_DISABLE == 0
+    if (CommandLine::GetBoolean("acpi.enable").ValueOr(true) && info.RSDP)
         ACPI::LoadTables(info.RSDP);
+#endif
+
     Arch::Initialize();
 
     System::InitializeNumaDomains();

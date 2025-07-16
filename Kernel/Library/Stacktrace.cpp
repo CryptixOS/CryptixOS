@@ -10,7 +10,7 @@
 #include <Debug/Debug.hpp>
 #include <Library/Stacktrace.hpp>
 
-#include <Memory/MemoryManager.hpp>
+#include <Memory/MM.hpp>
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
@@ -77,7 +77,7 @@ namespace Stacktrace
         Pointer fileEnd    = fileStart.Offset(module->Size);
         char*   current    = fileStart.As<char>();
 
-        auto    kernelVirt = MemoryManager::KernelVirtualAddress();
+        auto    kernelVirt = MM::KernelVirtualAddress();
         Pointer address    = 0;
         while (current < fileEnd.As<char>())
         {

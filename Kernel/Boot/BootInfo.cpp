@@ -467,14 +467,12 @@ extern "C" CTOS_NO_KASAN [[noreturn]] void kernelStart(const BootInformation&);
 #define VerifyExistenceOrRetValue(requestName, value)                          \
     if (!requestName.response) return value;
 
-namespace BootInfo
+extern "C" __attribute__((no_sanitize("address"))) void Initialize()
 {
-    extern "C" __attribute__((no_sanitize("address"))) void Initialize()
-    {
-        CtosUnused(s_StackSizeRequest.response);
-        CtosUnused(s_EntryPointRequest.response);
+    CtosUnused(s_StackSizeRequest.response);
+    CtosUnused(s_EntryPointRequest.response);
 
-        Logger::EnableSink(LOG_SINK_E9);
+    Logger::EnableSink(LOG_SINK_E9);
 #if defined(CTOS_TARGET_X86_64) && defined(__aarch64__)
     #error "target is aarch64 and CTOS_TARGET_X86_64 is defined"
 #elif defined(__aarch64__) && !defined(CTOS_TARGET_AARCH64)
@@ -482,29 +480,29 @@ namespace BootInfo
 #endif
 
 #if defined(CTOS_TARGET_X86_64) && !defined(CTOS_TARGET_AARCH64)
-        Logger::EnableSink(LOG_SINK_SERIAL);
+    Logger::EnableSink(LOG_SINK_SERIAL);
 #endif
 
-        if (!LIMINE_BASE_REVISION_SUPPORTED)
-            EarlyPanic("Boot: Limine base revision is not supported");
+    if (!LIMINE_BASE_REVISION_SUPPORTED)
+        EarlyPanic("Boot: Limine base revision is not supported");
 
-        if (!s_MemmapRequest.response
-            || s_MemmapRequest.response->entry_count == 0)
-            Panic("Boot: Failed to acquire limine memory map entries");
-        if (!s_FramebufferRequest.response
-            || s_FramebufferRequest.response->framebuffer_count < 1)
-            EarlyPanic("Boot: Failed to acquire the framebuffer!");
-        Logger::EnableSink(LOG_SINK_TERMINAL);
+    if (!s_MemmapRequest.response || s_MemmapRequest.response->entry_count == 0)
+        Panic("Boot: Failed to acquire limine memory map entries");
+    if (!s_FramebufferRequest.response
+        || s_FramebufferRequest.response->framebuffer_count < 1)
+        EarlyPanic("Boot: Failed to acquire the framebuffer!");
+    Logger::EnableSink(LOG_SINK_TERMINAL);
 
-        BootInformation info;
-        SetupBootInfo(info);
+    BootInformation info;
+    Memory::Fill(&info, 0, sizeof(info));
 
-        kernelStart(info);
-    }
-    limine_mp_response* SMP_Response()
-    {
-        VerifyExistenceOrRet(s_SmpRequest);
+    SetupBootInfo(info);
 
-        return s_SmpRequest.response;
-    }
-} // namespace BootInfo
+    kernelStart(info);
+}
+limine_mp_response* SMP_Response()
+{
+    VerifyExistenceOrRet(s_SmpRequest);
+
+    return s_SmpRequest.response;
+}

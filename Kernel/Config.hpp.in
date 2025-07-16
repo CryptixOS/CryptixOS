@@ -10,11 +10,13 @@
 // Compile-time kernel configuration
 //--------------------------------------------------------------------------
 
-#define KERNEL_VIRTUAL_RANGE_BASE 0xffff'0000'0000'0000zu
-#define KERNEL_VIRTUAL_RANGE_TOP  0x6a9e'7f5c'8000'0000zu
+#mesondefine KERNEL_VIRTUAL_RANGE_BASE
+#mesondefine KERNEL_VIRTUAL_RANGE_TOP
 #define KERNEL_VIRTUAL_RANGE_SIZE                                              \
     KERNEL_VIRTUAL_RANGE_TOP KERNEL_VIRTUAL_RANGE_BASE
 
-#define USER_VIRTUAL_RANGE_BASE 0x0000'0000'0010'0000zu
-#define USER_VIRTUAL_RANGE_TOP  0x0000'7fff'ffff'ffffzu
+#mesondefine USER_VIRTUAL_RANGE_BASE
+#mesondefine USER_VIRTUAL_RANGE_TOP
 #define USER_VIRTUAL_RANGE_SIZE USER_VIRTUAL_RANGE_TOP - USER_VIRTUAL_RANGE_BASE
+
+#mesondefine CTOS_ACPI_DISABLE
