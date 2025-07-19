@@ -28,7 +28,7 @@ class AddressRange final
 
     constexpr inline bool    Contains(Pointer address) const
     {
-        return address >= m_Base && address < m_Base.Offset<Pointer>(m_Size);
+        return address >= m_Base && address < End();
     }
 
     bool Intersects(AddressRange const& other) const

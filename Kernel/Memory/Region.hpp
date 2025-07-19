@@ -76,11 +76,11 @@ namespace VMM
             return m_VirtualRange.Base().Offset(m_VirtualRange.Size());
         }
 
-        inline usize           Size() const { return m_VirtualRange.Size(); }
-        inline FileDescriptor* FileDescriptor() const { return m_Fd; }
+        inline usize Size() const { return m_VirtualRange.Size(); }
+        inline class FileDescriptor* FileDescriptor() const { return m_Fd; }
 
-        inline enum Access     Access() const { return m_Access; }
-        PageAttributes         PageAttributes() const;
+        inline enum Access           Access() const { return m_Access; }
+        enum PageAttributes          PageAttributes() const;
 
         inline void    SetPhysicalBase(Pointer phys) { m_PhysicalBase = phys; }
         inline void    SetAccessMode(enum Access access) { m_Access = access; }

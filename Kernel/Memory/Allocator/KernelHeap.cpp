@@ -87,7 +87,7 @@ namespace KernelHeap
             auto virt   = baseVirt.Offset<Pointer>(offset);
             auto phys   = virt.FromHigherHalf();
 
-            if (pageMap->Virt2Phys(virt)) continue;
+            if (pageMap->ValidateAddress(virt)) continue;
             Assert(pageMap->Map(virt, phys));
         }
     }

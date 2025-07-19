@@ -5,6 +5,8 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Memory/PageMap.hpp>
+#include <Memory/VMM.hpp>
+
 #include <Prism/Utility/Math.hpp>
 
 namespace Arch::VMM
@@ -42,6 +44,14 @@ std::pair<usize, PageAttributes> PageMap::RequiredSize(usize size) const
     return {m_PageSize, static_cast<PageAttributes>(0)};
 }
 
+bool PageMap::ValidateAddress(Pointer address, PageAttributes flags)
+{
+    auto pte = Virt2Pte(m_TopLevel, address, false, PMM::PAGE_SIZE);
+    if (!pte) return false;
+
+    return Arch::VMM::FromNativeFlags(pte->Flags()) & flags;
+}
+
 ErrorOr<Pointer> PageMap::MapIoRegion(Pointer phys, usize length,
                                       PageAttributes flags, usize alignment)
 {
@@ -55,7 +65,24 @@ ErrorOr<Pointer> PageMap::MapIoRegion(Pointer phys, usize length,
 
 bool PageMap::Map(Pointer virt, Pointer phys, PageAttributes flags)
 {
+    u64 pte = Virt2Phys(virt);
+    if (pte != static_cast<u64>(-1))
+    {
+        auto errorMessage = fmt::format(
+            "VMM: Trying to map address {:#x} to {:#x}, but it is already "
+            "mapped => {:#x}",
+            virt.Raw(), phys.Raw(), pte);
+
+        Assert(errorMessage.data());
+    }
+
+    // AssertFmt(entry == u64(-1),
+    //           "VMM: Trying to map address {:#x} to {:#x}, but it is already "
+    //           "mapped => {:#x}",
+    //           virt.Raw(), phys.Raw(), entry);
+
     ScopedLock guard(m_Lock);
+
     return InternalMap(virt, phys, flags);
 }
 bool PageMap::Unmap(Pointer virt, PageAttributes flags)

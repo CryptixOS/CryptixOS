@@ -64,14 +64,16 @@ namespace VMM
         usize baseMemorySize   = 3_gib;
         auto [pageSize, flags] = s_KernelPageMap->RequiredSize(baseMemorySize);
 
-        Assert(s_KernelPageMap->MapRange(GetHigherHalfOffset(), 0, baseMemorySize,
-                                         PageAttributes::eRW | flags
-                                             | PageAttributes::eWriteBack));
+        Assert(s_KernelPageMap->MapRange(
+            GetHigherHalfOffset(), 0, baseMemorySize,
+            PageAttributes::eRW | flags | PageAttributes::eWriteBack));
 
         auto memoryMap = PMM::MemoryZones();
         for (const auto& entry : memoryMap)
         {
-            if (entry.Base() <= baseMemorySize || entry.Type() == MemoryZoneType::eReserved) continue;
+            if ((entry.Base() <= baseMemorySize)
+                || entry.Type() == MemoryZoneType::eReserved)
+                continue;
 
             Pointer base = Math::AlignDown(entry.Base(), GetPageSize());
             Pointer top  = Math::AlignUp(entry.Base().Offset(entry.Length()),
@@ -86,9 +88,12 @@ namespace VMM
             if (entry.Type() == MemoryZoneType::eFramebuffer)
                 flags |= PageAttributes::eWriteCombining;
 
+            Assert(!s_KernelPageMap->ValidateAddress(base.ToHigherHalf()));
             Assert(s_KernelPageMap->MapRange(
                 base.ToHigherHalf(), base, alignedSize,
                 PageAttributes::eRW | flags | PageAttributes::eWriteBack));
+
+            Assert(s_KernelPageMap->ValidateAddress(base.ToHigherHalf()));
             base += alignedSize;
 
             Assert(s_KernelPageMap->MapRange(
@@ -111,9 +116,9 @@ namespace VMM
         auto limineRequestsSize
             = Pointer(limine_requests_addr_end) - limineRequestsVirt;
 
-        LogTrace(
-            "VMM: Mapping .limine_requests   => {:#016x}-{:#016x}",
-            limineRequestsVirt, limineRequestsVirt.Offset(limineRequestsSize));
+        LogTrace("VMM: Mapping .limine_requests   => {:#016x}-{:#016x}",
+                 limineRequestsVirt,
+                 limineRequestsVirt.Offset(limineRequestsSize));
         Assert(s_KernelPageMap->MapRange(
             limineRequestsVirt, limineRequestsPhys, limineRequestsSize,
             PageAttributes::eRead | PageAttributes::eWriteBack));
@@ -122,16 +127,17 @@ namespace VMM
         auto textPhys = Pointer(text_start_addr) - kernelVirt + kernelPhys;
         auto textSize = Pointer(text_end_addr) - textVirt;
 
-        LogTrace("VMM: Mapping .text            => {:#016x}-{:#016x}",
-                 textVirt, textVirt.Offset(textSize));
+        LogTrace("VMM: Mapping .text            => {:#016x}-{:#016x}", textVirt,
+                 textVirt.Offset(textSize));
         Assert(s_KernelPageMap->MapRange(textVirt, textPhys, textSize,
                                          PageAttributes::eRead
                                              | PageAttributes::eExecutable
                                              | PageAttributes::eWriteBack));
 
         {
-            auto memoryTop = PMM::GetMemoryTop();
-            auto base = Pointer(Math::AlignUp(memoryTop, 1_gib)).ToHigherHalf();
+            auto    memoryTop = PMM::GetMemoryTop();
+            Pointer base
+                = Pointer(Math::AlignUp(memoryTop, 1_gib)).ToHigherHalf();
             s_VirtualAddressSpace = base.Offset(4_gib);
         }
 
@@ -139,9 +145,8 @@ namespace VMM
         auto    initPhys = initVirt - kernelVirt + kernelPhys;
         auto    initSize = Pointer(kernel_init_end_addr) - textVirt;
 
-        LogTrace(
-            "VMM: Mapping .kernel_init_code  => {:#016x}-{:#016x}",
-            initVirt, initVirt.Offset(initSize));
+        LogTrace("VMM: Mapping .kernel_init_code  => {:#016x}-{:#016x}",
+                 initVirt, initVirt.Offset(initSize));
         Assert(s_KernelPageMap->MapRange(initVirt, initPhys, initSize,
                                          PageAttributes::eRWX
                                              | PageAttributes::eWriteBack));
@@ -150,8 +155,8 @@ namespace VMM
         auto    modulesPhys = modulesVirt - kernelVirt + kernelPhys;
         auto    modulesSize = Pointer(module_init_end_addr) - modulesVirt;
 
-        LogTrace("VMM: Mapping .modules      => {:#016x}-{:#016x}",
-                 modulesVirt, modulesVirt.Offset(modulesSize));
+        LogTrace("VMM: Mapping .modules      => {:#016x}-{:#016x}", modulesVirt,
+                 modulesVirt.Offset(modulesSize));
         s_KernelPageMap->MapRange(modulesVirt, modulesPhys, modulesSize,
                                   PageAttributes::eRWX
                                       | PageAttributes::eWriteBack);
@@ -160,8 +165,8 @@ namespace VMM
         auto    rodataPhys = rodataVirt - kernelVirt + kernelPhys;
         auto    rodataSize = Pointer(rodata_end_addr) - rodataVirt;
 
-        LogTrace("VMM: Mapping .rodata       => {:#016x}-{:#016x}",
-                 rodataVirt, rodataVirt.Offset(rodataSize));
+        LogTrace("VMM: Mapping .rodata       => {:#016x}-{:#016x}", rodataVirt,
+                 rodataVirt.Offset(rodataSize));
         s_KernelPageMap->MapRange(rodataVirt, rodataPhys, rodataSize,
                                   PageAttributes::eRead
                                       | PageAttributes::eWriteBack);
@@ -170,8 +175,8 @@ namespace VMM
         auto    dataPhys = dataVirt - kernelVirt + kernelPhys;
         auto    dataSize = Pointer(data_end_addr) - dataVirt;
 
-        LogTrace("VMM: Mapping .data         => {:#016x}-{:#016x}",
-                 dataVirt, dataVirt.Offset(dataSize));
+        LogTrace("VMM: Mapping .data         => {:#016x}-{:#016x}", dataVirt,
+                 dataVirt.Offset(dataSize));
         s_KernelPageMap->MapRange(dataVirt, dataPhys, dataSize,
                                   PageAttributes::eRW
                                       | PageAttributes::eWriteBack);
