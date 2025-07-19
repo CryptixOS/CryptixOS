@@ -1,7 +1,9 @@
+name: Contribution Stats
+
 on:
   pull_request:
     branches:
-      - dev
+      - main
 
 jobs:
   calculate_stats:
