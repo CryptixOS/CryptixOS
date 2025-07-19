@@ -1,3 +1,8 @@
+name: cppcheck
+on:
+  push:
+    branches:
+      - dev
 jobs:
   build:
     name: cppcheck-test
