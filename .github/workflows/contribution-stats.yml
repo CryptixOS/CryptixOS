@@ -1,10 +1,9 @@
 - name: Contribution Stats
-  uses: umutto/contribution-stats@v1.0.7
-
+  uses: umutto/contribution-stats@v1
 on:
   pull_request:
     branches:
-      - main
+      - dev
 
 jobs:
   calculate_stats:
