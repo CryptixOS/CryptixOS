@@ -3,7 +3,7 @@ name: Contribution Stats
 on:
   pull_request:
     branches:
-      - main
+      - dev
 
 jobs:
   calculate_stats:
