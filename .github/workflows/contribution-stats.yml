@@ -1,5 +1,3 @@
-- name: Contribution Stats
-  uses: umutto/contribution-stats@v1
 on:
   pull_request:
     branches:
