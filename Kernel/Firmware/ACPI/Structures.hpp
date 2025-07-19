@@ -101,13 +101,13 @@ namespace ACPI
 
     struct [[gnu::packed]] X86BootArchitectureFlags
     {
-        bool LegacyDevices     : 1;
-        bool I8042Available    : 1;
-        bool VgaNotPresent     : 1;
-        bool MsiNotSupported   : 1;
-        bool PCIeASPM_Controls : 1;
-        bool CmosRtcNotPresent : 1;
-        u16  Reserved          : 10;
+        bool LegacyDevices     : 1  = 0;
+        bool I8042Available    : 1  = 0;
+        bool VgaNotPresent     : 1  = 0;
+        bool MsiNotSupported   : 1  = 0;
+        bool PCIeASPM_Controls : 1  = 0;
+        bool CmosRtcNotPresent : 1  = 0;
+        u16  Reserved          : 10 = 0;
     };
     enum class FadtFlags : u32
     {

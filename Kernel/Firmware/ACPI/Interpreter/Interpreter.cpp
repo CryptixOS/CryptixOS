@@ -270,8 +270,11 @@ namespace ACPI::Interpreter
             case OpCode::eOne: initialValue = 1; break;
             case OpCode::eZero: initialValue = 0; break;
             case OpCode::eQWordPrefix: byteCount = 4;
+                [[fallthrough]];
             case OpCode::eDWordPrefix: byteCount = 3;
+                [[fallthrough]];
             case OpCode::eWordPrefix: byteCount = 2;
+                [[fallthrough]];
             case OpCode::eBytePrefix: byteCount = 1; break;
             case OpCode::eBuffer:
             {
