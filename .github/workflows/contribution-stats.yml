@@ -1,7 +1,7 @@
 name: Contribution Stats
 
 on:
-  pull_request:
+  push:
     branches:
       - dev
 
