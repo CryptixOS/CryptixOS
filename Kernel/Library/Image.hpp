@@ -42,10 +42,12 @@ namespace PNG
         eIndexed            = 3,
         eGrayscaleWithAlpha = 4,
         eTrueColorWithAlpha = 6,
+        eCount              = 7,
     };
     enum class CompressionMethod : u8
     {
         eDeflate = 0,
+        eCount   = 1,
     };
     enum class FilterType : u8
     {
@@ -54,11 +56,13 @@ namespace PNG
         eUp      = 2,
         eAverage = 3,
         ePaeth   = 4,
+        eCount   = 5,
     };
     enum class InterlaceMethod : u8
     {
         eNone  = 0,
         eAdam7 = 1,
+        eCount = 2,
     };
 
     struct [[gnu::packed]] PaletteEntry

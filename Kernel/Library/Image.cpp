@@ -12,10 +12,10 @@
 
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Memory/ByteStream.hpp>
+#include <Prism/String/StringUtils.hpp>
+
 #include <Prism/Utility/Checksum.hpp>
 #include <Prism/Utility/Math.hpp>
-
-#include <magic_enum/magic_enum.hpp>
 
 namespace PNG
 {
@@ -58,7 +58,7 @@ namespace PNG
         ByteStream<Endian::eBig> stream(data, size);
         u8                       signature[8];
         stream >> signature;
-        if (std::memcmp(signature, PNG::SIGNATURE, 8) != 0)
+        if (Memory::Compare(signature, PNG::SIGNATURE, 8) != 0)
         {
             LogError("PNG: Invalid signature -> '{:#02x}'",
                      fmt::join(signature, "\\"));
@@ -202,7 +202,7 @@ namespace PNG
             FilterType filter;
             inputStream >> filter;
 
-            if (!magic_enum::enum_contains(filter))
+            if (filter >= FilterType::eCount)
             {
                 LogError("PNG: Invalid filter, the image is corrupted");
                 return {};
@@ -218,17 +218,17 @@ namespace PNG
             {
                 u8* src = currentRow + x * m_ChannelCount;
                 u8* dst = currentRow + x * outputChannelCount;
-                std::memmove(dst, src, m_ChannelCount);
+                Memory::Move(dst, src, m_ChannelCount);
                 if (m_ChannelCount == 3) dst[3] = 255;
             }
 
             for (usize i = 0; m_Depth == 16 && i < stride; i += 2)
-                std::swap(currentRow[i], currentRow[i + 1]);
+                Swap(currentRow[i], currentRow[i + 1]);
 
             prevRow = currentRow;
         }
 
-        return std::move(reconstructedScanlines);
+        return Move(reconstructedScanlines);
     }
     void Loader::UnfilterScanline(u8* currentRow, const u8* previousRow,
                                   i32 bytesPerPixel, i32 length,
@@ -253,6 +253,8 @@ namespace PNG
                 case PNG::FilterType::ePaeth:
                     currentRow[x] += PNG::PredictPaeth(left, above, upperLeft);
                     break;
+
+                default: break;
             }
         }
     }
@@ -268,8 +270,8 @@ namespace PNG
         stream >> m_Width;
         stream >> m_Height;
 
-        if (m_Width == 0 || m_Width > std::numeric_limits<i32>::max()
-            || m_Height == 0 || m_Height > std::numeric_limits<i32>::max())
+        if (m_Width == 0 || m_Width > NumericLimits<i32>::Max()
+            || m_Height == 0 || m_Height > NumericLimits<i32>::Max())
         {
             LogError("PNG: Invalid image size, width: {}, height: {}", m_Width,
                      m_Height);
@@ -287,7 +289,7 @@ namespace PNG
         }
         stream >> m_Color;
         m_ColorType = static_cast<ColorType>(m_Color);
-        if (!magic_enum::enum_contains(m_ColorType))
+        if (m_ColorType >= ColorType::eCount)
         {
             LogError("PNG: Invalid color type -> {}", m_Color);
             return false;
@@ -318,7 +320,7 @@ namespace PNG
         if (!validDepth)
         {
             LogError("PNG: Invalid depth({}) for color type '{}'", m_Depth,
-                     magic_enum::enum_name(m_ColorType).data() + 1);
+                     ToString(m_ColorType).Substr(1));
             return false;
         }
         m_ChannelCount = channelCountForColorType[m_Color];
@@ -337,7 +339,7 @@ namespace PNG
             return false;
         }
         stream >> m_Interlace;
-        if (!magic_enum::enum_contains(m_Interlace))
+        if (m_Interlace >= InterlaceMethod::eCount)
         {
             LogError("PNG: Bad interlace method -> {}",
                      ToUnderlying(m_Interlace));
@@ -356,7 +358,7 @@ namespace PNG
                 "\nPLTE chunk can only appear in images with ColorType:\n"
                 "- TrueColor\n",
                 "- Indexed\n", "- TrueColorWithAlpha",
-                magic_enum::enum_name(m_ColorType).data() + 1);
+                ToString(m_ColorType).Substr(1));
             return false;
         }
         if (chunk.Length > 256 * 3)
@@ -456,7 +458,7 @@ namespace PNG
             case ColorType::eGrayscaleWithAlpha:
             case ColorType::eTrueColorWithAlpha:
                 LogWarn("PNG: tRNS chunk shouldn't appear for color type: '{}'",
-                        magic_enum::enum_name(m_ColorType).data() + 1);
+                        ToString(m_ColorType).Substr(1));
                 break;
 
             default: break;
@@ -478,7 +480,7 @@ namespace PNG
         if (pixels.Empty()) return false;
 
         m_Pixels.Resize(pixels.Size());
-        std::memcpy(m_Pixels.Raw(), pixels.Raw(), pixels.Size());
+        Memory::Copy(m_Pixels.Raw(), pixels.Raw(), pixels.Size());
         m_Width         = pngLoader.Width();
         m_Height        = pngLoader.Height();
         m_Pitch         = m_Width * 4;
