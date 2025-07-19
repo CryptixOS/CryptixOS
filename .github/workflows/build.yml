@@ -1,5 +1,8 @@
 name: CI Meson
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: ["master", "dev"]
