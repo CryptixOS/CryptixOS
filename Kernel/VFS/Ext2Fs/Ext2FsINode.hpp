@@ -20,7 +20,7 @@ class Ext2FsINode : public INode
     TraverseDirectories(class DirectoryEntry* parent,
                         DirectoryIterator     iterator) override;
     virtual ErrorOr<Ref<DirectoryEntry>>
-    Lookup(Ref<DirectoryEntry> dentry) override;
+                   Lookup(Ref<DirectoryEntry> dentry) override;
 
     virtual const UnorderedMap<StringView, INode*>& Children() const
     {
@@ -37,9 +37,10 @@ class Ext2FsINode : public INode
     friend class Ext2Fs;
 
   private:
-    Ext2Fs*                                m_Fs;
-    Ext2FsINodeMeta                        m_Meta;
+    Ext2Fs*                          m_Fs;
+    Ext2FsINodeMeta                  m_Meta;
     UnorderedMap<StringView, INode*> m_Children;
+    usize                            m_DirectoryOffset = 0;
 
     void          Initialize(ino_t index, mode_t mode, u16 type);
     ErrorOr<void> AddDirectoryEntry(Ext2FsDirectoryEntry& dentry);

@@ -10,8 +10,8 @@
 
 #include <Library/ELF_Definitions.hpp>
 
-#include <Prism/Core/Error.hpp>
 #include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Core/Error.hpp>
 
 #include <Prism/Memory/Buffer.hpp>
 #include <Prism/Memory/Memory.hpp>
@@ -89,6 +89,7 @@ namespace ELF
 
         struct SectionHeader*         m_SymbolSection = nullptr;
         struct SectionHeader*         m_StringSection = nullptr;
+        struct SectionHeader*         m_GotSection    = nullptr;
         const char*                   m_StringTable   = nullptr;
 
         RedBlackTree<StringView, u64> m_Symbols;

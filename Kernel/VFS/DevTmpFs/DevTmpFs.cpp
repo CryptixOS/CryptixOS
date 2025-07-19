@@ -16,7 +16,7 @@ DevTmpFs::DevTmpFs(u32 flags)
 {
 }
 
-ErrorOr<Ref<DirectoryEntry>> DevTmpFs::Mount(StringView  sourcePath,
+ErrorOr<::Ref<DirectoryEntry>> DevTmpFs::Mount(StringView  sourcePath,
                                              const void* data)
 {
     m_MountData
@@ -35,7 +35,7 @@ ErrorOr<Ref<DirectoryEntry>> DevTmpFs::Mount(StringView  sourcePath,
     return m_RootEntry;
 }
 
-ErrorOr<INode*> DevTmpFs::CreateNode(INode* parent, Ref<DirectoryEntry> entry,
+ErrorOr<INode*> DevTmpFs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
                                      mode_t mode, uid_t uid, gid_t gid)
 {
     auto inodeOr = MkNod(parent, entry.Raw(), mode, 0);
@@ -46,7 +46,7 @@ ErrorOr<INode*> DevTmpFs::CreateNode(INode* parent, Ref<DirectoryEntry> entry,
     return inode;
 }
 
-ErrorOr<INode*> DevTmpFs::Symlink(INode* parent, Ref<DirectoryEntry> entry,
+ErrorOr<INode*> DevTmpFs::Symlink(INode* parent, ::Ref<DirectoryEntry> entry,
                                   StringView target)
 {
     ToDo();
@@ -60,7 +60,7 @@ INode* DevTmpFs::Link(INode* parent, StringView name, INode* oldNode)
     return nullptr;
 }
 
-ErrorOr<INode*> DevTmpFs::MkNod(INode* parent, Ref<DirectoryEntry> entry,
+ErrorOr<INode*> DevTmpFs::MkNod(INode* parent, ::Ref<DirectoryEntry> entry,
                                 mode_t mode, dev_t dev)
 {
     auto inode = new DevTmpFsINode(entry->Name(), this, mode);

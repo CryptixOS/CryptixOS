@@ -121,7 +121,7 @@ ErrorOr<Ref<ELF::Image>>
 ExecutableProgram::LoadImage(PathView path, PageMap* pageMap,
                              AddressSpace& addressSpace, bool interpreter)
 {
-    Ref entry = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), path)
+    Ref entry = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), path)
                     .value()
                     .Entry;
     if (!entry) return Error(ENOENT);
@@ -130,7 +130,7 @@ ExecutableProgram::LoadImage(PathView path, PageMap* pageMap,
     if (!inode) return Error(ENOENT);
 
     auto maybeFile
-        = VFS::Open(VFS::GetRootDirectoryEntry().Raw(), path, O_RDONLY, 0);
+        = VFS::Open(VFS::RootDirectoryEntry().Raw(), path, O_RDONLY, 0);
     RetOnError(maybeFile);
 
     Ref file  = maybeFile.value();

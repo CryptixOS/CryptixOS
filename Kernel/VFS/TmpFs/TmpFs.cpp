@@ -22,7 +22,7 @@ TmpFs::TmpFs(u32 flags)
 {
 }
 
-ErrorOr<Ref<DirectoryEntry>> TmpFs::Mount(StringView  sourcePath,
+ErrorOr<::Ref<DirectoryEntry>> TmpFs::Mount(StringView  sourcePath,
                                           const void* data)
 {
     m_MountData
@@ -68,7 +68,7 @@ ErrorOr<INode*> TmpFs::AllocateNode(StringView name, mode_t mode)
     --m_FreeINodeCount;
     return inode;
 }
-ErrorOr<INode*> TmpFs::CreateNode(INode* parent, Ref<DirectoryEntry> entry,
+ErrorOr<INode*> TmpFs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
                                   mode_t mode, uid_t uid, gid_t gid)
 {
     auto inodeOr = MkNod(parent, entry.Raw(), mode, 0);
@@ -81,7 +81,7 @@ ErrorOr<INode*> TmpFs::CreateNode(INode* parent, Ref<DirectoryEntry> entry,
     return inode;
 }
 
-ErrorOr<INode*> TmpFs::Symlink(INode* parent, Ref<DirectoryEntry> entry,
+ErrorOr<INode*> TmpFs::Symlink(INode* parent, ::Ref<DirectoryEntry> entry,
                                StringView target)
 {
     if (m_NextInodeIndex >= m_MaxInodeCount) return Error(ENOSPC);
@@ -108,7 +108,7 @@ INode* TmpFs::Link(INode* parent, StringView name, INode* oldNode)
     return new TmpFsINode(name, this, (oldNode->Stats().st_mode & ~S_IFMT));
 }
 
-ErrorOr<INode*> TmpFs::MkNod(INode* parent, Ref<DirectoryEntry> entry,
+ErrorOr<INode*> TmpFs::MkNod(INode* parent, ::Ref<DirectoryEntry> entry,
                              mode_t mode, dev_t dev)
 {
     if (parent)

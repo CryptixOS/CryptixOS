@@ -125,6 +125,22 @@ To run CryptixOS in QEMU:
 
 ## ✅ To-Do Tracker
 
+## Subsystems
+
+### Scheduler
+- ✅ Per-CPU Wait, Ready, Blocked Queues using IntrusiveLists
+- ✅ Multi-threading
+- ✅ SMP
+- ✅ WaitPid
+- ✅ Events
+
+### Memory Manager 
+- ✅ Physical Bitmap Allocator
+- ⬜ Physical Buddy Allocator
+- ✅ Virtual Memory Allocator, using Red-Black Tree
+- ✅ Heap Slab Allocator
+- ⬜ Heap Slob Allocator
+
 ## 🔌 Drivers
 
 ### 🧱 Base
@@ -152,6 +168,7 @@ To run CryptixOS in QEMU:
 - ✅ PCIe
 - ✅ Device Tree
 - ✅ ACPI
+- ✅ Basic Power Management (Reboot, Shutdown)
 - ⬜ USB
 - ⬜ Embedded Controller
 

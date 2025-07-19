@@ -4,21 +4,26 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <VFS/Filesystem.hpp>
 #include <VFS/MountPoint.hpp>
 
 MountPoint::List MountPoint::s_MountPoints = {};
 
-MountPoint::MountPoint(DirectoryEntry* hostEntry, class Filesystem* mountedFs)
+MountPoint::MountPoint(::Ref<DirectoryEntry>   hostEntry,
+                       ::Ref<class Filesystem> mountedFs)
     : m_Root(hostEntry)
     , m_Filesystem(mountedFs)
 {
 }
 
-void MountPoint::Attach(MountPoint* mountPoint)
+::Ref<DirectoryEntry> MountPoint::HostEntry() const { return m_Root; }
+::Ref<Filesystem>     MountPoint::Filesystem() const { return m_Filesystem; }
+
+void                  MountPoint::Attach(::Ref<MountPoint> mountPoint)
 {
     s_MountPoints.PushBack(mountPoint);
 }
-MountPoint* MountPoint::Lookup(DirectoryEntry* entry)
+::Ref<MountPoint> MountPoint::Lookup(::Ref<DirectoryEntry> entry)
 {
     auto current = Head();
     while (current && current->HostEntry() != entry)
@@ -27,13 +32,13 @@ MountPoint* MountPoint::Lookup(DirectoryEntry* entry)
     return current;
 }
 
-MountPoint* MountPoint::Head() { return s_MountPoints.Head(); }
-MountPoint* MountPoint::Tail() { return s_MountPoints.Tail(); }
-void        MountPoint::Iterate(MountPointIterator iterator)
+::Ref<MountPoint> MountPoint::Head() { return s_MountPoints.Head(); }
+::Ref<MountPoint> MountPoint::Tail() { return s_MountPoints.Tail(); }
+void              MountPoint::Iterate(MountPointIterator iterator)
 {
     auto current = Head();
     for (; current; current = current->NextMountPoint())
         if (iterator(current)) break;
 }
 
-MountPoint* MountPoint::NextMountPoint() const { return Hook.Next; }
+::Ref<MountPoint> MountPoint::NextMountPoint() const { return Hook.Next; }

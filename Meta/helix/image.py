@@ -13,7 +13,8 @@ class Image:
         self.last_part_sector = 1
         size_mib = size_bytes // 1024 // 1024
         trace(f'creating image `{path}` with size: `{size_mib}`')
-        run(['dd', 'if=/dev/zero', f'of={path}', 'bs=1M', f'count={size_mib}'])
+        run(['fallocate', '-l', f'{size_mib}M', path])
+        # run(['dd', 'if=/dev/zero', f'of={path}', 'bs=1M', f'count={size_mib}'])
         self.image_path = path
         
     def close(self):

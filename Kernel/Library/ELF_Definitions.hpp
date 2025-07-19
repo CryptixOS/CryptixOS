@@ -130,25 +130,25 @@ namespace ELF
 
     struct [[gnu::packed]] Header
     {
-        u32            Magic;
-        Bitness        Bitness;
-        Endianness     Endianness;
-        u8             HeaderVersion;
-        ABI            Abi;
-        u64            Padding;
-        u16            Type;
-        InstructionSet InstructionSet;
-        u32            ElfVersion;
-        u64            EntryPoint;
-        u64            ProgramHeaderTableOffset;
-        u64            SectionHeaderTableOffset;
-        u32            Flags;
-        u16            HeaderSize;
-        u16            ProgramEntrySize;
-        u16            ProgramEntryCount;
-        u16            SectionEntrySize;
-        u16            SectionEntryCount;
-        u16            SectionNamesIndex;
+        u32                 Magic;
+        enum Bitness        Bitness;
+        enum Endianness     Endianness;
+        u8                  HeaderVersion;
+        ABI                 Abi;
+        u64                 Padding;
+        u16                 Type;
+        enum InstructionSet InstructionSet;
+        u32                 ElfVersion;
+        u64                 EntryPoint;
+        u64                 ProgramHeaderTableOffset;
+        u64                 SectionHeaderTableOffset;
+        u32                 Flags;
+        u16                 HeaderSize;
+        u16                 ProgramEntrySize;
+        u16                 ProgramEntryCount;
+        u16                 SectionEntrySize;
+        u16                 SectionEntryCount;
+        u16                 SectionNamesIndex;
     };
 
     enum class HeaderType : u32

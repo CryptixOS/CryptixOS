@@ -20,20 +20,20 @@ class TmpFs : public Filesystem
     inline usize GetSize() const { return m_Size; }
     inline usize GetMaxSize() const { return m_MaxSize; }
 
-    virtual ErrorOr<Ref<DirectoryEntry>>
+    virtual ErrorOr<::Ref<DirectoryEntry>>
     Mount(StringView sourcePath, const void* data = nullptr) override;
 
     virtual ErrorOr<INode*> AllocateNode(StringView name,
                                          INodeMode  mode) override;
-    virtual ErrorOr<INode*> CreateNode(INode* parent, Ref<DirectoryEntry> entry,
-                                       mode_t mode, uid_t uid = 0,
-                                       gid_t gid = 0) override;
-    virtual ErrorOr<INode*> Symlink(INode* parent, Ref<DirectoryEntry> entry,
+    virtual ErrorOr<INode*> CreateNode(INode*                parent,
+                                       ::Ref<DirectoryEntry> entry, mode_t mode,
+                                       uid_t uid = 0, gid_t gid = 0) override;
+    virtual ErrorOr<INode*> Symlink(INode* parent, ::Ref<DirectoryEntry> entry,
                                     StringView target) override;
     virtual INode*          Link(INode* parent, StringView name,
                                  INode* oldNode) override;
     virtual bool Populate(DirectoryEntry* dentry) override { return true; }
-    virtual ErrorOr<INode*> MkNod(INode* parent, Ref<DirectoryEntry> entry,
+    virtual ErrorOr<INode*> MkNod(INode* parent, ::Ref<DirectoryEntry> entry,
                                   mode_t mode, dev_t dev) override;
 
   private:

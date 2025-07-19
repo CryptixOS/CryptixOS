@@ -161,13 +161,21 @@ ErrorOr<isize> INode::CheckPermissions(mode_t mask)
     return 0;
 }
 
-ErrorOr<DirectoryEntry*> INode::Lookup(class DirectoryEntry* entry)
+ErrorOr<Ref<DirectoryEntry>> INode::Lookup(Ref<DirectoryEntry> dentry)
 {
-    auto node = Lookup(entry->Name());
-    if (!node) return Error(ENOENT);
+    auto inode = Lookup(dentry->Name());
+    if (!inode) return Error(ENOENT);
 
-    entry->m_INode = node;
-    return entry;
+    dentry->Bind(inode);
+    return dentry;
+}
+ErrorOr<Ref<DirectoryEntry>> INode::LookupV2(Ref<DirectoryEntry> dentry)
+{
+    auto inode = Lookup(dentry->Name());
+    if (!inode) return Error(ENOENT);    
+
+    dentry->Bind(inode);
+    return dentry;
 }
 
 ErrorOr<void> INode::SetOwner(uid_t uid, gid_t gid)

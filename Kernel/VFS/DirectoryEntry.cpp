@@ -15,15 +15,18 @@
 // NOTE(v1tr10l7): Directories should only have one DirectoryEntry, regular
 // files might have multiple pointing to the same inode
 
-DirectoryEntry::DirectoryEntry(::Ref<DirectoryEntry> parent, class INode* inode)
+DirectoryEntry::DirectoryEntry(::WeakRef<DirectoryEntry> parent,
+                               class INode*              inode)
     : m_INode(inode)
 {
     m_Name   = inode->Name();
     m_Parent = parent;
 
     if (parent) parent->InsertChild(this);
+    Bind(inode);
 }
-DirectoryEntry::DirectoryEntry(::Ref<DirectoryEntry> parent, StringView name)
+DirectoryEntry::DirectoryEntry(::WeakRef<DirectoryEntry> parent,
+                               StringView                name)
     : m_Name(name)
     , m_Parent(parent)
 {
@@ -35,14 +38,15 @@ Path DirectoryEntry::Path()
 {
     StringBuilder pathBuilder;
 
-    auto          current   = this;
-    auto          rootEntry = VFS::GetRootDirectoryEntry();
+    WeakRef       current   = this;
+    auto          rootEntry = VFS::RootDirectoryEntry();
 
-    while (current && current != rootEntry.Raw())
+    while (current && current != rootEntry)
     {
         auto segment = "/"_s;
         segment += current->m_Name;
-        pathBuilder.Insert(segment);
+
+        if (current->m_Name != "/"_sv) pathBuilder.Insert(segment);
 
         current = current->GetEffectiveParent().Raw();
     }
@@ -55,20 +59,32 @@ DirectoryEntry::Children() const
     return m_Children;
 }
 
-void DirectoryEntry::SetParent(::Ref<DirectoryEntry> entry)
+void DirectoryEntry::SetParent(::WeakRef<DirectoryEntry> entry)
 {
     m_Parent = entry;
 }
-void DirectoryEntry::SetMountGate(class INode*          inode,
-                                  ::Ref<DirectoryEntry> mountPoint)
+void DirectoryEntry::SetMountGate(::Ref<DirectoryEntry> mountPoint)
 {
     ScopedLock guard(m_Lock);
     m_MountGate = mountPoint;
+
+    if (!(m_Flags & DirectoryEntryFlags::eEntryTypeMask))
+        m_Flags |= DirectoryEntryFlags::eDirectory;
+    m_Flags |= DirectoryEntryFlags::eMountPoint;
 }
 void DirectoryEntry::Bind(class INode* inode)
 {
+    Assert(inode);
+
     ScopedLock guard(m_Lock);
     m_INode = inode;
+
+    if (inode->IsDirectory()) m_Flags |= DirectoryEntryFlags::eDirectory;
+    if (inode->IsRegular()) m_Flags |= DirectoryEntryFlags::eRegular;
+    if (inode->IsSymlink()) m_Flags |= DirectoryEntryFlags::eSymlink;
+    if (inode->IsCharDevice() /*|| inode->IsBlockDevice()*/ || inode->IsSocket()
+        || inode->IsFifo())
+        m_Flags |= DirectoryEntryFlags::eSpecial;
 }
 void DirectoryEntry::InsertChild(Prism::Ref<class DirectoryEntry> entry)
 {
@@ -85,11 +101,10 @@ void DirectoryEntry::RemoveChild(Prism::Ref<class DirectoryEntry> entry)
     m_Children.Erase(it);
 }
 
-::Ref<DirectoryEntry> DirectoryEntry::FollowMounts()
+::WeakRef<DirectoryEntry> DirectoryEntry::FollowMounts()
 {
-    auto current = this;
-    while (current && current->m_MountGate)
-        current = current->m_MountGate.Raw();
+    WeakRef current = this;
+    while (current && current->m_MountGate) current = current->m_MountGate;
 
     return current;
 }
@@ -97,12 +112,12 @@ void DirectoryEntry::RemoveChild(Prism::Ref<class DirectoryEntry> entry)
 {
     auto target = m_INode->GetTarget();
 
-    if (!target.Empty())
+    if (!target.Empty() && IsSymlink())
     {
         if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
 
         auto next = VFS::ResolvePath(m_Parent.Raw(), target.Raw(), true)
-                        .value_or(VFS::PathResolution{})
+                        .ValueOr(VFS::PathResolution{})
                         .Entry;
         if (!next) return_err(nullptr, ENOENT);
 
@@ -113,10 +128,10 @@ void DirectoryEntry::RemoveChild(Prism::Ref<class DirectoryEntry> entry)
 }
 WeakRef<DirectoryEntry> DirectoryEntry::GetEffectiveParent()
 {
-    auto rootEntry  = VFS::GetRootDirectoryEntry()->FollowMounts();
+    auto rootEntry  = VFS::RootDirectoryEntry()->FollowMounts();
     auto mountPoint = MountPoint::Lookup(const_cast<DirectoryEntry*>(this));
 
-    if (this == rootEntry.Raw() || this == VFS::GetRootDirectoryEntry().Raw())
+    if (this == rootEntry.Raw() || this == VFS::RootDirectoryEntry().Raw())
         return const_cast<DirectoryEntry*>(this);
     else if (mountPoint) return mountPoint->HostEntry()->Parent();
 
@@ -125,22 +140,37 @@ WeakRef<DirectoryEntry> DirectoryEntry::GetEffectiveParent()
 ::Ref<DirectoryEntry> DirectoryEntry::Lookup(const String& name)
 {
     auto entryIt = m_Children.Find(name);
-    if (entryIt != m_Children.end()) return entryIt->Value.Raw();
+    if (entryIt != m_Children.end()) return entryIt->Value;
     if (!m_INode) return nullptr;
 
     auto inode = m_INode->Lookup(name);
     if (!inode) return nullptr;
 
-    ::Ref entry = new DirectoryEntry(this, name);
+    ::Ref entry = CreateRef<DirectoryEntry>(this, name);
     entry->Bind(inode);
 
     InsertChild(entry);
-    return entry.Raw();
+    return entry;
 }
 
-bool DirectoryEntry::IsCharDevice() const { return m_INode->IsCharDevice(); }
-bool DirectoryEntry::IsFifo() const { return m_INode->IsFifo(); }
-bool DirectoryEntry::IsDirectory() const { return m_INode->IsDirectory(); }
-bool DirectoryEntry::IsRegular() const { return m_INode->IsRegular(); }
-bool DirectoryEntry::IsSymlink() const { return m_INode->IsSymlink(); }
-bool DirectoryEntry::IsSocket() const { return m_INode->IsSocket(); }
+bool DirectoryEntry::IsMountPoint() const
+{
+    return m_Flags & DirectoryEntryFlags::eMountPoint;
+}
+bool DirectoryEntry::IsDirectory() const
+{
+    return m_Flags & DirectoryEntryFlags::eDirectory;
+}
+bool DirectoryEntry::IsRegular() const
+{
+    return m_Flags & DirectoryEntryFlags::eRegular;
+}
+bool DirectoryEntry::IsSymlink() const
+{
+    return m_INode->IsSymlink();
+    // return m_Flags & DirectoryEntryFlags::eSymlink;
+}
+bool DirectoryEntry::IsSpecial() const
+{
+    return m_Flags & DirectoryEntryFlags::eSpecial;
+}

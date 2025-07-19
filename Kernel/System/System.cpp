@@ -73,17 +73,29 @@ namespace System
         Stacktrace::Initialize();
         return {};
     }
+
+    static void MapBootModule(const BootModuleInfo& module)
+    {
+        PageMap* pageMap   = VMM::GetKernelPageMap();
+        Pointer  virtBase  = module.LoadAddress;
+        usize    size      = module.Size;
+        usize    pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
+
+        for (usize i = 0; i < pageCount; i++)
+        {
+            usize offset = PMM::PAGE_SIZE * i;
+            auto  virt   = virtBase.Offset<Pointer>(offset);
+            auto  phys   = virt.FromHigherHalf();
+
+            if (pageMap->ValidateAddress(virt)) continue;
+            Assert(pageMap->Map(virt, phys));
+        }
+    }
     void PrepareBootModules(Span<BootModuleInfo> bootModules)
     {
         s_BootModules = bootModules;
 
-        // TODO(v1tr10l7): Map modules
-
-        // auto pageMap  = VMM::GetKernelPageMap();
-        // for (const auto& module : s_BootModules)
-        //     Assert(pageMap->MapRange(module.LoadAddress,
-        //                              module.LoadAddress.FromHigherHalf(),
-        //                              module.Size));
+        for (const auto& module : s_BootModules) MapBootModule(module);
     }
     const BootModuleInfo* FindBootModule(StringView name)
     {
@@ -279,17 +291,19 @@ namespace System
                     module->Initialize
                         = reinterpret_cast<ModuleInitProc>(symbol.Value);
                 }
+                // LogTrace("Symbol => {}", name);
                 // u64 resolvedValue = System::LookupKernelSymbol(name);
                 // LogTrace("Resolved symbol =>\n\tName: {}, Value: {:#x}",
                 // name,
                 //          resolvedValue);
-
                 return true;
             });
 
         ELF::Image::SymbolLookup lookup;
         lookup.Bind<LookupKernelSymbol>();
         status = image->ApplyRelocations(lookup);
+        image->ForEachSymbolEntry(it);
+
         // image->ForEachSymbolEntry(it);
         // status = image->ResolveSymbols(lookup);
         if (!status)
@@ -298,11 +312,11 @@ namespace System
         else
             LogInfo("System: Successfully resolved symbols of module `{}`",
                     module->Name);
-        if (module->Initialize) module->Initialize();
-        else
-            LogError("System: Module `{}` doesn't have any entry point",
-                     module->Name);
-
+        // if (module->Initialize) module->Initialize();
+        // else
+        //     LogError("System: Module `{}` doesn't have any entry point",
+        //              module->Name);
+        //
         // TODO(v1tr10l7): Load the module
 
         // delete module;
@@ -336,8 +350,8 @@ namespace System
     Module::List& Modules() { return s_Modules; }
     Ref<Module>   FindModule(StringView name)
     {
-        for (auto& module : s_Modules)
-            if (module.Name == name) return &module;
+        for (Ref<Module> module : s_Modules)
+            if (module->Name == name) return module;
 
         return nullptr;
     }

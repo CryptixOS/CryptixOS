@@ -118,8 +118,7 @@ namespace API::MM
             region = addressSpace.AllocateRegion(length, pageSize);
 
         // TODO(v1tr10l7): sharring mappings
-        if (flags & MAP_SHARED)
-            ;
+        if (flags & MAP_SHARED) {};
 
         if (!region) goto fail;
         region->SetAccessMode(access);

@@ -36,7 +36,7 @@ namespace
     Process*                      s_KernelProcess = nullptr;
     Spinlock                      s_ProcessListLock;
     UnorderedMap<pid_t, Process*> s_Processes;
-    ProcFs*                       s_ProcFs = nullptr;
+    Ref<ProcFs>                   s_ProcFs = nullptr;
 } // namespace
 
 struct ThreadQueue
@@ -162,7 +162,7 @@ void Scheduler::InitializeProcFs()
     VFS::CreateNode(nullptr, "/proc", 0755 | S_IFDIR);
     Assert(VFS::Mount(nullptr, "", "/proc", "procfs"));
 
-    s_ProcFs = reinterpret_cast<ProcFs*>(MountPoint::Head()->Filesystem());
+    s_ProcFs = MountPoint::Head()->Filesystem().As<ProcFs>();
     s_ProcFs->AddProcess(s_KernelProcess);
 }
 void Scheduler::PrepareAP(bool start)

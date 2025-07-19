@@ -6,6 +6,7 @@ import argparse
 
 from helix.log import trace, info, error, fail
 import helix.image
+from helix import shell
 from helix.image import Image, PartitionTableType
 from enum import Enum
 
@@ -59,14 +60,19 @@ def run():
     finally:
         image.close()
 
+    # shell.run(['chown', 'image_path', real_uid, real_gid])
     info("Done.")
 
 def elevate():
+    os.environ['RAISED_BY_SUDO_UID'] = str(os.getuid())
+    os.environ['RAISED_BY_SUDO_GID'] = str(os.getgid())
     args = ['sudo', sys.executable] + sys.argv
     os.execlpe('sudo', *args, os.environ)
 
 if __name__ == '__main__':
-    if os.geteuid() != 0:
+    uid = os.geteuid()
+
+    if uid != 0:
         info("Script not started as root. Running sudo...")
         elevate()
 
@@ -78,4 +84,3 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     run()
-

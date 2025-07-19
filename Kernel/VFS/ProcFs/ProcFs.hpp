@@ -29,12 +29,12 @@ class ProcFs : public Filesystem
         return "rw,nosuid,nodev,noexec,relatime";
     }
 
-    virtual ErrorOr<Ref<DirectoryEntry>>
+    virtual ErrorOr<::Ref<DirectoryEntry>>
     Mount(StringView sourcePath, const void* data = nullptr) override;
-    virtual ErrorOr<INode*> CreateNode(INode* parent, Ref<DirectoryEntry> entry,
-                                       mode_t mode, uid_t uid = 0,
-                                       gid_t gid = 0) override;
-    virtual ErrorOr<INode*> Symlink(INode* parent, Ref<DirectoryEntry> entry,
+    virtual ErrorOr<INode*> CreateNode(INode*                parent,
+                                       ::Ref<DirectoryEntry> entry, mode_t mode,
+                                       uid_t uid = 0, gid_t gid = 0) override;
+    virtual ErrorOr<INode*> Symlink(INode* parent, ::Ref<DirectoryEntry> entry,
                                     StringView target) override;
     virtual INode*          Link(INode* parent, StringView name,
                                  INode* oldNode) override;
@@ -45,5 +45,5 @@ class ProcFs : public Filesystem
 
     UnorderedMap<StringView, ProcFsProperty*> m_Properties;
 
-    void                                            AddChild(StringView name);
+    void                                      AddChild(StringView name);
 };

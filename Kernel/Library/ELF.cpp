@@ -11,9 +11,10 @@
 #include <Memory/PMM.hpp>
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
-#include <Prism/Memory/ByteStream.hpp>
 
 #include <Prism/Containers/Array.hpp>
+#include <Prism/Memory/ByteStream.hpp>
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <VFS/DirectoryEntry.hpp>
@@ -170,11 +171,19 @@ namespace ELF
                 else
                 {
                     symAddr = lookup(symName);
-                    if (!symAddr)
+                    if (!symAddr && symName == "_GLOBAL_OFFSET_TABLE_"_sv)
                     {
-                        LogError("ELF: Unresolved symbol: {}", symName);
-                        return Error(ENOEXEC);
+                        if (m_GotSection)
+                        {
+                            auto gotBase
+                                = m_LoadBase.Offset(m_GotSection->Offset);
+                            symAddr = gotBase;
+                        }
+                        else LogError(".got section was not found in the executable");
+                        // return Error(ENOEXEC);
                     }
+                    else if (!symAddr)
+                        LogError("ELF: Unresolved symbol: {}", symName);
                 }
 
                 switch (type)
@@ -355,9 +364,11 @@ namespace ELF
             return Error(ENOEXEC);
         }
 
-        if (m_Header.InstructionSet != InstructionSet::eAMDx86_64 && m_Header.InstructionSet != InstructionSet::eArm64)
+        if (m_Header.InstructionSet != InstructionSet::eAMDx86_64
+            && m_Header.InstructionSet != InstructionSet::eArm64)
         {
-            LogError("ELF: Only x86_64 and AArch64 instruction sets are supported");
+            LogError(
+                "ELF: Only x86_64 and AArch64 instruction sets are supported");
             return Error(ENOEXEC);
         }
         if (m_Header.ElfVersion != CURRENT_ELF_HEADER_VERSION)
@@ -404,6 +415,7 @@ namespace ELF
 
     StringView Image::LookupString(usize index)
     {
+        if (!m_StringTable || index >= m_StringSection->Size) return ""_sv;
         return &m_StringTable[index];
     }
 
@@ -421,15 +433,15 @@ namespace ELF
                 m_StringTable   = reinterpret_cast<const char*>(m_Image.Raw()
                                                                 + shdr.Offset);
             }
+#if 1
+            auto sectionName = LookupString(shdr.Name);
 
-#if 0
-            auto stringTable = reinterpret_cast<char*>(
-                m_Image.Raw()
-                + SectionHeader(m_Header.SectionNamesIndex)->Offset);
-            const char* sectionName = stringTable + shdr.Name;
-            ElfDebugLog(
-                "ELF: Section[{}] -> '{}': {}", i, sectionName,
-                sectionTypeToString(static_cast<SectionType>(shdr.Type)));
+            if (!sectionName.Empty()
+                && (sectionName.Compare(0, 4, ".got"_sv) == 0))
+            {
+                LogDebug("ELF: Found .got section, {}", sectionName);
+                m_GotSection = &shdr;
+            }
 #endif
         }
 

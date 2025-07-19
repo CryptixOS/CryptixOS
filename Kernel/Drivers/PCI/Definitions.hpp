@@ -93,18 +93,18 @@ namespace PCI
 
     struct [[gnu::packed]] DeviceHeader
     {
-        u16        DeviceID;
-        VendorID   VendorID;
-        Status     Status;
-        Command    Command;
-        ClassID    ClassID;
-        SubClassID SubClassID;
-        ProgIf     ProgIf;
-        u8         RevisionID;
-        u8         BIST;
-        HeaderType HeaderType;
-        u8         LatencyTimer;
-        u8         CacheLineSize;
+        u16             DeviceID;
+        enum VendorID   VendorID;
+        enum Status     Status;
+        enum Command    Command;
+        enum ClassID    ClassID;
+        enum SubClassID SubClassID;
+        enum ProgIf     ProgIf;
+        u8              RevisionID;
+        u8              BIST;
+        enum HeaderType HeaderType;
+        u8              LatencyTimer;
+        u8              CacheLineSize;
     };
 
     enum class CapabilityID : u8

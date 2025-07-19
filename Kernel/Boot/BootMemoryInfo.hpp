@@ -32,7 +32,7 @@ struct BootMemoryInfo
     Pointer             KernelPhysicalBase = nullptr;
     Pointer             KernelVirtualBase  = nullptr;
     usize               HigherHalfOffset   = 0;
-    enum PagingMode      PagingMode         = PagingMode::eNone;
-    MemoryMap           MemoryMap          = {nullptr, 0};
+    enum PagingMode     PagingMode         = PagingMode::eNone;
+    struct MemoryMap    MemoryMap          = {nullptr, 0};
     struct EfiMemoryMap EfiMemoryMap;
 };

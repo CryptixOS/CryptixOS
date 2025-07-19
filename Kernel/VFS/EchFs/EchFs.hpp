@@ -19,12 +19,12 @@ class EchFs final : public Filesystem
     }
     virtual ~EchFs();
 
-    virtual ErrorOr<Ref<DirectoryEntry>>
+    virtual ErrorOr<::Ref<DirectoryEntry>>
     Mount(StringView sourcePath, const void* data = nullptr) override;
-    virtual ErrorOr<INode*> CreateNode(INode* parent, Ref<DirectoryEntry> entry,
-                                       mode_t mode, uid_t uid = 0,
-                                       gid_t gid = 0) override;
-    virtual ErrorOr<INode*> Symlink(INode* parent, Ref<DirectoryEntry> entry,
+    virtual ErrorOr<INode*> CreateNode(INode*                parent,
+                                       ::Ref<DirectoryEntry> entry, mode_t mode,
+                                       uid_t uid = 0, gid_t gid = 0) override;
+    virtual ErrorOr<INode*> Symlink(INode* parent, ::Ref<DirectoryEntry> entry,
                                     StringView target) override
     {
         return nullptr;

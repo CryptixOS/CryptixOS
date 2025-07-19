@@ -45,7 +45,7 @@ usize DirectoryEntries::CopyAndPop(u8* out, usize capacity)
     Entries.PopFront();
     if (!entry || !(char*)entry->d_name) return 0;
 
-    std::memcpy(out, entry, entry->d_reclen);
+    Memory::Copy(out, entry, entry->d_reclen);
     delete entry;
 
     return entrySize;
@@ -118,8 +118,8 @@ ErrorOr<const stat> FileDescriptor::Stat() const
 ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
 {
     ScopedLock guard(m_Lock);
-    auto       entry = DirectoryEntry();
-    if (IsPipe() || entry->IsSocket() || entry->IsFifo()) return Error(ESPIPE);
+    auto       file = m_File;
+    if (IsPipe() || file->IsSocket() || file->IsFifo()) return Error(ESPIPE);
 
     switch (whence)
     {
@@ -130,7 +130,7 @@ ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
         case SEEK_CUR:
         {
             isize newOffset = m_Offset + offset;
-            if (newOffset >= std::numeric_limits<off_t>::max())
+            if (newOffset >= NumericLimits<off_t>::Max())
                 return Error(EOVERFLOW);
             if (newOffset < 0) return Error(EINVAL);
             m_Offset += offset;
@@ -138,14 +138,13 @@ ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
         }
         case SEEK_END:
         {
-            usize size = INode()->Stats().st_size;
+            usize size = file->Size();
             if (static_cast<usize>(m_Offset) + size
-                > std::numeric_limits<off_t>::max())
-                return Error(EOVERFLOW);  
-            
-            usize fileSize = m_File->Size();
+                > NumericLimits<off_t>::Max())
+                return Error(EOVERFLOW);
 
-            m_Offset = fileSize + offset;
+            usize fileSize = m_File->Size();
+            m_Offset       = fileSize + offset;
             break;
         }
 
@@ -158,12 +157,24 @@ ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
 ErrorOr<isize> FileDescriptor::Truncate(off_t size)
 {
     if (m_File->IsDirectory()) return Error(EISDIR);
-    if (!(m_AccessMode & FileAccessMode::eWrite)
-        || !m_File->IsRegular())
+    if (!(m_AccessMode & FileAccessMode::eWrite) || !m_File->IsRegular())
         return Error(EBADF);
 
     return m_File->Truncate(size);
 }
+
+bool FileDescriptor::IsCharDevice() const
+{
+    return INode() && INode()->IsCharDevice();
+}
+bool FileDescriptor::IsFifo() const { return INode() && INode()->IsFifo(); }
+bool FileDescriptor::IsDirectory() const
+{
+    return DirectoryEntry()->IsDirectory();
+}
+bool FileDescriptor::IsRegular() const { return DirectoryEntry()->IsRegular(); }
+bool FileDescriptor::IsSymlink() const { return DirectoryEntry()->IsSymlink(); }
+bool FileDescriptor::IsSocket() const { return INode() && INode()->IsSocket(); }
 
 [[clang::no_sanitize("alignment")]] ErrorOr<isize>
 FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
@@ -180,7 +191,7 @@ FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
 
     usize length = 0;
     for (const auto& entry : dirEntries) length += entry->d_reclen;
-    length = std::min(maxSize, length) - sizeof(dirent);
+    length = Math::Min(maxSize, length) - sizeof(dirent);
 
     if (dirEntries.Front()->d_reclen > maxSize) return Error(EINVAL);
 
@@ -214,29 +225,15 @@ bool FileDescriptor::GenerateDirEntries()
     DirectoryEntries& dirEntries = GetDirEntries();
     dirEntries.Clear();
 
-    auto current = DirectoryEntry();
-    while (current->IsSymlink() || current->m_MountGate)
-    {
-        if (current->m_MountGate)
-        {
-            current = current->FollowMounts().Raw();
-            continue;
-        }
-
-        auto parentEntry = current->Parent() ? current->Parent() : nullptr;
-        auto target      = current->INode()->GetTarget();
-        auto next = VFS::ResolvePath(parentEntry.Raw(), target.Raw(), true)
-                        .value_or(VFS::PathResolution{})
-                        .Entry;
-
-        if (!next) break;
-        current = next.Raw();
-    }
+    auto current = DirectoryEntry()->FollowMounts()->FollowSymlinks();
 
     auto iterator
         = [&](StringView name, loff_t offset, usize ino, usize type) -> bool
     {
         dirEntries.Push(name, offset, ino, type);
+        if (StringView(DirectoryEntry()->Path().Raw()).StartsWith("/mnt"))
+            LogTrace("name: => {}, path => {}", name, DirectoryEntry()->Path());
+
         return true;
     };
     (void)iterator;
@@ -251,7 +248,7 @@ bool FileDescriptor::GenerateDirEntries()
     auto cwd = Process::Current()->CWD();
     if (!cwd) return true;
 
-    auto stats = cwd->FollowMounts()->INode()->Stats();
+    auto stats = cwd->INode()->Stats();
     dirEntries.Push(".", 0, stats.st_ino, IF2DT(stats.st_mode));
 
     if (!cwd->Parent()) return true;

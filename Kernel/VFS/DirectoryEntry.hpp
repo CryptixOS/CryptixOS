@@ -16,6 +16,41 @@
 #include <Prism/Utility/Path.hpp>
 
 class INode;
+
+enum class DirectoryEntryFlags
+{
+    eNegative      = 0,
+    eDirectory     = 2,
+    eRegular       = 4,
+    eSpecial       = 5,
+    eSymlink       = 6,
+    eEntryTypeMask = 7,
+
+    eMountPoint    = Bit(5),
+};
+
+constexpr DirectoryEntryFlags& operator|=(DirectoryEntryFlags&      lhs,
+                                          const DirectoryEntryFlags rhs)
+{
+    return lhs = static_cast<DirectoryEntryFlags>(ToUnderlying(lhs)
+                                                  | ToUnderlying(rhs));
+}
+constexpr DirectoryEntryFlags& operator&=(DirectoryEntryFlags&      lhs,
+                                          const DirectoryEntryFlags rhs)
+{
+    return lhs = static_cast<DirectoryEntryFlags>(ToUnderlying(lhs)
+                                                  & ToUnderlying(rhs));
+}
+constexpr DirectoryEntryFlags operator~(const DirectoryEntryFlags flags)
+{
+    return static_cast<DirectoryEntryFlags>(~ToUnderlying(flags));
+}
+constexpr bool operator&(const DirectoryEntryFlags lhs,
+                         const DirectoryEntryFlags rhs)
+{
+    return ToUnderlying(lhs) & ToUnderlying(rhs);
+}
+
 class DirectoryEntry : public RefCounted
 {
   public:
@@ -23,8 +58,8 @@ class DirectoryEntry : public RefCounted
         : m_Name(name)
     {
     }
-    DirectoryEntry(::Ref<DirectoryEntry> parent, INode* inode);
-    DirectoryEntry(::Ref<DirectoryEntry> parent, StringView name);
+    DirectoryEntry(::WeakRef<DirectoryEntry> parent, INode* inode);
+    DirectoryEntry(::WeakRef<DirectoryEntry> parent, StringView name);
     DirectoryEntry(const DirectoryEntry& other)
         : m_INode(other.m_INode)
     {
@@ -32,43 +67,42 @@ class DirectoryEntry : public RefCounted
 
     virtual ~DirectoryEntry();
 
-    inline INode*                INode() const { return m_INode; }
-    inline StringView            Name() const { return m_Name; }
-    inline ::Ref<DirectoryEntry> Parent() { return m_Parent; }
+    inline class INode*              INode() const { return m_INode; }
+    inline StringView                Name() const { return m_Name; }
+    inline ::WeakRef<DirectoryEntry> Parent() { return m_Parent; }
 
-    Path                         Path();
-    const UnorderedMap<StringView, ::Ref<DirectoryEntry>>&
-         Children() const;
+    Path                             Path();
+    const UnorderedMap<StringView, ::Ref<DirectoryEntry>>& Children() const;
 
-    void SetParent(::Ref<DirectoryEntry> entry);
-    void SetMountGate(class INode* inode, ::Ref<DirectoryEntry> mountGate);
-    void Bind(class INode* inode);
-    void InsertChild(::Ref<class DirectoryEntry> entry);
-    void RemoveChild(::Ref<class DirectoryEntry> entry);
+    void                      SetParent(::WeakRef<DirectoryEntry> entry);
+    void                      SetMountGate(::Ref<DirectoryEntry> mountGate);
+    void                      Bind(class INode* inode);
+    void                      InsertChild(::Ref<class DirectoryEntry> entry);
+    void                      RemoveChild(::Ref<class DirectoryEntry> entry);
 
-    ::Ref<DirectoryEntry>   FollowMounts();
-    ::Ref<DirectoryEntry>   FollowSymlinks(usize cnt = 0);
+    ::WeakRef<DirectoryEntry> FollowMounts();
+    ::Ref<DirectoryEntry>     FollowSymlinks(usize cnt = 0);
 
-    WeakRef<DirectoryEntry> GetEffectiveParent();
-    ::Ref<DirectoryEntry>   Lookup(const String& name);
+    WeakRef<DirectoryEntry>   GetEffectiveParent();
+    ::Ref<DirectoryEntry>     Lookup(const String& name);
 
-    bool                    IsCharDevice() const;
-    bool                    IsFifo() const;
-    bool                    IsDirectory() const;
-    bool                    IsRegular() const;
-    bool                    IsSymlink() const;
-    bool                    IsSocket() const;
+    bool                      IsMountPoint() const;
+    bool                      IsDirectory() const;
+    bool                      IsRegular() const;
+    bool                      IsSymlink() const;
+    bool                      IsSpecial() const;
 
-    ::Ref<DirectoryEntry>   m_MountGate = nullptr;
+    ::Ref<DirectoryEntry>     m_MountGate = nullptr;
 
   private:
     friend class INode;
 
-    Spinlock              m_Lock;
-    class INode*          m_INode  = nullptr;
+    Spinlock                  m_Lock;
 
-    String                m_Name   = "";
+    String                    m_Name   = "";
+    DirectoryEntryFlags       m_Flags  = DirectoryEntryFlags::eNegative;
+    class INode*              m_INode  = nullptr;
 
-    ::Ref<DirectoryEntry> m_Parent = nullptr;
+    ::WeakRef<DirectoryEntry> m_Parent = nullptr;
     UnorderedMap<StringView, ::Ref<class DirectoryEntry>> m_Children;
 };

@@ -6,40 +6,41 @@
  */
 #pragma once
 
-#include <Prism/Containers/IntrusiveList.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Memory/Ref.hpp>
 #include <Prism/Utility/Delegate.hpp>
 
 class DirectoryEntry;
 class Filesystem;
-class MountPoint
+class MountPoint : public RefCounted
 {
   public:
-    using MountPointIterator = Delegate<bool(MountPoint* mountPoint)>;
+    using MountPointIterator = Delegate<bool(::Ref<MountPoint> mountPoint)>;
 
-    MountPoint(DirectoryEntry* hostEntry  = nullptr,
-               Filesystem*     filesystem = nullptr);
+    MountPoint(::Ref<DirectoryEntry> hostEntry  = nullptr,
+               ::Ref<Filesystem>     filesystem = nullptr);
 
-    inline constexpr DirectoryEntry* HostEntry() const { return m_Root; }
-    inline constexpr Filesystem*     Filesystem() const { return m_Filesystem; }
+    ::Ref<DirectoryEntry>    HostEntry() const;
+    ::Ref<Filesystem>        Filesystem() const;
 
-    static void                      Attach(MountPoint* mountPoint);
-    static MountPoint*               Lookup(DirectoryEntry* entry);
+    static void              Attach(::Ref<MountPoint> mountPoint);
+    static ::Ref<MountPoint> Lookup(::Ref<DirectoryEntry> entry);
 
-    static MountPoint*               Head();
-    static MountPoint*               Tail();
-    static void                      Iterate(MountPointIterator iterator);
+    static ::Ref<MountPoint> Head();
+    static ::Ref<MountPoint> Tail();
+    static void              Iterate(MountPointIterator iterator);
 
-    MountPoint*                      NextMountPoint() const;
+    ::Ref<MountPoint>        NextMountPoint() const;
 
   private:
-    DirectoryEntry*   m_Root       = nullptr;
-    class Filesystem* m_Filesystem = nullptr;
+    ::Ref<DirectoryEntry>   m_Root       = nullptr;
+    ::Ref<class Filesystem> m_Filesystem = nullptr;
 
-    friend class IntrusiveList<MountPoint>;
-    friend struct IntrusiveListHook<MountPoint>;
+    friend class IntrusiveRefList<MountPoint>;
+    friend struct IntrusiveRefListHook<MountPoint>;
 
-    IntrusiveListHook<MountPoint> Hook;
+    IntrusiveRefListHook<MountPoint> Hook;
 
-    using List = IntrusiveList<MountPoint>;
+    using List = IntrusiveRefList<MountPoint>;
     static List s_MountPoints;
 };

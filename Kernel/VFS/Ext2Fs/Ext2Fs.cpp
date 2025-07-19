@@ -13,11 +13,11 @@
 #include <VFS/Ext2Fs/Ext2Fs.hpp>
 #include <VFS/Ext2Fs/Ext2FsINode.hpp>
 
-ErrorOr<Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
+ErrorOr<::Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
                                            const void* data)
 {
     auto sourceEntry = VFS::ResolvePath(nullptr, sourcePath)
-                           .value_or(VFS::PathResolution{})
+                           .ValueOr(VFS::PathResolution{})
                            .Entry;
     if (!sourceEntry || !sourceEntry->INode()) return Error(ENODEV);
 
@@ -77,7 +77,7 @@ ErrorOr<Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
     return m_RootEntry;
 }
 
-ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, Ref<DirectoryEntry> entry,
+ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
                                    mode_t mode, uid_t uid, gid_t gid)
 {
     usize inodeIndex = m_Allocator.AllocateINode();
@@ -207,8 +207,7 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
                 break;
         }
 
-        DirectoryEntry* newEntry      = new DirectoryEntry(dentry, nameBuffer);
-        Ext2FsINode*    newNode       = new Ext2FsINode(nameBuffer, this, mode);
+        Ext2FsINode* newNode          = new Ext2FsINode(nameBuffer, this, mode);
         newNode->m_Metadata.UID       = inodeMeta.UID;
         newNode->m_Metadata.GID       = inodeMeta.GID;
         newNode->m_Metadata.ID        = entry->INodeIndex;
@@ -223,10 +222,8 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
         newNode->m_Metadata.ModificationTime.tv_sec  = inodeMeta.ModifiedTime;
         newNode->m_Metadata.ModificationTime.tv_nsec = 0;
 
-        newNode->m_Populated                         = false;
         newNode->m_Meta                              = inodeMeta;
 
-        newEntry->Bind(newNode);
         e2node->InsertChild(newNode, newNode->Name());
 
         // TODO(v1tr10l7): resolve link
@@ -237,9 +234,8 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
         i += entry->Size;
     }
 
-    e2node->m_Populated = true;
     delete[] buffer;
-    return e2node->m_Populated;
+    return true;
 }
 
 void Ext2Fs::FreeINode(usize inode)

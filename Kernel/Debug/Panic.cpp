@@ -60,13 +60,12 @@ CTOS_NO_KASAN [[noreturn]]
 void earlyPanic(const char* format, ...)
 {
     enterPanicMode();
+    Stacktrace::Print(32);
 
     va_list args;
     va_start(args, format);
     Logger::Logv(LogLevel::eError, format, args);
     va_end(args);
-
-    Stacktrace::Print(32);
 
     EarlyLogFatal("CPU[%d]: Halted", CPU::GetCurrentID());
 

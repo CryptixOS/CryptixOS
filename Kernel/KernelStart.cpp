@@ -60,10 +60,70 @@
 #include <VFS/MountPoint.hpp>
 #include <VFS/VFS.hpp>
 
+#include <VFS/DevTmpFs/DevTmpFs.hpp>
+#include <VFS/EchFs/EchFs.hpp>
+#include <VFS/Ext2Fs/Ext2Fs.hpp>
+#include <VFS/Fat32Fs/Fat32Fs.hpp>
+#include <VFS/ProcFs/ProcFs.hpp>
+#include <VFS/TmpFs/TmpFs.hpp>
+
 namespace EFI
 {
     bool Initialize(Pointer systemTable, const EfiMemoryMap& memoryMap);
 };
+
+// static s_Filesystems = {
+//     {
+//         false,
+//         "tmpfs"_sv,
+//     },
+//     {
+//         false,
+//         "devtmpfs"_sv,
+//     },
+//     {
+//         false,
+//         "procfs"_sv,
+//     },
+//     {
+//         true,
+//         "echfs"_sv,
+//     },
+//     {
+//         true,
+//         "fat32fs"_sv,
+//     },
+//     {
+//         true,
+//         "ext2fs"_sv,
+//     },
+// };
+//
+
+template <typename T>
+void registerFilesystem(StringView name)
+{
+    auto fs            = CreateRef<FilesystemDriver>();
+
+    fs->Owner          = nullptr;
+    fs->FilesystemName = name;
+    fs->FlagsMask      = 0;
+
+    fs->Instantiate    = []() -> ErrorOr<Ref<Filesystem>> { return new T(0); };
+    fs->Destroy        = [](Ref<Filesystem>) -> ErrorOr<void> { return {}; };
+
+    VFS::RegisterFilesystem(fs);
+}
+
+void registerFilesystems()
+{
+    registerFilesystem<TmpFs>("tmpfs");
+    registerFilesystem<DevTmpFs>("devtmpfs");
+    registerFilesystem<ProcFs>("procfs");
+    registerFilesystem<Fat32Fs>("fat32fs");
+    registerFilesystem<Ext2Fs>("ext2fs");
+    registerFilesystem<EchFs>("echfs");
+}
 
 static void eternal()
 {
@@ -116,6 +176,7 @@ static bool loadInitProcess(Path initPath)
 
 static void kernelThread()
 {
+    registerFilesystems();
     Assert(VFS::MountRoot("tmpfs"));
     Initrd::Initialize();
 
@@ -156,7 +217,7 @@ static void kernelThread()
         LogWarn("ELF: Could not find any builtin drivers");
 
     auto moduleDirectory
-        = VFS::ResolvePath(VFS::GetRootDirectoryEntry().Raw(), "/lib/modules/")
+        = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), "/lib/modules/")
               .value_or(VFS::PathResolution{})
               .Entry;
     if (moduleDirectory)
@@ -165,6 +226,33 @@ static void kernelThread()
             System::LoadModule(child);
     }
 
+    // auto maybePathRes
+    //     = VFS::ResolvePath(VFS::RootDirectoryEntry(), "/mnt/ext2/Kernel");
+    // if (!maybePathRes)
+    //     LogError("Kernel: Failed to resolve `/mnt/ext2/Kernel/`");
+    // else if (auto entry = maybePathRes.value().Parent; entry)
+    // {
+    //     LogInfo("Kernel: Found entry => {}", entry->Path());
+    //
+    //     auto iterator
+    //         = [&](StringView name, loff_t offset, usize ino, usize type) ->
+    //         bool
+    //     {
+    //         LogTrace("Child => {}", name);
+    //
+    //         return true;
+    //     };
+    //
+    //     Delegate<bool(StringView, loff_t, usize, usize)> delegate;
+    //     delegate.BindLambda(iterator);
+    //
+    //     LogTrace("Children of {} =>", entry->Name());
+    //     entry->INode()->TraverseDirectories(entry.Raw(), delegate);
+    //
+    //     entry = entry->FollowMounts()->Lookup("Kernel");
+    //     entry->INode()->TraverseDirectories(entry.Raw(), delegate);
+    // }
+    //
     LogTrace("Loading init process...");
     auto initPath = CommandLine::GetString("init");
     if (!loadInitProcess(initPath.Empty() ? "/usr/sbin/init" : initPath))

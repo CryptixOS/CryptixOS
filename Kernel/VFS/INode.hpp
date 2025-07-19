@@ -70,36 +70,33 @@ class INode
         return Error(ENOSYS);
     }
 
-    virtual ErrorOr<Ref<DirectoryEntry>> Lookup(Ref<DirectoryEntry> dentry)
-    {
-        return nullptr;
-    }
-    virtual INode* Lookup(const String& name) { return nullptr; }
-    virtual ErrorOr<DirectoryEntry*> Lookup(DirectoryEntry* entry);
+    virtual ErrorOr<Ref<DirectoryEntry>> Lookup(Ref<DirectoryEntry> dentry);
+    virtual ErrorOr<Ref<DirectoryEntry>> LookupV2(Ref<DirectoryEntry> dentry);
+    virtual INode*    Lookup(const String& name) { return nullptr; }
 
-    inline StringView                Name() { return m_Name; }
-    mode_t                           Mode() const;
+    inline StringView Name() { return m_Name; }
+    mode_t            Mode() const;
 
-    bool                             IsFilesystemRoot() const;
-    bool                             IsEmpty();
-    bool                             ReadOnly();
-    bool                             Immutable();
-    bool                             CanWrite(const Credentials& creds) const;
+    bool              IsFilesystemRoot() const;
+    bool              IsEmpty();
+    bool              ReadOnly();
+    bool              Immutable();
+    bool              CanWrite(const Credentials& creds) const;
 
-    inline bool   IsCharDevice() const { return S_ISCHR(m_Metadata.Mode); }
-    inline bool   IsFifo() const { return S_ISFIFO(m_Metadata.Mode); }
-    inline bool   IsDirectory() const { return S_ISDIR(m_Metadata.Mode); }
-    inline bool   IsRegular() const { return S_ISREG(m_Metadata.Mode); }
-    inline bool   IsSymlink() const { return S_ISLNK(m_Metadata.Mode); }
-    inline bool   IsSocket() const { return S_ISSOCK(m_Metadata.Mode); }
+    inline bool       IsCharDevice() const { return S_ISCHR(m_Metadata.Mode); }
+    inline bool       IsFifo() const { return S_ISFIFO(m_Metadata.Mode); }
+    inline bool       IsDirectory() const { return S_ISDIR(m_Metadata.Mode); }
+    inline bool       IsRegular() const { return S_ISREG(m_Metadata.Mode); }
+    inline bool       IsSymlink() const { return S_ISLNK(m_Metadata.Mode); }
+    inline bool       IsSocket() const { return S_ISSOCK(m_Metadata.Mode); }
 
-    bool          ValidatePermissions(const Credentials& creds, u32 acc);
-    void          UpdateATime();
+    bool              ValidatePermissions(const Credentials& creds, u32 acc);
+    void              UpdateATime();
 
-    virtual void  InsertChild(INode* node, StringView name)            = 0;
-    virtual isize Read(void* buffer, off_t offset, usize bytes)        = 0;
-    virtual isize Write(const void* buffer, off_t offset, usize bytes) = 0;
-    virtual i32   IoCtl(usize request, usize arg) { return_err(-1, ENODEV); }
+    virtual void      InsertChild(INode* node, StringView name)            = 0;
+    virtual isize     Read(void* buffer, off_t offset, usize bytes)        = 0;
+    virtual isize     Write(const void* buffer, off_t offset, usize bytes) = 0;
+    virtual i32 IoCtl(usize request, usize arg) { return_err(-1, ENODEV); }
     virtual ErrorOr<isize> Truncate(usize size) { return Error(ENOSYS); }
     virtual ErrorOr<void>  Rename(INode* newParent, StringView newName)
     {

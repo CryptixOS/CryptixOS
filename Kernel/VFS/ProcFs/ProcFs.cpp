@@ -41,8 +41,8 @@ struct ProcFsFilesystemsProperty : public ProcFsProperty
         Buffer.Clear();
         Buffer.Resize(PMM::PAGE_SIZE);
 
-        for (auto& [physical, fs] : VFS::Filesystems())
-            Write("{} {}\n", physical ? "     " : "nodev", fs);
+        // for (auto& [physical, fs] : VFS::Filesystems())
+        //     Write("{} {}\n", physical ? "     " : "nodev", fs);
     }
 };
 struct ProcFsModulesProperty : public ProcFsProperty
@@ -52,7 +52,7 @@ struct ProcFsModulesProperty : public ProcFsProperty
         Buffer.Clear();
         Buffer.Resize(PMM::PAGE_SIZE);
 
-        for (auto& module : System::Modules()) Write("{}\n", module.Name);
+        for (Ref<Module> module : System::Modules()) Write("{}\n", module->Name);
     }
 };
 struct ProcFsMountsProperty : public ProcFsProperty
@@ -207,7 +207,7 @@ void ProcFs::RemoveProcess(pid_t pid)
     ScopedLock guard(m_Lock);
     s_Processes.Erase(pid);
 }
-ErrorOr<Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
+ErrorOr<::Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
                                            const void* data)
 {
     ScopedLock guard(m_Lock);
@@ -235,7 +235,7 @@ ErrorOr<Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
 
     return m_RootEntry;
 }
-ErrorOr<INode*> ProcFs::CreateNode(INode* parent, Ref<DirectoryEntry> entry,
+ErrorOr<INode*> ProcFs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
                                    mode_t mode, uid_t uid, gid_t gid)
 {
     auto inode = new ProcFsINode(entry->Name(), this, mode, nullptr);
@@ -243,7 +243,7 @@ ErrorOr<INode*> ProcFs::CreateNode(INode* parent, Ref<DirectoryEntry> entry,
 
     return inode;
 }
-ErrorOr<INode*> ProcFs::Symlink(INode* parent, Ref<DirectoryEntry> entry,
+ErrorOr<INode*> ProcFs::Symlink(INode* parent, ::Ref<DirectoryEntry> entry,
                                 StringView target)
 {
     return nullptr;

@@ -58,7 +58,7 @@ namespace Ustar
             auto     mode = StringUtils::ToNumber<mode_t>(current->Mode, 8);
             usize    size = StringUtils::ToNumber<usize>(current->FileSize, 8);
 
-            if (filename == "./")
+            if (filename == "./"_pv)
             {
                 current = getNextFile(current, size);
                 continue;

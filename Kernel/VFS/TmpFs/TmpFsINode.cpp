@@ -227,7 +227,6 @@ ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateNode(Ref<DirectoryEntry> entry,
 
     m_Metadata.ChangeTime       = currentTime;
     m_Metadata.ModificationTime = currentTime;
-    entry->Bind(inode);
 
     InsertChild(inode, entry->Name());
     if (Mode() & S_ISGID)
@@ -235,6 +234,8 @@ ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateNode(Ref<DirectoryEntry> entry,
         inode->m_Metadata.GID = m_Metadata.GID;
         if (S_ISDIR(mode)) inode->m_Metadata.Mode |= S_ISGID;
     }
+
+    entry->Bind(inode);
     return entry;
 }
 

@@ -8,6 +8,7 @@
 #include <Arch/CPU.hpp>
 
 #include <Library/Locking/Spinlock.hpp>
+#include <Library/Locking/SpinlockProtected.hpp>
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 
@@ -27,55 +28,97 @@
 
 namespace VFS
 {
-    static Ref<DirectoryEntry>           s_RootDirectoryEntry = nullptr;
-    static Spinlock                      s_Lock;
+    static SpinlockProtected<FilesystemDriver::List> s_FilesystemDrivers;
+    static Ref<DirectoryEntry>     s_RootDirectoryEntry = nullptr;
+    static Spinlock                s_Lock;
 
-    Vector<std::pair<bool, StringView>>& Filesystems()
+    ErrorOr<Ref<FilesystemDriver>> FindFilesystemDriver(StringView name)
     {
-        static Vector<std::pair<bool, StringView>> s_Filesystems = {
+        Ref<FilesystemDriver> found = nullptr;
+        s_FilesystemDrivers.ForEachRead(
+            [&](auto fs)
             {
-                false,
-                "tmpfs"_sv,
-            },
-            {
-                false,
-                "devtmpfs"_sv,
-            },
-            {
-                false,
-                "procfs"_sv,
-            },
-            {
-                true,
-                "echfs"_sv,
-            },
-            {
-                true,
-                "fat32fs"_sv,
-            },
-            {
-                true,
-                "ext2fs"_sv,
-            },
-        };
+                if (fs->FilesystemName == name) found = fs;
+            });
 
-        return s_Filesystems;
+        if (!found) return Error(ENODEV);
+        return found;
     }
 
-    Ref<DirectoryEntry> GetRootDirectoryEntry() { return s_RootDirectoryEntry; }
-
-    static Filesystem*  CreateFilesystem(StringView name, u32 flags)
+    ErrorOr<void> RegisterFilesystem(Ref<FilesystemDriver> driver)
     {
-        Filesystem* fs = nullptr;
-        if (name == "tmpfs") fs = new TmpFs(flags);
-        else if (name == "devtmpfs") fs = new DevTmpFs(flags);
-        else if (name == "procfs") fs = new ProcFs(flags);
-        else if (name == "echfs") fs = new EchFs(flags);
-        else if (name == "fat32fs") fs = new Fat32Fs(flags);
-        else if (name == "ext2fs") fs = new Ext2Fs(flags);
+        Assert(driver);
 
-        if (!fs) LogError("VFS: No filesystem driver found for '{}'", name);
+        StringView fsName = driver->FilesystemName;
+        LogTrace("VFS: Trying to register a filesystem driver: '{}'", fsName);
+        if (driver->Hook.IsLinked())
+        {
+            LogError("VFS: The driver: '{}' is already linked!", fsName);
+            return Error(EBUSY);
+        }
+
+        auto found = FindFilesystemDriver(driver->FilesystemName);
+        if (found)
+        {
+            LogError("VFS: Driver with name: '{}', already exists!", fsName);
+            return Error(EEXIST);
+        }
+
+        s_FilesystemDrivers.With([&](auto& list) { list.PushBack(driver); });
+
+        LogTrace("VFS: Successfully registered '{}' driver", fsName);
+        return {};
+    }
+    ErrorOr<void> UnregisterFilesystem(Ref<FilesystemDriver> driver)
+    {
+        Assert(driver);
+        Assert(driver->Hook.IsLinked());
+
+        auto fsName = driver->FilesystemName;
+        LogTrace("VFS: Trying to unregister filesystem driver for '{}'",
+                 fsName);
+
+        auto fs = TryOrRetFmt(FindFilesystemDriver(driver->FilesystemName),
+                              Error(result.Error()),
+                              "VFS: Failed to find the driver '{}'", fsName);
+
+        fs->Hook.Unlink(fs);
+        return {};
+    }
+
+    static ErrorOr<Ref<Filesystem>> InstantiateFilesystem(StringView name)
+    {
+        Ref<FilesystemDriver> fsDriver = TryOrRet(FindFilesystemDriver(name));
+
+        LogTrace(
+            "VFS: Successfully retrieved '{}' file system driver, needed "
+            "for mounting",
+            name);
+        if (!fsDriver->Instantiate)
+        {
+            LogError("VFS: The '{}' driver's Instantiate function is nullptr",
+                     name);
+            return Error(ENODEV);
+        }
+
+        LogTrace("VFS: Instantiating '{}' instance...", name);
+        Ref<Filesystem> fs = TryOrRet(fsDriver->Instantiate());
+
+        if (!fs)
+        {
+            LogError("VFS: Failed to create filesystem: '{}'", name);
+            return Error(ENODEV);
+        }
+
         return fs;
+    }
+
+    Ref<DirectoryEntry> RootDirectoryEntry()
+    {
+        auto root = s_RootDirectoryEntry;
+
+        while (root && root->m_MountGate) root = root->m_MountGate;
+        return root;
     }
 
     void RecursiveDelete(INode* node)
@@ -118,7 +161,7 @@ namespace VFS
 
         auto maybePathRes = ResolvePath(parent, path, followSymlinks);
         RetOnError(maybePathRes);
-        Ref<DirectoryEntry> dentry = maybePathRes.value().Entry;
+        Ref<DirectoryEntry> dentry = maybePathRes.Value().Entry;
 
         if (!dentry)
         {
@@ -135,7 +178,7 @@ namespace VFS
         }
         else if (flags & O_EXCL) return Error(EEXIST);
 
-        dentry = dentry->FollowMounts();
+        while (dentry->m_MountGate) dentry = dentry->m_MountGate;
         dentry = dentry->FollowSymlinks();
 
         if (dentry->IsSymlink()) return Error(ELOOP);
@@ -176,7 +219,7 @@ namespace VFS
     ErrorOr<PathResolution> ResolvePath(Ref<DirectoryEntry> parent,
                                         PathView path, bool followLinks)
     {
-        if (!parent || path.Absolute()) parent = s_RootDirectoryEntry.Raw();
+        if (!parent || path.Absolute()) parent = RootDirectoryEntry();
         PathResolution res = {nullptr, nullptr, ""_sv};
 
         PathResolver   resolver(parent, path);
@@ -195,103 +238,53 @@ namespace VFS
         return res;
     }
 
-    ErrorOr<MountPoint*> MountRoot(StringView filesystemName)
+    ErrorOr<Ref<MountPoint>> MountRoot(StringView filesystemName)
     {
-        auto fs = CreateFilesystem(filesystemName, 0);
-        if (!fs)
-        {
-            LogError("VFS: Failed to create filesystem: '{}'", filesystemName);
-            return Error(ENODEV);
-        }
-        if (s_RootDirectoryEntry.Raw())
+        if (s_RootDirectoryEntry)
         {
             LogError("VFS: Root already mounted!");
-
-            delete fs;
             return Error(EEXIST);
         }
 
-        auto maybeFsRoot = fs->Mount("", nullptr);
-        if (!maybeFsRoot)
-        {
-            delete fs;
-            s_RootDirectoryEntry.Reset();
+        auto root = s_RootDirectoryEntry = CreateRef<DirectoryEntry>("/");
+        if (!root) return Error(ENOMEM);
 
-            return Error(ENODEV);
-        }
-
-        s_RootDirectoryEntry = maybeFsRoot.value();
-        if (s_RootDirectoryEntry.Raw())
-            LogInfo("VFS: Mounted Filesystem '{}' on '/'", filesystemName);
-        else
-            LogError("VFS: Failed to mount filesystem '{}' on '/'",
-                     filesystemName);
-
-        auto rootMountPoint = new MountPoint(s_RootDirectoryEntry.Raw(), fs);
-        MountPoint::Attach(rootMountPoint);
-        return rootMountPoint;
+        return TryOrRet(Mount(nullptr, ""_pv, "/"_pv, filesystemName));
     }
 
     // TODO: flags
-    ErrorOr<MountPoint*> Mount(Ref<DirectoryEntry> parent, PathView sourcePath,
-                               PathView target, StringView fsName, i32 flags,
-                               const void* data)
+    ErrorOr<Ref<MountPoint>> Mount(Ref<DirectoryEntry> parent,
+                                   PathView sourcePath, PathView target,
+                                   StringView fsName, i32 flags,
+                                   const void* data)
     {
+        Ref<Filesystem> fs = TryOrRet(InstantiateFilesystem(fsName));
         if (target.Empty()) return Error(EINVAL);
 
-        Filesystem* fs = CreateFilesystem(fsName, flags);
-        if (!fs)
-        {
-            LogError("VFS: Failed to create '{}' filesystem", fsName);
-            return Error(ENODEV);
-        }
+        PathResolver targetResolver(parent, target);
+        auto         targetEntry
+            = TryOrRet(targetResolver.Resolve(PathLookupFlags::eRegular));
 
-        auto maybePathRes = ResolvePath(parent, target);
-        RetOnError(maybePathRes);
-
-        auto [targetParent, targetEntry, targetName] = maybePathRes.value();
-        bool isRoot = (targetEntry == GetRootDirectoryEntry().Raw());
-        Ref<DirectoryEntry> mountRoot = nullptr;
-
-        parent                        = targetParent.Raw();
-        if (!parent) parent = s_RootDirectoryEntry.Raw();
-        INode*      targetINode = nullptr;
-        MountPoint* mountPoint  = nullptr;
-
-        if (!targetEntry)
-        {
-            LogError("VFS: Failed to resolve target path -> '{}'", target);
-
-            delete targetINode;
-            delete fs;
-            return Error(ENOENT);
-        }
-
-        targetINode = targetEntry->INode();
+        bool isRoot = targetEntry == RootDirectoryEntry().Raw();
         if (!isRoot && !targetEntry->IsDirectory())
         {
             LogError("VFS: '{}' target is not a directory", target);
-            delete fs;
-            delete targetINode;
             return Error(ENOTDIR);
         }
 
-        mountPoint       = new MountPoint(targetEntry.Raw(), fs);
-        auto mountGateOr = fs->Mount(sourcePath, data);
-        mountRoot        = mountGateOr.value();
+        Ref<MountPoint> mountPoint = CreateRef<MountPoint>(targetEntry, fs);
+        auto            fsRoot     = TryOrRetFmt(
+            fs->Mount(sourcePath, data), Error(result.Error()),
+            "VFS: Failed to mount filesystem '{}' on '/'", fsName);
 
-        if (!mountRoot)
+        if (!fsRoot)
         {
             LogError("VFS: Failed to mount '{}' fs", fsName);
-            goto fail;
+            return Error(ENODEV);
         }
 
-        if (targetEntry)
-        {
-            mountRoot->SetParent(targetEntry);
-            targetEntry->SetMountGate(mountRoot->INode(), mountRoot.Raw());
-        }
-        targetEntry->m_MountGate = mountRoot.Raw();
+        fsRoot->SetParent(targetEntry);
+        targetEntry->SetMountGate(fsRoot);
 
         if (sourcePath.Empty())
             LogTrace("VFS: Mounted Filesystem '{}' on '{}'", fsName, target);
@@ -301,10 +294,6 @@ namespace VFS
 
         MountPoint::Attach(mountPoint);
         return mountPoint;
-    fail:
-        delete targetINode;
-        delete fs;
-        return Error(ENODEV);
     }
 
     bool Unmount(Ref<DirectoryEntry> parent, PathView path, i32 flags)
@@ -317,7 +306,7 @@ namespace VFS
     Ref<DirectoryEntry> CreateNode(Ref<DirectoryEntry> parent, PathView path,
                                    mode_t mode)
     {
-        if (!parent) parent = GetRootDirectoryEntry();
+        if (!parent) parent = RootDirectoryEntry();
         ScopedLock guard(s_Lock);
 
         auto       maybePathRes = ResolvePath(parent.Raw(), path);
@@ -359,7 +348,7 @@ namespace VFS
     }
     ErrorOr<Ref<DirectoryEntry>> CreateFile(PathView path, mode_t mode)
     {
-        PathResolver resolver(GetRootDirectoryEntry().Raw(), path);
+        PathResolver resolver(RootDirectoryEntry().Raw(), path);
         auto         maybeEntry = resolver.Resolve();
         if (!maybeEntry && maybeEntry.error() != ENOENT)
             return Error(maybeEntry.error());
@@ -391,8 +380,8 @@ namespace VFS
     {
         auto maybePathRes = ResolvePath(directory.Raw(), path, true);
 
-        #define error_or(code) ErrorOr(code)
-        auto err          = maybePathRes.error_or(EEXIST);
+#define error_or(code) ErrorOr(code)
+        auto err = maybePathRes.error_or(EEXIST);
         if (err && err != ENOENT) return Error(err);
 
         Ref  entry      = new DirectoryEntry(directory.Raw(),
@@ -422,7 +411,7 @@ namespace VFS
     }
     ErrorOr<Ref<DirectoryEntry>> MkNod(PathView path, mode_t mode, dev_t dev)
     {
-        auto maybePathRes = ResolvePath(GetRootDirectoryEntry().Raw(), path);
+        auto maybePathRes = ResolvePath(RootDirectoryEntry().Raw(), path);
         RetOnError(maybePathRes);
 
         auto pathRes = maybePathRes.value();
@@ -435,35 +424,49 @@ namespace VFS
     Ref<DirectoryEntry> Symlink(Ref<DirectoryEntry> parent, PathView path,
                                 StringView target)
     {
-        if (!parent) parent = GetRootDirectoryEntry().Raw();
-        ScopedLock guard(s_Lock);
+        if (!parent) parent = RootDirectoryEntry().Raw();
+        ScopedLock   guard(s_Lock);
 
-        auto       maybePathRes = ResolvePath(parent, path);
-        if (!maybePathRes) return_err(nullptr, maybePathRes.error());
+        PathResolver resolver(parent, path);
+        auto         directory
+            = TryOrRetVal(resolver.Resolve(PathLookupFlags::eParent
+                                           | PathLookupFlags::eNegativeEntry),
+                          nullptr);
 
-        auto pathRes = maybePathRes.value();
-        parent       = pathRes.Parent.Raw();
-        auto entry   = pathRes.Entry;
+        auto newEntry = CreateRef<DirectoryEntry>(directory, path.BaseName());
+        auto directoryINode = directory->INode();
+        auto newINode       = TryOrRetVal(directoryINode->Filesystem()->Symlink(
+                                        directoryINode, newEntry, target),
+                                          nullptr);
+        Assert(newINode);
+        return newEntry;
 
-        if (entry) return_err(nullptr, EEXIST);
-        if (!parent) return_err(nullptr, ENOENT);
+        // auto maybePathRes = ResolvePath(parent, path);
+        // if (!maybePathRes) return_err(nullptr, maybePathRes.error());
 
-        entry            = new DirectoryEntry(parent, pathRes.BaseName);
-        auto parentINode = parent->INode();
+        // auto pathRes = maybePathRes.value();
+        // parent       = pathRes.Parent.Raw();
+        // auto entry   = pathRes.Entry;
 
-        auto newNodeOr
-            = parentINode->Filesystem()->Symlink(parentINode, entry, target);
-        if (!newNodeOr) return_err(nullptr, newNodeOr.error());
+        // if (entry) return_err(nullptr, EEXIST);
+        // if (!parent) return_err(nullptr, ENOENT);
 
-        return entry;
+        // entry            = new DirectoryEntry(parent, pathRes.BaseName);
+        // auto parentINode = parent->INode();
+        //
+        // auto newNodeOr
+        //     = parentINode->Filesystem()->Symlink(parentINode, entry, target);
+        // if (!newNodeOr) return_err(nullptr, newNodeOr.error());
+
+        // return entry;
     }
 
     Ref<DirectoryEntry> Link(Ref<DirectoryEntry> oldParent, PathView oldPath,
                              Ref<DirectoryEntry> newParent, PathView newPath,
                              i32 flags)
     {
-        if (!oldParent) oldParent = GetRootDirectoryEntry().Raw();
-        if (!newParent) newParent = GetRootDirectoryEntry().Raw();
+        if (!oldParent) oldParent = RootDirectoryEntry().Raw();
+        if (!newParent) newParent = RootDirectoryEntry().Raw();
 
         auto maybeOldPathRes = ResolvePath(oldParent, oldPath);
         auto maybeNewPathRes = ResolvePath(newParent, newPath);
@@ -490,7 +493,7 @@ namespace VFS
 
     bool Unlink(Ref<DirectoryEntry> parent, PathView path, i32 flags)
     {
-        if (!parent) parent = GetRootDirectoryEntry().Raw();
+        if (!parent) parent = RootDirectoryEntry().Raw();
 
         ToDo();
         return false;

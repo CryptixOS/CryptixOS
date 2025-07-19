@@ -44,17 +44,31 @@ def run_qemu(build_dir: str, firmware_type: str):
 
     shell.try_run(['meson', 'compile', '-C', build_dir, '-j5', f'run_{firmware_type}'], stream=True)
 
+def prompt(message: str) -> str:
+    result: str = ''
+    while result not in ['yes', 'no', 'y', 'no']:
+        result = input(f'{message} => [y/n]: ').lower()
+    return result[0]
+
 def run():
-    build_dir = f'build_{args.build_type}_{args.target_arch}'
+    build_dir = f'build_{args.build_type}_{args.target_arch}' if args.build_dir == '' else args.build_dir
 
     if not os.path.isdir(build_dir) and args.action != 'setup' and args.action != 'all':
         error('Build directory {build_dir} does not exist. Please run the Meson setup step before compiling.')
+    if args.action == 'r':
+        args.action = 'run'
 
-    if args.action == 'setup':
+    if args.action in ['setup', 's']:
         setup(build_dir, args.target_arch, args.build_type, args.compiler)
-    elif args.action == 'build':
+    elif args.action in ['build', 'b']:
         build(build_dir)
-    elif args.action in ['run', 'run-bios', 'run-uefi']:
+    elif args.action in ['rebuild', 'rb']:
+        if prompt('this will regenerate your current build directory\ndo you want to proceed?') == 'n':
+            sys.exit(0)
+        setup(build_dir, args.target_arch, args.build_type, args.compiler)
+        build(build_dir)
+
+    elif args.action in ['run', 'run-bios', 'run-uefi', 'r']:
         firmware = 'uefi'
         if args.action != 'run':
             firmware = args.action.removesuffix('run-')
@@ -66,7 +80,8 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--target-arch', choices=['x86_64', 'aarch64'], default='x86_64', help='target architecture')
     parser.add_argument('-c', '--compiler', choices=['clang', 'gcc'], default='gcc', help='compiler')
     parser.add_argument('-b', '--build-type', choices=['release', 'debug', 'dist'], default='release', help='build type')
-    parser.add_argument('action', type=str, choices=['setup', 'build', 'run', 'run-bios', 'run-uefi'], help='')
+    parser.add_argument('-C', '--build-dir', type=str, default='', help='build directory', required=False)
+    parser.add_argument('action', type=str, choices=['setup', 'build', 'rebuild', 'run', 'run-bios', 'run-uefi', 's', 'b', 'rb', 'r'], help='')
 
     args = parser.parse_args()
     run()

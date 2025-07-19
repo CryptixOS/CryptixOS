@@ -35,44 +35,35 @@ Ext2FsINode::Ext2FsINode(StringView name, Ext2Fs* fs, mode_t mode)
 ErrorOr<void> Ext2FsINode::TraverseDirectories(class DirectoryEntry* parent,
                                                DirectoryIterator     iterator)
 {
-    m_Filesystem->Populate(parent);
+    LogTrace("Ext2fs: Traversing directories");
+    m_Fs->ReadINodeEntry(&m_Meta, m_Metadata.ID);
 
-    usize offset = 0;
-    for (const auto [name, inode] : Children())
-    {
-        usize  ino  = inode->Stats().st_ino;
-        mode_t mode = inode->Stats().st_mode;
-        auto   type = IF2DT(mode);
+    u8* buffer = new u8[m_Meta.GetSize()];
+    m_Fs->ReadINode(m_Meta, buffer, 0, m_Meta.GetSize());
 
-        if (!iterator(name, offset, ino, type)) break;
-        ++offset;
-    }
+    usize bufferOffset = 0;
+    usize i            = 0;
 
-    return {};
-}
-ErrorOr<Ref<DirectoryEntry>> Ext2FsINode::Lookup(Ref<DirectoryEntry> dentry)
-{
-    Ext2FsINodeMeta meta;
-    m_Fs->ReadINodeEntry(&meta, m_Metadata.ID);
-
-    usize pageCount = Math::DivRoundUp(meta.GetSize(), PMM::PAGE_SIZE);
-    u8*   buffer = Pointer(PMM::CallocatePages(pageCount)).ToHigherHalf<u8*>();
-    m_Fs->ReadINode(meta, buffer, 0, meta.GetSize());
-
-    for (usize i = 0; i < meta.GetSize();)
+    LogTrace("Ext2Fs: Reading children directory entries of {}", Name());
+    for (bufferOffset = 0, i = 0; bufferOffset < m_Meta.GetSize(); i++)
     {
         Ext2FsDirectoryEntry* entry
-            = reinterpret_cast<Ext2FsDirectoryEntry*>(buffer + i);
+            = reinterpret_cast<Ext2FsDirectoryEntry*>(buffer + bufferOffset);
+        if (i < m_DirectoryOffset) continue;
 
         char* nameBuffer = new char[entry->NameSize + 1];
         std::strncpy(nameBuffer, reinterpret_cast<char*>(entry->Name),
                      entry->NameSize);
         nameBuffer[entry->NameSize] = 0;
-
-        auto name                   = dentry->Name();
-        if (std::strncmp(nameBuffer, name.Raw(), name.Size()) != 0)
+        if (entry->INodeIndex == 0)
         {
-            i += entry->Size;
+            delete[] nameBuffer;
+            bufferOffset += entry->Size;
+            continue;
+        }
+        if (!std::strcmp(nameBuffer, ".") && !std::strcmp(nameBuffer, ".."))
+        {
+            bufferOffset += entry->Size;
             continue;
         }
 
@@ -114,18 +105,57 @@ ErrorOr<Ref<DirectoryEntry>> Ext2FsINode::Lookup(Ref<DirectoryEntry> dentry)
         newNode->m_Metadata.ModificationTime.tv_sec  = inodeMeta.ModifiedTime;
         newNode->m_Metadata.ModificationTime.tv_nsec = 0;
 
-        newNode->m_Populated                         = false;
         newNode->m_Meta                              = inodeMeta;
+        LogTrace(
+            "Ext2Fs: New Ext2FsINode =>\n"
+            "\tname => {}\n"
+            "\tid => {}\n"
+            "index => {}\n",
+            newNode->Name(), newNode->m_Metadata.ID, i);
+
         InsertChild(newNode, newNode->Name());
 
-        // TODO(v1tr10l7): Resolve symlink
+        // TODO(v1tr10l7): resolve link
         if (newNode->IsSymlink())
             ;
 
         delete[] nameBuffer;
-        PMM::FreePages(Pointer(buffer).FromHigherHalf(), pageCount);
+        bufferOffset += entry->Size;
 
-        dentry->Bind(newNode);
+        auto type   = IF2DT(mode);
+        auto offset = m_DirectoryOffset;
+        ++m_DirectoryOffset;
+
+        if (!iterator(newNode->Name(), offset, newNode->m_Metadata.ID, type))
+            break;
+    }
+
+    if (bufferOffset == m_Meta.GetSize()) m_DirectoryOffset = 0;
+    delete[] buffer;
+
+    return {};
+}
+ErrorOr<Ref<DirectoryEntry>> Ext2FsINode::Lookup(Ref<DirectoryEntry> dentry)
+{
+    auto iterator
+        = [&](StringView name, loff_t offset, usize ino, usize type) -> bool
+    {
+        if (name == dentry->Name()) return false;
+
+        return true;
+    };
+
+    Delegate<bool(StringView, loff_t, usize, usize)> delegate;
+    delegate.BindLambda(iterator);
+
+    LogTrace("Ext2Fs: Looking up an inode => `{}`", dentry->Name());
+    TraverseDirectories(dentry->Parent().Raw(), delegate);
+
+    for (const auto& [name, inode] : Children())
+    {
+        if (name != inode->Name()) continue;
+
+        dentry->Bind(inode);
         return dentry;
     }
 

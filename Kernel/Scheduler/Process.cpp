@@ -46,7 +46,7 @@ Process::Process(Process* parent, StringView name,
     , m_Credentials(creds)
     , m_Ring(PrivilegeLevel::eUnprivileged)
     , m_NextTid(m_Pid)
-    , m_CWD(VFS::GetRootDirectoryEntry())
+    , m_CWD(VFS::RootDirectoryEntry())
 
 {
     m_FdTable.OpenStdioStreams();
@@ -164,7 +164,7 @@ ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
     Ref parent = CWD();
     if (CPU::AsUser([path]() -> bool { return path.Absolute(); }))
-        parent = VFS::GetRootDirectoryEntry().Raw();
+        parent = VFS::RootDirectoryEntry().Raw();
     else if (dirFd != AT_FDCWD)
     {
         Ref<FileDescriptor> descriptor = GetFileHandle(dirFd);

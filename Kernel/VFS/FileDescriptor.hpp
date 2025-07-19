@@ -119,16 +119,13 @@ class FileDescriptor : public RefCounted
     // TODO(v1t10l7): verify whether the fd is blocking
     inline bool                 WouldBlock() const { return false; }
 
-    virtual bool                IsCharDevice() const
-    {
-        return DirectoryEntry()->IsCharDevice();
-    }
-    virtual bool IsFifo() const { return DirectoryEntry()->IsFifo(); }
-    virtual bool IsDirectory() const { return DirectoryEntry()->IsDirectory(); }
-    virtual bool IsRegular() const { return DirectoryEntry()->IsRegular(); }
-    virtual bool IsSymlink() const { return DirectoryEntry()->IsSymlink(); }
-    inline bool  IsSocket() const { return DirectoryEntry()->IsSocket(); }
-    inline bool  IsPipe() const
+    virtual bool                IsCharDevice() const;
+    virtual bool                IsFifo() const;
+    virtual bool                IsDirectory() const;
+    virtual bool                IsRegular() const;
+    virtual bool                IsSymlink() const;
+    bool                        IsSocket() const;
+    inline bool                 IsPipe() const
     {
         // FIXME(v1tr10l7): implement this once pipes are supported
 
