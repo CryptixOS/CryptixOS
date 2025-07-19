@@ -187,7 +187,7 @@ void ProcFs::AddProcess(Process* process)
     Assert(!s_Processes.Contains(process->Pid()));
     s_Processes[process->Pid()] = process;
     auto name                   = StringUtils::ToString(process->Pid());
-    auto entry                  = new DirectoryEntry(m_RootEntry.Raw(), name);
+    auto entry                  = new DirectoryEntry(m_RootEntry, name);
 
     auto maybeINode             = CreateNode(m_Root, entry, 0755 | S_IFDIR);
     if (!maybeINode) return;
@@ -256,7 +256,7 @@ bool ProcFs::Populate(DirectoryEntry* dentry) { return true; }
 
 void ProcFs::AddChild(StringView name)
 {
-    auto entry = new DirectoryEntry(m_RootEntry.Raw(), name);
+    auto entry = new DirectoryEntry(m_RootEntry, name);
     auto inode = CreateProcFsNode(m_Root, name, this);
     entry->Bind(inode);
 

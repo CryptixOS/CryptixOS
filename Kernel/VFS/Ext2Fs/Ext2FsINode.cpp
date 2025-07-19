@@ -32,8 +32,8 @@ Ext2FsINode::Ext2FsINode(StringView name, Ext2Fs* fs, mode_t mode)
     m_Metadata.ModificationTime = Time::GetReal();
 }
 
-ErrorOr<void> Ext2FsINode::TraverseDirectories(class DirectoryEntry* parent,
-                                               DirectoryIterator     iterator)
+ErrorOr<void> Ext2FsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
+                                               DirectoryIterator iterator)
 {
     LogTrace("Ext2fs: Traversing directories");
     m_Fs->ReadINodeEntry(&m_Meta, m_Metadata.ID);
@@ -149,7 +149,7 @@ ErrorOr<Ref<DirectoryEntry>> Ext2FsINode::Lookup(Ref<DirectoryEntry> dentry)
     delegate.BindLambda(iterator);
 
     LogTrace("Ext2Fs: Looking up an inode => `{}`", dentry->Name());
-    TraverseDirectories(dentry->Parent().Raw(), delegate);
+    TraverseDirectories(dentry->Parent().Promote(), delegate);
 
     for (const auto& [name, inode] : Children())
     {

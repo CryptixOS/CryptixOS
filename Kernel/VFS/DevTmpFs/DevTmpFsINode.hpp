@@ -46,8 +46,8 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
     }
 
     virtual ErrorOr<void>
-    TraverseDirectories(class DirectoryEntry* parent,
-                        DirectoryIterator     iterator) override;
+    TraverseDirectories(Ref<class DirectoryEntry> parent,
+                        DirectoryIterator         iterator) override;
     virtual ErrorOr<Ref<DirectoryEntry>>
     Lookup(Ref<DirectoryEntry> dentry) override;
 

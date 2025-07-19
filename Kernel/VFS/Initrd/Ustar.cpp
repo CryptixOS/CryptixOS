@@ -25,8 +25,7 @@ namespace Ustar
     bool Validate(Pointer address)
     {
         auto file = address.As<FileHeader>();
-        return std::strncmp(file->Signature, MAGIC.Raw(), MAGIC_LENGTH - 1)
-            == 0;
+        return StringView(file->Signature, MAGIC_LENGTH - 1) == MAGIC;
     }
 
     void Load(Pointer address, usize size)
@@ -43,14 +42,13 @@ namespace Ustar
         auto getNextFile
             = [](FileHeader* current, usize fileSize) -> FileHeader*
         {
-            Pointer nextFile = reinterpret_cast<uintptr_t>(current) + 512
-                             + Math::AlignUp(fileSize, 512);
+            Pointer nextFile
+                = Pointer(current).Offset(512 + Math::AlignUp(fileSize, 512));
 
             return nextFile.As<FileHeader>();
         };
 
-        while (std::strncmp(current->Signature, MAGIC.Raw(), MAGIC_LENGTH - 1)
-               == 0)
+        while (StringView(current->Signature, MAGIC_LENGTH - 1) == MAGIC)
         {
             PathView filename(current->FileName);
             PathView linkName(current->LinkName);

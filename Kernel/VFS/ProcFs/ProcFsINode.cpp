@@ -64,8 +64,8 @@ const stat ProcFsINode::Stats()
     stats.st_ctim    = m_Metadata.ChangeTime;
     return stats;
 }
-ErrorOr<void> ProcFsINode::TraverseDirectories(class DirectoryEntry* parent,
-                                               DirectoryIterator     iterator)
+ErrorOr<void> ProcFsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
+                                               DirectoryIterator iterator)
 {
     usize offset = 0;
     for (const auto [name, inode] : Children())

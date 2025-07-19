@@ -17,10 +17,10 @@ class Ext2FsINode : public INode
     virtual ~Ext2FsINode() {}
 
     virtual ErrorOr<void>
-    TraverseDirectories(class DirectoryEntry* parent,
-                        DirectoryIterator     iterator) override;
+    TraverseDirectories(Ref<class DirectoryEntry> parent,
+                        DirectoryIterator         iterator) override;
     virtual ErrorOr<Ref<DirectoryEntry>>
-                   Lookup(Ref<DirectoryEntry> dentry) override;
+    Lookup(Ref<DirectoryEntry> dentry) override;
 
     virtual const UnorderedMap<StringView, INode*>& Children() const
     {

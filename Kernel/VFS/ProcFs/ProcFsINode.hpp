@@ -73,8 +73,8 @@ class ProcFsINode : public INode
 
     virtual const stat Stats() override;
     virtual ErrorOr<void>
-    TraverseDirectories(class DirectoryEntry* parent,
-                        DirectoryIterator     iterator) override;
+    TraverseDirectories(Ref<class DirectoryEntry> parent,
+                        DirectoryIterator         iterator) override;
 
     virtual const UnorderedMap<StringView, INode*>& Children() const
     {
@@ -86,6 +86,6 @@ class ProcFsINode : public INode
     virtual ErrorOr<isize> Truncate(usize size) override;
 
   private:
-    ProcFsProperty*                        m_Property = nullptr;
+    ProcFsProperty*                  m_Property = nullptr;
     UnorderedMap<StringView, INode*> m_Children;
 };

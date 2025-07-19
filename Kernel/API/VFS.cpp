@@ -50,7 +50,7 @@ namespace API::VFS
             if (!fd) return Error(EBADF);
             ::VFS::PathResolution res;
             res.Entry    = fd->DirectoryEntry();
-            res.Parent   = res.Entry->Parent().Raw();
+            res.Parent   = res.Entry->Parent().Promote();
             res.BaseName = res.Entry->Name();
 
             return res;
@@ -72,7 +72,7 @@ namespace API::VFS
         }
 
         const bool followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
-        auto       res = ::VFS::ResolvePath(base.Raw(), path, followSymlinks);
+        auto       res = ::VFS::ResolvePath(base, path, followSymlinks);
         if (errno != no_error && errno != ENOENT) return Error(errno);
 
         return res;
@@ -202,7 +202,7 @@ namespace API::VFS
 
         auto maybeBuffer = UserBuffer::ForUserBuffer(out, count);
         RetOnError(maybeBuffer);
-        auto outBuffer = maybeBuffer.value();
+        auto outBuffer = maybeBuffer.Value();
 
         return fd->Read(outBuffer, count, offset);
     }
@@ -218,7 +218,7 @@ namespace API::VFS
 
         auto maybeBuffer = UserBuffer::ForUserBuffer(in, count);
         RetOnError(maybeBuffer);
-        auto inBuffer = maybeBuffer.value();
+        auto inBuffer = maybeBuffer.Value();
 
         return fd->Write(inBuffer, count, offset);
     }
@@ -234,9 +234,9 @@ namespace API::VFS
         if (mode != (mode & S_IRWXO)) return Error(EINVAL);
 
         auto maybePathRes
-            = ::VFS::ResolvePath(::VFS::RootDirectoryEntry().Raw(), path);
+            = ::VFS::ResolvePath(::VFS::RootDirectoryEntry(), path);
         RetOnError(maybePathRes);
-        auto pathRes = maybePathRes.value();
+        auto pathRes = maybePathRes.Value();
 
         auto entry   = pathRes.Entry;
         if (!entry) return Error(errno);
@@ -275,9 +275,9 @@ namespace API::VFS
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
         auto maybePathRes
-            = ::VFS::ResolvePath(::VFS::RootDirectoryEntry().Raw(), path);
+            = ::VFS::ResolvePath(::VFS::RootDirectoryEntry(), path);
         RetOnError(maybePathRes);
-        auto pathRes = maybePathRes.value();
+        auto pathRes = maybePathRes.Value();
 
         auto entry   = pathRes.Entry;
         if (!entry) return Error(ENOENT);
@@ -327,9 +327,9 @@ namespace API::VFS
         auto cwd = process->CWD();
         if (!cwd) return Error(ENOENT);
 
-        auto maybePathRes = ::VFS::ResolvePath(cwd.Raw(), path);
+        auto maybePathRes = ::VFS::ResolvePath(cwd, path);
         RetOnError(maybePathRes);
-        auto pathRes      = maybePathRes.value();
+        auto pathRes      = maybePathRes.Value();
 
         auto newDirectory = pathRes.Entry;
         if (!newDirectory) return Error(ENOENT);
@@ -383,10 +383,10 @@ namespace API::VFS
         auto cwd = process->CWD();
         Assert(cwd);
 
-        auto maybePathRes = ::VFS::ResolvePath(cwd.Raw(), path, true);
+        auto maybePathRes = ::VFS::ResolvePath(cwd, path, true);
         RetOnError(maybePathRes);
 
-        auto pathRes     = maybePathRes.value();
+        auto pathRes     = maybePathRes.Value();
 
         auto entry       = pathRes.Entry;
         auto parentINode = pathRes.Parent->INode();
@@ -459,8 +459,8 @@ namespace API::VFS
             });
 
         auto pathResOr = ResolveAtFd(dirFdNum, path, 0);
-        if (!pathResOr) return Error(pathResOr.error());
-        auto    pathRes     = pathResOr.value();
+        if (!pathResOr) return Error(pathResOr.Error());
+        auto    pathRes     = pathResOr.Value();
 
         WeakRef parentEntry = pathRes.Parent;
         auto    parentINode = parentEntry->INode();
@@ -472,7 +472,7 @@ namespace API::VFS
 
         entry           = new DirectoryEntry(pathRes.Parent, pathRes.BaseName);
         auto maybeEntry = parentINode->CreateDirectory(entry, mode);
-        if (!maybeEntry) return Error(maybeEntry.error());
+        if (!maybeEntry) return Error(maybeEntry.Error());
 
         return 0;
     }
@@ -483,8 +483,8 @@ namespace API::VFS
             = CPU::AsUser([&pathView]() -> Path { return Path(pathView); });
 
         auto pathResOr = ResolveAtFd(dirFdNum, path, AT_SYMLINK_NOFOLLOW);
-        if (!pathResOr) return Error(pathResOr.error());
-        auto pathRes = pathResOr.value();
+        if (!pathResOr) return Error(pathResOr.Error());
+        auto pathRes = pathResOr.Value();
 
         auto entry   = pathRes.Entry;
         if (!entry) return Error(ENOENT);
@@ -492,22 +492,20 @@ namespace API::VFS
 
         auto userBufferSuccess
             = UserBuffer::ForUserBuffer(outBuffer, bufferSize);
-        if (!userBufferSuccess) return Error(userBufferSuccess.error());
-        auto userBuffer = userBufferSuccess.value();
+        if (!userBufferSuccess) return Error(userBufferSuccess.Error());
+        auto userBuffer = userBufferSuccess.Value();
 
         auto success    = inode->ReadLink(userBuffer);
-        if (!success) return Error(success.error());
+        if (!success) return Error(success.Error());
 
-        return success.value();
+        return success.Value();
     }
     ErrorOr<isize> FChModAt(isize dirFdNum, PathView pathView, mode_t mode)
     {
-        Path path
-            = CPU::AsUser([pathView]() -> Path
-                          { return Path(pathView.Raw(), pathView.Size()); });
+        Path path      = CPU::AsUser([pathView]() -> Path { return pathView; });
         auto pathResOr = ResolveAtFd(dirFdNum, path, mode);
         RetOnError(pathResOr);
-        auto pathRes = pathResOr.value();
+        auto pathRes = pathResOr.Value();
 
         auto entry   = pathRes.Entry;
         if (!entry) return Error(ENOENT);
@@ -552,10 +550,10 @@ namespace API::VFS
 
     ErrorOr<isize> UTime(PathView path, const utimbuf* out)
     {
-        auto maybePathRes = ::VFS::ResolvePath(
-            ::VFS::RootDirectoryEntry().Raw(), path, true);
+        auto maybePathRes
+            = ::VFS::ResolvePath(::VFS::RootDirectoryEntry(), path, true);
         RetOnError(maybePathRes);
-        auto pathRes = maybePathRes.value();
+        auto pathRes = maybePathRes.Value();
 
         auto entry   = pathRes.Entry;
         if (!entry) return Error(ENOENT);
@@ -570,18 +568,18 @@ namespace API::VFS
         timespec modificationTime = {utime.modtime, 0};
 
         auto     result = inode->UpdateTimestamps(accessTime, modificationTime);
-        if (!result) return Error(result.error());
+        if (!result) return Error(result.Error());
         result = inode->FlushMetadata();
-        if (!result) return Error(result.error());
+        if (!result) return Error(result.Error());
 
         return {};
     }
     ErrorOr<isize> StatFs(PathView path, statfs* out)
     {
         auto maybePathRes
-            = ::VFS::ResolvePath(::VFS::RootDirectoryEntry().Raw(), path);
+            = ::VFS::ResolvePath(::VFS::RootDirectoryEntry(), path);
         RetOnError(maybePathRes);
-        auto pathRes = maybePathRes.value();
+        auto pathRes = maybePathRes.Value();
 
         auto entry   = pathRes.Entry;
         if (!entry) return Error(ENOENT);
@@ -592,7 +590,7 @@ namespace API::VFS
         auto fs     = inode->Filesystem();
         auto result = fs->Stats(*out);
 
-        return !result ? result.error() : 0;
+        return !result ? result.Error() : 0;
     }
 
     ErrorOr<isize> FStatAt(isize dirFdNum, const char* path, isize flags,
@@ -632,9 +630,8 @@ namespace API::VFS
             return 0;
         }
 
-        WeakRef parentEntry = PathView(path).Absolute()
-                                ? ::VFS::RootDirectoryEntry()
-                                : nullptr;
+        WeakRef parentEntry
+            = PathView(path).Absolute() ? ::VFS::RootDirectoryEntry() : nullptr;
         if (!parentEntry)
         {
             if (dirFdNum == AT_FDCWD) parentEntry = cwdEntry;
@@ -649,8 +646,8 @@ namespace API::VFS
         }
 
         Ref<DirectoryEntry> entry
-            = ::VFS::ResolvePath(parentEntry.Raw(), path, followSymlinks)
-                  .value()
+            = ::VFS::ResolvePath(parentEntry.Promote(), path, followSymlinks)
+                  .Value()
                   .Entry;
         if (!entry) return Error(errno);
 
@@ -726,7 +723,7 @@ namespace API::VFS
         if (!pathResOr)
         {
             if (dirFdNum < 0 && dirFdNum != AT_FDCWD)
-                return Error(pathResOr.error());
+                return Error(pathResOr.Error());
 
             auto fd = process->GetFileHandle(dirFdNum);
             if (!fd) return Error(EBADF);
@@ -735,7 +732,7 @@ namespace API::VFS
         }
         else
         {
-            auto dentry = pathResOr.value().Entry;
+            auto dentry = pathResOr.Value().Entry;
             if (!dentry) return Error(ENOENT);
             inode = dentry->INode();
         }
@@ -744,9 +741,9 @@ namespace API::VFS
         if (!inode->CanWrite(process->Credentials())) return Error(EPERM);
 
         auto result = inode->UpdateTimestamps(atime, mtime, ctime);
-        if (!result) return Error(result.error());
+        if (!result) return Error(result.Error());
         result = inode->FlushMetadata();
-        if (!result) return result.error();
+        if (!result) return result.Error();
 
         return 0;
     }
@@ -766,13 +763,13 @@ namespace API::VFS
 
         auto oldPathResolutionOr
             = ResolveAtFd(oldDirFdNum, getPath(oldPath), 0);
-        if (!oldPathResolutionOr) return Error(oldPathResolutionOr.error());
-        auto oldPathResolution = oldPathResolutionOr.value();
+        if (!oldPathResolutionOr) return Error(oldPathResolutionOr.Error());
+        auto oldPathResolution = oldPathResolutionOr.Value();
 
         auto newPathResolutionOr
             = ResolveAtFd(newDirFdNum, getPath(newPath), 0);
-        if (!newPathResolutionOr) return Error(newPathResolutionOr.error());
-        auto newPathResolution = newPathResolutionOr.value();
+        if (!newPathResolutionOr) return Error(newPathResolutionOr.Error());
+        auto newPathResolution = newPathResolutionOr.Value();
 
         auto oldParent         = oldPathResolution.Parent->INode();
         if (!oldParent->IsDirectory()) return Error(ENOTDIR);
@@ -786,7 +783,7 @@ namespace API::VFS
                            : oldPathResolution.BaseName;
         auto success   = oldParent->Rename(newParent->INode(), newName);
 
-        if (!success) return Error(success.error());
+        if (!success) return Error(success.Error());
         return 0;
     }
 }; // namespace API::VFS

@@ -61,8 +61,8 @@ TmpFsINode::TmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
     }
 }
 
-ErrorOr<void> TmpFsINode::TraverseDirectories(class DirectoryEntry* parent,
-                                              DirectoryIterator     iterator)
+ErrorOr<void> TmpFsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
+                                              DirectoryIterator iterator)
 {
     usize offset = 0;
     for (const auto [name, inode] : Children())

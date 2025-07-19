@@ -36,7 +36,7 @@ ErrorOr<::Ref<DirectoryEntry>> TmpFs::Mount(StringView  sourcePath,
     auto inodeOr    = MkNod(nullptr, m_RootEntry, 0644 | S_IFDIR, 0);
     RetOnError(inodeOr);
 
-    m_Root = inodeOr.value();
+    m_Root = inodeOr.Value();
     m_RootEntry->Bind(m_Root);
 
     return m_RootEntry;
@@ -71,10 +71,10 @@ ErrorOr<INode*> TmpFs::AllocateNode(StringView name, mode_t mode)
 ErrorOr<INode*> TmpFs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
                                   mode_t mode, uid_t uid, gid_t gid)
 {
-    auto inodeOr = MkNod(parent, entry.Raw(), mode, 0);
-    if (!inodeOr) return Error(inodeOr.error());
+    auto inodeOr = MkNod(parent, entry, mode, 0);
+    if (!inodeOr) return Error(inodeOr.Error());
 
-    auto inode            = reinterpret_cast<TmpFsINode*>(inodeOr.value());
+    auto inode            = reinterpret_cast<TmpFsINode*>(inodeOr.Value());
     inode->m_Metadata.UID = uid;
     inode->m_Metadata.GID = gid;
 
@@ -88,9 +88,9 @@ ErrorOr<INode*> TmpFs::Symlink(INode* parent, ::Ref<DirectoryEntry> entry,
 
     mode_t mode    = S_IFLNK | 0777;
     auto   inodeOr = CreateNode(parent, entry, mode, 0, 0);
-    if (!inodeOr) return Error(inodeOr.error());
+    if (!inodeOr) return Error(inodeOr.Error());
 
-    auto inode      = reinterpret_cast<TmpFsINode*>(inodeOr.value());
+    auto inode      = reinterpret_cast<TmpFsINode*>(inodeOr.Value());
     inode->m_Target = target;
 
     parent->InsertChild(parent, entry->Name());
@@ -116,7 +116,7 @@ ErrorOr<INode*> TmpFs::MkNod(INode* parent, ::Ref<DirectoryEntry> entry,
         auto maybeEntry = parent->CreateNode(entry, mode, 0);
         RetOnError(maybeEntry);
 
-        return maybeEntry.value()->INode();
+        return maybeEntry.Value()->INode();
     }
 
     return new TmpFsINode(entry->Name(), this, mode, 0, 0);

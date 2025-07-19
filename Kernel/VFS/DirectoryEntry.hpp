@@ -92,17 +92,16 @@ class DirectoryEntry : public RefCounted
     bool                      IsSymlink() const;
     bool                      IsSpecial() const;
 
-    ::Ref<DirectoryEntry>     m_MountGate = nullptr;
-
   private:
     friend class INode;
 
     Spinlock                  m_Lock;
 
-    String                    m_Name   = "";
-    DirectoryEntryFlags       m_Flags  = DirectoryEntryFlags::eNegative;
-    class INode*              m_INode  = nullptr;
+    String                    m_Name      = "";
+    DirectoryEntryFlags       m_Flags     = DirectoryEntryFlags::eNegative;
+    class INode*              m_INode     = nullptr;
 
-    ::WeakRef<DirectoryEntry> m_Parent = nullptr;
+    ::WeakRef<DirectoryEntry> m_Parent    = nullptr;
+    ::Ref<DirectoryEntry>     m_MountGate = nullptr;
     UnorderedMap<StringView, ::Ref<class DirectoryEntry>> m_Children;
 };

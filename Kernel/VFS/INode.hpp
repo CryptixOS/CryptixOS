@@ -64,8 +64,8 @@ class INode
 
     using DirectoryIterator
         = Delegate<bool(StringView name, loff_t offset, usize ino, u64 type)>;
-    virtual ErrorOr<void> TraverseDirectories(class DirectoryEntry* parent,
-                                              DirectoryIterator     iterator)
+    virtual ErrorOr<void> TraverseDirectories(Ref<class DirectoryEntry> parent,
+                                              DirectoryIterator iterator)
     {
         return Error(ENOSYS);
     }

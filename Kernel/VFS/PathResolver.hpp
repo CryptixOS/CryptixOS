@@ -55,16 +55,16 @@ class PathResolver
     explicit PathResolver(Ref<DirectoryEntry> const root, PathView path);
 
     ErrorOr<void> Initialize(Ref<DirectoryEntry> const root, PathView path);
-    ErrorOr<DirectoryEntry*>        Resolve(bool followLinks = true);
-    ErrorOr<DirectoryEntry*>        Resolve(PathLookupFlags flags);
+    ErrorOr<Ref<DirectoryEntry>>    Resolve(bool followLinks = true);
+    ErrorOr<Ref<DirectoryEntry>>    Resolve(PathLookupFlags flags);
 
     ErrorOr<void>                   Step();
     ErrorOr<Ref<DirectoryEntry>>    FollowMounts(Ref<DirectoryEntry> dentry
                                                  = nullptr);
-    ErrorOr<DirectoryEntry*>        FollowDown();
-    ErrorOr<DirectoryEntry*>        FollowSymlinks();
-    ErrorOr<DirectoryEntry*>        FollowSymlink();
-    DirectoryEntry*                 FollowDots();
+    ErrorOr<Ref<DirectoryEntry>>    FollowDown();
+    ErrorOr<Ref<DirectoryEntry>>    FollowSymlinks();
+    ErrorOr<Ref<DirectoryEntry>>    FollowSymlink();
+    Ref<DirectoryEntry>             FollowDots();
     Error                           Terminate(ErrorCode code);
 
     inline Ref<DirectoryEntry>      RootDirectoryEntry() { return m_Root; }
@@ -75,13 +75,13 @@ class PathResolver
         return m_CurrentSegment.Name;
     }
 
-    DirectoryEntry*            GetEffectiveParent(INode* node = nullptr);
+    WeakRef<DirectoryEntry>    GetEffectiveParent(INode* node = nullptr);
     inline Ref<DirectoryEntry> ParentEntry() { return m_Parent; }
     inline Ref<DirectoryEntry> DirectoryEntry() { return m_DirectoryEntry; }
 
     inline INode*              ParentINode()
     {
-        return m_Parent.Raw() ? m_Parent->INode() : nullptr;
+        return m_Parent ? m_Parent->INode() : nullptr;
     }
     inline INode* INode() const
     {
@@ -91,7 +91,7 @@ class PathResolver
     {
         return m_CurrentSegment.Type;
     }
-    constexpr const Path& BaseName() const { return m_BaseName; }
+    constexpr const PathView BaseName() const { return m_BaseName; }
 
   private:
     class Ref<::DirectoryEntry> m_Root  = nullptr;

@@ -241,7 +241,7 @@ bool FileDescriptor::GenerateDirEntries()
     delegate.BindLambda(iterator);
 
     auto inode  = current->INode();
-    auto result = inode->TraverseDirectories(current.Raw(), delegate);
+    auto result = inode->TraverseDirectories(current, delegate);
     CtosUnused(result);
 
     // . && ..

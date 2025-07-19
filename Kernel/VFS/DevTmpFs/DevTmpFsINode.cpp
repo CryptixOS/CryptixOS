@@ -44,8 +44,9 @@ DevTmpFsINode::DevTmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
     m_Metadata.ModificationTime = Time::GetReal();
 }
 
-ErrorOr<void> DevTmpFsINode::TraverseDirectories(class DirectoryEntry* parent,
-                                                 DirectoryIterator     iterator)
+ErrorOr<void>
+DevTmpFsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
+                                   DirectoryIterator         iterator)
 {
     usize offset = 0;
     for (const auto [name, inode] : Children())

@@ -116,7 +116,7 @@ void DirectoryEntry::RemoveChild(Prism::Ref<class DirectoryEntry> entry)
     {
         if (cnt >= SYMLOOP_MAX - 1) return_err(nullptr, ELOOP);
 
-        auto next = VFS::ResolvePath(m_Parent.Raw(), target.Raw(), true)
+        auto next = VFS::ResolvePath(m_Parent.Promote(), target, true)
                         .ValueOr(VFS::PathResolution{})
                         .Entry;
         if (!next) return_err(nullptr, ENOENT);

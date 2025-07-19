@@ -17,7 +17,7 @@ DevTmpFs::DevTmpFs(u32 flags)
 }
 
 ErrorOr<::Ref<DirectoryEntry>> DevTmpFs::Mount(StringView  sourcePath,
-                                             const void* data)
+                                               const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
@@ -29,7 +29,7 @@ ErrorOr<::Ref<DirectoryEntry>> DevTmpFs::Mount(StringView  sourcePath,
     auto maybeRoot = MkNod(nullptr, m_RootEntry, 0755 | S_IFDIR, 0);
     RetOnError(maybeRoot);
 
-    m_Root = maybeRoot.value();
+    m_Root = maybeRoot.Value();
     m_RootEntry->Bind(m_Root);
 
     return m_RootEntry;
@@ -38,9 +38,9 @@ ErrorOr<::Ref<DirectoryEntry>> DevTmpFs::Mount(StringView  sourcePath,
 ErrorOr<INode*> DevTmpFs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
                                      mode_t mode, uid_t uid, gid_t gid)
 {
-    auto inodeOr = MkNod(parent, entry.Raw(), mode, 0);
-    auto inode   = inodeOr.value_or(nullptr);
-    if (!inode) return Error(inodeOr.error());
+    auto inodeOr = MkNod(parent, entry, mode, 0);
+    auto inode   = inodeOr.ValueOr(nullptr);
+    if (!inode) return Error(inodeOr.Error());
 
     entry->Bind(inode);
     return inode;
