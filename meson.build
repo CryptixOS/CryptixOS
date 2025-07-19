@@ -40,13 +40,13 @@ include_directories = [
 warnings = [
   #'-Wno-error=#warnings',
   '-Wno-builtin-macro-redefined',
-  '-Wno-macro-redefined',
-  '-Wno-nan-infinity-disabled',
-  '-Wno-deprecated-builtins',
+  '-Wno-macro-redefined', # clang
+  '-Wno-nan-infinity-disabled', # clang 
+  '-Wno-deprecated-builtins', # clang
   '-Wno-unused-parameter',
   '-Wno-frame-address',
-  '-Wno-c23-extensions',
-  #'-Wglobal-constructors',
+  '-Wno-c23-extensions', # clang
+  # '-Wglobal-constructors', # clang
 ]
 
 macros = [
@@ -81,6 +81,7 @@ add_global_arguments(
     '-fstack-protector-all',
     '-mstack-protector-guard=global',
     '-fno-PIC',
+    # '-fno-PIE', # gcc
     '-fPIE',
     '-nostdlib',
     '-static',
@@ -99,6 +100,7 @@ add_global_arguments(
     '-fno-rtti',
     '-Wno-non-virtual-dtor',
     '-nostdinc++',
+    # '-Wno-changes-meaning', # gcc
   ],
   language: 'cpp',
 )
@@ -115,7 +117,7 @@ deps = [
   ),
   dependency('demangler'),
   dependency('fmt10'),
-  dependency('libstdcxx_headers'),
+  dependency('freestnd-cxx-hdrs'),
   dependency('limine'),
   dependency('magic_enum', default_options: [
     'test=false',
