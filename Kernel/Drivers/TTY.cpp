@@ -10,10 +10,12 @@
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptGuard.hpp>
 
+#include <Debug/Debug.hpp>
 #include <Drivers/DeviceManager.hpp>
 #include <Drivers/TTY.hpp>
 #include <Drivers/Terminal.hpp>
 
+#include <Prism/String/Formatter.hpp>
 #include <Prism/String/StringView.hpp>
 
 #include <Scheduler/Process.hpp>
@@ -114,7 +116,9 @@ winsize    TTY::GetSize() const { return m_Terminal->GetSize(); }
 
 void       TTY::SetTermios(const termios2& termios)
 {
+#if CTOS_TTY_LOG_TERMIOS
     LogDebug("TTY: Setting termios to ->\n{}", termios);
+#endif
     m_Termios = termios;
     m_RawBuffer.Clear();
 }
@@ -165,16 +169,16 @@ ErrorOr<isize> TTY::Read(void* buffer, off_t offset, usize bytes)
 }
 ErrorOr<isize> TTY::Write(const void* src, off_t offset, usize bytes)
 {
-    const char*           s = reinterpret_cast<const char*>(src);
-    static constexpr char MLIBC_LOG_SIGNATURE[] = "[mlibc]: ";
+    const char*                 s = reinterpret_cast<const char*>(src);
+    static constexpr StringView MLIBC_LOG_SIGNATURE = "[mlibc]: "_sv;
 
-    StringView            str(s, bytes);
+    StringView                  str(s, bytes);
 
     if (str.StartsWith(MLIBC_LOG_SIGNATURE))
     {
-        StringView errorMessage(s + sizeof(MLIBC_LOG_SIGNATURE) - 1 - 1);
+        str.RemovePrefix(MLIBC_LOG_SIGNATURE.Size());
         LogMessage("[{}mlibc{}]: {}", AnsiColor::FOREGROUND_MAGENTA,
-                   AnsiColor::FOREGROUND_WHITE, errorMessage);
+                   AnsiColor::FOREGROUND_WHITE, str);
 
         return bytes;
     }
@@ -196,52 +200,65 @@ ErrorOr<isize> TTY::Write(const UserBuffer& in, usize count, isize offset)
 i32 TTY::IoCtl(usize request, uintptr_t argp)
 {
     if (!argp) return_err(-1, EFAULT);
-    Process* current = Process::GetCurrent();
+    Process* current = Process::Current();
 
     switch (request)
     {
         case TCGETS:
         {
-            std::memcpy(reinterpret_cast<void*>(argp), &m_Termios,
-                        sizeof(m_Termios));
+            if (!current->ValidateWrite(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
+            Memory::Copy(argp, &m_Termios, sizeof(m_Termios));
             break;
         }
-        case TCSETS: SetTermios(*reinterpret_cast<termios2*>(argp)); break;
+        case TCSETS:
+            if (!current->ValidateRead(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
+            SetTermios(*reinterpret_cast<termios2*>(argp));
+            break;
         case TCSETSW:
             // TODO(v1tr10l7): Drain the output buffer
+            if (!current->ValidateRead(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
             SetTermios(*reinterpret_cast<termios2*>(argp));
             break;
         case TCSETSF:
             // TODO(v1tr10l7): Allow current output buffer to drain
+            if (!current->ValidateRead(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
             SetTermios(*reinterpret_cast<termios2*>(argp));
             FlushInput();
             break;
 
         case TCGETS2:
         {
-            std::memcpy(reinterpret_cast<void*>(argp), &m_Termios,
-                        sizeof(termios2));
+            if (!current->ValidateWrite(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
+            Memory::Copy(argp, &m_Termios, sizeof(termios2));
             break;
         }
         case TCSETS2:
         {
-            std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
-                        sizeof(termios2));
+            if (!current->ValidateRead(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
+            Memory::Copy(&m_Termios, argp, sizeof(termios2));
             break;
         }
         case TCSETSW2:
         {
             // TODO(v1tr10l7): Drain the output buffer
-            std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
-                        sizeof(termios2));
+            if (!current->ValidateRead(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
+            Memory::Copy(&m_Termios, argp, sizeof(termios2));
             break;
         }
         case TCSETSF2:
         {
             // TODO(v1tr10l7): Allow current output buffer to drain,
             //  and discard the input buffer
-            std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
-                        sizeof(termios2));
+            if (!current->ValidateRead(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
+            Memory::Copy(&m_Termios, argp, sizeof(termios2));
             break;
         }
 
@@ -262,16 +279,16 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         case TIOCSETD: m_Termios.c_line = *reinterpret_cast<u32*>(argp); break;
         // Make the TTY the controlling terminal of the calling process
         case TIOCSCTTY:
-            if (current->GetSid() != current->GetPid() || current->GetTTY())
+            if (current->Sid() != current->Pid() || current->TTY())
                 return_err(-1, EINVAL);
-            if (m_ControlSid && current->GetCredentials().uid != 0)
+            if (m_ControlSid && current->Credentials().uid != 0)
                 return_err(-1, EPERM);
             current->SetTTY(this);
-            m_ControlSid = current->GetCredentials().sid;
+            m_ControlSid = current->Credentials().sid;
             break;
         case TIOCNOTTY:
-            if (current->GetTTY() != this
-                || m_ControlSid != current->GetCredentials().sid)
+            if (current->TTY() != this
+                || m_ControlSid != current->Credentials().sid)
                 return_err(-1, EINVAL);
 
             current->SetTTY(nullptr);
@@ -319,7 +336,7 @@ void TTY::Initialize()
     {
         LogTrace("TTY: Creating device /dev/tty{}...", minor);
 
-        auto tty = new TTY(fmt::format("tty{}", minor).data(), terminal, minor);
+        auto tty = new TTY(Prism::FormatString("tty{}", minor), terminal, minor);
         s_TTYs.PushBack(tty);
 
         auto result = DeviceManager::RegisterCharDevice(tty);
@@ -337,7 +354,7 @@ void TTY::Initialize()
         if (!registered) delete tty;
     }
     if (!s_TTYs.Empty())
-        VFS::MkNod("/dev/tty"_sv, 0644 | S_IFCHR, s_TTYs.Front()->ID());
+        VFS::CreateNode("/dev/tty"_sv, 0644 | S_IFCHR, s_TTYs.Front()->ID());
 
     LogInfo("TTY: Initialized");
 }
@@ -351,13 +368,12 @@ void TTY::SendSignal(i32 signal)
     Process::SendGroupSignal(m_Pgid, signal);
     return;
 
-    Process* current = Process::GetCurrent();
+    Process* current = Process::Current();
     if (signal == SIGINT) current->Exit(0);
 
     Process* groupLeader = Scheduler::GetProcess(m_Pgid);
     groupLeader->SendSignal(signal);
-    for (const auto& child : groupLeader->GetChildren())
-        child->SendSignal(signal);
+    for (const auto& child : groupLeader->Children()) child->SendSignal(signal);
 }
 
 bool TTY::OnCanonChar(char c)

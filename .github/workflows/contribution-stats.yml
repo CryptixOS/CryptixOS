@@ -1,0 +1,12 @@
+name: Contribution Stats
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  calculate_stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: umutto/contribution-stats@v1

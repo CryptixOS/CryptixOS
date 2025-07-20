@@ -4,13 +4,16 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Debug/Debug.hpp>
+
 #include <Memory/PMM.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <Time/Time.hpp>
-#include <VFS/INode.hpp>
-
 #include <VFS/DirectoryEntry.hpp>
+#include <VFS/INode.hpp>
+#include <VFS/VFS.hpp>
+
 #include <VFS/EchFs/EchFs.hpp>
 #include <VFS/EchFs/EchFsINode.hpp>
 
@@ -26,11 +29,13 @@ EchFs::~EchFs()
     }
 }
 
-ErrorOr<DirectoryEntry*> EchFs::Mount(StringView sourcePath, const void* data)
+ErrorOr<::Ref<DirectoryEntry>> EchFs::Mount(StringView  sourcePath,
+                                          const void* data)
 {
-    auto pathResolution = VFS::ResolvePath(nullptr, sourcePath);
+    auto pathResolution
+        = VFS::ResolvePath(nullptr, sourcePath).ValueOr(VFS::PathResolution{});
 
-    auto sourceEntry    = pathResolution.Entry;
+    auto sourceEntry = pathResolution.Entry;
     if (!sourceEntry || !sourceEntry->INode()) return nullptr;
     auto source = sourceEntry->INode();
 
@@ -62,6 +67,7 @@ ErrorOr<DirectoryEntry*> EchFs::Mount(StringView sourcePath, const void* data)
     uuid[0]             = m_IdentityTable->UUID[0];
     uuid[1]             = m_IdentityTable->UUID[1];
 
+#if CTOS_DEBUG_ECHFS
     EchFsDebug("EchFs", "", "IdentityTable =>");
     EchFsDebug("Signature", "", signature);
     EchFsDebug("TotalBlockCount", ":#x", totalBlockCount);
@@ -69,6 +75,7 @@ ErrorOr<DirectoryEntry*> EchFs::Mount(StringView sourcePath, const void* data)
     EchFsDebug("BytesPerBlock", ":#x", m_BlockSize);
     EchFsDebug("UUID0", ":#x", uuid[0]);
     EchFsDebug("UUID1", ":#x", uuid[1]);
+#endif
 
     if (signature != ECHFS_SIGNATURE)
     {
@@ -110,21 +117,21 @@ ErrorOr<DirectoryEntry*> EchFs::Mount(StringView sourcePath, const void* data)
         goto fail_free_inode_and_id_table;
     }
 
-    m_NativeRoot->m_Stats.st_dev
+    m_NativeRoot->m_Metadata.DeviceID
         = reinterpret_cast<Filesystem*>(this)->DeviceID();
-    m_NativeRoot->m_Stats.st_ino     = 2;
-    m_NativeRoot->m_Stats.st_mode    = 0644 | S_IFDIR;
-    m_NativeRoot->m_Stats.st_nlink   = 2;
-    m_NativeRoot->m_Stats.st_uid     = 0;
-    m_NativeRoot->m_Stats.st_gid     = 0;
-    m_NativeRoot->m_Stats.st_rdev    = 0;
-    m_NativeRoot->m_Stats.st_size    = totalBlockCount * m_BlockSize;
-    m_NativeRoot->m_Stats.st_blksize = m_BlockSize;
-    m_NativeRoot->m_Stats.st_blocks  = totalBlockCount;
+    m_NativeRoot->m_Metadata.ID               = 2;
+    m_NativeRoot->m_Metadata.Mode             = 0644 | S_IFDIR;
+    m_NativeRoot->m_Metadata.LinkCount        = 2;
+    m_NativeRoot->m_Metadata.UID              = 0;
+    m_NativeRoot->m_Metadata.GID              = 0;
+    m_NativeRoot->m_Metadata.RootDeviceID     = 0;
+    m_NativeRoot->m_Metadata.Size             = totalBlockCount * m_BlockSize;
+    m_NativeRoot->m_Metadata.BlockSize        = m_BlockSize;
+    m_NativeRoot->m_Metadata.BlockCount       = totalBlockCount;
 
-    m_NativeRoot->m_Stats.st_ctim    = Time::GetReal();
-    m_NativeRoot->m_Stats.st_atim    = Time::GetReal();
-    m_NativeRoot->m_Stats.st_mtim    = Time::GetReal();
+    m_NativeRoot->m_Metadata.ChangeTime       = Time::GetReal();
+    m_NativeRoot->m_Metadata.AccessTime       = Time::GetReal();
+    m_NativeRoot->m_Metadata.ModificationTime = Time::GetReal();
 
     return m_RootEntry;
 fail_free_inode_and_id_table:
@@ -132,12 +139,6 @@ fail_free_inode_and_id_table:
 fail_free_id_table:
     delete m_IdentityTable;
     m_IdentityTable = nullptr;
-    return nullptr;
-}
-
-ErrorOr<INode*> EchFs::CreateNode(INode* parent, DirectoryEntry* entry,
-                                  mode_t mode, uid_t uid, gid_t gid)
-{
     return nullptr;
 }
 
@@ -173,21 +174,22 @@ bool EchFs::Populate(EchFsINode* native)
 
         EchFsINode* child = new EchFsINode(
             name, reinterpret_cast<Filesystem*>(this), mode, entry, offset);
-        child->m_Stats.st_dev = reinterpret_cast<Filesystem*>(this)->DeviceID();
-        child->m_Stats.st_ino = 2;
-        child->m_Stats.st_mode    = mode;
-        child->m_Stats.st_nlink   = 1;
-        child->m_Stats.st_uid     = entry.OwnerID;
-        child->m_Stats.st_gid     = entry.GroupID;
-        child->m_Stats.st_rdev    = 0;
-        child->m_Stats.st_size    = entry.FileSize;
-        child->m_Stats.st_blksize = m_BlockSize;
-        child->m_Stats.st_blocks
+        child->m_Metadata.DeviceID
+            = reinterpret_cast<Filesystem*>(this)->DeviceID();
+        child->m_Metadata.ID           = 2;
+        child->m_Metadata.Mode         = mode;
+        child->m_Metadata.LinkCount    = 1;
+        child->m_Metadata.UID          = entry.OwnerID;
+        child->m_Metadata.GID          = entry.GroupID;
+        child->m_Metadata.RootDeviceID = 0;
+        child->m_Metadata.Size         = entry.FileSize;
+        child->m_Metadata.BlockSize    = m_BlockSize;
+        child->m_Metadata.BlockCount
             = Math::DivRoundUp(entry.FileSize, m_BlockSize);
 
-        child->m_Stats.st_ctim = Time::GetReal();
-        child->m_Stats.st_atim = Time::GetReal();
-        child->m_Stats.st_mtim = Time::GetReal();
+        child->m_Metadata.ChangeTime       = Time::GetReal();
+        child->m_Metadata.AccessTime       = Time::GetReal();
+        child->m_Metadata.ModificationTime = Time::GetReal();
 
         inode->InsertChild(reinterpret_cast<INode*>(child), name);
     }

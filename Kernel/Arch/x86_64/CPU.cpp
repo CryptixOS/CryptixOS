@@ -10,14 +10,16 @@
 #include <Boot/BootInfo.hpp>
 #include <Debug/Panic.hpp>
 
+#include <Memory/MM.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-extern u8 g_ScheduleVector;
-u8        g_PanicIpiVector = 255;
+u8                         g_PanicIpiVector = 255;
+
+extern limine_mp_response* SMP_Response();
 
 namespace CPU
 {
@@ -55,7 +57,38 @@ namespace CPU
 
     extern "C" __attribute__((noreturn)) void syscall_entry();
 
-    static void                               InitializeFPU()
+    void                                      Identify()
+    {
+        ID  id(1);
+        u8  steppingID     = id.rax & 0x0f;
+        u32 model          = (id.rax >> 4) & 0x0f;
+        u32 family         = (id.rax >> 8) & 0x0f;
+        u32 type           = (id.rax >> 12) & 0x03;
+        u32 extendedModel  = (id.rax >> 16) & 0x0f;
+        u32 extendedFamily = (id.rax >> 20) & 0xff;
+
+        u64 displayFamily  = family;
+        u64 displayModel   = model;
+        if (family == 15)
+        {
+            displayFamily = family + extendedFamily;
+            displayModel  = model + (extendedModel << 4);
+        }
+        else if (family == 6)
+        {
+            displayFamily = family;
+            displayModel  = model + (extendedModel << 4);
+        }
+
+        LogInfo(
+            "CPU: Version Information =>\n\tType: {}\n\tFamily: {}\n\tModel: "
+            "{}\n\tSteppingID: {}\n\tExtended Family: {}\n\tExtended Model: "
+            "{}\n\tDisplayFamily: {}\n\tDisplay Model: {}",
+            type, family, model, steppingID, extendedFamily, extendedModel,
+            displayFamily, displayModel);
+    }
+
+    KERNEL_INIT_CODE static void InitializeFPU()
     {
         if (!EnableSSE()) return;
         CPU* current = GetCurrent();
@@ -107,6 +140,7 @@ namespace CPU
         LogInfo("FPU: Initialized on cpu[{}]", current->ID);
     }
 
+    KERNEL_INIT_CODE
     static void InitializeCPU(limine_mp_info* cpu)
     {
         CPU* current = reinterpret_cast<CPU*>(cpu->extra_argument);
@@ -162,9 +196,10 @@ namespace CPU
         IDT::SetIST(14, 2);
     }
 
+    KERNEL_INIT_CODE
     void InitializeBSP()
     {
-        limine_mp_response* smp      = BootInfo::GetSMP_Response();
+        limine_mp_response* smp      = SMP_Response();
         usize               cpuCount = smp->cpu_count;
 
         s_CPUs.Resize(cpuCount);
@@ -205,9 +240,12 @@ namespace CPU
             current->IsOnline = true;
         }
 
-        IDT::SetIST(g_ScheduleVector, 1);
+        IDT::SetIST(Lapic::Instance()->InterruptVector(), 1);
         LogInfo("BSP: Initialized");
+
+        Identify();
     }
+    KERNEL_INIT_CODE
     void StartAPs()
     {
         LogTrace("SMP: Launching APs");
@@ -228,7 +266,7 @@ namespace CPU
             Halt();
         };
 
-        auto smpResponse = BootInfo::GetSMP_Response();
+        auto smpResponse = SMP_Response();
         for (usize i = 0; i < smpResponse->cpu_count; i++)
         {
             auto cpu = smpResponse->cpus[i];
@@ -316,10 +354,11 @@ namespace CPU
     void WakeUp(usize id, bool everyone)
     {
         if (everyone)
-            Lapic::Instance()->SendIpi(g_ScheduleVector | (0b10 << 18), 0);
+            Lapic::Instance()->SendIpi(
+                Lapic::Instance()->InterruptVector() | (0b10 << 18), 0);
         else
-            Lapic::Instance()->SendIpi(g_ScheduleVector | s_CPUs[id].LapicID,
-                                       0);
+            Lapic::Instance()->SendIpi(
+                Lapic::Instance()->InterruptVector() | s_CPUs[id].LapicID, 0);
     }
 
     void WriteMSR(u32 msr, u64 value)
@@ -471,14 +510,14 @@ namespace CPU
             thread->Context.ds = thread->Context.es = thread->Context.ss;
 
             thread->Context.rsp                     = thread->GetStack();
-            current->FpuRestore(thread->GetFpuStorage());
+            current->FpuRestore(thread->FpuStorage());
 
             u16 defaultFcw = 0b1100111111;
             __asm__ volatile("fldcw %0" ::"m"(defaultFcw) : "memory");
             u32 defaultMxCsr = 0b1111110000000;
             asm volatile("ldmxcsr %0" ::"m"(defaultMxCsr) : "memory");
 
-            current->FpuSave(thread->GetFpuStorage());
+            current->FpuSave(thread->FpuStorage());
         }
         else
         {
@@ -486,8 +525,8 @@ namespace CPU
             thread->Context.ss = GDT::KERNEL_DATA_SELECTOR;
             thread->Context.ds = thread->Context.es = thread->Context.ss;
 
-            thread->Context.rsp                     = thread->GetKernelStack();
-            thread->SetStack(thread->GetKernelStack());
+            thread->Context.rsp                     = thread->KernelStack();
+            thread->SetStack(thread->KernelStack());
         }
     }
     void SaveThread(Thread* thread, CPUContext* ctx)
@@ -497,20 +536,20 @@ namespace CPU
         thread->SetGsBase(GetKernelGSBase());
         thread->SetFsBase(GetFSBase());
 
-        GetCurrent()->FpuSave(thread->GetFpuStorage());
+        GetCurrent()->FpuSave(thread->FpuStorage());
     }
     void LoadThread(Thread* thread, CPUContext* ctx)
     {
         thread->SetRunningOn(GetCurrent()->ID);
 
-        GetCurrent()->TSS.ist[1] = thread->GetPageFaultStack();
-        GetCurrent()->FpuRestore(thread->GetFpuStorage());
+        GetCurrent()->TSS.ist[1] = thread->PageFaultStack();
+        GetCurrent()->FpuRestore(thread->FpuStorage());
 
-        thread->GetParent()->PageMap->Load();
+        thread->Parent()->PageMap->Load();
 
         SetGSBase(reinterpret_cast<u64>(thread));
-        SetKernelGSBase(thread->GetGsBase());
-        SetFSBase(thread->GetFsBase());
+        SetKernelGSBase(thread->GsBase());
+        SetFSBase(thread->FsBase());
 
         *ctx = thread->Context;
     }

@@ -14,7 +14,7 @@ project('CryptixOS', ['c', 'cpp'],
     'b_lundef=true',
     'b_pie=true',
     'c_std=c17',
-    'cpp_std=c++23',
+    'cpp_std=c++26',
   ],
 )
 
@@ -40,12 +40,13 @@ include_directories = [
 warnings = [
   #'-Wno-error=#warnings',
   '-Wno-builtin-macro-redefined',
-  '-Wno-macro-redefined',
-  '-Wno-nan-infinity-disabled',
-  '-Wno-deprecated-builtins',
+  '-Wno-macro-redefined', # clang
+  '-Wno-nan-infinity-disabled', # clang 
+  '-Wno-deprecated-builtins', # clang
   '-Wno-unused-parameter',
   '-Wno-frame-address',
-  '-Wno-c23-extensions',
+  '-Wno-c23-extensions', # clang
+  # '-Wglobal-constructors', # clang
 ]
 
 macros = [
@@ -72,6 +73,7 @@ add_global_arguments(
     warnings,
     macros,
     '-ffreestanding',
+    # keep stack pointer in the appropriate register
     '-fno-omit-frame-pointer',
     '-fno-lto',
     '-fsanitize=undefined',
@@ -79,6 +81,7 @@ add_global_arguments(
     '-fstack-protector-all',
     '-mstack-protector-guard=global',
     '-fno-PIC',
+    # '-fno-PIE', # gcc
     '-fPIE',
     '-nostdlib',
     '-static',
@@ -88,6 +91,7 @@ add_global_arguments(
 
 add_global_arguments(
   [
+    # pass the size argument to delete operator
     '-fsized-deallocation',
     '-D__cplusplus=202302L',
     '-D__cpp_concepts=202207L',
@@ -95,25 +99,14 @@ add_global_arguments(
     '-fno-exceptions',
     '-fno-rtti',
     '-Wno-non-virtual-dtor',
-    '-nostdinc++'
+    '-nostdinc++',
+    # '-Wno-changes-meaning', # gcc
   ],
   language: 'cpp',
 )
 
 # ==============================================================================
 ### Dependencies
-cmake = import('cmake')
-phmap_opts = cmake.subproject_options()
-phmap_opts.add_cmake_defines(
-  {
-    'PHMAP_BUILD_EXAMPLES': false,
-    'PHMAP_BUILD_TESTS': false,
-    'PHMAP_INSTALL': false,
-    'CMAKE_TRY_COMPILE_TARGET_TYPE': 'STATIC_LIBRARY',
-    'CMAKE_CROSSCOMPILING': true,
-  },
-)
-
 limine = subproject('limine', default_options: 'arch=' + arch)
 deps = [
 
@@ -124,13 +117,11 @@ deps = [
   ),
   dependency('demangler'),
   dependency('fmt10'),
-  dependency('libstdcxx_headers'),
+  dependency('freestnd-cxx-hdrs'),
   dependency('limine'),
   dependency('magic_enum', default_options: [
     'test=false',
   ]),
-  cmake.subproject('parallel_hashmap', options: phmap_opts).dependency('phmap'),
-  dependency('smart_ptr'),
   dependency('string'),
   dependency('uacpi'),
 ]
@@ -153,29 +144,68 @@ no_ext_mods = ext_mods.length() == 0
 # ==============================================================================
 ### Qemu args
 qemu_args = [
+  # CPU
+  # enable all host cpu features
   '-cpu', 'max',
-  '-net', 'none',
-  '-d', 'int,guest_errors',
-  '-smp', '4',
-  '-d', 'cpu_reset',
-  '-m', '2G',
-  '-rtc', 'base=localtime',
-  #'-no-shutdown', '-no-reboot',
-  '-D', meson.project_source_root() / 'qemu.log',
-  '-boot', 'order=d,menu=on,splash-time=100',
-  '-audiodev', 'id=audio,driver=alsa',
+  # use acceleration if available
   '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
+  # use 4 cores
+  '-smp', '4',
+
+  # setup NUMA nodes
+  '-object', 'memory-backend-ram,id=ram0,size=1024M',
+  '-object', 'memory-backend-ram,id=ram1,size=1024M',
+  '-numa', 'node,cpus=0-1,memdev=ram0',
+  '-numa', 'node,cpus=2-3,memdev=ram1',
+
+  # use 2G of memory
+  '-m', '2G',
+
+  # reset the cpu
+  '-d', 'cpu_reset',
+  # do a register dump on exception
+  '-d', 'int,guest_errors',
+
+  # don't reboot nor shutdown on triple fault
+  #'-no-shutdown', '-no-reboot',
+  # output qemu logs to > qemu.log
+  '-D', meson.project_source_root() / 'qemu.log',
+  # enable boot menu
+  '-boot', 'order=d,menu=on,splash-time=100',
+
+  # set rtc to localtime
+  '-rtc', 'base=localtime',
+  # disable network
+  '-net', 'none',
+  # add smbios table of type 1
   '-smbios', 'type=1',
-  '-device', 'nvme,id=nvme-ctrl1,serial=nvme',
+
+  # setup audio backend
+  '-audiodev', 'id=audio,driver=alsa',
+  # add rtl8139 nic card
   '-nic', 'user,model=rtl8139',
-  '-object', 'memory-backend-file,id=erstnvram,mem-path=acpi-erst.backing,size=0x10000,share=on',
-  '-device', 'acpi-erst,memdev=erstnvram',
+  # add erst table
+  #'-object', 'memory-backend-file,id=erstnvram,mem-path=acpi-erst.backing,size=0x10000,share=on',
+  #'-device', 'acpi-erst,memdev=erstnvram',
   #'-device', 'virtio-mmio-device,dev=hd',
-  #'-device', 'virtio-blk-pci,dev=hd',
-  #'-drive', 'file=image.hdd,if=none,id=virtio-disk0,format=raw,cache=none,aio=native', '-device', 'virtio-blk-pci,scsi=off,drive=virtio-disk0,id=disk0',
-  #'-drive', 'file=mydisk,if=none,id=virtio-disk0,format=raw,cache=none,aio=native',
-  #'-device', 'virtio-blk-pci,drive=virtio-disk0,id=disk0',
-  #'-drive', 'file=mydisk,if=none,format=raw,id=hd', '-device', 'virtio-blk-device,drive=hd',
+
+  # image drives
+  '-drive', 'format=raw,file=image.hdd,if=none,id=drive1', 
+  # '-drive', 'format=raw,file=image2.hdd,if=none,id=drive2', 
+
+  # nvme0 - nvme controller
+  '-device', 'nvme,id=nvme0,serial=nvme,bus=pcie.0',
+  # nvme0n1 - nvme namespace of controller nvme0
+  '-device', 'nvme-ns,drive=drive1,nsid=2,bus=nvme0,id=nvme0n1',
+
+  #'-usb', '-device', 'usb-ehci,id=ehci', '-device', 'usb-kbd,bus=usb-bus.0',  
+
+  # pci-to-pci bridge
+  '-device', 'pci-bridge,id=pcie2,bus=pcie.0,addr=1e,chassis_nr=1',
+  # virtio drive
+  # '-device', 'virtio-blk-pci,drive=drive2,id=virtio0,bus=pcie2,addr=0x6',
+
+
   #'-device', 'virtio-serial-pci,max_ports=2',
   #'-device', 'virtconsole,chardev=vcon,name=vcon0',
   #'-chardev', 'socket,id=vcon,ipv4=on,host=localhost,port=443,server,telnet=on,wait=off',
@@ -196,10 +226,15 @@ if arch == 'x86_64'
   qemu_args += [
     '-M', 'q35',
     '-device', 'isa-debug-exit',
+    # output port 0xe9 to the stdio
     '-debugcon', 'stdio',
+    # output serial to > debug.log
     '-serial', 'file:' + meson.project_source_root() / 'debug.log',
+    # enable kvm acceleration
     '-enable-kvm',
+    # enable pcspeaker
     '-machine', 'pcspk-audiodev=audio',
+    # use host cpu
     '-cpu', 'host',
   ]
   ovmf_id = 'X64'
@@ -251,12 +286,18 @@ ksyms = custom_target(
   depends: [kernel_elf],
 )
 
-echfs_image = custom_target(
-  'echfs_image',
+root_image = custom_target(
+  'root_image',
+  input: [initrd_dir / 'usr' / 'sbin' / 'init', ext_mods],
   output: 'image.hdd',
   command: [
-    './Meta/create_image.sh',
+    './Meta/create_image.py',
+    '--input', meson.project_source_root() / 'Kernel',
+    '--output', '@OUTPUT@',
+    '--partition-table', 'mbr',
+    '--size', '728MiB',
   ],
+  depends: ext_mods,
   build_by_default: true,
   console: true,
   install: false,
@@ -270,10 +311,12 @@ iso_files = [
   limine.get_variable('limine_binaries'),
   meson.project_source_root() / 'Meta' / 'qemu.dtb',
 ]
+c = run_command(['find', meson.project_source_root() / 'BaseFiles', '-type', 'f'], check: true)
+base_files = c.stdout().strip().split('\n')
 
 initrd = custom_target(
   'initrd',
-  input: [initrd_dir / 'usr' / 'sbin' / 'init', ext_mods],
+  input: [ext_mods, meson.project_source_root() / 'sysroot/usr/sbin/init' ],
   output: 'initrd.img.gz',
   command: [
     'rm', '-rf', initrd_dir / 'usr/lib/modules', '&&',
@@ -281,10 +324,25 @@ initrd = custom_target(
     no_ext_mods ? [] : ['cp', '@INPUT@', initrd_dir / 'usr/lib/modules/', '&&'],
     'tar', '-cvf', '@OUTPUT@', '-C', initrd_dir, '.'],
   build_by_default: true,
+  depend_files: base_files,
   console: true,
   install: false,
   depends: ext_mods
 )
+initrd_zlib = custom_target(
+  'initrd_zlib',
+  input: [initrd],
+  output: 'initrd.zlib',
+  command: [
+    meson.project_source_root() / 'Meta' / 'compress-initrd.sh', 
+    '@INPUT@', '@OUTPUT@',
+  ],
+  build_by_default: true,
+  console: true,
+  install: false,
+  depends: initrd,
+)
+
 iso = custom_target(
   'iso',
   input: [
@@ -334,10 +392,10 @@ iso = custom_target(
     'rm',
     '-rf', iso_dir,
   ],
-  build_by_default: true,
+  build_by_default: false,
   console: true,
   install: false,
-  depends: [kernel_elf, initrd, echfs_image],
+  depends: [kernel_elf, initrd, root_image],
 )
 
 acpi_dir = meson.project_source_root() / 'Meta' / 'firmware' / 'acpi-tables'
@@ -354,34 +412,34 @@ endif
 
 run_bios = custom_target(
   'run_bios',
-  input: [iso, echfs_image],
+  input: [iso, root_image],
   output: 'run_bios',
-  command: [qemu, qemu_args, '-cdrom', '@INPUT0@', '-drive', 'format=raw,file=@INPUT1@,if=none,id=nvm1', '-device', 'nvme-ns,drive=nvm1,nsid=2,bus=nvme-ctrl1'],
+  command: [qemu, qemu_args, '-cdrom', '@INPUT0@'],
   build_by_default: true,
   console: true,
   install: false,
-  depends: [iso, echfs_image],
+  depends: [iso, root_image],
 )
 
 ovmf_binaries = subproject('ovmf_binaries')
 ovmf = ovmf_binaries.get_variable(ovmf_id)
 
 run_uefi = custom_target(
-  input: [iso, echfs_image],
+  input: [iso, root_image],
   output: 'run_uefi',
-  command: [qemu, qemu_args, '-cdrom', '@INPUT0@', '-drive', 'format=raw,file=@INPUT1@,if=none,id=nvm1', '-device', 'nvme-ns,drive=nvm1,nsid=2,bus=nvme-ctrl1', '-bios', ovmf],
+  command: [qemu, qemu_args, '-cdrom', '@INPUT0@', '-bios', ovmf],
   console: true,
   install: false,
-  depends: [iso, echfs_image]
+  depends: [iso, root_image]
 )
 
 run_uefi_vnc = custom_target(
-  input: [iso, echfs_image],
+  input: [iso, root_image],
   output: 'run_uefi_vnc',
-  command: [qemu, qemu_args, '-display', 'vnc=127.0.0.1:0', '-cdrom', '@INPUT0@', '-drive', 'format=raw,file=@INPUT1@,if=none,id=nvm1', '-device', 'nvme-ns,drive=nvm1,nsid=2,bus=nvme-ctrl1', '-bios', ovmf],
+  command: [qemu, qemu_args, '-display', 'vnc=127.0.0.1:0', '-cdrom', '@INPUT0@', '-bios', ovmf],
   console: true,
   install: false,
-  depends: [iso, echfs_image]
+  depends: [iso, root_image]
 )
 
 run_uefi_gdb = custom_target(

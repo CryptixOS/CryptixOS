@@ -7,14 +7,16 @@
  */
 #pragma once
 
-#include <Boot/BootInfo.hpp>
+#include <Config.hpp>
 
+#include <Library/Locking/Spinlock.hpp>
 #include <Memory/Region.hpp>
-#include <Memory/VMM.hpp>
 
 #include <Prism/Containers/RedBlackTree.hpp>
 #include <Prism/Containers/Vector.hpp>
+#include <Prism/Memory/Memory.hpp>
 #include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
 
 class AddressSpace
 {
@@ -22,36 +24,30 @@ class AddressSpace
     AddressSpace();
     ~AddressSpace();
 
-    bool           IsAvailable(Pointer base, usize length) const;
+    bool        IsAvailable(Pointer base, usize length) const;
 
-    void           Insert(Pointer, Region* region);
-    void           Erase(Pointer);
+    void        Insert(Pointer, Ref<Region> region);
+    void        Erase(Pointer);
 
-    Region*        AllocateRegion(usize size, usize alignment = 0);
-    Region*        AllocateFixed(Pointer requestedAddress, usize size);
+    Ref<Region> AllocateRegion(usize size, usize alignment = 0);
+    Ref<Region> AllocateFixed(Pointer requestedAddress, usize size);
 
-    Region*        Find(Pointer virt);
-    constexpr bool Contains(Pointer virt) const
+    Ref<Region> Find(Pointer virt) const;
+    bool        Contains(Pointer virt) const { return Find(virt) != nullptr; }
+
+    inline Ref<Region> operator[](Pointer virt)
     {
-        return m_RegionTree.Contains(virt);
+        return m_RegionTree[virt.Raw()];
     }
+    void Clear();
 
-    inline Region* operator[](Pointer virt) { return m_RegionTree[virt.Raw()]; }
-    void           Clear();
+    auto begin() { return m_RegionTree.begin(); }
+    auto end() { return m_RegionTree.end(); }
 
-    auto           begin() { return m_RegionTree.begin(); }
-    auto           end() { return m_RegionTree.end(); }
-
-    inline PageMap*                  GetPageMap() const { return m_PageMap; }
-
-    PageMap*                         m_PageMap = nullptr;
-    RedBlackTree<uintptr_t, Region*> m_RegionTree;
+    RedBlackTree<uintptr_t, Ref<Region>> m_RegionTree;
 
   private:
-    Spinlock                 m_Lock;
-    constexpr static Pointer USERSPACE_VIRT_BASE{0x100000zu};
+    Spinlock     m_Lock;
 
-    AddressRange             m_TotalRange
-        = {USERSPACE_VIRT_BASE,
-           BootInfo::GetHHDMOffset() - USERSPACE_VIRT_BASE.Raw() - 0x1000000zu};
+    AddressRange m_TotalRange;
 };

@@ -8,10 +8,18 @@
 all_modules = {}
 
 args = [ '-fsanitize=undefined']
+
+if arch == 'aarch64'
+  args += [
+    '-mgeneral-regs-only', '-march=armv8-a+nofp+nosimd',
+    '-mcmodel=small'
+]
+endif
+
 ld_args = [
-  '-relocatable',
   '-nostdlib',
-  '-static'
+  '-static',
+  '-relocatable',
 ]
 
 subdir(arch)
@@ -23,19 +31,20 @@ foreach name, mod : all_modules
 
   if external == true
     lib = static_library(name, 
+      dependencies: [inc_deps, dep],
+      link_depends: [meson.current_source_dir() / 'linker.' + arch + '.ld'],
       include_directories: incs,
       c_args: args,
       cpp_args: args,
       link_args: ld_args,
+      install: false,
       pic: false,
       build_by_default: true,
-      dependencies: [inc_deps, dep],
-      install: false
   )
   ext_mods += custom_target(name.split('/')[1] + '.ko',
     input: lib.extract_all_objects(recursive: true),
     output: name.split('/')[1] + '.ko',
-    command: [c.get_linker_id(), ld_args, '@INPUT@', '-o', '@OUTPUT@'],
+    command: ['ld.lld', ld_args, '-T', meson.current_source_dir() / 'linker.' + arch + '.ld', '@INPUT@', '-o', '@OUTPUT@'],
     build_by_default: true,
     install: false,
     depends: lib

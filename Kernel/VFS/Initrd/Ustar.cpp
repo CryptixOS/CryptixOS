@@ -7,11 +7,15 @@
 
 #include <API/UnixTypes.hpp>
 #include <Drivers/Device.hpp>
+#include <Library/ZLib.hpp>
+
 #include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/INode.hpp>
+#include <VFS/VFS.hpp>
+
 #include <VFS/Initrd/Ustar.hpp>
 
 #include <cstring>
@@ -21,26 +25,30 @@ namespace Ustar
     bool Validate(Pointer address)
     {
         auto file = address.As<FileHeader>();
-        return std::strncmp(file->Signature, MAGIC.Raw(), MAGIC_LENGTH - 1)
-            == 0;
+        return StringView(file->Signature, MAGIC_LENGTH - 1) == MAGIC;
     }
 
-    void Load(Pointer address)
+    ErrorOr<void> Load(Pointer address, usize size)
     {
         LogTrace("USTAR: Loading at '{:#x}'...", address);
+
+        // ZLib::Decompressor decompressor(address, size);
+        // Assert(decompressor.Decompress(size));
+        //
+        // address = decompressor.DecompressedData();
+        // size = decompressor.DecompressedSize();
 
         auto current = address.As<FileHeader>();
         auto getNextFile
             = [](FileHeader* current, usize fileSize) -> FileHeader*
         {
-            Pointer nextFile = reinterpret_cast<uintptr_t>(current) + 512
-                             + Math::AlignUp(fileSize, 512);
+            Pointer nextFile
+                = Pointer(current).Offset(512 + Math::AlignUp(fileSize, 512));
 
             return nextFile.As<FileHeader>();
         };
 
-        while (std::strncmp(current->Signature, MAGIC.Raw(), MAGIC_LENGTH - 1)
-               == 0)
+        while (StringView(current->Signature, MAGIC_LENGTH - 1) == MAGIC)
         {
             PathView filename(current->FileName);
             PathView linkName(current->LinkName);
@@ -48,18 +56,19 @@ namespace Ustar
             auto     mode = StringUtils::ToNumber<mode_t>(current->Mode, 8);
             usize    size = StringUtils::ToNumber<usize>(current->FileSize, 8);
 
-            if (filename == "./")
+            if (filename == "./"_pv)
             {
                 current = getNextFile(current, size);
                 continue;
             }
 
-            DirectoryEntry* dentry = nullptr;
+            Ref<DirectoryEntry> dentry = nullptr;
             switch (current->Type)
             {
                 case FILE_TYPE_NORMAL:
                 case FILE_TYPE_NORMAL_:
-                    dentry = VFS::CreateNode(nullptr, filename, mode | S_IFREG);
+                    dentry
+                        = TryOrRet(VFS::CreateFile(filename, mode | S_IFREG));
 
                     if (!dentry)
                         LogError(
@@ -82,7 +91,7 @@ namespace Ustar
                              filename, linkName);
                     break;
                 case FILE_TYPE_SYMLINK:
-                    if (!VFS::Symlink(nullptr, filename, linkName.Raw()))
+                    if (!VFS::Symlink(filename, linkName))
                         LogError(
                             "USTAR: Failed to create Symlink: '{}' -> '{}'",
                             filename, linkName);
@@ -94,7 +103,7 @@ namespace Ustar
                     u32 deviceMinor
                         = StringUtils::ToNumber<u32>(current->DeviceMinor, 8);
 
-                    if (!VFS::MkNod(filename, mode | S_IFCHR,
+                    if (!VFS::CreateNode(filename, mode | S_IFCHR,
                                     MakeDevice(deviceMajor, deviceMinor)))
                         LogError(
                             "USTAR: Failed to create character device! path: "
@@ -105,7 +114,8 @@ namespace Ustar
                 }
                 case FILE_TYPE_BLOCK_DEVICE: ToDo(); break;
                 case FILE_TYPE_DIRECTORY:
-                    dentry = VFS::CreateNode(nullptr, filename, mode | S_IFDIR);
+                    dentry = TryOrRet(
+                        VFS::CreateDirectory(filename, mode | S_IFDIR));
                     if (!dentry)
                         LogError(
                             "USTAR: Failed to create a directory! path: '{}'",
@@ -117,5 +127,7 @@ namespace Ustar
 
             current = getNextFile(current, size);
         }
+
+        return {};
     }
 } // namespace Ustar

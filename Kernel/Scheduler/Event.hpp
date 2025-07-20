@@ -8,8 +8,12 @@
 
 #include <Library/Locking/Spinlock.hpp>
 
+#include <Prism/Containers/Array.hpp>
 #include <Prism/Containers/Deque.hpp>
+#include <Prism/Containers/Span.hpp>
+
 #include <Prism/Core/Types.hpp>
+#include <Prism/Utility/Optional.hpp>
 
 constexpr usize MAX_LISTENERS = 32;
 struct EventListener
@@ -22,16 +26,15 @@ struct Event
   public:
     bool Await(bool block = true)
     {
-        std::array evs = {this};
-        return Await(evs, block) != std::nullopt;
+        Array evs = {this};
+        return Await(Span(evs.Raw(), evs.Size()), block) != NullOpt;
     }
-    void Trigger(bool drop = false) { Trigger(this, drop); }
+    void                   Trigger(bool drop = false) { Trigger(this, drop); }
 
-    static std::optional<usize> Await(std::span<Event*> events,
-                                      bool              block = true);
-    static void                 Trigger(Event* event, bool drop = false);
+    static Optional<usize> Await(Span<Event*> events, bool block = true);
+    static void            Trigger(Event* event, bool drop = false);
 
-    Spinlock                    Lock;
-    usize                       Pending;
-    Deque<EventListener>        Listeners;
+    Spinlock               Lock;
+    usize                  Pending;
+    Deque<EventListener>   Listeners;
 };

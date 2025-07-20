@@ -38,4 +38,17 @@ namespace DeviceTree
         }
         Logger::Print("\n");
     }
+
+    void Node::InsertProperty(StringView name, Property* property)
+    {
+        m_Properties[name] = property;
+    }
+
+    void Node::Print(u32 depth)
+    {
+        LogMessage("- {}\n", m_Name);
+        for (auto& [name, property] : m_Properties) property->Print(depth);
+
+        for (const auto& [name, node] : m_Children) node->Print(depth + 4);
+    }
 }; // namespace DeviceTree

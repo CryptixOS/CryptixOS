@@ -5,18 +5,21 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <API/System.hpp>
+#include <Boot/CommandLine.hpp>
 
 #include <Drivers/DeviceManager.hpp>
-#include <Library/Module.hpp>
 #include <Prism/String/StringUtils.hpp>
 
+#include <System/System.hpp>
 #include <Time/Time.hpp>
 
 #include <VFS/MountPoint.hpp>
+#include <VFS/VFS.hpp>
+
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
 
-std::unordered_map<pid_t, Process*> ProcFs::s_Processes;
+UnorderedMap<pid_t, Process*> ProcFs::s_Processes;
 
 struct ProcFsCmdLineProperty : public ProcFsProperty
 {
@@ -24,8 +27,8 @@ struct ProcFsCmdLineProperty : public ProcFsProperty
     {
         Buffer.Clear();
 
-        StringView kernelPath = BootInfo::GetExecutableFile()->path;
-        StringView cmdline    = BootInfo::GetKernelCommandLine();
+        StringView kernelPath = System::KernelExecutablePath();
+        StringView cmdline    = CommandLine::KernelCommandLine();
 
         Buffer.Resize(kernelPath.Size() + cmdline.Size() + 10);
         Write("{} {}\n", kernelPath, cmdline);
@@ -38,8 +41,8 @@ struct ProcFsFilesystemsProperty : public ProcFsProperty
         Buffer.Clear();
         Buffer.Resize(PMM::PAGE_SIZE);
 
-        for (auto& [physical, fs] : VFS::Filesystems())
-            Write("{} {}\n", physical ? "     " : "nodev", fs);
+        // for (auto& [physical, fs] : VFS::Filesystems())
+        //     Write("{} {}\n", physical ? "     " : "nodev", fs);
     }
 };
 struct ProcFsModulesProperty : public ProcFsProperty
@@ -49,7 +52,7 @@ struct ProcFsModulesProperty : public ProcFsProperty
         Buffer.Clear();
         Buffer.Resize(PMM::PAGE_SIZE);
 
-        for (auto& [name, module] : GetModules()) Write("{}\n", name);
+        for (Ref<Module> module : System::Modules()) Write("{}\n", module->Name);
     }
 };
 struct ProcFsMountsProperty : public ProcFsProperty
@@ -127,10 +130,10 @@ struct ProcFsMemoryRegionsProperty : public ProcFsProperty
         auto process = Process::GetCurrent();
 
         Write("======================================================\n");
-        Write("Base\t\tLength\t\tPhys\t\tProt\n");
-        for (const auto& [base, region] : process->GetAddressSpace())
-            Write("{:#x}\t\t{:#x}\t\t{:#x}\t\t{:#b}\n", base, region->GetSize(),
-                  region->GetPhysicalBase().Raw(), region->GetProt());
+        Write("Base\t\tLength\t\tPhys\t\tAccess\n");
+        for (const auto& [base, region] : process->AddressSpace())
+            Write("{:#x}\t\t{:#x}\t\t{:#x}\t\t{:#b}\n", base, region->Size(),
+                  region->PhysicalBase().Raw(), ToString(region->Access()));
         Write("======================================================\n");
     }
 };
@@ -143,7 +146,7 @@ struct ProcFsStatusProperty : public ProcFsProperty
         auto       process   = ProcFs::GetProcess(pid);
         if (!process) return;
 
-        Write("Name: {}\n", process->GetName());
+        Write("Name: {}\n", process->Name());
     }
 };
 
@@ -173,20 +176,20 @@ static ProcFsINode* CreateProcFsNode(INode* parent, StringView name,
 
 Process* ProcFs::GetProcess(pid_t pid)
 {
-    auto it = s_Processes.find(pid);
+    auto it = s_Processes.Find(pid);
     if (it == s_Processes.end()) return nullptr;
 
-    return it->second;
+    return it->Value;
 }
 void ProcFs::AddProcess(Process* process)
 {
     ScopedLock guard(m_Lock);
-    Assert(!s_Processes.contains(process->GetPid()));
-    s_Processes[process->GetPid()] = process;
-    auto name                      = StringUtils::ToString(process->GetPid());
-    auto entry                     = new DirectoryEntry(m_RootEntry, name);
+    Assert(!s_Processes.Contains(process->Pid()));
+    s_Processes[process->Pid()] = process;
+    auto name                   = StringUtils::ToString(process->Pid());
+    auto entry                  = new DirectoryEntry(m_RootEntry, name);
 
-    auto maybeINode                = CreateNode(m_Root, entry, 0755 | S_IFDIR);
+    auto maybeINode             = CreateNode(m_Root, entry, 0755 | S_IFDIR);
     if (!maybeINode) return;
     m_RootEntry->InsertChild(entry);
 
@@ -202,9 +205,10 @@ void ProcFs::AddProcess(Process* process)
 void ProcFs::RemoveProcess(pid_t pid)
 {
     ScopedLock guard(m_Lock);
-    s_Processes.erase(pid);
+    s_Processes.Erase(pid);
 }
-ErrorOr<DirectoryEntry*> ProcFs::Mount(StringView sourcePath, const void* data)
+ErrorOr<::Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
+                                           const void* data)
 {
     ScopedLock guard(m_Lock);
     m_MountData
@@ -215,9 +219,9 @@ ErrorOr<DirectoryEntry*> ProcFs::Mount(StringView sourcePath, const void* data)
 
     m_RootEntry    = new DirectoryEntry(nullptr, "/");
     auto maybeRoot = CreateNode(nullptr, m_RootEntry, 0755 | S_IFDIR);
-    if (!maybeRoot) return Error(maybeRoot.error());
+    if (!maybeRoot) return Error(maybeRoot.Error());
 
-    m_Root = maybeRoot.value();
+    m_Root = maybeRoot.Value();
     m_RootEntry->Bind(m_Root);
 
     AddChild("cmdline");
@@ -231,7 +235,7 @@ ErrorOr<DirectoryEntry*> ProcFs::Mount(StringView sourcePath, const void* data)
 
     return m_RootEntry;
 }
-ErrorOr<INode*> ProcFs::CreateNode(INode* parent, DirectoryEntry* entry,
+ErrorOr<INode*> ProcFs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
                                    mode_t mode, uid_t uid, gid_t gid)
 {
     auto inode = new ProcFsINode(entry->Name(), this, mode, nullptr);
@@ -239,20 +243,11 @@ ErrorOr<INode*> ProcFs::CreateNode(INode* parent, DirectoryEntry* entry,
 
     return inode;
 }
-ErrorOr<INode*> ProcFs::Symlink(INode* parent, DirectoryEntry* entry,
-                                StringView target)
-{
-    return nullptr;
-}
-INode* ProcFs::Link(INode* parent, StringView name, INode* oldNode)
-{
-    return nullptr;
-}
 bool ProcFs::Populate(DirectoryEntry* dentry) { return true; }
 
 void ProcFs::AddChild(StringView name)
 {
-    auto entry = new DirectoryEntry(m_RootEntry, name);
+    auto entry = new DirectoryEntry(nullptr, name);
     auto inode = CreateProcFsNode(m_Root, name, this);
     entry->Bind(inode);
 
@@ -261,4 +256,7 @@ void ProcFs::AddChild(StringView name)
         m_Root->InsertChild(inode, name);
         m_RootEntry->InsertChild(entry);
     }
+
+    entry->SetParent(m_RootEntry);
+    m_RootEntry->InsertChild(entry);
 }

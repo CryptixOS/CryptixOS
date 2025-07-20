@@ -6,9 +6,10 @@
  */
 #include <Firmware/ACPI/MADT.hpp>
 
+#include <Prism/String/StringUtils.hpp>
+
 namespace MADT
 {
-    using Prism::Pointer;
     namespace
     {
         struct [[gnu::packed]] MADT
@@ -61,37 +62,37 @@ namespace MADT
 
         {
             Pointer   entry     = &s_MADT->Entries[off];
-            Header*   header    = entry.ToHigherHalf();
+            Header*   header    = entry.ToHigherHalf<Header*>();
 
             EntryType entryType = static_cast<EntryType>(header->ID);
             LogTrace("MADT: Found '{}' entry",
-                     magic_enum::enum_name(entryType));
+                     ToString(entryType).Substr(1));
 
             switch (static_cast<EntryType>(header->ID))
             {
                 case EntryType::eProcessorLapic:
                 {
                     auto& lapicEntry = s_LapicEntries.EmplaceBack();
-                    std::memcpy(&lapicEntry, header, sizeof(LapicEntry));
+                    Memory::Copy(&lapicEntry, header, sizeof(LapicEntry));
                     break;
                 }
                 case EntryType::eIoApic:
                 {
                     auto& ioapicEntry = s_IoApicEntries.EmplaceBack();
-                    std::memcpy(&ioapicEntry, header, sizeof(IoApicEntry));
+                    Memory::Copy(&ioapicEntry, header, sizeof(IoApicEntry));
                     break;
                 }
                 case EntryType::eInterruptSourceOverride:
                 {
                     auto& isoEntry = s_IsoEntries.EmplaceBack();
-                    std::memcpy(&isoEntry, header, sizeof(IsoEntry));
+                    Memory::Copy(&isoEntry, header, sizeof(IsoEntry));
                     break;
                 }
                 case EntryType::eNmiSource: break;
                 case EntryType::eLapicNmi:
                 {
                     auto& lapicNmiEntry = s_LapicNmiEntries.EmplaceBack();
-                    std::memcpy(&lapicNmiEntry, header, sizeof(LapicNmiEntry));
+                    Memory::Copy(&lapicNmiEntry, header, sizeof(LapicNmiEntry));
                     break;
                 }
                 case EntryType::eLapicAddressOverride: break;
@@ -106,7 +107,7 @@ namespace MADT
                     break;
             }
 
-            off += std::max(header->Length, u8(2));
+            off += Max(header->Length, u8(2));
         }
 
         LogInfo("MADT: Initialized");

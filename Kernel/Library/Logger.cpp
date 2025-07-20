@@ -4,19 +4,18 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-
 #include <Drivers/Serial.hpp>
-#include <Drivers/VideoTerminal.hpp>
+#include <Drivers/Video/VideoTerminal.hpp>
 
-#include <Library/Logger.hpp>
 #include <Library/Locking/Spinlock.hpp>
+#include <Library/Logger.hpp>
 
 #include <Prism/Debug/LogSink.hpp>
-#include <Prism/String/StringUtils.hpp>
-#include <Prism/Utility/Math.hpp>
 
-#include <cctype>
-#include <magic_enum/magic_enum.hpp>
+#include <Prism/String/Printf.hpp>
+#include <Prism/String/StringUtils.hpp>
+
+#include <Prism/Utility/Math.hpp>
 
 namespace E9
 {
@@ -27,9 +26,12 @@ namespace E9
 #endif
     }
 
-    CTOS_NO_KASAN static void PrintString(StringView str)
+    CTOS_NO_KASAN static isize PrintString(StringView str)
     {
-        for (auto c : str) PrintChar(c);
+        isize nwritten = 0;
+        for (auto c : str) PrintChar(c), ++nwritten;
+
+        return nwritten;
     }
 }; // namespace E9
 
@@ -39,16 +41,22 @@ static usize   s_EnabledSinks = 0;
 class CoreSink final : public LogSink
 {
   public:
-    void WriteNoLock(StringView str) override
+    isize WriteNoLock(StringView str) override
     {
-        if (s_EnabledSinks & LOG_SINK_E9) E9::PrintString(str);
-        if (s_EnabledSinks & LOG_SINK_SERIAL) Serial::Write(str);
+        isize nwritten = 0;
+        if (s_EnabledSinks & LOG_SINK_E9) nwritten = E9::PrintString(str);
+        isize ret = 0;
+        if (s_EnabledSinks & LOG_SINK_SERIAL) ret = Serial::Write(str);
+        nwritten = nwritten ?: ret;
         if (s_EnabledSinks & LOG_SINK_TERMINAL)
         {
             auto terminal = Terminal::GetPrimary();
-            if (!terminal) return;
-            terminal->PrintString(str);
+            if (!terminal) return nwritten;
+
+            if (nwritten == 0) nwritten = terminal->PrintString(str);
         }
+
+        return nwritten;
     }
 };
 CoreSink g_CoreSink;
@@ -65,192 +73,88 @@ namespace Logger
             FOREGROUND_COLOR_WHITE,
         };
 
+        using ArgumentType       = Printf::ArgumentType;
+        using Sign               = Printf::Sign;
+        using PrintfFormatSpec   = Printf::FormatSpec;
+        using PrintfFormatParser = Printf::FormatParser;
         template <typename T>
-        CTOS_NO_KASAN void
-        LogNumber(va_list& args, int base, bool justifyLeft = false,
-                  bool plusSign = false, bool spaceIfNoSign = false,
-                  bool zeroPadding = false, usize lengthSpecifier = 0)
+        CTOS_NO_KASAN isize LogNumber(va_list& args, PrintfFormatSpec& spec)
         {
-            char       buf[64];
-            T          value    = va_arg(args, T);
-            StringView strStart = ToString(value, buf, base);
-            char*      str      = const_cast<char*>(strStart.Raw());
+            isize nwritten = 0;
+            T     value    = va_arg(args, T);
 
-            size_t     len      = strlen(str);
-            char       padding  = zeroPadding ? '0' : ' ';
-            if (plusSign && lengthSpecifier > 0) lengthSpecifier--;
-            if (!justifyLeft)
+            if (value < 0 && spec.Base == 10)
             {
-                while (len < lengthSpecifier)
+                spec.Sign = Sign::eMinus;
+                value *= -1;
+            }
+            String str     = ToString(value, spec.Base);
+
+            char   padding = spec.ZeroPad ? '0' : ' ';
+            if (spec.Sign != Sign::eNone && spec.Length > 0) spec.Length--;
+            if (!spec.JustifyLeft)
+            {
+                while (static_cast<isize>(str.Size()) < spec.Length)
                 {
                     LogChar(padding);
-                    lengthSpecifier--;
+                    --spec.Length;
+                    ++nwritten;
                 }
             }
-            if (value >= 0)
+
+            if (spec.Sign == Sign::ePlus) LogChar('+'), ++nwritten;
+            else if (spec.Sign == Sign::eMinus) LogChar('-'), ++nwritten;
+            else if (spec.Sign == Sign::eSpace) LogChar(' '), ++nwritten;
+
+            if (spec.Base != 10 && spec.PrintBase)
             {
-                if (plusSign) LogChar('+');
-                else if (spaceIfNoSign) LogChar(' ');
+                if (spec.Base == 2) nwritten += Print("0b");
+                else if (spec.Base == 8) nwritten += Print("0");
+                else if (spec.Base == 16) nwritten += Print("0x");
             }
-            while (*str) LogChar(*str++);
-            if (justifyLeft)
+
+            for (const auto c : str)
+                LogChar(spec.UpperCase && c >= 'a' && c <= 'z'
+                            ? StringUtils::ToUpper(c)
+                            : c),
+                    ++nwritten;
+            while (spec.JustifyLeft
+                   && static_cast<isize>(str.Size()) < spec.Length)
             {
-                while (len < lengthSpecifier)
-                {
-                    LogChar(padding);
-                    lengthSpecifier--;
-                }
+                LogChar(padding);
+                --spec.Length;
+                ++nwritten;
             }
+
+            return nwritten;
         }
 
-        CTOS_NO_KASAN void PrintArg(const char*& fmt, va_list& args)
+        CTOS_NO_KASAN isize PrintLogLevel(LogLevel logLevel)
         {
-            ++fmt;
-            bool  leftJustify    = false;
-            bool  plusSign       = false;
-            bool  spaceIfNoSign  = false;
-            bool  altConversion  = false;
-            bool  zeroPadding    = false;
-            char* precisionStart = nullptr;
+            isize nwritten = 0;
+            if (logLevel == LogLevel::eNone) return nwritten;
+            nwritten += Print("[");
 
-            while (true)
-            {
-                switch (*fmt)
-                {
-                    case '\0': return;
-                    case '-': leftJustify = true; break;
-                    case '+': plusSign = true; break;
-                    case ' ': spaceIfNoSign = true; break;
-                    case '#': altConversion = true; break;
-                    case '0': zeroPadding = true; break;
-                    case '.':
-                        precisionStart = const_cast<char*>(fmt) + 1;
-                        break;
+            LogChar(s_LogForegroundColors[ToUnderlying(logLevel)]);
+            ++nwritten;
+            if (logLevel == LogLevel::eFatal)
+                LogChar(BACKGROUND_COLOR_RED), ++nwritten;
 
-                    default: goto loop_end;
-                }
-                fmt++;
-            }
-        loop_end:
+            auto logLevelString = StringUtils::ToString(logLevel);
+            logLevelString.RemovePrefix(1);
 
-            auto parseNumber = [](const char*& fmt) -> isize
-            {
-                char* start  = const_cast<char*>(fmt);
-                usize length = 0;
-
-                for (; StringUtils::IsDigit(*fmt); length++, fmt++);
-                StringView numberString(start, length);
-
-                return ToNumber<isize>(numberString, 10);
-            };
-
-            isize width     = 0;
-            isize precision = 1000;
-            if (fmt != precisionStart)
-            {
-                if (StringUtils::IsDigit(*fmt)) width = parseNumber(fmt);
-                else if (*fmt == '*') width = va_arg(args, i32);
-            }
-            if (*fmt == '*' && fmt == precisionStart)
-                precision = va_arg(args, i32);
-            else if (StringUtils::IsDigit(*fmt) && fmt == precisionStart)
-                precision = parseNumber(fmt);
-
-            enum class ArgLength
-            {
-                eInt,
-                eLong,
-                eLongLong,
-                eSizeT,
-                ePointer,
-            };
-
-            ArgLength argLength = ArgLength::eInt;
-            if (*fmt == 'l')
-            {
-                fmt++;
-                argLength = ArgLength::eLong;
-                if (*fmt == 'l')
-                {
-                    argLength = ArgLength::eLongLong;
-                    fmt++;
-                }
-            }
-            else if (*fmt == 'z')
-            {
-                argLength = ArgLength::eSizeT;
-                fmt++;
-            }
-            i32 base = 10;
-
-#define LogNum(type)                                                           \
-    LogNumber<type>(args, base, leftJustify, plusSign, spaceIfNoSign,          \
-                    zeroPadding, width)
-            switch (*fmt)
-            {
-                case 'b':
-                    base = 2;
-                    if (altConversion) Print("0b");
-                    goto print_unsigned;
-                case 'o':
-                    base = 8;
-                    if (altConversion) LogChar('0');
-                    goto print_unsigned;
-                case 'p': argLength = ArgLength::ePointer;
-                case 'X':
-                case 'x':
-                    base = 16;
-                    if (altConversion)
-                    {
-                        LogChar('0');
-                        LogChar('x');
-                    }
-                case 'u':
-                {
-                print_unsigned:
-                    if (argLength == ArgLength::eInt) LogNum(unsigned int);
-                    else if (argLength == ArgLength::eLong)
-                        LogNum(unsigned long);
-                    else if (argLength == ArgLength::eLongLong)
-                        LogNum(unsigned long long);
-                    else if (argLength == ArgLength::eSizeT) LogNum(size_t);
-                    else LogNum(uintptr_t);
-                    break;
-                }
-                case 'd':
-                case 'i':
-                {
-                    if (argLength == ArgLength::eInt) LogNum(int);
-                    else if (argLength == ArgLength::eLong) LogNum(long long);
-                    else if (argLength == ArgLength::eLongLong) LogNum(long);
-                    break;
-                }
-                case 'c': LogChar(*fmt); break;
-                case 's':
-                {
-                    char* str = va_arg(args, char*);
-                    for (; *str != '\0' && precision > 0; --precision)
-                        LogChar(*str++);
-                }
-                break;
-            }
-            ++fmt;
-        }
-
-        CTOS_NO_KASAN void PrintLogLevel(LogLevel logLevel)
-        {
-            if (logLevel == LogLevel::eNone) return;
-            Print("[");
-
-            LogChar(s_LogForegroundColors[std::to_underlying(logLevel)]);
-            if (logLevel == LogLevel::eFatal) LogChar(BACKGROUND_COLOR_RED);
-
-            Print(magic_enum::enum_name(logLevel).data() + 1);
+            nwritten += Print(logLevelString);
 
             LogChar(FOREGROUND_COLOR_WHITE);
             LogChar(BACKGROUND_COLOR_BLACK);
             LogChar(RESET_COLOR);
-            Print("]: ");
+
+            nwritten += Print("]:") + 3;
+
+            for (usize i = 0; i < 8 - logLevelString.Size(); i++, nwritten++)
+                LogChar(' ');
+
+            return nwritten;
         }
     }; // namespace
 
@@ -258,57 +162,143 @@ namespace Logger
     {
         auto terminal = Terminal::GetPrimary();
         if (output == LOG_SINK_TERMINAL && terminal)
-            terminal->Initialize(*BootInfo::GetPrimaryFramebuffer());
+            terminal->Initialize(Terminal::PrimaryFramebuffer());
 
         s_EnabledSinks |= output;
     }
     CTOS_NO_KASAN void DisableSink(usize output) { s_EnabledSinks &= ~output; }
 
-    void LogChar(u64 c) { Print(reinterpret_cast<const char*>(&c)); }
-    void Print(StringView string) { g_CoreSink.WriteNoLock(string); }
-    i32  Printv(const char* format, va_list* args)
+    void  LogChar(u64 c) { Print(reinterpret_cast<const char*>(&c)); }
+    isize Print(StringView string) { return g_CoreSink.WriteNoLock(string); }
+    isize Printv(const char* format, va_list* args)
     {
-        Logv(LogLevel::eNone, format, *args);
-
-        return 0;
+        return Logv(LogLevel::eNone, format, *args);
     }
 
-    CTOS_NO_KASAN void Log(LogLevel logLevel, StringView string,
-                           bool printNewline)
-    {
-        ScopedLock guard(s_Lock, true);
-
-        PrintLogLevel(logLevel);
-        Print(string);
-
-        if (printNewline && logLevel != LogLevel::eNone) LogChar('\n');
-    }
-
-    CTOS_NO_KASAN void Logf(LogLevel logLevel, const char* fmt, ...)
-    {
-        va_list args;
-        va_start(args, fmt);
-        Logv(logLevel, fmt, args);
-        va_end(args);
-    }
-    CTOS_NO_KASAN void Logv(LogLevel level, const char* fmt, va_list& args,
+    CTOS_NO_KASAN isize Log(LogLevel logLevel, StringView string,
                             bool printNewline)
     {
         ScopedLock guard(s_Lock, true);
-        PrintLogLevel(level);
-        while (*fmt)
+
+        isize      nwritten = PrintLogLevel(logLevel);
+        nwritten += Print(string);
+
+        if (printNewline && logLevel != LogLevel::eNone)
+            LogChar('\n'), ++nwritten;
+        return nwritten;
+    }
+
+    CTOS_NO_KASAN isize Logf(LogLevel logLevel, const char* fmt, ...)
+    {
+        va_list args;
+        va_start(args, fmt);
+        auto nwritten = Logv(logLevel, fmt, args);
+        va_end(args);
+
+        return nwritten;
+    }
+
+    isize PrintArgument(StringView::Iterator& it, va_list& args,
+                        PrintfFormatSpec& specs)
+    {
+        isize nwritten = 0;
+
+        switch (specs.Type)
         {
-            if (*fmt == '%') PrintArg(fmt, args);
-            else if (*fmt == '\n')
+            case ArgumentType::eChar:
+            {
+                i32 c = va_arg(args, i32);
+                LogChar(c);
+                ++nwritten;
+                break;
+            }
+            case ArgumentType::eInteger:
+                nwritten += LogNumber<int>(args, specs);
+                break;
+            case ArgumentType::eLong:
+                nwritten += LogNumber<long>(args, specs);
+                break;
+            case ArgumentType::eLongLong:
+                nwritten += LogNumber<long long>(args, specs);
+                break;
+            case ArgumentType::eSize:
+                nwritten += LogNumber<isize>(args, specs);
+                break;
+            case ArgumentType::eUnsignedChar:
+            {
+                i32 c = va_arg(args, i32);
+                LogChar(c);
+                ++nwritten;
+                break;
+            }
+            case ArgumentType::eUnsignedInteger:
+                nwritten += LogNumber<unsigned int>(args, specs);
+                break;
+            case ArgumentType::eUnsignedLong:
+                nwritten += LogNumber<unsigned long>(args, specs);
+                break;
+            case ArgumentType::eUnsignedLongLong:
+                nwritten += LogNumber<unsigned long long>(args, specs);
+                break;
+            case ArgumentType::eUnsignedSize:
+                nwritten += LogNumber<usize>(args, specs);
+                break;
+            case ArgumentType::eString:
+            {
+                StringView string = va_arg(args, const char*);
+                usize      size   = string.Size();
+                if (specs.Precision > 0
+                    && specs.Precision < static_cast<isize>(size))
+                    size = static_cast<usize>(specs.Precision);
+                if (size == 0) break;
+
+                for (const auto& c : string.Substr(0, size))
+                    LogChar(c), ++nwritten;
+                break;
+            }
+            case ArgumentType::eOutWrittenCharCount:
+            {
+                i32* out = va_arg(args, i32*);
+                *out     = nwritten;
+                break;
+            }
+
+            default: break;
+        }
+
+        return nwritten;
+    }
+    CTOS_NO_KASAN isize Logv(LogLevel level, const char* fmt, va_list& args,
+                             bool printNewline)
+    {
+        ScopedLock guard(s_Lock, true);
+        PrintLogLevel(level);
+
+        isize      nwritten = 0;
+        auto       it       = fmt;
+        while (*it)
+        {
+            if (*it == '%' && *(it + 1) != '%')
+            {
+                PrintfFormatParser parser;
+                auto   specs = parser(it, args);
+
+                nwritten += PrintArgument(it, args, specs);
+                continue;
+            }
+            else if (*it == '\n')
             {
                 LogChar('\r');
                 LogChar('\n');
-                fmt++;
+                it++;
+                nwritten += 2;
+                continue;
             }
-            else LogChar(*fmt++);
+            LogChar(*it++), nwritten++;
         }
 
-        if (printNewline) LogChar('\n');
+        if (printNewline) LogChar('\n'), ++nwritten;
+        return nwritten;
     }
 
     Terminal& GetTerminal() { return *Terminal::GetPrimary(); }

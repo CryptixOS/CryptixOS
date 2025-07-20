@@ -16,6 +16,7 @@
 
 #include <VFS/Fifo.hpp>
 #include <VFS/FileDescriptor.hpp>
+#include <VFS/VFS.hpp>
 
 inline usize AllocatePid()
 {
@@ -37,14 +38,15 @@ Credentials Credentials::s_Root = {
     .pgid = 0,
 };
 
-Process::Process(Process* parent, StringView name, const Credentials& creds)
+Process::Process(Process* parent, StringView name,
+                 const struct Credentials& creds)
     : m_Parent(parent)
     , m_Pid(AllocatePid())
     , m_Name(name.Raw())
     , m_Credentials(creds)
     , m_Ring(PrivilegeLevel::eUnprivileged)
     , m_NextTid(m_Pid)
-    , m_CWD("/")
+    , m_CWD(VFS::RootDirectoryEntry())
 
 {
     m_FdTable.OpenStdioStreams();
@@ -106,11 +108,11 @@ Thread* Process::CreateThread(Pointer rip, bool isUser, i64 runOn)
     m_Threads.PushBack(thread);
     return thread;
 }
-Thread* Process::CreateThread(Pointer rip, Vector<StringView>& argv,
-                              Vector<StringView>& envp, ELF::Image& program,
-                              i64 runOn)
+Thread* Process::CreateThread(Vector<StringView>& argv,
+                              Vector<StringView>& envp,
+                              ExecutableProgram& program, i64 runOn)
 {
-    auto thread = new Thread(this, rip, argv, envp, program, runOn);
+    auto thread = new Thread(this, argv, envp, program, runOn);
 
     if (m_Threads.Empty()) m_MainThread = thread;
 
@@ -154,19 +156,18 @@ void Process::SendGroupSignal(pid_t pgid, i32 signal)
 {
     auto& processMap = Scheduler::GetProcessMap();
     for (auto [pid, process] : processMap)
-        if (process->m_Credentials.pgid == pgid) process->SendSignal(signal);
+        if (process->Credentials().pgid == pgid) process->SendSignal(signal);
 }
 void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
-ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
+ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
-    DirectoryEntry* parent
-        = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), m_CWD.Raw()).Entry;
+    Ref parent = CWD();
     if (CPU::AsUser([path]() -> bool { return path.Absolute(); }))
-        parent = VFS::GetRootDirectoryEntry();
+        parent = VFS::RootDirectoryEntry().Raw();
     else if (dirFd != AT_FDCWD)
     {
-        auto* descriptor = GetFileHandle(dirFd);
+        Ref<FileDescriptor> descriptor = GetFileHandle(dirFd);
         if (!descriptor) return Error(EBADF);
         auto entry = descriptor->DirectoryEntry();
 
@@ -174,11 +175,31 @@ ErrorOr<i32> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
     }
 
     auto descriptor
-        = CPU::AsUser([&]() -> ErrorOr<FileDescriptor*>
-                      { return VFS::Open(parent, path, flags, mode); });
+        = CPU::AsUser([&]() -> ErrorOr<Ref<FileDescriptor>>
+                      { return VFS::Open(parent.Raw(), path, flags, mode); });
     if (!descriptor) return Error(descriptor.error());
 
     return m_FdTable.Insert(descriptor.value());
+}
+ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
+{
+    if (oldFdNum == newFdNum) return Error(EINVAL);
+
+    Ref<FileDescriptor> oldFd = GetFileHandle(oldFdNum);
+    if (!oldFd) return Error(EBADF);
+
+    while (newFdNum < 0 || m_FdTable.IsValid(newFdNum)) ++newFdNum;
+    Ref<FileDescriptor> newFd = GetFileHandle(newFdNum);
+    if (newFd) CloseFd(newFdNum);
+
+    // newFd = CreateRef<FileDescriptor>(oldFd, flags);
+    // if (!newFd) return Error(ENOMEM);
+
+    newFd    = oldFd;
+    newFdNum = m_FdTable.Insert(newFd, newFdNum);
+    if (newFdNum < 0) return Error(EBADF);
+
+    return newFdNum;
 }
 i32            Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
 
@@ -236,70 +257,17 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
     delete PageMap;
     PageMap = new class PageMap();
 
-    /*
-    auto nodeOr = CPU::AsUser([path]() -> auto
-                              { return VFS::ResolvePath(path.Raw()); });
-    if (!nodeOr) return nodeOr.error();
-
-    String shellPath;
-    char        shebang[2];
-    nodeOr.value()->Read(shebang, 0, 2);
-    bool containsShebang = false;
-    if (shebang[0] == '#' && shebang[1] == '!')
-    {
-        containsShebang = true;
-        String buffer;
-        buffer.Resize(20);
-        usize offset = 0;
-        usize index  = 0;
-        nodeOr.value()->Read(buffer.Raw(), offset + 2, 20);
-        for (;;)
-        {
-            if (index >= buffer.Size())
-            {
-                nodeOr.value()->Read(buffer.Raw(), offset + 2, 20);
-                index = 0;
-            }
-
-            if (buffer[index] == '\n' || buffer[index] == '\r') break;
-            ++index;
-            ++offset;
-        }
-
-        shellPath.Resize(offset + 1);
-        nodeOr.value()->Read(shellPath.Raw(), 2, offset);
-
-        shellPath[offset] = 0;
-        EarlyLogInfo("Shell: %s", shellPath.Raw());
-    }
-
-    shellPath.ShrinkToFit();
-    EarlyLogInfo("ShellPath: %s", shellPath.Raw() ?: "<NULL>");
-    EarlyLogInfo("Path: %s", path.Raw() ?: "<NULL>");
-    StringView     shPath = String(shellPath.Raw(), shellPath.Size());
-
-    Vector<String> args   = SplitArguments(
-        containsShebang && !shellPath.empty() ? shPath : StringView(path));
-    */
     Vector<StringView> argvArr;
     {
         CPU::UserMemoryProtectionGuard guard;
         // for (auto& arg : args) argvArr.EmplaceBack(arg.Raw(), arg.Size());
     }
-    // if (!shellPath.Empty()) argvArr.PushBack(path);
 
-    static ELF::Image program, ld;
-    // if (!program.Load(shellPath.Empty() || !containsShebang ? path.Raw()
-    // : argvArr[0].Raw(),
-    // PageMap, m_AddressSpace))
-    // return Error(ENOEXEC);
+    static ExecutableProgram program;
 
     if (!program.Load(path.Raw(), PageMap, m_AddressSpace))
         return Error(ENOEXEC);
 
-    auto ldPath = program.GetLdPath();
-    if (!ldPath.Empty())
-        Assert(ld.Load(ldPath, PageMap, m_AddressSpace, 0x40000000));
     Thread* currentThread = CPU::GetCurrentThread();
     currentThread->SetState(ThreadState::eExited);
 
@@ -308,9 +276,6 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
         if (thread == currentThread) continue;
         delete thread;
     }
-
-    uintptr_t address
-        = ldPath.Empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
 
     {
         CPU::UserMemoryProtectionGuard guard;
@@ -326,8 +291,8 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
         for (char** env = envp; *env; env++) envpArr.PushBack(*env);
     }
 
-    auto thread = CreateThread(address, argvArr, envpArr, program,
-                               CPU::GetCurrent()->ID);
+    auto thread
+        = CreateThread(argvArr, envpArr, program, CPU::GetCurrent()->ID);
     Scheduler::EnqueueThread(thread);
 
     Scheduler::Yield();
@@ -346,7 +311,7 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
         auto  it  = std::find_if(m_Children.begin(), m_Children.end(),
                                  [gid](Process* proc) -> bool
                                  {
-                                   if (proc->GetPGid() == gid) return true;
+                                   if (proc->PGid() == gid) return true;
                                    return false;
                                });
         if (it == m_Children.end()) return Error(ECHILD);
@@ -358,7 +323,7 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
         auto it = std::find_if(m_Children.begin(), m_Children.end(),
                                [process](Process* proc) -> bool
                                {
-                                   if (proc->GetPGid() == process->GetPGid())
+                                   if (proc->PGid() == process->PGid())
                                        return true;
                                    return false;
                                });
@@ -371,7 +336,7 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
         auto it = std::find_if(m_Children.begin(), m_Children.end(),
                                [pid](Process* proc) -> bool
                                {
-                                   if (proc->GetPid() == pid) return true;
+                                   if (proc->Pid() == pid) return true;
                                    return false;
                                });
 
@@ -385,22 +350,21 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
     bool block = !(flags & WNOHANG);
     for (;;)
     {
-        auto ret = Event::Await(std::span(events.begin(), events.end()), block);
-        if (!ret.has_value()) return Error(EINTR);
+        auto ret = Event::Await(Span(events.Raw(), events.Size()), block);
+        if (!ret.HasValue()) return Error(EINTR);
 
-        auto which = procs[ret.value()];
-        if (!(flags & WUNTRACED) && WIFSTOPPED(which->GetStatus().value_or(0)))
+        auto which = procs[ret.Value()];
+        if (!(flags & WUNTRACED) && WIFSTOPPED(which->Status().ValueOr(0)))
             continue;
-        if (!(flags & WCONTINUED)
-            && WIFCONTINUED(which->GetStatus().value_or(0)))
+        if (!(flags & WCONTINUED) && WIFCONTINUED(which->Status().ValueOr(0)))
             continue;
 
         if (wstatus)
             CPU::AsUser(
                 [wstatus, &which]()
-                { *wstatus = W_EXITCODE(which->GetStatus().value_or(0), 0); });
+                { *wstatus = W_EXITCODE(which->Status().ValueOr(0), 0); });
 
-        return which->GetPid();
+        return which->Pid();
     }
 }
 
@@ -424,31 +388,29 @@ ErrorOr<Process*> Process::Fork()
     for (const auto& [base, range] : m_AddressSpace)
     {
         usize pageCount
-            = Math::AlignUp(range->GetSize(), PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
+            = Math::AlignUp(range->Size(), PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
 
         uintptr_t physicalSpace = PMM::CallocatePages<uintptr_t>(pageCount);
         Assert(physicalSpace);
 
         std::memcpy(Pointer(physicalSpace).ToHigherHalf<void*>(),
-                    range->GetPhysicalBase().ToHigherHalf<void*>(),
-                    range->GetSize());
-        pageMap->MapRange(range->GetVirtualBase(), physicalSpace,
-                          range->GetSize(),
+                    range->PhysicalBase().ToHigherHalf<void*>(), range->Size());
+        pageMap->MapRange(range->VirtualBase(), physicalSpace, range->Size(),
                           PageAttributes::eRWXU | PageAttributes::eWriteBack);
 
-        auto newRegion = new Region(physicalSpace, range->GetVirtualBase(),
-                                    range->GetSize());
-        newRegion->SetProt(range->GetAccess(), range->GetProt());
-        newProcess->m_AddressSpace.Insert(range->GetVirtualBase().Raw(),
+        auto newRegion
+            = new Region(physicalSpace, range->VirtualBase(), range->Size());
+        newRegion->SetAccessMode(range->Access());
+        newProcess->m_AddressSpace.Insert(range->VirtualBase().Raw(),
                                           newRegion);
         continue;
         // auto newRegion = newProcess->m_AddressSpace.AllocateFixed(
-        //     range->GetVirtualBase(), range->GetSize());
+        //     range->VirtualBase(), range->Size());
         // if (!newRegion)
         //    newRegion
-        //        = newProcess->m_AddressSpace.AllocateRegion(range->GetSize());
+        //        = newProcess->m_AddressSpace.AllocateRegion(range->Size());
         newRegion->SetPhysicalBase(physicalSpace);
-        newRegion->SetProt(range->GetAccess(), range->GetProt());
+        newRegion->SetAccessMode(range->Access());
 
         // pageMap->MapRegion(newRegion);
         //  TODO(v1tr10l7): Free regions;
@@ -457,8 +419,8 @@ ErrorOr<Process*> Process::Fork()
     newProcess->m_NextTid.Store(m_NextTid.Load());
     for (const auto& [i, fd] : m_FdTable)
     {
-        FileDescriptor* newFd = new FileDescriptor(fd);
-        newProcess->m_FdTable.Insert(newFd, i);
+        // Ref<FileDescriptor> newFd = new FileDescriptor(fd);
+        newProcess->m_FdTable.Insert(fd, i);
     }
 
     Thread* thread             = currentThread->Fork(newProcess);
@@ -480,7 +442,7 @@ i32 Process::Exit(i32 code)
     // FIXME(v1tr10l7): Do proper cleanup of all resources
     m_FdTable.Clear();
 
-    Thread* currentThread   = Thread::GetCurrent();
+    Thread* currentThread   = Thread::Current();
     currentThread->m_Parent = Scheduler::GetKernelProcess();
 
     Process* subreaper      = Scheduler::GetProcess(1);

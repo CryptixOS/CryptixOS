@@ -16,7 +16,7 @@
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
 
-#include <Library/ELF.hpp>
+#include <Library/ExecutableProgram.hpp>
 #include <Prism/String/String.hpp>
 
 #include <VFS/FileDescriptorTable.hpp>
@@ -56,9 +56,8 @@ class Process
     static Process* CreateIdleProcess();
 
     Thread* CreateThread(Pointer rip, bool isUser = true, i64 runOn = -1);
-    Thread* CreateThread(Pointer rip, Vector<StringView>& argv,
-                         Vector<StringView>& envp, ELF::Image& program,
-                         i64 runOn = -1);
+    Thread* CreateThread(Vector<StringView>& argv, Vector<StringView>& envp,
+                         ExecutableProgram& program, i64 runOn = -1);
 
     bool    ValidateAddress(const Pointer address, i32 accessMode, usize size);
     inline bool ValidateRead(const Pointer address, usize size)
@@ -71,46 +70,46 @@ class Process
     }
 
     template <typename T>
-        requires(!std::is_pointer_v<T>)
+        requires(!IsPointerV<T>)
     inline bool ValidateRead(const T* address)
     {
         return ValidateRead(address, sizeof(T));
     }
     template <typename T>
-        requires(!std::is_pointer_v<T>)
+        requires(!IsPointerV<T>)
     inline bool ValidateWrite(const T* address)
     {
         return ValidateWrite(address, sizeof(T));
     }
 
-    inline pid_t GetParentPid() const
+    inline pid_t ParentPid() const
     {
         if (m_Parent) return m_Parent->m_Pid;
 
         // TODO(v1tr10l7): What should we return, if there is no parent??
         return 0;
     }
-    inline Process*           GetParent() const { return m_Parent; }
-    inline pid_t              GetPid() const { return m_Pid; }
-    inline StringView         GetName() const { return m_Name; }
-    inline const Credentials& GetCredentials() const { return m_Credentials; }
-    inline std::optional<i32> GetStatus() const { return m_Status; }
+    inline Process*           Parent() const { return m_Parent; }
+    inline pid_t              Pid() const { return m_Pid; }
+    inline StringView         Name() const { return m_Name; }
+    inline const Credentials& Credentials() const { return m_Credentials; }
+    inline Optional<i32>      Status() const { return m_Status; }
 
-    inline Thread*            GetMainThread() { return m_MainThread; }
-    inline AddressSpace&      GetAddressSpace() { return m_AddressSpace; }
+    inline Thread*            MainThread() { return m_MainThread; }
+    inline AddressSpace&      AddressSpace() { return m_AddressSpace; }
 
-    inline pid_t              GetSid() const { return m_Credentials.sid; }
-    inline pid_t              GetPGid() const { return m_Credentials.pgid; }
+    inline pid_t              Sid() const { return m_Credentials.sid; }
+    inline pid_t              PGid() const { return m_Credentials.pgid; }
 
     pid_t                     SetSid();
     inline void               SetPGid(pid_t pgid) { m_Credentials.pgid = pgid; }
 
-    inline TTY*               GetTTY() const { return m_TTY; }
-    inline void               SetTTY(TTY* tty) { m_TTY = tty; }
+    inline TTY*               TTY() const { return m_TTY; }
+    inline void               SetTTY(class TTY* tty) { m_TTY = tty; }
 
-    inline const Vector<Process*>& GetChildren() const { return m_Children; }
-    inline const Vector<Process*>& GetZombies() const { return m_Zombies; }
-    inline const Vector<Thread*>&  GetThreads() const { return m_Threads; }
+    inline const Vector<Process*>& Children() const { return m_Children; }
+    inline const Vector<Process*>& Zombies() const { return m_Zombies; }
+    inline const Vector<Thread*>&  Threads() const { return m_Threads; }
 
     inline bool IsSessionLeader() const { return m_Pid == m_Credentials.sid; }
     inline bool IsGroupLeader() const { return m_Pid == m_Credentials.pgid; }
@@ -122,36 +121,45 @@ class Process
         return false;
     }
 
-    inline DirectoryEntry* GetRootNode() const { return m_RootDirectoryEntry; }
-    inline StringView      GetCWD() const { return m_CWD; }
-    inline mode_t          GetUmask() const { return m_Umask; }
-    mode_t                 Umask(mode_t mask);
+    inline Ref<DirectoryEntry> RootNode() const { return m_RootDirectoryEntry; }
+    inline Ref<DirectoryEntry> CWD() const { return m_CWD; }
+    inline void                SetCWD(Ref<DirectoryEntry> cwd) { m_CWD = cwd; }
+    inline mode_t              Umask() const { return m_Umask; }
+    mode_t                     Umask(mode_t mask);
 
-    static void            SendGroupSignal(pid_t pgid, i32 signal);
-    void                   SendSignal(i32 signal);
+    static void                SendGroupSignal(pid_t pgid, i32 signal);
+    void                       SendSignal(i32 signal);
 
-    ErrorOr<i32>   OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
+    ErrorOr<isize> OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
+    ErrorOr<isize> DupFd(isize oldFdNum, isize newFdNum, isize flags);
     i32            CloseFd(i32 fd);
     ErrorOr<isize> OpenPipe(i32* pipeFds);
     inline bool    IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
-    inline FileDescriptor* GetFileHandle(i32 fd) { return m_FdTable.GetFd(fd); }
+    inline Ref<FileDescriptor> GetFileHandle(i32 fd)
+    {
+        return m_FdTable.GetFd(fd);
+    }
 
-    ErrorOr<pid_t>         WaitPid(pid_t pid, i32* wstatus, i32 flags,
-                                   struct rusage* rusage);
+    ErrorOr<pid_t>    WaitPid(pid_t pid, i32* wstatus, i32 flags,
+                              struct rusage* rusage);
 
-    ErrorOr<Process*>      Fork();
-    ErrorOr<i32>           Exec(String path, char** argv, char** envp);
-    i32                    Exit(i32 code);
+    ErrorOr<Process*> Fork();
+    ErrorOr<i32>      Exec(String path, char** argv, char** envp);
+    i32               Exit(i32 code);
 
     friend struct Thread;
+
+    PageMap* PageMap = nullptr;
+
+  private:
     Process*            m_Parent      = nullptr;
     pid_t               m_Pid         = -1;
     String              m_Name        = "?";
-    PageMap*            PageMap       = nullptr;
-    Credentials         m_Credentials = {};
-    TTY*                m_TTY;
+
+    struct Credentials  m_Credentials = {};
+    class TTY*          m_TTY;
     PrivilegeLevel      m_Ring = PrivilegeLevel::eUnprivileged;
-    std::optional<i32>  m_Status;
+    Optional<i32>       m_Status;
     bool                m_Exited     = false;
 
     Thread*             m_MainThread = nullptr;
@@ -160,12 +168,12 @@ class Process
     Vector<Process*>    m_Zombies;
     Vector<Thread*>     m_Threads;
 
-    DirectoryEntry*     m_RootDirectoryEntry = VFS::GetRootDirectoryEntry();
-    String              m_CWD                = "/";
+    Ref<DirectoryEntry> m_RootDirectoryEntry = nullptr;
+    Ref<DirectoryEntry> m_CWD                = nullptr;
     mode_t              m_Umask              = 0;
 
     FileDescriptorTable m_FdTable;
-    AddressSpace        m_AddressSpace;
+    class AddressSpace  m_AddressSpace;
 
     Pointer             m_UserStackTop = 0x70000000000u;
     usize               m_Quantum      = 1000;

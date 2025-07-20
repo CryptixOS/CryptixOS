@@ -9,22 +9,20 @@
     #include <Arch/x86_64/Drivers/PCSpeaker.hpp>
     #include <Arch/x86_64/IO.hpp>
 #endif
-#include <Boot/BootInfo.hpp>
-
 #include <Drivers/Serial.hpp>
 #include <Drivers/TTY.hpp>
 #include <Drivers/Terminal.hpp>
-#include <Drivers/VideoTerminal.hpp>
+#include <Drivers/Video/VideoTerminal.hpp>
 
 #include <Memory/PMM.hpp>
 #include <Prism/String/StringUtils.hpp>
 
-Vector<Terminal*> Terminal::s_Terminals = {};
-Terminal*         s_ActiveTerminal      = nullptr;
+Vector<Terminal*>                Terminal::s_Terminals = {};
+Span<Framebuffer, DynamicExtent> s_Framebuffers;
 
 Terminal::Terminal()
 {
-    if (!s_ActiveTerminal) s_ActiveTerminal = this;
+    if (s_Terminals.Empty()) s_Terminals.PushBack(this);
 }
 
 void Terminal::Resize(const winsize& windowSize) {}
@@ -101,12 +99,15 @@ void Terminal::PutCharImpl(u64 c)
     RawPutChar(0xfe);
 }
 
-void Terminal::PrintString(StringView str)
+isize Terminal::PrintString(StringView str)
 {
-    if (!m_Initialized) return;
+    if (!m_Initialized) return 0;
 
-    for (auto c : str) PutCharImpl(c);
+    isize nwritten = 0;
+    for (auto c : str) PutCharImpl(c), ++nwritten;
     Flush();
+
+    return nwritten;
 }
 
 void Terminal::Bell()
@@ -118,20 +119,45 @@ void Terminal::Bell()
 #endif
 }
 
-Terminal*                Terminal::GetPrimary() { return s_ActiveTerminal; }
+void Terminal::SetupFramebuffers(Span<Framebuffer, DynamicExtent> framebuffers)
+{
+    static bool s_Initialized = false;
+    if (s_Initialized) return;
+
+    s_Framebuffers = framebuffers;
+    s_Initialized  = true;
+}
+
+Framebuffer& Terminal::PrimaryFramebuffer()
+{
+    Assert(!s_Framebuffers.Empty());
+    return s_Framebuffers[0];
+}
+Span<Framebuffer> Terminal::Framebuffers() { return s_Framebuffers; }
+
+Terminal*         Terminal::GetPrimary()
+{
+    return !s_Terminals.Empty() ? s_Terminals[0] : nullptr;
+}
 const Vector<Terminal*>& Terminal::EnumerateTerminals()
 {
-    static bool initialized = false;
-    if (initialized) return s_Terminals;
+    if (s_Framebuffers.Empty())
+    {
+        LogWarn("Terminal: Can't to enumerate, no available framebuffers");
+        return s_Terminals;
+    }
+    if (!s_Terminals.Empty()) return s_Terminals;
 
-    usize         framebufferCount = 0;
-    Framebuffer** framebuffers = BootInfo::GetFramebuffers(framebufferCount);
+    LogTrace("Terminal: Initializing terminals for {} framebuffers...", s_Framebuffers.Size());
+    for (auto& framebuffer : s_Framebuffers) 
+    {
+        auto terminal = VideoTerminal::Create(framebuffer);
+        s_Terminals.PushBack(terminal);
 
-    s_ActiveTerminal           = new VideoTerminal(*framebuffers[0]);
-    s_Terminals.PushBack(s_ActiveTerminal);
+        LogTrace("Terminal: Instantiated a terminal");
+    }
 
     LogInfo("Terminal: Initialized {} terminals", s_Terminals.Size());
-    initialized = true;
     return s_Terminals;
 }
 

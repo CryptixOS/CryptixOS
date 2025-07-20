@@ -7,7 +7,7 @@
 #pragma once
 
 #include <Prism/Containers/Vector.hpp>
-#include <Prism/Delegate.hpp>
+#include <Prism/Utility/Delegate.hpp>
 
 #include <Prism/Memory/Buffer.hpp>
 #include <Prism/String/StringView.hpp>
@@ -37,7 +37,7 @@ struct ProcFsProperty
         if (Offset >= Buffer.Size()) Offset = 0;
         auto result
             = fmt::format_to_n(Buffer.Raw() + Offset, Buffer.Size() - Offset,
-                               format, std::forward<Args>(args)...);
+                               format, Forward<Args>(args)...);
         Offset += result.size;
     }
     isize Read(u8* outBuffer, off_t offset, usize count);
@@ -71,12 +71,12 @@ class ProcFsINode : public INode
         if (m_Property) delete m_Property;
     }
 
-    virtual const stat& Stats() override;
+    virtual const stat Stats() override;
     virtual ErrorOr<void>
-    TraverseDirectories(class DirectoryEntry* parent,
-                        DirectoryIterator     iterator) override;
+    TraverseDirectories(Ref<class DirectoryEntry> parent,
+                        DirectoryIterator         iterator) override;
 
-    virtual const std::unordered_map<StringView, INode*>& Children() const
+    virtual const UnorderedMap<StringView, INode*>& Children() const
     {
         return m_Children;
     }
@@ -85,9 +85,7 @@ class ProcFsINode : public INode
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
 
-    virtual ErrorOr<void>  ChMod(mode_t mode) override { return Error(ENOSYS); }
-
   private:
-    ProcFsProperty*                        m_Property = nullptr;
-    std::unordered_map<StringView, INode*> m_Children;
+    ProcFsProperty*                  m_Property = nullptr;
+    UnorderedMap<StringView, INode*> m_Children;
 };

@@ -7,23 +7,22 @@
 #pragma once
 
 #include <Arch/x86_64/Types.hpp>
-
-#include <concepts>
+#include <Prism/Core/Concepts.hpp>
 
 namespace IO
 {
-    template <std::unsigned_integral T>
+    template <UnsignedIntegral T>
     inline static void Out(word port, T value)
         requires(sizeof(T) <= sizeof(dword))
     {
-        if constexpr (std::same_as<T, byte>)
+        if constexpr (SameAs<T, byte>)
             __asm__ volatile("outb %0, %1" : : "a"(value), "d"(port));
         else if constexpr (sizeof(T) == 2)
             __asm__ volatile("outw %0, %1" : : "a"(value), "d"(port));
         else if constexpr (sizeof(T) == 4)
             __asm__ volatile("outl %0, %1" : : "a"(value), "d"(port));
     }
-    template <std::unsigned_integral T>
+    template <UnsignedIntegral T>
     inline static T In(word port)
         requires(sizeof(T) <= sizeof(dword))
     {

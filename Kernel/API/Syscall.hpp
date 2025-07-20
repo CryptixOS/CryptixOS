@@ -11,8 +11,8 @@
 #include <Arch/CPU.hpp>
 
 #include <Prism/Core/TypeTraits.hpp>
-#include <Prism/Path.hpp>
-#include <Prism/PathView.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Utility/PathView.hpp>
 
 #include <magic_enum/magic_enum.hpp>
 #include <magic_enum/magic_enum_format.hpp>
@@ -153,13 +153,15 @@ namespace Syscall
         eMUnMap           = 11,
         eSigProcMask      = 14,
         eIoCtl            = 16,
+        ePRead64          = 17,
+        ePWrite64         = 18,
         eAccess           = 21,
         ePipe             = 22,
         eSchedYield       = 24,
         eDup              = 32,
         eDup2             = 33,
         eNanoSleep        = 35,
-        eGetPid           = 39,
+        ePid              = 39,
         eFork             = 57,
         eExecve           = 59,
         eExit             = 60,
@@ -177,8 +179,8 @@ namespace Syscall
         eRmDir            = 84,
         eCreat            = 85,
         eLink             = 86,
-        eUnlink           = 86,
-        eSymlink          = 87,
+        eUnlink           = 87,
+        eSymlink          = 88,
         eReadLink         = 89,
         eChMod            = 90,
         eUmask            = 95,
@@ -194,7 +196,7 @@ namespace Syscall
         eGetPgrp          = 111,
         eSetSid           = 112,
         eGet_pGid         = 121,
-        eGetSid           = 124,
+        eSid              = 124,
         eUTime            = 132,
         eStatFs           = 137,
         eArchPrCtl        = 158,
@@ -227,7 +229,7 @@ namespace Syscall
                                std::function<ErrorOr<uintptr_t>(Arguments&)> handler,
                                String                                        name);
 #define RegisterSyscall(index, handler)                                        \
-    ::Syscall::RegisterHandler(std::to_underlying(index), handler, #handler)
+    ::Syscall::RegisterHandler(ToUnderlying(index), handler, #handler)
 #define RegisterSyscall2(id, handler)                                          \
     s_Syscalls[id] = new Wrapper<decltype(handler)>(#handler, handler);
 

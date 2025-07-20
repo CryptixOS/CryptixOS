@@ -17,11 +17,12 @@ class Ext2FsINode : public INode
     virtual ~Ext2FsINode() {}
 
     virtual ErrorOr<void>
-                   TraverseDirectories(class DirectoryEntry* parent,
-                                       DirectoryIterator     iterator) override;
-    virtual INode* Lookup(const String& name) override;
+    TraverseDirectories(Ref<class DirectoryEntry> parent,
+                        DirectoryIterator         iterator) override;
+    virtual ErrorOr<Ref<DirectoryEntry>>
+    Lookup(Ref<DirectoryEntry> dentry) override;
 
-    virtual const std::unordered_map<StringView, INode*>& Children() const
+    virtual const UnorderedMap<StringView, INode*>& Children() const
     {
         return m_Children;
     }
@@ -33,14 +34,13 @@ class Ext2FsINode : public INode
     }
     virtual ErrorOr<isize> Truncate(usize size) override { return -1; }
 
-    virtual ErrorOr<void>  ChMod(mode_t mode) override;
-
     friend class Ext2Fs;
 
   private:
-    Ext2Fs*                                m_Fs;
-    Ext2FsINodeMeta                        m_Meta;
-    std::unordered_map<StringView, INode*> m_Children;
+    Ext2Fs*                          m_Fs;
+    Ext2FsINodeMeta                  m_Meta;
+    UnorderedMap<StringView, INode*> m_Children;
+    usize                            m_DirectoryOffset = 0;
 
     void          Initialize(ino_t index, mode_t mode, u16 type);
     ErrorOr<void> AddDirectoryEntry(Ext2FsDirectoryEntry& dentry);

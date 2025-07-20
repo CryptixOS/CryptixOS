@@ -42,10 +42,12 @@ namespace PNG
         eIndexed            = 3,
         eGrayscaleWithAlpha = 4,
         eTrueColorWithAlpha = 6,
+        eCount              = 7,
     };
     enum class CompressionMethod : u8
     {
         eDeflate = 0,
+        eCount   = 1,
     };
     enum class FilterType : u8
     {
@@ -54,11 +56,13 @@ namespace PNG
         eUp      = 2,
         eAverage = 3,
         ePaeth   = 4,
+        eCount   = 5,
     };
     enum class InterlaceMethod : u8
     {
         eNone  = 0,
         eAdam7 = 1,
+        eCount = 2,
     };
 
     struct [[gnu::packed]] PaletteEntry
@@ -72,9 +76,9 @@ namespace PNG
     inline constexpr u8 PredictPaeth(u8 a, u8 b, u8 c)
     {
         i32 p  = a + b - c;
-        i32 pa = Math::Abs(p - a);
-        i32 pb = Math::Abs(p - b);
-        i32 pc = Math::Abs(p - c);
+        i32 pa = Math::Absolute(p - a);
+        i32 pb = Math::Absolute(p - b);
+        i32 pc = Math::Absolute(p - c);
 
         if (pa <= pb && pa <= pc) return a;
         if (pb <= pc) return b;

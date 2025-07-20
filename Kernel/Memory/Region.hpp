@@ -10,11 +10,12 @@
 
 #include <API/Posix/sys/mman.h>
 #include <Memory/AddressRange.hpp>
+#include <Prism/Memory/Ref.hpp>
 
 class FileDescriptor;
 enum class PageAttributes : isize;
 
-namespace VirtualMemoryManager
+namespace VMM
 {
     enum class Access : u8
     {
@@ -29,7 +30,7 @@ namespace VirtualMemoryManager
     };
     inline constexpr Access& operator|=(Access& lhs, const Access rhs)
     {
-        auto result = std::to_underlying(lhs) | std::to_underlying(rhs);
+        auto result = ToUnderlying(lhs) | ToUnderlying(rhs);
         lhs         = static_cast<Access>(result);
 
         return lhs;
@@ -37,24 +38,23 @@ namespace VirtualMemoryManager
 
     constexpr bool operator&(const Access lhs, const Access rhs)
     {
-        return std::to_underlying(lhs) & std::to_underlying(rhs);
+        return ToUnderlying(lhs) & ToUnderlying(rhs);
     }
     constexpr Access operator|(const Access lhs, const Access rhs)
     {
-        auto result = std::to_underlying(lhs) | std::to_underlying(rhs);
+        auto result = ToUnderlying(lhs) | ToUnderlying(rhs);
 
         return static_cast<Access>(result);
     }
 
-    class Region final
+    class Region final : public RefCounted
     {
       public:
         Region() = default;
         Region(Pointer phys, Pointer virt, usize size,
-               i32 flags = PROT_READ | PROT_WRITE, FileDescriptor* fd = nullptr)
+               FileDescriptor* fd = nullptr)
             : m_VirtualRange(virt, size)
             , m_PhysicalBase(phys)
-            , m_Flags(flags)
             , m_Fd(fd)
 
         {
@@ -65,38 +65,26 @@ namespace VirtualMemoryManager
             return m_VirtualRange.Contains(address);
         }
 
-        inline const AddressRange& GetVirtualRange() const
+        inline const AddressRange& VirtualRange() const
         {
             return m_VirtualRange;
         }
-        inline Pointer GetPhysicalBase() const { return m_PhysicalBase; }
-        inline Pointer GetVirtualBase() const
-        {
-            return m_VirtualRange.GetBase();
-        }
+        inline Pointer PhysicalBase() const { return m_PhysicalBase; }
+        inline Pointer VirtualBase() const { return m_VirtualRange.Base(); }
         inline Pointer End() const
         {
-            return m_VirtualRange.GetBase().Offset(m_VirtualRange.GetSize());
+            return m_VirtualRange.Base().Offset(m_VirtualRange.Size());
         }
 
-        inline usize GetSize() const { return m_VirtualRange.GetSize(); }
-        inline FileDescriptor* GetFileDescriptor() const { return m_Fd; }
+        inline usize Size() const { return m_VirtualRange.Size(); }
+        inline class FileDescriptor* FileDescriptor() const { return m_Fd; }
 
-        inline Access          GetAccess() const { return m_Access; }
-        inline i32             GetProt() const { return m_Flags; }
-        PageAttributes         GetPageAttributes() const;
+        inline enum Access           Access() const { return m_Access; }
+        enum PageAttributes          PageAttributes() const;
 
-        inline void SetPhysicalBase(Pointer phys) { m_PhysicalBase = phys; }
-        inline void SetProt(Access access, i32 prot)
-        {
-            m_Access = access;
-            m_Flags  = prot;
-        }
+        inline void    SetPhysicalBase(Pointer phys) { m_PhysicalBase = phys; }
+        inline void    SetAccessMode(enum Access access) { m_Access = access; }
 
-        constexpr bool ValidateFlags(i32 flags) const
-        {
-            return m_Flags & flags;
-        }
         constexpr bool IsReadable() const { return m_Access & Access::eRead; }
         constexpr bool IsWriteable() const { return m_Access & Access::eWrite; }
         constexpr bool IsExecutable() const
@@ -105,11 +93,10 @@ namespace VirtualMemoryManager
         }
 
       private:
-        AddressRange    m_VirtualRange;
-        Pointer         m_PhysicalBase = nullptr;
-        Access          m_Access       = Access::eNone;
-        i32             m_Flags        = 0;
-        FileDescriptor* m_Fd           = nullptr;
+        AddressRange          m_VirtualRange;
+        Pointer               m_PhysicalBase = nullptr;
+        enum Access           m_Access       = Access::eNone;
+        class FileDescriptor* m_Fd           = nullptr;
     };
-}; // namespace VirtualMemoryManager
-using VirtualMemoryManager::Region;
+}; // namespace VMM
+using VMM::Region;

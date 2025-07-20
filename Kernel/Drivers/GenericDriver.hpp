@@ -7,6 +7,7 @@
 #pragma once
 
 #include <Prism/String/String.hpp>
+#include <Prism/Core/Error.hpp>
 
 struct GenericDriver
 {

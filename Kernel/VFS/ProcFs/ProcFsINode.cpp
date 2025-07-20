@@ -5,8 +5,9 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <API/Posix/dirent.h>
-
 #include <Memory/PMM.hpp>
+
+#include <VFS/Filesystem.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
 
 isize ProcFsProperty::Read(u8* outBuffer, off_t offset, usize size)
@@ -27,29 +28,44 @@ ProcFsINode::ProcFsINode(StringView name, class Filesystem* fs, mode_t mode,
 {
     Assert(!S_ISDIR(mode) || !m_Property);
 
-    m_Stats.st_dev     = m_Filesystem->DeviceID();
-    m_Stats.st_ino     = m_Filesystem->NextINodeIndex();
-    m_Stats.st_nlink   = 1;
-    m_Stats.st_mode    = mode;
-    m_Stats.st_uid     = 0;
-    m_Stats.st_gid     = 0;
-    m_Stats.st_rdev    = m_Stats.st_dev;
-    m_Stats.st_size    = 0;
-    m_Stats.st_blksize = 512;
-    m_Stats.st_blocks  = 0;
+    m_Metadata.DeviceID     = m_Filesystem->DeviceID();
+    m_Metadata.ID           = m_Filesystem->NextINodeIndex();
+    m_Metadata.LinkCount    = 1;
+    m_Metadata.Mode         = mode;
+    m_Metadata.UID          = 0;
+    m_Metadata.GID          = 0;
+    m_Metadata.RootDeviceID = m_Metadata.DeviceID;
+    m_Metadata.Size         = 0;
+    m_Metadata.BlockSize    = 512;
+    m_Metadata.BlockCount   = 0;
 }
 
-const stat& ProcFsINode::Stats()
+const stat ProcFsINode::Stats()
 {
     if (m_Property)
     {
         m_Property->GenerateRecord();
-        m_Stats.st_size = m_Property->Buffer.Size();
+        m_Metadata.Size = m_Property->Buffer.Size();
     }
-    return m_Stats;
+
+    stat stats{};
+    stats.st_dev     = m_Metadata.DeviceID;
+    stats.st_ino     = m_Metadata.ID;
+    stats.st_nlink   = m_Metadata.LinkCount;
+    stats.st_mode    = m_Metadata.Mode;
+    stats.st_uid     = m_Metadata.UID;
+    stats.st_gid     = m_Metadata.GID;
+    stats.st_rdev    = m_Metadata.RootDeviceID;
+    stats.st_size    = m_Metadata.Size;
+    stats.st_blksize = m_Metadata.BlockSize;
+    stats.st_blocks  = m_Metadata.BlockCount;
+    stats.st_atim    = m_Metadata.AccessTime;
+    stats.st_mtim    = m_Metadata.ModificationTime;
+    stats.st_ctim    = m_Metadata.ChangeTime;
+    return stats;
 }
-ErrorOr<void> ProcFsINode::TraverseDirectories(class DirectoryEntry* parent,
-                                               DirectoryIterator     iterator)
+ErrorOr<void> ProcFsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
+                                               DirectoryIterator iterator)
 {
     usize offset = 0;
     for (const auto [name, inode] : Children())

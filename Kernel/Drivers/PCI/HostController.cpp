@@ -98,7 +98,7 @@ namespace PCI
                         uacpi_free_resources(resources);
                     }
 
-#if 0
+#if CTOS_DUMP_PCI_IRQ_ROUTES
                     LogInfo(
                         "PCI: Adding irq entry: {{ gsi: {}, device: {}, "
                         "function: {}, pin: {}, edge: {}, high: {} }}",
@@ -115,6 +115,19 @@ namespace PCI
             },
             this);
     }
+
+    Device* HostController::FindDeviceByID(const DeviceID& id)
+    {
+        Device* device = nullptr;
+
+        for (const auto bus : m_RootBuses)
+        {
+            device = bus->FindDeviceByID(id);
+            if (device) break;
+        }
+
+        return device;
+    }
     bool HostController::EnumerateDevices(Enumerator enumerator)
     {
         return EnumerateRootBus(enumerator);
@@ -122,7 +135,7 @@ namespace PCI
 
     void HostController::Initialize()
     {
-        bool pciUseEcam = CommandLine::GetBoolean("pci.ecam").value_or(true);
+        bool pciUseEcam = CommandLine::GetBoolean("pci.ecam").ValueOr(true);
 
         if (pciUseEcam && m_Address)
         {

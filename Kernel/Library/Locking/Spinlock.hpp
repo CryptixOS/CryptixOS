@@ -65,6 +65,9 @@ class Spinlock : public NonCopyable<Spinlock>
 class ScopedLock final : public NonCopyable<ScopedLock>
 {
   public:
+    ScopedLock()                        = delete;
+    ScopedLock& operator=(ScopedLock&&) = delete;
+
     ScopedLock(Spinlock& lock, bool disableInterrupts = false)
         : m_Lock(lock)
         , m_RestoreInterrupts(disableInterrupts)

@@ -6,30 +6,17 @@
  */
 #pragma once
 
-#include <Prism/Core/Types.hpp>
-#include <Prism/Memory/Pointer.hpp>
-#include <Prism/String/StringView.hpp>
+#include <Boot/BootMemoryInfo.hpp>
+#include <Boot/BootModuleInfo.hpp>
+#include <Drivers/Video/Framebuffer.hpp>
+
+#include <Library/Color.hpp>
+#include <Memory/PMM.hpp>
+
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Utility/Time.hpp>
 
 #include <limine.h>
-
-#include <utility>
-
-constexpr u32 FRAMEBUFFER_MEMORY_MODEL_RGB = LIMINE_FRAMEBUFFER_RGB;
-
-constexpr u32 MEMORY_MAP_USABLE            = LIMINE_MEMMAP_USABLE;
-constexpr u32 MEMORY_MAP_RESERVED          = LIMINE_MEMMAP_RESERVED;
-constexpr u32 MEMORY_MAP_ACPI_RECLAIMABLE  = LIMINE_MEMMAP_ACPI_RECLAIMABLE;
-constexpr u32 MEMORY_MAP_ACPI_NVS          = LIMINE_MEMMAP_ACPI_NVS;
-constexpr u32 MEMORY_MAP_BAD_MEMORY        = LIMINE_MEMMAP_BAD_MEMORY;
-constexpr u32 MEMORY_MAP_BOOTLOADER_RECLAIMABLE
-    = LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE;
-constexpr u32 MEMORY_MAP_KERNEL_AND_MODULES
-    = LIMINE_MEMMAP_EXECUTABLE_AND_MODULES;
-constexpr u32 MEMORY_MAP_FRAMEBUFFER = LIMINE_MEMMAP_FRAMEBUFFER;
-
-using MemoryMapEntry                 = limine_memmap_entry;
-using MemoryMap                      = MemoryMapEntry**;
-using Framebuffer                    = limine_framebuffer;
 
 enum class FirmwareType : i32
 {
@@ -40,26 +27,31 @@ enum class FirmwareType : i32
     eSbi       = 3,
 };
 
-namespace BootInfo
+struct BootInformation
 {
-    const char*                 GetBootloaderName();
-    const char*                 GetBootloaderVersion();
-    StringView                  GetKernelCommandLine();
-    FirmwareType                GetFirmwareType();
-    u64                         GetHHDMOffset();
-    Framebuffer**               GetFramebuffers(usize& outCount);
-    Framebuffer*                GetPrimaryFramebuffer();
-    usize                       GetPagingMode();
-    limine_mp_response*         GetSMP_Response();
-    MemoryMap                   GetMemoryMap(u64& entryCount);
-    limine_file*                GetExecutableFile();
-    limine_file*                FindModule(const char* name);
-    Pointer                     GetRSDPAddress();
-    std::pair<Pointer, Pointer> GetSmBiosEntries();
-    Pointer                     GetEfiSystemTable();
-    limine_efi_memmap_response* GetEfiMemoryMap();
-    u64                         GetDateAtBoot();
-    Pointer                     GetKernelPhysicalAddress();
-    Pointer                     GetKernelVirtualAddress();
-    Pointer                     GetDeviceTreeBlobAddress();
-}; // namespace BootInfo
+    StringView                          BootloaderName    = ""_sv;
+    StringView                          BootloaderVersion = ""_sv;
+    StringView                          KernelCommandLine = ""_sv;
+    enum FirmwareType                   FirmwareType;
+    DateTime                            DateAtBoot = 0;
+
+    BootModuleInfo                      KernelExecutable{};
+    Span<BootModuleInfo, DynamicExtent> KernelModules;
+
+    u64                                 BspID          = 0;
+    u64                                 ProcessorCount = 0;
+    BootMemoryInfo                      MemoryInformation{};
+    Span<Framebuffer, DynamicExtent>    Framebuffers;
+
+    // Physical address of the RSDP structure
+    Pointer                             RSDP           = nullptr;
+    // Physical address of the Device Tree Blob
+    Pointer                             DeviceTreeBlob = nullptr;
+    // Physical address of the SMBIOS 32 bit EntryPoint structure
+    Pointer                             SmBios32Phys   = nullptr;
+    // Physical address of the SMBIOS 64 bit EntryPoint structure
+    Pointer                             SmBios64Phys   = nullptr;
+
+    Pointer                             EfiSystemTable = nullptr;
+};
+

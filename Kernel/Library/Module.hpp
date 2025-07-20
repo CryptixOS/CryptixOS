@@ -7,45 +7,59 @@
  */
 #pragma once
 
+#include <Compiler.hpp>
+
+#include <Library/ELF.hpp>
+
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Containers/UnorderedMap.hpp>
+
 #include <Prism/Core/Types.hpp>
 #include <Prism/String/StringView.hpp>
 
 #include <uacpi/resources.h>
 #include <uacpi/utilities.h>
 
-#include <unordered_map>
-
-#define CONCAT(a, b)       CONCAT_INNER(a, b)
-#define CONCAT_INNER(a, b) a##b
-#define UNIQUE_NAME(name)  CONCAT(_##name##__, CONCAT(__COUNTER__, __LINE__))
-
-struct [[gnu::packed, gnu::aligned(8)]] Module
+namespace ELF
 {
-    const char* Name;
-    bool        Initialized;
-    bool        Failed;
+    class Image;
+}
 
-    bool (*Initialize)();
-    void (*Terminate)();
+using ModuleInitProc      = bool (*)();
+using ModuleTerminateProc = void (*)();
+struct CTOS_PACKED_ALIGNED(8) ModuleHeader
+{
+    const char*         Name;
 
-    static bool Load();
+    ModuleInitProc      Initialize;
+    ModuleTerminateProc Terminate;
+};
+struct Module : public RefCounted
+{
+    StringView Name;
+    bool       Initialized;
+    bool       Failed;
+
+    friend class IntrusiveRefList<Module>;
+    friend struct IntrusiveRefListHook<Module>;
+
+    using List = IntrusiveRefList<Module>;
+    IntrusiveRefListHook<Module> Hook;
+
+    ::Ref<ELF::Image>            Image = nullptr;
+
+    ModuleInitProc               Initialize;
+    ModuleTerminateProc          Terminate;
+
+    static bool                  Load();
 };
 
-std::unordered_map<StringView, Module*>& GetModules();
-bool                                     LoadModule(Module* drv);
-
-#define MODULE_SECTION      ".module_init"
-#define MODULE_DATA_SECTION ".module_init.data"
-
 #define MODULE_INIT(name, init)                                                \
-    extern "C" [[gnu::section(MODULE_SECTION), gnu::used]] const Module        \
-    CONCAT(kernel_module, UNIQUE_NAME(name))                                   \
-        = {.Name        = #name,                                               \
-           .Initialized = false,                                               \
-           .Failed      = false,                                               \
-           .Initialize  = init,                                                \
-           .Terminate   = nullptr}
+    extern "C" MODULE_SECTION const ModuleHeader CtConcatenateName(            \
+        kernel_module, CtUniqueName(name))                                     \
+        = {.Name = #name, .Initialize = init, .Terminate = nullptr}
 
 #define MODULE_EXIT(name, exit)                                                \
-    extern "C" [[gnu::section(MODULE_SECTION "." #name)], gnu::used]] \
-    void (*Terminate)() = exit;
+    extern "C" CTOS_SECTION(MODULE_SECTION_NAME "." #name,                     \
+                            CTOS_FORCE_EMIT) void (*Terminate)()               \
+        = exit;

@@ -13,7 +13,7 @@
 #include <API/Syscall.hpp>
 #include <API/UnixTypes.hpp>
 
-#include <Prism/PathView.hpp>
+#include <Prism/Utility/PathView.hpp>
 
 namespace API::VFS
 {
@@ -26,16 +26,27 @@ namespace API::VFS
     ErrorOr<isize> FStat(isize fdNum, stat* out);
     ErrorOr<isize> LStat(const char* path, stat* out);
 
+    ErrorOr<isize> LSeek(isize fdNum, off_t offset, i32 whence);
+    ErrorOr<isize> IoCtl(isize fdNum, usize request, usize argument);
+
+    ErrorOr<isize> PRead(isize fdNum, void* out, usize count, off_t offset);
+    ErrorOr<isize> PWrite(isize fdNum, const void* in, usize count,
+                          off_t offset);
+    ErrorOr<isize> Access(const char* filename, mode_t mode);
+
     ErrorOr<isize> Dup(isize oldFdNum);
     ErrorOr<isize> Dup2(isize oldFdNum, isize newFdNum);
 
     ErrorOr<isize> Truncate(PathView path, off_t length);
     ErrorOr<isize> FTruncate(i32 fdNum, off_t length);
     ErrorOr<isize> GetCwd(char* buffer, usize size);
+    ErrorOr<isize> ChDir(const char* filename);
+    ErrorOr<isize> FChDir(isize fdNum);
 
     ErrorOr<isize> Rename(const char* oldPath, const char* newPath);
     ErrorOr<isize> MkDir(const char* pathname, mode_t mode);
-    ErrorOr<isize> RmDir(PathView path);
+    ErrorOr<isize> RmDir(const char* pathname);
+    ErrorOr<isize> Creat(const char* pathname, mode_t mode);
     ErrorOr<isize> Link(const char* oldPath, const char* newPath);
     ErrorOr<isize> Unlink(const char* path);
     ErrorOr<isize> Symlink(const char* target, const char* linkPath);
@@ -73,19 +84,10 @@ namespace API::VFS
 } // namespace API::VFS
 namespace Syscall::VFS
 {
-    ErrorOr<off_t> SysLSeek(Syscall::Arguments& args);
-    ErrorOr<i32>   SysIoCtl(Syscall::Arguments& args);
+    ErrorOr<isize> SysFcntl(Syscall::Arguments& args);
 
-    ErrorOr<i32>   SysAccess(Syscall::Arguments& args);
-
-    ErrorOr<i32>   SysFcntl(Syscall::Arguments& args);
-    ErrorOr<i32>   SysChDir(Syscall::Arguments& args);
-    ErrorOr<i32>   SysFChDir(Syscall::Arguments& args);
-    ErrorOr<i32>   SysMkDir(Syscall::Arguments& args);
-
-    [[clang::no_sanitize("alignment")]] ErrorOr<i32>
+    [[clang::no_sanitize("alignment")]] ErrorOr<isize>
                  SysGetDents64(Syscall::Arguments& args);
-    ErrorOr<i32> SysOpenAt(Syscall::Arguments& args);
-    ErrorOr<i32> SysMkDirAt(Syscall::Arguments& args);
-    ErrorOr<i32> SysFStatAt(Syscall::Arguments& args);
+    ErrorOr<isize> SysOpenAt(Syscall::Arguments& args);
+    ErrorOr<isize> SysFStatAt(Syscall::Arguments& args);
 } // namespace Syscall::VFS

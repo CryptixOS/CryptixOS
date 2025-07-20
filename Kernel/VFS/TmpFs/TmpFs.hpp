@@ -6,34 +6,42 @@
  */
 #pragma once
 
+#include <VFS/Filesystem.hpp>
 #include <VFS/INode.hpp>
-#include <VFS/TmpFs/TmpFsINode.hpp>
 #include <VFS/VFS.hpp>
+
+#include <VFS/TmpFs/TmpFsINode.hpp>
 
 class TmpFs : public Filesystem
 {
   public:
     TmpFs(u32 flags);
 
-    inline usize                     GetSize() const { return m_Size; }
-    inline usize                     GetMaxSize() const { return m_MaxSize; }
+    inline usize GetSize() const { return m_Size; }
+    inline usize GetMaxSize() const { return m_MaxSize; }
 
-    virtual ErrorOr<DirectoryEntry*> Mount(StringView  sourcePath,
-                                           const void* data = nullptr) override;
-    virtual ErrorOr<INode*> CreateNode(INode* parent, DirectoryEntry* entry,
-                                       mode_t mode, uid_t uid = 0,
-                                       gid_t gid = 0) override;
-    virtual ErrorOr<INode*> Symlink(INode* parent, DirectoryEntry* entry,
-                                    StringView target) override;
-    virtual INode*          Link(INode* parent, StringView name,
-                                 INode* oldNode) override;
-    virtual bool Populate(DirectoryEntry* dentry) override { return true; }
-    virtual ErrorOr<INode*> MkNod(INode* parent, DirectoryEntry* entry,
-                                  mode_t mode, dev_t dev) override;
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    Mount(StringView sourcePath, const void* data = nullptr) override;
+
+    virtual ErrorOr<INode*> AllocateNode(StringView name,
+                                         INodeMode  mode) override;
+    virtual bool    Populate(DirectoryEntry* dentry) override { return true; }
+    ErrorOr<INode*> CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
+                               mode_t mode, dev_t dev);
+
+    virtual ErrorOr<void> Stats(statfs& stats) override;
 
   private:
-    usize m_MaxInodeCount = 0;
-    usize m_MaxSize       = 0;
+    usize                  m_MaxBlockCount      = 0;
+    usize                  m_FreeBlockCount     = 0;
+    usize                  m_MaxINodeCount      = 0;
+    usize                  m_FreeINodeCount     = PMM::PAGE_SIZE << 2;
+    usize                  m_MaxSize            = 0;
 
-    usize m_Size          = 0;
+    usize                  m_Size               = 0;
+    // FIXME(v1tr10l7): hardcoded for now
+
+    constexpr static usize DIRECTORY_ENTRY_SIZE = 20;
+    constexpr static usize INODE_SIZE           = 1024;
+    friend class TmpFsINode;
 };

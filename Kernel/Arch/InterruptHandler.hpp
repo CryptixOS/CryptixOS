@@ -9,7 +9,7 @@
 #include <Common.hpp>
 
 #include <Arch/InterruptManager.hpp>
-#include <Prism/Delegate.hpp>
+#include <Prism/Utility/Delegate.hpp>
 
 #include <functional>
 #include <optional>

@@ -9,6 +9,7 @@
 #include <Firmware/DeviceTree/Node.hpp>
 
 #include <Prism/Memory/Endian.hpp>
+#include <Prism/Memory/Pointer.hpp>
 
 constexpr usize FDT_MAGIC = 0xd00dfeed;
 
@@ -41,5 +42,5 @@ namespace DeviceTree
     static_assert(sizeof(FDT_Header) == 40,
                   "FDT header's size doesn't match the specification!");
 
-    bool Initialize();
+    bool Initialize(Pointer deviceTreeBlob);
 }; // namespace DeviceTree

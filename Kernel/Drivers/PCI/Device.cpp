@@ -27,8 +27,7 @@ namespace PCI
         if (!IsMMIO) return nullptr;
         if (Base) return Base;
 
-        if (VMM::GetKernelPageMap()->Virt2Phys(Address.ToHigherHalf<u64>())
-            == uintptr_t(-1))
+        if (VMM::GetKernelPageMap()->Virt2Phys(Address.ToHigherHalf<u64>()).Raw() == u64(-1))
         {
             usize   pageSize = PMM::PAGE_SIZE;
             Pointer base     = Math::AlignDown(Address.Raw(), pageSize);
@@ -46,24 +45,132 @@ namespace PCI
         return (Base = Address.ToHigherHalf<Pointer>());
     }
 
+    Device::Device(const DeviceAddress& address)
+        : m_Address(address)
+    {
+        m_ID.VendorID          = GetVendorID();
+        m_ID.ID                = Read<u16>(Register::eDeviceID);
+        m_ID.SubsystemID       = Read<u16>(Register::eSubsystemID);
+        m_ID.SubsystemVendorID = Read<u16>(Register::eSubsystemVendorID);
+        m_ID.Class             = Read<u8>(Register::eClassID);
+        m_ID.Subclass          = Read<u8>(Register::eSubClassID);
+
+        auto status = static_cast<Status>(Read<u16>(Register::eStatus));
+        if (!(status & Status::eCapabilityList)) return;
+
+        ReadCapabilities();
+        for (const auto& capability : m_Capabilities)
+        {
+            CapabilityID capabilityID = capability.ID;
+
+            switch (capabilityID)
+            {
+                case CapabilityID::eMSI:
+                    m_MsiSupported = true;
+                    m_MsiOffset    = capability.Offset;
+                    break;
+                case CapabilityID::eMSIx:
+                {
+                    m_MsixSupported = true;
+                    m_MsixOffset    = capability.Offset;
+                    MsiXControl control(ReadAt(capability.Offset + 0x02, 2));
+                    MsiXAddress table(ReadAt(capability.Offset + 0x04, 4));
+                    MsiXAddress pending(ReadAt(capability.Offset + 0x08, 4));
+
+                    usize       count = control.Irqs;
+                    m_MsixMessages    = count;
+                    m_MsixIrqs.Allocate(count);
+
+                    m_MsixTableBar      = table.Bir;
+                    m_MsixTableOffset   = table.Offset << 3;
+
+                    m_MsixPendingBar    = pending.Bir;
+                    m_MsixPendingOffset = pending.Offset << 3;
+                    break;
+                }
+
+                default: break;
+            }
+        }
+    }
+
+    ErrorOr<void> Device::Enable()
+    {
+        // SetPowerState(PowerState::eD0);
+        return {};
+    }
+
+    void Device::EnableIOSpace() { SendCommand(Command::eEnableIOSpace, true); }
+    void Device::DisableIOSpace()
+    {
+        SendCommand(Command::eEnableIOSpace, false);
+    }
+
     void Device::EnableMemorySpace()
     {
-        ScopedLock guard(m_Lock);
-
-        u16        cmd = Read<u16>(RegisterOffset::eCommand) | Bit(0);
-        Write<u16>(RegisterOffset::eCommand, cmd);
+        SendCommand(Command::eEnableMMIO, true);
     }
+    void Device::DisableMemorySpace()
+    {
+        SendCommand(Command::eEnableMMIO, false);
+    }
+
     void Device::EnableBusMastering()
     {
-        ScopedLock guard(m_Lock);
-        u16        value = Read<u16>(RegisterOffset::eCommand);
-        value |= Bit(2);
-        value |= Bit(0);
-
-        Write<u16>(RegisterOffset::eCommand, value);
+        EnableIOSpace();
+        SendCommand(Command::eEnableBusMaster, true);
+    }
+    void Device::DisableBusMastering()
+    {
+        SendCommand(Command::eEnableBusMaster, false);
     }
 
-    bool Device::MatchID(std::span<DeviceID> idTable, DeviceID& outID)
+    void Device::EnableInterrupts()
+    {
+        SendCommand(Command::eInterruptDisable, false);
+    }
+    void Device::DisableInterrupts()
+    {
+        SendCommand(Command::eInterruptDisable, true);
+    }
+
+    PowerState    Device::PowerState() const { return PowerState::eD0; }
+    ErrorOr<void> Device::SetPowerState(enum PowerState state)
+    {
+        if (ToUnderlying(state) >= ToUnderlying(PowerState::eD3))
+            state = PowerState::eD3;
+
+        if (ToUnderlying(state) > ToUnderlying(PowerState::eD0))
+            return Error(EINVAL);
+        else if (state == PowerState()) return {};
+
+        auto maybeCapability = FindCapability(CapabilityID::ePowerManagement);
+        if (!maybeCapability) return Error(EIO);
+
+        auto capability = maybeCapability.Value();
+        if (state == PowerState::eD1 || state == PowerState::eD2)
+        {
+            u16 pmCapabilities = ReadAt(capability.Offset, 2);
+            if (state == PowerState::eD1 && !(pmCapabilities & 0))
+                return Error(EIO);
+            // else if (state == PowerState::eD2 && (!pmCapabilities & 1))
+            //     return Error(EIO);
+        }
+
+        // if (ToUnderlying(PowerState()) >= ToUnderlying(PowerState::eD3))
+
+        return Error(ENOSYS);
+    }
+
+    Optional<Capability> Device::FindCapability(CapabilityID id)
+    {
+        for (const auto& capability : m_Capabilities)
+            if (capability.ID == id) return capability;
+
+        return NullOpt;
+    }
+
+    bool Device::MatchID(Span<DeviceID> idTable, DeviceID& outID)
     {
         for (DeviceID& id : idTable)
         {
@@ -229,5 +336,20 @@ namespace PCI
     {
         auto* controller = GetHostController(m_Address.Domain);
         controller->Write(m_Address, offset, value, accessSize);
+    }
+
+    void Device::ReadCapabilities()
+    {
+        isize ttl = 48;
+
+        for (auto offset = Read<u8>(Register::eCapabilitiesPointer);
+             offset >= 0x40 && ttl-- > 0;)
+        {
+            u16  header       = ReadAt(offset, 2);
+            auto capabilityID = static_cast<CapabilityID>(header & 0xff);
+            m_Capabilities.EmplaceBack(capabilityID, offset);
+
+            offset = (header >> 8) & 0xfc;
+        }
     }
 }; // namespace PCI

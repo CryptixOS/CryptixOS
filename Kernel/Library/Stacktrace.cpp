@@ -4,20 +4,27 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/BootInfo.hpp>
-
 #include <Common.hpp>
 
+#include <Boot/BootModuleInfo.hpp>
+#include <Debug/Debug.hpp>
 #include <Library/Stacktrace.hpp>
 
+#include <Memory/MM.hpp>
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
 #include <Prism/String/String.hpp>
 #include <Prism/Utility/Math.hpp>
 
+#include <System/System.hpp>
+
 #include <demangler/Demangle.h>
 
+using ConstructorFunction = void (*)();
+
+extern "C" ConstructorFunction __init_array_start[];
+extern "C" ConstructorFunction __init_array_end[];
 namespace Stacktrace
 {
     namespace
@@ -39,39 +46,39 @@ namespace Stacktrace
 
             return (digit - 'a') + 0xa;
         }
-
-        const Symbol* GetSymbol(Pointer address)
-        {
-            if (address < s_LowestKernelSymbolAddress
-                || address > s_HighestKernelSymbolAddress)
-                return nullptr;
-            const Symbol* ret = nullptr;
-
-            for (const auto& symbol : s_Symbols)
-            {
-                if ((&symbol + 1) == s_Symbols.end()) break;
-                if (address < (&symbol + 1)->Address)
-                {
-                    ret = &symbol;
-                    break;
-                }
-            }
-
-            return ret;
-        }
     }; // namespace
 
+    const Symbol* GetSymbol(Pointer address)
+    {
+        if (address < s_LowestKernelSymbolAddress
+            || address > s_HighestKernelSymbolAddress)
+            return nullptr;
+        const Symbol* ret = nullptr;
+
+        for (const auto& symbol : s_Symbols)
+        {
+            if ((&symbol + 1) == s_Symbols.end()) break;
+            if (address < (&symbol + 1)->Address)
+            {
+                ret = &symbol;
+                break;
+            }
+        }
+
+        return ret;
+    }
     bool Initialize()
     {
         LogTrace("Stacktrace: Loading kernel s_Symbols...");
-        limine_file* file = BootInfo::FindModule("ksyms");
-        if (!file || !file->address) return false;
+        const BootModuleInfo* module = System::FindBootModule("ksyms");
+        if (!module || !module->LoadAddress || module->Size == 0) return false;
 
-        Pointer fileStart = file->address;
-        Pointer fileEnd   = fileStart.Offset(file->size);
-        char*   current   = fileStart.As<char>();
+        Pointer fileStart  = module->LoadAddress;
+        Pointer fileEnd    = fileStart.Offset(module->Size);
+        char*   current    = fileStart.As<char>();
 
-        Pointer address   = 0;
+        auto    kernelVirt = MM::KernelVirtualAddress();
+        Pointer address    = 0;
         while (current < fileEnd.As<char>())
         {
             for (usize i = 0; i < sizeof(void*) * 2; ++i)
@@ -83,8 +90,7 @@ namespace Stacktrace
                 if (*current == '\n') break;
 
             Symbol ksym;
-            if (address < BootInfo::GetKernelVirtualAddress().Raw<>())
-                address += BootInfo::GetKernelVirtualAddress().Raw<>();
+            if (address < kernelVirt) address += kernelVirt;
 
             ksym.Address = address;
             ksym.Name    = name.Substr(0, name.FindFirstOf('\n'));
@@ -99,9 +105,23 @@ namespace Stacktrace
             ++current;
         }
 
-        u64 filePageCount = Math::DivRoundUp(file->size, PMM::PAGE_SIZE);
+        u64 filePageCount = Math::DivRoundUp(module->Size, PMM::PAGE_SIZE);
         PMM::FreePages(fileStart.FromHigherHalf(), filePageCount);
         LogInfo("Stacktrace: kernel symbols loaded");
+
+        #if CTOS_DUMP_INIT_ARRAY != 0
+        LogTrace("System: Dumping init array =>");
+        for (ConstructorFunction* entry = __init_array_start;
+             entry < __init_array_end; entry++)
+        {
+            ConstructorFunction constructor = *entry;
+            auto sym = GetSymbol(constructor);
+            if (!sym) continue;
+            
+            LogTrace("\t{:#016p} => {}", Pointer(constructor).Raw(), sym->Name);
+        }
+        #endif
+
         return true;
     }
     void Print(usize maxFrames)

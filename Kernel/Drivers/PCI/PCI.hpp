@@ -6,16 +6,33 @@
  */
 #pragma once
 
-#include <Prism/Core/Types.hpp>
+#include <Drivers/PCI/Device.hpp>
+
 #include <Library/Locking/Spinlock.hpp>
+#include <Prism/Core/Types.hpp>
 
 namespace PCI
 {
+    struct Driver
+    {
+        String         Name;
+        Span<DeviceID> MatchIDs;
+
+        using ProbeFn
+            = ErrorOr<void> (*)(DeviceAddress& address, const DeviceID& id);
+        using RemoveFn = void (*)(Device& device);
+
+        ProbeFn  Probe;
+        RemoveFn Remove;
+    };
+
     void                  Initialize();
     void                  InitializeIrqRoutes();
 
     class HostController* GetHostController(u32 domain);
     bool                  RegisterDriver(struct Driver& driver);
+
+    Device*               FindDeviceByID(const DeviceID& id);
 
     constexpr usize       PCI_CONFIG_ADDRESS = 0x0cf8;
     constexpr usize       PCI_CONFIG_DATA    = 0x0cfc;

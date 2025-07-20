@@ -6,12 +6,11 @@
  */
 #pragma once
 
+#include <Prism/Containers/UnorderedMap.hpp>
 #include <Scheduler/Process.hpp>
 
 #include <VFS/Filesystem.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
-
-#include <unordered_map>
 
 class ProcFs : public Filesystem
 {
@@ -30,21 +29,16 @@ class ProcFs : public Filesystem
         return "rw,nosuid,nodev,noexec,relatime";
     }
 
-    virtual ErrorOr<DirectoryEntry*> Mount(StringView  sourcePath,
-                                           const void* data = nullptr) override;
-    virtual ErrorOr<INode*> CreateNode(INode* parent, DirectoryEntry* entry,
-                                       mode_t mode, uid_t uid = 0,
-                                       gid_t gid = 0) override;
-    virtual ErrorOr<INode*> Symlink(INode* parent, DirectoryEntry* entry,
-                                    StringView target) override;
-    virtual INode*          Link(INode* parent, StringView name,
-                                 INode* oldNode) override;
-    virtual bool            Populate(DirectoryEntry* dentry) override;
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    Mount(StringView sourcePath, const void* data = nullptr) override;
+    ErrorOr<INode*> CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
+                               mode_t mode, uid_t uid = 0, gid_t gid = 0);
+    virtual bool    Populate(DirectoryEntry* dentry) override;
 
   private:
-    static std::unordered_map<pid_t, Process*>      s_Processes;
+    static UnorderedMap<pid_t, Process*>      s_Processes;
 
-    std::unordered_map<StringView, ProcFsProperty*> m_Properties;
+    UnorderedMap<StringView, ProcFsProperty*> m_Properties;
 
-    void                                            AddChild(StringView name);
+    void                                      AddChild(StringView name);
 };

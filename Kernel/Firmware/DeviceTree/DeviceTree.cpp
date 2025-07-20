@@ -4,13 +4,14 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/BootInfo.hpp>
+#include <Debug/Debug.hpp>
 
 #include <Firmware/DeviceTree/DeviceTree.hpp>
 #include <Library/Logger.hpp>
 
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Debug/Assertions.hpp>
+#include <Prism/Utility/Math.hpp>
 
 namespace DeviceTree
 {
@@ -49,9 +50,8 @@ namespace DeviceTree
                     break;
                 }
                 case FDT_TokenType::eEndNode:
-                    current = (current && current->GetParent())
-                                ? current->GetParent()
-                                : root;
+                    current = (current && current->Parent()) ? current->Parent()
+                                                             : root;
                     break;
                 case FDT_TokenType::eProperty:
                 {
@@ -92,10 +92,9 @@ namespace DeviceTree
     }
     bool ParseFDT(FDT_Header* header);
 
-    bool Initialize()
+    bool Initialize(Pointer dtb)
     {
-        auto        dtb    = BootInfo::GetDeviceTreeBlobAddress();
-        FDT_Header* header = dtb.As<FDT_Header>();
+        FDT_Header* header = dtb.ToHigherHalf<FDT_Header*>();
 
         if (!header)
 #ifdef CTOS_TARGET_AARCH64
@@ -115,7 +114,10 @@ namespace DeviceTree
         auto success = ParseFDT(header);
         if (!success) return false;
 
+#if CTOS_DUMP_DEVICE_TREE
         s_RootNode->Print();
+#endif
+
         LogInfo("DeviceTree: FDT parsed successfully");
         return success;
     }

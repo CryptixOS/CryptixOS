@@ -35,19 +35,19 @@ namespace InterruptManager
         if (IoApic::IsAnyEnabled())
             IoApic::SetIrqRedirect(CPU::GetCurrent()->LapicID, irq + 0x20, irq,
                                    false);
-        else PIC::MaskIRQ(irq);
+        else I8259A::Instance().Mask(irq);
     }
     void Unmask(u8 irq)
     {
         if (IoApic::IsAnyEnabled())
             IoApic::SetIrqRedirect(CPU::GetCurrent()->LapicID, irq + 0x20, irq,
                                    true);
-        else PIC::UnmaskIRQ(irq);
+        else I8259A::Instance().Unmask(irq);
     }
 
     void SendEOI(u8 vector)
     {
         if (IoApic::IsAnyEnabled()) Lapic::Instance()->SendEOI();
-        else PIC::SendEOI(vector);
+        else I8259A::Instance().SendEOI(vector);
     }
 }; // namespace InterruptManager

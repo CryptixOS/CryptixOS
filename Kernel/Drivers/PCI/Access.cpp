@@ -49,7 +49,7 @@ namespace PCI
         u64 phys = m_Base.Raw<u64>() + ((dev.Bus - m_BusStart) << 20)
                  | (dev.Slot << 15) | (dev.Function << 12);
 
-        if (m_Mappings.contains(phys)) return m_Mappings[phys] + offset;
+        if (m_Mappings.Contains(phys)) return m_Mappings[phys].Offset(offset);
 
         usize size = 1 << 20;
         // FIXME(v1tr10l7): Research why it doesn't work

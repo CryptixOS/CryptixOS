@@ -24,12 +24,12 @@ enum class PageFaultReason
 inline constexpr bool operator&(const PageFaultReason lhs,
                                 const PageFaultReason rhs)
 {
-    return std::to_underlying(lhs) & std::to_underlying(rhs);
+    return ToUnderlying(lhs) & ToUnderlying(rhs);
 }
 inline constexpr PageFaultReason operator|=(PageFaultReason&      lhs,
                                             const PageFaultReason rhs)
 {
-    auto result = std::to_underlying(lhs) | std::to_underlying(rhs);
+    auto result = ToUnderlying(lhs) | ToUnderlying(rhs);
 
     return static_cast<PageFaultReason>(result);
 }

@@ -5,92 +5,116 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Memory/AddressSpace.hpp>
+#include <Memory/MM.hpp>
+#include <Memory/PMM.hpp>
+
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Utility/Optional.hpp>
 
 AddressSpace::AddressSpace()
+// : m_TotalRange(USER_VIRTUAL_RANGE_BASE, USER_VIRTUAL_RANGE_SIZE)
 {
     auto memoryTop = PMM::GetMemoryTop();
     auto base      = Pointer(Math::AlignUp(memoryTop, 1_gib));
-    m_TotalRange   = {base.Offset(4_gib), BootInfo::GetHHDMOffset()};
+    m_TotalRange   = {base.Offset(4_gib), MM::HigherHalfOffset()};
 }
-AddressSpace::~AddressSpace()
-{
-    for (auto [base, region] : m_RegionTree) delete region;
-    m_RegionTree.Clear();
-}
+AddressSpace::~AddressSpace() { m_RegionTree.Clear(); }
 
 bool AddressSpace::IsAvailable(Pointer base, usize length) const
 {
-    return true;
-    for (auto& [base, region] : *const_cast<AddressSpace*>(this))
+    auto end = base.Offset(length);
+
+    for (const auto& [virt, current] : m_RegionTree)
     {
-        auto range = region->GetVirtualRange();
-        if (range.Contains(base) /*|| range.Contains(base.Offset(length - 1))*/)
-            return false;
+        auto currentStart = current->VirtualBase();
+        auto currentEnd   = current->End();
+
+        if (end < currentStart || currentEnd < base) return false;
     }
 
     return true;
 }
-void AddressSpace::Insert(Pointer base, Region* region)
+void AddressSpace::Insert(Pointer base, Ref<Region> region)
 {
-    m_RegionTree[base.Raw()] = region;
+    m_RegionTree.Insert(base.Raw(), region);
 }
 void AddressSpace::Erase(Pointer base)
 {
     ScopedLock guard(m_Lock);
     auto       it = m_RegionTree.Find(base.Raw());
 
-    if (it != m_RegionTree.end())
-    {
-        delete it->Value;
-        m_RegionTree.Erase(it->Key);
-    }
+    if (it != m_RegionTree.end()) m_RegionTree.Erase(it->Key);
 }
 
-Region* AddressSpace::AllocateRegion(usize size, usize alignment)
+Ref<Region> AddressSpace::AllocateRegion(usize size, usize alignment)
 {
     ScopedLock guard(m_Lock);
     if (alignment == 0) alignment = sizeof(void*);
 
-    Pointer currentRegion = m_TotalRange.GetBase();
-    Pointer regionStart;
-    usize   regionSize;
-    Pointer regionEnd;
+    auto windowStart = m_TotalRange.Base();
+    auto allocateFromWindow
+        = [&](AddressRange const& window) -> Optional<AddressRange>
+    {
+        if (window.Size() < (size + alignment)) return NullOpt;
 
-    do {
-        regionStart = Math::AlignUp(currentRegion, alignment);
-        regionSize  = (regionStart - currentRegion).Offset(size);
-        currentRegion += regionSize;
-        regionEnd = regionStart.Offset(regionSize);
-    } while (m_RegionTree.Contains(regionStart.Raw())
-             || m_RegionTree.Contains(regionEnd.Raw()));
+        auto initialBase = window.Base();
+        auto alignedBase
+            = Math::RoundUpToPowerOfTwo(initialBase.Raw(), alignment);
 
-    auto region = new Region(0, regionStart, regionEnd - regionStart);
+        Assert(size);
+        return AddressRange(alignedBase, size);
+    };
 
-    Insert(region->GetVirtualBase().Raw(), region);
+    Optional<AddressRange> found;
+    for (const auto& [key, region] : m_RegionTree)
+    {
+        if (windowStart == region->VirtualBase())
+        {
+            windowStart = region->VirtualBase().Offset(region->Size());
+            continue;
+        }
+
+        AddressRange window(windowStart,
+                            region->VirtualBase().Raw() - windowStart.Raw());
+        auto         maybeRange = allocateFromWindow(window);
+        if (maybeRange) found = maybeRange.Value();
+    }
+
+    if (!found) return nullptr;
+
+    auto        area        = found.Value();
+    Pointer     regionStart = area.Base();
+    usize       regionSize  = area.Size();
+
+    Ref<Region> region      = new Region(0, regionStart, regionSize);
+
+    Insert(region->VirtualBase().Raw(), region);
     return region;
 }
-Region* AddressSpace::AllocateFixed(Pointer virt, usize size)
+Ref<Region> AddressSpace::AllocateFixed(Pointer virt, usize size)
 {
     ScopedLock guard(m_Lock);
     size = Math::AlignUp(size, PMM::PAGE_SIZE);
 
     if (!IsAvailable(virt, size)) return nullptr;
 
-    auto region = new Region(0, virt, size);
-    Insert(region->GetVirtualBase(), region);
+    Ref<Region> region = new Region(0, virt, size);
+    Insert(region->VirtualBase(), region);
     return region;
 }
 
-Region* AddressSpace::Find(Pointer virt)
+Ref<Region> AddressSpace::Find(Pointer address) const
 {
-    auto it = m_RegionTree.Find(virt);
-    if (!it) return nullptr;
+    for (const auto& [virt, region] : m_RegionTree)
+    {
+        auto size  = region->Size();
+        auto start = region->VirtualBase();
+        auto end   = start.Offset(size);
 
-    return it->Value;
+        if (address >= start.Raw() && address < end) return region;
+    }
+
+    return nullptr;
 }
 
-void AddressSpace::Clear()
-{
-    for (const auto& [_, region] : *this) delete region;
-    m_RegionTree.Clear();
-}
+void AddressSpace::Clear() { m_RegionTree.Clear(); }

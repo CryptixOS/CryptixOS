@@ -17,40 +17,39 @@
 #include <Firmware/ACPI/ACPI.hpp>
 
 #include <Prism/Memory/Ref.hpp>
-
-#include <magic_enum/magic_enum.hpp>
+#include <Prism/String/StringUtils.hpp>
 
 Ref<Ps2KeyboardDevice>  s_Keyboard;
 
 Ps2Controller*          Ps2Controller::s_Instance = nullptr;
 static I8042Controller* s_Controller              = nullptr;
 
-static Ps2DeviceType    ToPs2DeviceType(std::optional<u8> byte1,
-                                        std::optional<u8> byte2)
+static Ps2DeviceType    ToPs2DeviceType(Optional<u8> byte1,
+                                        Optional<u8> byte2)
 {
     if (!byte1 && !byte2) return Ps2DeviceType::eATKeyboard;
-    else if (byte1.value_or(1) == 0x00 && !byte2)
+    else if (byte1.ValueOr(1) == 0x00 && !byte2)
         return Ps2DeviceType::eStandardMouse;
-    else if (byte1.value_or(0) == 0x03 && !byte2)
+    else if (byte1.ValueOr(0) == 0x03 && !byte2)
         return Ps2DeviceType::eScrollWheelMouse;
-    else if (byte1.value_or(0) == 0x04 && !byte2)
+    else if (byte1.ValueOr(0) == 0x04 && !byte2)
         return Ps2DeviceType::e5ButtonMouse;
-    else if (byte1.value_or(0) == 0xab
-             && (byte2.value_or(0) == 0x83 || byte2.value_or(0) == 0xc1))
+    else if (byte1.ValueOr(0) == 0xab
+             && (byte2.ValueOr(0) == 0x83 || byte2.ValueOr(0) == 0xc1))
         return Ps2DeviceType::eMf2Keyboard;
-    else if (byte1.value_or(0) == 0xab && byte2.value_or(0) == 0x84)
+    else if (byte1.ValueOr(0) == 0xab && byte2.ValueOr(0) == 0x84)
         return Ps2DeviceType::eThinkPadKeyboard;
-    else if (byte1.value_or(0) == 0xab && byte2.value_or(0) == 0x85)
+    else if (byte1.ValueOr(0) == 0xab && byte2.ValueOr(0) == 0x85)
         return Ps2DeviceType::eNcdKeyboard;
-    else if (byte1.value_or(0) == 0xab && byte2.value_or(0) == 0x86)
+    else if (byte1.ValueOr(0) == 0xab && byte2.ValueOr(0) == 0x86)
         return Ps2DeviceType::eStandardKeyboard;
-    else if (byte1.value_or(0) == 0xab && byte2.value_or(0) == 0x90)
+    else if (byte1.ValueOr(0) == 0xab && byte2.ValueOr(0) == 0x90)
         return Ps2DeviceType::eJapaneseGKeyboard;
-    else if (byte1.value_or(0) == 0xab && byte2.value_or(0) == 0x91)
+    else if (byte1.ValueOr(0) == 0xab && byte2.ValueOr(0) == 0x91)
         return Ps2DeviceType::eJapanesePKeyboard;
-    else if (byte1.value_or(0) == 0xab && byte2.value_or(0) == 0x92)
+    else if (byte1.ValueOr(0) == 0xab && byte2.ValueOr(0) == 0x92)
         return Ps2DeviceType::eJapaneseAKeyboard;
-    else if (byte1.value_or(0) == 0xac && byte2.value_or(0) == 0xa1)
+    else if (byte1.ValueOr(0) == 0xac && byte2.ValueOr(0) == 0xa1)
         return Ps2DeviceType::eNcdKeyboard;
 
     return Ps2DeviceType::eUndefined;
@@ -143,14 +142,12 @@ ErrorOr<void> I8042Controller::Initialize()
 
 bool I8042Controller::IsOutputEmpty()
 {
-    return (ReadPort(Port::eStatus)
-            & std::to_underlying(Status::eOutBufferFull))
+    return (ReadPort(Port::eStatus) & ToUnderlying(Status::eOutBufferFull))
         == 0;
 }
 bool I8042Controller::IsInputEmpty()
 {
-    return (ReadPort(Port::eStatus) & std::to_underlying(Status::eInBufferFull))
-        == 0;
+    return (ReadPort(Port::eStatus) & ToUnderlying(Status::eInBufferFull)) == 0;
 }
 
 u8 I8042Controller::ReadBlocking()
@@ -169,7 +166,7 @@ void I8042Controller::WriteBlocking(Port port, u8 data)
 ErrorOr<u8> I8042Controller::TryRead()
 {
     auto status = WaitForIncomingData();
-    if (!status) return status.error();
+    if (!status) return status.Error();
 
     return ReadPort(Port::eBuffer);
 }
@@ -199,8 +196,7 @@ ErrorOr<void> I8042Controller::FlushReadBuffer()
 }
 ErrorOr<void> I8042Controller::SendCommand(Command command)
 {
-    if (!TryWrite(Port::eCommand, std::to_underlying(command)))
-        return Error(EBUSY);
+    if (!TryWrite(Port::eCommand, ToUnderlying(command))) return Error(EBUSY);
 
     return {};
 }
@@ -313,17 +309,17 @@ ErrorOr<void> I8042Controller::ResetDevice(DevicePort port)
     auto byte1 = TryRead();
     auto byte2 = TryRead();
 
-    if (!byte1) return Error(byte1.error());
-    if (!byte2) return Error(byte2.error());
+    if (!byte1) return Error(byte1.Error());
+    if (!byte2) return Error(byte2.Error());
 
-    if (byte1.value() == Response::eAcknowledge
-        && byte2.value() == Response::eDeviceTestPassed)
+    if (byte1.Value() == Response::eAcknowledge
+        && byte2.Value() == Response::eDeviceTestPassed)
     {
         auto id1 = TryRead();
         auto id2 = TryRead();
 
-        if (id1) LogTrace("id[0] = {:#x}", id1.value());
-        if (id2) LogTrace("id[1] = {:#x}", id2.value());
+        if (id1) LogTrace("id[0] = {:#x}", id1.Value());
+        if (id2) LogTrace("id[1] = {:#x}", id2.Value());
         return {};
     }
 
@@ -361,7 +357,7 @@ void I8042Controller::HandleInterrupt(CPUContext* context)
     while (!GetInstance()->IsOutputEmpty())
     {
         auto byte = s_Controller->TryRead();
-        if (byte) s_Keyboard->OnByteReceived(byte.value());
+        if (byte) s_Keyboard->OnByteReceived(byte.Value());
     }
 }
 
@@ -384,7 +380,7 @@ bool I8042Controller::PerformSelfTest()
     while (!SendCommand(Command::eTestController) && attemptCount < 5)
     {
         auto status = TryRead();
-        if (status && status.value() == Response::eSelfTestSuccess) break;
+        if (status && status.Value() == Response::eSelfTestSuccess) break;
         IO::Delay(50);
 
         ++attemptCount;
@@ -430,8 +426,8 @@ bool I8042Controller::TestInterfaces()
 }
 bool I8042Controller::TestSingleInterface(DevicePort port)
 {
-    Assert(std::to_underlying(port) <= 2);
-    LogTrace("I8042: Testing port #{}...", std::to_underlying(port));
+    Assert(ToUnderlying(port) <= 2);
+    LogTrace("I8042: Testing port #{}...", ToUnderlying(port));
     if (!SendCommand(port == DevicePort::ePort1 ? Command::eTestPort1
                                                 : Command::eTestPort2))
         return false;
@@ -439,13 +435,12 @@ bool I8042Controller::TestSingleInterface(DevicePort port)
 
     if (status == Response::ePortTestSuccess)
     {
-        LogTrace("I8042: Port #{} is working correctly",
-                 std::to_underlying(port));
+        LogTrace("I8042: Port #{} is working correctly", ToUnderlying(port));
 
         return true;
     }
 
-    LogError("I8042: Port #1 error -> {}", magic_enum::enum_name(status));
+    LogError("I8042: Port #1 error -> {}", ToString(status));
     return false;
 }
 
@@ -455,16 +450,14 @@ void I8042Controller::EnumerateDevices()
     {
         auto deviceType = ScanPortForDevices(DevicePort::ePort1);
         if (deviceType)
-            LogTrace("I8042: DeviceType: {}",
-                     magic_enum::enum_name(deviceType.value()));
+            LogTrace("I8042: DeviceType: {}", ToString(deviceType.Value()));
         LogTrace("I8042: Detected device on port #1");
     }
     if (m_Port2Available)
     {
         auto deviceType = ScanPortForDevices(DevicePort::ePort2);
         if (deviceType)
-            LogTrace("I8042: DeviceType: {}",
-                     magic_enum::enum_name(deviceType.value()));
+            LogTrace("I8042: DeviceType: {}", ToString(deviceType.Value()));
         LogTrace("I8042: Detected device on port #2");
     }
 
@@ -481,53 +474,53 @@ ErrorOr<Ps2DeviceType> I8042Controller::ScanPortForDevices(DevicePort port)
                                            : Command::eEnablePort2);
 
     auto status = SendDeviceCommand(port, DeviceCommand::eDisableScanning);
-    if (!status) return Error(status.error());
+    if (!status) return Error(status.Error());
 
     auto response = TryRead();
-    if (!response) return Error(response.error());
-    if (response.value() != Response::eAcknowledge) return Error(ENODEV);
+    if (!response) return Error(response.Error());
+    if (response.Value() != Response::eAcknowledge) return Error(ENODEV);
 
     FlushReadBuffer();
     status = SendDeviceCommand(port, DeviceCommand::eIdentify);
-    if (!status) return Error(status.error());
+    if (!status) return Error(status.Error());
 
     response = TryRead();
-    if (!response) return Error(response.error());
-    if (response.value() != Response::eAcknowledge) return Error(ENODEV);
+    if (!response) return Error(response.Error());
+    if (response.Value() != Response::eAcknowledge) return Error(ENODEV);
 
     auto byte1 = TryRead();
     auto byte2 = TryRead();
 
     if (byte1)
-        LogInfo("I8042: Device #{} reply[0] = {:#x}", std::to_underlying(port),
-                byte1.value());
+        LogInfo("I8042: Device #{} reply[0] = {:#x}", ToUnderlying(port),
+                byte1.Value());
     if (byte2)
-        LogInfo("I8042: Device #{} reply[1] = {:#x}", std::to_underlying(port),
-                byte2.value());
+        LogInfo("I8042: Device #{} reply[1] = {:#x}", ToUnderlying(port),
+                byte2.Value());
 
     FlushReadBuffer();
     status = SendDeviceCommand(port, DeviceCommand::eEnableScanning);
     if (!status)
     {
         LogError("I8042: Failed to enable scanning on device #{}",
-                 std::to_underlying(port));
+                 ToUnderlying(port));
 
-        return Error(status.error());
+        return Error(status.Error());
     }
 
     response = TryRead();
-    if (!response) return Error(response.error());
-    if (response.value() != Response::eAcknowledge) return Error(ENODEV);
+    if (!response) return Error(response.Error());
+    if (response.Value() != Response::eAcknowledge) return Error(ENODEV);
 
     if (!SendCommand(port == DevicePort::ePort1 ? Command::eDisablePort1
                                                 : Command::eDisablePort2))
         return Error(ENODEV);
     FlushReadBuffer();
 
-    std::optional<u8> identify1;
-    std::optional<u8> identify2;
-    if (byte1) identify1 = byte1.value();
-    if (byte2) identify2 = byte2.value();
+    Optional<u8> identify1;
+    Optional<u8> identify2;
+    if (byte1) identify1 = byte1.Value();
+    if (byte2) identify2 = byte2.Value();
 
     return ToPs2DeviceType(identify1, identify2);
 }
@@ -556,9 +549,9 @@ ErrorOr<void> I8042Controller::WaitForWriteReady()
 
 u8 I8042Controller::ReadPort(Port port)
 {
-    return IO::In<byte>(std::to_underlying(port));
+    return IO::In<byte>(ToUnderlying(port));
 }
 void I8042Controller::WritePort(Port port, u8 data)
 {
-    IO::Out<byte>(std::to_underlying(port), data);
+    IO::Out<byte>(ToUnderlying(port), data);
 }

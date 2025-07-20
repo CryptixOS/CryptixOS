@@ -1,0 +1,16 @@
+#*
+#* Created by v1tr10l7 on 15.07.2025.
+#* Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
+#*
+#* SPDX-License-Identifier: GPL-3
+#*/
+srcs += files(
+  'PowerManager.cpp',
+  'User.cpp',
+)
+
+if arch == 'x86_64'
+  subdir('x86_64')
+elif arch == 'aarch64'
+  subdir('aarch64')
+endif

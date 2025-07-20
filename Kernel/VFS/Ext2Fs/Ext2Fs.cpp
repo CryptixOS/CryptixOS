@@ -8,12 +8,17 @@
 #include <Time/Time.hpp>
 
 #include <VFS/DirectoryEntry.hpp>
+#include <VFS/VFS.hpp>
+
 #include <VFS/Ext2Fs/Ext2Fs.hpp>
 #include <VFS/Ext2Fs/Ext2FsINode.hpp>
 
-ErrorOr<DirectoryEntry*> Ext2Fs::Mount(StringView sourcePath, const void* data)
+ErrorOr<::Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
+                                             const void* data)
 {
-    auto sourceEntry = VFS::ResolvePath(nullptr, sourcePath).Entry;
+    auto sourceEntry = VFS::ResolvePath(nullptr, sourcePath)
+                           .ValueOr(VFS::PathResolution{})
+                           .Entry;
     if (!sourceEntry || !sourceEntry->INode()) return Error(ENODEV);
 
     m_Device     = sourceEntry->INode();
@@ -47,31 +52,33 @@ ErrorOr<DirectoryEntry*> Ext2Fs::Mount(StringView sourcePath, const void* data)
 
     m_Allocator.Initialize(this);
 
-    m_RootEntry = new DirectoryEntry(nullptr, "/");
-    auto* root  = new Ext2FsINode("/", this, 0644 | S_IFDIR);
-    ReadINodeEntry(&root->m_Meta, 2);
-
-    root->m_Stats.st_ino   = 2;
-    root->m_Stats.st_dev   = m_Device->Stats().st_rdev;
-    root->m_Stats.st_nlink = root->m_Meta.HardLinkCount;
-    root->m_Stats.st_size  = root->m_Meta.SizeLow
-                          | (static_cast<u64>(root->m_Meta.SizeHigh) << 32);
-    root->m_Stats.st_blocks = root->m_Stats.st_size / root->m_Stats.st_blksize;
-
+    m_RootEntry = CreateRef<DirectoryEntry>(nullptr, "/");
+    auto* root
+        = m_RootEntry ? new Ext2FsINode("/", this, 0644 | S_IFDIR) : nullptr;
     if (!root)
     {
         LogError("Ext2Fs: '{}' -> Failed to create root node",
                  sourceEntry->Path());
         delete m_SuperBlock;
-        return nullptr;
+        return Error(ENOMEM);
     }
+
+    ReadINodeEntry(&root->m_Meta, 2);
+
+    root->m_Metadata.ID        = 2;
+    root->m_Metadata.DeviceID  = m_Device->Stats().st_rdev;
+    root->m_Metadata.LinkCount = root->m_Meta.HardLinkCount;
+    root->m_Metadata.Size      = root->m_Meta.SizeLow
+                          | (static_cast<u64>(root->m_Meta.SizeHigh) << 32);
+    root->m_Metadata.BlockCount
+        = root->m_Metadata.Size / root->m_Metadata.BlockSize;
 
     m_RootEntry->Bind(root);
     m_Root = root;
     return m_RootEntry;
 }
 
-ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, DirectoryEntry* entry,
+ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
                                    mode_t mode, uid_t uid, gid_t gid)
 {
     usize inodeIndex = m_Allocator.AllocateINode();
@@ -112,7 +119,7 @@ ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, DirectoryEntry* entry,
         WriteINode(inode->m_Meta, buffer, inodeIndex, 0, m_BlockSize);
 
         usize bgdIndex
-            = (inode->m_Stats.st_ino - 1) / m_SuperBlock->INodesPerGroup;
+            = (inode->m_Metadata.ID - 1) / m_SuperBlock->INodesPerGroup;
         Ext2FsBlockGroupDescriptor blockGroup{};
         ReadBlockGroupDescriptor(&blockGroup, bgdIndex);
         ++blockGroup.DirectoryCount;
@@ -127,14 +134,14 @@ ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, DirectoryEntry* entry,
     usize entrySize = Math::AlignUp(8 + entry->Name().Size(), 4);
     Ext2FsDirectoryEntry* dentry
         = Pointer(new u8[entrySize]).As<Ext2FsDirectoryEntry>();
-    std::memset(dentry, 0, entrySize);
+    Memory::Fill(dentry, 0, entrySize);
 
     dentry->INodeIndex = inodeIndex;
     dentry->Size       = entrySize;
     dentry->NameSize   = entry->Name().Size();
     dentry->Type       = Ext2Mode2DirectoryEntryType(mode);
-    std::strncpy(reinterpret_cast<char*>(dentry->Name), entry->Name().Raw(),
-                 dentry->NameSize);
+    StringView(reinterpret_cast<char*>(dentry->Name), dentry->NameSize)
+        .Copy(const_cast<char*>(entry->Name().Raw()), entry->Name().Size());
     auto result
         = reinterpret_cast<Ext2FsINode*>(parent)->AddDirectoryEntry(*dentry);
     if (!result)
@@ -151,7 +158,7 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
 {
     Ext2FsINode*    e2node = reinterpret_cast<Ext2FsINode*>(dentry->INode());
     Ext2FsINodeMeta parentMeta;
-    ReadINodeEntry(&parentMeta, e2node->m_Stats.st_ino);
+    ReadINodeEntry(&parentMeta, e2node->m_Metadata.ID);
 
     u8* buffer = new u8[parentMeta.GetSize()];
     ReadINode(parentMeta, buffer, 0, parentMeta.GetSize());
@@ -197,30 +204,27 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
 
             default:
                 LogError("Ext2Fs: Invalid directory entry type: {}",
-                         std::to_underlying(entry->Type));
+                         ToUnderlying(entry->Type));
                 break;
         }
 
-        DirectoryEntry* newEntry   = new DirectoryEntry(dentry, nameBuffer);
-        Ext2FsINode*    newNode    = new Ext2FsINode(nameBuffer, this, mode);
-        newNode->m_Stats.st_uid    = inodeMeta.UID;
-        newNode->m_Stats.st_gid    = inodeMeta.GID;
-        newNode->m_Stats.st_ino    = entry->INodeIndex;
-        newNode->m_Stats.st_size   = inodeMeta.GetSize();
-        newNode->m_Stats.st_nlink  = inodeMeta.HardLinkCount;
-        newNode->m_Stats.st_blocks = newNode->m_Stats.st_size / m_BlockSize;
+        Ext2FsINode* newNode          = new Ext2FsINode(nameBuffer, this, mode);
+        newNode->m_Metadata.UID       = inodeMeta.UID;
+        newNode->m_Metadata.GID       = inodeMeta.GID;
+        newNode->m_Metadata.ID        = entry->INodeIndex;
+        newNode->m_Metadata.Size      = inodeMeta.GetSize();
+        newNode->m_Metadata.LinkCount = inodeMeta.HardLinkCount;
+        newNode->m_Metadata.BlockCount = newNode->m_Metadata.Size / m_BlockSize;
 
-        newNode->m_Stats.st_atim.tv_sec  = inodeMeta.AccessTime;
-        newNode->m_Stats.st_atim.tv_nsec = 0;
-        newNode->m_Stats.st_ctim.tv_sec  = inodeMeta.CreationTime;
-        newNode->m_Stats.st_ctim.tv_nsec = 0;
-        newNode->m_Stats.st_mtim.tv_sec  = inodeMeta.ModifiedTime;
-        newNode->m_Stats.st_mtim.tv_nsec = 0;
+        newNode->m_Metadata.AccessTime.tv_sec        = inodeMeta.AccessTime;
+        newNode->m_Metadata.AccessTime.tv_nsec       = 0;
+        newNode->m_Metadata.ChangeTime.tv_sec        = inodeMeta.CreationTime;
+        newNode->m_Metadata.ChangeTime.tv_nsec       = 0;
+        newNode->m_Metadata.ModificationTime.tv_sec  = inodeMeta.ModifiedTime;
+        newNode->m_Metadata.ModificationTime.tv_nsec = 0;
 
-        newNode->m_Populated             = false;
-        newNode->m_Meta                  = inodeMeta;
+        newNode->m_Meta                              = inodeMeta;
 
-        newEntry->Bind(newNode);
         e2node->InsertChild(newNode, newNode->Name());
 
         // TODO(v1tr10l7): resolve link
@@ -231,9 +235,8 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
         i += entry->Size;
     }
 
-    e2node->m_Populated = true;
     delete[] buffer;
-    return e2node->m_Populated;
+    return true;
 }
 
 void Ext2Fs::FreeINode(usize inode)

@@ -7,13 +7,19 @@
 #pragma once
 
 #include <Common.hpp>
+#include <Boot/BootMemoryInfo.hpp>
 
-namespace PhysicalMemoryManager
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Memory/Pointer.hpp>
+
+namespace PMM
 {
     constexpr usize     PAGE_SIZE = 0x1000;
 
-    CTOS_NO_KASAN bool  Initialize();
+    CTOS_NO_KASAN bool  Initialize(const MemoryMap& memoryMap);
     bool                IsInitialized();
+
+    Span<MemoryZone>  MemoryZones();
 
     CTOS_NO_KASAN void* AllocatePages(usize count = 1);
     CTOS_NO_KASAN void* CallocatePages(usize count = 1);
@@ -22,7 +28,7 @@ namespace PhysicalMemoryManager
     template <PointerHolder T>
     inline CTOS_NO_KASAN T AllocatePages(usize count = 1)
     {
-        if constexpr (std::is_same_v<T, Pointer>) return AllocatePages(count);
+        if constexpr (IsSameV<T, Pointer>) return AllocatePages(count);
 
         return reinterpret_cast<T>(AllocatePages(count));
     }
@@ -47,6 +53,4 @@ namespace PhysicalMemoryManager
     usize     GetTotalMemory();
     usize     GetFreeMemory();
     usize     GetUsedMemory();
-}; // namespace PhysicalMemoryManager
-
-namespace PMM = PhysicalMemoryManager;
+}; // namespace PMM

@@ -12,8 +12,6 @@ namespace Syscall
 {
     ErrorOr<isize> SysPipe(Arguments& args);
     ErrorOr<isize> SysNanoSleep(Arguments& args);
-    ErrorOr<isize> SysRmDir(Arguments& args);
-    ErrorOr<isize> SysCreat(Arguments& args);
     ErrorOr<isize> SysReadLink(Arguments& args);
     ErrorOr<isize> SysClockGetTime(Arguments& args);
 }; // namespace Syscall

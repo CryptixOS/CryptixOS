@@ -19,19 +19,17 @@
 #include <VFS/VFS.hpp>
 
 #include <cctype>
-#include <magic_enum/magic_enum.hpp>
-#include <unordered_map>
 
 namespace PCI
 {
-    static std::unordered_map<u32, HostController*> s_HostControllers;
+    static UnorderedMap<u32, HostController*> s_HostControllers;
     struct Vendor
     {
         String                          Name;
-        std::unordered_map<u16, String> DeviceIDs;
+        UnorderedMap<u16, String> DeviceIDs;
     };
 
-    std::unordered_map<u16, Vendor> s_VendorIDs;
+    UnorderedMap<u16, Vendor> s_VendorIDs;
 
     void                            ParseVendorID(StringView line)
     {
@@ -55,9 +53,10 @@ namespace PCI
     }
     void InitializeDatabase()
     {
-        PathView        path = "/usr/share/hwdata/pci.ids";
-        DirectoryEntry* entry
-            = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), path).Entry;
+        PathView path = "/usr/share/hwdata/pci.ids";
+        Ref entry = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), path)
+                        .value()
+                        .Entry;
         if (!entry) return;
 
         auto file = entry->INode();
@@ -134,7 +133,7 @@ namespace PCI
     void Initialize()
     {
         DetectControllers();
-        if (s_HostControllers.empty())
+        if (s_HostControllers.Empty())
         {
             Domain domain(0, 0, 32);
             s_HostControllers[0] = new HostController(domain, 0);
@@ -152,26 +151,21 @@ namespace PCI
                     addr, ToUnderlying(RegisterOffset::eDeviceID));
                 u8 classID = controller->Read<u8>(
                     addr, ToUnderlying(RegisterOffset::eClassID));
-                u8 subclassID = controller->Read<u8>(
+                u8 subClassID = controller->Read<u8>(
                     addr, ToUnderlying(RegisterOffset::eSubClassID));
 
-                auto       vendor     = s_VendorIDs.find(vendorID);
+                auto       vendor     = s_VendorIDs.Find(vendorID);
                 StringView vendorName = vendor != s_VendorIDs.end()
-                                          ? vendor->second.Name.View()
+                                          ? vendor->Value.Name.View()
                                           : "Unrecognized"_sv;
 
                 LogInfo(
                     "PCI: {:#x}:{:#x}:{:#x}, ID: {:#x}:{:#x}:{:#x}:{:#x} - {}",
                     addr.Bus, addr.Slot, addr.Function,
-                    static_cast<u16>(vendorID), deviceID, classID, subclassID,
+                    static_cast<u16>(vendorID), deviceID, classID, subClassID,
                     vendorName);
 
-                if (s_HostControllers[addr.Domain]->Read<u8>(
-                        addr, ToUnderlying(RegisterOffset::eClassID))
-                        == 0x01
-                    && s_HostControllers[addr.Domain]->Read<u8>(
-                           addr, ToUnderlying(RegisterOffset::eSubClassID))
-                           == 0x08)
+                if (classID == 0x01 && subClassID == 0x08)
                 {
                     LogInfo(
                         "NVMe{}: {{ Domain: {}, Bus: {}, Slot: {}, Function: "
@@ -194,7 +188,7 @@ namespace PCI
 
     HostController* GetHostController(u32 domain)
     {
-        Assert(s_HostControllers.contains(domain));
+        Assert(s_HostControllers.Contains(domain));
         return s_HostControllers[domain];
     }
     bool RegisterDriver(struct Driver& driver)
@@ -227,5 +221,17 @@ namespace PCI
         }
 
         return false;
+    }
+
+    Device* FindDeviceByID(const DeviceID& id)
+    {
+        for (const auto& [domain, controller] : s_HostControllers)
+        {
+            auto device = controller->FindDeviceByID(id);
+
+            if (device) return device;
+        }
+
+        return nullptr;
     }
 }; // namespace PCI

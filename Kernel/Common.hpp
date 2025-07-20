@@ -6,8 +6,6 @@
  */
 #pragma once
 
-#include <Arch/Arch.hpp>
-
 #include <Debug/Assertions.hpp>
 #include <Library/Logger.hpp>
 #include <Library/Stacktrace.hpp>
@@ -34,21 +32,8 @@
     #define DebugSyscall(...)
 #endif
 
-#define TryOrRet(...)                                                          \
+#define RetOnError(...)                                                        \
     {                                                                          \
         auto result = (__VA_ARGS__);                                           \
         if (!result) return Error(result.error());                             \
     }
-
-constexpr usize operator""_kib(unsigned long long count)
-{
-    return count * 1024;
-}
-constexpr usize operator""_mib(unsigned long long count)
-{
-    return count * 1024_kib;
-}
-constexpr usize operator""_gib(unsigned long long count)
-{
-    return count * 1024_mib;
-}

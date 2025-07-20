@@ -8,6 +8,7 @@
 
 #include <Prism/Core/Types.hpp>
 #include <Prism/Memory/Ref.hpp>
+#include <Prism/Core/Error.hpp>
 
 class Ps2Controller
 {

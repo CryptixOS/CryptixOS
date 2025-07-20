@@ -7,16 +7,18 @@
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/DevTmpFs/DevTmpFsINode.hpp>
 #include <VFS/DirectoryEntry.hpp>
+#include <VFS/VFS.hpp>
+#include <Time/Time.hpp>
 
-std::unordered_map<dev_t, Device*> DevTmpFs::s_Devices{};
+UnorderedMap<dev_t, Device*> DevTmpFs::s_Devices{};
 
 DevTmpFs::DevTmpFs(u32 flags)
     : Filesystem("DevTmpFs", flags)
 {
 }
 
-ErrorOr<DirectoryEntry*> DevTmpFs::Mount(StringView  sourcePath,
-                                         const void* data)
+ErrorOr<::Ref<DirectoryEntry>> DevTmpFs::Mount(StringView  sourcePath,
+                                               const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
@@ -25,57 +27,38 @@ ErrorOr<DirectoryEntry*> DevTmpFs::Mount(StringView  sourcePath,
     if (m_Root) VFS::RecursiveDelete(m_Root);
 
     m_RootEntry    = new DirectoryEntry(nullptr, "/");
-    auto maybeRoot = MkNod(nullptr, m_RootEntry, 0755 | S_IFDIR, 0);
-    if (!maybeRoot)
-    {
-        delete m_RootEntry;
-        return Error(maybeRoot.error());
-    }
+    auto maybeRoot = AllocateNode(m_RootEntry->Name(), 0755 | S_IFDIR);
+    RetOnError(maybeRoot);
 
-    m_Root = maybeRoot.value();
+    m_Root = maybeRoot.Value();
     m_RootEntry->Bind(m_Root);
 
     return m_RootEntry;
 }
 
-ErrorOr<INode*> DevTmpFs::CreateNode(INode* parent, DirectoryEntry* entry,
-                                     mode_t mode, uid_t uid, gid_t gid)
+ErrorOr<INode*> DevTmpFs::AllocateNode(StringView name, mode_t mode)
 {
-    auto inodeOr = MkNod(parent, entry, mode, 0);
-    auto inode   = inodeOr.value_or(nullptr);
-    if (!inode) return Error(inodeOr.error());
-
-    entry->Bind(inode);
-    return inode;
-}
-
-ErrorOr<INode*> DevTmpFs::Symlink(INode* parent, DirectoryEntry* entry,
-                                  StringView target)
-{
-    ToDo();
-
-    return nullptr;
-}
-INode* DevTmpFs::Link(INode* parent, StringView name, INode* oldNode)
-{
-    ToDo();
-
-    return nullptr;
-}
-
-ErrorOr<INode*> DevTmpFs::MkNod(INode* parent, DirectoryEntry* entry,
-                                mode_t mode, dev_t dev)
-{
-    auto inode = new DevTmpFsINode(entry->Name(), this, mode);
+    auto inode = new DevTmpFsINode(name, this, mode);
     if (!inode) return Error(ENOMEM);
-    entry->Bind(inode);
+    // TODO(v1tr10l7): uid, gid
 
-    if (parent) parent->InsertChild(inode, entry->Name());
+    inode->m_Metadata.ID               = NextINodeIndex();
+    inode->m_Metadata.BlockSize        = PMM::PAGE_SIZE;
+    inode->m_Metadata.BlockCount       = 0;
+    inode->m_Metadata.RootDeviceID     = 0;
 
-    auto it = s_Devices.find(dev);
-    if (it == s_Devices.end()) return inode;
+    auto currentTime                   = Time::GetReal();
+    inode->m_Metadata.AccessTime       = currentTime;
+    inode->m_Metadata.ModificationTime = currentTime;
+    inode->m_Metadata.ChangeTime       = currentTime;
 
-    inode->m_Device = it->second;
+    if (S_ISDIR(mode))
+    {
+        ++inode->m_Metadata.LinkCount;
+        inode->m_Metadata.Size = 2 * PMM::PAGE_SIZE;
+    }
+
+    // --m_FreeINodeCount;
     return inode;
 }
 
@@ -83,7 +66,7 @@ bool DevTmpFs::RegisterDevice(Device* device)
 {
     Assert(device);
 
-    if (s_Devices.contains(device->ID())) return false;
+    if (s_Devices.Contains(device->ID())) return false;
 
     s_Devices[device->ID()] = device;
     return true;

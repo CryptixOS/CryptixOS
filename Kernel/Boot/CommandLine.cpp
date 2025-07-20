@@ -7,20 +7,23 @@
 #include <Boot/CommandLine.hpp>
 
 #include <Library/Logger.hpp>
+
+#include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/String/String.hpp>
 
 #include <cctype>
-#include <unordered_map>
 
 namespace CommandLine
 {
-    static StringView                         s_KernelCommandLine = "";
-    static std::unordered_map<String, String> s_OptionMap;
+    static StringView                   s_KernelCommandLine = ""_sv;
+    static UnorderedMap<String, String> s_OptionMap;
 
-    void                                      ParseArguments(StringView args)
+    void                                ParseArguments(StringView args)
     {
-        std::unordered_map<String, String>& result = s_OptionMap;
-        usize                               pos    = 0;
+        UnorderedMap<String, String>& result = s_OptionMap;
+        usize                         pos    = 0;
+        if (args.StartsWith("\"")) args.RemovePrefix(1);
+        if (args.EndsWith("\"")) args.RemoveSuffix(1);
 
         while (pos < args.Size())
         {
@@ -70,9 +73,9 @@ namespace CommandLine
         LogTrace("CommandLine: Finished parsing the arguments");
     }
 
-    void Initialize()
+    void Initialize(StringView commandLine)
     {
-        s_KernelCommandLine = BootInfo::GetKernelCommandLine();
+        s_KernelCommandLine = commandLine;
 
         LogInfo("CommandLine: Parsing '{}'...", s_KernelCommandLine);
         ParseArguments(s_KernelCommandLine);
@@ -82,19 +85,21 @@ namespace CommandLine
             LogInfo("CommandLine: {} -> {}", arg, value);
     }
 
-    using namespace Prism::StringViewLiterals;
-    std::optional<bool> GetBoolean(StringView key)
-    {
-        auto it = s_OptionMap.find(String(key));
-        if (it != s_OptionMap.end())
-            return it->second == "true"_sv || it->second == "1"_sv;
+    StringView KernelCommandLine() { return s_KernelCommandLine; }
 
-        return std::nullopt;
+    bool       Contains(StringView key) { return s_OptionMap.Contains(key); }
+    Optional<bool> GetBoolean(StringView key)
+    {
+        auto it = s_OptionMap.Find(String(key));
+        if (it != s_OptionMap.end())
+            return it->Value == "true"_sv || it->Value == "1"_sv;
+
+        return NullOpt;
     }
     StringView GetString(StringView key)
     {
-        auto it = s_OptionMap.find(String(key));
-        if (it != s_OptionMap.end()) return it->second;
+        auto it = s_OptionMap.Find(String(key));
+        if (it != s_OptionMap.end()) return it->Value;
 
         return "";
     }

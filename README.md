@@ -39,6 +39,7 @@ Make sure the following tools are installed on your system:
 - QEMU (or Bochs) for emulation
 - Meson + Ninja (build system)
 - xbstrap + Python 3 (for sysroot management)
+- python-guestfs (for creating and formatting the root filesystem image)
 - xorriso (for ISO image creation)
 
 ## 📦 Setting Up the Sysroot
@@ -78,6 +79,7 @@ To run CryptixOS in QEMU:
 - ✅ PCI / ACPI / APIC / HPET / NVMe / PS/2
 - ✅ Multiple filesystems: ext2, tmpfs, procfs, fat32
 - ✅ Basic userland shell
+- ✅ Lazy Loading the pages 
 - ⏳ Signals, AHCI, and full networking coming soon
 - ⏳ Networking
 - ⏳ Module support
@@ -99,10 +101,9 @@ To run CryptixOS in QEMU:
 - [compiler-rt builtins](https://github.com/ilobilo/compiler-rt-builtins.git/) – Low-level runtime library for compiler support.
 - [demangler](https://github.com/ilobilo/demangler.git) - C++, Microsoft C++, Rust and DLang name demangler
 - [fmt](https://github.com/fmtlib/fmt) – Fast, type-safe formatting library (used instead of stdio or iostreams).
-- [libstdcxx-freestanding](https://github.com/ilobilo/libstdcxx-freestanding) - Headers from GCC's libstdc++ that can be used in a freestanding environment.
+- [freestnd-cxx-hdrs](https://codeberg.org/osdev/freestnd-cxx-hdrs.git) - Headers from GCC's libstdc++ that can be used in a freestanding environment.
 - [magic_enum](https://github.com/Neargye/magic_enum) - Header-only C++17 library provides static reflection for enums, work with any enum type without any macro or boilerplate code.
 - [OVMF binaries](https://retrage.github.io/edk2-nightly/) - Unofficial EDK2 nightly build
-- [parallel-hashmap](https://github.com/greg7mdp/parallel-hashmap) - A set of excellent hash map implementations, as well as a btree alternative to std::map and std::set
 - [uACPI](https://github.com/acpica/uacpi) - A portable and easy-to-integrate implementation of the Advanced Configuration and Power Interface (ACPI).
 
 ---
@@ -123,6 +124,22 @@ To run CryptixOS in QEMU:
 * Prefer Ref over raw pointers
 
 ## ✅ To-Do Tracker
+
+## Subsystems
+
+### Scheduler
+- ✅ Per-CPU Wait, Ready, Blocked Queues using IntrusiveLists
+- ✅ Multi-threading
+- ✅ SMP
+- ✅ WaitPid
+- ✅ Events
+
+### Memory Manager 
+- ✅ Physical Bitmap Allocator
+- ⬜ Physical Buddy Allocator
+- ✅ Virtual Memory Allocator, using Red-Black Tree
+- ✅ Heap Slab Allocator
+- ⬜ Heap Slob Allocator
 
 ## 🔌 Drivers
 
@@ -151,6 +168,7 @@ To run CryptixOS in QEMU:
 - ✅ PCIe
 - ✅ Device Tree
 - ✅ ACPI
+- ✅ Basic Power Management (Reboot, Shutdown)
 - ⬜ USB
 - ⬜ Embedded Controller
 

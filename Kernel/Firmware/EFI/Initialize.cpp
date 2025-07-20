@@ -4,42 +4,45 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/BootInfo.hpp>
+#include <Boot/BootMemoryInfo.hpp>
+#include <Debug/Debug.hpp>
 
 #include <Firmware/EFI/Memory.hpp>
+#include <Firmware/EFI/SystemTable.hpp>
 #include <Library/Logger.hpp>
 
 #include <Memory/VMM.hpp>
-
-#include <magic_enum/magic_enum.hpp>
+#include <Prism/String/StringUtils.hpp>
 
 namespace EFI
 {
-    bool Initialize()
-    {
-        auto firmwareType = BootInfo::GetFirmwareType();
-        if (firmwareType != FirmwareType::eUefi32
-            && firmwareType != FirmwareType::eUefi64)
-            return false;
+    SystemTable* g_SystemTable = nullptr;
 
+    bool         Initialize(Pointer systemTable, const EfiMemoryMap& memoryMap)
+    {
         LogTrace("EFI: Initializing...");
-        auto efiMemoryMapResponse = BootInfo::GetEfiMemoryMap();
-        if (!efiMemoryMapResponse)
+        if (!systemTable)
         {
-            LogError(
-                "EFI: Couldn't retrieve "
-                "limine_efi_memmap_response");
+            LogTrace("EFI: System table not available, aborting");
             return false;
         }
 
-        Pointer memoryMap      = efiMemoryMapResponse->memmap;
-        auto    memoryMapSize  = efiMemoryMapResponse->memmap_size;
-        auto    descriptorSize = efiMemoryMapResponse->desc_size;
+        g_SystemTable = systemTable.As<SystemTable>();
+        if (!memoryMap.Address)
+        {
+            LogError(
+                "EFI: Couldn't retrieve "
+                "the memory map");
+            return false;
+        }
+
+        auto    memoryMapSize  = memoryMap.Size;
+        auto    descriptorSize = memoryMap.DescriptorSize;
         usize   entryCount     = memoryMapSize / descriptorSize;
 
-        Pointer current        = efiMemoryMapResponse->memmap;
-        Pointer end            = memoryMap.Offset(memoryMapSize);
-        if (!memoryMap || entryCount == 0)
+        Pointer current        = memoryMap.Address;
+        Pointer end            = current.Offset(memoryMapSize);
+        if (!current || entryCount == 0)
         {
             return false;
             LogError("EFI: Couldn't acquire efi memory map");
@@ -59,16 +62,19 @@ namespace EFI
             usize      phys       = descriptor->PhysicalStart;
             usize      virt       = descriptor->VirtualStart;
             usize      pageCount  = descriptor->PageCount;
-            auto       attributes = std::to_underlying(descriptor->Attribute);
 
-            StringView typeString
-                = magic_enum::enum_name(type).data() ?: "Unknown";
-            if (typeString.StartsWith("e")) typeString = typeString.Raw() + 1;
+            StringView typeString = ToString(type);
+            if (typeString.Empty()) typeString = "Unknown"_sv;
+            if (typeString.StartsWith("e")) typeString.RemovePrefix(1);
+
+#if CTOS_DUMP_EFI_MEMORY_MAP
+            auto attributes = ToUnderlying(descriptor->Attribute);
 
             LogTrace(
                 "EFI: MemoryMap[{}] => {{ .Type: {}, .PhysicalStart: {:#x}, "
                 ".VirtualStart: {:#x}, .PageCount: {}, .Attributes: {:#b} }}",
                 i, typeString, phys, virt, pageCount, attributes);
+#endif
 
             if (type != MemoryType::eRuntimeServicesCode
                 && type != MemoryType::eRuntimeServicesData)

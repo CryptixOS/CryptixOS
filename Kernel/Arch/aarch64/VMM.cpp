@@ -9,6 +9,7 @@
 
 #include <Library/Locking/Spinlock.hpp>
 #include <Memory/VMM.hpp>
+#include <Memory/MM.hpp>
 
 struct [[gnu::packed]] TTBR
 {
@@ -112,7 +113,7 @@ namespace Arch::VMM
     static usize                     llPageSize        = 0;
 
     uintptr_t                        pteAddressMask    = 0;
-    uintptr_t                        g_DefaultPteFlags = VALID | TABLE;
+    u64                              g_DefaultPteFlags = VALID | TABLE;
 
     void                             Initialize()
     {
@@ -132,7 +133,7 @@ namespace Arch::VMM
         else if (mmfr0.tGran64 == 0b0000) pageSize = PAGE_SIZE_64KIB;
         else ::panic("VMM: Unknown page size");
 
-        if (BootInfo::GetPagingMode() == 1
+        if (MM::PagingMode() == PagingMode::eLevel5
             && (tcrEl1 & Bit(59) && featLpa
                 && ((pageSize == PAGE_SIZE_64KIB && featLva)
                     || (pageSize == PAGE_SIZE_16KIB && mmfr0.tGran16 == 0b0010)
@@ -204,96 +205,97 @@ namespace Arch::VMM
 }; // namespace Arch::VMM
 using namespace Arch::VMM;
 
-namespace VirtualMemoryManager
+namespace VMM
 {
     void SaveCurrentPageMap(PageMap& pageMap)
     {
         u64 value = 0;
         __asm__ volatile("mrs %0, ttbr0_el1" : "=r"(value));
-        pageMap.GetTopLevel()->ttbr0 = ToHigherHalfAddress<TTBR*>(value);
+        pageMap.TopLevel()->ttbr0 = ToHigherHalfAddress<TTBR*>(value);
         __asm__ volatile("mrs %0, ttbr1_el1" : "=r"(value));
-        pageMap.GetTopLevel()->ttbr1 = ToHigherHalfAddress<TTBR*>(value);
+        pageMap.TopLevel()->ttbr1 = ToHigherHalfAddress<TTBR*>(value);
     }
     void LoadPageMap(PageMap& pageMap, bool hh = true)
     {
         __asm__ volatile(
             "msr ttbr0_el1, %0" ::"r"(FromHigherHalfAddress<uintptr_t>(
-                reinterpret_cast<uintptr_t>(pageMap.GetTopLevel()->ttbr0))));
+                reinterpret_cast<uintptr_t>(pageMap.TopLevel()->ttbr0))));
         if (hh == true)
-            __asm__ volatile("msr ttbr1_el1, %0" ::"r"(
-                FromHigherHalfAddress<uintptr_t>(reinterpret_cast<uintptr_t>(
-                    pageMap.GetTopLevel()->ttbr1))));
+            __asm__ volatile(
+                "msr ttbr1_el1, %0" ::"r"(FromHigherHalfAddress<uintptr_t>(
+                    reinterpret_cast<uintptr_t>(pageMap.TopLevel()->ttbr1))));
     }
-}; // namespace VirtualMemoryManager
+}; // namespace VMM
 
-using namespace VirtualMemoryManager;
+using namespace VMM;
 
 PageMap::PageMap()
-    : topLevel(new PageTable{new TTBR, nullptr})
+    : m_TopLevel(new PageTable{new TTBR, nullptr})
 {
-    llPageSize     = Arch::VMM::pageSize * 512 * 512;
-    lPageSize      = Arch::VMM::pageSize * 512;
-    this->pageSize = Arch::VMM::pageSize;
+    llPageSize = Arch::VMM::pageSize * 512 * 512;
+    lPageSize  = Arch::VMM::pageSize * 512;
+    m_PageSize = Arch::VMM::pageSize;
 
-    if (!VMM::GetKernelPageMap()) topLevel->ttbr1 = new TTBR;
-    else topLevel->ttbr1 = VMM::GetKernelPageMap()->topLevel->ttbr1;
+    if (!VMM::GetKernelPageMap()) m_TopLevel->ttbr1 = new TTBR;
+    else m_TopLevel->ttbr1 = VMM::GetKernelPageMap()->m_TopLevel->ttbr1;
 }
 
 bool            PageTableEntry::IsValid() { return GetFlag(VALID); }
 bool            PageTableEntry::IsLarge() { return !GetFlag(TABLE); }
 
-PageTableEntry* PageMap::Virt2Pte(PageTable* topLevel, uintptr_t virt,
+PageTableEntry* PageMap::Virt2Pte(PageTable* topLevel, Pointer virt,
                                   bool allocate, u64 pageSize)
 {
-    usize pml5Entry = (virt & (0x1ffull << 48)) >> 48;
-    usize pml4Entry = (virt & (0x1ffull << 39)) >> 39;
-    usize pml3Entry = (virt & (0x1ffull << 30)) >> 30;
-    usize pml2Entry = (virt & (0x1ffull << 21)) >> 21;
-    usize pml1Entry = (virt & (0x1ffull << 12)) >> 12;
+    usize pml5Entry = (virt.Raw() & (0x1ffull << 48)) >> 48;
+    usize pml4Entry = (virt.Raw() & (0x1ffull << 39)) >> 39;
+    usize pml3Entry = (virt.Raw() & (0x1ffull << 30)) >> 30;
+    usize pml2Entry = (virt.Raw() & (0x1ffull << 21)) >> 21;
+    usize pml1Entry = (virt.Raw() & (0x1ffull << 12)) >> 12;
 
-    TTBR* half = (virt & (1ull << 63ull)) ? topLevel->ttbr1 : topLevel->ttbr0;
+    TTBR* half
+        = (virt.Raw() & (1ull << 63ull)) ? topLevel->ttbr1 : topLevel->ttbr0;
     if (!half) return nullptr;
 
-    TTBR* pml4 = static_cast<TTBR*>(
-        (BootInfo::GetPagingMode() == 1)
-            ? GetNextLevel(half->entries[pml5Entry], allocate)
-            : half);
+    TTBR* pml4
+        = static_cast<TTBR*>((MM::PagingMode() == PagingMode::eLevel5)
+                                 ? NextLevel(half->entries[pml5Entry], allocate)
+                                 : half);
     if (!pml4) return nullptr;
 
     TTBR* pml3 = static_cast<TTBR*>(
-        GetNextLevel(pml4->entries[pml4Entry], allocate, pageSize));
+        NextLevel(pml4->entries[pml4Entry], allocate, pageSize));
     if (!pml3) return nullptr;
     if (pageSize == llPageSize /*|| pml3->entries[pml3Entry].IsLarge()*/)
         return &pml3->entries[pml3Entry];
 
     TTBR* pml2 = static_cast<TTBR*>(
-        GetNextLevel(pml3->entries[pml3Entry], allocate, virt));
+        NextLevel(pml3->entries[pml3Entry], allocate, virt));
     if (!pml2) return nullptr;
 
     if (pageSize == lPageSize /*|| pml2->entries[pml2Entry].IsLarge()*/)
         return &pml2->entries[pml2Entry];
 
     TTBR* pml1 = static_cast<TTBR*>(
-        GetNextLevel(pml2->entries[pml2Entry], allocate, virt));
+        NextLevel(pml2->entries[pml2Entry], allocate, virt));
     if (!pml1) return nullptr;
 
     return &pml1->entries[pml1Entry];
 }
 
-uintptr_t PageMap::Virt2Phys(uintptr_t virt, PageAttributes flags)
+Pointer PageMap::Virt2Phys(Pointer virt, PageAttributes flags)
 {
     ScopedLock      guard(m_Lock);
 
     auto            pSize    = GetPageSize(flags);
-    PageTableEntry* pmlEntry = Virt2Pte(topLevel, virt, false, pSize);
-    if (!pmlEntry || !pmlEntry->GetFlag(VALID)) return -1;
+    PageTableEntry* pmlEntry = Virt2Pte(m_TopLevel, virt, false, pSize);
+    if (!pmlEntry || !pmlEntry->GetFlag(VALID)) return u64(-1);
 
-    return pmlEntry->GetAddress() + (virt % pSize);
+    return pmlEntry->Address() + (virt % pSize);
 }
-bool PageMap::InternalMap(uintptr_t virt, uintptr_t phys, PageAttributes flags)
+bool PageMap::InternalMap(Pointer virt, Pointer phys, PageAttributes flags)
 {
     PageTableEntry* pmlEntry
-        = Virt2Pte(topLevel, virt, true, GetPageSize(flags));
+        = Virt2Pte(m_TopLevel, virt, true, GetPageSize(flags));
     if (!pmlEntry)
     {
         LogError("VMM: Could not get page map entry for address {:#x}", virt);
@@ -308,10 +310,10 @@ bool PageMap::InternalMap(uintptr_t virt, uintptr_t phys, PageAttributes flags)
     return true;
 }
 
-bool PageMap::InternalUnmap(uintptr_t virt, PageAttributes flags)
+bool PageMap::InternalUnmap(Pointer virt, PageAttributes flags)
 {
     PageTableEntry* pmlEntry
-        = Virt2Pte(topLevel, virt, false, GetPageSize(flags));
+        = Virt2Pte(m_TopLevel, virt, false, GetPageSize(flags));
     if (!pmlEntry)
     {
         LogError("VMM: Could not get page map entry for address 0x{:X}", virt);
@@ -320,7 +322,7 @@ bool PageMap::InternalUnmap(uintptr_t virt, PageAttributes flags)
 
     pmlEntry->Clear();
 
-    usize addr = (0ull << 48ull) | (virt >> 12ul);
+    usize addr = (0ull << 48ull) | (virt.Raw() >> 12ul);
     __asm__ volatile(
         "dsb st; \n\t"
         "tlbi vale1, %0;\n\t"
@@ -329,10 +331,10 @@ bool PageMap::InternalUnmap(uintptr_t virt, PageAttributes flags)
     return true;
 }
 
-bool PageMap::SetFlags(uintptr_t virt, PageAttributes flags)
+bool PageMap::SetFlags(Pointer virt, PageAttributes flags)
 {
     PageTableEntry* pmlEntry
-        = Virt2Pte(topLevel, virt, false, GetPageSize(flags));
+        = Virt2Pte(m_TopLevel, virt, false, GetPageSize(flags));
     if (!pmlEntry)
     {
         LogError("VMM: Could not get page map entry for address {:#x}", virt);
@@ -340,7 +342,7 @@ bool PageMap::SetFlags(uintptr_t virt, PageAttributes flags)
     }
 
     auto nativeFlags = ToNativeFlags(flags);
-    auto addr        = pmlEntry->GetAddress();
+    auto addr        = pmlEntry->Address();
 
     pmlEntry->Clear();
     pmlEntry->SetAddress(addr);

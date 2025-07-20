@@ -81,7 +81,7 @@ namespace
         s_PCSpeaker = new PCSpeakerDevice();
         if (!s_PCSpeaker) return Error(ENOMEM);
 
-        TryOrRet(DeviceManager::RegisterCharDevice(s_PCSpeaker));
+        RetOnError(DeviceManager::RegisterCharDevice(s_PCSpeaker));
         return {};
     }
 

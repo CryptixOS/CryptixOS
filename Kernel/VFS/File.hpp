@@ -12,28 +12,32 @@
 
 #include <Library/UserBuffer.hpp>
 #include <Prism/Containers/Deque.hpp>
+#include <Prism/Core/Error.hpp>
 
+class INode;
+class DirectoryEntry;
 class File
 {
   public:
+    File() = default;
+    File(class INode* inode);
+
     virtual ~File() = default;
 
-    virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
-                                isize offset = -1)
+    virtual class INode*        INode() const;
+
+    virtual usize               Size() const;
+
+    virtual ErrorOr<isize>      Read(const UserBuffer& out, usize count,
+                                     isize offset = -1);
+    virtual ErrorOr<isize>      Write(const UserBuffer& in, usize count,
+                                      isize offset = -1);
+    virtual ErrorOr<const stat> Stat() const;
+    virtual ErrorOr<isize>      Seek(i32 whence, off_t offset)
     {
         return Error(ENOSYS);
     }
-    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
-                                 isize offset = -1)
-    {
-        return Error(ENOSYS);
-    }
-    virtual ErrorOr<const stat*> Stat() const { return Error(ENOSYS); }
-    virtual ErrorOr<isize>       Seek(i32 whence, off_t offset)
-    {
-        return Error(ENOSYS);
-    }
-    virtual ErrorOr<isize> Truncate(off_t size) { return Error(ENOSYS); }
+    virtual ErrorOr<isize> Truncate(off_t size);
 
     virtual bool           IsCharDevice() const { return false; }
     virtual bool           IsFifo() const { return false; }
@@ -43,4 +47,7 @@ class File
     virtual bool           IsSocket() const { return false; }
 
   private:
+    Spinlock                    m_Lock;
+    CTOS_UNUSED DirectoryEntry* m_DirectoryEntry = nullptr;
+    CTOS_UNUSED class INode*    m_INode          = nullptr;
 };

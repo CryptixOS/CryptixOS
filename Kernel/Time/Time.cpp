@@ -7,8 +7,8 @@
 #include <Arch/Arch.hpp>
 #include <Debug/Assertions.hpp>
 
-#include <Library/Logger.hpp>
 #include <Library/Locking/Spinlock.hpp>
+#include <Library/Logger.hpp>
 
 #include <Prism/Containers/Deque.hpp>
 #include <Prism/Utility/Time.hpp>
@@ -26,13 +26,13 @@ namespace Time
             Arm();
         }
 
-        std::optional<usize> Index = std::nullopt;
-        bool                 Fired = false;
-        timespec             When  = {0, 0};
-        Event                Event;
+        Optional<usize> Index = NullOpt;
+        bool            Fired = false;
+        timespec        When  = {0, 0};
+        Event           Event;
 
-        void                 Arm();
-        void                 Disarm();
+        void            Arm();
+        void            Disarm();
     };
 
     namespace
@@ -63,16 +63,14 @@ namespace Time
             if (*it == this) break;
 
         if (it != s_ArmedTimers.end()) s_ArmedTimers.Erase(it);
-        Index = std::nullopt;
+        Index = NullOpt;
     }
 
-    void Initialize()
+    void Initialize(DateTime dateAtBoot)
     {
-        s_BootTime = BootInfo::GetDateAtBoot();
-        DateTime dateAtBoot(s_BootTime);
+        s_BootTime = dateAtBoot.ToEpoch() * 1'000'000'000;
         LogInfo("Time: Boot Date: {}", dateAtBoot);
 
-        s_BootTime  = s_BootTime * 1'000'000'000;
         auto now    = static_cast<usize>(Arch::GetEpoch());
         s_RealTime  = now * 1'000'000'000;
         s_Monotonic = s_RealTime;

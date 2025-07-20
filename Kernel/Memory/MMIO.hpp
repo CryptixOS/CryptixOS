@@ -11,18 +11,16 @@
 #include <Prism/Core/Types.hpp>
 #include <Prism/Memory/Pointer.hpp>
 
-#include <concepts>
-
 namespace MMIO
 {
-    template <std::unsigned_integral T>
+    template <UnsignedIntegral T>
     inline static T Read(Pointer address)
     {
         volatile T* reg = address.As<volatile T>();
 
         return *reg;
     }
-    template <std::unsigned_integral T>
+    template <UnsignedIntegral T>
     inline static void Write(Pointer address, T value)
     {
         volatile T* reg = address.As<volatile T>();

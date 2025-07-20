@@ -16,62 +16,54 @@ Ext2FsINode::Ext2FsINode(StringView name, Ext2Fs* fs, mode_t mode)
     : INode(name, fs)
     , m_Fs(fs)
 {
-    m_Stats.st_dev     = fs->DeviceID();
-    m_Stats.st_ino     = fs->NextINodeIndex();
-    m_Stats.st_mode    = mode;
-    m_Stats.st_nlink   = 1;
-    m_Stats.st_uid     = 0;
-    m_Stats.st_gid     = 0;
-    m_Stats.st_rdev    = 0;
-    m_Stats.st_size    = 0;
-    m_Stats.st_blksize = m_Fs->GetBlockSize();
-    m_Stats.st_blocks  = 0;
+    m_Metadata.DeviceID         = fs->DeviceID();
+    m_Metadata.ID               = fs->NextINodeIndex();
+    m_Metadata.Mode             = mode;
+    m_Metadata.LinkCount        = 1;
+    m_Metadata.UID              = 0;
+    m_Metadata.GID              = 0;
+    m_Metadata.RootDeviceID     = 0;
+    m_Metadata.Size             = 0;
+    m_Metadata.BlockSize        = m_Fs->GetBlockSize();
+    m_Metadata.BlockCount       = 0;
 
-    m_Stats.st_atim    = Time::GetReal();
-    m_Stats.st_ctim    = Time::GetReal();
-    m_Stats.st_mtim    = Time::GetReal();
+    m_Metadata.AccessTime       = Time::GetReal();
+    m_Metadata.ChangeTime       = Time::GetReal();
+    m_Metadata.ModificationTime = Time::GetReal();
 }
 
-ErrorOr<void> Ext2FsINode::TraverseDirectories(class DirectoryEntry* parent,
-                                               DirectoryIterator     iterator)
+ErrorOr<void> Ext2FsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
+                                               DirectoryIterator iterator)
 {
-    m_Filesystem->Populate(parent);
+    LogTrace("Ext2fs: Traversing directories");
+    m_Fs->ReadINodeEntry(&m_Meta, m_Metadata.ID);
 
-    usize offset = 0;
-    for (const auto [name, inode] : Children())
-    {
-        usize  ino  = inode->Stats().st_ino;
-        mode_t mode = inode->Stats().st_mode;
-        auto   type = IF2DT(mode);
+    u8* buffer = new u8[m_Meta.GetSize()];
+    m_Fs->ReadINode(m_Meta, buffer, 0, m_Meta.GetSize());
 
-        if (!iterator(name, offset, ino, type)) break;
-        ++offset;
-    }
+    usize bufferOffset = 0;
+    usize i            = 0;
 
-    return {};
-}
-INode* Ext2FsINode::Lookup(const String& name)
-{
-    Ext2FsINodeMeta meta;
-    m_Fs->ReadINodeEntry(&meta, m_Stats.st_ino);
-
-    usize pageCount = Math::DivRoundUp(meta.GetSize(), PMM::PAGE_SIZE);
-    u8*   buffer = Pointer(PMM::CallocatePages(pageCount)).ToHigherHalf<u8*>();
-    m_Fs->ReadINode(meta, buffer, 0, meta.GetSize());
-
-    for (usize i = 0; i < meta.GetSize();)
+    LogTrace("Ext2Fs: Reading children directory entries of {}", Name());
+    for (bufferOffset = 0, i = 0; bufferOffset < m_Meta.GetSize(); i++)
     {
         Ext2FsDirectoryEntry* entry
-            = reinterpret_cast<Ext2FsDirectoryEntry*>(buffer + i);
+            = reinterpret_cast<Ext2FsDirectoryEntry*>(buffer + bufferOffset);
+        if (i < m_DirectoryOffset) continue;
 
         char* nameBuffer = new char[entry->NameSize + 1];
         std::strncpy(nameBuffer, reinterpret_cast<char*>(entry->Name),
                      entry->NameSize);
         nameBuffer[entry->NameSize] = 0;
-
-        if (std::strncmp(nameBuffer, name.Raw(), name.Size()) != 0)
+        if (entry->INodeIndex == 0)
         {
-            i += entry->Size;
+            delete[] nameBuffer;
+            bufferOffset += entry->Size;
+            continue;
+        }
+        if (!std::strcmp(nameBuffer, ".") && !std::strcmp(nameBuffer, ".."))
+        {
+            bufferOffset += entry->Size;
             continue;
         }
 
@@ -97,36 +89,77 @@ INode* Ext2FsINode::Lookup(const String& name)
                 break;
         }
 
-        Ext2FsINode* newNode      = new Ext2FsINode(nameBuffer, m_Fs, mode);
-        newNode->m_Stats.st_uid   = inodeMeta.UID;
-        newNode->m_Stats.st_gid   = inodeMeta.GID;
-        newNode->m_Stats.st_ino   = entry->INodeIndex;
-        newNode->m_Stats.st_size  = inodeMeta.GetSize();
-        newNode->m_Stats.st_nlink = inodeMeta.HardLinkCount;
-        newNode->m_Stats.st_blocks
-            = newNode->m_Stats.st_size / m_Fs->GetBlockSize();
+        Ext2FsINode* newNode          = new Ext2FsINode(nameBuffer, m_Fs, mode);
+        newNode->m_Metadata.UID       = inodeMeta.UID;
+        newNode->m_Metadata.GID       = inodeMeta.GID;
+        newNode->m_Metadata.ID        = entry->INodeIndex;
+        newNode->m_Metadata.Size      = inodeMeta.GetSize();
+        newNode->m_Metadata.LinkCount = inodeMeta.HardLinkCount;
+        newNode->m_Metadata.BlockCount
+            = newNode->m_Metadata.Size / m_Fs->GetBlockSize();
 
-        newNode->m_Stats.st_atim.tv_sec  = inodeMeta.AccessTime;
-        newNode->m_Stats.st_atim.tv_nsec = 0;
-        newNode->m_Stats.st_ctim.tv_sec  = inodeMeta.CreationTime;
-        newNode->m_Stats.st_ctim.tv_nsec = 0;
-        newNode->m_Stats.st_mtim.tv_sec  = inodeMeta.ModifiedTime;
-        newNode->m_Stats.st_mtim.tv_nsec = 0;
+        newNode->m_Metadata.AccessTime.tv_sec        = inodeMeta.AccessTime;
+        newNode->m_Metadata.AccessTime.tv_nsec       = 0;
+        newNode->m_Metadata.ChangeTime.tv_sec        = inodeMeta.CreationTime;
+        newNode->m_Metadata.ChangeTime.tv_nsec       = 0;
+        newNode->m_Metadata.ModificationTime.tv_sec  = inodeMeta.ModifiedTime;
+        newNode->m_Metadata.ModificationTime.tv_nsec = 0;
 
-        newNode->m_Populated             = false;
-        newNode->m_Meta                  = inodeMeta;
+        newNode->m_Meta                              = inodeMeta;
+        LogTrace(
+            "Ext2Fs: New Ext2FsINode =>\n"
+            "\tname => {}\n"
+            "\tid => {}\n"
+            "index => {}\n",
+            newNode->Name(), newNode->m_Metadata.ID, i);
+
         InsertChild(newNode, newNode->Name());
 
-        // TODO(v1tr10l7): Resolve symlink
+        // TODO(v1tr10l7): resolve link
         if (newNode->IsSymlink())
             ;
 
         delete[] nameBuffer;
-        PMM::FreePages(Pointer(buffer).FromHigherHalf(), pageCount);
-        return newNode;
+        bufferOffset += entry->Size;
+
+        auto type   = IF2DT(mode);
+        auto offset = m_DirectoryOffset;
+        ++m_DirectoryOffset;
+
+        if (!iterator(newNode->Name(), offset, newNode->m_Metadata.ID, type))
+            break;
     }
 
-    return nullptr;
+    if (bufferOffset == m_Meta.GetSize()) m_DirectoryOffset = 0;
+    delete[] buffer;
+
+    return {};
+}
+ErrorOr<Ref<DirectoryEntry>> Ext2FsINode::Lookup(Ref<DirectoryEntry> dentry)
+{
+    auto iterator
+        = [&](StringView name, loff_t offset, usize ino, usize type) -> bool
+    {
+        if (name == dentry->Name()) return false;
+
+        return true;
+    };
+
+    Delegate<bool(StringView, loff_t, usize, usize)> delegate;
+    delegate.BindLambda(iterator);
+
+    LogTrace("Ext2Fs: Looking up an inode => `{}`", dentry->Name());
+    TraverseDirectories(dentry->Parent().Promote(), delegate);
+
+    for (const auto& [name, inode] : Children())
+    {
+        if (name != inode->Name()) continue;
+
+        dentry->Bind(inode);
+        return dentry;
+    }
+
+    return Error(ENOENT);
 }
 
 void Ext2FsINode::InsertChild(INode* node, StringView name)
@@ -137,60 +170,62 @@ void Ext2FsINode::InsertChild(INode* node, StringView name)
 isize Ext2FsINode::Read(void* buffer, off_t offset, usize bytes)
 {
     ScopedLock guard(m_Lock);
-    m_Fs->ReadINodeEntry(&m_Meta, m_Stats.st_ino);
+    m_Fs->ReadINodeEntry(&m_Meta, m_Metadata.ID);
 
-    if (static_cast<isize>(offset + bytes) > m_Stats.st_size)
-        bytes = bytes - ((offset + bytes) - m_Stats.st_size);
+    if (offset + bytes > m_Metadata.Size)
+        bytes = bytes - ((offset + bytes) - m_Metadata.Size);
 
-    m_Stats.st_atim   = Time::GetReal();
-    m_Meta.AccessTime = m_Stats.st_atim.tv_sec;
-    m_Fs->WriteINodeEntry(m_Meta, m_Stats.st_ino);
+    m_Metadata.AccessTime = Time::GetReal();
+    m_Meta.AccessTime     = m_Metadata.AccessTime.tv_sec;
+    m_Fs->WriteINodeEntry(m_Meta, m_Metadata.ID);
 
     return m_Fs->ReadINode(m_Meta, reinterpret_cast<u8*>(buffer), offset,
                            bytes);
 }
 
+/*
 ErrorOr<void> Ext2FsINode::ChMod(mode_t mode)
 {
     ScopedLock guard(m_Lock);
-    m_Fs->ReadINodeEntry(&m_Meta, m_Stats.st_ino);
+    m_Fs->ReadINodeEntry(&m_Meta, m_Metadata.ID);
 
     m_Meta.Permissions &= ~0777;
     m_Meta.Permissions |= mode & 0777;
 
-    m_Fs->WriteINodeEntry(m_Meta, m_Stats.st_ino);
+    m_Fs->WriteINodeEntry(m_Meta, m_Metadata.ID);
 
-    m_Stats.st_mode &= ~0777;
-    m_Stats.st_mode |= mode & 0777;
+    m_Metadata.Mode &= ~0777;
+    m_Metadata.Mode |= mode & 0777;
 
     return {};
 }
+*/
 
 void Ext2FsINode::Initialize(ino_t index, mode_t mode, u16 type)
 {
-    m_Stats.st_dev                  = m_Fs->DeviceID();
-    m_Stats.st_ino                  = index;
-    m_Stats.st_nlink                = 1;
-    m_Stats.st_mode                 = mode;
+    m_Metadata.DeviceID             = m_Fs->DeviceID();
+    m_Metadata.ID                   = index;
+    m_Metadata.LinkCount            = 1;
+    m_Metadata.Mode                 = mode;
     // TODO(v1tr10l7): Credentials
-    m_Stats.st_uid                  = 0;
-    m_Stats.st_gid                  = 0;
-    m_Stats.st_rdev                 = 0;
-    m_Stats.st_size                 = 0;
-    m_Stats.st_blksize              = m_Fs->GetBlockSize();
-    m_Stats.st_blocks               = 0;
+    m_Metadata.UID                  = 0;
+    m_Metadata.GID                  = 0;
+    m_Metadata.RootDeviceID         = 0;
+    m_Metadata.Size                 = 0;
+    m_Metadata.BlockSize            = m_Fs->GetBlockSize();
+    m_Metadata.BlockCount           = 0;
     // TODO(v1tr10l7): atim, mtim, ctim
 
     m_Meta.Permissions              = (mode & 0xfff) | type;
-    m_Meta.UID                      = m_Stats.st_uid;
+    m_Meta.UID                      = m_Metadata.UID;
     m_Meta.SizeLow                  = 0;
     // TODO(v1tr10l7): Update UTimes
     m_Meta.AccessTime               = 0;
     m_Meta.CreationTime             = 0;
     m_Meta.ModifiedTime             = 0;
     m_Meta.DeletedTime              = 0;
-    m_Meta.GID                      = m_Stats.st_gid;
-    m_Meta.HardLinkCount            = m_Stats.st_nlink;
+    m_Meta.GID                      = m_Metadata.GID;
+    m_Meta.HardLinkCount            = m_Metadata.LinkCount;
     m_Meta.SectorCount              = 0;
     m_Meta.Flags                    = 0;
     m_Meta.OperatingSystemSpecific1 = 0;
@@ -205,7 +240,7 @@ void Ext2FsINode::Initialize(ino_t index, mode_t mode, u16 type)
 }
 ErrorOr<void> Ext2FsINode::AddDirectoryEntry(Ext2FsDirectoryEntry& dentry)
 {
-    m_Fs->ReadINodeEntry(&m_Meta, m_Stats.st_ino);
+    m_Fs->ReadINodeEntry(&m_Meta, m_Metadata.ID);
 
     usize pageCount = Math::DivRoundUp(m_Meta.GetSize(), PMM::PAGE_SIZE);
     auto  buffer = Pointer(PMM::CallocatePages(pageCount)).ToHigherHalf<u8*>();
@@ -239,7 +274,7 @@ ErrorOr<void> Ext2FsINode::AddDirectoryEntry(Ext2FsDirectoryEntry& dentry)
             std::strncpy(reinterpret_cast<char*>(entry->Name),
                          reinterpret_cast<char*>(dentry.Name), nameSize + 1);
 
-            m_Fs->WriteINode(m_Meta, buffer, m_Stats.st_ino, 0,
+            m_Fs->WriteINode(m_Meta, buffer, m_Metadata.ID, 0,
                              m_Meta.GetSize());
             PMM::FreePages(Pointer(buffer).FromHigherHalf(), pageCount);
             return {};
@@ -270,7 +305,7 @@ ErrorOr<void> Ext2FsINode::AddDirectoryEntry(Ext2FsDirectoryEntry& dentry)
     std::strncpy(reinterpret_cast<char*>(entry->Name),
                  reinterpret_cast<char*>(dentry.Name), nameSize + 1);
 
-    m_Fs->WriteINode(m_Meta, buffer, m_Stats.st_ino, 0, m_Meta.GetSize());
+    m_Fs->WriteINode(m_Meta, buffer, m_Metadata.ID, 0, m_Meta.GetSize());
     PMM::FreePages(buffer, pageCount);
 
     return {};

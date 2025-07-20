@@ -8,12 +8,14 @@
 
 #include <Prism/Core/Types.hpp>
 #include <Prism/String/StringView.hpp>
+#include <Prism/Utility/Optional.hpp>
 
 namespace CommandLine
 {
-    void                Initialize();
+    void           Initialize(StringView commandLine);
 
-    bool                Contains(StringView key);
-    StringView          GetString(StringView key);
-    std::optional<bool> GetBoolean(StringView key);
+    StringView     KernelCommandLine();
+    bool           Contains(StringView key);
+    Optional<bool> GetBoolean(StringView key);
+    StringView     GetString(StringView key);
 }; // namespace CommandLine

@@ -8,11 +8,10 @@
 
 #include <Debug/Panic.hpp>
 
-namespace PhysicalMemoryManager
+namespace PMM
 {
     extern bool IsInitialized();
 }
-namespace PMM = PhysicalMemoryManager;
 
 #define ExpectInterrupts(expected) Assert(CPU::GetInterruptFlag() == expected)
 #define AssertPMM_Ready()          Assert(PMM::IsInitialized())

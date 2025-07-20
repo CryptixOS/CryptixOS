@@ -12,49 +12,107 @@
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptManager.hpp>
 
+#include <Boot/BootInfo.hpp>
 #include <Boot/CommandLine.hpp>
 
-#include <Drivers/FramebufferDevice.hpp>
 #include <Drivers/MemoryDevices.hpp>
 #include <Drivers/PCI/PCI.hpp>
 #include <Drivers/Serial.hpp>
 #include <Drivers/TTY.hpp>
 #include <Drivers/Terminal.hpp>
+#include <Drivers/USB/USB.hpp>
+#include <Drivers/Video/FramebufferDevice.hpp>
 
 #include <Firmware/ACPI/ACPI.hpp>
+#include <Firmware/DMI/SMBIOS.hpp>
 #include <Firmware/DeviceTree/DeviceTree.hpp>
-#include <Firmware/SMBIOS/SMBIOS.hpp>
 
-#include <Library/ELF.hpp>
+#include <Library/ExecutableProgram.hpp>
 #include <Library/ICxxAbi.hpp>
 #include <Library/Image.hpp>
 #include <Library/Module.hpp>
 #include <Library/Stacktrace.hpp>
 
+#include <Memory/MM.hpp>
 #include <Memory/PMM.hpp>
+#include <Memory/ScopedMapping.hpp>
 #include <Memory/VMM.hpp>
+
+#include <Memory/Allocator/KernelHeap.hpp>
 
 #include <Prism/Containers/Array.hpp>
 #include <Prism/Containers/RedBlackTree.hpp>
-#include <Prism/Delegate.hpp>
 #include <Prism/Memory/Endian.hpp>
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/String/StringView.hpp>
+#include <Prism/Utility/Delegate.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
+#include <System/System.hpp>
+#include <Time/Time.hpp>
+
+#include <VFS/Filesystem.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/Initrd/Initrd.hpp>
 #include <VFS/MountPoint.hpp>
 #include <VFS/VFS.hpp>
 
-#include <magic_enum/magic_enum.hpp>
+#include <VFS/DevTmpFs/DevTmpFs.hpp>
+#include <VFS/EchFs/EchFs.hpp>
+#include <VFS/Ext2Fs/Ext2Fs.hpp>
+#include <VFS/Fat32Fs/Fat32Fs.hpp>
+#include <VFS/ProcFs/ProcFs.hpp>
+#include <VFS/TmpFs/TmpFs.hpp>
 
 namespace EFI
 {
-    bool Initialize();
+    bool Initialize(Pointer systemTable, const EfiMemoryMap& memoryMap);
 };
+bool g_LogTmpFs = false;
+
+template <typename T>
+void registerFilesystem(StringView name)
+{
+    auto fs            = CreateRef<FilesystemDriver>();
+
+    fs->Owner          = nullptr;
+    fs->FilesystemName = name;
+    fs->FlagsMask      = 0;
+
+    fs->Instantiate    = []() -> ErrorOr<Ref<Filesystem>> { return new T(0); };
+    fs->Destroy        = [](Ref<Filesystem>) -> ErrorOr<void> { return {}; };
+
+    VFS::RegisterFilesystem(fs);
+}
+
+void registerFilesystems()
+{
+    registerFilesystem<TmpFs>("tmpfs");
+    registerFilesystem<DevTmpFs>("devtmpfs");
+    registerFilesystem<ProcFs>("procfs");
+    registerFilesystem<Fat32Fs>("fat32fs");
+    registerFilesystem<Ext2Fs>("ext2fs");
+    registerFilesystem<EchFs>("echfs");
+}
+
+static void eternal()
+{
+    for (;;)
+    {
+        auto status = Time::NanoSleep(1000 * 1000 * 5);
+        if (!status)
+        {
+            LogError("Sleeping failed");
+            Process::Current()->Exit(-1);
+        }
+
+        LogTrace("Kernel thread");
+        Arch::Pause();
+    }
+}
 
 static bool loadInitProcess(Path initPath)
 {
@@ -68,30 +126,22 @@ static bool loadInitProcess(Path initPath)
     Vector<StringView> envp;
     envp.PushBack("TERM=linux");
 
-    static ELF::Image program, ld;
-    PageMap*          pageMap = new PageMap();
-    if (!program.Load(initPath, pageMap, userProcess->GetAddressSpace()))
+    static ExecutableProgram program;
+    PageMap*                 pageMap = new PageMap();
+    if (!program.Load(initPath, pageMap, userProcess->AddressSpace()))
         return false;
-    PathView ldPath = program.GetLdPath();
-    if (!ldPath.Empty()
-        && !ld.Load(ldPath, pageMap, userProcess->GetAddressSpace(),
-                    0x40000000))
-    {
-        delete pageMap;
-        return false;
-    }
-    userProcess->PageMap = pageMap;
-    auto address
-        = ldPath.Empty() ? program.GetEntryPoint() : ld.GetEntryPoint();
-    if (!address)
-    {
-        delete pageMap;
-        return false;
-    }
 
+    userProcess->PageMap = pageMap;
     Logger::DisableSink(LOG_SINK_TERMINAL);
-    auto userThread = userProcess->CreateThread(address, argv, envp, program,
-                                                CPU::GetCurrent()->ID);
+    auto userThread
+        = userProcess->CreateThread(argv, envp, program, CPU::GetCurrent()->ID);
+    VMM::UnmapKernelInitCode();
+
+    (void)eternal;
+    auto colonel   = Scheduler::GetKernelProcess();
+    auto newThread = colonel->CreateThread(reinterpret_cast<uintptr_t>(eternal),
+                                           false, CPU::Current()->ID);
+    Scheduler::EnqueueThread(newThread);
     Scheduler::EnqueueThread(userThread);
 
     return true;
@@ -99,81 +149,54 @@ static bool loadInitProcess(Path initPath)
 
 static void kernelThread()
 {
+    registerFilesystems();
     Assert(VFS::MountRoot("tmpfs"));
     Initrd::Initialize();
 
-    VFS::CreateNode(nullptr, "/dev", 0755 | S_IFDIR);
+    VFS::CreateDirectory("/dev", 0755 | S_IFDIR);
     Assert(VFS::Mount(nullptr, "", "/dev", "devtmpfs"));
 
     Scheduler::InitializeProcFs();
 
     Arch::ProbeDevices();
     PCI::Initialize();
-    if (ACPI::IsAvailable())
+
+#if CTOS_ACPI_DISABLE == 0
+    if (CommandLine::GetBoolean("acpi.enable").ValueOr(true)
+        && ACPI::IsAvailable())
     {
         ACPI::Enable();
         ACPI::LoadNameSpace();
         ACPI::EnumerateDevices();
     }
     PCI::InitializeIrqRoutes();
+#endif
 
     if (!FramebufferDevice::Initialize())
         LogError("kernel: Failed to initialize fbdev");
     TTY::Initialize();
     MemoryDevices::Initialize();
 
-    VFS::Mount(nullptr, "/dev/nvme0n2p1"_sv, "/mnt/ext2"_sv, "ext2fs"_sv);
-    VFS::Mount(nullptr, "/dev/nvme0n2p2"_sv, "/mnt/fat32"_sv, "fat32fs"_sv);
-    VFS::Mount(nullptr, "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv, "echfs"_sv);
+    IgnoreUnused(
+        VFS::Mount(nullptr, "/dev/nvme0n2p2"_sv, "/mnt/ext2"_sv, "ext2fs"_sv));
+    IgnoreUnused(VFS::Mount(nullptr, "/dev/nvme0n2p1"_sv, "/mnt/fat32"_sv,
+                            "fat32fs"_sv));
+    IgnoreUnused(
+        VFS::Mount(nullptr, "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv, "echfs"_sv));
 
-    auto    kernelExecutable = BootInfo::GetExecutableFile();
-    Pointer imageAddress     = kernelExecutable->address;
+    if (!USB::Initialize()) LogWarn("USB: Failed to initialize");
 
-    auto    header           = imageAddress.As<ELF::Header>();
-    auto    sections
-        = imageAddress.Offset<Pointer>(header->SectionHeaderTableOffset)
-              .As<ELF::SectionHeader>();
-
-    auto sectionNamesOffset = sections[header->SectionNamesIndex].Offset;
-    auto stringTable
-        = imageAddress.Offset<Pointer>(sectionNamesOffset).As<char>();
-
-    ELF::Image kernelImage;
-    kernelImage.LoadFromMemory(reinterpret_cast<u8*>(header),
-                               kernelExecutable->size);
-
-    LogTrace("Loading kernel drivers");
-    if (!ELF::Image::LoadModules(header->SectionEntryCount, sections,
-                                 stringTable))
+    if (!System::LoadModules())
         LogWarn("ELF: Could not find any builtin drivers");
-    if (!Module::Load()) LogWarn("Module: Failed to find any modules");
 
-    LogDebug("VFS: Testing directory entry caches...");
-    auto pathRes = VFS::ResolvePath(VFS::GetRootDirectoryEntry(), "/mnt");
-    auto entry   = pathRes.Entry->FollowMounts();
-    for (auto& [name, dentry] : entry->Children())
+    auto moduleDirectory
+        = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), "/lib/modules/")
+              .ValueOr(VFS::PathResolution{})
+              .Entry;
+    if (moduleDirectory)
     {
-        LogTrace("Found directory => {}", name);
-        LogTrace("Full path => {}", dentry->Path());
-        LogTrace("Child entries =>");
-
-        auto entry      = dentry;
-        auto mountPoint = MountPoint::Lookup(entry);
-        if (mountPoint) entry = mountPoint->HostEntry();
-        entry->INode()->Populate();
-
-        for (const auto& [childName, child] : entry->Children())
-            LogTrace("\t- /{}", childName);
-    }
-
-    MountPoint* mountPoint = MountPoint::Head();
-
-    LogTrace("Iterating mountpoints...");
-    while (mountPoint)
-    {
-        LogTrace("{} => {}", mountPoint->HostEntry()->Name(),
-                 mountPoint->Filesystem()->Name());
-        mountPoint = mountPoint->NextMountPoint();
+        for (const auto& [name, child] : moduleDirectory->Children())
+            System::LoadModule(child);
     }
 
     LogTrace("Loading init process...");
@@ -186,59 +209,87 @@ static void kernelThread()
     for (;;) Arch::Halt();
 }
 
-extern "C" KERNEL_INIT_CODE __attribute__((no_sanitize("address"))) void
-kernelStart()
+static void setupLogging(Span<Framebuffer, DynamicExtent> framebuffers)
 {
-    InterruptManager::InstallExceptions();
-#define CTOS_GDB_ATTACHED 0
-#if CTOS_GDB_ATTACHED == 1
-    __asm__ volatile("1: jmp 1b");
-#endif
-
-    Assert(PMM::Initialize());
-    icxxabi::Initialize();
-
 #ifdef CTOS_TARGET_X86_64
     #define SERIAL_LOG_ENABLE_DEFAULT false
 #else
     #define SERIAL_LOG_ENABLE_DEFAULT true
 #endif
 
-    VMM::Initialize();
-    Serial::Initialize();
-
-    if (CommandLine::GetBoolean("log.serial")
-            .value_or(SERIAL_LOG_ENABLE_DEFAULT))
-        Logger::EnableSink(LOG_SINK_SERIAL);
-    if (!CommandLine::GetBoolean("log.e9").value_or(true))
-        Logger::DisableSink(LOG_SINK_E9);
-    // if (CommandLine::GetBoolean("log.boot.terminal").value_or(true))
+    Logger::EnableSink(LOG_SINK_E9);
     Logger::EnableSink(LOG_SINK_TERMINAL);
+
+    bool enabledSinks[3] = {
+        CommandLine::GetBoolean("log.e9").ValueOr(true),
+        CommandLine::GetBoolean("log.serial")
+            .ValueOr(SERIAL_LOG_ENABLE_DEFAULT),
+        CommandLine::GetBoolean("log.terminal").ValueOr(true),
+    };
+
+    Terminal::SetupFramebuffers(framebuffers);
+    for (usize i = 0; i < sizeof(enabledSinks) / sizeof(enabledSinks[0]); i++)
+    {
+        if (enabledSinks[i]) Logger::EnableSink(Bit(i));
+        else Logger::DisableSink(Bit(i));
+    }
+}
+
+extern "C" KERNEL_INIT_CODE __attribute__((no_sanitize("address"))) void
+kernelStart(const BootInformation& info)
+{
+#define CTOS_GDB_ATTACHED 0
+#if CTOS_GDB_ATTACHED == 1
+    __asm__ volatile("1: jmp 1b");
+#endif
+
+    // DONT MOVE START
+    // -------------------------------------------------------------
+    // NOTE(v1tr10l7): It is important that these calls happen at the very
+    // beginning of the kernel initialization, because we want to have a working
+    // Heap and Serial logging be available ASAP, as every other subsystem
+    // depends on this
+    auto& memoryInfo = info.MemoryInformation;
+    MM::PrepareInitialHeap(memoryInfo);
+    InterruptManager::InstallExceptions();
+    CommandLine::Initialize(info.KernelCommandLine);
+
+    LogTrace("Kernel: Available framebuffers => {}", info.Framebuffers.Size());
+    setupLogging(info.Framebuffers);
 
     LogInfo(
         "Boot: Kernel loaded with {}-{} -> firmware type: {}, boot time: {}s",
-        BootInfo::GetBootloaderName(), BootInfo::GetBootloaderVersion(),
-        magic_enum::enum_name(BootInfo::GetFirmwareType()),
-        BootInfo::GetDateAtBoot());
+        info.BootloaderName, info.BootloaderVersion,
+        ToString(info.FirmwareType), info.DateAtBoot);
 
-    LogInfo("Boot: Kernel Physical Address: {:#x}",
-            BootInfo::GetKernelPhysicalAddress().Raw<>());
-    LogInfo("Boot: Kernel Virtual Address: {:#x}",
-            BootInfo::GetKernelVirtualAddress().Raw<>());
+    LogInfo("Boot: Kernel Physical Address: {:#p}",
+            memoryInfo.KernelPhysicalBase);
+    LogInfo("Boot: Kernel Virtual Address: {:#p}",
+            memoryInfo.KernelVirtualBase);
 
-    Stacktrace::Initialize();
-    CommandLine::Initialize();
+    MM::Initialize();
+    Serial::Initialize();
+    // DONT MOVE END
+    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    System::PrepareBootModules(info.KernelModules);
 
     Device::Initialize();
-    DeviceTree::Initialize();
+    DeviceTree::Initialize(info.DeviceTreeBlob);
 
-    ACPI::LoadTables();
+#if CTOS_ACPI_DISABLE == 0
+    if (CommandLine::GetBoolean("acpi.enable").ValueOr(true) && info.RSDP)
+        ACPI::LoadTables(info.RSDP);
+#endif
+
+    Assert(System::LoadKernelSymbols(info.KernelExecutable));
     Arch::Initialize();
 
-    if (!EFI::Initialize())
+    System::InitializeNumaDomains();
+    if (!EFI::Initialize(info.EfiSystemTable, memoryInfo.EfiMemoryMap))
         LogError("EFI: Failed to initialize efi runtime services...");
-    SMBIOS::Initialize();
+    DMI::SMBIOS::Initialize(info.SmBios32Phys, info.SmBios64Phys);
 
+    Time::Initialize(info.DateAtBoot);
     Scheduler::Initialize();
     auto process = Scheduler::GetKernelProcess();
     auto thread

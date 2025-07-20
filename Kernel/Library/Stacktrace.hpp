@@ -27,4 +27,4 @@ namespace Stacktrace
     bool Initialize();
     void Print(usize maxFrames = 16);
 }; // namespace Stacktrace
-using Stacktrace::Symbol;
+using KernelSymbol = Stacktrace::Symbol;

@@ -7,33 +7,26 @@
 #pragma once
 
 #include <Drivers/Device.hpp>
-#include <VFS/Filesystem.hpp>
 
-#include <unordered_map>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <VFS/Filesystem.hpp>
 
 class DevTmpFs : public Filesystem
 {
   public:
     DevTmpFs(u32 flags);
 
-    virtual ErrorOr<DirectoryEntry*> Mount(StringView  sourcePath,
-                                           const void* data = nullptr) override;
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    Mount(StringView sourcePath, const void* data = nullptr) override;
 
-    virtual ErrorOr<INode*> CreateNode(INode* parent, DirectoryEntry* entry,
-                                       mode_t mode, uid_t uid = 0,
-                                       gid_t gid = 0) override;
+    virtual ErrorOr<INode*> AllocateNode(StringView name,
+                                         INodeMode  mode) override;
 
-    virtual ErrorOr<INode*> Symlink(INode* parent, DirectoryEntry* entry,
-                                    StringView target) override;
-    virtual INode*          Link(INode* parent, StringView name,
-                                 INode* oldNode) override;
     virtual bool Populate(DirectoryEntry* dentry) override { return true; }
-
-    virtual ErrorOr<INode*> MkNod(INode* parent, DirectoryEntry* entry,
-                                  mode_t mode, dev_t dev) override;
 
     static bool             RegisterDevice(Device* device);
 
   private:
-    static std::unordered_map<dev_t, Device*> s_Devices;
+    static UnorderedMap<dev_t, Device*> s_Devices;
+    friend class DevTmpFsINode;
 };

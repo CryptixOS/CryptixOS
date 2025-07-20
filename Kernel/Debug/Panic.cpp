@@ -13,10 +13,10 @@
 
 CTOS_NO_KASAN void dumpProcessInfo()
 {
-    Process* currentProcess = Process::GetCurrent();
-    if (!currentProcess) return;
+    Process* current = Process::Current();
+    if (!current) return;
 
-    EarlyLogInfo("Process: %s", currentProcess->m_Name.Raw());
+    EarlyLogInfo("Process: %s", current->Name().Raw());
 }
 
 inline static void enterPanicMode()
@@ -60,13 +60,12 @@ CTOS_NO_KASAN [[noreturn]]
 void earlyPanic(const char* format, ...)
 {
     enterPanicMode();
+    Stacktrace::Print(32);
 
     va_list args;
     va_start(args, format);
     Logger::Logv(LogLevel::eError, format, args);
     va_end(args);
-
-    Stacktrace::Print(32);
 
     EarlyLogFatal("CPU[%d]: Halted", CPU::GetCurrentID());
 

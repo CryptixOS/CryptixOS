@@ -4,92 +4,102 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-
 #include <Memory/PMM.hpp>
+#include <System/Limits.hpp>
+#include <Time/Time.hpp>
 
 #include <VFS/DirectoryEntry.hpp>
+#include <VFS/VFS.hpp>
+
 #include <VFS/TmpFs/TmpFs.hpp>
 #include <VFS/TmpFs/TmpFsINode.hpp>
 
+using namespace System;
+
 TmpFs::TmpFs(u32 flags)
     : Filesystem("TmpFs", flags)
-    , m_MaxInodeCount(0)
+    , m_MaxINodeCount(0)
     , m_MaxSize(0)
     , m_Size(0)
 {
+    m_ID = NextFilesystemID();
 }
 
-ErrorOr<DirectoryEntry*> TmpFs::Mount(StringView sourcePath, const void* data)
+ErrorOr<::Ref<DirectoryEntry>> TmpFs::Mount(StringView  sourcePath,
+                                            const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
                : nullptr;
 
     m_MaxSize       = PMM::GetTotalMemory() / 2;
-    m_MaxInodeCount = PMM::GetTotalMemory() / PMM::PAGE_SIZE / 2;
+    m_MaxINodeCount = PMM::GetTotalMemory() / PMM::PAGE_SIZE / 2;
 
     m_RootEntry     = new DirectoryEntry(nullptr, "/");
-    auto inodeOr    = MkNod(nullptr, m_RootEntry, 0644 | S_IFDIR, 0);
-    if (!inodeOr) goto fail;
+    auto inodeOr    = CreateNode(nullptr, m_RootEntry, 0644 | S_IFDIR, 0);
+    RetOnError(inodeOr);
 
-    m_Root = inodeOr.value();
+    m_Root = inodeOr.Value();
     m_RootEntry->Bind(m_Root);
 
     return m_RootEntry;
-fail:
-    delete m_RootEntry;
-    return Error(inodeOr.error());
-}
-ErrorOr<INode*> TmpFs::CreateNode(INode* parent, DirectoryEntry* entry,
-                                  mode_t mode, uid_t uid, gid_t gid)
-{
-    auto inodeOr = MkNod(parent, entry, mode, 0);
-    if (!inodeOr) return Error(inodeOr.error());
-
-    auto inode            = reinterpret_cast<TmpFsINode*>(inodeOr.value());
-    inode->m_Stats.st_uid = uid;
-    inode->m_Stats.st_gid = gid;
-
-    return inode;
 }
 
-ErrorOr<INode*> TmpFs::Symlink(INode* parent, DirectoryEntry* entry,
-                               StringView target)
+ErrorOr<INode*> TmpFs::AllocateNode(StringView name, mode_t mode)
 {
-    if (m_NextInodeIndex >= m_MaxInodeCount) return Error(ENOSPC);
+    if (m_NextINodeIndex >= m_MaxINodeCount) return Error(ENOSPC);
+    auto inode = new TmpFsINode(name, this, mode);
+    if (!inode) return Error(ENOMEM);
+    // TODO(v1tr10l7): uid, gid
 
-    mode_t mode    = S_IFLNK | 0777;
-    auto   inodeOr = CreateNode(parent, entry, mode, 0, 0);
-    if (!inodeOr) return Error(inodeOr.error());
+    inode->m_Metadata.ID               = NextINodeIndex();
+    inode->m_Metadata.BlockSize        = PMM::PAGE_SIZE;
+    inode->m_Metadata.BlockCount       = 0;
+    inode->m_Metadata.RootDeviceID     = 0;
 
-    auto inode      = reinterpret_cast<TmpFsINode*>(inodeOr.value());
-    inode->m_Target = target;
+    auto currentTime                   = Time::GetReal();
+    inode->m_Metadata.AccessTime       = currentTime;
+    inode->m_Metadata.ModificationTime = currentTime;
+    inode->m_Metadata.ChangeTime       = currentTime;
 
-    parent->InsertChild(parent, entry->Name());
-    return inode;
-}
-
-INode* TmpFs::Link(INode* parent, StringView name, INode* oldNode)
-{
-    if (oldNode->IsDirectory())
+    if (S_ISDIR(mode))
     {
-        errno = EISDIR;
-        return nullptr;
+        ++inode->m_Metadata.LinkCount;
+        inode->m_Metadata.Size = 2 * DIRECTORY_ENTRY_SIZE;
     }
 
-    return new TmpFsINode(name, this, (oldNode->Stats().st_mode & ~S_IFMT));
+    --m_FreeINodeCount;
+    return inode;
+}
+ErrorOr<INode*> TmpFs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
+                                  mode_t mode, dev_t dev)
+{
+    if (parent)
+    {
+        auto maybeEntry = parent->CreateNode(entry, mode, 0);
+        RetOnError(maybeEntry);
+
+        return maybeEntry.Value()->INode();
+    }
+
+    return new TmpFsINode(entry->Name(), this, mode, 0, 0);
 }
 
-ErrorOr<INode*> TmpFs::MkNod(INode* parent, DirectoryEntry* entry, mode_t mode,
-                             dev_t dev)
+ErrorOr<void> TmpFs::Stats(statfs& stats)
 {
-    if (m_NextInodeIndex >= m_MaxInodeCount
-        || (S_ISREG(mode) && m_Size + TmpFsINode::GetDefaultSize() > m_MaxSize))
-        return Error(ENOSPC);
+    Memory::Fill(&stats, 0, sizeof(statfs));
 
-    auto inode = new TmpFsINode(entry->Name(), this, mode, 0, 0);
-    entry->Bind(inode);
+    stats.f_type   = TMPFS_MAGIC;
+    stats.f_bsize  = PMM::PAGE_SIZE;
+    stats.f_blocks = m_MaxBlockCount;
+    stats.f_bfree = stats.f_bavail = m_FreeBlockCount;
 
-    if (parent) parent->InsertChild(inode, entry->Name());
-    return inode;
+    stats.f_files                  = m_MaxINodeCount;
+    stats.f_ffree                  = m_FreeINodeCount / INODE_SIZE;
+    stats.f_fsid                   = m_ID;
+    stats.f_namelen                = Limits::FILE_NAME;
+    stats.f_frsize                 = 0;
+    stats.f_flags                  = m_Flags;
+
+    return {};
 }

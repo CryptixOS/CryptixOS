@@ -121,9 +121,8 @@ namespace HPET
 
         data.frequency = 0x38d7ea4c68000 / tickPeriod;
         LogInfo("HPET: Frequency is set to {:#x}", data.frequency);
-        data.minimumTick = table->MinimumTick;
+        data.minimumTick     = table->MinimumTick;
 
-        LogDebug("Enabling hpet");
         m_Entry->mainCounter = 0;
         m_Entry->configuration |= HPET_ENABLE;
         m_Entry->interruptStatusRegister = m_Entry->interruptStatusRegister;

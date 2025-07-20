@@ -6,7 +6,7 @@
 #*/
 modules = [
   'net/rtl8139',
-  #'net/e1000e',
+  'net/e1000e',
 ]
 
 foreach name : modules

@@ -13,8 +13,9 @@
 namespace ACPI
 {
     bool       IsAvailable();
+    Pointer    RSDP();
 
-    bool       LoadTables();
+    bool       LoadTables(Pointer rsdp);
     void       Enable();
 
     void       LoadNameSpace();

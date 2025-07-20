@@ -4,10 +4,12 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Boot/CommandLine.hpp>
+
 #include <Firmware/ACPI/ACPI.hpp>
+#include <Firmware/ACPI/Interpreter/Interpreter.hpp>
 #include <Firmware/ACPI/MADT.hpp>
 
-#include <Boot/BootInfo.hpp>
 #include <Memory/ScopedMapping.hpp>
 #include <Memory/VMM.hpp>
 
@@ -53,11 +55,12 @@ namespace ACPI
             };
         };
 
-        bool  s_XsdtAvailable = false;
-        RSDT* s_Rsdt          = nullptr;
-        FADT* s_FADT          = nullptr;
+        struct RSDP* s_RSDP          = nullptr;
+        bool         s_XsdtAvailable = false;
+        RSDT*        s_Rsdt          = nullptr;
+        FADT*        s_FADT          = nullptr;
 
-        bool  ValidateChecksum(SDTHeader* header)
+        bool         ValidateChecksum(SDTHeader* header)
         {
 
             u32 checksum = 0;
@@ -95,9 +98,47 @@ namespace ACPI
         }
         void InitializeFADT(Pointer fadtAddress)
         {
+            if (!fadtAddress) return;
             ScopedMapping<FADT> fadt(fadtAddress,
                                      PageAttributes::eRW
                                          | PageAttributes::eUncacheableStrong);
+
+            if ((fadt->Flags & FadtFlags::eHardwareReducedAcpi) != 0)
+            {
+                LogInfo("ACPI: Detected hardware reduced acpi");
+                return;
+            }
+
+            if (fadt->PM1EventLength < 4)
+                LogError("ACPI: Invalid value of PM1_EVT_LEN({:#x}) in FADT",
+                         fadt->PM1EventLength);
+            if (fadt->PM1ControlLength == 0)
+                LogError("ACPI: Invalid value of PM1_CNT_LEN({:#x}) in FADT",
+                         fadt->PM1ControlLength);
+            if (!fadt->X_PM1aEventBlock.Address)
+                LogError("ACPI: Invalid value of X_PM1a_EVT_BLK({:#x}) in FADT",
+                         fadt->X_PM1aEventBlock.Address);
+            if (!fadt->X_PM1aControlBlock.Address)
+                LogError("ACPI: Invalid value of X_PM1a_CNT_BLK({:#x}) in FADT",
+                         fadt->X_PM1aControlBlock.Address);
+            if (!fadt->X_PMTimerBlock.Address)
+                LogError("ACPI: Invalid value of X_PM_TMR_BLK({:#x}) in FADT",
+                         fadt->X_PMTimerBlock.Address);
+            if (fadt->X_PM2ControlBlock.Address
+                && !fadt->X_PM2ControlBlock.RegisterBitWidth)
+                LogError("ACPI: Invalid value of PM2_CNT_LEN({:#x}) in FADT",
+                         fadt->X_PM2ControlBlock.RegisterBitWidth);
+            if (!fadt->PMTimerLength)
+                LogError("ACPI: Invalid value of PM_TM_LEN({:#x}) in FADT",
+                         fadt->PMTimerLength);
+            if (!fadt->X_GPE0Block.Address
+                && fadt->X_GPE0Block.RegisterBitWidth & 1)
+                LogError("ACPI: Invalid value of GPE0_BLK_LEN({:#x}) in FADT",
+                         fadt->X_GPE0Block.RegisterBitWidth);
+            if (!fadt->X_GPE1Block.Address
+                && fadt->X_GPE1Block.RegisterBitWidth & 1)
+                LogError("ACPI: Invalid value of GPE1_BLK_LEN({:#x}) in FADT",
+                         fadt->X_GPE1Block.RegisterBitWidth);
 
             if (fadt->Header.Revision <= 2)
             {
@@ -109,30 +150,59 @@ namespace ACPI
             }
             if (!fadt->X_Dsdt) fadt->X_Dsdt = fadt->DSDT;
             LogTrace("ACPI: Found DSDT table");
+
+            VMM::MapKernelRange(fadt->X_Dsdt, fadt->X_Dsdt, sizeof(SDTHeader));
+            auto& dsdt = *reinterpret_cast<SDTHeader*>(fadt->X_Dsdt);
+            usize len  = dsdt.Length;
+            VMM::MapKernelRange(fadt->X_Dsdt + 4096, fadt->X_Dsdt + 4096, len);
+
+            if (CommandLine::GetBoolean("acpi.new-interpreter").ValueOr(false))
+                Interpreter::ExecuteTable(dsdt);
         }
 
+        uacpi_iteration_decision EnumerateDevice(void*                 ctx,
+                                                 uacpi_namespace_node* node,
+                                                 uacpi_u32 node_depth)
+        {
+            uacpi_namespace_node_info* info;
+            (void)node_depth;
+
+            uacpi_status ret = uacpi_get_namespace_node_info(node, &info);
+            if (uacpi_unlikely_error(ret))
+            {
+                const char* path
+                    = uacpi_namespace_node_generate_absolute_path(node);
+                LogError("ACPI: Unable to retrieve node %s information: {}",
+                         path, uacpi_status_to_string(ret));
+                uacpi_free_absolute_path(path);
+                return UACPI_ITERATION_DECISION_CONTINUE;
+            }
+
+            LogInfo("ACPI: Found device - {}", info->name.text);
+            uacpi_free_namespace_node_info(info);
+            return UACPI_ITERATION_DECISION_CONTINUE;
+        }
     } // namespace
 
-    bool IsAvailable() { return BootInfo::GetRSDPAddress().operator bool(); }
-    bool LoadTables()
-    {
-        using namespace std::literals;
+    bool    IsAvailable() { return s_RSDP != nullptr; }
+    Pointer RSDP() { return s_RSDP; }
 
+    bool    LoadTables(Pointer rsdpAddress)
+    {
         LogTrace("ACPI: Initializing...");
         constexpr StringView RSDP_SIGNATURE = "RSD PTR"_sv;
-        auto                 rsdpPointer    = BootInfo::GetRSDPAddress();
-        if (!rsdpPointer) return false;
+        if (!rsdpAddress) return false;
 
-        RSDP* rsdp = rsdpPointer.ToHigherHalf<Pointer>().As<RSDP>();
-        if (RSDP_SIGNATURE.Compare(0, 7, rsdp->Signature) == 0)
+        s_RSDP = rsdpAddress.ToHigherHalf<struct RSDP*>();
+        if (RSDP_SIGNATURE.Compare(0, 7, s_RSDP->Signature) == 0)
         {
             LogError("ACPI: Invalid RSDP signature!");
             return false;
         }
 
-        s_XsdtAvailable = rsdp->Revision >= 2 && rsdp->XsdtAddress != 0;
+        s_XsdtAvailable = s_RSDP->Revision >= 2 && s_RSDP->XsdtAddress != 0;
         Pointer rsdtPointer
-            = s_XsdtAvailable ? rsdp->XsdtAddress : rsdp->RsdtAddress;
+            = s_XsdtAvailable ? s_RSDP->XsdtAddress : s_RSDP->RsdtAddress;
 
         if (!rsdtPointer) return false;
         s_Rsdt = rsdtPointer.ToHigherHalf<RSDT*>();
@@ -142,36 +212,16 @@ namespace ACPI
         DetectACPIEntries();
 
         MADT::Initialize();
+
         s_FADT = GetTable<FADT>("FACP");
         InitializeFADT(Pointer(s_FADT).FromHigherHalf());
 
         LogInfo("ACPI: Loaded static tables");
         return true;
     }
-
-    static uacpi_iteration_decision
-    EnumerateDevice(void* ctx, uacpi_namespace_node* node, uacpi_u32 node_depth)
-    {
-        uacpi_namespace_node_info* info;
-        (void)node_depth;
-
-        uacpi_status ret = uacpi_get_namespace_node_info(node, &info);
-        if (uacpi_unlikely_error(ret))
-        {
-            const char* path
-                = uacpi_namespace_node_generate_absolute_path(node);
-            LogError("ACPI: Unable to retrieve node %s information: {}", path,
-                     uacpi_status_to_string(ret));
-            uacpi_free_absolute_path(path);
-            return UACPI_ITERATION_DECISION_CONTINUE;
-        }
-
-        LogInfo("ACPI: Found device - {}", info->name.text);
-        uacpi_free_namespace_node_info(info);
-        return UACPI_ITERATION_DECISION_CONTINUE;
-    }
     void Enable()
     {
+        Assert(s_Rsdt);
         LogTrace("ACPI: Entering ACPI Mode");
 
 #define UACPI_DEBUG 0
@@ -183,18 +233,21 @@ namespace ACPI
 
         uAcpiCall(uacpi_initialize(0), "ACPI: Failed to enter acpi mode!");
     }
+
     void LoadNameSpace()
     {
+        Assert(s_Rsdt);
         uAcpiCall(uacpi_namespace_load(), "ACPI: Failed to load namespace");
         uAcpiCall(uacpi_set_interrupt_model(UACPI_INTERRUPT_MODEL_IOAPIC),
                   "ACPI: Failed to set uACPI interrupt model");
         uAcpiCall(uacpi_namespace_initialize(),
                   "ACPI: Failed to initialize namespace");
-        // uAcpiCall(uacpi_finalize_gpe_initialization(),
-        //           "ACPI: Failed to finalize gpe initialization!");
+        uAcpiCall(uacpi_finalize_gpe_initialization(),
+                  "ACPI: Failed to finalize gpe initialization!");
     }
     void EnumerateDevices()
     {
+        Assert(s_Rsdt);
         uacpi_namespace_for_each_child(uacpi_namespace_root(), EnumerateDevice,
                                        UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
                                        UACPI_MAX_DEPTH_ANY, UACPI_NULL);
@@ -203,6 +256,7 @@ namespace ACPI
     SDTHeader* GetTable(const char* signature, usize index)
     {
         Assert(signature != nullptr);
+        if (!s_Rsdt) return nullptr;
 
         const usize entryCount = (s_Rsdt->Header.Length - sizeof(SDTHeader))
                                / (s_XsdtAvailable ? 8 : 4);

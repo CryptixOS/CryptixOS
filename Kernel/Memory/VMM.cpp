@@ -7,37 +7,35 @@
 #include <API/Syscall.hpp>
 #include <Arch/CPU.hpp>
 
-#include <Boot/BootInfo.hpp>
-
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
 #include <Prism/Utility/Math.hpp>
 #include <Scheduler/Process.hpp>
 
-extern "C" symbol           text_start_addr;
-extern "C" symbol           text_end_addr;
-extern "C" symbol           kernel_init_start_addr;
-extern "C" symbol           kernel_init_end_addr;
-extern "C" symbol           module_init_start_addr;
-extern "C" symbol           module_init_end_addr;
-extern "C" symbol           rodata_start_addr;
-extern "C" symbol           rodata_end_addr;
-extern "C" symbol           data_start_addr;
-extern "C" symbol           data_end_addr;
+extern "C" symbol      limine_requests_addr_start;
+extern "C" symbol      limine_requests_addr_end;
+extern "C" symbol      text_start_addr;
+extern "C" symbol      text_end_addr;
+extern "C" symbol      kernel_init_start_addr;
+extern "C" symbol      kernel_init_end_addr;
+extern "C" symbol      module_init_start_addr;
+extern "C" symbol      module_init_end_addr;
+extern "C" symbol      rodata_start_addr;
+extern "C" symbol      rodata_end_addr;
+extern "C" symbol      data_start_addr;
+extern "C" symbol      data_end_addr;
 
-static PageMap*             s_KernelPageMap;
-static Pointer              s_VirtualAddressSpace{};
+static PageMap*        s_KernelPageMap;
+static Pointer         s_VirtualAddressSpace{};
 
-static std::optional<usize> s_HigherHalfOffset = BootInfo::GetHHDMOffset();
+static Optional<usize> s_HigherHalfOffset = NullOpt;
 
 using namespace Arch::VMM;
 
-void* PageMap::GetNextLevel(PageTableEntry& entry, bool allocate,
-                            uintptr_t virt)
+void* PageMap::NextLevel(PageTableEntry& entry, bool allocate, uintptr_t virt)
 {
-    if (entry.IsValid())
-        return Pointer(entry.GetAddress()).ToHigherHalf<void*>();
+    if (entry.IsValid()) return Pointer(entry.Address()).ToHigherHalf<void*>();
     if (!allocate) return nullptr;
 
     Pointer newEntry = Arch::VMM::AllocatePageTable();
@@ -46,49 +44,56 @@ void* PageMap::GetNextLevel(PageTableEntry& entry, bool allocate,
     return newEntry;
 }
 
-namespace VirtualMemoryManager
+namespace VMM
 {
     static bool s_Initialized = false;
 
-    void        Initialize()
+    void        Initialize(Pointer kernelPhys, Pointer kernelVirt,
+                           usize higherHalfOffset)
     {
         if (s_Initialized) return;
-        s_Initialized = true;
+        s_Initialized      = true;
+        s_HigherHalfOffset = higherHalfOffset;
+
         LogTrace("VMM: Initializing...");
         Arch::VMM::Initialize();
 
         s_KernelPageMap = new PageMap();
-        Assert(s_KernelPageMap->GetTopLevel() != 0);
+        Assert(s_KernelPageMap->TopLevel() != 0);
 
-        auto [pageSize, flags] = s_KernelPageMap->RequiredSize(4_gib);
+        usize baseMemorySize   = 3_gib;
+        auto [pageSize, flags] = s_KernelPageMap->RequiredSize(baseMemorySize);
 
-        Assert(s_KernelPageMap->MapRange(GetHigherHalfOffset(), 0, 4_gib,
-                                         PageAttributes::eRW | flags
-                                             | PageAttributes::eWriteBack));
+        Assert(s_KernelPageMap->MapRange(
+            GetHigherHalfOffset(), 0, baseMemorySize,
+            PageAttributes::eRW | flags | PageAttributes::eWriteBack));
 
-        usize entryCount    = 0;
-        auto  memoryEntries = BootInfo::GetMemoryMap(entryCount);
-        for (usize i = 0; i < entryCount; i++)
+        auto memoryMap = PMM::MemoryZones();
+        for (const auto& entry : memoryMap)
         {
-            MemoryMapEntry* entry = memoryEntries[i];
+            if ((entry.Base() <= baseMemorySize)
+                || entry.Type() == MemoryZoneType::eReserved)
+                continue;
 
-            Pointer         base  = Math::AlignDown(entry->base, GetPageSize());
-            Pointer         top
-                = Math::AlignUp(entry->base + entry->length, GetPageSize());
+            Pointer base = Math::AlignDown(entry.Base(), GetPageSize());
+            Pointer top  = Math::AlignUp(entry.Base().Offset(entry.Length()),
+                                         GetPageSize());
 
-            auto size              = (top - base).Raw();
+            auto    size = (top - base).Raw();
             auto [pageSize, flags] = s_KernelPageMap->RequiredSize(size);
 
             auto alignedSize       = Math::AlignDown(size, pageSize);
 
             flags |= PageAttributes::eWriteBack;
-            if (entry->type == MEMORY_MAP_FRAMEBUFFER)
+            if (entry.Type() == MemoryZoneType::eFramebuffer)
                 flags |= PageAttributes::eWriteCombining;
 
-            if (base < 4_gib) continue;
+            Assert(!s_KernelPageMap->ValidateAddress(base.ToHigherHalf()));
             Assert(s_KernelPageMap->MapRange(
                 base.ToHigherHalf(), base, alignedSize,
                 PageAttributes::eRW | flags | PageAttributes::eWriteBack));
+
+            Assert(s_KernelPageMap->ValidateAddress(base.ToHigherHalf()));
             base += alignedSize;
 
             Assert(s_KernelPageMap->MapRange(
@@ -96,41 +101,97 @@ namespace VirtualMemoryManager
                 PageAttributes::eRW | PageAttributes::eWriteBack));
         }
 
-        auto kernelExecutable = BootInfo::GetExecutableFile();
-        auto kernelPhys       = BootInfo::GetKernelPhysicalAddress();
-        auto kernelVirt       = BootInfo::GetKernelVirtualAddress();
+        // const void* sectionRanges[6][2] = {
+        //     { limine_requests_addr_start, limine_requests_addr_end },
+        //     { text_start_addr, text_end_addr },
+        //     { kernel_init_start_addr, kernel_init_end_addr },
+        //     { module_init_start_addr, module_init_end_addr },
+        //     { rodata_start_addr, rodata_end_addr },
+        //     { data_start_addr, data_end_addr },
+        // };
 
+        auto limineRequestsVirt = Pointer(limine_requests_addr_start);
+        auto limineRequestsPhys
+            = Pointer(limine_requests_addr_start) - kernelVirt + kernelPhys;
+        auto limineRequestsSize
+            = Pointer(limine_requests_addr_end) - limineRequestsVirt;
+
+        LogTrace("VMM: Mapping .limine_requests   => {:#016x}-{:#016x}",
+                 limineRequestsVirt,
+                 limineRequestsVirt.Offset(limineRequestsSize));
         Assert(s_KernelPageMap->MapRange(
-            kernelVirt, kernelPhys, kernelExecutable->size,
-            PageAttributes::eRWX | PageAttributes::eWriteBack));
+            limineRequestsVirt, limineRequestsPhys, limineRequestsSize,
+            PageAttributes::eRead | PageAttributes::eWriteBack));
 
         auto textVirt = Pointer(text_start_addr);
         auto textPhys = Pointer(text_start_addr) - kernelVirt + kernelPhys;
         auto textSize = Pointer(text_end_addr) - textVirt;
+
+        LogTrace("VMM: Mapping .text            => {:#016x}-{:#016x}", textVirt,
+                 textVirt.Offset(textSize));
         Assert(s_KernelPageMap->MapRange(textVirt, textPhys, textSize,
-                                         PageAttributes::eRWX
+                                         PageAttributes::eRead
+                                             | PageAttributes::eExecutable
                                              | PageAttributes::eWriteBack));
 
         {
-            auto memoryTop = PMM::GetMemoryTop();
-            auto base = Pointer(Math::AlignUp(memoryTop, 1_gib)).ToHigherHalf();
+            auto    memoryTop = PMM::GetMemoryTop();
+            Pointer base
+                = Pointer(Math::AlignUp(memoryTop, 1_gib)).ToHigherHalf();
             s_VirtualAddressSpace = base.Offset(4_gib);
         }
 
-        auto modulesVirt = Pointer(module_init_start_addr);
-        auto modulesPhys = modulesVirt - kernelVirt + kernelPhys;
-        auto modulesSize = Pointer(module_init_end_addr) - modulesVirt;
+        Pointer initVirt = kernel_init_start_addr;
+        auto    initPhys = initVirt - kernelVirt + kernelPhys;
+        auto    initSize = Pointer(kernel_init_end_addr) - textVirt;
+
+        LogTrace("VMM: Mapping .kernel_init_code  => {:#016x}-{:#016x}",
+                 initVirt, initVirt.Offset(initSize));
+        Assert(s_KernelPageMap->MapRange(initVirt, initPhys, initSize,
+                                         PageAttributes::eRWX
+                                             | PageAttributes::eWriteBack));
+
+        Pointer modulesVirt = module_init_start_addr;
+        auto    modulesPhys = modulesVirt - kernelVirt + kernelPhys;
+        auto    modulesSize = Pointer(module_init_end_addr) - modulesVirt;
+
+        LogTrace("VMM: Mapping .modules      => {:#016x}-{:#016x}", modulesVirt,
+                 modulesVirt.Offset(modulesSize));
         s_KernelPageMap->MapRange(modulesVirt, modulesPhys, modulesSize,
                                   PageAttributes::eRWX
+                                      | PageAttributes::eWriteBack);
+
+        Pointer rodataVirt = rodata_start_addr;
+        auto    rodataPhys = rodataVirt - kernelVirt + kernelPhys;
+        auto    rodataSize = Pointer(rodata_end_addr) - rodataVirt;
+
+        LogTrace("VMM: Mapping .rodata       => {:#016x}-{:#016x}", rodataVirt,
+                 rodataVirt.Offset(rodataSize));
+        s_KernelPageMap->MapRange(rodataVirt, rodataPhys, rodataSize,
+                                  PageAttributes::eRead
+                                      | PageAttributes::eWriteBack);
+
+        Pointer dataVirt = data_start_addr;
+        auto    dataPhys = dataVirt - kernelVirt + kernelPhys;
+        auto    dataSize = Pointer(data_end_addr) - dataVirt;
+
+        LogTrace("VMM: Mapping .data         => {:#016x}-{:#016x}", dataVirt,
+                 dataVirt.Offset(dataSize));
+        s_KernelPageMap->MapRange(dataVirt, dataPhys, dataSize,
+                                  PageAttributes::eRW
                                       | PageAttributes::eWriteBack);
 
         s_KernelPageMap->Load();
         LogInfo("VMM: Loaded kernel page map");
     }
-    usize GetHigherHalfOffset()
+    void UnmapKernelInitCode()
     {
-        return s_HigherHalfOffset.has_value() ? s_HigherHalfOffset.value() : 0;
+        auto initVirt = Pointer(kernel_init_start_addr);
+        auto initSize = Pointer(kernel_init_end_addr) - initVirt;
+        s_KernelPageMap->UnmapRange(initVirt, initSize);
     }
+
+    usize   GetHigherHalfOffset() { return s_HigherHalfOffset.ValueOr(0); }
 
     Pointer AllocateSpace(usize increment, usize alignment, bool lowerHalf)
     {
@@ -145,68 +206,31 @@ namespace VirtualMemoryManager
         return lowerHalf ? virt.FromHigherHalf() : virt.ToHigherHalf<>();
     }
 
+    Ref<Region> AllocateDMACoherent(usize size, PageAttributes flags)
+    {
+        usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
+        auto  pages     = PMM::CallocatePages(pageCount);
+
+        auto  virt = AllocateSpace(pageCount * PMM::PAGE_SIZE, 4_kib, true);
+        Assert(MapKernelRegion(virt, pages, pageCount, flags));
+
+        auto region
+            = CreateRef<Region>(pages, virt, pageCount * PMM::PAGE_SIZE);
+        if (!region) return nullptr;
+
+        region->SetAccessMode(Access::eReadWrite);
+        return region;
+    }
+    void FreeDMA_Region(Ref<Region> region)
+    {
+        // TODO(v1tr10l7): we should keep track of mapped kernel addresses
+        s_KernelPageMap->UnmapRange(region->VirtualBase(), region->Size());
+    }
+
     PageMap* GetKernelPageMap()
     {
-        if (!s_Initialized) Initialize();
+        Assert(s_Initialized);
         return s_KernelPageMap;
-    }
-    void HandlePageFault(const PageFaultInfo& info)
-    {
-        auto message
-            = fmt::format("Page Fault occurred at '{:#x}'\nCaused by:\n",
-                          info.VirtualAddress().Raw());
-        auto reason = info.Reason();
-
-        if (reason & PageFaultReason::eNotPresent)
-            message += "\t- Non-present page\n";
-        if (reason & PageFaultReason::eWrite)
-            message += "\t- Write violation\n";
-        else message += "\t- Read violation\n";
-        if (reason & PageFaultReason::eUser) message += "\t- Reserved Write\n";
-        if (reason & PageFaultReason::eInstructionFetch)
-            message += "\t- Instruction Fetch\n";
-        if (reason & PageFaultReason::eProtectionKey)
-            message += "\t- Protection-Key violation\n";
-        if (reason & PageFaultReason::eShadowStack)
-            message += "\t- Shadow stack access\n";
-        if (reason & PageFaultReason::eSoftwareGuardExtension)
-            message += "\t- SGX violation\n";
-
-        bool kernelFault = !(reason & PageFaultReason::eUser);
-        message += fmt::format("In {} space", kernelFault ? "User" : "Kernel");
-
-        if (CPU::DuringSyscall())
-        {
-            usize      syscallID   = CPU::GetCurrent()->LastSyscallID;
-            StringView syscallName = Syscall::GetName(syscallID);
-            message += fmt::format(", and during syscall({}) => {}", syscallID,
-                                   syscallName);
-        }
-
-        message += '\n';
-        auto process = Process::GetCurrent();
-
-        if (process && !kernelFault)
-        {
-            auto tty = process->GetTTY();
-            LogError("{}: Segmentation Fault(core dumped)\n{}",
-                     process->GetName(), message);
-            Stacktrace::Print();
-
-            auto bufferOr
-                = UserBuffer::ForUserBuffer(message.data(), message.size());
-            if (!bufferOr) return;
-            auto messageBuffer = bufferOr.value();
-            if (tty)
-            {
-                auto status = tty->Write(messageBuffer, 0, message.size());
-                (void)status;
-            }
-            process->Exit(-1);
-            return;
-        }
-
-        earlyPanic(message.data());
     }
 
     bool MapKernelRegion(Pointer virt, Pointer phys, usize pageCount,
@@ -239,4 +263,4 @@ namespace VirtualMemoryManager
 
         return virt;
     }
-} // namespace VirtualMemoryManager
+} // namespace VMM

@@ -292,7 +292,7 @@ packages:
         - '-Ddefault_library=both'
         #- '-Ddebug_allocator=true'
         - '-Dlibgcc_dependency=true'
-        #- '-Dbuild_tests=true'
+        - '-Dbuild_tests=true'
         - '-Dposix_option=enabled'
         - '-Dlinux_option=enabled'
         - '-Dglibc_option=enabled'
@@ -358,7 +358,8 @@ packages:
     architecture: '@OPTION:arch@'
     source:
       subdir: 'sources'
-      version: '0.1'
+      git: 'https://github.com/CryptixOS/Prism.git'
+      branch: 'master'
     tools_required:
       - system-gcc
     pkgs_required:

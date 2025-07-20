@@ -8,6 +8,8 @@
 #include <Arch/InterruptHandler.hpp>
 #include <Arch/InterruptManager.hpp>
 
+#include <mutex>
+
 #ifdef CTOS_TARGET_X86_64
     #include <Arch/x86_64/IO.hpp>
 
@@ -37,7 +39,7 @@ namespace uACPI
     {
         uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr* outRsdp)
         {
-            uacpi_phys_addr rsdp = BootInfo::GetRSDPAddress().FromHigherHalf();
+            uacpi_phys_addr rsdp = ACPI::RSDP().FromHigherHalf();
 
             if (rsdp)
             {
@@ -281,16 +283,19 @@ namespace uACPI
         void uacpi_kernel_log(uacpi_log_level level, const uacpi_char* format,
                               ...)
         {
-            constexpr LogLevel uacpiToPrismLogLevels[] = {
-                LogLevel::eNone, LogLevel::eError, LogLevel::eWarn,
-                LogLevel::eInfo, LogLevel::eTrace, LogLevel::eDebug,
-            };
+            constexpr Array uacpiToPrismLogLevels = ToArray<LogLevel>({
+                LogLevel::eNone,
+                LogLevel::eError,
+                LogLevel::eWarn,
+                LogLevel::eInfo,
+                LogLevel::eTrace,
+                LogLevel::eDebug,
+            });
 
-            Assert(level < std::size(uacpiToPrismLogLevels));
+            Assert(level < uacpiToPrismLogLevels.Size());
             LogLevel pLevel = uacpiToPrismLogLevels[level];
 
             va_list  args;
-
             va_start(args, format);
             Logger::Logv(pLevel, format, args, false);
             va_end(args);
@@ -302,8 +307,10 @@ namespace uACPI
         }
         void uacpi_kernel_stall(uacpi_u8 usec)
         {
-            CtosUnused(usec);
-            ToDoWarn();
+            auto now      = Time::GetRealTime().Nanoseconds();
+            auto deadline = now + usec * 1000;
+
+            while (Time::GetRealTime().Nanoseconds() < deadline) Arch::Pause();
         }
         void uacpi_kernel_sleep(uacpi_u64 msec)
         {
@@ -340,9 +347,8 @@ namespace uACPI
 
         uacpi_thread_id uacpi_kernel_get_thread_id(void)
         {
-            auto thread = Thread::GetCurrent();
-            if (thread)
-                return reinterpret_cast<uacpi_thread_id>(thread->GetTid());
+            auto thread = Thread::Current();
+            if (thread) return reinterpret_cast<uacpi_thread_id>(thread->Tid());
 
             return UACPI_THREAD_ID_NONE;
         }
@@ -363,10 +369,11 @@ namespace uACPI
 
         uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle handle, uacpi_u16)
         {
-            auto&      event = *reinterpret_cast<Event*>(handle);
+            auto& event = *reinterpret_cast<Event*>(handle);
 
-            std::array evs   = {&event};
-            Event::Await(evs);
+            Array evs   = ToArray({&event});
+            auto  which = Event::Await(evs);
+            CtosUnused(which);
 
             return true;
         }

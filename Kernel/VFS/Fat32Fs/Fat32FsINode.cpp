@@ -4,6 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Prism/Memory/Memory.hpp>
+
 #include <VFS/Fat32Fs/Fat32Fs.hpp>
 #include <VFS/Fat32Fs/Fat32FsINode.hpp>
 
@@ -13,23 +15,23 @@ Fat32FsINode::Fat32FsINode(StringView name, class Filesystem* fs, mode_t mode)
     : INode(name, fs)
     , m_Fat32Fs(reinterpret_cast<Fat32Fs*>(fs))
 {
-    m_Stats.st_dev    = fs->DeviceID();
-    m_Stats.st_ino    = fs->NextINodeIndex();
-    m_Stats.st_nlink  = 1;
-    m_Stats.st_mode   = mode;
-    m_Stats.st_uid    = 0;
-    m_Stats.st_gid    = 0;
-    m_Stats.st_rdev   = 0;
-    // m_Stats.st_size    = S_ISDIR(mode) ? m_Filesystem->GetClusterSize() : 0;
-    // m_Stats.st_blksize = m_Filesystem->GetClusterSize();
-    m_Stats.st_blocks = S_ISDIR(mode);
+    m_Metadata.DeviceID         = fs->DeviceID();
+    m_Metadata.ID               = fs->NextINodeIndex();
+    m_Metadata.LinkCount        = 1;
+    m_Metadata.Mode             = mode;
+    m_Metadata.UID              = 0;
+    m_Metadata.GID              = 0;
+    m_Metadata.RootDeviceID     = 0;
+    // m_Metadata.Size    = S_ISDIR(mode) ? m_Filesystem->GetClusterSize() : 0;
+    // m_Metadata.BlockSize = m_Filesystem->GetClusterSize();
+    m_Metadata.BlockCount       = S_ISDIR(mode);
 
-    m_Stats.st_atim   = Time::GetReal();
-    m_Stats.st_ctim   = Time::GetReal();
-    m_Stats.st_mtim   = Time::GetReal();
+    m_Metadata.AccessTime       = Time::GetReal();
+    m_Metadata.ChangeTime       = Time::GetReal();
+    m_Metadata.ModificationTime = Time::GetReal();
 
-    m_DirectoryOffset = -1;
-    m_Cluster         = 0;
+    m_DirectoryOffset           = -1;
+    m_Cluster                   = 0;
 
     Fat32DirectoryEntry entry;
     if (S_ISDIR(mode))
@@ -53,12 +55,12 @@ Fat32FsINode::Fat32FsINode(StringView name, class Filesystem* fs, mode_t mode)
     if (S_ISDIR(mode))
     {
         m_Populated = true;
-        std::memcpy(entry.Name, ".          ", 11);
+        Memory::Copy(entry.Name, ".          ", 11);
         //
     }
 }
 
-const std::unordered_map<StringView, INode*>& Fat32FsINode::Children() const
+const UnorderedMap<StringView, INode*>& Fat32FsINode::Children() const
 {
     // TODO(v1tr10l7): Populate records
     return m_Children;
@@ -73,11 +75,12 @@ isize Fat32FsINode::Read(void* buffer, off_t offset, usize bytes)
 {
     ScopedLock guard(m_Lock);
 
-    off_t      endOffset = offset + bytes;
-    if (endOffset > m_Stats.st_size)
+    usize      endOffset = offset + bytes;
+    if (endOffset > m_Metadata.Size)
     {
-        endOffset = m_Stats.st_size;
-        bytes     = offset >= endOffset ? 0 : endOffset - offset;
+        endOffset = m_Metadata.Size;
+        bytes
+            = static_cast<usize>(offset) >= endOffset ? 0 : endOffset - offset;
     }
 
     if (bytes == 0) return 0;

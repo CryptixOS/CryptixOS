@@ -4,6 +4,7 @@ debug.log
 qemu.log
 serial.log
 .xbstrap/
+*.xbstrap
 subprojects/*/
 !subprojects/packagefiles/
 !subprojects/*.wrap
@@ -14,3 +15,6 @@ sources
 *.img
 *.log
 Meta/firmware/*
+compile_commands.json
+Meta/helix/__pycache__/*
+Meta/helix/__pycache__/

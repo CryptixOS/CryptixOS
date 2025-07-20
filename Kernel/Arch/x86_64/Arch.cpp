@@ -24,9 +24,12 @@
 
 namespace Arch
 {
+    KERNEL_INIT_CODE
     void Initialize()
     {
-        PIC::Remap(0x20, 0x28);
+        auto status = I8259A::Instance().Initialize();
+        if (!status) LogError("Arch: Failed to initialize I8259A controller");
+
         IoApic::Initialize();
         if (!HPET::DetectAndSetup()) LogError("HPET: Not Available");
 
@@ -41,6 +44,8 @@ namespace Arch
                 RTC::GetMonth(), RTC::GetCentury() * 100 + RTC::GetYear(),
                 RTC::GetHour(), RTC::GetMinute(), RTC::GetSecond());
     }
+
+    KERNEL_INIT_CODE
     void ProbeDevices()
     {
         auto result = I8042Controller::Probe();
@@ -66,7 +71,7 @@ namespace Arch
             return;
         IO::Out<word>(0x604, 0x2000);
     }
-
+    KERNEL_INIT_CODE
     void ProbeTimers(Vector<HardwareTimer*>& timers)
     {
         if (Lapic::IsInitialized()) timers.PushBack(Lapic::Instance());

@@ -9,10 +9,10 @@
 #include <Common.hpp>
 
 #include <Prism/Core/Types.hpp>
+#include <Prism/Containers/UnorderedMap.hpp>
+
 #include <Prism/Debug/Assertions.hpp>
 #include <Prism/Memory/Pointer.hpp>
-
-#include <unordered_map>
 
 namespace PCI
 {
@@ -119,7 +119,7 @@ namespace PCI
         Pointer                                  m_Base;
         u8                                       m_BusStart;
 
-        std::unordered_map<uintptr_t, uintptr_t> m_Mappings;
+        UnorderedMap<Pointer, Pointer> m_Mappings;
 
         uintptr_t GetAddress(const DeviceAddress& address, u32 offset);
     };

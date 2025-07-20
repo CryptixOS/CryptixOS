@@ -8,6 +8,7 @@
 
 #include <API/UnixTypes.hpp>
 
+#include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/Core/Singleton.hpp>
 #include <Scheduler/Process.hpp>
 
@@ -16,7 +17,9 @@ struct Thread;
 class Scheduler
 {
   public:
-    static void     Initialize();
+    KERNEL_INIT_CODE
+    static void Initialize();
+    KERNEL_INIT_CODE
     static void     InitializeProcFs();
     static void     PrepareAP(bool start = false);
 
@@ -49,7 +52,7 @@ class Scheduler
   private:
     Scheduler() = default;
 
-    static std::unordered_map<pid_t, Process*>& GetProcessMap();
+    static UnorderedMap<pid_t, Process*>& GetProcessMap();
     friend class Process;
 
     static Thread* GetNextThread(usize cpuID);

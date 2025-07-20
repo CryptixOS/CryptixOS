@@ -6,19 +6,37 @@
  */
 #pragma once
 
+#include <Drivers/InterruptController.hpp>
 #include <Prism/Core/Types.hpp>
 
-namespace PIC
+class I8259A : public InterruptController
 {
-    void Remap(u8 masterOffset, u8 slaveOffset);
+  public:
+    static I8259A& Instance();
 
-    void MaskIRQ(u8 irq);
-    void UnmaskIRQ(u8 irq);
+    virtual ErrorOr<void> Initialize() override;
+    virtual ErrorOr<void> Shutdown() override;
+
+    virtual ErrorOr<InterruptHandler*> AllocateHandler(u8 hint = 0x20 + 0x10) override;
+    
+    virtual ErrorOr<void> Mask(u8 irq) override;
+    virtual ErrorOr<void> Unmask(u8 irq) override;
+
+    virtual ErrorOr<void> SendEOI(u8 vector) override;
+
     void MaskAllIRQs();
     void UnmaskAllIRQs();
 
-    void SendEOI(u8 irq);
+  private:
+    I8259A() = default;
+    static I8259A s_Instance;
+
+    void Remap(u8 masterOffset, u8 slaveOffset);
+
+    bool HandleSpuriousInterrupt(u8 irq);
 
     u16  GetIRR();
     u16  GetISR();
+
+    u16 GetIRQRegister(u8 ocw3);
 }; // namespace PIC

@@ -7,7 +7,7 @@
 #include <Arch/x86_64/CMOS.hpp>
 #include <Arch/x86_64/IO.hpp>
 
-#include <utility>
+#include <Prism/Core/Core.hpp>
 
 namespace CMOS
 {
@@ -16,14 +16,14 @@ namespace CMOS
 
     void         Write(Register reg, byte value)
     {
-        IO::Out<byte>(REGISTER_SELECT, std::to_underlying(reg));
+        IO::Out<byte>(REGISTER_SELECT, ToUnderlying(reg));
         IO::Wait();
 
         IO::Out<byte>(DATA, value);
     }
     byte Read(Register reg)
     {
-        IO::Out<byte>(REGISTER_SELECT, std::to_underlying(reg));
+        IO::Out<byte>(REGISTER_SELECT, ToUnderlying(reg));
         IO::Wait();
 
         return IO::In<byte>(DATA);

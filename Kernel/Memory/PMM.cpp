@@ -6,209 +6,119 @@
  */
 #include <Common.hpp>
 
-#include <Boot/BootInfo.hpp>
-#include <Prism/Containers/Bitmap.hpp>
-#include <Prism/Utility/Math.hpp>
-
-#include <Memory/KernelHeap.hpp>
-#include <Memory/PMM.hpp>
-
+#include <Debug/Debug.hpp>
 #include <Library/Locking/Spinlock.hpp>
 
-namespace PhysicalMemoryManager
+#include <Memory/PMM.hpp>
+
+#include <Memory/Allocator/BitmapAllocator.hpp>
+#include <Memory/Allocator/KernelHeap.hpp>
+
+#include <Prism/String/StringUtils.hpp>
+#include <Prism/Utility/Math.hpp>
+
+namespace PMM
 {
     namespace
     {
-        bool     s_Initialized = false;
-        Bitmap   s_Bitmap{};
+        bool            s_Initialized = false;
 
-        Pointer  s_MemoryTop        = 0;
-        Pointer  s_UsableMemoryTop  = 0;
+        MemoryMap       s_MemoryMap{};
+        BitmapAllocator s_BitmapAllocator;
 
-        usize    s_UsableMemorySize = 0;
-        usize    s_TotalMemory      = 0;
-        usize    s_UsedMemory       = 0;
-
-        Spinlock s_Lock;
-
-        void*    FindFreeRegion(usize& start, usize count, usize limit)
+        Pointer         EarlyAllocatePages(usize count = 1)
         {
-            usize contiguousPages = 0;
-            while (start < limit)
-            {
-                if (!s_Bitmap.GetIndex(start++))
-                {
-                    if (++contiguousPages == count)
-                    {
-                        usize page = start - count;
-                        for (usize i = page; i < start; i++)
-                            s_Bitmap.SetIndex(i, true);
+            auto& memoryMap  = s_MemoryMap;
+            usize entryCount = memoryMap.EntryCount;
 
-                        return reinterpret_cast<void*>(page * PAGE_SIZE);
-                    }
-                }
-                else contiguousPages = 0;
+            for (usize i = 0; i < entryCount; i++)
+            {
+                auto& entry = memoryMap.Entries[i];
+                if (entry.Type() != MemoryZoneType::eUsable
+                    || entry.Length() < count * PAGE_SIZE)
+                    continue;
+
+                auto pages = entry.Allocate(count * PAGE_SIZE);
+                return pages;
             }
 
             return nullptr;
         }
     } // namespace
 
-    bool Initialize()
+    void EarlyInitialize(const MemoryMap& memoryMap)
     {
-        usize     entryCount = 0;
-        MemoryMap memoryMap  = BootInfo::GetMemoryMap(entryCount);
+        s_MemoryMap = memoryMap;
+    }
+    bool Initialize(const MemoryMap& memoryMap)
+    {
+        EarlyLogTrace("PMM: Initializing...");
+
+        s_MemoryMap     = memoryMap;
+        auto entryCount = s_MemoryMap.EntryCount;
         if (entryCount == 0) return false;
 
-        EarlyLogTrace("PMM: Initializing...");
+#if CTOS_PMM_DUMP_MEMORY_MAP
         for (usize i = 0; i < entryCount; i++)
         {
-            MemoryMapEntry* currentEntry = memoryMap[i];
-            Pointer         top = currentEntry->base + currentEntry->length;
-            s_MemoryTop         = std::max(s_MemoryTop.Raw(), top.Raw());
-
-            switch (currentEntry->type)
-            {
-                case MEMORY_MAP_USABLE:
-                    s_UsableMemorySize += currentEntry->length;
-                    s_UsableMemoryTop = std::max(s_UsableMemoryTop, top);
-                    break;
-                case MEMORY_MAP_ACPI_RECLAIMABLE:
-                case MEMORY_MAP_BOOTLOADER_RECLAIMABLE:
-                case MEMORY_MAP_KERNEL_AND_MODULES:
-                    s_UsedMemory += currentEntry->length;
-                    break;
-                default: continue;
-            }
-
-            s_TotalMemory += currentEntry->length;
-        }
-
-        if (!s_MemoryTop) return false;
-
-        usize s_BitmapEntryCount = s_UsableMemoryTop.Raw() / PAGE_SIZE;
-        usize s_BitmapSize = Math::AlignUp(s_BitmapEntryCount / 8, PAGE_SIZE);
-        s_BitmapEntryCount = s_BitmapSize * 8;
-
-        [[maybe_unused]]
-        auto entryTypeToString
-            = [](u64 type)
-        {
-            switch (type)
-            {
-                case LIMINE_MEMMAP_USABLE: return "Usable";
-                case LIMINE_MEMMAP_RESERVED: return "Reserved";
-                case LIMINE_MEMMAP_ACPI_RECLAIMABLE: return "ACPI Reclaimable";
-                case LIMINE_MEMMAP_ACPI_NVS: return "ACPI NVS";
-                case LIMINE_MEMMAP_BAD_MEMORY: return "Bad Memory";
-                case LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE:
-                    return "Bootloader Reclaimable";
-                case MEMORY_MAP_KERNEL_AND_MODULES: return "Kernel and Modules";
-                case LIMINE_MEMMAP_FRAMEBUFFER: return "Framebuffer";
-
-                default: break;
-            }
-
-            return "Undefined";
-        };
-        for (usize i = 0; i < entryCount; i++)
-        {
-            MemoryMapEntry* currentEntry = memoryMap[i];
-            Pointer         entryBase    = currentEntry->base;
-            usize           entryLength  = currentEntry->length;
-            auto entryTypeString = entryTypeToString(currentEntry->type);
+            auto&   current     = s_MemoryMap.Entries[i];
+            Pointer entryBase   = current.Base();
+            usize   entryLength = current.Length();
 
             EarlyLogDebug(
                 "PMM: MemoryMap[%zu] = { .Base: %#p, .Length: %#x, .Type: "
                 "%s }",
-                i, entryBase.Raw(), entryLength, entryTypeString);
-
-            if (currentEntry->type != LIMINE_MEMMAP_USABLE
-                || currentEntry->length <= s_BitmapSize)
-                continue;
-            s_Bitmap.Initialize(entryBase.ToHigherHalf(), s_BitmapSize, 0xff);
-
-            currentEntry->base += s_BitmapSize;
-            currentEntry->length -= s_BitmapSize;
-
-            s_UsedMemory += s_BitmapSize;
-            break;
+                i, entryBase.Raw(), entryLength, ToString(current.Type()));
         }
+#endif
 
-        Assert(s_Bitmap.GetSize() != 0);
-        for (usize i = 0; i < entryCount; i++)
+        auto status = s_BitmapAllocator.Initialize(s_MemoryMap, PAGE_SIZE);
+        if (!status)
         {
-            MemoryMapEntry* currentEntry = memoryMap[i];
-            if (currentEntry->type != MEMORY_MAP_USABLE) continue;
-
-            for (usize page = currentEntry->base == 0 ? 4096 : 0;
-                 page < currentEntry->length; page += PAGE_SIZE)
-                s_Bitmap.SetIndex((currentEntry->base + page) / PAGE_SIZE,
-                                  false);
+            LogError(
+                "PMM: Failed to initialize bitmap allocator, the error code: "
+                "{}",
+                ToString(status.Error()));
+            return false;
         }
-
-        // s_MemoryTop = Math::AlignUp(s_MemoryTop, 0x40000000);
         EarlyLogInfo("PMM: Initialized");
 
         EarlyLogInfo(
             "PMM: Memory Map entry count: %zu, Total Memory: %zuMiB, Free "
             "Memory%zuMiB ",
-            entryCount, s_TotalMemory / 1024 / 1024,
+            entryCount, s_BitmapAllocator.TotalMemorySize() / 1024 / 1024,
             GetFreeMemory() / 1024 / 1024);
-
-        KernelHeap::Initialize();
 
         return (s_Initialized = true);
     }
-    bool  IsInitialized() { return s_Initialized; }
+    bool             IsInitialized() { return s_Initialized; }
+
+    Span<MemoryZone> MemoryZones()
+    {
+        return Span(s_MemoryMap.Entries, s_MemoryMap.EntryCount);
+    }
 
     void* AllocatePages(usize count)
     {
-        ScopedLock guard(s_Lock);
-
-        if (count == 0) return nullptr;
-        static usize lastIndex = 0;
-
-        usize        i         = lastIndex;
-        void*        ret       = FindFreeRegion(lastIndex, count,
-                                                s_UsableMemoryTop.Raw() / PAGE_SIZE);
-        if (!ret)
-        {
-            lastIndex = 0;
-            ret       = FindFreeRegion(lastIndex, count, i);
-            if (!ret)
-                EarlyPanic("Out of memory!, tried to allocate %d pages", count);
-        }
-
-        s_UsedMemory += count * PAGE_SIZE;
-        return ret;
+        if (!s_Initialized) return EarlyAllocatePages(count);
+        return s_BitmapAllocator.AllocatePages(count);
     }
     void* CallocatePages(usize count)
     {
-        void* ret = AllocatePages(count);
-        if (!ret) return nullptr;
+        Pointer pages = AllocatePages(count);
+        if (!pages) return nullptr;
 
-        uintptr_t higherHalfAddress
-            = reinterpret_cast<uintptr_t>(ret) + BootInfo::GetHHDMOffset();
-        memset(reinterpret_cast<void*>(higherHalfAddress), 0,
-               PAGE_SIZE * count);
-
-        return ret;
+        Memory::Fill(pages.ToHigherHalf(), 0, PAGE_SIZE * count);
+        return pages;
     }
 
     void FreePages(void* ptr, usize count)
     {
-        ScopedLock guard(s_Lock);
-        if (count == 0 || !ptr) return;
-        uintptr_t page = reinterpret_cast<uintptr_t>(ptr) / PAGE_SIZE;
-
-        for (uintptr_t i = page; i < page + count; i++)
-            s_Bitmap.SetIndex(i, false);
-        s_UsedMemory -= count * PAGE_SIZE;
+        return s_BitmapAllocator.FreePages(ptr, count);
     }
 
-    uintptr_t GetMemoryTop() { return s_UsableMemoryTop; }
-    uint64_t  GetTotalMemory() { return s_TotalMemory; }
-    uint64_t  GetFreeMemory() { return s_TotalMemory - s_UsedMemory; }
-    uint64_t  GetUsedMemory() { return s_UsedMemory; }
-} // namespace PhysicalMemoryManager
+    uintptr_t GetMemoryTop() { return s_BitmapAllocator.MemoryTop(); }
+    u64       GetTotalMemory() { return s_BitmapAllocator.TotalMemorySize(); }
+    u64       GetFreeMemory() { return GetTotalMemory() - GetUsedMemory(); }
+    u64       GetUsedMemory() { return s_BitmapAllocator.UsedMemorySize(); }
+} // namespace PMM

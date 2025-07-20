@@ -23,6 +23,7 @@ namespace PCI
             DetectDevices();
         }
 
+        inline DeviceAddress Address() const { return {m_Domain, m_Bus, 0, 0}; }
         inline HostController* GetController() const
         {
             return m_HostController;
@@ -33,16 +34,18 @@ namespace PCI
         inline const Vector<Device*>& GetDevices();
         void                          DetectDevices();
 
+        Device*                       FindDeviceByID(const DeviceID& id);
         bool                          Enumerate(Enumerator enumerator);
 
       private:
-        HostController* m_HostController = nullptr;
-        u16             m_Domain;
-        u8              m_Bus;
+        HostController*       m_HostController = nullptr;
+        u16                   m_Domain;
+        u8                    m_Bus;
 
-        Vector<Device*> m_Devices;
-        Vector<Bus*>    m_ChildBridges;
+        Vector<DeviceAddress> m_AvailableFunctions;
+        Vector<Bus*>          m_ChildBridges;
+        Vector<Device*>       m_Devices;
 
-        void            EnumerateFunction(DeviceAddress& address);
+        void                  EnumerateFunction(DeviceAddress& address);
     };
 }; // namespace PCI

@@ -14,8 +14,8 @@
 #include <Network/NetworkAdapter.hpp>
 
 #include <Prism/Containers/Array.hpp>
-#include <Prism/PathView.hpp>
 #include <Prism/String/String.hpp>
+#include <Prism/Utility/PathView.hpp>
 
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
@@ -160,7 +160,7 @@ namespace E1000e
         {
             DetectEEProm();
             if (!ReadMacAddress()) return false;
-            StartLink();
+            // TODO(v1tr10l7): StartLink();
 
             for (u32 i = 0; i < 0x80; i++)
                 Write<u32>((Register)(0x5200 + i * 4), 0);
@@ -304,18 +304,18 @@ namespace E1000e
             }
         }
 
-        template <std::unsigned_integral T>
+        template <UnsignedIntegral T>
         inline T Read(Register reg)
         {
-            const usize registerOffset  = std::to_underlying(reg);
+            const usize registerOffset  = ToUnderlying(reg);
             const auto  registerAddress = m_Bar0.Address.Offset(registerOffset);
 
             return MMIO::Read<T>(registerAddress);
         }
-        template <std::unsigned_integral T>
+        template <UnsignedIntegral T>
         inline void Write(Register reg, const T value)
         {
-            const usize registerOffset  = std::to_underlying(reg);
+            const usize registerOffset  = ToUnderlying(reg);
             const auto  registerAddress = m_Bar0.Address.Offset(registerOffset);
 
             return MMIO::Write<T>(registerAddress, value);
@@ -326,7 +326,7 @@ namespace E1000e
 static ErrorOr<void> ProbeDevice(PCI::DeviceAddress&  address,
                                  const PCI::DeviceID& id)
 {
-    LogTrace("RTL8139: Detected pci nic device");
+    LogTrace("E1000e: Detected pci nic device");
     auto nic = new E1000e::Adapter(address);
 
     if (!NetworkAdapter::RegisterNIC(nic))
@@ -339,12 +339,13 @@ static ErrorOr<void> ProbeDevice(PCI::DeviceAddress&  address,
 static void        RemoveDevice(PCI::Device& device) {}
 
 static PCI::Driver s_Driver = {
-    .Name     = "e1000e",
-    .MatchIDs = std::span(E1000e::s_IdTable.begin(), E1000e::s_IdTable.end()),
-    .Probe    = ProbeDevice,
-    .Remove   = RemoveDevice,
+    .Name = "e1000e",
+    .MatchIDs
+    = Span<PCI::DeviceID>(E1000e::s_IdTable.begin(), E1000e::s_IdTable.Size()),
+    .Probe  = ProbeDevice,
+    .Remove = RemoveDevice,
 };
 
-static bool ModuleInit() { return PCI::RegisterDriver(s_Driver); }
+extern "C" bool ModuleInit() { return PCI::RegisterDriver(s_Driver); }
 
 MODULE_INIT(e1000e, ModuleInit);
