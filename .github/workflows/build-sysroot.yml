@@ -1,4 +1,6 @@
 name: Build system root
+permissions:
+  contents: write
 
 on:
   push:
