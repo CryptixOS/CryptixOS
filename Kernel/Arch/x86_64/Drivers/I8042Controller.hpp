@@ -10,9 +10,6 @@
 
 #include <Drivers/HID/Ps2Controller.hpp>
 
-#include <expected>
-#include <utility>
-
 enum class Ps2DeviceType
 {
     eUndefined = 0,

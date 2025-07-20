@@ -23,7 +23,7 @@ ErrorOr<void> ExecutableProgram::Load(PathView path, PageMap* pageMap,
     auto maybeImage = LoadImage(path, pageMap, addressSpace);
     RetOnError(maybeImage);
 
-    m_Image      = maybeImage.value();
+    m_Image      = maybeImage.Value();
     m_EntryPoint = m_Image->EntryPoint();
 
     auto ldPath  = m_Image->InterpreterPath();
@@ -33,7 +33,7 @@ ErrorOr<void> ExecutableProgram::Load(PathView path, PageMap* pageMap,
     maybeImage = LoadImage(ldPath, pageMap, addressSpace, true);
     RetOnError(maybeImage);
 
-    m_Interpreter = maybeImage.value();
+    m_Interpreter = maybeImage.Value();
     m_EntryPoint  = m_Interpreter->EntryPoint();
 
     return {};
@@ -122,7 +122,7 @@ ExecutableProgram::LoadImage(PathView path, PageMap* pageMap,
                              AddressSpace& addressSpace, bool interpreter)
 {
     Ref entry = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), path)
-                    .value()
+                    .Value()
                     .Entry;
     if (!entry) return Error(ENOENT);
 
@@ -133,7 +133,7 @@ ExecutableProgram::LoadImage(PathView path, PageMap* pageMap,
         = VFS::Open(VFS::RootDirectoryEntry().Raw(), path, O_RDONLY, 0);
     RetOnError(maybeFile);
 
-    Ref file  = maybeFile.value();
+    Ref file  = maybeFile.Value();
     Ref image = CreateRef<ELF::Image>();
 
     if (!image->Load(file.Raw(), m_LoadBase)) return Error(ENOEXEC);

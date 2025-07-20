@@ -246,7 +246,7 @@ namespace System
         auto maybePathRes = VFS::ResolvePath(nullptr, path);
         RetOnError(maybePathRes);
 
-        auto pathRes = maybePathRes.value();
+        auto pathRes = maybePathRes.Value();
         auto entry   = pathRes.Entry;
 
         if (!entry) return Error(ENOENT);
@@ -269,7 +269,7 @@ namespace System
             LogError("System: Failed to load the module located at `{}`",
                      entry->Path());
             delete module;
-            return Error(status.error());
+            return Error(status.Error());
         }
 
         module->Image = image;

@@ -7,8 +7,19 @@
 #pragma once
 
 #include <Library/Logger.hpp>
+#include <Prism/Memory/Buffer.hpp>
+
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/INode.hpp>
+
+extern bool g_LogTmpFs;
+
+#define CTOS_DEBUG_TMPFS 1
+#if CTOS_DEBUG_TMPFS != 0
+    #define TmpFsTrace(...) if (g_LogTmpFs) LogMessage("[\e[35mTmpFs\e[0m]: {}\n", __VA_ARGS__)
+#else
+    #define TmpFsTrace(...) 
+#endif
 
 class TmpFsINode final : public INode
 {
@@ -19,7 +30,6 @@ class TmpFsINode final : public INode
 
     virtual ~TmpFsINode()
     {
-        if (m_Capacity > 0) delete m_Data;
     }
 
     virtual ErrorOr<void>
@@ -57,8 +67,7 @@ class TmpFsINode final : public INode
     virtual ErrorOr<void> Link(PathView path) override;
 
   private:
-    u8*                              m_Data     = nullptr;
-    usize                            m_Capacity = 0;
+    Buffer                           m_Buffer;
     UnorderedMap<StringView, INode*> m_Children;
 
     friend class TmpFs;

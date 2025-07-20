@@ -81,7 +81,7 @@ class DirectoryEntry : public RefCounted
     void                      RemoveChild(::Ref<class DirectoryEntry> entry);
 
     ::WeakRef<DirectoryEntry> FollowMounts();
-    ::Ref<DirectoryEntry>     FollowSymlinks(usize cnt = 0);
+    ::WeakRef<DirectoryEntry> FollowSymlinks(usize cnt = 0);
 
     WeakRef<DirectoryEntry>   GetEffectiveParent();
     ::Ref<DirectoryEntry>     Lookup(const String& name);

@@ -158,6 +158,9 @@ namespace VFS
                 return Error(EINVAL);
         }
 
+        PathResolver resolver(parent, path);
+        Ref  parentEntry = TryOrRet(resolver.Resolve(PathLookupFlags::eParent));
+
         auto maybePathRes = ResolvePath(parent, path, followSymlinks);
         RetOnError(maybePathRes);
         Ref<DirectoryEntry> dentry = maybePathRes.Value().Entry;
@@ -170,14 +173,19 @@ namespace VFS
             if (!parent->INode()->ValidatePermissions(current->Credentials(),
                                                       5))
                 return Error(EACCES);
-            dentry = VFS::CreateNode(parent, path,
-                                     (mode & ~current->Umask()) | S_IFREG);
+
+            if (parent)
+                dentry = TryOrRet(VFS::CreateFile(parent, path.BaseName(),
+                                                  mode & ~current->Umask()));
+            else
+                dentry
+                    = TryOrRet(VFS::CreateFile(path, mode & ~current->Umask()));
 
             if (!dentry) return Error(ENOENT);
         }
         else if (flags & O_EXCL) return Error(EEXIST);
 
-        dentry = dentry->FollowMounts().Promote()->FollowSymlinks();
+        dentry = dentry->FollowMounts()->FollowSymlinks().Promote();
 
         if (dentry->IsSymlink()) return Error(ELOOP);
         if ((flags & O_DIRECTORY && !dentry->IsDirectory()))
@@ -227,7 +235,7 @@ namespace VFS
 
         auto parentEntry = resolver.ParentEntry();
         auto entry       = resolver.DirectoryEntry();
-        if (followLinks && entry) entry = entry->FollowSymlinks();
+        if (followLinks && entry) entry = entry->FollowSymlinks().Promote();
 
         res.Parent   = parentEntry;
         res.Entry    = entry;
@@ -323,36 +331,31 @@ namespace VFS
         auto newNodeOr
             = parentINode->Filesystem()->CreateNode(parentINode, entry, mode);
         if (!newNodeOr) return nullptr;
+
+        // parent->InsertChild(entry);
         return entry;
     }
-    static ErrorOr<Ref<DirectoryEntry>> CreateFile(Ref<DirectoryEntry> parent,
-                                                   StringView name, mode_t mode)
+    ErrorOr<Ref<DirectoryEntry>> CreateFile(Ref<DirectoryEntry> directory,
+                                            StringView name, mode_t mode)
     {
-        Assert(parent);
-        auto maybePathRes = ResolvePath(parent, name);
-        // RetOnError(maybePathRes);
+        Assert(directory);
+        if (directory->Lookup(name)) return Error(EEXIST);
 
-        auto pathRes      = maybePathRes.Value();
-        if (pathRes.Entry) return Error(EEXIST);
+        Ref  entry          = new DirectoryEntry(directory, name);
+        auto directoryINode = directory->INode();
+        if (!directoryINode || !directoryINode->Filesystem())
+            return Error(ENODEV);
 
-        Ref  entry       = new DirectoryEntry(parent, name);
-        auto parentINode = parent->INode();
-        auto inodeOr
-            = parentINode->Filesystem()->CreateNode(parentINode, entry, mode);
-
-        if (!inodeOr) return Error(inodeOr.Error());
-
+        TryOrRet(directoryINode->CreateFile(entry, mode));
+        directory->InsertChild(entry);
+        entry->SetParent(directory);
         return entry;
     }
     ErrorOr<Ref<DirectoryEntry>> CreateFile(PathView path, mode_t mode)
     {
         PathResolver resolver(RootDirectoryEntry(), path);
-        auto         maybeEntry = resolver.Resolve();
-        if (!maybeEntry && maybeEntry.Error() != ENOENT)
-            return Error(maybeEntry.Error());
-
-        auto parent = resolver.ParentEntry();
-        if (!parent) return Error(ENODEV);
+        auto         parent = TryOrRet(resolver.Resolve(
+            PathLookupFlags::eParent | PathLookupFlags::eNegativeEntry));
 
         return CreateFile(parent, path, mode);
     }
@@ -385,6 +388,8 @@ namespace VFS
             = new DirectoryEntry(directory, maybePathRes.Value().BaseName);
         auto maybeEntry = MkDir(directory, entry, mode);
 
+        if (!directory) directory = maybePathRes.Value().Parent;
+        // if (maybeEntry) directory->InsertChild(entry);
         return maybeEntry;
     }
 
@@ -404,6 +409,7 @@ namespace VFS
             = parentINode->Filesystem()->MkNod(parentINode, entry, mode, dev);
         if (!inodeOr) return Error(inodeOr.Error());
 
+        // if (pathRes.Parent) pathRes.Parent->InsertChild(entry);
         return entry;
     }
     ErrorOr<Ref<DirectoryEntry>> MkNod(PathView path, mode_t mode, dev_t dev)
@@ -435,6 +441,8 @@ namespace VFS
         auto newINode       = TryOrRetVal(directoryINode->Filesystem()->Symlink(
                                         directoryINode, newEntry, target),
                                           nullptr);
+        // if (resolver.ParentEntry())
+        // resolver.ParentEntry()->InsertChild(newEntry);
         Assert(newINode);
         return newEntry;
     }

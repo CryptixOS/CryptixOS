@@ -71,6 +71,7 @@ namespace EFI
 {
     bool Initialize(Pointer systemTable, const EfiMemoryMap& memoryMap);
 };
+bool g_LogTmpFs = false;
 
 // static s_Filesystems = {
 //     {
@@ -218,7 +219,7 @@ static void kernelThread()
 
     auto moduleDirectory
         = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), "/lib/modules/")
-              .value_or(VFS::PathResolution{})
+              .ValueOr(VFS::PathResolution{})
               .Entry;
     if (moduleDirectory)
     {
@@ -226,11 +227,13 @@ static void kernelThread()
             System::LoadModule(child);
     }
 
+    g_LogTmpFs = true;
+
     // auto maybePathRes
     //     = VFS::ResolvePath(VFS::RootDirectoryEntry(), "/mnt/ext2/Kernel");
     // if (!maybePathRes)
     //     LogError("Kernel: Failed to resolve `/mnt/ext2/Kernel/`");
-    // else if (auto entry = maybePathRes.value().Parent; entry)
+    // else if (auto entry = maybePathRes.Value().Parent; entry)
     // {
     //     LogInfo("Kernel: Found entry => {}", entry->Path());
     //
@@ -321,7 +324,6 @@ kernelStart(const BootInformation& info)
     LogInfo("Boot: Kernel Virtual Address: {:#p}",
             memoryInfo.KernelVirtualBase);
 
-    Assert(System::LoadKernelSymbols(info.KernelExecutable));
     MM::Initialize();
     Serial::Initialize();
     // DONT MOVE END
@@ -336,6 +338,8 @@ kernelStart(const BootInformation& info)
         ACPI::LoadTables(info.RSDP);
 #endif
 
+    Assert(System::LoadKernelSymbols(info.KernelExecutable));
+    Stacktrace::Print(30);
     Arch::Initialize();
 
     System::InitializeNumaDomains();

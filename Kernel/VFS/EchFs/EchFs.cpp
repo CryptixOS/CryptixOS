@@ -33,7 +33,7 @@ ErrorOr<::Ref<DirectoryEntry>> EchFs::Mount(StringView  sourcePath,
                                           const void* data)
 {
     auto pathResolution
-        = VFS::ResolvePath(nullptr, sourcePath).value_or(VFS::PathResolution{});
+        = VFS::ResolvePath(nullptr, sourcePath).ValueOr(VFS::PathResolution{});
 
     auto sourceEntry = pathResolution.Entry;
     if (!sourceEntry || !sourceEntry->INode()) return nullptr;

@@ -23,6 +23,7 @@
 #include <VFS/Filesystem.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/MountPoint.hpp>
+#include <VFS/PathResolver.hpp>
 #include <VFS/VFS.hpp>
 
 namespace API::VFS
@@ -437,9 +438,11 @@ namespace API::VFS
     {
         Process* current = Process::GetCurrent();
         CtosUnused(current);
+        auto getString = [](const char* string) -> String
+        { return CPU::AsUser([string]() -> String { return string; }); };
 
-        auto success
-            = ::VFS::Mount(nullptr, path, target, filesystemType, flags, data);
+        auto success = ::VFS::Mount(nullptr, getString(path), getString(target),
+                                    getString(filesystemType), flags, data);
 
         if (!success) return Error(errno);
         return 0;
@@ -576,21 +579,21 @@ namespace API::VFS
     }
     ErrorOr<isize> StatFs(PathView path, statfs* out)
     {
-        auto maybePathRes
-            = ::VFS::ResolvePath(::VFS::RootDirectoryEntry(), path);
-        RetOnError(maybePathRes);
-        auto pathRes = maybePathRes.Value();
-
-        auto entry   = pathRes.Entry;
-        if (!entry) return Error(ENOENT);
+        PathResolver resolver(nullptr,
+                              CPU::AsUser([path]() -> Path { return path; }));
+        auto entry = TryOrRet(resolver.Resolve(PathLookupFlags::eFollowLinks));
 
         auto inode = entry->INode();
-        if (!entry) return Error(ENOENT);
+        if (!inode || !inode->Filesystem()) return Error(ENOENT);
 
-        auto fs     = inode->Filesystem();
-        auto result = fs->Stats(*out);
+        auto   fs = inode->Filesystem();
 
-        return !result ? result.Error() : 0;
+        statfs stats;
+        Memory::Fill(&stats, 0, sizeof(stats));
+
+        RetOnError(fs->Stats(stats));
+        CPU::CopyToUser(out, stats);
+        return 0;
     }
 
     ErrorOr<isize> FStatAt(isize dirFdNum, const char* path, isize flags,

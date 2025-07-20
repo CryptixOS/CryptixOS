@@ -15,8 +15,8 @@
 #include <Drivers/TTY.hpp>
 #include <Drivers/Terminal.hpp>
 
-#include <Prism/String/StringView.hpp>
 #include <Prism/String/Formatter.hpp>
+#include <Prism/String/StringView.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
@@ -206,46 +206,59 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
     {
         case TCGETS:
         {
-            std::memcpy(reinterpret_cast<void*>(argp), &m_Termios,
-                        sizeof(m_Termios));
+            if (!current->ValidateWrite(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
+            Memory::Copy(argp, &m_Termios, sizeof(m_Termios));
             break;
         }
-        case TCSETS: SetTermios(*reinterpret_cast<termios2*>(argp)); break;
+        case TCSETS:
+            if (!current->ValidateRead(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
+            SetTermios(*reinterpret_cast<termios2*>(argp));
+            break;
         case TCSETSW:
             // TODO(v1tr10l7): Drain the output buffer
+            if (!current->ValidateRead(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
             SetTermios(*reinterpret_cast<termios2*>(argp));
             break;
         case TCSETSF:
             // TODO(v1tr10l7): Allow current output buffer to drain
+            if (!current->ValidateRead(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
             SetTermios(*reinterpret_cast<termios2*>(argp));
             FlushInput();
             break;
 
         case TCGETS2:
         {
-            std::memcpy(reinterpret_cast<void*>(argp), &m_Termios,
-                        sizeof(termios2));
+            if (!current->ValidateWrite(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
+            Memory::Copy(argp, &m_Termios, sizeof(termios2));
             break;
         }
         case TCSETS2:
         {
-            std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
-                        sizeof(termios2));
+            if (!current->ValidateRead(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
+            Memory::Copy(&m_Termios, argp, sizeof(termios2));
             break;
         }
         case TCSETSW2:
         {
             // TODO(v1tr10l7): Drain the output buffer
-            std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
-                        sizeof(termios2));
+            if (!current->ValidateRead(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
+            Memory::Copy(&m_Termios, argp, sizeof(termios2));
             break;
         }
         case TCSETSF2:
         {
             // TODO(v1tr10l7): Allow current output buffer to drain,
             //  and discard the input buffer
-            std::memcpy(&m_Termios, reinterpret_cast<void*>(argp),
-                        sizeof(termios2));
+            if (!current->ValidateRead(argp, sizeof(termios2)))
+                return_err(-1, EFAULT);
+            Memory::Copy(&m_Termios, argp, sizeof(termios2));
             break;
         }
 

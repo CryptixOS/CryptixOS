@@ -53,7 +53,7 @@ Path DirectoryEntry::Path()
 
     return pathBuilder.Empty() ? "/"_s : pathBuilder.ToString();
 }
-const UnorderedMap<StringView, Prism::Ref<DirectoryEntry>>&
+const UnorderedMap<StringView, ::Ref<DirectoryEntry>>&
 DirectoryEntry::Children() const
 {
     return m_Children;
@@ -86,12 +86,12 @@ void DirectoryEntry::Bind(class INode* inode)
         || inode->IsFifo())
         m_Flags |= DirectoryEntryFlags::eSpecial;
 }
-void DirectoryEntry::InsertChild(Prism::Ref<class DirectoryEntry> entry)
+void DirectoryEntry::InsertChild(::Ref<class DirectoryEntry> entry)
 {
     ScopedLock guard(m_Lock);
     m_Children[entry->Name()] = entry;
 }
-void DirectoryEntry::RemoveChild(Prism::Ref<class DirectoryEntry> entry)
+void DirectoryEntry::RemoveChild(::Ref<class DirectoryEntry> entry)
 {
     ScopedLock guard(m_Lock);
 
@@ -108,7 +108,7 @@ void DirectoryEntry::RemoveChild(Prism::Ref<class DirectoryEntry> entry)
 
     return current;
 }
-::Ref<DirectoryEntry> DirectoryEntry::FollowSymlinks(usize cnt)
+::WeakRef<DirectoryEntry> DirectoryEntry::FollowSymlinks(usize cnt)
 {
     auto target = m_INode->GetTarget();
 

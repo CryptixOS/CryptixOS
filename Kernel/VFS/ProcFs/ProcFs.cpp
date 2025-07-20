@@ -219,9 +219,9 @@ ErrorOr<::Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
 
     m_RootEntry    = new DirectoryEntry(nullptr, "/");
     auto maybeRoot = CreateNode(nullptr, m_RootEntry, 0755 | S_IFDIR);
-    if (!maybeRoot) return Error(maybeRoot.error());
+    if (!maybeRoot) return Error(maybeRoot.Error());
 
-    m_Root = maybeRoot.value();
+    m_Root = maybeRoot.Value();
     m_RootEntry->Bind(m_Root);
 
     AddChild("cmdline");

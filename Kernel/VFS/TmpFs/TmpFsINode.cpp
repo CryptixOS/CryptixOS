@@ -55,9 +55,8 @@ TmpFsINode::TmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
 
     if (S_ISREG(mode))
     {
-        m_Capacity      = GetDefaultSize();
         m_Metadata.Size = GetDefaultSize();
-        m_Data          = new u8[m_Capacity];
+        m_Buffer.Resize(GetDefaultSize());
     }
 }
 
@@ -110,13 +109,13 @@ isize TmpFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
     ScopedLock guard(m_Lock);
 
-    if (offset + bytes >= m_Metadata.Size)
-        bytes = bytes - ((offset + bytes) - m_Metadata.Size);
+    if (offset + bytes >= m_Buffer.Size())
+        bytes = bytes - ((offset + bytes) - m_Buffer.Size());
 
     Assert(buffer);
     if (m_Filesystem->ShouldUpdateATime())
         m_Metadata.AccessTime = Time::GetReal();
-    Memory::Copy(buffer, reinterpret_cast<u8*>(m_Data) + offset, bytes);
+    Memory::Copy(buffer, reinterpret_cast<u8*>(m_Buffer.Raw()) + offset, bytes);
     return bytes;
 }
 isize TmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
@@ -124,26 +123,23 @@ isize TmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
     ScopedLock guard(m_Lock);
 
     // TODO(v1tr10l7): we should resize in separate function
-    if (offset + bytes > m_Capacity)
+    auto       capacity = m_Buffer.Size();
+    if (offset + bytes > capacity)
     {
-        usize newCapacity = m_Capacity;
+        usize newCapacity = capacity;
         while (offset + bytes >= newCapacity) newCapacity *= 2;
 
         auto tfs = reinterpret_cast<TmpFs*>(m_Filesystem);
-        if (tfs->GetSize() + (newCapacity - m_Capacity) > tfs->GetMaxSize())
+        if (tfs->GetSize() + (newCapacity - capacity) > tfs->GetMaxSize())
         {
             errno = ENOSPC;
             return -1;
         }
 
-        m_Data = static_cast<uint8_t*>(
-            KernelHeap::Reallocate(m_Data, newCapacity));
-        if (!m_Data) return -1;
-
-        m_Capacity = newCapacity;
+        m_Buffer.Resize(newCapacity);
     }
 
-    memcpy(m_Data + offset, buffer, bytes);
+    Memory::Copy(m_Buffer.Raw() + offset, buffer, bytes);
 
     if (offset + bytes >= m_Metadata.Size)
     {
@@ -156,26 +152,22 @@ isize TmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
         m_Metadata.AccessTime = Time::GetReal();
     if (m_Filesystem->ShouldUpdateMTime())
         m_Metadata.ModificationTime = Time::GetReal();
-    m_Metadata.Size = m_Capacity;
+    m_Metadata.Size = m_Buffer.Size();
     return bytes;
 }
 ErrorOr<isize> TmpFsINode::Truncate(usize size)
 {
     ScopedLock guard(m_Lock);
-    if (size == m_Capacity) return 0;
+
+    auto       capacity = m_Buffer.Size();
+    if (size == capacity) return 0;
 
     const Credentials& creds = Process::GetCurrent()->Credentials();
     if (!CanWrite(creds)) return Error(EPERM);
 
-    u8* newData = new u8[size];
-    Memory::Copy(newData, m_Data, size > m_Capacity ? size : m_Capacity);
-
-    if (m_Capacity < size)
-        Memory::Fill(newData + m_Capacity, 0, size - m_Capacity);
-
-    delete m_Data;
-    m_Data     = newData;
-    m_Capacity = size;
+    m_Buffer.Resize(size);
+    if (capacity < size)
+        Memory::Fill(m_Buffer.Raw() + capacity, 0, size - capacity);
 
     if (m_Filesystem->ShouldUpdateCTime())
         m_Metadata.ChangeTime = Time::GetReal();
@@ -205,19 +197,20 @@ ErrorOr<void> TmpFsINode::Rename(INode* newParent, StringView newName)
 ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateNode(Ref<DirectoryEntry> entry,
                                                     mode_t mode, dev_t dev)
 {
+    TmpFsTrace("Create file system node...");
+    if (g_LogTmpFs) Stacktrace::Print(5);
     if (m_Children.Contains(entry->Name())) return Error(EEXIST);
 
     auto maybeINode = m_Filesystem->AllocateNode(entry->Name(), mode);
     RetOnError(maybeINode);
 
-    auto inode             = reinterpret_cast<TmpFsINode*>(maybeINode.value());
+    auto inode             = reinterpret_cast<TmpFsINode*>(maybeINode.Value());
     inode->m_Name          = entry->Name();
     inode->m_Metadata.Mode = mode;
     if (S_ISREG(mode))
     {
-        inode->m_Capacity      = inode->GetDefaultSize();
         inode->m_Metadata.Size = inode->GetDefaultSize();
-        inode->m_Data          = new u8[inode->m_Capacity];
+        m_Buffer.Resize(GetDefaultSize());
     }
 
     // TODO(v1tr10l7): set dev
@@ -228,6 +221,7 @@ ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateNode(Ref<DirectoryEntry> entry,
     m_Metadata.ChangeTime       = currentTime;
     m_Metadata.ModificationTime = currentTime;
 
+    TmpFsTrace("Inserting into children registry...");
     InsertChild(inode, entry->Name());
     if (Mode() & S_ISGID)
     {
@@ -242,6 +236,7 @@ ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateNode(Ref<DirectoryEntry> entry,
 ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateFile(Ref<DirectoryEntry> entry,
                                                     mode_t              mode)
 {
+    TmpFsTrace("Create regular file...");
     return CreateNode(entry, mode | S_IFREG, 0);
 }
 ErrorOr<Ref<DirectoryEntry>>

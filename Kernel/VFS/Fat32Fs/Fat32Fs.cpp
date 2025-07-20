@@ -33,7 +33,7 @@ ErrorOr<::Ref<DirectoryEntry>> Fat32Fs::Mount(StringView  sourcePath,
                : nullptr;
 
     auto sourceEntry = VFS::ResolvePath(nullptr, sourcePath)
-                           .value_or(VFS::PathResolution{})
+                           .ValueOr(VFS::PathResolution{})
                            .Entry;
     if (!sourceEntry || !sourceEntry->INode()) return nullptr;
     auto source = sourceEntry->INode();
@@ -90,9 +90,9 @@ ErrorOr<::Ref<DirectoryEntry>> Fat32Fs::Mount(StringView  sourcePath,
 
     m_RootEntry = new DirectoryEntry(nullptr, "/");
     auto rootOr = CreateNode(nullptr, m_RootEntry, 0644 | S_IFDIR);
-    if (!rootOr) return Error(rootOr.error());
+    if (!rootOr) return Error(rootOr.Error());
 
-    m_Root     = rootOr.value();
+    m_Root     = rootOr.Value();
     m_RootNode = reinterpret_cast<Fat32FsINode*>(m_Root);
 
     m_RootEntry->Bind(m_Root);
@@ -216,7 +216,7 @@ bool Fat32Fs::Populate(DirectoryEntry* dentry)
             return false;
         }
 
-        auto newNode = reinterpret_cast<Fat32FsINode*>(newNodeOr.value());
+        auto newNode = reinterpret_cast<Fat32FsINode*>(newNodeOr.Value());
         dentry->Bind(newNode);
         if (!newNode)
         {

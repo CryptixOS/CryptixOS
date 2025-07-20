@@ -57,6 +57,10 @@ namespace VFS
 
     Ref<DirectoryEntry> CreateNode(Ref<DirectoryEntry> parent, PathView path,
                                    mode_t mode);
+
+    ErrorOr<Ref<DirectoryEntry>> CreateFile(Ref<DirectoryEntry> directory,
+                                            StringView name, mode_t mode);
+    ErrorOr<Ref<DirectoryEntry>> CreateFile(PathView path, mode_t mode);
     ErrorOr<Ref<DirectoryEntry>> MkDir(Ref<DirectoryEntry> directory,
                                        Ref<DirectoryEntry> entry, mode_t mode);
     ErrorOr<Ref<DirectoryEntry>> MkDir(Ref<DirectoryEntry> directory,

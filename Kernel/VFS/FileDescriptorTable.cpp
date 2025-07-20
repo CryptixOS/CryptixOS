@@ -34,7 +34,7 @@ void FileDescriptorTable::OpenStdioStreams()
     // FIXME(v1tr10l7): Should we verify whether stdio fds are already open?
     Ref ttyNode
         = VFS::ResolvePath(VFS::RootDirectoryEntry(), "/dev/tty")
-              .value()
+              .Value()
               .Entry;
 
     Insert(CreateRef<FileDescriptor>(ttyNode, 0, FileAccessMode::eRead), 0);

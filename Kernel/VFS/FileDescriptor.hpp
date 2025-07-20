@@ -94,8 +94,8 @@ class FileDescriptor : public RefCounted
     inline ErrorOr<isize>  Read(void* const outBuffer, usize count)
     {
         auto bufferOr = UserBuffer::ForUserBuffer(outBuffer, count);
-        if (!bufferOr) return Error(bufferOr.error());
-        auto buffer = bufferOr.value();
+        if (!bufferOr) return Error(bufferOr.Error());
+        auto buffer = bufferOr.Value();
 
         return Read(buffer, count, m_Offset);
     }
@@ -104,8 +104,8 @@ class FileDescriptor : public RefCounted
     inline ErrorOr<isize>  Write(const void* inBuffer, usize count)
     {
         auto bufferOr = UserBuffer::ForUserBuffer(inBuffer, count);
-        if (!bufferOr) return Error(bufferOr.error());
-        auto buffer = bufferOr.value();
+        if (!bufferOr) return Error(bufferOr.Error());
+        auto buffer = bufferOr.Value();
 
         return Write(buffer, count, m_Offset);
     }

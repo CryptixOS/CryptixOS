@@ -36,14 +36,19 @@ class TmpFs : public Filesystem
     virtual ErrorOr<INode*> MkNod(INode* parent, ::Ref<DirectoryEntry> entry,
                                   mode_t mode, dev_t dev) override;
 
+    virtual ErrorOr<void>   Stats(statfs& stats) override;
+
   private:
-    usize                  m_MaxInodeCount      = 0;
+    usize                  m_MaxBlockCount      = 0;
+    usize                  m_FreeBlockCount     = 0;
+    usize                  m_MaxINodeCount      = 0;
+    usize                  m_FreeINodeCount     = PMM::PAGE_SIZE << 2;
     usize                  m_MaxSize            = 0;
 
     usize                  m_Size               = 0;
     // FIXME(v1tr10l7): hardcoded for now
-    usize                  m_FreeINodeCount     = PMM::PAGE_SIZE << 2;
 
     constexpr static usize DIRECTORY_ENTRY_SIZE = 20;
+    constexpr static usize INODE_SIZE           = 1024;
     friend class TmpFsINode;
 };

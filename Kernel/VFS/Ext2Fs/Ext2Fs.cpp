@@ -14,7 +14,7 @@
 #include <VFS/Ext2Fs/Ext2FsINode.hpp>
 
 ErrorOr<::Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
-                                           const void* data)
+                                             const void* data)
 {
     auto sourceEntry = VFS::ResolvePath(nullptr, sourcePath)
                            .ValueOr(VFS::PathResolution{})
@@ -133,14 +133,14 @@ ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
     usize entrySize = Math::AlignUp(8 + entry->Name().Size(), 4);
     Ext2FsDirectoryEntry* dentry
         = Pointer(new u8[entrySize]).As<Ext2FsDirectoryEntry>();
-    std::memset(dentry, 0, entrySize);
+    Memory::Fill(dentry, 0, entrySize);
 
     dentry->INodeIndex = inodeIndex;
     dentry->Size       = entrySize;
     dentry->NameSize   = entry->Name().Size();
     dentry->Type       = Ext2Mode2DirectoryEntryType(mode);
-    std::strncpy(reinterpret_cast<char*>(dentry->Name), entry->Name().Raw(),
-                 dentry->NameSize);
+    StringView(reinterpret_cast<char*>(dentry->Name), dentry->NameSize)
+        .Copy(const_cast<char*>(entry->Name().Raw()), entry->Name().Size());
     auto result
         = reinterpret_cast<Ext2FsINode*>(parent)->AddDirectoryEntry(*dentry);
     if (!result)

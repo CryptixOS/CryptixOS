@@ -81,7 +81,7 @@ isize DevTmpFsINode::Read(void* buffer, off_t offset, usize bytes)
     if (m_Device)
     {
         auto result = m_Device->Read(buffer, offset, bytes);
-        return result ? result.value() : -1;
+        return result ? result.Value() : -1;
     }
 
     ScopedLock guard(m_Lock);
@@ -101,7 +101,7 @@ isize DevTmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
     if (m_Device)
     {
         auto result = m_Device->Write(buffer, offset, bytes);
-        return result ? result.value() : -1;
+        return result ? result.Value() : -1;
     }
 
     ScopedLock guard(m_Lock);

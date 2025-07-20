@@ -126,8 +126,11 @@ namespace Syscall::Process
 
         CPU::SetInterruptFlag(false);
 
-        return ::Process::Current()->Exec(
-            CPU::AsUser([path]() -> String { return path; }), argv, envp);
+        auto process = ::Process::Current();
+        process->Exec(CPU::AsUser([path]() -> String { return path; }), argv,
+                      envp);
+
+        return process->Exit(-1);
     }
     ErrorOr<i32> SysExit(Arguments& args)
     {
