@@ -187,34 +187,34 @@ class Filesystem : public RefCounted
     virtual bool          ShouldUpdateCTime() { return true; }
 
   protected:
-    constexpr static usize  TMPFS_MAGIC = 0x01021994;
+    constexpr static usize TMPFS_MAGIC = 0x01021994;
 
     // Synchronization lock for internal access
-    Spinlock                m_Lock;
+    Spinlock               m_Lock;
 
-    String                  m_Name           = "NoFs";
-    fsid_t                  m_ID             = {};
+    String                 m_Name           = "NoFs";
+    fsid_t                 m_ID             = {};
 
-    dev_t                   m_DeviceID       = -1;
-    usize                   m_BlockSize      = 512;
-    usize                   m_BytesLimit     = 0;
+    dev_t                  m_DeviceID       = -1;
+    usize                  m_BlockSize      = 512;
+    usize                  m_BytesLimit     = 0;
     ///> Filesystem specific flags for internal use
-    u32                     m_Flags          = 0;
+    u32                    m_Flags          = 0;
 
     ///> Backing device
-    INode*                  m_SourceDevice   = nullptr;
+    INode*                 m_SourceDevice   = nullptr;
     ///> Root directory entry
-    ::Ref<DirectoryEntry>   m_RootEntry      = nullptr;
+    ::Ref<DirectoryEntry>  m_RootEntry      = nullptr;
     ///> Root inode
-    INode*                  m_Root           = nullptr;
+    INode*                 m_Root           = nullptr;
 
     ///> Filesystem specific data
-    void*                   m_MountData      = nullptr;
+    void*                  m_MountData      = nullptr;
 
     ///> Counter for generating inode ids
-    Atomic<ino_t>           m_NextINodeIndex = 2;
+    Atomic<ino_t>          m_NextINodeIndex = 2;
 
-    constexpr static fsid_t NextFilesystemID()
+    inline static fsid_t   NextFilesystemID()
     {
         static Atomic<fsid_t> id = 1000;
         return id++;
