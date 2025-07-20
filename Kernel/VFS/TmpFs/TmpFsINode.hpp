@@ -16,9 +16,10 @@ extern bool g_LogTmpFs;
 
 #define CTOS_DEBUG_TMPFS 1
 #if CTOS_DEBUG_TMPFS != 0
-    #define TmpFsTrace(...) if (g_LogTmpFs) LogMessage("[\e[35mTmpFs\e[0m]: {}\n", __VA_ARGS__)
+    #define TmpFsTrace(...)                                                    \
+        if (g_LogTmpFs) LogMessage("[\e[35mTmpFs\e[0m]: {}\n", __VA_ARGS__)
 #else
-    #define TmpFsTrace(...) 
+    #define TmpFsTrace(...)
 #endif
 
 class TmpFsINode final : public INode
@@ -28,9 +29,7 @@ class TmpFsINode final : public INode
     TmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
                uid_t uid = 0, gid_t gid = 0);
 
-    virtual ~TmpFsINode()
-    {
-    }
+    virtual ~TmpFsINode() {}
 
     virtual ErrorOr<void>
     TraverseDirectories(Ref<class DirectoryEntry> parent,
@@ -59,6 +58,8 @@ class TmpFsINode final : public INode
                                                     mode_t mode) override;
     virtual ErrorOr<Ref<DirectoryEntry>>
     CreateDirectory(Ref<DirectoryEntry> entry, mode_t mode) override;
+    virtual ErrorOr<Ref<DirectoryEntry>> Symlink(Ref<DirectoryEntry> entry,
+                                                 PathView targetPath) override;
     virtual ErrorOr<Ref<DirectoryEntry>>
     Link(Ref<DirectoryEntry> oldEntry, Ref<DirectoryEntry> entry) override;
 

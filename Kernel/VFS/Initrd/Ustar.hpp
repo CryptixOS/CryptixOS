@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <Prism/Core/Error.hpp>
 #include <Prism/Core/Types.hpp>
 #include <Prism/Memory/Pointer.hpp>
 #include <Prism/String/StringView.hpp>
@@ -47,5 +48,5 @@ namespace Ustar
     constexpr const u8   FILE_TYPE_CONTIGUOUS       = '7';
 
     bool                 Validate(Pointer address);
-    void                 Load(Pointer address, usize size);
+    ErrorOr<void>        Load(Pointer address, usize size);
 } // namespace Ustar

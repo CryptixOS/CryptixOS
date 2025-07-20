@@ -109,6 +109,8 @@ class INode
                                                     mode_t              mode);
     virtual ErrorOr<Ref<DirectoryEntry>>
     CreateDirectory(Ref<DirectoryEntry> entry, mode_t mode);
+    virtual ErrorOr<Ref<DirectoryEntry>> Symlink(Ref<DirectoryEntry> entry,
+                                                 PathView targetPath);
     virtual ErrorOr<Ref<DirectoryEntry>> Link(Ref<DirectoryEntry> oldEntry,
                                               Ref<DirectoryEntry> entry);
 

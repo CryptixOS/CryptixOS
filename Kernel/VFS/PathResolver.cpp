@@ -101,7 +101,7 @@ ErrorOr<Ref<DirectoryEntry>> PathResolver::Resolve(PathLookupFlags flags)
         return Error(errno);
     }
 
-    if (flags & PathLookupFlags::eNegativeEntry
+    if (flags & PathLookupFlags::eNegativeEntry && m_DirectoryEntry
         && m_DirectoryEntry->Lookup(m_Path.BaseName()))
         return Error(EEXIST);
     return m_DirectoryEntry;

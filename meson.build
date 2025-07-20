@@ -316,7 +316,7 @@ base_files = c.stdout().strip().split('\n')
 
 initrd = custom_target(
   'initrd',
-  input: [ext_mods],
+  input: [ext_mods, meson.project_source_root() / 'sysroot/usr/sbin/init' ],
   output: 'initrd.img.gz',
   command: [
     'rm', '-rf', initrd_dir / 'usr/lib/modules', '&&',

@@ -249,6 +249,15 @@ TmpFsINode::CreateDirectory(Ref<DirectoryEntry> entry, mode_t mode)
     ++m_Metadata.LinkCount;
     return entry;
 }
+ErrorOr<Ref<DirectoryEntry>> TmpFsINode::Symlink(Ref<DirectoryEntry> entry,
+                                                 PathView            targetPath)
+{
+    auto dentry     = TryOrRet(CreateNode(entry, 0777 | S_IFLNK, 0));
+    auto inode      = reinterpret_cast<TmpFsINode*>(dentry->INode());
+
+    inode->m_Target = targetPath;
+    return dentry;
+}
 ErrorOr<Ref<DirectoryEntry>> TmpFsINode::Link(Ref<DirectoryEntry> oldEntry,
                                               Ref<DirectoryEntry> entry)
 {

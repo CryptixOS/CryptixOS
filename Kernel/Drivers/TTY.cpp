@@ -336,7 +336,7 @@ void TTY::Initialize()
     {
         LogTrace("TTY: Creating device /dev/tty{}...", minor);
 
-        auto tty = new TTY(Prism::FormatString("tty{}", minor), terminal, minor);
+        auto tty = new TTY(Prism::Format1("tty{}", minor), terminal, minor);
         s_TTYs.PushBack(tty);
 
         auto result = DeviceManager::RegisterCharDevice(tty);
@@ -354,7 +354,7 @@ void TTY::Initialize()
         if (!registered) delete tty;
     }
     if (!s_TTYs.Empty())
-        VFS::MkNod("/dev/tty"_sv, 0644 | S_IFCHR, s_TTYs.Front()->ID());
+        VFS::CreateNode("/dev/tty"_sv, 0644 | S_IFCHR, s_TTYs.Front()->ID());
 
     LogInfo("TTY: Initialized");
 }

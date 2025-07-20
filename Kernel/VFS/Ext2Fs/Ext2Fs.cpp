@@ -52,8 +52,17 @@ ErrorOr<::Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
 
     m_Allocator.Initialize(this);
 
-    m_RootEntry = new DirectoryEntry(nullptr, "/");
-    auto* root  = new Ext2FsINode("/", this, 0644 | S_IFDIR);
+    m_RootEntry = CreateRef<DirectoryEntry>(nullptr, "/");
+    auto* root
+        = m_RootEntry ? new Ext2FsINode("/", this, 0644 | S_IFDIR) : nullptr;
+    if (!root)
+    {
+        LogError("Ext2Fs: '{}' -> Failed to create root node",
+                 sourceEntry->Path());
+        delete m_SuperBlock;
+        return Error(ENOMEM);
+    }
+
     ReadINodeEntry(&root->m_Meta, 2);
 
     root->m_Metadata.ID        = 2;
@@ -63,14 +72,6 @@ ErrorOr<::Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
                           | (static_cast<u64>(root->m_Meta.SizeHigh) << 32);
     root->m_Metadata.BlockCount
         = root->m_Metadata.Size / root->m_Metadata.BlockSize;
-
-    if (!root)
-    {
-        LogError("Ext2Fs: '{}' -> Failed to create root node",
-                 sourceEntry->Path());
-        delete m_SuperBlock;
-        return nullptr;
-    }
 
     m_RootEntry->Bind(root);
     m_Root = root;

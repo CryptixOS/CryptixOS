@@ -31,7 +31,7 @@ namespace DeviceManager
         DevTmpFs::RegisterDevice(cdev);
 
         auto path          = "/dev/"_s + cdev->Name();
-        auto devTmpFsEntry = VFS::MkNod(path, 0666, cdev->ID());
+        auto devTmpFsEntry = VFS::CreateNode(path, 0666, cdev->ID());
         if (!devTmpFsEntry)
         {
             s_Devices.PopBack();

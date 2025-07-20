@@ -48,6 +48,8 @@ namespace VFS
 
     ErrorOr<PathResolution>      ResolvePath(Ref<DirectoryEntry> parent,
                                              PathView path, bool followLinks = true);
+    ErrorOr<Ref<DirectoryEntry>> ResolveParent(Ref<DirectoryEntry> parent,
+                                               PathView            path);
 
     ErrorOr<Ref<MountPoint>>     MountRoot(StringView filesystemName);
     ErrorOr<Ref<MountPoint>> Mount(Ref<DirectoryEntry> parent, PathView source,
@@ -55,22 +57,24 @@ namespace VFS
                                    i32 flags = 0, const void* data = nullptr);
     bool Unmount(Ref<DirectoryEntry> parent, PathView path, i32 flags = 0);
 
-    Ref<DirectoryEntry> CreateNode(Ref<DirectoryEntry> parent, PathView path,
-                                   mode_t mode);
+    ErrorOr<Ref<DirectoryEntry>> CreateNode(Ref<DirectoryEntry> parent,
+                                            StringView name, mode_t mode,
+                                            dev_t dev, PathView target = ""_pv);
+    ErrorOr<Ref<DirectoryEntry>> CreateNode(PathView path, mode_t mode,
+                                            dev_t dev);
 
     ErrorOr<Ref<DirectoryEntry>> CreateFile(Ref<DirectoryEntry> directory,
                                             StringView name, mode_t mode);
     ErrorOr<Ref<DirectoryEntry>> CreateFile(PathView path, mode_t mode);
-    ErrorOr<Ref<DirectoryEntry>> MkDir(Ref<DirectoryEntry> directory,
-                                       Ref<DirectoryEntry> entry, mode_t mode);
-    ErrorOr<Ref<DirectoryEntry>> MkDir(Ref<DirectoryEntry> directory,
-                                       PathView path, mode_t mode);
 
-    ErrorOr<Ref<DirectoryEntry>> MkNod(Ref<DirectoryEntry> parent,
-                                       PathView name, mode_t mode, dev_t dev);
-    ErrorOr<Ref<DirectoryEntry>> MkNod(PathView path, mode_t mode, dev_t dev);
-    Ref<DirectoryEntry> Symlink(Ref<DirectoryEntry> parent, PathView path,
-                                StringView target);
+    ErrorOr<Ref<DirectoryEntry>> CreateDirectory(Ref<DirectoryEntry> directory,
+                                                 StringView name, mode_t mode);
+    ErrorOr<Ref<DirectoryEntry>> CreateDirectory(PathView path, mode_t mode);
+
+    ErrorOr<Ref<DirectoryEntry>> Symlink(Ref<DirectoryEntry> directory,
+                                         StringView name, PathView targetPath);
+    ErrorOr<Ref<DirectoryEntry>> Symlink(PathView path, PathView targetPath);
+
     Ref<DirectoryEntry> Link(Ref<DirectoryEntry> oldParent, PathView oldPath,
                              Ref<DirectoryEntry> newParent, PathView newPath,
                              i32 flags = 0);

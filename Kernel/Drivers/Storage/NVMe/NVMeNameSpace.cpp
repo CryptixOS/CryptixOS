@@ -54,7 +54,7 @@ namespace NVMe
         StringView path
             = fmt::format("/dev/{}n{}", m_Controller->Name(), m_ID).data();
         LogTrace("NVMe: Creating device at '{}'", path);
-        VFS::MkNod(path, m_Stats.st_mode, ID());
+        VFS::CreateNode(path, m_Stats.st_mode, ID());
         DeviceManager::RegisterBlockDevice(this);
         // TODO(v1tr10l7): enumerate partitions
 
@@ -87,7 +87,7 @@ namespace NVMe
             StringView partitionPath
                 = fmt::format("/dev/{}n{}p{}", m_Controller->Name(), m_ID, i)
                       .data();
-            VFS::MkNod(partitionPath, m_Stats.st_mode, partition->ID());
+            VFS::CreateNode(partitionPath, m_Stats.st_mode, partition->ID());
 
             ++i;
         }

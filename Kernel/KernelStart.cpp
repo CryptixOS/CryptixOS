@@ -73,34 +73,6 @@ namespace EFI
 };
 bool g_LogTmpFs = false;
 
-// static s_Filesystems = {
-//     {
-//         false,
-//         "tmpfs"_sv,
-//     },
-//     {
-//         false,
-//         "devtmpfs"_sv,
-//     },
-//     {
-//         false,
-//         "procfs"_sv,
-//     },
-//     {
-//         true,
-//         "echfs"_sv,
-//     },
-//     {
-//         true,
-//         "fat32fs"_sv,
-//     },
-//     {
-//         true,
-//         "ext2fs"_sv,
-//     },
-// };
-//
-
 template <typename T>
 void registerFilesystem(StringView name)
 {
@@ -181,7 +153,7 @@ static void kernelThread()
     Assert(VFS::MountRoot("tmpfs"));
     Initrd::Initialize();
 
-    VFS::CreateNode(nullptr, "/dev", 0755 | S_IFDIR);
+    VFS::CreateDirectory("/dev", 0755 | S_IFDIR);
     Assert(VFS::Mount(nullptr, "", "/dev", "devtmpfs"));
 
     Scheduler::InitializeProcFs();
@@ -339,7 +311,6 @@ kernelStart(const BootInformation& info)
 #endif
 
     Assert(System::LoadKernelSymbols(info.KernelExecutable));
-    Stacktrace::Print(30);
     Arch::Initialize();
 
     System::InitializeNumaDomains();

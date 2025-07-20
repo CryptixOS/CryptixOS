@@ -29,18 +29,16 @@ namespace Initrd
         }
 
         auto address = Pointer(initrd->LoadAddress).ToHigherHalf();
-
-        if (Ustar::Validate(address)) Ustar::Load(address, initrd->Size);
-        else
+        if (!Ustar::Validate(address))
         {
             LogError("Initrd: Unknown archive format!");
             return false;
         }
 
-        size_t pageCount
+        Assert(Ustar::Load(address, initrd->Size));
+        usize pageCount
             = (Math::AlignUp(initrd->Size, 512) + 512) / PMM::PAGE_SIZE;
-        PMM::FreePages(address.FromHigherHalf<void*>(),
-                                         pageCount);
+        PMM::FreePages(address.FromHigherHalf<void*>(), pageCount);
 
         LogInfo("Initrd: Loaded successfully");
         return true;

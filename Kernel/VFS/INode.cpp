@@ -132,6 +132,11 @@ ErrorOr<Ref<DirectoryEntry>> INode::CreateDirectory(Ref<DirectoryEntry> entry,
 {
     return Error(ENOSYS);
 }
+ErrorOr<Ref<DirectoryEntry>> INode::Symlink(Ref<DirectoryEntry> entry,
+                                            PathView            targetPath)
+{
+    return Error(ENOSYS);
+}
 ErrorOr<Ref<DirectoryEntry>> INode::Link(Ref<DirectoryEntry> oldEntry,
                                          Ref<DirectoryEntry> newEntry)
 {

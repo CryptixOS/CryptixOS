@@ -159,7 +159,7 @@ void Scheduler::Initialize()
 KERNEL_INIT_CODE
 void Scheduler::InitializeProcFs()
 {
-    VFS::CreateNode(nullptr, "/proc", 0755 | S_IFDIR);
+    VFS::CreateDirectory("/proc", 0755);
     Assert(VFS::Mount(nullptr, "", "/proc", "procfs"));
 
     s_ProcFs = MountPoint::Head()->Filesystem().As<ProcFs>();

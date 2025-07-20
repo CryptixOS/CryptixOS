@@ -256,7 +256,7 @@ bool ProcFs::Populate(DirectoryEntry* dentry) { return true; }
 
 void ProcFs::AddChild(StringView name)
 {
-    auto entry = new DirectoryEntry(m_RootEntry, name);
+    auto entry = new DirectoryEntry(nullptr, name);
     auto inode = CreateProcFsNode(m_Root, name, this);
     entry->Bind(inode);
 
@@ -265,4 +265,7 @@ void ProcFs::AddChild(StringView name)
         m_Root->InsertChild(inode, name);
         m_RootEntry->InsertChild(entry);
     }
+
+    entry->SetParent(m_RootEntry);
+    m_RootEntry->InsertChild(entry);
 }

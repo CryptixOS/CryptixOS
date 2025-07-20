@@ -22,7 +22,6 @@ DirectoryEntry::DirectoryEntry(::WeakRef<DirectoryEntry> parent,
     m_Name   = inode->Name();
     m_Parent = parent;
 
-    if (parent) parent->InsertChild(this);
     Bind(inode);
 }
 DirectoryEntry::DirectoryEntry(::WeakRef<DirectoryEntry> parent,
@@ -30,7 +29,6 @@ DirectoryEntry::DirectoryEntry(::WeakRef<DirectoryEntry> parent,
     : m_Name(name)
     , m_Parent(parent)
 {
-    if (parent) parent->InsertChild(this);
 }
 DirectoryEntry::~DirectoryEntry() {}
 
@@ -143,13 +141,12 @@ WeakRef<DirectoryEntry> DirectoryEntry::GetEffectiveParent()
     if (entryIt != m_Children.end()) return entryIt->Value;
     if (!m_INode) return nullptr;
 
-    auto inode = m_INode->Lookup(name);
-    if (!inode) return nullptr;
-
-    ::Ref entry = CreateRef<DirectoryEntry>(this, name);
-    entry->Bind(inode);
-
+    ::Ref entry = CreateRef<DirectoryEntry>(nullptr, name);
+    TryOrRetVal(m_INode->Lookup(entry), nullptr);
+        
+    entry->SetParent(this);
     InsertChild(entry);
+
     return entry;
 }
 

@@ -421,7 +421,7 @@ namespace API::VFS
     ErrorOr<isize> Unlink(const char* path) { return Error(ENOSYS); }
     ErrorOr<isize> Symlink(const char* target, const char* linkPath)
     {
-        return Error(ENOSYS);
+        return SymlinkAt(target, AT_FDCWD, linkPath);
     }
     ErrorOr<isize> ReadLink(PathView path, char* out, usize size)
     {
@@ -461,23 +461,14 @@ namespace API::VFS
                 return pathname;
             });
 
-        auto pathResOr = ResolveAtFd(dirFdNum, path, 0);
-        if (!pathResOr) return Error(pathResOr.Error());
-        auto    pathRes     = pathResOr.Value();
+        auto         pathRes   = TryOrRet(ResolveAtFd(dirFdNum, path, 0));
+        auto         directory = pathRes.Entry;
 
-        WeakRef parentEntry = pathRes.Parent;
-        auto    parentINode = parentEntry->INode();
+        PathResolver resolver(directory, path);
+        directory = TryOrRet(resolver.Resolve(
+            PathLookupFlags::eParent | PathLookupFlags::eNegativeEntry));
 
-        if (!parentEntry->IsDirectory()) return Error(ENOTDIR);
-        Ref entry = pathRes.Entry;
-
-        if (entry) return Error(EEXIST);
-
-        entry           = new DirectoryEntry(pathRes.Parent, pathRes.BaseName);
-        auto maybeEntry = parentINode->CreateDirectory(entry, mode);
-        if (!maybeEntry) return Error(maybeEntry.Error());
-
-        return 0;
+        return ::VFS::CreateDirectory(directory, path.BaseName(), mode);
     }
     ErrorOr<isize> ReadLinkAt(isize dirFdNum, const char* pathView,
                               char* outBuffer, usize bufferSize)
@@ -683,10 +674,22 @@ namespace API::VFS
 
         return 0;
     }
-    ErrorOr<isize> SymlinkAt(const char* target, isize newDirFdNum,
+    ErrorOr<isize> SymlinkAt(const char* targetPath, isize newDirFdNum,
                              const char* linkPath)
     {
-        return Error(ENOSYS);
+        auto getPath = [](const char* path) -> Path
+        { return CPU::AsUser([path]() -> Path { return path; }); };
+
+        auto         target    = getPath(targetPath);
+        auto         link      = getPath(linkPath);
+
+        auto         pathRes   = TryOrRet(ResolveAtFd(newDirFdNum, link, 0));
+        auto         directory = pathRes.Entry;
+
+        PathResolver resolver(directory, link);
+        directory = TryOrRet(resolver.Resolve(PathLookupFlags::eParent));
+
+        return ::VFS::Symlink(directory, link.BaseName(), target);
     }
 
     ErrorOr<isize> UtimensAt(i64 dirFdNum, const char* pathname,

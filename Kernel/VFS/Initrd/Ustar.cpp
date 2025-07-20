@@ -28,7 +28,7 @@ namespace Ustar
         return StringView(file->Signature, MAGIC_LENGTH - 1) == MAGIC;
     }
 
-    void Load(Pointer address, usize size)
+    ErrorOr<void> Load(Pointer address, usize size)
     {
         LogTrace("USTAR: Loading at '{:#x}'...", address);
 
@@ -67,7 +67,8 @@ namespace Ustar
             {
                 case FILE_TYPE_NORMAL:
                 case FILE_TYPE_NORMAL_:
-                    dentry = VFS::CreateNode(nullptr, filename, mode | S_IFREG);
+                    dentry
+                        = TryOrRet(VFS::CreateFile(filename, mode | S_IFREG));
 
                     if (!dentry)
                         LogError(
@@ -90,7 +91,7 @@ namespace Ustar
                              filename, linkName);
                     break;
                 case FILE_TYPE_SYMLINK:
-                    if (!VFS::Symlink(nullptr, filename, linkName.Raw()))
+                    if (!VFS::Symlink(filename, linkName))
                         LogError(
                             "USTAR: Failed to create Symlink: '{}' -> '{}'",
                             filename, linkName);
@@ -102,7 +103,7 @@ namespace Ustar
                     u32 deviceMinor
                         = StringUtils::ToNumber<u32>(current->DeviceMinor, 8);
 
-                    if (!VFS::MkNod(filename, mode | S_IFCHR,
+                    if (!VFS::CreateNode(filename, mode | S_IFCHR,
                                     MakeDevice(deviceMajor, deviceMinor)))
                         LogError(
                             "USTAR: Failed to create character device! path: "
@@ -113,7 +114,8 @@ namespace Ustar
                 }
                 case FILE_TYPE_BLOCK_DEVICE: ToDo(); break;
                 case FILE_TYPE_DIRECTORY:
-                    dentry = VFS::CreateNode(nullptr, filename, mode | S_IFDIR);
+                    dentry = TryOrRet(
+                        VFS::CreateDirectory(filename, mode | S_IFDIR));
                     if (!dentry)
                         LogError(
                             "USTAR: Failed to create a directory! path: '{}'",
@@ -125,5 +127,7 @@ namespace Ustar
 
             current = getNextFile(current, size);
         }
+
+        return {};
     }
 } // namespace Ustar
