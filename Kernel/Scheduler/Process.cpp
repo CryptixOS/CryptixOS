@@ -395,7 +395,7 @@ ErrorOr<Process*> Process::Fork()
         uintptr_t physicalSpace = PMM::CallocatePages<uintptr_t>(pageCount);
         Assert(physicalSpace);
 
-        std::memcpy(Pointer(physicalSpace).ToHigherHalf<void*>(),
+        Memory::Copy(Pointer(physicalSpace).ToHigherHalf<void*>(),
                     range->PhysicalBase().ToHigherHalf<void*>(), range->Size());
         pageMap->MapRange(range->VirtualBase(), physicalSpace, range->Size(),
                           PageAttributes::eRWXU | PageAttributes::eWriteBack);

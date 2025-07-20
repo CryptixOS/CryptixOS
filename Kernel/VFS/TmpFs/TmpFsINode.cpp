@@ -90,100 +90,6 @@ ErrorOr<Ref<DirectoryEntry>> TmpFsINode::Lookup(Ref<DirectoryEntry> entry)
 
     return Error(ENOENT);
 }
-void TmpFsINode::InsertChild(INode* inode, StringView name)
-{
-    ScopedLock guard(m_Lock);
-    m_Children[name] = inode;
-}
-
-isize TmpFsINode::Read(void* buffer, off_t offset, usize bytes)
-{
-    ScopedLock guard(m_Lock);
-
-    if (offset + bytes >= m_Buffer.Size())
-        bytes = bytes - ((offset + bytes) - m_Buffer.Size());
-
-    Assert(buffer);
-    if (m_Filesystem->ShouldUpdateATime())
-        m_Metadata.AccessTime = Time::GetReal();
-    Memory::Copy(buffer, reinterpret_cast<u8*>(m_Buffer.Raw()) + offset, bytes);
-    return bytes;
-}
-isize TmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
-{
-    ScopedLock guard(m_Lock);
-
-    // TODO(v1tr10l7): we should resize in separate function
-    auto       capacity = m_Buffer.Size();
-    if (offset + bytes > capacity)
-    {
-        usize newCapacity = capacity;
-        while (offset + bytes >= newCapacity) newCapacity *= 2;
-
-        auto tfs = reinterpret_cast<TmpFs*>(m_Filesystem);
-        if (tfs->GetSize() + (newCapacity - capacity) > tfs->GetMaxSize())
-        {
-            errno = ENOSPC;
-            return -1;
-        }
-
-        m_Buffer.Resize(newCapacity);
-    }
-
-    Memory::Copy(m_Buffer.Raw() + offset, buffer, bytes);
-
-    if (offset + bytes >= m_Metadata.Size)
-    {
-        m_Metadata.Size = off_t(offset + bytes);
-        m_Metadata.BlockCount
-            = Math::DivRoundUp(m_Metadata.Size, m_Metadata.BlockSize);
-    }
-
-    if (m_Filesystem->ShouldUpdateATime())
-        m_Metadata.AccessTime = Time::GetReal();
-    if (m_Filesystem->ShouldUpdateMTime())
-        m_Metadata.ModificationTime = Time::GetReal();
-    m_Metadata.Size = m_Buffer.Size();
-    return bytes;
-}
-ErrorOr<isize> TmpFsINode::Truncate(usize size)
-{
-    ScopedLock guard(m_Lock);
-
-    auto       capacity = m_Buffer.Size();
-    if (size == capacity) return 0;
-
-    const Credentials& creds = Process::GetCurrent()->Credentials();
-    if (!CanWrite(creds)) return Error(EPERM);
-
-    m_Buffer.Resize(size);
-    if (capacity < size)
-        Memory::Fill(m_Buffer.Raw() + capacity, 0, size - capacity);
-
-    if (m_Filesystem->ShouldUpdateCTime())
-        m_Metadata.ChangeTime = Time::GetReal();
-    if (m_Filesystem->ShouldUpdateMTime())
-        m_Metadata.ModificationTime = Time::GetReal();
-
-    m_Metadata.Size = static_cast<off_t>(size);
-    m_Metadata.BlockCount
-        = Math::DivRoundUp(m_Metadata.Size, m_Metadata.BlockSize);
-
-    return 0;
-}
-
-ErrorOr<void> TmpFsINode::Rename(INode* newParent, StringView newName)
-{
-    // TODO(v1tr10l7): Remove old inode
-
-    // auto parent = reinterpret_cast<TmpFsINode*>(m_Parent);
-    // parent->m_Children.Erase(m_Name);
-
-    m_Name = newName;
-    newParent->InsertChild(this, Name());
-
-    return {};
-}
 
 ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateNode(Ref<DirectoryEntry> entry,
                                                     mode_t mode, dev_t dev)
@@ -263,6 +169,103 @@ ErrorOr<Ref<DirectoryEntry>> TmpFsINode::Link(Ref<DirectoryEntry> oldEntry,
     return entry;
 }
 
+void TmpFsINode::InsertChild(INode* inode, StringView name)
+{
+    ScopedLock guard(m_Lock);
+    m_Children[name] = inode;
+}
+
+isize TmpFsINode::Read(void* buffer, off_t offset, usize bytes)
+{
+    ScopedLock guard(m_Lock);
+
+    if (offset + bytes >= m_Buffer.Size())
+        bytes = bytes - ((offset + bytes) - m_Buffer.Size());
+
+    Assert(buffer);
+    if (m_Filesystem->ShouldUpdateATime())
+        m_Metadata.AccessTime = Time::GetReal();
+    Memory::Copy(buffer, reinterpret_cast<u8*>(m_Buffer.Raw()) + offset, bytes);
+    return bytes;
+}
+isize TmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
+{
+    ScopedLock guard(m_Lock);
+
+    // TODO(v1tr10l7): we should resize in separate function
+    auto       capacity = m_Buffer.Size();
+    if (offset + bytes > capacity)
+    {
+        usize newCapacity = capacity;
+        while (offset + bytes >= newCapacity) newCapacity *= 2;
+
+        auto tfs = reinterpret_cast<TmpFs*>(m_Filesystem);
+        if (tfs->GetSize() + (newCapacity - capacity) > tfs->GetMaxSize())
+        {
+            errno = ENOSPC;
+            return -1;
+        }
+
+        m_Buffer.Resize(newCapacity);
+    }
+
+    Memory::Copy(m_Buffer.Raw() + offset, buffer, bytes);
+
+    if (offset + bytes >= m_Metadata.Size)
+    {
+        m_Metadata.Size = off_t(offset + bytes);
+        m_Metadata.BlockCount
+            = Math::DivRoundUp(m_Metadata.Size, m_Metadata.BlockSize);
+    }
+
+    if (m_Filesystem->ShouldUpdateATime())
+        m_Metadata.AccessTime = Time::GetReal();
+    if (m_Filesystem->ShouldUpdateMTime())
+        m_Metadata.ModificationTime = Time::GetReal();
+    m_Metadata.Size = m_Buffer.Size();
+    return bytes;
+}
+ErrorOr<Path>  TmpFsINode::ReadLink() { return m_Target; }
+
+ErrorOr<isize> TmpFsINode::Truncate(usize size)
+{
+    ScopedLock guard(m_Lock);
+
+    auto       capacity = m_Buffer.Size();
+    if (size == capacity) return 0;
+
+    const Credentials& creds = Process::GetCurrent()->Credentials();
+    if (!CanWrite(creds)) return Error(EPERM);
+
+    m_Buffer.Resize(size);
+    if (capacity < size)
+        Memory::Fill(m_Buffer.Raw() + capacity, 0, size - capacity);
+
+    if (m_Filesystem->ShouldUpdateCTime())
+        m_Metadata.ChangeTime = Time::GetReal();
+    if (m_Filesystem->ShouldUpdateMTime())
+        m_Metadata.ModificationTime = Time::GetReal();
+
+    m_Metadata.Size = static_cast<off_t>(size);
+    m_Metadata.BlockCount
+        = Math::DivRoundUp(m_Metadata.Size, m_Metadata.BlockSize);
+
+    return 0;
+}
+
+ErrorOr<void> TmpFsINode::Rename(INode* newParent, StringView newName)
+{
+    // TODO(v1tr10l7): Remove old inode
+
+    // auto parent = reinterpret_cast<TmpFsINode*>(m_Parent);
+    // parent->m_Children.Erase(m_Name);
+
+    m_Name = newName;
+    newParent->InsertChild(this, Name());
+
+    return {};
+}
+
 ErrorOr<void> TmpFsINode::Unlink(Ref<DirectoryEntry> entry)
 {
     auto it = m_Children.Find(entry->Name());
@@ -296,16 +299,4 @@ ErrorOr<void> TmpFsINode::RmDir(Ref<DirectoryEntry> entry)
     --m_Metadata.LinkCount;
 
     return Unlink(entry);
-}
-
-ErrorOr<void> TmpFsINode::Link(PathView path)
-{
-    // auto pathRes = VFS::ResolvePath(VFS::GetRootNode(), path);
-    // if (pathRes.Node) return Error(EEXIST);
-
-    // auto parent = pathRes.Parent;
-    // parent->InsertChild(this, pathRes.BaseName);
-
-    // return {};
-    return Error(ENOSYS);
 }

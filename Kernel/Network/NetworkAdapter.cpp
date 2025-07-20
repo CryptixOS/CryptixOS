@@ -20,26 +20,26 @@ bool NetworkAdapter::RegisterNIC(NetworkAdapter* nic)
     u8              packet[42]     = {0};
 
     EthernetHeader* ethernetHeader = reinterpret_cast<EthernetHeader*>(packet);
-    std::memset(ethernetHeader->DestinationHardwareAddress, 0xff, 6);
-    std::memcpy(ethernetHeader->SourceHardwareAddress,
+    Memory::Fill(ethernetHeader->DestinationHardwareAddress, 0xff, 6);
+    Memory::Copy(ethernetHeader->SourceHardwareAddress,
                 nic->GetMacAddress().Raw(), 6);
     ethernetHeader->EthernetType = __builtin_bswap16(0x0806);
 
     ArpPacket* arpHeader
         = reinterpret_cast<ArpPacket*>(packet + sizeof(EthernetHeader));
     arpHeader->HardwareType = static_cast<HardwareType>(
-        __builtin_bswap16(std::to_underlying(HardwareType::eEthernet)));
+        __builtin_bswap16(ToUnderlying(HardwareType::eEthernet)));
     arpHeader->ProtocolType = static_cast<ProtocolType>(
-        __builtin_bswap16(std::to_underlying(ProtocolType::eArp)));
+        __builtin_bswap16(ToUnderlying(ProtocolType::eArp)));
     arpHeader->HardwareAddressLength = 6;
     arpHeader->ProtocolAddressLength = 4;
     arpHeader->OpCode                = static_cast<ArpOpCode>(
-        __builtin_bswap16(std::to_underlying(ArpOpCode::eRequest)));
+        __builtin_bswap16(ToUnderlying(ArpOpCode::eRequest)));
 
-    std::memcpy(arpHeader->SourceHardwareAddress, nic->GetMacAddress().Raw(),
+    Memory::Copy(arpHeader->SourceHardwareAddress, nic->GetMacAddress().Raw(),
                 6);
 
-    std::memset(arpHeader->DestinationHardwareAddress, 0, 6);
+    Memory::Fill(arpHeader->DestinationHardwareAddress, 0, 6);
 
     arpHeader->SourceIPv4 = __builtin_bswap32(0xC0A8007A);
     arpHeader->DestIPv4   = __builtin_bswap32(0xC0A8007C);

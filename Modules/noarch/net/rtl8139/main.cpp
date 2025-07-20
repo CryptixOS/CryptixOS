@@ -95,9 +95,9 @@ namespace RTL8139
         auto& transmit = m_TransmitBuffers[bufferIndex];
         m_TransmitNext = (bufferIndex + 1) % 4;
 
-        std::memcpy(transmit.As<void>(), data, length);
+        Memory::Copy(transmit.As<void>(), data, length);
         if (auto left = TRANSMIT_BUFFER_SIZE - length; left > 0)
-            std::memset(transmit.Offset<Pointer>(length).As<void*>(), 0, left);
+            Memory::Fill(transmit.Offset<Pointer>(length).As<void*>(), 0, left);
 
         Register transmitStatusReg = static_cast<Register>(
             bufferIndex + ToUnderlying(Register::eTransmitStatus0));

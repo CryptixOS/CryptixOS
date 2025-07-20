@@ -195,9 +195,9 @@ isize DevTmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
     return bytes;
 }
 
-i32 DevTmpFsINode::IoCtl(usize request, usize arg)
+ErrorOr<isize> DevTmpFsINode::IoCtl(usize request, usize arg)
 {
-    if (!m_Device) return_err(-1, ENOTTY);
+    if (!m_Device) return Error(ENOTTY);
 
     return m_Device->IoCtl(request, arg);
 }

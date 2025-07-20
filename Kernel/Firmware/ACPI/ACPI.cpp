@@ -92,7 +92,7 @@ namespace ACPI
                 if (!header || !(reinterpret_cast<char*>(header->Signature))
                     || header->Signature[0] == 0)
                     continue;
-                std::memcpy(acpiSignature, header->Signature, 4);
+                Memory::Copy(acpiSignature, header->Signature, 4);
                 LogTrace("  -{}", acpiSignature);
             }
         }

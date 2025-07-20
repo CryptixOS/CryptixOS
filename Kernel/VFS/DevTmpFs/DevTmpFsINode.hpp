@@ -20,9 +20,7 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
   public:
     DevTmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
                   Device* device = nullptr);
-    virtual ~DevTmpFsINode()
-    {
-    }
+    virtual ~DevTmpFsINode() {}
 
     virtual const stat Stats() override
     {
@@ -72,7 +70,7 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
 
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
-    virtual i32   IoCtl(usize request, usize arg) override;
+    virtual ErrorOr<isize> IoCtl(usize request, usize arg) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
 
   private:

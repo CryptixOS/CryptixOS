@@ -7,33 +7,31 @@
 #pragma once
 
 #include <Debug/Assertions.hpp>
+#include <Prism/Containers/Array.hpp>
 #include <Prism/Core/Types.hpp>
-
-#include <array>
-#include <cstring>
 
 class [[gnu::packed]] MacAddress
 {
   public:
     MacAddress() = default;
-    MacAddress(const std::array<u8, 6> segments) { m_Segments = segments; }
+    explicit MacAddress(const Array<u8, 6> segments) { m_Segments = segments; }
 
-    constexpr u8* Raw() { return m_Segments.data(); }
+    constexpr u8* Raw() { return m_Segments.Raw(); }
 
     constexpr u8  operator[](const usize index) const
     {
-        Assert(index < m_Segments.size());
+        Assert(index < m_Segments.Size());
         return m_Segments[index];
     }
     constexpr u8& operator[](const usize index)
     {
-        Assert(index < m_Segments.size());
+        Assert(index < m_Segments.Size());
         return m_Segments[index];
     }
     constexpr auto operator<=>(const MacAddress& other) const = default;
 
   private:
-    std::array<u8, 6> m_Segments;
+    Array<u8, 6> m_Segments;
 };
 
 template <>

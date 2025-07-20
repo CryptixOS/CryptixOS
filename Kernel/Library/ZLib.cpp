@@ -202,7 +202,7 @@ namespace ZLib
         } while (!final);
 
         u32 checksum = 0;
-        std::memcpy(&checksum, m_InputData.Offset<u8*>(m_InputSize - 4), 4);
+        Memory::Copy(&checksum, m_InputData.Offset<u8*>(m_InputSize - 4), 4);
         checksum = ConvertEndian<Endian::eNative, Endian::eBig>(checksum);
 
         const u32 computedAdler32
@@ -300,7 +300,7 @@ namespace ZLib
         i32          codeLengthCodeCount = stream.ReadBits(4) + 4;
         i32          totalCodes          = literalCodeCount + distanceCodeCount;
 
-        std::memset(codeLengthCodeLengths, 0, sizeof(codeLengthCodeLengths));
+        Memory::Fill(codeLengthCodeLengths, 0, sizeof(codeLengthCodeLengths));
         for (i32 i = 0; i < codeLengthCodeCount; ++i)
             codeLengthCodeLengths[codeLengthOrder[i]] = stream.ReadBits(3);
         if (!codeLengthTree.Build({codeLengthCodeLengths, 19})) return false;
@@ -324,7 +324,7 @@ namespace ZLib
                 default: LogError("ZLib: Invalid code length"); return false;
             }
 
-            std::memset(allCodeLengths + i, value, repeat);
+            Memory::Fill(allCodeLengths + i, value, repeat);
             i += repeat;
         }
         if (i != totalCodes)

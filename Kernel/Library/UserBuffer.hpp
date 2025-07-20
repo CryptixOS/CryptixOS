@@ -52,22 +52,22 @@ class [[nodiscard]] UserBuffer
     inline isize Read(Pointer destination, usize count, isize pos = -1)
     {
         if (pos < 0) pos = 0;
-        usize                          copied = std::min(count, m_Size - pos);
+        usize                          copied = Min(count, m_Size - pos);
 
         CPU::UserMemoryProtectionGuard guard;
-        std::memcpy(destination.As<u8>(), m_Base.Offset<Pointer>(pos).As<u8>(),
-                    count);
+        Memory::Copy(destination.As<u8>(), m_Base.Offset<Pointer>(pos).As<u8>(),
+                     count);
 
         return copied;
     }
     inline isize Write(Pointer source, usize count, isize pos = -1)
     {
         if (pos < 0) pos = 0;
-        count = std::min(count, m_Size - pos);
+        count = Min(count, m_Size - pos);
 
         CPU::UserMemoryProtectionGuard guard;
-        std::memcpy(m_Base.Offset<Pointer>(pos).As<u8>(), source.As<u8>(),
-                    count);
+        Memory::Copy(m_Base.Offset<Pointer>(pos).As<u8>(), source.As<u8>(),
+                     count);
         return count;
     }
 

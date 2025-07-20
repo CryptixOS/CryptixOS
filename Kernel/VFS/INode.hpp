@@ -102,24 +102,27 @@ class INode
     virtual ErrorOr<Ref<DirectoryEntry>> Link(Ref<DirectoryEntry> oldEntry,
                                               Ref<DirectoryEntry> entry);
 
-    virtual void  InsertChild(INode* node, StringView name)            = 0;
-    virtual isize Read(void* buffer, off_t offset, usize bytes)        = 0;
-    virtual isize Write(const void* buffer, off_t offset, usize bytes) = 0;
-    virtual i32   IoCtl(usize request, usize arg) { return_err(-1, ENODEV); }
+    virtual void          InsertChild(INode* node, StringView name)     = 0;
+    virtual isize         Read(void* buffer, off_t offset, usize bytes) = 0;
+    virtual isize Write(const void* buffer, off_t offset, usize bytes)  = 0;
+    virtual ErrorOr<isize> IoCtl(usize request, usize arg)
+    {
+        return Error(ENODEV);
+    }
+    virtual ErrorOr<isize> ReadLink(UserBuffer& outBuffer);
+    virtual ErrorOr<Path>  ReadLink();
+
     virtual ErrorOr<isize> Truncate(usize size) { return Error(ENOSYS); }
     virtual ErrorOr<void>  Rename(INode* newParent, StringView newName)
     {
         return Error(ENOSYS);
     }
-    virtual ErrorOr<Path> ReadLink();
 
     virtual ErrorOr<void> Unlink(Ref<DirectoryEntry> entry);
     virtual ErrorOr<void> RmDir(Ref<DirectoryEntry> entry)
     {
         return Error(ENOSYS);
     }
-    virtual ErrorOr<void>  Link(PathView path) { return Error(ENOSYS); }
-    virtual ErrorOr<isize> ReadLink(UserBuffer& outBuffer);
 
     virtual ErrorOr<isize> CheckPermissions(mode_t mask);
 

@@ -81,7 +81,7 @@ namespace NVMe
 
         uintptr_t dest = reinterpret_cast<uintptr_t>(&m_Submit[currentTail]);
 
-        std::memcpy(reinterpret_cast<u8*>(dest), cmd, sizeof(Submission));
+        Memory::Copy(dest, cmd, sizeof(Submission));
         currentTail         = (currentTail + 1) % m_Depth;
 
         *(m_SubmitDoorbell) = currentTail;

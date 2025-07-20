@@ -673,16 +673,10 @@ namespace API::VFS
     ErrorOr<isize> LinkAt(isize oldDirFdNum, const char* oldPath,
                           isize newDirFdNum, const char* newPath, isize flags)
     {
-        auto getPath = [](const char* path) -> Path
-        { return CPU::AsUser([path]() -> Path { return path; }); };
+        auto oldPathName = CPU::CopyStringFromUser(oldPath);
+        auto newPathName = CPU::CopyStringFromUser(newPath);
 
-        auto oldPathName = getPath(oldPath);
-        auto newPathName = getPath(newPath);
-
-        auto entry = ::VFS::Link(nullptr, oldPathName, nullptr, newPathName, 0);
-        if (!entry) return Error(errno);
-
-        return 0;
+        return ::VFS::Link(oldPathName, newPathName, 0);
     }
     ErrorOr<isize> SymlinkAt(const char* targetPath, isize newDirFdNum,
                              const char* linkPath)
@@ -821,8 +815,7 @@ namespace Syscall::VFS
         switch (op)
         {
             CTOS_FALLTHROUGH;
-            case F_DUPFD: cloExec = false;
-            CTOS_FALLTHROUGH;
+            case F_DUPFD: cloExec = false; CTOS_FALLTHROUGH;
             case F_DUPFD_CLOEXEC:
             {
                 isize newFdNum = -1;

@@ -16,7 +16,7 @@ class Ext2FsINode;
 class Ext2Fs : public Filesystem
 {
   public:
-    Ext2Fs(u32 flags)
+    explicit Ext2Fs(u32 flags)
         : Filesystem("Ext2Fs", flags)
     {
     }
