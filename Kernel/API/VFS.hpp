@@ -58,6 +58,7 @@ namespace API::VFS
                          const void* data);
 
     ErrorOr<isize> MkDirAt(isize dirFdNum, const char* path, mode_t mode);
+    ErrorOr<isize> MkNodAt(isize dirFdNum, const char* path, mode_t mode, dev_t dev);
     ErrorOr<isize> ReadLinkAt(isize dirFdNum, const char* path, char* out,
                               usize bufferSize);
     ErrorOr<isize> FChModAt(isize dirFdNum, PathView path, mode_t mode);

@@ -211,6 +211,7 @@ namespace Syscall
         ePanic            = 255,
         eOpenAt           = 257,
         eMkDirAt          = 258,
+        eMkNodAt          = 259,
         eFStatAt          = 262,
         eUnlinkAt         = 263,
         eRenameAt         = 264,

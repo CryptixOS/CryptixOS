@@ -167,6 +167,7 @@ namespace Syscall
         RegisterSyscall2(ID::ePanic, API::System::SysPanic);
         RegisterSyscall(ID::eOpenAt, VFS::SysOpenAt);
         RegisterSyscall2(ID::eMkDirAt, API::VFS::MkDirAt);
+        RegisterSyscall2(ID::eMkNodAt, API::VFS::MkNodAt);
         RegisterSyscall2(ID::eFStatAt, API::VFS::FStatAt);
         RegisterSyscall2(ID::eUnlinkAt, API::VFS::UnlinkAt);
         RegisterSyscall2(ID::eRenameAt, API::VFS::RenameAt);

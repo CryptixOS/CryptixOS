@@ -117,10 +117,10 @@ ErrorOr<void> PathResolver::Step()
 {
     m_Parent         = m_DirectoryEntry;
     m_DirectoryEntry = m_DirectoryEntry->Lookup(m_CurrentSegment.Name);
-    while (m_DirectoryEntry->IsMountPoint())
+    while (m_DirectoryEntry && m_DirectoryEntry->IsMountPoint())
         m_DirectoryEntry = m_DirectoryEntry->FollowMounts().Promote();
 
-    m_BaseName       = Path(m_CurrentSegment.Name);
+    m_BaseName = Path(m_CurrentSegment.Name);
     if (!m_DirectoryEntry) return Terminate(ENOENT);
 
     if (m_CurrentSegment.IsLast)
