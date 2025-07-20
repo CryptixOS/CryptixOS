@@ -10,6 +10,7 @@
 
 #include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Memory/Buffer.hpp>
 
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/INode.hpp>
@@ -21,7 +22,6 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
                   Device* device = nullptr);
     virtual ~DevTmpFsINode()
     {
-        if (m_Capacity > 0) delete m_Data;
     }
 
     virtual const stat Stats() override
@@ -61,16 +61,24 @@ class DevTmpFsINode : public INode, NonCopyable<DevTmpFsINode>
         m_Children[name] = node;
     }
 
+    virtual ErrorOr<Ref<DirectoryEntry>>
+    CreateNode(Ref<DirectoryEntry> entry, mode_t mode, dev_t dev = 0) override;
+    virtual ErrorOr<Ref<DirectoryEntry>> CreateFile(Ref<DirectoryEntry> entry,
+                                                    mode_t mode) override;
+    virtual ErrorOr<Ref<DirectoryEntry>>
+    CreateDirectory(Ref<DirectoryEntry> entry, mode_t mode) override;
+    virtual ErrorOr<Ref<DirectoryEntry>> Symlink(Ref<DirectoryEntry> entry,
+                                                 PathView targetPath) override;
+
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual i32   IoCtl(usize request, usize arg) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
 
   private:
-    Device*                          m_Device   = nullptr;
-    u8*                              m_Data     = nullptr;
-    usize                            m_Capacity = 0;
+    Device*                          m_Device = nullptr;
 
+    Buffer                           m_Buffer;
     UnorderedMap<StringView, INode*> m_Children;
     friend class DevTmpFs;
 };

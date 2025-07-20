@@ -71,8 +71,6 @@ class INode
     }
 
     virtual ErrorOr<Ref<DirectoryEntry>> Lookup(Ref<DirectoryEntry> dentry);
-    virtual ErrorOr<Ref<DirectoryEntry>> LookupV2(Ref<DirectoryEntry> dentry);
-    virtual INode*    Lookup(const String& name) { return nullptr; }
 
     inline StringView Name() { return m_Name; }
     mode_t            Mode() const;
@@ -93,16 +91,6 @@ class INode
     bool              ValidatePermissions(const Credentials& creds, u32 acc);
     void              UpdateATime();
 
-    virtual void      InsertChild(INode* node, StringView name)            = 0;
-    virtual isize     Read(void* buffer, off_t offset, usize bytes)        = 0;
-    virtual isize     Write(const void* buffer, off_t offset, usize bytes) = 0;
-    virtual i32 IoCtl(usize request, usize arg) { return_err(-1, ENODEV); }
-    virtual ErrorOr<isize> Truncate(usize size) { return Error(ENOSYS); }
-    virtual ErrorOr<void>  Rename(INode* newParent, StringView newName)
-    {
-        return Error(ENOSYS);
-    }
-
     virtual ErrorOr<Ref<DirectoryEntry>> CreateNode(Ref<DirectoryEntry> entry,
                                                     mode_t mode, dev_t dev = 0);
     virtual ErrorOr<Ref<DirectoryEntry>> CreateFile(Ref<DirectoryEntry> entry,
@@ -113,6 +101,16 @@ class INode
                                                  PathView targetPath);
     virtual ErrorOr<Ref<DirectoryEntry>> Link(Ref<DirectoryEntry> oldEntry,
                                               Ref<DirectoryEntry> entry);
+
+    virtual void      InsertChild(INode* node, StringView name)            = 0;
+    virtual isize     Read(void* buffer, off_t offset, usize bytes)        = 0;
+    virtual isize     Write(const void* buffer, off_t offset, usize bytes) = 0;
+    virtual i32 IoCtl(usize request, usize arg) { return_err(-1, ENODEV); }
+    virtual ErrorOr<isize> Truncate(usize size) { return Error(ENOSYS); }
+    virtual ErrorOr<void>  Rename(INode* newParent, StringView newName)
+    {
+        return Error(ENOSYS);
+    }
 
     virtual ErrorOr<void>                Unlink(Ref<DirectoryEntry> entry);
     virtual ErrorOr<void>                RmDir(Ref<DirectoryEntry> entry)

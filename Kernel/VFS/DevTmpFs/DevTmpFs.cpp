@@ -8,6 +8,7 @@
 #include <VFS/DevTmpFs/DevTmpFsINode.hpp>
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/VFS.hpp>
+#include <Time/Time.hpp>
 
 UnorderedMap<dev_t, Device*> DevTmpFs::s_Devices{};
 
@@ -26,7 +27,7 @@ ErrorOr<::Ref<DirectoryEntry>> DevTmpFs::Mount(StringView  sourcePath,
     if (m_Root) VFS::RecursiveDelete(m_Root);
 
     m_RootEntry    = new DirectoryEntry(nullptr, "/");
-    auto maybeRoot = MkNod(nullptr, m_RootEntry, 0755 | S_IFDIR, 0);
+    auto maybeRoot = AllocateNode(m_RootEntry->Name(), 0755 | S_IFDIR);
     RetOnError(maybeRoot);
 
     m_Root = maybeRoot.Value();
@@ -35,44 +36,29 @@ ErrorOr<::Ref<DirectoryEntry>> DevTmpFs::Mount(StringView  sourcePath,
     return m_RootEntry;
 }
 
-ErrorOr<INode*> DevTmpFs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
-                                     mode_t mode, uid_t uid, gid_t gid)
+ErrorOr<INode*> DevTmpFs::AllocateNode(StringView name, mode_t mode)
 {
-    auto inodeOr = MkNod(parent, entry, mode, 0);
-    auto inode   = inodeOr.ValueOr(nullptr);
-    if (!inode) return Error(inodeOr.Error());
-
-    entry->Bind(inode);
-    return inode;
-}
-
-ErrorOr<INode*> DevTmpFs::Symlink(INode* parent, ::Ref<DirectoryEntry> entry,
-                                  StringView target)
-{
-    ToDo();
-
-    return nullptr;
-}
-INode* DevTmpFs::Link(INode* parent, StringView name, INode* oldNode)
-{
-    ToDo();
-
-    return nullptr;
-}
-
-ErrorOr<INode*> DevTmpFs::MkNod(INode* parent, ::Ref<DirectoryEntry> entry,
-                                mode_t mode, dev_t dev)
-{
-    auto inode = new DevTmpFsINode(entry->Name(), this, mode);
+    auto inode = new DevTmpFsINode(name, this, mode);
     if (!inode) return Error(ENOMEM);
-    entry->Bind(inode);
+    // TODO(v1tr10l7): uid, gid
 
-    if (parent) parent->InsertChild(inode, entry->Name());
+    inode->m_Metadata.ID               = NextINodeIndex();
+    inode->m_Metadata.BlockSize        = PMM::PAGE_SIZE;
+    inode->m_Metadata.BlockCount       = 0;
+    inode->m_Metadata.RootDeviceID     = 0;
 
-    auto it = s_Devices.Find(dev);
-    if (it == s_Devices.end()) return inode;
+    auto currentTime                   = Time::GetReal();
+    inode->m_Metadata.AccessTime       = currentTime;
+    inode->m_Metadata.ModificationTime = currentTime;
+    inode->m_Metadata.ChangeTime       = currentTime;
 
-    inode->m_Device = it->Value;
+    if (S_ISDIR(mode))
+    {
+        ++inode->m_Metadata.LinkCount;
+        inode->m_Metadata.Size = 2 * PMM::PAGE_SIZE;
+    }
+
+    // --m_FreeINodeCount;
     return inode;
 }
 

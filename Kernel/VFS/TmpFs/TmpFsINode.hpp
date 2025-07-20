@@ -37,7 +37,6 @@ class TmpFsINode final : public INode
 
     virtual ErrorOr<Ref<DirectoryEntry>>
                                   Lookup(Ref<DirectoryEntry> dentry) override;
-    virtual INode*                Lookup(const String& name) override;
 
     inline static constexpr usize GetDefaultSize() { return 0x1000; }
 

@@ -117,10 +117,7 @@ bool INode::ValidatePermissions(const Credentials& creds, u32 acc)
 ErrorOr<Ref<DirectoryEntry>> INode::CreateNode(Ref<DirectoryEntry> entry,
                                                mode_t mode, dev_t dev)
 {
-    auto newEntry = m_Filesystem->CreateNode(this, entry, mode);
-    RetOnError(newEntry);
-
-    return entry;
+    return Error(ENOSYS);
 }
 ErrorOr<Ref<DirectoryEntry>> INode::CreateFile(Ref<DirectoryEntry> entry,
                                                mode_t              mode)
@@ -168,19 +165,7 @@ ErrorOr<isize> INode::CheckPermissions(mode_t mask)
 
 ErrorOr<Ref<DirectoryEntry>> INode::Lookup(Ref<DirectoryEntry> dentry)
 {
-    auto inode = Lookup(dentry->Name());
-    if (!inode) return Error(ENOENT);
-
-    dentry->Bind(inode);
-    return dentry;
-}
-ErrorOr<Ref<DirectoryEntry>> INode::LookupV2(Ref<DirectoryEntry> dentry)
-{
-    auto inode = Lookup(dentry->Name());
-    if (!inode) return Error(ENOENT);
-
-    dentry->Bind(inode);
-    return dentry;
+    return Error(ENOSYS);
 }
 
 ErrorOr<void> INode::SetOwner(uid_t uid, gid_t gid)

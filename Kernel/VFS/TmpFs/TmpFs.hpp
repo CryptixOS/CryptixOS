@@ -25,18 +25,11 @@ class TmpFs : public Filesystem
 
     virtual ErrorOr<INode*> AllocateNode(StringView name,
                                          INodeMode  mode) override;
-    virtual ErrorOr<INode*> CreateNode(INode*                parent,
-                                       ::Ref<DirectoryEntry> entry, mode_t mode,
-                                       uid_t uid = 0, gid_t gid = 0) override;
-    virtual ErrorOr<INode*> Symlink(INode* parent, ::Ref<DirectoryEntry> entry,
-                                    StringView target) override;
-    virtual INode*          Link(INode* parent, StringView name,
-                                 INode* oldNode) override;
-    virtual bool Populate(DirectoryEntry* dentry) override { return true; }
-    virtual ErrorOr<INode*> MkNod(INode* parent, ::Ref<DirectoryEntry> entry,
-                                  mode_t mode, dev_t dev) override;
+    virtual bool    Populate(DirectoryEntry* dentry) override { return true; }
+    ErrorOr<INode*> CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
+                               mode_t mode, dev_t dev);
 
-    virtual ErrorOr<void>   Stats(statfs& stats) override;
+    virtual ErrorOr<void> Stats(statfs& stats) override;
 
   private:
     usize                  m_MaxBlockCount      = 0;

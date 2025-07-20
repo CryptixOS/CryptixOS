@@ -113,65 +113,12 @@ class Filesystem : public RefCounted
         return Error(ENOSYS);
     }
     /**
-     * @brief Create a new inode (file or directory).
-     *
-     * @param parent Parent directory.
-     * @param entry Directory entry under which to create node.
-     * @param mode File mode (type and permissions).
-     * @param uid Owner user ID.
-     * @param gid Owner group ID.
-     *
-     * @return ErrorOr<INode*> Pointer to the new inode or error.
-     */
-    virtual ErrorOr<INode*> CreateNode(INode*                parent,
-                                       ::Ref<DirectoryEntry> entry, mode_t mode,
-                                       uid_t uid = 0, gid_t gid = 0)
-        = 0;
-    /**
-     * @brief Create a symbolic link.
-     *
-     * @param parent Parent directory.
-     * @param entry Directory entry for the link.
-     * @param target Path the link should point to.
-     *
-     * @return ErrorOr<INode*> Pointer to the symlink inode or error.
-     */
-    virtual ErrorOr<INode*> Symlink(INode* parent, ::Ref<DirectoryEntry> entry,
-                                    StringView target)
-        = 0;
-    /**
-     * @brief Create a hard link to an existing inode.
-     *
-     * @param parent Directory in which to place the link.
-     * @param name Name of the new link.
-     * @param oldNode The inode to link to.
-     *
-     * @return INode* Pointer to the newly linked inode.
-     */
-    virtual INode* Link(INode* parent, StringView name, INode* oldNode) = 0;
-    /**
      * @brief Populate directory contents, if lazy-loading is used.
      * @param Directory entry to populate.
      *
      * @return true if successful or not needed, false on failure.
      */
     virtual bool   Populate(DirectoryEntry* entry)                      = 0;
-
-    /**
-     * @brief Create a special or device file node.
-     *
-     * @param parent Parent directory.
-     * @param entry Directory entry.
-     * @param mode Mode specifying node type.
-     * @param dev Device ID for special node.
-     *
-     * @return ErrorOr<INode*> Pointer to new node or error.
-     */
-    virtual ErrorOr<INode*> MkNod(INode* parent, ::Ref<DirectoryEntry> entry,
-                                  mode_t mode, dev_t dev = 0)
-    {
-        return Error(ENOSYS);
-    }
 
     /**
      * @brief Return filesystem statistics (like block size, usage).

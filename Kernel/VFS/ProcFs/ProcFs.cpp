@@ -243,15 +243,6 @@ ErrorOr<INode*> ProcFs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
 
     return inode;
 }
-ErrorOr<INode*> ProcFs::Symlink(INode* parent, ::Ref<DirectoryEntry> entry,
-                                StringView target)
-{
-    return nullptr;
-}
-INode* ProcFs::Link(INode* parent, StringView name, INode* oldNode)
-{
-    return nullptr;
-}
 bool ProcFs::Populate(DirectoryEntry* dentry) { return true; }
 
 void ProcFs::AddChild(StringView name)

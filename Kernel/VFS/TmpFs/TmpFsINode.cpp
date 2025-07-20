@@ -90,15 +90,6 @@ ErrorOr<Ref<DirectoryEntry>> TmpFsINode::Lookup(Ref<DirectoryEntry> entry)
 
     return Error(ENOENT);
 }
-INode* TmpFsINode::Lookup(const String& name)
-{
-    ScopedLock guard(m_Lock);
-
-    auto       child = Children().Find(name);
-    if (child != Children().end()) return child->Value;
-
-    return nullptr;
-}
 void TmpFsINode::InsertChild(INode* inode, StringView name)
 {
     ScopedLock guard(m_Lock);
@@ -197,8 +188,6 @@ ErrorOr<void> TmpFsINode::Rename(INode* newParent, StringView newName)
 ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateNode(Ref<DirectoryEntry> entry,
                                                     mode_t mode, dev_t dev)
 {
-    TmpFsTrace("Create file system node...");
-    if (g_LogTmpFs) Stacktrace::Print(5);
     if (m_Children.Contains(entry->Name())) return Error(EEXIST);
 
     auto maybeINode = m_Filesystem->AllocateNode(entry->Name(), mode);
@@ -210,7 +199,7 @@ ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateNode(Ref<DirectoryEntry> entry,
     if (S_ISREG(mode))
     {
         inode->m_Metadata.Size = inode->GetDefaultSize();
-        m_Buffer.Resize(GetDefaultSize());
+        inode->m_Buffer.Resize(GetDefaultSize());
     }
 
     // TODO(v1tr10l7): set dev
@@ -221,7 +210,6 @@ ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateNode(Ref<DirectoryEntry> entry,
     m_Metadata.ChangeTime       = currentTime;
     m_Metadata.ModificationTime = currentTime;
 
-    TmpFsTrace("Inserting into children registry...");
     InsertChild(inode, entry->Name());
     if (Mode() & S_ISGID)
     {
@@ -236,7 +224,6 @@ ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateNode(Ref<DirectoryEntry> entry,
 ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateFile(Ref<DirectoryEntry> entry,
                                                     mode_t              mode)
 {
-    TmpFsTrace("Create regular file...");
     return CreateNode(entry, mode | S_IFREG, 0);
 }
 ErrorOr<Ref<DirectoryEntry>>

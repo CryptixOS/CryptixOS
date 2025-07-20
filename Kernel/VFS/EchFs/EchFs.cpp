@@ -142,12 +142,6 @@ fail_free_id_table:
     return nullptr;
 }
 
-ErrorOr<INode*> EchFs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
-                                  mode_t mode, uid_t uid, gid_t gid)
-{
-    return nullptr;
-}
-
 bool EchFs::Populate(EchFsINode* native)
 {
     INode*              inode      = reinterpret_cast<INode*>(native);

@@ -199,35 +199,6 @@ static void kernelThread()
             System::LoadModule(child);
     }
 
-    g_LogTmpFs = true;
-
-    // auto maybePathRes
-    //     = VFS::ResolvePath(VFS::RootDirectoryEntry(), "/mnt/ext2/Kernel");
-    // if (!maybePathRes)
-    //     LogError("Kernel: Failed to resolve `/mnt/ext2/Kernel/`");
-    // else if (auto entry = maybePathRes.Value().Parent; entry)
-    // {
-    //     LogInfo("Kernel: Found entry => {}", entry->Path());
-    //
-    //     auto iterator
-    //         = [&](StringView name, loff_t offset, usize ino, usize type) ->
-    //         bool
-    //     {
-    //         LogTrace("Child => {}", name);
-    //
-    //         return true;
-    //     };
-    //
-    //     Delegate<bool(StringView, loff_t, usize, usize)> delegate;
-    //     delegate.BindLambda(iterator);
-    //
-    //     LogTrace("Children of {} =>", entry->Name());
-    //     entry->INode()->TraverseDirectories(entry.Raw(), delegate);
-    //
-    //     entry = entry->FollowMounts()->Lookup("Kernel");
-    //     entry->INode()->TraverseDirectories(entry.Raw(), delegate);
-    // }
-    //
     LogTrace("Loading init process...");
     auto initPath = CommandLine::GetString("init");
     if (!loadInitProcess(initPath.Empty() ? "/usr/sbin/init" : initPath))

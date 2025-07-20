@@ -24,13 +24,10 @@
 #include <VFS/TmpFs/TmpFs.hpp>
 #include <VFS/VFS.hpp>
 
-#include <cerrno>
-
 namespace VFS
 {
     static SpinlockProtected<FilesystemDriver::List> s_FilesystemDrivers;
     static Ref<DirectoryEntry>     s_RootDirectoryEntry = nullptr;
-    static Spinlock                s_Lock;
 
     ErrorOr<Ref<FilesystemDriver>> FindFilesystemDriver(StringView name)
     {
@@ -340,8 +337,7 @@ namespace VFS
                 break;
 
             default:
-                TryOrRet(directoryINode->Filesystem()->MkNod(directoryINode,
-                                                             entry, mode, dev));
+                TryOrRet(directoryINode->CreateNode(entry, mode, dev));
                 break;
         }
 
@@ -396,29 +392,6 @@ namespace VFS
     {
         return Symlink(TryOrRet(ResolveParent(RootDirectoryEntry(), path)),
                        path.BaseName(), targetPath);
-    }
-
-    Ref<DirectoryEntry> Symlink(Ref<DirectoryEntry> parent, PathView path,
-                                StringView target)
-    {
-        if (!parent) parent = RootDirectoryEntry();
-        ScopedLock   guard(s_Lock);
-
-        PathResolver resolver(parent, path);
-        auto         directory
-            = TryOrRetVal(resolver.Resolve(PathLookupFlags::eParent
-                                           | PathLookupFlags::eNegativeEntry),
-                          nullptr);
-
-        auto newEntry = CreateRef<DirectoryEntry>(directory, path.BaseName());
-        auto directoryINode = directory->INode();
-        auto newINode       = TryOrRetVal(directoryINode->Filesystem()->Symlink(
-                                        directoryINode, newEntry, target),
-                                          nullptr);
-        // if (resolver.ParentEntry())
-        // resolver.ParentEntry()->InsertChild(newEntry);
-        Assert(newINode);
-        return newEntry;
     }
 
     Ref<DirectoryEntry> Link(Ref<DirectoryEntry> oldParent, PathView oldPath,

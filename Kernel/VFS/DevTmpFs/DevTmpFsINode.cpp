@@ -7,12 +7,11 @@
 #include <Prism/Utility/Math.hpp>
 
 #include <Scheduler/Process.hpp>
+#include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/DevTmpFs/DevTmpFsINode.hpp>
 #include <VFS/Filesystem.hpp>
 
 #include <Time/Time.hpp>
-
-#include <cstdlib>
 
 DevTmpFsINode::DevTmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
                              Device* device)
@@ -33,10 +32,10 @@ DevTmpFsINode::DevTmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
 
     if (S_ISREG(mode))
     {
-        m_Capacity            = 0x1000;
-        m_Data                = new u8[m_Capacity];
-        m_Metadata.Size       = m_Capacity;
-        m_Metadata.BlockCount = Math::AlignUp(m_Capacity, m_Metadata.BlockSize);
+        m_Buffer.Resize(PMM::PAGE_SIZE);
+        m_Metadata.Size = m_Buffer.Size();
+        m_Metadata.BlockCount
+            = Math::AlignUp(m_Metadata.Size, m_Metadata.BlockSize);
     }
 
     m_Metadata.AccessTime       = Time::GetReal();
@@ -75,6 +74,71 @@ ErrorOr<Ref<DirectoryEntry>> DevTmpFsINode::Lookup(Ref<DirectoryEntry> dentry)
     return Error(ENOENT);
 }
 
+ErrorOr<Ref<DirectoryEntry>>
+DevTmpFsINode::CreateNode(Ref<DirectoryEntry> entry, mode_t mode, dev_t dev)
+{
+    if (m_Children.Contains(entry->Name())) return Error(EEXIST);
+
+    auto maybeINode = m_Filesystem->AllocateNode(entry->Name(), mode);
+    RetOnError(maybeINode);
+
+    auto inode    = reinterpret_cast<DevTmpFsINode*>(maybeINode.Value());
+    inode->m_Name = entry->Name();
+    inode->m_Metadata.Mode = mode;
+    if (S_ISREG(mode))
+    {
+        inode->m_Metadata.Size = PMM::PAGE_SIZE;
+        inode->m_Buffer.Resize(PMM::PAGE_SIZE);
+    }
+    else if (S_ISCHR(mode) || S_ISBLK(mode))
+    {
+        auto it = DevTmpFs::s_Devices.Find(dev);
+        if (it != DevTmpFs::s_Devices.end()) inode->m_Device = it->Value;
+    }
+    entry->Bind(inode);
+
+    // TODO(v1tr10l7): set dev
+
+    auto currentTime            = Time::GetReal();
+    // m_Metadata.Size += TmpFs::DIRECTORY_ENTRY_SIZE;
+
+    m_Metadata.ChangeTime       = currentTime;
+    m_Metadata.ModificationTime = currentTime;
+
+    InsertChild(inode, entry->Name());
+    if (Mode() & S_ISGID)
+    {
+        inode->m_Metadata.GID = m_Metadata.GID;
+        if (S_ISDIR(mode)) inode->m_Metadata.Mode |= S_ISGID;
+    }
+
+    entry->Bind(inode);
+    return entry;
+}
+ErrorOr<Ref<DirectoryEntry>>
+DevTmpFsINode::CreateFile(Ref<DirectoryEntry> entry, mode_t mode)
+{
+    return CreateNode(entry, mode | S_IFREG, 0);
+}
+ErrorOr<Ref<DirectoryEntry>>
+DevTmpFsINode::CreateDirectory(Ref<DirectoryEntry> entry, mode_t mode)
+{
+    auto maybeEntry = CreateNode(entry, mode | S_IFDIR, 0);
+    RetOnError(maybeEntry);
+
+    ++m_Metadata.LinkCount;
+    return entry;
+}
+ErrorOr<Ref<DirectoryEntry>> DevTmpFsINode::Symlink(Ref<DirectoryEntry> entry,
+                                                    PathView targetPath)
+{
+    auto dentry     = TryOrRet(CreateNode(entry, 0777 | S_IFLNK, 0));
+    auto inode      = reinterpret_cast<DevTmpFsINode*>(dentry->INode());
+
+    inode->m_Target = targetPath;
+    return dentry;
+}
+
 isize DevTmpFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
     if (!buffer) return_err(-1, EFAULT);
@@ -89,7 +153,7 @@ isize DevTmpFsINode::Read(void* buffer, off_t offset, usize bytes)
     if (offset + bytes >= m_Metadata.Size)
         count = bytes - ((offset + bytes) - m_Metadata.Size);
 
-    Memory::Copy(buffer, reinterpret_cast<u8*>(m_Data) + offset, count);
+    Memory::Copy(buffer, m_Buffer.Raw() + offset, count);
 
     if (m_Filesystem->ShouldUpdateATime())
         m_Metadata.AccessTime = Time::GetReal();
@@ -106,18 +170,16 @@ isize DevTmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
 
     ScopedLock guard(m_Lock);
 
-    if (offset + bytes >= m_Capacity)
+    auto       capacity = m_Buffer.Size();
+    if (offset + bytes >= capacity)
     {
-        usize newCapacity = m_Capacity;
+        usize newCapacity = capacity;
         while (offset + bytes >= newCapacity) newCapacity *= 2;
 
-        m_Data = static_cast<u8*>(std::realloc(m_Data, newCapacity));
-        if (!m_Data) return_err(-1, ENOMEM);
-
-        m_Capacity = newCapacity;
+        m_Buffer.Resize(newCapacity);
     }
 
-    Memory::Copy(m_Data + offset, buffer, bytes);
+    Memory::Copy(m_Buffer.Raw() + offset, buffer, bytes);
 
     if (offset + bytes >= m_Metadata.Size)
     {
@@ -142,20 +204,15 @@ i32 DevTmpFsINode::IoCtl(usize request, usize arg)
 ErrorOr<isize> DevTmpFsINode::Truncate(usize size)
 {
     ScopedLock guard(m_Lock);
-    if (m_Device || size == m_Capacity) return 0;
+
+    auto       capacity = m_Buffer.Size();
+    if (m_Device || size == capacity) return 0;
 
     const Credentials& creds = Process::GetCurrent()->Credentials();
     if (!CanWrite(creds)) return Error(EPERM);
 
-    u8* newData = new u8[size];
-    Memory::Copy(newData, m_Data, size > m_Capacity ? size : m_Capacity);
-
-    if (m_Capacity < size)
-        Memory::Fill(newData + m_Capacity, 0, size - m_Capacity);
-    delete m_Data;
-
-    m_Data     = newData;
-    m_Capacity = size;
+    m_Buffer.Resize(size);
+    // m_Buffer.ShrinkToFit();
 
     if (m_Filesystem->ShouldUpdateCTime())
         m_Metadata.ChangeTime = Time::GetReal();
