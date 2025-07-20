@@ -1,0 +1,1121 @@
+Kernel/API/Process.cpp:135:37: style: Parameter 'args' can be declared with const [constParameter]
+    ErrorOr<i32> SysExit(Arguments& args)
+                                    ^
+Kernel/API/Syscall.cpp:192:66: style: Condition 'g_LogSyscalls' is always false [knownConditionTrueFalse]
+        if (static_cast<isize>(args.Index) != previousSyscall && g_LogSyscalls)
+                                                                 ^
+Kernel/API/Syscall.cpp:190:40: note: Assignment 'g_LogSyscalls=false', assigned value is 0
+        g_LogSyscalls                = false;
+                                       ^
+Kernel/API/Syscall.cpp:192:66: note: Condition 'g_LogSyscalls' is always false
+        if (static_cast<isize>(args.Index) != previousSyscall && g_LogSyscalls)
+                                                                 ^
+Kernel/API/System.cpp:47:9: style:inconclusive: Statements following return, break, continue, goto or throw will never be executed. [unreachableCode]
+        switch (resource)
+        ^
+Kernel/API/Time.cpp:68:32: style: Same expression on both sides of '||' because 'tv->tv_sec<0' and 'tv->tv_sec<now' represent the same value. [knownConditionTrueFalse]
+            if (tv->tv_sec < 0 || tv->tv_sec < now || tv->tv_usec < 0
+                               ^
+Kernel/API/Time.cpp:64:26: note: 'now' is assigned value '0' here.
+            time_t now = 0;
+                         ^
+Kernel/API/Time.cpp:68:32: note: Same expression on both sides of '||' because 'tv->tv_sec<0' and 'tv->tv_sec<now' represent the same value.
+            if (tv->tv_sec < 0 || tv->tv_sec < now || tv->tv_usec < 0
+                               ^
+Kernel/API/Time.cpp:38:13: style:inconclusive: Statements following return, break, continue, goto or throw will never be executed. [unreachableCode]
+            tv->tv_sec  = now;
+            ^
+Kernel/API/Time.cpp:30:24: style: Variable 'now' is assigned a value that is never used. [unreadVariable]
+            time_t now = 0;
+                       ^
+Kernel/API/VFS.cpp:234:9: style:inconclusive: Statements following return, break, continue, goto or throw will never be executed. [unreachableCode]
+        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
+        ^
+Kernel/API/VFS.cpp:524:9: style: Statements following return, break, continue, goto or throw will never be executed. [unreachableCode]
+        usize set = 0;
+        ^
+Kernel/API/VFS.cpp:525:20: style: Local variable 'i' shadows outer variable [shadowVariable]
+        for (isize i = 0; i < FD_SETSIZE; i++)
+                   ^
+Kernel/API/VFS.cpp:522:32: note: Shadowed declaration
+        [[maybe_unused]] isize i, j, max;
+                               ^
+Kernel/API/VFS.cpp:525:20: note: Shadow variable
+        for (isize i = 0; i < FD_SETSIZE; i++)
+                   ^
+Kernel/API/VFS.cpp:520:40: style: Variable 'current' is assigned a value that is never used. [unreadVariable]
+        auto                   current = Process::GetCurrent();
+                                       ^
+Kernel/API/VFS.cpp:524:19: style: Variable 'set' is assigned a value that is never used. [unreadVariable]
+        usize set = 0;
+                  ^
+Kernel/Arch/x86_64/CPU.cpp:352:53: style:inconclusive: Boolean expression '0b10<18' is used in bitwise operation. Did you mean '||'? [bitwiseOnBoolean]
+        Lapic::Instance()->SendIpi(g_PanicIpiVector | (0b10 < 18), 0);
+                                                    ^
+Kernel/Arch/x86_64/CPU.cpp:590:13: style: Variable 'pat' is reassigned a value before the old one has been used. [redundantAssignment]
+        pat = (PAT::eUncacheable << 56) | (PAT::eWriteBack << 48)
+            ^
+Kernel/Arch/x86_64/CPU.cpp:588:13: note: pat is assigned
+        pat |= 0x0105ull << 32ull;
+            ^
+Kernel/Arch/x86_64/CPU.cpp:590:13: note: pat is overwritten
+        pat = (PAT::eUncacheable << 56) | (PAT::eWriteBack << 48)
+            ^
+Kernel/Arch/x86_64/Drivers/I8042Controller.cpp:131:5: style: Statements following return, break, continue, goto or throw will never be executed. [unreachableCode]
+    auto handler = InterruptManager::AllocateHandler(0x21);
+    ^
+Kernel/Arch/x86_64/Drivers/IoApic.cpp:109:5: error: syntax error [syntaxError]
+    for (usize i = 0; const auto& entry : MADT::GetIoApicEntries())
+    ^
+Kernel/Arch/x86_64/Drivers/Timers/HPET.cpp:128:42: warning: Redundant assignment of 'm_Entry->interruptStatusRegister' to itself. [selfAssignment]
+        m_Entry->interruptStatusRegister = m_Entry->interruptStatusRegister;
+                                         ^
+Kernel/Arch/x86_64/GDT.cpp:86:29: style: Redundant initialization for 'userCodeAccess'. The initialized value is overwritten before it is read. [redundantInitialization]
+        userCodeAccess      = 0xf2;
+                            ^
+Kernel/Arch/x86_64/GDT.cpp:82:27: note: userCodeAccess is initialized
+        u8 userCodeAccess = GDT_RING3 | GDT_CODE_OR_DATA | GDT_CODE_SEGMENT
+                          ^
+Kernel/Arch/x86_64/GDT.cpp:86:29: note: userCodeAccess is overwritten
+        userCodeAccess      = 0xf2;
+                            ^
+Kernel/Arch/x86_64/GDT.cpp:87:29: style: Redundant initialization for 'userDataAccess'. The initialized value is overwritten before it is read. [redundantInitialization]
+        userDataAccess      = 0xfa;
+                            ^
+Kernel/Arch/x86_64/GDT.cpp:84:29: note: userDataAccess is initialized
+        u8 userDataAccess   = GDT_DATA_WRITEABLE | GDT_CODE_OR_DATA | GDT_RING3;
+                            ^
+Kernel/Arch/x86_64/GDT.cpp:87:29: note: userDataAccess is overwritten
+        userDataAccess      = 0xfa;
+                            ^
+Kernel/Arch/x86_64/VMM.cpp:84:43: style: Clarify calculation precedence for '&' and '?'. [clarifyCalculation]
+        usize patbit = (flags & PTE_LPAGE ? PTE_PATLG : PTE_PAT4K);
+                                          ^
+Kernel/Boot/BootInfo.cpp:367:25: style: Same expression in both branches of ternary operator. [duplicateExpressionTernary]
+                        : MemoryModel::eRGB;
+                        ^
+Kernel/Boot/BootInfo.cpp:390:21: style: Same expression in both branches of ternary operator. [duplicateExpressionTernary]
+                    : MemoryModel::eRGB;
+                    ^
+Kernel/Boot/BootInfo.cpp:209:17: style:inconclusive: Consecutive return, break, continue, goto or throw statements are unnecessary. [duplicateBreak]
+                return PagingMode::eLevel5;
+                ^
+Kernel/Boot/BootInfo.cpp:437:24: style: Variable 'info.BspID' is reassigned a value before the old one has been used. [redundantAssignment]
+            info.BspID = smpResponse->bsp_mpidr;
+                       ^
+Kernel/Boot/BootInfo.cpp:435:24: note: info.BspID is assigned
+            info.BspID = smpResponse->bsp_lapic_id;
+                       ^
+Kernel/Boot/BootInfo.cpp:437:24: note: info.BspID is overwritten
+            info.BspID = smpResponse->bsp_mpidr;
+                       ^
+Kernel/Drivers/PCI/Bus.cpp:59:0: style: Consider using std::any_of algorithm instead of a raw loop. [useStlAlgorithm]
+            if (enumerator(bridge->Address())) return true;
+^
+Kernel/Drivers/PCI/Device.cpp:154:45: style: Condition '!(pmCapabilities&0)' is always true [knownConditionTrueFalse]
+            if (state == PowerState::eD1 && !(pmCapabilities & 0))
+                                            ^
+Kernel/Drivers/PCI/Device.cpp:249:25: style: Variable 'bar.Size' is reassigned a value before the old one has been used. [redundantAssignment]
+            bar.Size    = ~(sizeLow & ~0b1111) + 1;
+                        ^
+Kernel/Drivers/PCI/Device.cpp:246:25: note: bar.Size is assigned
+            bar.Size    = length;
+                        ^
+Kernel/Drivers/PCI/Device.cpp:249:25: note: bar.Size is overwritten
+            bar.Size    = ~(sizeLow & ~0b1111) + 1;
+                        ^
+Kernel/Drivers/PCI/Device.cpp:250:25: style: Variable 'bar.IsMMIO' is reassigned a value before the old one has been used. [redundantAssignment]
+            bar.IsMMIO  = true;
+                        ^
+Kernel/Drivers/PCI/Device.cpp:247:25: note: bar.IsMMIO is assigned
+            bar.IsMMIO  = true;
+                        ^
+Kernel/Drivers/PCI/Device.cpp:250:25: note: bar.IsMMIO is overwritten
+            bar.IsMMIO  = true;
+                        ^
+Kernel/Drivers/PCI/Device.cpp:168:0: style: Consider using std::find_if algorithm instead of a raw loop. [useStlAlgorithm]
+            if (capability.ID == id) return capability;
+^
+Kernel/Drivers/PCI/Device.cpp:290:9: style:inconclusive: Consecutive return, break, continue, goto or throw statements are unnecessary. [duplicateBreak]
+        return false;
+        ^
+Kernel/Drivers/PCI/HostController.cpp:66:42: style: Local variable 'resources' shadows outer variable [shadowVariable]
+                        uacpi_resources* resources;
+                                         ^
+Kernel/Drivers/PCI/HostController.cpp:37:34: note: Shadowed declaration
+                uacpi_resources* resources = nullptr;
+                                 ^
+Kernel/Drivers/PCI/HostController.cpp:66:42: note: Shadow variable
+                        uacpi_resources* resources;
+                                         ^
+Kernel/Drivers/PCI/HostController.cpp:176:0: style: Consider using std::any_of algorithm instead of a raw loop. [useStlAlgorithm]
+            if (bus->Enumerate(enumerator)) return true;
+^
+Kernel/Drivers/PCI/PCI.cpp:79:28: style: Redundant initialization for 'newLinePos'. The initialized value is overwritten before it is read. [redundantInitialization]
+        while ((newLinePos = buffer.FindFirstOf("\n", currentPos))
+                           ^
+Kernel/Drivers/PCI/PCI.cpp:78:26: note: newLinePos is initialized
+        usize newLinePos = String::NPos;
+                         ^
+Kernel/Drivers/PCI/PCI.cpp:79:28: note: newLinePos is overwritten
+        while ((newLinePos = buffer.FindFirstOf("\n", currentPos))
+                           ^
+Kernel/Drivers/PCI/PCI.cpp:198:23: style: The scope of the variable 'found' can be reduced. [variableScope]
+        bool          found = false;
+                      ^
+Kernel/Drivers/Storage/NVMe/NVMeNameSpace.cpp:66:13: style: Statements following return, break, continue, goto or throw will never be executed. [unreachableCode]
+            auto handler = InterruptManager::AllocateHandler();
+            ^
+Kernel/Drivers/TTY.cpp:158:5: style:inconclusive: Statements following return, break, continue, goto or throw will never be executed. [unreachableCode]
+    while (count > 0 && m_RawBuffer.Size())
+    ^
+Kernel/Drivers/TTY.cpp:371:5: style:inconclusive: Statements following return, break, continue, goto or throw will never be executed. [unreachableCode]
+    Process* current = Process::Current();
+    ^
+Kernel/Drivers/TTY.cpp:160:20: style: Local variable 'guard' shadows outer variable [shadowVariable]
+        ScopedLock guard(m_RawLock);
+                   ^
+Kernel/Drivers/TTY.cpp:141:16: note: Shadowed declaration
+    ScopedLock guard(m_RawLock);
+               ^
+Kernel/Drivers/TTY.cpp:160:20: note: Shadow variable
+        ScopedLock guard(m_RawLock);
+                   ^
+Kernel/Drivers/Terminal.cpp:306:13: style: Statements following return, break, continue, goto or throw will never be executed. [unreachableCode]
+            TTY* tty = TTY::GetCurrent();
+            ^
+Kernel/Drivers/USB/UHCI/UHCiController.cpp:92:9: style:inconclusive: Statements following return, break, continue, goto or throw will never be executed. [unreachableCode]
+        LogInfo("UHCI: Successfully registered an interrupt handler");
+        ^
+Kernel/Drivers/USB/UHCI/UHCiController.cpp:63:17: style: Local variable 'status' shadows outer variable [shadowVariable]
+            u32 status = Read(static_cast<Register>(0x10 + port * 2));
+                ^
+Kernel/Drivers/USB/UHCI/UHCiController.cpp:18:14: note: Shadowed declaration
+        auto status = Enable();
+             ^
+Kernel/Drivers/USB/UHCI/UHCiController.cpp:63:17: note: Shadow variable
+            u32 status = Read(static_cast<Register>(0x10 + port * 2));
+                ^
+Kernel/Drivers/Video/VideoTerminal.cpp:485:48: style: Variable 'marginNoGradient' is assigned a value that is never used. [unreadVariable]
+    if (marginNoGradient < 0) marginNoGradient = 0;
+                                               ^
+Kernel/Firmware/ACPI/Interpreter/Interpreter.cpp:274:50: style: Variable 'byteCount' is reassigned a value before the old one has been used. 'break;' missing? [redundantAssignInSwitch]
+            case OpCode::eDWordPrefix: byteCount = 3;
+                                                 ^
+Kernel/Firmware/ACPI/Interpreter/Interpreter.cpp:272:50: note: $symbol is assigned
+            case OpCode::eQWordPrefix: byteCount = 4;
+                                                 ^
+Kernel/Firmware/ACPI/Interpreter/Interpreter.cpp:274:50: note: $symbol is overwritten
+            case OpCode::eDWordPrefix: byteCount = 3;
+                                                 ^
+Kernel/Firmware/ACPI/Interpreter/Interpreter.cpp:276:49: style: Variable 'byteCount' is reassigned a value before the old one has been used. 'break;' missing? [redundantAssignInSwitch]
+            case OpCode::eWordPrefix: byteCount = 2;
+                                                ^
+Kernel/Firmware/ACPI/Interpreter/Interpreter.cpp:274:50: note: $symbol is assigned
+            case OpCode::eDWordPrefix: byteCount = 3;
+                                                 ^
+Kernel/Firmware/ACPI/Interpreter/Interpreter.cpp:276:49: note: $symbol is overwritten
+            case OpCode::eWordPrefix: byteCount = 2;
+                                                ^
+Kernel/Firmware/ACPI/Interpreter/Interpreter.cpp:278:49: style: Variable 'byteCount' is reassigned a value before the old one has been used. 'break;' missing? [redundantAssignInSwitch]
+            case OpCode::eBytePrefix: byteCount = 1; break;
+                                                ^
+Kernel/Firmware/ACPI/Interpreter/Interpreter.cpp:276:49: note: $symbol is assigned
+            case OpCode::eWordPrefix: byteCount = 2;
+                                                ^
+Kernel/Firmware/ACPI/Interpreter/Interpreter.cpp:278:49: note: $symbol is overwritten
+            case OpCode::eBytePrefix: byteCount = 1; break;
+                                                ^
+Kernel/Firmware/ACPI/Interpreter/Interpreter.cpp:392:27: style: Variable 'name' is assigned a value that is never used. [unreadVariable]
+                auto name = DecodeName();
+                          ^
+Kernel/Firmware/ACPI/Interpreter/Interpreter.cpp:399:27: style: Variable 'name' is assigned a value that is never used. [unreadVariable]
+                auto name = DecodeName();
+                          ^
+Kernel/Firmware/ACPI/Interpreter/Interpreter.cpp:404:27: style: Variable 'name' is assigned a value that is never used. [unreadVariable]
+                auto name = DecodeName();
+                          ^
+Kernel/Firmware/DMI/SMBIOS.cpp:137:21: style: Statements following return, break, continue, goto or throw will never be executed. [unreachableCode]
+                    auto firmwareInfo
+                    ^
+Kernel/Firmware/EFI/Initialize.cpp:48:13: style: Statements following return, break, continue, goto or throw will never be executed. [unreachableCode]
+            LogError("EFI: Couldn't acquire efi memory map");
+            ^
+Kernel/Library/Stacktrace.hpp:23:28: error: syntax error: <= > [syntaxError]
+            return Address <=> rhs.Address;
+                           ^
+Kernel/Library/ExecutableProgram.cpp:102:5: error: syntax error [syntaxError]
+    for (usize i = 0; auto env : envp)
+    ^
+Kernel/Library/ICxxAbi.cpp:102:10: error: The address of local variable '__stack_chk_guard' is accessed at non-zero index. [objectIndex]
+        p[sizeof(__stack_chk_guard) - 1] = 255;
+         ^
+Kernel/Library/ICxxAbi.cpp:101:46: note: Address of variable taken here.
+        p = reinterpret_cast<unsigned char*>(&__stack_chk_guard);
+                                             ^
+Kernel/Library/ICxxAbi.cpp:102:10: note: The address of local variable '__stack_chk_guard' is accessed at non-zero index.
+        p[sizeof(__stack_chk_guard) - 1] = 255;
+         ^
+Kernel/Library/ICxxAbi.cpp:103:10: error: The address of local variable '__stack_chk_guard' is accessed at non-zero index. [objectIndex]
+        p[sizeof(__stack_chk_guard) - 2] = '\n';
+         ^
+Kernel/Library/ICxxAbi.cpp:101:46: note: Address of variable taken here.
+        p = reinterpret_cast<unsigned char*>(&__stack_chk_guard);
+                                             ^
+Kernel/Library/ICxxAbi.cpp:103:10: note: The address of local variable '__stack_chk_guard' is accessed at non-zero index.
+        p[sizeof(__stack_chk_guard) - 2] = '\n';
+         ^
+Kernel/Library/ICxxAbi.cpp:139:20: error: Comparing pointers that point to different objects [comparePointers]
+             entry < __init_array_end; entry++)
+                   ^
+Kernel/Library/ICxxAbi.cpp:132:36: note: Variable declared here.
+    extern "C" ConstructorFunction __init_array_start[];
+                                   ^
+Kernel/Library/ICxxAbi.cpp:138:43: note: Array decayed to pointer here.
+        for (ConstructorFunction* entry = __init_array_start;
+                                          ^
+Kernel/Library/ICxxAbi.cpp:133:36: note: Variable declared here.
+    extern "C" ConstructorFunction __init_array_end[];
+                                   ^
+Kernel/Library/ICxxAbi.cpp:139:22: note: Array decayed to pointer here.
+             entry < __init_array_end; entry++)
+                     ^
+Kernel/Library/ICxxAbi.cpp:139:20: note: Comparing pointers that point to different objects
+             entry < __init_array_end; entry++)
+                   ^
+Kernel/Library/Image.cpp:319:46: style: Consider using std::any_of, std::all_of, std::none_of, or std::accumulate algorithm instead of a raw loop. [useStlAlgorithm]
+            if (depth == m_Depth) validDepth = true;
+                                             ^
+Kernel/Library/KLibC/stdio.cpp:28:33: style:inconclusive: Function 'fputws' argument 1 names different: declaration 'str' definition 's'. [funcArgNamesDifferent]
+    i32   fputws(const wchar_t* s, FILE* stream) { return -1; }
+                                ^
+Kernel/Library/KLibC/stdio.h:32:34: note: Function 'fputws' argument 1 names different: declaration 'str' definition 's'.
+    int    fputws(const wchar_t* str, FILE* stream);
+                                 ^
+Kernel/Library/KLibC/stdio.cpp:28:33: note: Function 'fputws' argument 1 names different: declaration 'str' definition 's'.
+    i32   fputws(const wchar_t* s, FILE* stream) { return -1; }
+                                ^
+Kernel/Library/KLibC/stdlib.cpp:14:25: style:inconclusive: Function 'calloc' argument 1 names different: declaration 'bytes' definition 'num'. [funcArgNamesDifferent]
+    void* calloc(size_t num, size_t size) throw()
+                        ^
+Kernel/Library/KLibC/stdlib.h:66:24: note: Function 'calloc' argument 1 names different: declaration 'bytes' definition 'num'.
+         calloc(size_t bytes, size_t count) throw();
+                       ^
+Kernel/Library/KLibC/stdlib.cpp:14:25: note: Function 'calloc' argument 1 names different: declaration 'bytes' definition 'num'.
+    void* calloc(size_t num, size_t size) throw()
+                        ^
+Kernel/Library/KLibC/stdlib.cpp:14:37: style:inconclusive: Function 'calloc' argument 2 names different: declaration 'count' definition 'size'. [funcArgNamesDifferent]
+    void* calloc(size_t num, size_t size) throw()
+                                    ^
+Kernel/Library/KLibC/stdlib.h:66:38: note: Function 'calloc' argument 2 names different: declaration 'count' definition 'size'.
+         calloc(size_t bytes, size_t count) throw();
+                                     ^
+Kernel/Library/KLibC/stdlib.cpp:14:37: note: Function 'calloc' argument 2 names different: declaration 'count' definition 'size'.
+    void* calloc(size_t num, size_t size) throw()
+                                    ^
+Kernel/Library/KLibC/stdlib.cpp:21:25: style:inconclusive: Function 'malloc' argument 1 names different: declaration 'bytes' definition 'size'. [funcArgNamesDifferent]
+    void* malloc(size_t size) throw() { return KernelHeap::Allocate(size); }
+                        ^
+Kernel/Library/KLibC/stdlib.h:69:56: note: Function 'malloc' argument 1 names different: declaration 'bytes' definition 'size'.
+                                         malloc(size_t bytes) throw();
+                                                       ^
+Kernel/Library/KLibC/stdlib.cpp:21:25: note: Function 'malloc' argument 1 names different: declaration 'bytes' definition 'size'.
+    void* malloc(size_t size) throw() { return KernelHeap::Allocate(size); }
+                        ^
+Kernel/Library/KLibC/stdlib.cpp:23:25: style:inconclusive: Function 'realloc' argument 1 names different: declaration 'ptr' definition 'oldptr'. [funcArgNamesDifferent]
+    void* realloc(void* oldptr, size_t size) throw()
+                        ^
+Kernel/Library/KLibC/stdlib.h:70:57: note: Function 'realloc' argument 1 names different: declaration 'ptr' definition 'oldptr'.
+    __attribute__((alloc_size(2))) void* realloc(void*  ptr,
+                                                        ^
+Kernel/Library/KLibC/stdlib.cpp:23:25: note: Function 'realloc' argument 1 names different: declaration 'ptr' definition 'oldptr'.
+    void* realloc(void* oldptr, size_t size) throw()
+                        ^
+Kernel/Library/KLibC/stdlib.cpp:23:40: style:inconclusive: Function 'realloc' argument 2 names different: declaration 'bytes' definition 'size'. [funcArgNamesDifferent]
+    void* realloc(void* oldptr, size_t size) throw()
+                                       ^
+Kernel/Library/KLibC/stdlib.h:71:57: note: Function 'realloc' argument 2 names different: declaration 'bytes' definition 'size'.
+                                                 size_t bytes) throw();
+                                                        ^
+Kernel/Library/KLibC/stdlib.cpp:23:40: note: Function 'realloc' argument 2 names different: declaration 'bytes' definition 'size'.
+    void* realloc(void* oldptr, size_t size) throw()
+                                       ^
+Kernel/Library/KLibC/stdlib.cpp:28:35: style:inconclusive: Function 'strtoll' argument 1 names different: declaration 'nptr' definition 'str'. [funcArgNamesDifferent]
+    long long strtoll(const char* str, char** str_end, int base) throw()
+                                  ^
+Kernel/Library/KLibC/stdlib.h:52:39: note: Function 'strtoll' argument 1 names different: declaration 'nptr' definition 'str'.
+    long long int strtoll(const char* nptr, char** endptr, int base) throw();
+                                      ^
+Kernel/Library/KLibC/stdlib.cpp:28:35: note: Function 'strtoll' argument 1 names different: declaration 'nptr' definition 'str'.
+    long long strtoll(const char* str, char** str_end, int base) throw()
+                                  ^
+Kernel/Library/KLibC/stdlib.cpp:28:47: style:inconclusive: Function 'strtoll' argument 2 names different: declaration 'endptr' definition 'str_end'. [funcArgNamesDifferent]
+    long long strtoll(const char* str, char** str_end, int base) throw()
+                                              ^
+Kernel/Library/KLibC/stdlib.h:52:52: note: Function 'strtoll' argument 2 names different: declaration 'endptr' definition 'str_end'.
+    long long int strtoll(const char* nptr, char** endptr, int base) throw();
+                                                   ^
+Kernel/Library/KLibC/stdlib.cpp:28:47: note: Function 'strtoll' argument 2 names different: declaration 'endptr' definition 'str_end'.
+    long long strtoll(const char* str, char** str_end, int base) throw()
+                                              ^
+Kernel/Library/KLibC/string.cpp:181:15: style: The scope of the variable 'a' can be reduced. [variableScope]
+        char  a;
+              ^
+Kernel/Memory/Allocator/KernelHeap.cpp:36:34: performance:inconclusive: Technically the member function 'KernelHeap::SpinLockPolicy::Init' can be static (but you may consider moving to unnamed namespace). [functionStatic]
+        void                     Init() {}
+                                 ^
+Kernel/Memory/PageMap.cpp:42:19: style: Expression is always false because 'else if' condition matches previous condition at line 41. [multiCondition]
+    else if (size >= lPageSize) return {lPageSize, PageAttributes::eLPage};
+                  ^
+Kernel/Memory/PageMap.cpp:42:19: warning: Identical condition 'size>=lPageSize', second condition is always false [identicalConditionAfterEarlyExit]
+    else if (size >= lPageSize) return {lPageSize, PageAttributes::eLPage};
+                  ^
+Kernel/Memory/PageMap.cpp:41:14: note: If condition 'size>=lPageSize' is true, the function will return/exit
+    if (size >= lPageSize) return {llPageSize, PageAttributes::eLLPage};
+             ^
+Kernel/Memory/PageMap.cpp:42:19: note: Testing identical condition 'size>=lPageSize'
+    else if (size >= lPageSize) return {lPageSize, PageAttributes::eLPage};
+                  ^
+Kernel/Memory/Region.cpp:15:9: style: Statements following return, break, continue, goto or throw will never be executed. [unreachableCode]
+        enum PageAttributes flags = PageAttributes::eWriteBack;
+        ^
+Kernel/Network/NetworkAdapter.cpp:20:5: style: Statements following return, break, continue, goto or throw will never be executed. [unreachableCode]
+    u8              packet[42]     = {0};
+    ^
+Kernel/Scheduler/Event.cpp:14:5: error: syntax error [syntaxError]
+    for (usize i = 0; auto& event : events)
+    ^
+Kernel/Scheduler/Process.cpp:235:17: style: Redundant initialization for 'end'. The initialized value is overwritten before it is read. [redundantInitialization]
+    while ((end = findSlash(start)) < path.Size())
+                ^
+Kernel/Scheduler/Process.cpp:225:21: note: end is initialized
+    usize end       = start;
+                    ^
+Kernel/Scheduler/Process.cpp:235:17: note: end is overwritten
+    while ((end = findSlash(start)) < path.Size())
+                ^
+Kernel/Scheduler/Process.cpp:412:9: style:inconclusive: Statements following return, break, continue, goto or throw will never be executed. [unreachableCode]
+        newRegion->SetPhysicalBase(physicalSpace);
+        ^
+Kernel/System/System.cpp:151:27: style: Local variable 'length' shadows outer variable [shadowVariable]
+                    usize length     = memoryEntry->Length;
+                          ^
+Kernel/System/System.cpp:115:17: note: Shadowed declaration
+        usize   length    = srat->Header.Length;
+                ^
+Kernel/System/System.cpp:151:27: note: Shadow variable
+                    usize length     = memoryEntry->Length;
+                          ^
+Kernel/System/System.cpp:103:0: style: Consider using std::find_if algorithm instead of a raw loop. [useStlAlgorithm]
+            if (module.Name == name) return &module;
+^
+Kernel/System/System.cpp:354:0: style: Consider using std::find_if algorithm instead of a raw loop. [useStlAlgorithm]
+            if (module->Name == name) return module;
+^
+Kernel/Time/Time.cpp:83:9: error: syntax error [syntaxError]
+        for (usize i = 0; auto& timer : s_HardwareTimers)
+        ^
+Kernel/VFS/Fat32Fs/Fat32Fs.cpp:204:68: style: Clarify calculation precedence for '&' and '?'. [clarifyCalculation]
+                 | (entry->Attributes & Fat32Attribute::eDirectory ? S_IFDIR
+                                                                   ^
+Kernel/VFS/Fat32Fs/Fat32FsINode.cpp:40:13: style: Condition '!cluster' is always true [knownConditionTrueFalse]
+        if (!cluster)
+            ^
+Kernel/VFS/Fat32Fs/Fat32FsINode.cpp:39:23: note: Assignment 'cluster=0', assigned value is 0
+        u32 cluster = 0; // m_Filesystem->AllocateClusters(1);
+                      ^
+Kernel/VFS/Fat32Fs/Fat32FsINode.cpp:40:13: note: Condition '!cluster' is always true
+        if (!cluster)
+            ^
+Kernel/VFS/FileDescriptor.cpp:193:22: style: Local variable 'entry' shadows outer variable [shadowVariable]
+    for (const auto& entry : dirEntries) length += entry->d_reclen;
+                     ^
+Kernel/VFS/FileDescriptor.cpp:184:16: note: Shadowed declaration
+    auto       entry = DirectoryEntry();
+               ^
+Kernel/VFS/FileDescriptor.cpp:193:22: note: Shadow variable
+    for (const auto& entry : dirEntries) length += entry->d_reclen;
+                     ^
+Kernel/VFS/FileDescriptor.cpp:193:49: style: Consider using std::accumulate algorithm instead of a raw loop. [useStlAlgorithm]
+    for (const auto& entry : dirEntries) length += entry->d_reclen;
+                                                ^
+Kernel/VFS/Initrd/Ustar.cpp:57:22: style: Local variable 'size' shadows outer argument [shadowArgument]
+            usize    size = StringUtils::ToNumber<usize>(current->FileSize, 8);
+                     ^
+Kernel/VFS/Initrd/Ustar.cpp:31:47: note: Shadowed declaration
+    ErrorOr<void> Load(Pointer address, usize size)
+                                              ^
+Kernel/VFS/Initrd/Ustar.cpp:57:22: note: Shadow variable
+            usize    size = StringUtils::ToNumber<usize>(current->FileSize, 8);
+                     ^
+Kernel/VFS/SynthFsINode.cpp:106:29: style: Same expression on both sides of '&'. [duplicateExpression]
+    m_Stats.st_mode |= 0777 & 0777;
+                            ^
+Kernel/VFS/VFS.cpp:429:29: style: Variable 'parent' is assigned a value that is never used. [unreadVariable]
+        if (!parent) parent = RootDirectoryEntry();
+                            ^
+Modules/noarch/gpu/bochs/main.cpp:21:5: style: Class 'BochsAdapter' has a constructor with 1 argument that is not explicit. [noExplicitConstructor]
+    BochsAdapter(PCI::DeviceAddress address)
+    ^
+Modules/noarch/net/e1000e/main.cpp:156:13: performance: Variable 'm_Bar0' is assigned in constructor body. Consider performing initialization in initialization list. [useInitializationList]
+            m_Bar0 = GetBar(0);
+            ^
+Modules/noarch/net/e1000e/main.cpp:153:9: style: Class 'Adapter' has a constructor with 1 argument that is not explicit. [noExplicitConstructor]
+        Adapter(PCI::DeviceAddress address)
+        ^
+Modules/noarch/net/e1000e/main.cpp:221:27: style: C-style pointer casting [cstyleCast]
+            descriptors = (TxDescriptor*)tx;
+                          ^
+Modules/noarch/net/rtl8139/main.cpp:187:9: error: syntax error [syntaxError]
+        for (usize i = 0; auto& buffer : m_TransmitBuffers)
+        ^
+Userland/CryptixUtils/reboot.cpp:19:14: style: Variable 'ret' is assigned a value that is never used. [unreadVariable]
+    auto ret = Syscall(SYS_REBOOT, RebootCmd::eRestart);
+             ^
+Userland/Init/test_tty.c:23:10: style: The scope of the variable 'escape' can be reduced. [variableScope]
+    bool escape = false;
+         ^
+Userland/Init/test_tty.c:23:17: style: Variable 'escape' is assigned a value that is never used. [unreadVariable]
+    bool escape = false;
+                ^
+Userland/Init/test_tty.c:29:20: style: Variable 'escape' is assigned a value that is never used. [unreadVariable]
+            escape = true;
+                   ^
+Kernel/Arch/aarch64/VMM.cpp:19:1: error: The one definition rule is violated, different classes/structs have the same name 'PageTable' [ctuOneDefinitionRuleViolation]
+struct PageTable
+^
+Kernel/Arch/x86_64/VMM.cpp:27:1: note: The one definition rule is violated, different classes/structs have the same name 'PageTable'
+struct [[gnu::packed]] PageTable
+^
+Kernel/Arch/aarch64/VMM.cpp:19:1: note: The one definition rule is violated, different classes/structs have the same name 'PageTable'
+struct PageTable
+^
+Kernel/Memory/VMM.cpp:209:0: style: The function 'AllocateDMACoherent' is never used. [unusedFunction]
+
+^
+Kernel/Drivers/DeviceManager.cpp:53:0: style: The function 'CharDevicesTail' is never used. [unusedFunction]
+
+^
+Kernel/Drivers/DeviceManager.cpp:49:0: style: The function 'DevicesHead' is never used. [unusedFunction]
+
+^
+Kernel/Drivers/DeviceManager.cpp:50:0: style: The function 'DevicesTail' is never used. [unusedFunction]
+
+^
+Kernel/Library/Logger.cpp:169:0: style: The function 'DisableSink' is never used. [unusedFunction]
+
+^
+Kernel/Arch/x86_64/CPU.cpp:311:0: style: The function 'DumpRegisters' is never used. [unusedFunction]
+
+^
+Kernel/Arch/aarch64/Arch.cpp:24:0: style: The function 'ExchangeInterruptFlag' is never used. [unusedFunction]
+
+^
+Kernel/Arch/User.cpp:32:0: style: The function 'FillUser' is never used. [unusedFunction]
+
+^
+Kernel/Memory/VMM.cpp:224:0: style: The function 'FreeDMA_Region' is never used. [unusedFunction]
+
+^
+Kernel/Memory/MM.cpp:176:0: style: The function 'FreeRegion' is never used. [unusedFunction]
+
+^
+Kernel/Arch/x86_64/CPU.cpp:458:0: style: The function 'GetBsp' is never used. [unusedFunction]
+
+^
+Kernel/Arch/x86_64/CPU.cpp:457:0: style: The function 'GetBspId' is never used. [unusedFunction]
+
+^
+Kernel/Arch/x86_64/CPU.cpp:454:0: style: The function 'GetCPUs' is never used. [unusedFunction]
+
+^
+Kernel/Arch/x86_64/Drivers/Timers/HPET.cpp:165:0: style: The function 'GetDevices' is never used. [unusedFunction]
+
+^
+Kernel/Arch/aarch64/Arch.cpp:20:0: style: The function 'GetEpoch' is never used. [unusedFunction]
+
+^
+Kernel/Arch/x86_64/CPU.cpp:444:0: style: The function 'GetGSBase' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/MADT.cpp:119:0: style: The function 'GetIoApicEntries' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/MADT.cpp:120:0: style: The function 'GetIsoEntries' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/MADT.cpp:118:0: style: The function 'GetLapicEntries' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/MADT.cpp:121:0: style: The function 'GetLapicNmiEntries' is never used. [unusedFunction]
+
+^
+Kernel/Boot/CommandLine.cpp:99:0: style: The function 'GetString' is never used. [unusedFunction]
+
+^
+Kernel/Library/Logger.cpp:304:0: style: The function 'GetTerminal' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/ACPI.cpp:281:0: style: The function 'GetX86BootArchitectureFlags' is never used. [unusedFunction]
+
+^
+Kernel/Memory/Allocator/KernelHeap.cpp:36:0: style: The function 'Init' is never used. [unusedFunction]
+
+^
+Kernel/System/System.cpp:107:0: style: The function 'InitializeNumaDomains' is never used. [unusedFunction]
+
+^
+Kernel/API/Syscall.cpp:96:0: style: The function 'InstallAll' is never used. [unusedFunction]
+
+^
+Kernel/Arch/aarch64/InterruptManager.cpp:29:0: style: The function 'InstallExceptions' is never used. [unusedFunction]
+
+^
+Kernel/Drivers/DeviceManager.cpp:70:0: style: The function 'IterateDevices' is never used. [unusedFunction]
+
+^
+Kernel/System/System.cpp:360:0: style: The function 'KernelImage' is never used. [unusedFunction]
+
+^
+Kernel/Memory/MM.cpp:94:0: style: The function 'KernelPhysicalAddress' is never used. [unusedFunction]
+
+^
+Kernel/System/System.cpp:361:0: style: The function 'KernelSymbols' is never used. [unusedFunction]
+
+^
+Kernel/System/System.cpp:35:0: style: The function 'LoadKernelSymbols' is never used. [unusedFunction]
+
+^
+Kernel/System/System.cpp:221:0: style: The function 'LoadModules' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/ACPI.cpp:237:0: style: The function 'LoadNameSpace' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/ACPI.cpp:190:0: style: The function 'LoadTables' is never used. [unusedFunction]
+
+^
+Kernel/Library/Logger.cpp:191:0: style: The function 'Logf' is never used. [unusedFunction]
+
+^
+Kernel/System/System.cpp:366:0: style: The function 'LookupKernelSymbol' is never used. [unusedFunction]
+
+^
+Kernel/VFS/VFS.cpp:249:0: style: The function 'MountRoot' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/Interpreter/Interpreter.cpp:568:0: style: The function 'ParseMethod' is never used. [unusedFunction]
+
+^
+Kernel/System/System.cpp:94:0: style: The function 'PrepareBootModules' is never used. [unusedFunction]
+
+^
+Kernel/Memory/MM.cpp:40:0: style: The function 'PrepareInitialHeap' is never used. [unusedFunction]
+
+^
+Kernel/Arch/aarch64/Arch.cpp:12:0: style: The function 'ProbeDevices' is never used. [unusedFunction]
+
+^
+Kernel/Arch/aarch64/Arch.cpp:34:0: style: The function 'ProbeTimers' is never used. [unusedFunction]
+
+^
+Kernel/Arch/x86_64/CPU.cpp:401:0: style: The function 'ReadCR3' is never used. [unusedFunction]
+
+^
+Kernel/Scheduler/Scheduler.cpp:128:0: style: The function 'ReadyQueue' is never used. [unusedFunction]
+
+^
+Kernel/VFS/VFS.cpp:45:0: style: The function 'RegisterFilesystem' is never used. [unusedFunction]
+
+^
+Kernel/API/Syscall.cpp:48:0: style: The function 'RegisterHandler' is never used. [unusedFunction]
+
+^
+Kernel/Arch/aarch64/VMM.cpp:210:0: style: The function 'SaveCurrentPageMap' is never used. [unusedFunction]
+
+^
+Kernel/API/Process.cpp:83:0: style: The function 'SetGid' is never used. [unusedFunction]
+
+^
+Kernel/API/Process.cpp:78:0: style: The function 'SetUid' is never used. [unusedFunction]
+
+^
+Kernel/Scheduler/Process.cpp:218:0: style: The function 'SplitArguments' is never used. [unusedFunction]
+
+^
+Kernel/API/SyscallEntryPoints.cpp:58:0: style: The function 'SysFTruncate' is never used. [unusedFunction]
+
+^
+Kernel/API/SyscallEntryPoints.cpp:65:0: style: The function 'SysReadLink' is never used. [unusedFunction]
+
+^
+Kernel/API/SyscallEntryPoints.cpp:51:0: style: The function 'SysTruncate' is never used. [unusedFunction]
+
+^
+Kernel/Memory/VMM.cpp:187:0: style: The function 'UnmapKernelInitCode' is never used. [unusedFunction]
+
+^
+Kernel/Memory/VMM.cpp:249:0: style: The function 'UnmapKernelRange' is never used. [unusedFunction]
+
+^
+Kernel/VFS/VFS.cpp:307:0: style: The function 'Unmount' is never used. [unusedFunction]
+
+^
+Kernel/VFS/VFS.cpp:69:0: style: The function 'UnregisterFilesystem' is never used. [unusedFunction]
+
+^
+Kernel/Scheduler/Scheduler.cpp:124:0: style: The function 'WaitQueue' is never used. [unusedFunction]
+
+^
+Kernel/Arch/x86_64/Drivers/Serial.cpp:77:0: style: The function 'Write2' is never used. [unusedFunction]
+
+^
+Kernel/Arch/x86_64/CPU.cpp:413:0: style: The function 'WriteCR2' is never used. [unusedFunction]
+
+^
+Kernel/Arch/x86_64/CPU.cpp:417:0: style: The function 'WriteCR3' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:433:0: style: The function '__asan_after_dynamic_init' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:391:0: style: The function '__asan_alloca_poison' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:404:0: style: The function '__asan_allocas_unpoison' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:430:0: style: The function '__asan_before_dynamic_init' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:427:0: style: The function '__asan_handle_no_return' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:290:0: style: The function '__asan_load1' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:294:0: style: The function '__asan_load16' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:294:0: style: The function '__asan_load16_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:290:0: style: The function '__asan_load1_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:291:0: style: The function '__asan_load2' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:291:0: style: The function '__asan_load2_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:292:0: style: The function '__asan_load4' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:292:0: style: The function '__asan_load4_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:293:0: style: The function '__asan_load8' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:293:0: style: The function '__asan_load8_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:299:0: style: The function '__asan_loadN' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:306:0: style: The function '__asan_loadN_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:413:0: style: The function '__asan_poison_stack_memory' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:374:0: style: The function '__asan_register_globals' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:290:0: style: The function '__asan_report_load1' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:294:0: style: The function '__asan_report_load16' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:294:0: style: The function '__asan_report_load16_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:290:0: style: The function '__asan_report_load1_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:291:0: style: The function '__asan_report_load2' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:291:0: style: The function '__asan_report_load2_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:292:0: style: The function '__asan_report_load4' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:292:0: style: The function '__asan_report_load4_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:293:0: style: The function '__asan_report_load8' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:293:0: style: The function '__asan_report_load8_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:327:0: style: The function '__asan_report_load_n' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:334:0: style: The function '__asan_report_load_n_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:290:0: style: The function '__asan_report_store1' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:294:0: style: The function '__asan_report_store16' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:294:0: style: The function '__asan_report_store16_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:290:0: style: The function '__asan_report_store1_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:291:0: style: The function '__asan_report_store2' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:291:0: style: The function '__asan_report_store2_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:292:0: style: The function '__asan_report_store4' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:292:0: style: The function '__asan_report_store4_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:293:0: style: The function '__asan_report_store8' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:293:0: style: The function '__asan_report_store8_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:341:0: style: The function '__asan_report_store_n' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:348:0: style: The function '__asan_report_store_n_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:290:0: style: The function '__asan_store1' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:294:0: style: The function '__asan_store16' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:294:0: style: The function '__asan_store16_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:290:0: style: The function '__asan_store1_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:291:0: style: The function '__asan_store2' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:291:0: style: The function '__asan_store2_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:292:0: style: The function '__asan_store4' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:292:0: style: The function '__asan_store4_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:293:0: style: The function '__asan_store8' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:293:0: style: The function '__asan_store8_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:313:0: style: The function '__asan_storeN' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:320:0: style: The function '__asan_storeN_noabort' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:420:0: style: The function '__asan_unpoison_stack_memory' is never used. [unusedFunction]
+
+^
+Kernel/Library/Kasan.cpp:382:0: style: The function '__asan_unregister_globals' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/assert.cpp:21:0: style: The function '__assert' is never used. [unusedFunction]
+
+^
+Kernel/Library/ICxxAbi.cpp:31:0: style: The function '__cxa_atexit' is never used. [unusedFunction]
+
+^
+Kernel/Library/ICxxAbi.cpp:41:0: style: The function '__cxa_finalize' is never used. [unusedFunction]
+
+^
+Kernel/Library/ICxxAbi.cpp:109:0: style: The function '__cxa_guard_acquire' is never used. [unusedFunction]
+
+^
+Kernel/Library/ICxxAbi.cpp:118:0: style: The function '__cxa_guard_release' is never used. [unusedFunction]
+
+^
+Kernel/Library/ICxxAbi.cpp:73:0: style: The function '__cxa_pure_virtual' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/errno.cpp:14:0: style: The function '__errno_location' is never used. [unusedFunction]
+
+^
+Kernel/Library/ICxxAbi.cpp:89:0: style: The function '__guard_setup' is never used. [unusedFunction]
+
+^
+Kernel/Library/ICxxAbi.cpp:82:0: style: The function '__stack_chk_fail' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdlib.cpp:33:0: style: The function 'abort' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdio.cpp:84:0: style: The function 'asprintf' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdlib.cpp:14:0: style: The function 'calloc' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdio.cpp:30:0: style: The function 'fflush' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdio.cpp:36:0: style: The function 'fprintf' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdio.cpp:26:0: style: The function 'fputc' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdio.cpp:27:0: style: The function 'fputs' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdio.cpp:28:0: style: The function 'fputws' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdlib.cpp:19:0: style: The function 'free' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdio.cpp:37:0: style: The function 'fwrite' is never used. [unusedFunction]
+
+^
+Kernel/Arch/aarch64/Drivers/GIC.cpp:58:0: style: The function 'gic_enable_irq' is never used. [unusedFunction]
+
+^
+Kernel/Arch/aarch64/Drivers/GIC.cpp:48:0: style: The function 'gic_v2_init' is never used. [unusedFunction]
+
+^
+Kernel/Network/NetworkAdapter.cpp:10:0: style: The function 'htonl' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/ctype.cpp:13:0: style: The function 'isblank' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/ctype.cpp:14:0: style: The function 'iscntrl' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/ctype.cpp:19:0: style: The function 'ispunct' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/ctype.cpp:30:0: style: The function 'isxdigit' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/string.cpp:60:0: style: The function 'memchr' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/string.cpp:48:0: style: The function 'memcmp' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/string.cpp:35:0: style: The function 'memmove' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdio.cpp:86:0: style: The function 'putchar' is never used. [unusedFunction]
+
+^
+Kernel/Arch/aarch64/InterruptManager.cpp:16:0: style: The function 'raiseFault' is never used. [unusedFunction]
+
+^
+Kernel/Arch/x86_64/IDT.cpp:179:0: style: The function 'raiseInterrupt' is never used. [unusedFunction]
+
+^
+Kernel/Arch/aarch64/InterruptManager.cpp:21:0: style: The function 'raiseIrq' is never used. [unusedFunction]
+
+^
+Kernel/Arch/aarch64/InterruptManager.cpp:11:0: style: The function 'raiseSyncException' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdlib.cpp:23:0: style: The function 'realloc' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdio.cpp:70:0: style: The function 'snprintf' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdio.cpp:56:0: style: The function 'sprintf' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/string.cpp:90:0: style: The function 'strcat' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/string.cpp:135:0: style: The function 'strcpy' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/string.cpp:99:0: style: The function 'strncat' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/string.cpp:179:0: style: The function 'strrev' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdlib.cpp:28:0: style: The function 'strtoll' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdio.cpp:15:0: style: The function 'terminate' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/ctype.cpp:31:0: style: The function 'tolower' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:356:0: style: The function 'uacpi_kernel_acquire_mutex' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:272:0: style: The function 'uacpi_kernel_alloc' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:273:0: style: The function 'uacpi_kernel_calloc' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:337:0: style: The function 'uacpi_kernel_create_event' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:326:0: style: The function 'uacpi_kernel_create_mutex' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:431:0: style: The function 'uacpi_kernel_create_spinlock' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:278:0: style: The function 'uacpi_kernel_free' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:343:0: style: The function 'uacpi_kernel_free_event' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:332:0: style: The function 'uacpi_kernel_free_mutex' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:437:0: style: The function 'uacpi_kernel_free_spinlock' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:304:0: style: The function 'uacpi_kernel_get_nanoseconds_since_boot' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:40:0: style: The function 'uacpi_kernel_get_rsdp' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:348:0: style: The function 'uacpi_kernel_get_thread_id' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:392:0: style: The function 'uacpi_kernel_handle_firmware_request' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:406:0: style: The function 'uacpi_kernel_install_interrupt_handler' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:202:0: style: The function 'uacpi_kernel_io_map' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:218:0: style: The function 'uacpi_kernel_io_read16' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:225:0: style: The function 'uacpi_kernel_io_read32' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:211:0: style: The function 'uacpi_kernel_io_read8' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:209:0: style: The function 'uacpi_kernel_io_unmap' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:238:0: style: The function 'uacpi_kernel_io_write16' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:244:0: style: The function 'uacpi_kernel_io_write32' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:232:0: style: The function 'uacpi_kernel_io_write8' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:442:0: style: The function 'uacpi_kernel_lock_spinlock' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:283:0: style: The function 'uacpi_kernel_log' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:144:0: style: The function 'uacpi_kernel_pci_device_close' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:132:0: style: The function 'uacpi_kernel_pci_device_open' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:157:0: style: The function 'uacpi_kernel_pci_read16' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:166:0: style: The function 'uacpi_kernel_pci_read32' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:149:0: style: The function 'uacpi_kernel_pci_read8' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:183:0: style: The function 'uacpi_kernel_pci_write16' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:192:0: style: The function 'uacpi_kernel_pci_write32' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:175:0: style: The function 'uacpi_kernel_pci_write8' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:53:0: style: The function 'uacpi_kernel_raw_memory_read' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:73:0: style: The function 'uacpi_kernel_raw_memory_write' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:364:0: style: The function 'uacpi_kernel_release_mutex' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:385:0: style: The function 'uacpi_kernel_reset_event' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:457:0: style: The function 'uacpi_kernel_schedule_work' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:380:0: style: The function 'uacpi_kernel_signal_event' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:315:0: style: The function 'uacpi_kernel_sleep' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:308:0: style: The function 'uacpi_kernel_stall' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:423:0: style: The function 'uacpi_kernel_uninstall_interrupt_handler' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:449:0: style: The function 'uacpi_kernel_unlock_spinlock' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:370:0: style: The function 'uacpi_kernel_wait_for_event' is never used. [unusedFunction]
+
+^
+Kernel/Firmware/ACPI/UACPI.cpp:466:0: style: The function 'uacpi_kernel_wait_for_work_completion' is never used. [unusedFunction]
+
+^
+Kernel/Library/KLibC/stdio.cpp:83:0: style: The function 'vasprintf' is never used. [unusedFunction]
+
+^
+nofile:0:0: information: Cppcheck cannot find all the include files (use --check-config for details) [missingInclude]
+
