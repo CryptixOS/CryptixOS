@@ -301,55 +301,57 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
                                 rusage* rusage)
 {
-    Process*         process = Process::GetCurrent();
-    Vector<Process*> procs;
-    if (m_Children.Empty()) return Error(ECHILD);
-
-    if (pid < -1)
-    {
-        pid_t gid = -pid;
-        auto  it  = std::find_if(m_Children.begin(), m_Children.end(),
-                                 [gid](Process* proc) -> bool
-                                 {
-                                   if (proc->PGid() == gid) return true;
-                                   return false;
-                               });
-        if (it == m_Children.end()) return Error(ECHILD);
-        procs.PushBack(*it);
-    }
-    else if (pid == -1) procs = process->m_Children;
-    else if (pid == 0)
-    {
-        auto it = std::find_if(m_Children.begin(), m_Children.end(),
-                               [process](Process* proc) -> bool
-                               {
-                                   if (proc->PGid() == process->PGid())
-                                       return true;
-                                   return false;
-                               });
-
-        if (it == m_Children.end()) return Error(ECHILD);
-        procs.PushBack(*it);
-    }
-    else if (pid > 0)
-    {
-        auto it = std::find_if(m_Children.begin(), m_Children.end(),
-                               [pid](Process* proc) -> bool
-                               {
-                                   if (proc->Pid() == pid) return true;
-                                   return false;
-                               });
-
-        if (it == m_Children.end()) return Error(ECHILD);
-        procs.PushBack(*it);
-    }
-
-    Vector<Event*> events;
-    for (auto& proc : procs) events.PushBack(&proc->m_Event);
-
     bool block = !(flags & WNOHANG);
+    Vector<Event*> events;
     for (;;)
     {
+        events.Clear();
+        events.ShrinkToFit();
+        Process*         process = Process::GetCurrent();
+        Vector<Process*> procs;
+        if (m_Children.Empty()) return Error(ECHILD);
+
+        if (pid < -1)
+        {
+            pid_t gid = -pid;
+            auto  it  = std::find_if(m_Children.begin(), m_Children.end(),
+                                     [gid](Process* proc) -> bool
+                                     {
+                                       if (proc->PGid() == gid) return true;
+                                       return false;
+                                   });
+            if (it == m_Children.end()) return Error(ECHILD);
+            procs.PushBack(*it);
+        }
+        else if (pid == -1) procs = process->m_Children;
+        else if (pid == 0)
+        {
+            auto it = std::find_if(m_Children.begin(), m_Children.end(),
+                                   [process](Process* proc) -> bool
+                                   {
+                                       if (proc->PGid() == process->PGid())
+                                           return true;
+                                       return false;
+                                   });
+
+            if (it == m_Children.end()) return Error(ECHILD);
+            procs.PushBack(*it);
+        }
+        else if (pid > 0)
+        {
+            auto it = std::find_if(m_Children.begin(), m_Children.end(),
+                                   [pid](Process* proc) -> bool
+                                   {
+                                       if (proc->Pid() == pid) return true;
+                                       return false;
+                                   });
+
+            if (it == m_Children.end()) return Error(ECHILD);
+            procs.PushBack(*it);
+        }
+
+        for (auto& proc : procs) events.PushBack(&proc->m_Event);
+
         auto ret = Event::Await(Span(events.Raw(), events.Size()), block);
         if (!ret.HasValue()) return Error(EINTR);
 

@@ -43,7 +43,7 @@ struct ProcFsProperty
     isize Read(u8* outBuffer, off_t offset, usize count);
 
     template <typename F>
-    ProcFsProperty(F f)
+    explicit ProcFsProperty(F f)
     {
         GenProp.BindLambda(f);
     }

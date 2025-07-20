@@ -13,7 +13,7 @@ class EchFsINode;
 class EchFs final : public Filesystem
 {
   public:
-    EchFs(u32 flags)
+    explicit EchFs(u32 flags)
         : Filesystem("EchFs", flags)
     {
     }

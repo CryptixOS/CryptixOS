@@ -15,17 +15,17 @@
 #include <magic_enum/magic_enum.hpp>
 
 constexpr usize MAX_FONT_GLYPHS     = 256;
-constexpr Color DEFAULT_BACKGROUND  = 0xa0'00'00'00;
-constexpr Color DEFAULT_BACKDROP    = 0x00'00'00'00;
+constexpr Color DEFAULT_BACKGROUND  = Color(0xa0'00'00'00);
+constexpr Color DEFAULT_BACKDROP    = Color(0x00'00'00'00);
 
 constexpr usize BUILTIN_FONT_WIDTH  = 8;
 constexpr usize BUILTIN_FONT_HEIGHT = 16;
 
-VideoTerminal* VideoTerminal::Create(Framebuffer& framebuffer)
+VideoTerminal*  VideoTerminal::Create(Framebuffer& framebuffer)
 {
     return new VideoTerminal(framebuffer);
 }
-bool            VideoTerminal::Initialize(const ::Framebuffer& framebuffer)
+bool VideoTerminal::Initialize(const ::Framebuffer& framebuffer)
 {
     if (!framebuffer.Address) return false;
     else if (m_Initialized) return true;
@@ -198,8 +198,9 @@ void VideoTerminal::Refresh()
         for (usize x = 0; x < m_Framebuffer.Width; x++)
         {
             if (m_Canvas.Address && bgColor == DEFAULT_TEXT_BACKGROUND)
-                bgColor = m_Canvas.Address
-                              .As<volatile u32>()[y * m_Framebuffer.Width + x];
+                bgColor = Color(
+                    m_Canvas.Address
+                        .As<volatile u32>()[y * m_Framebuffer.Width + x]);
             m_Framebuffer.PutPixel(x, y, bgColor);
         }
     }
@@ -276,9 +277,9 @@ inline constexpr Color s_AnsiColors[]
     = {Color::AnsiBlack(), Color::AnsiRed(), Color::AnsiGreen(),
        Color::AnsiYellow(), Color::AnsiBlue(), Color::AnsiMagenta(),
        // Cyan, White, ---
-       Color::AnsiCyan(), Color::AnsiWhite(), 0x00555555,
+       Color::AnsiCyan(), Color::AnsiWhite(), Color(0x00555555ull),
        // Default, BrightBlack, BrightRed
-       0x00ff5555, Color::AnsiBrightBlack(), Color::AnsiBrightRed(),
+       Color(0x00ff5555), Color::AnsiBrightBlack(), Color::AnsiBrightRed(),
        // Bright Green, Bright Yellow, Bright Blue
        Color::AnsiBrightGreen(), Color::AnsiBrightYellow(),
        Color::AnsiBrightBlue(),
@@ -358,7 +359,7 @@ void VideoTerminal::PlotChar(Character* c, usize xpos, usize ypos)
             {
                 usize gx = m_Font.ScaleX * fx + i;
                 if (m_Canvas.Address && color == defaultBg)
-                    color = canvasLine[gx];
+                    color = Color(canvasLine[gx]);
                 // color = BlendColors(m_CurrentState.TextBackground,
                 //                     canvasLine[gx]);
 

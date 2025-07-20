@@ -20,7 +20,7 @@ namespace Time
 {
     struct Timer
     {
-        Timer(timespec when)
+        explicit Timer(timespec when)
             : When(when)
         {
             Arm();

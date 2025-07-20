@@ -111,7 +111,7 @@ namespace PCI
     class Device
     {
       public:
-        Device(const DeviceAddress& address);
+        explicit Device(const DeviceAddress& address);
 
         ErrorOr<void>               Enable();
 

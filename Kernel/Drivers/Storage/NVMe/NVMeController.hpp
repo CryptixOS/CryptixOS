@@ -159,7 +159,7 @@ namespace NVMe
     class Controller : public PCI::Device, public Device
     {
       public:
-        Controller(const PCI::DeviceAddress& address);
+        explicit Controller(const PCI::DeviceAddress& address);
 
         bool          Initialize();
         void          Shutdown();

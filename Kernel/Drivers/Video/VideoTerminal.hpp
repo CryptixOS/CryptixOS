@@ -33,7 +33,10 @@ class VideoTerminal final : public Terminal
 
   protected:
     VideoTerminal() = default;
-    VideoTerminal(const Framebuffer& framebuffer) { Initialize(framebuffer); }
+    explicit VideoTerminal(const Framebuffer& framebuffer)
+    {
+        Initialize(framebuffer);
+    }
 
     virtual void Clear(u32 = 0xffffffff, bool clear = true) override;
 
@@ -106,21 +109,23 @@ class VideoTerminal final : public Terminal
         Color Background;
     };
 
-    constexpr static Color DEFAULT_TEXT_FOREGROUND        = 0x00'aa'aa'aa;
-    constexpr static Color DEFAULT_TEXT_BACKGROUND        = 0xff'ff'ff'ff;
-    constexpr static Color DEFAULT_TEXT_FOREGROUND_BRIGHT = 0xa0'55'55'55;
-    constexpr static Color DEFAULT_TEXT_BACKGROUND_BRIGHT = 0x00'aa'aa'aa;
+    constexpr static Color DEFAULT_TEXT_FOREGROUND = Color(0x00'aa'aa'aa);
+    constexpr static Color DEFAULT_TEXT_BACKGROUND = Color(0xff'ff'ff'ff);
+    constexpr static Color DEFAULT_TEXT_FOREGROUND_BRIGHT
+        = Color(0xa0'55'55'55);
+    constexpr static Color DEFAULT_TEXT_BACKGROUND_BRIGHT
+        = Color(0x00'aa'aa'aa);
 
-    ConsoleState           m_CurrentState;
-    ConsoleState           m_SavedState;
+    ConsoleState m_CurrentState;
+    ConsoleState m_SavedState;
 
-    usize                  m_OldCursorX     = 0;
-    usize                  m_OldCursorY     = 0;
-    usize                  m_OffsetX        = 0;
-    usize                  m_OffsetY        = 0;
+    usize        m_OldCursorX     = 0;
+    usize        m_OldCursorY     = 0;
+    usize        m_OffsetX        = 0;
+    usize        m_OffsetY        = 0;
 
-    u16                    m_Margin         = 0;
-    u16                    m_MarginGradient = 0;
+    u16          m_Margin         = 0;
+    u16          m_MarginGradient = 0;
 
     struct Character
     {

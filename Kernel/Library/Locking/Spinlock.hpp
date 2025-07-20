@@ -68,7 +68,7 @@ class ScopedLock final : public NonCopyable<ScopedLock>
     ScopedLock()                        = delete;
     ScopedLock& operator=(ScopedLock&&) = delete;
 
-    ScopedLock(Spinlock& lock, bool disableInterrupts = false)
+    explicit ScopedLock(Spinlock& lock, bool disableInterrupts = false)
         : m_Lock(lock)
         , m_RestoreInterrupts(disableInterrupts)
     {

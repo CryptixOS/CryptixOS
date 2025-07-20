@@ -13,21 +13,15 @@
 class SynthFsINode : public INode
 {
   public:
-    SynthFsINode(INode* parent, StringView name, Filesystem* filesystem,
-                 mode_t mode);
+    SynthFsINode(INode* parent, StringView name,
+                 class Filesystem* filesystem, mode_t mode);
     virtual ~SynthFsINode() = default;
 
-    virtual void InsertChild(INode* node, StringView name) override
-    {
-        ScopedLock guard(m_Lock);
-        m_Children[name] = node;
-    }
+    virtual void  InsertChild(INode* node, StringView name) override {}
 
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
-
-    virtual ErrorOr<void>  ChMod(mode_t mode) override;
 
   private:
     Buffer                 m_Buffer;

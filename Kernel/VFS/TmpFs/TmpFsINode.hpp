@@ -25,7 +25,7 @@ extern bool g_LogTmpFs;
 class TmpFsINode final : public INode
 {
   public:
-    TmpFsINode(class Filesystem* fs);
+    explicit TmpFsINode(class Filesystem* fs);
     TmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
                uid_t uid = 0, gid_t gid = 0);
 

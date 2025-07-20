@@ -554,6 +554,7 @@ namespace ACPI::Interpreter
                 // return new ReturnStatement(val);
             }
 
+            CTOS_FALLTHROUGH;
             default:
                 if (IsNameSegment(op))
                 {

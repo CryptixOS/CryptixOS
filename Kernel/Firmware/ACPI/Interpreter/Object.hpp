@@ -33,7 +33,7 @@ namespace ACPI
     class Object 
     {
       public:
-        Object(ObjectType type)
+        explicit Object(ObjectType type)
           : m_Type(type)
         {
 
@@ -46,7 +46,7 @@ namespace ACPI
     class IntegerObject : public Object 
     {
       public:
-        IntegerObject(usize value)
+        explicit IntegerObject(usize value)
             : Object(ObjectType::eInteger), m_Value(value)
         {
 
@@ -73,7 +73,7 @@ namespace ACPI
     struct ConstantExpression : Expression 
     {
         u64 Value;
-        ConstantExpression(u64 val) : Value(val) { Type = ExpressionType::eConstant; }
+        explicit ConstantExpression(u64 val) : Value(val) { Type = ExpressionType::eConstant; }
 
         void Dump(int indent = 0) const override 
         {
@@ -86,7 +86,7 @@ namespace ACPI
     struct NameRefExpr : Expression 
     {
         String Name;
-        NameRefExpr(String name) : Name(Move(name)) { Type = ExpressionType::eNameRef; }
+        explicit NameRefExpr(String name) : Name(Move(name)) { Type = ExpressionType::eNameRef; }
 
         void Dump(int indent = 0) const override 
         {
@@ -120,7 +120,7 @@ namespace ACPI
     {
         String Callee;
         Vector<Expression*> Args;
-        CallExpression(String callee) : Callee(Move(callee)) { Type = ExpressionType::eCall; }
+        explicit CallExpression(String callee) : Callee(Move(callee)) { Type = ExpressionType::eCall; }
 
         void Dump(int indent = 0) const override 
         {
@@ -159,7 +159,7 @@ namespace ACPI
     struct ExpressionStatement : Statement 
     {
         Expression* Expr;
-        ExpressionStatement(Expression* e) : Expr(e) { Type = StatementType::eExpressionStatement; }
+        explicit ExpressionStatement(Expression* e) : Expr(e) { Type = StatementType::eExpressionStatement; }
 
         void Dump(int indent = 0) const override 
         {
@@ -174,7 +174,7 @@ namespace ACPI
     {
         Expression* Cond;
         Vector<Statement*> Body;
-        WhileStatement(Expression* cond) : Cond(cond) 
+        explicit WhileStatement(Expression* cond) : Cond(cond) 
         { 
             Type = StatementType::eWhile; 
         }
@@ -192,7 +192,7 @@ namespace ACPI
     struct CallStatement : Statement 
     {
         CallExpression* Expression;
-        CallStatement(CallExpression* c) : Expression(c) { Type = StatementType::eCallStatement; }
+        explicit CallStatement(CallExpression* c) : Expression(c) { Type = StatementType::eCallStatement; }
         void Dump(int indent = 0) const override 
         {
             for (int i = 0; i < indent; i++)

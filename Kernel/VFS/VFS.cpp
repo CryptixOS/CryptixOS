@@ -426,7 +426,9 @@ namespace VFS
 
     bool Unlink(Ref<DirectoryEntry> parent, PathView path, i32 flags)
     {
-        if (!parent) parent = RootDirectoryEntry();
+        if (!parent)
+            parent = path.StartsWith("/") ? RootDirectoryEntry()
+                                          : Process::Current()->CWD();
 
         ToDo();
         return false;

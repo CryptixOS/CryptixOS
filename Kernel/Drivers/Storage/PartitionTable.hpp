@@ -14,6 +14,7 @@
 class PartitionTable
 {
   public:
+    constexpr PartitionTable() = default;
     bool Load(class StorageDevice& device);
 
     struct Entry
@@ -37,8 +38,8 @@ class PartitionTable
     auto end() { return m_Entries.end(); }
 
   private:
-    StorageDevice* m_Device;
-    Vector<Entry>  m_Entries;
+    StorageDevice* m_Device = nullptr;
+    Vector<Entry>  m_Entries{};
 
     bool           IsProtective(struct MasterBootRecord* mbr);
 

@@ -12,7 +12,7 @@
 class Semaphore : public NonCopyable<Semaphore>
 {
   public:
-    Semaphore(usize initial = 0)
+    explicit Semaphore(usize initial = 0)
         : m_Count(initial)
     {
     }

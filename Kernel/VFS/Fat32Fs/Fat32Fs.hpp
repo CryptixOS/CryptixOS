@@ -13,7 +13,7 @@
 class Fat32Fs final : public Filesystem
 {
   public:
-    Fat32Fs(u32 flags)
+    explicit Fat32Fs(u32 flags)
         : Filesystem("Fat32Fs", flags)
     {
     }

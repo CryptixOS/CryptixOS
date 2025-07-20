@@ -140,6 +140,11 @@ ErrorOr<Ref<DirectoryEntry>> INode::Link(Ref<DirectoryEntry> oldEntry,
     return Error(ENOSYS);
 }
 
+ErrorOr<Path> INode::ReadLink()
+{
+    if (!IsSymlink()) return Error(EINVAL);
+    return m_Target;
+}
 ErrorOr<void> INode::Unlink(Ref<DirectoryEntry> entry) { return Error(ENOSYS); }
 
 ErrorOr<isize> INode::ReadLink(UserBuffer& outBuffer)

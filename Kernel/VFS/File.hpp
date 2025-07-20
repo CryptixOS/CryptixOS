@@ -20,7 +20,7 @@ class File
 {
   public:
     File() = default;
-    File(class INode* inode);
+    explicit File(class INode* inode);
 
     virtual ~File() = default;
 

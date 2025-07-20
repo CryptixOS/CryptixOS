@@ -14,7 +14,7 @@
 class DevTmpFs : public Filesystem
 {
   public:
-    DevTmpFs(u32 flags);
+    explicit DevTmpFs(u32 flags);
 
     virtual ErrorOr<::Ref<DirectoryEntry>>
     Mount(StringView sourcePath, const void* data = nullptr) override;

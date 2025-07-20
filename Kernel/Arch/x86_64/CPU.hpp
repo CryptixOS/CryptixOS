@@ -122,7 +122,7 @@ namespace CPU
     struct ID final
     {
         ID() = default;
-        ID(u64 leaf, u64 subleaf = 0);
+        explicit ID(u64 leaf, u64 subleaf = 0);
 
         bool operator()(u64 leaf, u64 subleaf = 0);
 

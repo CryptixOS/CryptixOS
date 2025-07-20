@@ -83,7 +83,10 @@ ErrorOr<Ref<DirectoryEntry>> PathResolver::Resolve(PathLookupFlags flags)
                 if (flags & PathLookupFlags::eNegativeEntry
                     && m_DirectoryEntry->Lookup(m_Path.BaseName()))
                     return Error(EEXIST);
-                return m_DirectoryEntry;
+
+                return m_DirectoryEntry && m_DirectoryEntry->IsMountPoint()
+                         ? m_DirectoryEntry->FollowMounts().Promote()
+                         : m_DirectoryEntry;
             }
             continue;
         }
@@ -104,6 +107,9 @@ ErrorOr<Ref<DirectoryEntry>> PathResolver::Resolve(PathLookupFlags flags)
     if (flags & PathLookupFlags::eNegativeEntry && m_DirectoryEntry
         && m_DirectoryEntry->Lookup(m_Path.BaseName()))
         return Error(EEXIST);
+
+    if (m_DirectoryEntry && m_DirectoryEntry->IsMountPoint())
+        m_DirectoryEntry = m_DirectoryEntry->FollowMounts().Promote();
     return m_DirectoryEntry;
 }
 
@@ -111,6 +117,9 @@ ErrorOr<void> PathResolver::Step()
 {
     m_Parent         = m_DirectoryEntry;
     m_DirectoryEntry = m_DirectoryEntry->Lookup(m_CurrentSegment.Name);
+    while (m_DirectoryEntry->IsMountPoint())
+        m_DirectoryEntry = m_DirectoryEntry->FollowMounts().Promote();
+
     m_BaseName       = Path(m_CurrentSegment.Name);
     if (!m_DirectoryEntry) return Terminate(ENOENT);
 

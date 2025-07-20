@@ -72,24 +72,24 @@ class INode
 
     virtual ErrorOr<Ref<DirectoryEntry>> Lookup(Ref<DirectoryEntry> dentry);
 
-    inline StringView Name() { return m_Name; }
-    mode_t            Mode() const;
+    inline StringView                    Name() { return m_Name; }
+    mode_t                               Mode() const;
 
-    bool              IsFilesystemRoot() const;
-    bool              IsEmpty();
-    bool              ReadOnly();
-    bool              Immutable();
-    bool              CanWrite(const Credentials& creds) const;
+    bool                                 IsFilesystemRoot() const;
+    bool                                 IsEmpty();
+    bool                                 ReadOnly();
+    bool                                 Immutable();
+    bool        CanWrite(const Credentials& creds) const;
 
-    inline bool       IsCharDevice() const { return S_ISCHR(m_Metadata.Mode); }
-    inline bool       IsFifo() const { return S_ISFIFO(m_Metadata.Mode); }
-    inline bool       IsDirectory() const { return S_ISDIR(m_Metadata.Mode); }
-    inline bool       IsRegular() const { return S_ISREG(m_Metadata.Mode); }
-    inline bool       IsSymlink() const { return S_ISLNK(m_Metadata.Mode); }
-    inline bool       IsSocket() const { return S_ISSOCK(m_Metadata.Mode); }
+    inline bool IsCharDevice() const { return S_ISCHR(m_Metadata.Mode); }
+    inline bool IsFifo() const { return S_ISFIFO(m_Metadata.Mode); }
+    inline bool IsDirectory() const { return S_ISDIR(m_Metadata.Mode); }
+    inline bool IsRegular() const { return S_ISREG(m_Metadata.Mode); }
+    inline bool IsSymlink() const { return S_ISLNK(m_Metadata.Mode); }
+    inline bool IsSocket() const { return S_ISSOCK(m_Metadata.Mode); }
 
-    bool              ValidatePermissions(const Credentials& creds, u32 acc);
-    void              UpdateATime();
+    bool        ValidatePermissions(const Credentials& creds, u32 acc);
+    void        UpdateATime();
 
     virtual ErrorOr<Ref<DirectoryEntry>> CreateNode(Ref<DirectoryEntry> entry,
                                                     mode_t mode, dev_t dev = 0);
@@ -102,18 +102,19 @@ class INode
     virtual ErrorOr<Ref<DirectoryEntry>> Link(Ref<DirectoryEntry> oldEntry,
                                               Ref<DirectoryEntry> entry);
 
-    virtual void      InsertChild(INode* node, StringView name)            = 0;
-    virtual isize     Read(void* buffer, off_t offset, usize bytes)        = 0;
-    virtual isize     Write(const void* buffer, off_t offset, usize bytes) = 0;
-    virtual i32 IoCtl(usize request, usize arg) { return_err(-1, ENODEV); }
+    virtual void  InsertChild(INode* node, StringView name)            = 0;
+    virtual isize Read(void* buffer, off_t offset, usize bytes)        = 0;
+    virtual isize Write(const void* buffer, off_t offset, usize bytes) = 0;
+    virtual i32   IoCtl(usize request, usize arg) { return_err(-1, ENODEV); }
     virtual ErrorOr<isize> Truncate(usize size) { return Error(ENOSYS); }
     virtual ErrorOr<void>  Rename(INode* newParent, StringView newName)
     {
         return Error(ENOSYS);
     }
+    virtual ErrorOr<Path> ReadLink();
 
-    virtual ErrorOr<void>                Unlink(Ref<DirectoryEntry> entry);
-    virtual ErrorOr<void>                RmDir(Ref<DirectoryEntry> entry)
+    virtual ErrorOr<void> Unlink(Ref<DirectoryEntry> entry);
+    virtual ErrorOr<void> RmDir(Ref<DirectoryEntry> entry)
     {
         return Error(ENOSYS);
     }

@@ -15,7 +15,7 @@
 class ProcFs : public Filesystem
 {
   public:
-    ProcFs(u32 flags)
+    explicit ProcFs(u32 flags)
         : Filesystem("ProcFs", flags)
     {
     }

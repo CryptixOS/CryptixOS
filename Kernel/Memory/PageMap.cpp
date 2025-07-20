@@ -38,7 +38,7 @@ std::pair<usize, PageAttributes> PageMap::RequiredSize(usize size) const
     usize lPageSize  = Arch::VMM::GetPageSize(PageAttributes::eLPage);
     usize llPageSize = Arch::VMM::GetPageSize(PageAttributes::eLLPage);
 
-    if (size >= lPageSize) return {llPageSize, PageAttributes::eLLPage};
+    if (size >= llPageSize) return {llPageSize, PageAttributes::eLLPage};
     else if (size >= lPageSize) return {lPageSize, PageAttributes::eLPage};
 
     return {m_PageSize, static_cast<PageAttributes>(0)};

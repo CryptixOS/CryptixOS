@@ -181,8 +181,8 @@ static void kernelThread()
         VFS::Mount(nullptr, "/dev/nvme0n2p2"_sv, "/mnt/ext2"_sv, "ext2fs"_sv));
     IgnoreUnused(VFS::Mount(nullptr, "/dev/nvme0n2p1"_sv, "/mnt/fat32"_sv,
                             "fat32fs"_sv));
-    IgnoreUnused(
-        VFS::Mount(nullptr, "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv, "echfs"_sv));
+    // IgnoreUnused(
+    //     VFS::Mount(nullptr, "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv, "echfs"_sv));
 
     if (!USB::Initialize()) LogWarn("USB: Failed to initialize");
 

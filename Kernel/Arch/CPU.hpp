@@ -70,6 +70,13 @@ namespace CPU
 
         return value;
     }
+    inline constexpr String CopyStringFromUser(const char* string)
+    {
+        UserMemoryProtectionGuard guard;
+
+        return string;
+    }
+
     template <typename T>
         requires(!SameAs<T, void>)
     inline constexpr void CopyToUser(T* userBuffer, const T& value)
@@ -78,6 +85,13 @@ namespace CPU
 
         *userBuffer = value;
     }
+    inline constexpr void CopyStringToUser(StringView source, char* dest)
+    {
+        UserMemoryProtectionGuard guard;
+
+        source.Copy(dest, source.Size());
+    }
+
 
     template <typename F, typename... Args>
     inline static void AsUser(F&& f, Args&&... args)

@@ -11,7 +11,7 @@
 class InterruptGuard final
 {
   public:
-    InterruptGuard(bool ints)
+    explicit InterruptGuard(bool ints)
         : m_SavedInts(CPU::GetInterruptFlag())
     {
         CPU::SetInterruptFlag(ints);
