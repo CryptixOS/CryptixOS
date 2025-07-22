@@ -11,14 +11,14 @@ namespace VMM
 {
     enum PageAttributes Region::PageAttributes() const
     {
-        return PageAttributes::eRWXU | PageAttributes::eWriteBack;
         enum PageAttributes flags = PageAttributes::eWriteBack;
 
         if (m_Access & Access::eRead) flags |= PageAttributes::eRead;
         if (m_Access & Access::eWrite) flags |= PageAttributes::eWrite;
         if (m_Access & Access::eExecute) flags |= PageAttributes::eExecutable;
-        if (m_Access & Access::eUser) flags |= PageAttributes::eUser;
 
-        return flags;
+        if (m_Access & Access::eUser) flags |= PageAttributes::eUser;
+        return flags | PageAttributes::eRead | PageAttributes::eWrite
+             | PageAttributes::eExecutable;
     }
 }; // namespace VMM

@@ -416,23 +416,21 @@ namespace VFS
 
         newParent->InsertChild(newEntry);
         newEntry->SetParent(newParent);
+
+        LogInfo("Link result => oldEntry: `{}`, newEntry: `{}`",
+                oldEntry->Path(), newEntry->Path());
+        LogInfo("old parent name: `{}`, new parent name: `{}`",
+                oldParent->Name(), newParent->Name());
+        LogInfo("old parent path: `{}`, new parent path: `{}`",
+                oldParent->Path(), newParent->Path());
+        LogInfo("old name: `{}`, new name: `{}`", oldName, newName);
         return newEntry;
     }
     ErrorOr<Ref<DirectoryEntry>> Link(PathView oldPath, PathView newPath,
                                       i32 flags)
     {
-        auto process = Process::Current();
-        auto parent
-            = oldPath.StartsWith("/") ? RootDirectoryEntry() : process->CWD();
-        PathResolver oldResolver(parent, oldPath);
-        auto         oldParent
-            = TryOrRet(oldResolver.Resolve(PathLookupFlags::eParent));
-
-        parent
-            = newPath.StartsWith("/") ? RootDirectoryEntry() : process->CWD();
-        PathResolver newResolver(parent, newPath);
-        auto         newParent
-            = TryOrRet(newResolver.Resolve(PathLookupFlags::eParent));
+        auto oldParent = TryOrRet(ResolveParent(RootDirectoryEntry(), oldPath));
+        auto newParent = TryOrRet(ResolveParent(RootDirectoryEntry(), newPath));
 
         return Link(oldParent, oldPath.BaseName(), newParent,
                     newPath.BaseName(), flags);

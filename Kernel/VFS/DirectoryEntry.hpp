@@ -58,7 +58,6 @@ class DirectoryEntry : public RefCounted
         : m_Name(name)
     {
     }
-    DirectoryEntry(::WeakRef<DirectoryEntry> parent, INode* inode);
     DirectoryEntry(::WeakRef<DirectoryEntry> parent, StringView name);
     DirectoryEntry(const DirectoryEntry& other)
         : m_INode(other.m_INode)

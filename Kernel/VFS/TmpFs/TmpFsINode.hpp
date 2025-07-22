@@ -56,7 +56,7 @@ class TmpFsINode final : public INode
     virtual ErrorOr<Ref<DirectoryEntry>>
     Link(Ref<DirectoryEntry> oldEntry, Ref<DirectoryEntry> entry) override;
 
-    virtual void          InsertChild(INode* node, StringView name) override;
+    virtual void  InsertChild(INode* node, StringView name) override;
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<Path>  ReadLink() override;
@@ -70,6 +70,7 @@ class TmpFsINode final : public INode
   private:
     Buffer                           m_Buffer;
     UnorderedMap<StringView, INode*> m_Children;
+    String                           m_Target = ""_s;
 
     friend class TmpFs;
 };

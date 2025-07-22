@@ -326,11 +326,13 @@ namespace uACPI
         uacpi_handle uacpi_kernel_create_mutex(void)
         {
             auto mutex = new std::mutex;
+            // auto mutex = new Mutex;
 
             return reinterpret_cast<uacpi_handle>(mutex);
         }
         void uacpi_kernel_free_mutex(uacpi_handle handle)
         {
+            // delete reinterpret_cast<Mutex*>(handle);
             delete reinterpret_cast<std::mutex*>(handle);
         }
 
@@ -359,12 +361,18 @@ namespace uACPI
             auto& mutex = *reinterpret_cast<std::mutex*>(handle);
             mutex.lock();
 
+            // auto& mutex = *reinterpret_cast<Mutex*>(handle);
+            // mutex.Lock();
+
             return UACPI_STATUS_OK;
         }
         void uacpi_kernel_release_mutex(uacpi_handle handle)
         {
             auto& mutex = *reinterpret_cast<std::mutex*>(handle);
             mutex.unlock();
+
+            // auto& mutex = *reinterpret_cast<Mutex*>(handle);
+            // mutex.Unlock();
         }
 
         uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle handle, uacpi_u16)
@@ -454,14 +462,22 @@ namespace uACPI
             CPU::SetInterruptFlag(interruptState);
         }
 
-        uacpi_status uacpi_kernel_schedule_work(uacpi_work_type,
-                                                uacpi_work_handler,
-                                                uacpi_handle ctx)
+        uacpi_status uacpi_kernel_schedule_work(uacpi_work_type    type,
+                                                uacpi_work_handler handler,
+                                                uacpi_handle       ctx)
         {
             CtosUnused(ctx);
             ToDoWarn();
 
-            return UACPI_STATUS_UNIMPLEMENTED;
+            switch (type)
+            {
+                case UACPI_WORK_GPE_EXECUTION:
+                case UACPI_WORK_NOTIFICATION: return UACPI_STATUS_UNIMPLEMENTED;
+
+                default: return UACPI_STATUS_INVALID_ARGUMENT;
+            }
+
+            return UACPI_STATUS_OK;
         }
         uacpi_status uacpi_kernel_wait_for_work_completion(void)
         {

@@ -269,12 +269,9 @@ namespace ACPI::Interpreter
         {
             case OpCode::eOne: initialValue = 1; break;
             case OpCode::eZero: initialValue = 0; break;
-            case OpCode::eQWordPrefix: byteCount = 4;
-                [[fallthrough]];
-            case OpCode::eDWordPrefix: byteCount = 3;
-                [[fallthrough]];
-            case OpCode::eWordPrefix: byteCount = 2;
-                [[fallthrough]];
+            case OpCode::eQWordPrefix: byteCount = 4; [[fallthrough]];
+            case OpCode::eDWordPrefix: byteCount = 3; [[fallthrough]];
+            case OpCode::eWordPrefix: byteCount = 2; [[fallthrough]];
             case OpCode::eBytePrefix: byteCount = 1; break;
             case OpCode::eBuffer:
             {
@@ -483,7 +480,8 @@ namespace ACPI::Interpreter
 
                     break;
                 }
-                LogMessage("{:#x}, {:c}\n", op, std::isalnum(op) ? op : '?');
+                LogMessage("{:#x}, {:c}\n", op,
+                           StringUtils::IsAlphanumeric(op) ? op : '?');
                 break;
         }
     }
@@ -554,7 +552,7 @@ namespace ACPI::Interpreter
                 // return new ReturnStatement(val);
             }
 
-            CTOS_FALLTHROUGH;
+                CTOS_FALLTHROUGH;
             default:
                 if (IsNameSegment(op))
                 {

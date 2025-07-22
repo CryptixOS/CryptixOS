@@ -16,6 +16,7 @@
 
 #include <Memory/PMM.hpp>
 #include <Prism/String/StringUtils.hpp>
+using namespace StringUtils;
 
 Vector<Terminal*>                Terminal::s_Terminals = {};
 Span<Framebuffer, DynamicExtent> s_Framebuffers;
@@ -228,7 +229,7 @@ void Terminal::OnEscapeChar(char c)
 }
 void Terminal::OnCsi(char c)
 {
-    if (std::isdigit(c))
+    if (IsDigit(c))
     {
         m_State = State::eControlSequenceParams;
 

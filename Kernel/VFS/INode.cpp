@@ -31,20 +31,10 @@ INode::INode(StringView name, class Filesystem* fs)
     Thread*  thread  = CPU::GetCurrentThread();
     Process* process = thread ? thread->Parent() : nullptr;
 
-    // if (parent && parent->m_Stats.st_mode & S_ISUID)
-    // {
-    //     m_Stats.st_uid = parent->m_Stats.st_uid;
-    //     m_Stats.st_gid = parent->m_Stats.st_gid;
-    //
-    //     return;
-    // }
-
     if (!process) return;
 
     m_Metadata.UID = process->Credentials().euid;
     m_Metadata.GID = process->Credentials().egid;
-    // m_Stats.st_uid = process->Credentials().euid;
-    // m_Stats.st_gid = process->Credentials().egid;
 }
 
 const stat INode::Stats()
@@ -69,7 +59,7 @@ const stat INode::Stats()
 
 mode_t INode::Mode() const
 {
-    return /*m_Stats.st_mode*/ m_Metadata.Mode & ~S_IFMT;
+    return m_Metadata.Mode & ~S_IFMT;
 }
 bool INode::IsFilesystemRoot() const
 {
@@ -81,7 +71,6 @@ bool INode::IsFilesystemRoot() const
 
 bool INode::IsEmpty()
 {
-    // m_Filesystem->Populate(this);
     bool              hasEntries = false;
     DirectoryIterator iterator;
     iterator.BindLambda(
@@ -99,14 +88,14 @@ bool INode::ReadOnly() { return false; }
 bool INode::Immutable() { return false; }
 bool INode::CanWrite(const Credentials& creds) const
 {
-    if (creds.euid == 0 || /*m_Stats.st_mode*/ m_Metadata.Mode & S_IWOTH)
+    if (creds.euid == 0 ||  m_Metadata.Mode & S_IWOTH)
         return true;
-    if (creds.euid == /*m_Stats.st_uid*/ m_Metadata.UID
-        && /*m_Stats.st_mode*/ m_Metadata.Mode & S_IWUSR)
+    if (creds.euid ==  m_Metadata.UID
+        &&  m_Metadata.Mode & S_IWUSR)
         return true;
 
-    return /*m_Stats.st_gid*/ m_Metadata.GID == creds.egid
-        && /*m_Stats.st_mode*/ m_Metadata.Mode & S_IWGRP;
+    return  m_Metadata.GID == creds.egid
+        &&  m_Metadata.Mode & S_IWGRP;
 }
 
 bool INode::ValidatePermissions(const Credentials& creds, u32 acc)
@@ -142,20 +131,10 @@ ErrorOr<Ref<DirectoryEntry>> INode::Link(Ref<DirectoryEntry> oldEntry,
 
 ErrorOr<Path> INode::ReadLink()
 {
-    if (!IsSymlink()) return Error(EINVAL);
-    return m_Target;
+    return Error(ENOSYS);
 }
 ErrorOr<void> INode::Unlink(Ref<DirectoryEntry> entry) { return Error(ENOSYS); }
 
-ErrorOr<isize> INode::ReadLink(UserBuffer& outBuffer)
-{
-    if (!m_Target.Raw() || m_Target.Size() == 0) return Error(EINVAL);
-
-    usize count = Min(m_Target.Size(), outBuffer.Size());
-    outBuffer.Write(m_Target.Raw(), count);
-
-    return static_cast<isize>(count);
-}
 ErrorOr<isize> INode::CheckPermissions(mode_t mask)
 {
     if (mask & W_OK)

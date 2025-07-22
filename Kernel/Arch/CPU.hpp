@@ -8,6 +8,7 @@
 
 #include <Memory/VMM.hpp>
 #include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
 
 #include <Time/TimeStep.hpp>
 
@@ -70,11 +71,14 @@ namespace CPU
 
         return value;
     }
-    inline constexpr String CopyStringFromUser(const char* string)
+    inline constexpr Path CopyStringFromUser(const char* string)
     {
-        UserMemoryProtectionGuard guard;
-
-        return string;
+        return AsUser(
+            [&]() -> Path
+            {
+                if (!string || *string == 0) return ""_p;
+                return string;
+            });
     }
 
     template <typename T>
@@ -91,7 +95,6 @@ namespace CPU
 
         source.Copy(dest, source.Size());
     }
-
 
     template <typename F, typename... Args>
     inline static void AsUser(F&& f, Args&&... args)

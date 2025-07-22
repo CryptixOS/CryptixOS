@@ -157,8 +157,8 @@ class Process
     String              m_Name        = "?";
 
     struct Credentials  m_Credentials = {};
-    class TTY*          m_TTY;
-    PrivilegeLevel      m_Ring = PrivilegeLevel::eUnprivileged;
+    class TTY*          m_TTY         = nullptr;
+    PrivilegeLevel      m_Ring        = PrivilegeLevel::eUnprivileged;
     Optional<i32>       m_Status;
     bool                m_Exited     = false;
 

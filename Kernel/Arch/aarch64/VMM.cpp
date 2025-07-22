@@ -8,8 +8,8 @@
 #include <Debug/Panic.hpp>
 
 #include <Library/Locking/Spinlock.hpp>
-#include <Memory/VMM.hpp>
 #include <Memory/MM.hpp>
+#include <Memory/VMM.hpp>
 
 struct [[gnu::packed]] TTBR
 {
@@ -322,7 +322,7 @@ bool PageMap::InternalUnmap(Pointer virt, PageAttributes flags)
 
     pmlEntry->Clear();
 
-    usize addr = (0ull << 48ull) | (virt.Raw() >> 12ul);
+    usize addr = virt.Raw() >> 12ul;
     __asm__ volatile(
         "dsb st; \n\t"
         "tlbi vale1, %0;\n\t"

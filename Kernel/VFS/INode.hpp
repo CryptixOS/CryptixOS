@@ -56,9 +56,6 @@ class INode
     INode(StringView name, class Filesystem* fs);
     virtual ~INode() {}
 
-    // virtual Ref<DirectoryEntry> Ref() { return nullptr; }
-    StringView               GetTarget() const { return m_Target; }
-
     inline class Filesystem* Filesystem() { return m_Filesystem; }
     virtual const stat       Stats();
 
@@ -109,7 +106,6 @@ class INode
     {
         return Error(ENODEV);
     }
-    virtual ErrorOr<isize> ReadLink(UserBuffer& outBuffer);
     virtual ErrorOr<Path>  ReadLink();
 
     virtual ErrorOr<isize> Truncate(usize size) { return Error(ENOSYS); }
@@ -133,17 +129,9 @@ class INode
                                             timespec ctime = {});
     virtual ErrorOr<void>  FlushMetadata() { return Error(ENOSYS); }
 
-    inline bool            Populate()
-    {
-        return true;
-        // return (!m_Populated && IsDirectory()) ? m_Filesystem->Populate()
-        //                                        : true;
-    }
-
   protected:
     INode*            m_Parent;
     String            m_Name;
-    String            m_Target;
     Spinlock          m_Lock;
     Metadata          m_Metadata = {};
 

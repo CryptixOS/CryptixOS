@@ -128,18 +128,18 @@ namespace NVMe
         void                        Submit(Submission* cmd);
 
       private:
-        u16                  m_ID;
-        u16                  m_Depth;
-        volatile Submission* m_Submit;
-        volatile Completion* m_Complete;
-        volatile u32*        m_SubmitDoorbell;
-        volatile u32*        m_CompleteDoorbell;
-        u16                  m_CompleteVec;
-        u16                  m_SubmitHead;
-        u16                  m_SubmitTail;
-        u16                  m_CompleteHead;
-        u8                   m_CompletePhase;
-        u32                  m_CmdId;
-        u64*                 m_PhysRegPgs;
+        u16                  m_ID               = 0;
+        u16                  m_Depth            = 0;
+        volatile Submission* m_Submit           = nullptr;
+        volatile Completion* m_Complete         = nullptr;
+        volatile u32*        m_SubmitDoorbell   = nullptr;
+        volatile u32*        m_CompleteDoorbell = nullptr;
+        u16                  m_CompleteVec      = 0;
+        u16                  m_SubmitHead       = 0;
+        u16                  m_SubmitTail       = 0;
+        u16                  m_CompleteHead     = 0;
+        u8                   m_CompletePhase    = 0;
+        u32                  m_CmdId            = 0;
+        u64*                 m_PhysRegPgs       = nullptr;
     };
 }; // namespace NVMe

@@ -16,6 +16,7 @@
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Path.hpp>
 #include <Time/Time.hpp>
 
@@ -473,7 +474,10 @@ namespace API::VFS
         auto process = Process::Current();
         if (!process->ValidateRead(pathname, 255)) return Error(EFAULT);
 
-        auto path      = CPU::CopyStringFromUser(pathname);
+        auto getPath = [](const char* path) -> Path
+        { return CPU::AsUser([path]() -> Path { return path; }); };
+
+        auto path      = getPath(pathname);
         auto pathRes   = TryOrRet(ResolveAtFd(dirFdNum, path, 0));
         auto directory = pathRes.Parent;
         auto baseName  = pathRes.BaseName;
@@ -492,17 +496,17 @@ namespace API::VFS
 
         auto entry   = pathRes.Entry;
         if (!entry) return Error(ENOENT);
-        auto inode = entry->INode();
+        auto inode     = entry->INode();
 
-        auto userBufferSuccess
-            = UserBuffer::ForUserBuffer(outBuffer, bufferSize);
-        if (!userBufferSuccess) return Error(userBufferSuccess.Error());
-        auto userBuffer = userBufferSuccess.Value();
+        auto linkValue = TryOrRet(inode->ReadLink());
+        CPU::AsUser(
+            [&]()
+            {
+                Memory::Copy(outBuffer, linkValue.Raw(),
+                             Min(linkValue.Size(), bufferSize));
+            });
 
-        auto success    = inode->ReadLink(userBuffer);
-        if (!success) return Error(success.Error());
-
-        return success.Value();
+        return 0;
     }
     ErrorOr<isize> FChModAt(isize dirFdNum, PathView pathView, mode_t mode)
     {
@@ -673,10 +677,29 @@ namespace API::VFS
     ErrorOr<isize> LinkAt(isize oldDirFdNum, const char* oldPath,
                           isize newDirFdNum, const char* newPath, isize flags)
     {
-        auto oldPathName = CPU::CopyStringFromUser(oldPath);
-        auto newPathName = CPU::CopyStringFromUser(newPath);
+        auto getPath = [](const char* path) -> Path
+        { return CPU::AsUser([path]() -> Path { return path; }); };
 
-        return ::VFS::Link(oldPathName, newPathName, 0);
+        auto oldPathName = getPath(oldPath);
+        auto newPathName = getPath(newPath);
+        LogTrace("VFS::LinkAt Entry => linking `{}` to `{}`...", oldPathName,
+                 newPathName);
+    
+        auto oldPathRes = TryOrRet(ResolveAtFd(oldDirFdNum, oldPath, 0));
+        auto newPathRes = TryOrRet(ResolveAtFd(newDirFdNum, newPath, 0));
+
+        auto oldParent = oldPathRes.Parent;
+        auto newParent = newPathRes.Parent;
+        
+        auto oldBaseName = oldPathRes.BaseName;
+        auto newBaseName = newPathRes.BaseName;
+
+        auto err = ::VFS::Link(oldParent, oldBaseName, newParent, newBaseName, 0);
+        if (!err)
+            LogError("VFS: Failed to link `{}` to `{}`, err => {}", oldPathName,
+                     newPathName, StringUtils::ToString(err.Error()));
+
+        return err;
     }
     ErrorOr<isize> SymlinkAt(const char* targetPath, isize newDirFdNum,
                              const char* linkPath)

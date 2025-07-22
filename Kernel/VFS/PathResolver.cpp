@@ -197,7 +197,7 @@ ErrorOr<Ref<DirectoryEntry>> PathResolver::FollowSymlink()
         return Error(ELOOP);
 
     auto inode  = m_DirectoryEntry->INode();
-    auto target = inode->GetTarget();
+    auto target = TryOrRet(inode->ReadLink());
     if (target.Empty()) return m_DirectoryEntry;
 
     auto parent  = m_DirectoryEntry->Parent().Promote();

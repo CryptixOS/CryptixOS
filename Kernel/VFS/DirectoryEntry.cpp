@@ -16,15 +16,6 @@
 // files might have multiple pointing to the same inode
 
 DirectoryEntry::DirectoryEntry(::WeakRef<DirectoryEntry> parent,
-                               class INode*              inode)
-    : m_INode(inode)
-{
-    m_Name   = inode->Name();
-    m_Parent = parent;
-
-    Bind(inode);
-}
-DirectoryEntry::DirectoryEntry(::WeakRef<DirectoryEntry> parent,
                                StringView                name)
     : m_Name(name)
     , m_Parent(parent)
@@ -108,7 +99,7 @@ void DirectoryEntry::RemoveChild(::Ref<class DirectoryEntry> entry)
 }
 ::WeakRef<DirectoryEntry> DirectoryEntry::FollowSymlinks(usize cnt)
 {
-    auto target = m_INode->GetTarget();
+    auto target = TryOrRetVal(m_INode->ReadLink(), this);
 
     if (!target.Empty() && IsSymlink())
     {

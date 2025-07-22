@@ -295,8 +295,7 @@ PageMap::PageMap()
             NextLevel(m_TopLevel->entries[i], true);
 
         usize pat = (0x07ull << 56ull) | (0x06ull << 48ull) | (0x05ull << 40ull)
-                  | (0x04ull << 32ull) | (0x01ull << 24ull)
-                  | (0x00ull << 16ull);
+                  | (0x04ull << 32ull) | (0x01ull << 24ull);
 
         u32 edx = pat >> 32;
         u32 eax = static_cast<u32>(pat);

@@ -133,9 +133,9 @@ ErrorOr<Ref<DirectoryEntry>> DevTmpFsINode::Symlink(Ref<DirectoryEntry> entry,
                                                     PathView targetPath)
 {
     auto dentry     = TryOrRet(CreateNode(entry, 0777 | S_IFLNK, 0));
-    auto inode      = reinterpret_cast<DevTmpFsINode*>(dentry->INode());
+    CTOS_UNUSED auto inode      = reinterpret_cast<DevTmpFsINode*>(dentry->INode());
 
-    inode->m_Target = targetPath;
+    // inode->m_Target = targetPath;
     return dentry;
 }
 
