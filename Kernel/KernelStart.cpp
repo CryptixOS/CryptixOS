@@ -74,7 +74,7 @@ namespace EFI
 bool g_LogTmpFs = false;
 
 template <typename T>
-void registerFilesystem(StringView name)
+static void registerFilesystem(StringView name)
 {
     auto fs            = CreateRef<FilesystemDriver>();
 
@@ -91,10 +91,10 @@ void registerFilesystem(StringView name)
 void registerFilesystems()
 {
     registerFilesystem<TmpFs>("tmpfs");
-    registerFilesystem<DevTmpFs>("devtmpfs");
-    registerFilesystem<ProcFs>("procfs");
-    registerFilesystem<Fat32Fs>("fat32fs");
-    registerFilesystem<Ext2Fs>("ext2fs");
+    registerFilesystem<DevTmpFs>("devfs");
+    registerFilesystem<ProcFs>("proc");
+    registerFilesystem<Fat32Fs>("vfat");
+    registerFilesystem<Ext2Fs>("ext2");
     registerFilesystem<EchFs>("echfs");
 }
 
@@ -154,7 +154,7 @@ static void kernelThread()
     Initrd::Initialize();
 
     VFS::CreateDirectory("/dev", 0755 | S_IFDIR);
-    Assert(VFS::Mount(nullptr, "", "/dev", "devtmpfs"));
+    Assert(VFS::Mount(nullptr, "", "/dev", "devfs"));
 
     Scheduler::InitializeProcFs();
 
@@ -177,12 +177,13 @@ static void kernelThread()
     TTY::Initialize();
     MemoryDevices::Initialize();
 
-    IgnoreUnused(
-        VFS::Mount(nullptr, "/dev/nvme0n2p2"_sv, "/mnt/ext2"_sv, "ext2fs"_sv));
-    IgnoreUnused(VFS::Mount(nullptr, "/dev/nvme0n2p1"_sv, "/mnt/fat32"_sv,
-                            "fat32fs"_sv));
     // IgnoreUnused(
-    //     VFS::Mount(nullptr, "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv, "echfs"_sv));
+    //     VFS::Mount(nullptr, "/dev/nvme0n2p2"_sv, "/mnt/ext2"_sv, "ext2"_sv));
+    // IgnoreUnused(
+    //     VFS::Mount(nullptr, "/dev/nvme0n2p1"_sv, "/mnt/vfat"_sv, "vfat"_sv));
+    // IgnoreUnused(
+    //     VFS::Mount(nullptr, "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv,
+    //     "echfs"_sv));
 
     if (!USB::Initialize()) LogWarn("USB: Failed to initialize");
 
