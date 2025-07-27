@@ -18,9 +18,10 @@ if arch == 'aarch64'
 endif
 
 ld_args = [
-  '-nostdlib',
-  '-static',
-  '-relocatable',
+  # '-nostdlib',
+  # '-static',
+  # '-relocatable',
+  '-r',
 ]
 
 subdir(arch)

@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 OUTPUT_FORMAT(elf64-x86-64)
+ENTRY(ModuleInit)
 
 PHDRS
 {
