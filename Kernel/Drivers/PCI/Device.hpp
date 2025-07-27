@@ -88,7 +88,7 @@ namespace PCI
 
     struct Domain
     {
-        Domain() = delete;
+        Domain() = default;
         Domain(u32 id, u8 busStart, u8 busEnd)
             : ID(id)
             , BusStart(busStart)
