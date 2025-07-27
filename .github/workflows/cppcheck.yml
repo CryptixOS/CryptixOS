@@ -11,6 +11,7 @@ jobs:
     name: cppcheck-test
     runs-on: ubuntu-latest
     steps:
+      - name: checkout repository
       - uses: actions/checkout@v2
           
       - name: cppcheck
@@ -20,7 +21,7 @@ jobs:
           
         
       - name: publish report    
-        uses: mikeal/publish-to-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH_NAME: 'dev' 
+        uses: actions/upload-artifact@v4
+        with:
+          name: cppcheck-report
+          path: cppcheck_report.xml
