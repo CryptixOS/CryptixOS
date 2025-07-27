@@ -476,12 +476,24 @@ namespace API::VFS
                          const void* data)
     {
         Process* current = Process::GetCurrent();
-        CtosUnused(current);
+        if (!current->IsSuperUser()) return ErrorCode(EPERM);
 
-        Path   source = CPU::CopyStringFromUser(pathname);
-        Path   target = CPU::CopyStringFromUser(targetPath);
+        if (pathname
+            && !current->ValidateRead(pathname, Limits::MAX_PATH_LENGTH))
+            return Error(EFAULT);
+        if (!current->ValidateRead(targetPath, Limits::MAX_PATH_LENGTH))
+            return Error(EFAULT);
+        if (!current->ValidateRead(filesystemType, 255)) return Error(EFAULT);
+        if (data && !current->ValidateRead(data, PMM::PAGE_SIZE))
+            return Error(EFAULT);
+
+        Path source = pathname ? CPU::CopyStringFromUser(pathname) : ""_p;
+        Path target = targetPath ? CPU::CopyStringFromUser(targetPath) : ""_p;
+        if (target.Empty()) return Error(ENOENT);
+
+        if (!filesystemType) return Error(EINVAL);
         String fsType = CPU::CopyStringFromUser(filesystemType).StrView();
-        using Prism::Scope;
+        if (fsType.Empty()) return ErrorCode(ENODEV);
 
         Scope<u8[]> options = new u8[CPU::CopyStringFromUser(
                                          reinterpret_cast<const char*>(data))

@@ -89,9 +89,10 @@ class Process
         // TODO(v1tr10l7): What should we return, if there is no parent??
         return 0;
     }
-    inline Process*           Parent() const { return m_Parent; }
-    inline pid_t              Pid() const { return m_Pid; }
-    inline StringView         Name() const { return m_Name; }
+    inline Process*   Parent() const { return m_Parent; }
+    inline pid_t      Pid() const { return m_Pid; }
+    inline StringView Name() const { return m_Name; }
+    constexpr bool    IsSuperUser() const { return m_Credentials.euid == 0; }
     inline const Credentials& Credentials() const { return m_Credentials; }
     inline Optional<i32>      Status() const { return m_Status; }
 
