@@ -466,7 +466,11 @@ namespace API::VFS
     }
     ErrorOr<isize> ChMod(const char* path, mode_t mode)
     {
-        return FChModAt(AT_FDCWD, path, mode);
+        return FChModAt(AT_FDCWD, path, mode, 0);
+    }
+    ErrorOr<isize> FChMod(isize fdNum, mode_t mode)
+    {
+        return FChModAt(fdNum, ".", mode, 0);
     }
 
     ErrorOr<isize> Mount(const char* pathname, const char* targetPath,
@@ -585,23 +589,26 @@ namespace API::VFS
 
         return 0;
     }
-    ErrorOr<isize> FChModAt(isize dirFdNum, PathView pathView, mode_t mode)
+    ErrorOr<isize> FChModAt(isize dirFdNum, const char* pathView, mode_t mode,
+                            isize flags)
     {
-        Path path      = CPU::AsUser([pathView]() -> Path { return pathView; });
-        auto pathResOr = ResolveAtFd(dirFdNum, path, mode);
-        RetOnError(pathResOr);
-        auto pathRes = pathResOr.Value();
+        Path path    = CPU::CopyStringFromUser(pathView);
+        auto pathRes = TryOrRet(ResolveAtFd(dirFdNum, path, mode));
 
         auto entry   = pathRes.Entry;
         if (!entry) return Error(ENOENT);
 
-        auto inode = entry->INode();
-        auto ret   = inode->ChangeMode(mode);
+        auto process = Process::Current();
 
-        RetOnError(ret);
-        ret = inode->FlushMetadata();
-        RetOnError(ret);
+        auto inode   = entry->INode();
+        if (!process->IsSuperUser()
+            && process->Credentials().uid != inode->UserID())
+            return Error(EPERM);
+        // TODO(v1tr10l7): Validate group id
 
+        RetOnError(inode->ChangeMode(mode));
+        // TODO(v1tr10l7): don't flush metadata immediately
+        RetOnError(inode->FlushMetadata());
         return 0;
     }
     ErrorOr<isize> PSelect6(isize fdCount, fd_set* readFds, fd_set* writeFds,

@@ -66,15 +66,14 @@ namespace Syscall
                     return PathView(
                         StringView(reinterpret_cast<const char*>(value)));
                 });
-        else if constexpr (IsPointerV<T>)
-            return reinterpret_cast<T>(value);
+        else if constexpr (IsPointerV<T>) return reinterpret_cast<T>(value);
         else return static_cast<T>(value);
     }
 
     class WrapperBase
     {
       public:
-        virtual ~WrapperBase() = default;
+        virtual ~WrapperBase()                                       = default;
         virtual ErrorOr<upointer> Run(Array<upointer, 6> args) const = 0;
     };
     template <typename Func>
@@ -122,8 +121,8 @@ namespace Syscall
 
     struct Arguments
     {
-        u64       Index;
-        u64       Args[6];
+        u64      Index;
+        u64      Args[6];
 
         upointer ReturnValue;
 
@@ -180,6 +179,10 @@ namespace Syscall
         eSymlink          = 88,
         eReadLink         = 89,
         eChMod            = 90,
+        eFChMod           = 91,
+        eChown            = 92,
+        eFChown           = 93,
+        eLChown           = 94,
         eUmask            = 95,
         eGetTimeOfDay     = 96,
         eGetResourceLimit = 97,
@@ -223,9 +226,9 @@ namespace Syscall
     };
 
     StringView GetName(usize index);
-    void       RegisterHandler(usize                                         index,
+    void       RegisterHandler(usize                                        index,
                                std::function<ErrorOr<upointer>(Arguments&)> handler,
-                               String                                        name);
+                               String                                       name);
 #define RegisterSyscall(id, handler)                                           \
     s_Syscalls[id] = new Wrapper<decltype(handler)>(#handler, handler);
 

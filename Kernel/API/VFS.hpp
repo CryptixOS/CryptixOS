@@ -54,6 +54,7 @@ namespace API::VFS
     ErrorOr<isize> Symlink(const char* target, const char* linkPath);
     ErrorOr<isize> ReadLink(PathView path, char* out, usize size);
     ErrorOr<isize> ChMod(const char* path, mode_t mode);
+    ErrorOr<isize> FChMod(isize fdNum, mode_t mode);
 
     ErrorOr<isize> Mount(const char* path, const char* target,
                          const char* filesystemType, usize flags,
@@ -69,7 +70,8 @@ namespace API::VFS
                            dev_t dev);
     ErrorOr<isize> ReadLinkAt(isize dirFdNum, const char* path, char* out,
                               usize bufferSize);
-    ErrorOr<isize> FChModAt(isize dirFdNum, PathView path, mode_t mode);
+    ErrorOr<isize> FChModAt(isize dirFdNum, const char* path, mode_t mode,
+                            isize flags);
     ErrorOr<isize> PSelect6(isize fdCount, fd_set* readFds, fd_set* writeFds,
                             fd_set* exceptFds, const timeval* timeout,
                             const sigset_t* sigmask);

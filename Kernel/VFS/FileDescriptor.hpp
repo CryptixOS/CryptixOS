@@ -67,7 +67,9 @@ struct DirectoryEntries
 class FileDescriptor : public RefCounted
 {
   public:
-    FileDescriptor(::Ref<DirectoryEntry> node, i32 flags,
+    FileDescriptor(::Ref<DirectoryEntry> dentry, i32 flags,
+                   FileAccessMode accMode);
+    FileDescriptor(::Ref<DirectoryEntry> dentry, File* file, i32 flags,
                    FileAccessMode accMode);
     virtual ~FileDescriptor();
 

@@ -113,6 +113,7 @@ namespace Syscall
         RegisterSyscall(ID::eSymlink, API::VFS::Symlink);
         RegisterSyscall(ID::eReadLink, API::VFS::ReadLink);
         RegisterSyscall(ID::eChMod, API::VFS::ChMod);
+        RegisterSyscall(ID::eFChMod, API::VFS::FChMod);
         RegisterSyscall(ID::eUmask, API::Process::Umask);
         RegisterSyscall(ID::eGetTimeOfDay, API::Time::GetTimeOfDay);
         RegisterSyscall(ID::eGetResourceLimit, API::System::GetResourceLimit);
@@ -194,10 +195,9 @@ namespace Syscall
             return;
         }
 
-        errno = no_error;
-        Array<upointer, 6> arr
-            = {args.Args[0], args.Args[1], args.Args[2],
-               args.Args[3], args.Args[4], args.Args[5]};
+        errno                  = no_error;
+        Array<upointer, 6> arr = {args.Args[0], args.Args[1], args.Args[2],
+                                  args.Args[3], args.Args[4], args.Args[5]};
 #define SYSCALL_LOG_ERR   false
         // #if SYSCALL_LOG_ERR == true || true
 #define SyscallError(...) LogError(__VA_ARGS__)

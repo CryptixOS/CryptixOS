@@ -212,6 +212,14 @@ namespace VFS
         if (flags & O_PATH) accMode = FileAccessMode::eNone;
 
         auto dentry = maybeEntry.Value();
+        auto inode  = dentry->INode();
+        if (inode && inode->IsCharDevice())
+        {
+            auto device = DevTmpFs::Lookup(inode->Stats().st_dev);
+            if (device)
+                return new FileDescriptor(dentry, device, flags, accMode);
+        }
+
         return new FileDescriptor(dentry, flags, accMode);
     }
 

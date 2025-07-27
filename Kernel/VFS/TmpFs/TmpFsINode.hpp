@@ -67,6 +67,8 @@ class TmpFsINode final : public INode
     virtual ErrorOr<void> Unlink(Ref<DirectoryEntry> entry) override;
     virtual ErrorOr<void> RmDir(Ref<DirectoryEntry> entry) override;
 
+    virtual ErrorOr<void> FlushMetadata() override { return {}; }
+
   private:
     Buffer                           m_Buffer;
     UnorderedMap<StringView, INode*> m_Children;

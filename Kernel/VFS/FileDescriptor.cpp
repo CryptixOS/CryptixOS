@@ -67,6 +67,19 @@ FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry, i32 flags,
     m_AccessMode = accMode;
     m_Flags      = flags & O_CLOEXEC;
 }
+FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry, File* file,
+                               i32 flags, FileAccessMode accMode)
+    : m_DirectoryEntry(dentry)
+    , m_File(file)
+    , m_DirectoryIterator(dentry->begin())
+{
+    m_DescriptionFlags = flags
+                       & ~(O_CREAT | O_DIRECTORY | O_EXCL | O_NOCTTY
+                           | O_NOFOLLOW | O_TRUNC | O_CLOEXEC);
+    m_AccessMode = accMode;
+    m_Flags      = flags & O_CLOEXEC;
+}
+
 FileDescriptor::~FileDescriptor() { delete m_File; }
 
 ErrorOr<isize> FileDescriptor::Read(const UserBuffer& out, usize count,

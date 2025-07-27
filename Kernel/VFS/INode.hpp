@@ -43,8 +43,8 @@ class INode
         DeviceID  RootDeviceID = 0;
         DeviceID  DeviceID     = 0;
 
-        UserID    UID          = 0;
-        GroupID   GID          = 0;
+        ::UserID  UID          = 0;
+        ::GroupID GID          = 0;
 
         timespec  AccessTime{};
         timespec  ModificationTime{};
@@ -70,7 +70,20 @@ class INode
     virtual ErrorOr<Ref<DirectoryEntry>> Lookup(Ref<DirectoryEntry> dentry);
 
     inline StringView                    Name() { return m_Name; }
-    mode_t                               Mode() const;
+    DeviceID                             BackingDeviceID() const;
+    INodeID                              ID() const;
+    INodeMode                            Mode() const;
+    nlink_t                              LinkCount() const;
+    ::UserID                             UserID() const;
+    ::GroupID                            GroupID() const;
+    DeviceID                             DeviceID() const;
+    isize                                Size() const;
+    blksize_t                            BlockSize() const;
+    blkcnt_t                             BlockCount() const;
+
+    timespec                             AccessTime() const;
+    timespec                             ModificationTime() const;
+    timespec                             StatusChangeTime() const;
 
     bool                                 IsFilesystemRoot() const;
     bool                                 IsEmpty();
@@ -99,9 +112,9 @@ class INode
     virtual ErrorOr<Ref<DirectoryEntry>> Link(Ref<DirectoryEntry> oldEntry,
                                               Ref<DirectoryEntry> entry);
 
-    virtual void          InsertChild(INode* node, StringView name)     = 0;
-    virtual isize         Read(void* buffer, off_t offset, usize bytes) = 0;
-    virtual isize Write(const void* buffer, off_t offset, usize bytes)  = 0;
+    virtual void  InsertChild(INode* node, StringView name)            = 0;
+    virtual isize Read(void* buffer, off_t offset, usize bytes)        = 0;
+    virtual isize Write(const void* buffer, off_t offset, usize bytes) = 0;
     virtual ErrorOr<isize> IoCtl(usize request, usize arg)
     {
         return Error(ENODEV);
@@ -120,10 +133,10 @@ class INode
         return Error(ENOSYS);
     }
 
-    virtual ErrorOr<isize> CheckPermissions(mode_t mask);
+    virtual ErrorOr<isize> CheckPermissions(INodeMode mask);
 
-    virtual ErrorOr<void>  SetOwner(uid_t uid, gid_t gid);
-    virtual ErrorOr<void>  ChangeMode(mode_t mode);
+    virtual ErrorOr<void>  SetOwner(::UserID uid, ::GroupID gid);
+    virtual ErrorOr<void>  ChangeMode(INodeMode mode);
     virtual ErrorOr<void>  UpdateTimestamps(timespec atime = {},
                                             timespec mtime = {},
                                             timespec ctime = {});
