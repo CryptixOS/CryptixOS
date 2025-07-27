@@ -19,51 +19,25 @@ AtomicBool g_LogSyscalls = false;
 
 namespace Syscall
 {
-    void Initialize();
-
-    struct Syscall
-    {
-        String                                        Name;
-        std::function<ErrorOr<upointer>(Arguments&)> Handler;
-
-        inline ErrorOr<upointer> operator()(Arguments& args)
-        {
-            if (Handler.operator bool()) return Handler(args);
-
-            return 0;
-        }
-        inline operator bool() { return Handler.operator bool(); }
-    };
-    static Array<Syscall, 512>     syscalls;
+    void                           Initialize();
 
     UnorderedMap<ID, WrapperBase*> s_Syscalls;
-
     StringView                     GetName(usize index)
     {
         auto id = static_cast<ID>(index);
         return StringUtils::ToString(id);
     }
-    void
-    RegisterHandler(usize                                              index,
-                    std::function<ErrorOr<upointer>(Arguments& args)> handler,
-                    String                                             name)
-    {
-        syscalls[index] = {name, handler};
-    }
 
-    constexpr usize  ARCH_SET_GS = 0x1001;
-    constexpr usize  ARCH_SET_FS = 0x1002;
-    constexpr usize  ARCH_GET_FS = 0x1003;
-    constexpr usize  ARCH_GET_GS = 0x1004;
-    static upointer SysArchPrCtl(Arguments& args)
+    constexpr usize          ARCH_SET_GS = 0x1001;
+    constexpr usize          ARCH_SET_FS = 0x1002;
+    constexpr usize          ARCH_GET_FS = 0x1003;
+    constexpr usize          ARCH_GET_GS = 0x1004;
+    static ErrorOr<upointer> ArchPrCtl(isize opcode, upointer addr)
     {
 #ifdef CTOS_TARGET_X86_64
         auto                           thread = CPU::GetCurrentThread();
-        i32                            op     = args.Args[0];
-        upointer                      addr   = args.Args[1];
-
         CPU::UserMemoryProtectionGuard guard;
-        switch (op)
+        switch (opcode)
         {
             case ARCH_SET_GS:
                 thread->SetGsBase(addr);
@@ -96,87 +70,87 @@ namespace Syscall
     {
         Initialize();
 
-        RegisterSyscall2(ID::eRead, API::VFS::Read);
-        RegisterSyscall2(ID::eWrite, API::VFS::Write);
-        RegisterSyscall2(ID::eOpen, API::VFS::Open);
-        RegisterSyscall2(ID::eClose, API::VFS::Close);
-        RegisterSyscall2(ID::eStat, API::VFS::Stat);
-        RegisterSyscall2(ID::eFStat, API::VFS::FStat);
-        RegisterSyscall2(ID::eLStat, API::VFS::LStat);
-        RegisterSyscall2(ID::eLSeek, API::VFS::LSeek);
-        RegisterSyscall2(ID::eMMap, API::MM::MMap);
-        RegisterSyscall2(ID::eMProtect, API::MM::MProtect);
-        RegisterSyscall2(ID::eMUnMap, API::MM::MUnMap);
-        RegisterSyscall2(ID::eSigProcMask, API::Process::SigProcMask);
-        RegisterSyscall2(ID::eIoCtl, API::VFS::IoCtl);
-        RegisterSyscall2(ID::ePRead64, API::VFS::PRead);
-        RegisterSyscall2(ID::ePWrite64, API::VFS::PWrite);
-        RegisterSyscall2(ID::eAccess, API::VFS::Access);
-        // RegisterSyscall2(ID::ePipe, API::VFS::Pipe);
-        RegisterSyscall2(ID::eSchedYield, API::Process::SchedYield);
-        RegisterSyscall2(ID::eDup, API::VFS::Dup);
-        RegisterSyscall2(ID::eDup2, API::VFS::Dup2);
-        RegisterSyscall2(ID::eNanoSleep, API::Process::NanoSleep);
-        RegisterSyscall2(ID::ePid, API::Process::Pid);
-        RegisterSyscall2(ID::eFork, API::Process::Fork);
-        RegisterSyscall2(ID::eExecve, API::Process::Execve);
-        RegisterSyscall2(ID::eExit, API::Process::Exit);
-        RegisterSyscall2(ID::eWait4, API::Process::Wait4);
-        RegisterSyscall(ID::eKill, Process::SysKill);
-        RegisterSyscall2(ID::eUname, API::System::Uname);
-        RegisterSyscall2(ID::eFCntl, API::VFS::FCntl);
-        RegisterSyscall2(ID::eTruncate, API::VFS::Truncate);
-        RegisterSyscall2(ID::eFTruncate, API::VFS::FTruncate);
-        RegisterSyscall2(ID::eGetCwd, API::VFS::GetCwd);
-        RegisterSyscall2(ID::eChDir, API::VFS::ChDir);
-        RegisterSyscall2(ID::eFChDir, API::VFS::FChDir);
-        RegisterSyscall2(ID::eRename, API::VFS::Rename);
-        RegisterSyscall2(ID::eMkDir, API::VFS::MkDir);
-        RegisterSyscall2(ID::eRmDir, API::VFS::RmDir);
-        RegisterSyscall2(ID::eCreat, API::VFS::Creat);
-        RegisterSyscall2(ID::eLink, API::VFS::Link);
-        RegisterSyscall2(ID::eUnlink, API::VFS::Unlink);
-        RegisterSyscall2(ID::eSymlink, API::VFS::Symlink);
-        RegisterSyscall2(ID::eReadLink, API::VFS::ReadLink);
-        RegisterSyscall2(ID::eChMod, API::VFS::ChMod);
-        RegisterSyscall2(ID::eUmask, API::Process::Umask);
-        RegisterSyscall2(ID::eGetTimeOfDay, API::Time::GetTimeOfDay);
-        RegisterSyscall2(ID::eGetResourceLimit, API::System::GetResourceLimit);
-        RegisterSyscall2(ID::eGetResourceUsage, API::System::GetResourceUsage);
-        RegisterSyscall2(ID::eGetUid, API::Process::GetUid);
-        RegisterSyscall2(ID::eGetGid, API::Process::GetGid);
-        RegisterSyscall2(ID::eGet_eUid, API::Process::GetEUid);
-        RegisterSyscall2(ID::eGet_eGid, API::Process::GetEGid);
-        RegisterSyscall(ID::eSet_pGid, Process::SysSet_pGid);
-        RegisterSyscall2(ID::eGet_pPid, API::Process::GetPPid);
-        RegisterSyscall(ID::eGetPgrp, Process::SysGetPgrp);
-        RegisterSyscall(ID::eSetSid, Process::SysSetSid);
-        RegisterSyscall(ID::eGet_pGid, Process::SysGet_pGid);
-        RegisterSyscall(ID::eSid, Process::SysSid);
-        RegisterSyscall2(ID::eUTime, API::VFS::UTime);
-        RegisterSyscall2(ID::eStatFs, API::VFS::StatFs);
-        RegisterSyscall(ID::eArchPrCtl, SysArchPrCtl);
-        RegisterSyscall2(ID::eSetTimeOfDay, API::Time::SetTimeOfDay);
-        RegisterSyscall2(ID::eMount, API::VFS::Mount);
-        RegisterSyscall2(ID::eReboot, API::System::Reboot);
+        RegisterSyscall(ID::eRead, API::VFS::Read);
+        RegisterSyscall(ID::eWrite, API::VFS::Write);
+        RegisterSyscall(ID::eOpen, API::VFS::Open);
+        RegisterSyscall(ID::eClose, API::VFS::Close);
+        RegisterSyscall(ID::eStat, API::VFS::Stat);
+        RegisterSyscall(ID::eFStat, API::VFS::FStat);
+        RegisterSyscall(ID::eLStat, API::VFS::LStat);
+        RegisterSyscall(ID::eLSeek, API::VFS::LSeek);
+        RegisterSyscall(ID::eMMap, API::MM::MMap);
+        RegisterSyscall(ID::eMProtect, API::MM::MProtect);
+        RegisterSyscall(ID::eMUnMap, API::MM::MUnMap);
+        RegisterSyscall(ID::eSigProcMask, API::Process::SigProcMask);
+        RegisterSyscall(ID::eIoCtl, API::VFS::IoCtl);
+        RegisterSyscall(ID::ePRead64, API::VFS::PRead);
+        RegisterSyscall(ID::ePWrite64, API::VFS::PWrite);
+        RegisterSyscall(ID::eAccess, API::VFS::Access);
+        // RegisterSyscall(ID::ePipe, API::VFS::Pipe);
+        RegisterSyscall(ID::eSchedYield, API::Process::SchedYield);
+        RegisterSyscall(ID::eDup, API::VFS::Dup);
+        RegisterSyscall(ID::eDup2, API::VFS::Dup2);
+        RegisterSyscall(ID::eNanoSleep, API::Process::NanoSleep);
+        RegisterSyscall(ID::ePid, API::Process::Pid);
+        RegisterSyscall(ID::eFork, API::Process::Fork);
+        RegisterSyscall(ID::eExecve, API::Process::Execve);
+        RegisterSyscall(ID::eExit, API::Process::Exit);
+        RegisterSyscall(ID::eWait4, API::Process::Wait4);
+        RegisterSyscall(ID::eKill, API::Process::Kill);
+        RegisterSyscall(ID::eUname, API::System::Uname);
+        RegisterSyscall(ID::eFCntl, API::VFS::FCntl);
+        RegisterSyscall(ID::eTruncate, API::VFS::Truncate);
+        RegisterSyscall(ID::eFTruncate, API::VFS::FTruncate);
+        RegisterSyscall(ID::eGetCwd, API::VFS::GetCwd);
+        RegisterSyscall(ID::eChDir, API::VFS::ChDir);
+        RegisterSyscall(ID::eFChDir, API::VFS::FChDir);
+        RegisterSyscall(ID::eRename, API::VFS::Rename);
+        RegisterSyscall(ID::eMkDir, API::VFS::MkDir);
+        RegisterSyscall(ID::eRmDir, API::VFS::RmDir);
+        RegisterSyscall(ID::eCreat, API::VFS::Creat);
+        RegisterSyscall(ID::eLink, API::VFS::Link);
+        RegisterSyscall(ID::eUnlink, API::VFS::Unlink);
+        RegisterSyscall(ID::eSymlink, API::VFS::Symlink);
+        RegisterSyscall(ID::eReadLink, API::VFS::ReadLink);
+        RegisterSyscall(ID::eChMod, API::VFS::ChMod);
+        RegisterSyscall(ID::eUmask, API::Process::Umask);
+        RegisterSyscall(ID::eGetTimeOfDay, API::Time::GetTimeOfDay);
+        RegisterSyscall(ID::eGetResourceLimit, API::System::GetResourceLimit);
+        RegisterSyscall(ID::eGetResourceUsage, API::System::GetResourceUsage);
+        RegisterSyscall(ID::eGetUid, API::Process::GetUid);
+        RegisterSyscall(ID::eGetGid, API::Process::GetGid);
+        RegisterSyscall(ID::eGet_eUid, API::Process::GetEUid);
+        RegisterSyscall(ID::eGet_eGid, API::Process::GetEGid);
+        RegisterSyscall(ID::eSet_pGid, API::Process::SetPGid);
+        RegisterSyscall(ID::eGet_pPid, API::Process::GetPPid);
+        RegisterSyscall(ID::eGetPgrp, API::Process::GetPGrp);
+        RegisterSyscall(ID::eSetSid, API::Process::SetSid);
+        RegisterSyscall(ID::eGet_pGid, API::Process::GetPGid);
+        RegisterSyscall(ID::eSid, API::Process::GetSid);
+        RegisterSyscall(ID::eUTime, API::VFS::UTime);
+        RegisterSyscall(ID::eStatFs, API::VFS::StatFs);
+        RegisterSyscall(ID::eArchPrCtl, ArchPrCtl);
+        RegisterSyscall(ID::eSetTimeOfDay, API::Time::SetTimeOfDay);
+        RegisterSyscall(ID::eMount, API::VFS::Mount);
+        RegisterSyscall(ID::eReboot, API::System::Reboot);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
-        RegisterSyscall2(ID::eGetDents64, API::VFS::GetDEnts64);
-        RegisterSyscall2(ID::eClockGetTime, API::Time::ClockGetTime);
-        RegisterSyscall2(ID::ePanic, API::System::SysPanic);
-        RegisterSyscall2(ID::eOpenAt, API::VFS::OpenAt);
-        RegisterSyscall2(ID::eMkDirAt, API::VFS::MkDirAt);
-        RegisterSyscall2(ID::eMkNodAt, API::VFS::MkNodAt);
-        RegisterSyscall2(ID::eFStatAt, API::VFS::FStatAt);
-        RegisterSyscall2(ID::eUnlinkAt, API::VFS::UnlinkAt);
-        RegisterSyscall2(ID::eRenameAt, API::VFS::RenameAt);
-        RegisterSyscall2(ID::eLinkAt, API::VFS::LinkAt);
-        RegisterSyscall2(ID::eSymlinkAt, API::VFS::SymlinkAt);
-        RegisterSyscall2(ID::eReadLinkAt, API::VFS::ReadLinkAt);
-        RegisterSyscall2(ID::eFChModAt, API::VFS::FChModAt);
-        RegisterSyscall2(ID::ePSelect6, API::VFS::PSelect6);
-        RegisterSyscall2(ID::eUtimensAt, API::VFS::UtimensAt);
-        RegisterSyscall2(ID::eDup3, API::VFS::Dup3);
-        RegisterSyscall2(ID::eRenameAt2, API::VFS::RenameAt2);
+        RegisterSyscall(ID::eGetDents64, API::VFS::GetDEnts64);
+        RegisterSyscall(ID::eClockGetTime, API::Time::ClockGetTime);
+        RegisterSyscall(ID::ePanic, API::System::SysPanic);
+        RegisterSyscall(ID::eOpenAt, API::VFS::OpenAt);
+        RegisterSyscall(ID::eMkDirAt, API::VFS::MkDirAt);
+        RegisterSyscall(ID::eMkNodAt, API::VFS::MkNodAt);
+        RegisterSyscall(ID::eFStatAt, API::VFS::FStatAt);
+        RegisterSyscall(ID::eUnlinkAt, API::VFS::UnlinkAt);
+        RegisterSyscall(ID::eRenameAt, API::VFS::RenameAt);
+        RegisterSyscall(ID::eLinkAt, API::VFS::LinkAt);
+        RegisterSyscall(ID::eSymlinkAt, API::VFS::SymlinkAt);
+        RegisterSyscall(ID::eReadLinkAt, API::VFS::ReadLinkAt);
+        RegisterSyscall(ID::eFChModAt, API::VFS::FChModAt);
+        RegisterSyscall(ID::ePSelect6, API::VFS::PSelect6);
+        RegisterSyscall(ID::eUtimensAt, API::VFS::UtimensAt);
+        RegisterSyscall(ID::eDup3, API::VFS::Dup3);
+        RegisterSyscall(ID::eRenameAt2, API::VFS::RenameAt2);
     }
     void Handle(Arguments& args)
     {
@@ -206,8 +180,7 @@ namespace Syscall
         // #endif
 
         if (args.Index >= 512
-            || (!syscalls[args.Index]
-                && !s_Syscalls.Contains(static_cast<ID>(args.Index))))
+            || (!s_Syscalls.Contains(static_cast<ID>(args.Index))))
         {
             args.ReturnValue = -1;
             errno            = ENOSYS;
@@ -222,7 +195,7 @@ namespace Syscall
         }
 
         errno = no_error;
-        std::array<upointer, 6> arr
+        Array<upointer, 6> arr
             = {args.Args[0], args.Args[1], args.Args[2],
                args.Args[3], args.Args[4], args.Args[5]};
 #define SYSCALL_LOG_ERR   false
@@ -252,20 +225,6 @@ namespace Syscall
             return;
         }
 
-        auto ret = syscalls[args.Index](args);
-        if (ret) args.ReturnValue = ret.value();
-        else
-        {
-            args.ReturnValue = -ipointer(ret.Error());
-            if (g_LogSyscalls)
-            {
-                auto syscallID   = static_cast<ID>(args.Index);
-                auto syscallName = StringUtils::ToString(syscallID);
-                syscallName.RemovePrefix(1);
-                SyscallError("Syscall: '{}' caused error", syscallName,
-                             args.ReturnValue);
-            }
-        }
         CPU::OnSyscallLeave();
     }
 } // namespace Syscall
