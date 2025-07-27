@@ -214,6 +214,13 @@ ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
 
     return 0;
 }
+ErrorOr<Ref<FileDescriptor>> Process::GetFileDescriptor(isize fdNum)
+{
+    auto fd = m_FdTable.GetFd(fdNum);
+    if (!fd) return Error(EBADF);
+
+    return fd;
+}
 
 Vector<String> SplitArguments(const String& str)
 {
@@ -301,7 +308,7 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
                                 rusage* rusage)
 {
-    bool block = !(flags & WNOHANG);
+    bool           block = !(flags & WNOHANG);
     Vector<Event*> events;
     for (;;)
     {
@@ -396,7 +403,8 @@ ErrorOr<Process*> Process::Fork()
         Assert(physicalSpace);
 
         Memory::Copy(Pointer(physicalSpace).ToHigherHalf<void*>(),
-                    range->PhysicalBase().ToHigherHalf<void*>(), range->Size());
+                     range->PhysicalBase().ToHigherHalf<void*>(),
+                     range->Size());
         pageMap->MapRange(range->VirtualBase(), physicalSpace, range->Size(),
                           PageAttributes::eRWXU | PageAttributes::eWriteBack);
 

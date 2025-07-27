@@ -135,7 +135,8 @@ class Process
     i32            CloseFd(i32 fd);
     ErrorOr<isize> OpenPipe(i32* pipeFds);
     inline bool    IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
-    inline Ref<FileDescriptor> GetFileHandle(i32 fd)
+    ErrorOr<Ref<FileDescriptor>> GetFileDescriptor(isize fdNum);
+    inline Ref<FileDescriptor>   GetFileHandle(i32 fd)
     {
         return m_FdTable.GetFd(fd);
     }
