@@ -56,12 +56,12 @@ namespace CPU
     };
 
     template <typename F, typename... Args>
-        requires(!std::same_as<std::invoke_result_t<F, Args...>, void>)
+        requires(!SameAs<Prism::InvokeResultType<F, Args...>, void>)
     inline decltype(auto) AsUser(F&& f, Args&&... args)
     {
         UserMemoryProtectionGuard guard;
 
-        return f(std::forward<Args>(args)...);
+        return f(Forward<Args>(args)...);
     }
     template <typename T>
         requires(!SameAs<T, void>)
@@ -73,12 +73,7 @@ namespace CPU
     }
     inline constexpr Path CopyStringFromUser(const char* string)
     {
-        return AsUser(
-            [&]() -> Path
-            {
-                if (!string || *string == 0) return ""_p;
-                return string;
-            });
+        return AsUser([string]() -> Path { return string; });
     }
 
     template <typename T>
@@ -100,7 +95,7 @@ namespace CPU
     inline static void AsUser(F&& f, Args&&... args)
     {
         UserMemoryProtectionGuard guard;
-        f(std::forward<Args>(args)...);
+        f(Forward<Args>(args)...);
     }
 
     bool DuringSyscall();
