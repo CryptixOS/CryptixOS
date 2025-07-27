@@ -59,7 +59,7 @@ namespace DMI::SMBIOS
 
         while (index > 0 && *current)
         {
-            current += std::strlen(current);
+            current += StringView(current).Size();
             current++;
             index--;
         }

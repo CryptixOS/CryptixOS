@@ -22,10 +22,10 @@ namespace std
     using ::printf;
     using ::vprintf;
 
-    using ::sprintf;
+    // using ::sprintf;
     using ::vsprintf;
 
-    using ::snprintf;
+    // using ::snprintf;
     using ::vsnprintf;
 
     using ::putchar;

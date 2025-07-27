@@ -16,7 +16,7 @@ namespace RTL8139
     class AdapterCard : public NetworkAdapter, PCI::Device
     {
       public:
-        AdapterCard(PCI::DeviceAddress& addr);
+        explicit AdapterCard(PCI::DeviceAddress& addr);
 
         virtual bool SendPacket(const u8* data, usize length) override;
 

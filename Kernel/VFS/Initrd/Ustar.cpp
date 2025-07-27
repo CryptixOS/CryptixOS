@@ -87,8 +87,10 @@ namespace Ustar
                             filename);
                     break;
                 case FILE_TYPE_HARD_LINK:
-                    LogError("USTAR: Failed to create hardlink: '{}' -> '{}'",
-                             filename, linkName);
+                    if (!VFS::Link(filename, linkName))
+                        LogError(
+                            "USTAR: Failed to create hardlink: '{}' -> '{}'",
+                            filename, linkName);
                     break;
                 case FILE_TYPE_SYMLINK:
                     if (!VFS::Symlink(filename, linkName))
@@ -96,23 +98,28 @@ namespace Ustar
                             "USTAR: Failed to create Symlink: '{}' -> '{}'",
                             filename, linkName);
                     break;
-                case FILE_TYPE_CHARACTER_DEVICE:
+                case FILE_TYPE_CHARACTER_DEVICE: CTOS_FALLTHROUGH;
+                case FILE_TYPE_BLOCK_DEVICE:
                 {
                     u32 deviceMajor
                         = StringUtils::ToNumber<u32>(current->DeviceMajor, 8);
                     u32 deviceMinor
                         = StringUtils::ToNumber<u32>(current->DeviceMinor, 8);
 
-                    if (!VFS::CreateNode(filename, mode | S_IFCHR,
-                                    MakeDevice(deviceMajor, deviceMinor)))
+                    if (current->Type == FILE_TYPE_CHARACTER_DEVICE)
+                        mode |= S_IFCHR;
+                    else if (current->Type == FILE_TYPE_BLOCK_DEVICE)
+                        mode |= S_IFBLK;
+
+                    if (!VFS::CreateNode(filename, mode,
+                                         MakeDevice(deviceMajor, deviceMinor)))
                         LogError(
-                            "USTAR: Failed to create character device! path: "
+                            "USTAR: Failed to create device node! path: "
                             "'{}', id: "
                             "{{ major: {}, minor: {} }}",
                             filename, deviceMajor, deviceMinor);
                     break;
                 }
-                case FILE_TYPE_BLOCK_DEVICE: ToDo(); break;
                 case FILE_TYPE_DIRECTORY:
                     dentry = TryOrRet(
                         VFS::CreateDirectory(filename, mode | S_IFDIR));

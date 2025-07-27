@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <API/Limits.hpp>
+#include <API/Posix/dirent.h>
 #include <Prism/String/StringBuilder.hpp>
 
 #include <VFS/DirectoryEntry.hpp>
@@ -15,15 +16,6 @@
 // NOTE(v1tr10l7): Directories should only have one DirectoryEntry, regular
 // files might have multiple pointing to the same inode
 
-DirectoryEntry::DirectoryEntry(::WeakRef<DirectoryEntry> parent,
-                               class INode*              inode)
-    : m_INode(inode)
-{
-    m_Name   = inode->Name();
-    m_Parent = parent;
-
-    Bind(inode);
-}
 DirectoryEntry::DirectoryEntry(::WeakRef<DirectoryEntry> parent,
                                StringView                name)
     : m_Name(name)
@@ -108,7 +100,7 @@ void DirectoryEntry::RemoveChild(::Ref<class DirectoryEntry> entry)
 }
 ::WeakRef<DirectoryEntry> DirectoryEntry::FollowSymlinks(usize cnt)
 {
-    auto target = m_INode->GetTarget();
+    auto target = TryOrRetVal(m_INode->ReadLink(), this);
 
     if (!target.Empty() && IsSymlink())
     {
@@ -135,6 +127,40 @@ WeakRef<DirectoryEntry> DirectoryEntry::GetEffectiveParent()
 
     return Parent();
 }
+
+ErrorOr<void>
+DirectoryEntry::TraverseDirectories(::Ref<class DirectoryEntry> parent,
+                                    DirectoryIterator           iterator)
+{
+    PopulateDirectoryEntries();
+
+    usize index = 0;
+    for (const auto& [name, entry] : m_Children)
+    {
+        auto inode = entry->INode();
+        if (!inode)
+        {
+            ++index;
+            continue;
+        }
+        if (index < m_DirOffset)
+        {
+            ++index;
+            continue;
+        }
+
+        auto stats = inode->Stats();
+        auto mode  = stats.st_mode;
+        auto type  = IF2DT(mode);
+        if (!iterator(entry->Name(), m_DirOffset, stats.st_ino, type)) break;
+        ++m_DirOffset;
+        ++index;
+    }
+
+    if (m_DirOffset == m_Children.Size()) m_DirOffset = 0;
+
+    return {};
+}
 ::Ref<DirectoryEntry> DirectoryEntry::Lookup(const String& name)
 {
     auto entryIt = m_Children.Find(name);
@@ -143,11 +169,29 @@ WeakRef<DirectoryEntry> DirectoryEntry::GetEffectiveParent()
 
     ::Ref entry = CreateRef<DirectoryEntry>(nullptr, name);
     TryOrRetVal(m_INode->Lookup(entry), nullptr);
-        
+
     entry->SetParent(this);
     InsertChild(entry);
 
     return entry;
+}
+ErrorOr<void> DirectoryEntry::PopulateDirectoryEntries()
+{
+    if (m_Populated) return {};
+    if (!INode()) return Error(ENOENT);
+
+    DirectoryIterator iterator;
+    iterator.BindLambda(
+        [this](StringView name, loff_t offset, usize ino, u64 type) -> bool
+        {
+            Lookup(name);
+
+            return true;
+        });
+
+    INode()->TraverseDirectories(nullptr, iterator);
+    m_Populated = true;
+    return {};
 }
 
 bool DirectoryEntry::IsMountPoint() const

@@ -10,14 +10,12 @@
 
 #include <Arch/CPU.hpp>
 
-#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Tuple.hpp>
 #include <Prism/Utility/Path.hpp>
 #include <Prism/Utility/PathView.hpp>
 
 #include <magic_enum/magic_enum.hpp>
 #include <magic_enum/magic_enum_format.hpp>
-
-#include <type_traits>
 
 namespace Syscall
 {
@@ -46,11 +44,10 @@ namespace Syscall
     }
 
     template <typename T>
-    using ToFormattablePtr
-        = Conditional<std::is_pointer_v<T>,
-                      Conditional<std::is_constructible_v<StringView, T>,
-                                  NullableString, const void*>,
-                      T>;
+    using ToFormattablePtr = Conditional<
+        IsPointerV<T>,
+        Conditional<IsConvertibleV<StringView, T>, NullableString, const void*>,
+        T>;
 
     template <typename... Ts>
     auto Ptr(const std::tuple<Ts...>& tup)
@@ -59,9 +56,9 @@ namespace Syscall
     }
 
     template <typename T>
-    constexpr auto ConvertArgument(uintptr_t value)
+    constexpr auto ConvertArgument(upointer value)
     {
-        if constexpr (IsSameV<std::remove_cvref_t<std::remove_reference_t<T>>,
+        if constexpr (IsSameV<RemoveCvRefType<RemoveReferenceType<T>>,
                               Prism::PathView>)
             return CPU::AsUser(
                 [value]() -> PathView
@@ -69,22 +66,21 @@ namespace Syscall
                     return PathView(
                         StringView(reinterpret_cast<const char*>(value)));
                 });
-        else if constexpr (std::is_pointer_v<T>)
-            return reinterpret_cast<T>(value);
+        else if constexpr (IsPointerV<T>) return reinterpret_cast<T>(value);
         else return static_cast<T>(value);
     }
 
     class WrapperBase
     {
       public:
-        virtual ~WrapperBase() = default;
-        virtual ErrorOr<uintptr_t> Run(std::array<uintptr_t, 6> args) const = 0;
+        virtual ~WrapperBase()                                       = default;
+        virtual ErrorOr<upointer> Run(Array<upointer, 6> args) const = 0;
     };
     template <typename Func>
     class Wrapper : public WrapperBase
     {
       public:
-        using Sign = Signature<std::remove_cvref_t<Func>>;
+        using Sign = Signature<RemoveCvRefType<Func>>;
 
         constexpr Wrapper(const char* name, Func* func)
             : Function(func)
@@ -92,7 +88,7 @@ namespace Syscall
         {
         }
 
-        ErrorOr<uintptr_t> Run(std::array<uintptr_t, 6> arr) const
+        ErrorOr<upointer> Run(Array<upointer, 6> arr) const
         {
             typename Sign::ArgsContainer args;
             usize                        i = 0;
@@ -125,10 +121,10 @@ namespace Syscall
 
     struct Arguments
     {
-        u64       Index;
-        u64       Args[6];
+        u64      Index;
+        u64      Args[6];
 
-        uintptr_t ReturnValue;
+        upointer ReturnValue;
 
         template <typename T>
         inline T Get(usize index) const
@@ -168,7 +164,7 @@ namespace Syscall
         eWait4            = 61,
         eKill             = 62,
         eUname            = 63,
-        eFcntl            = 72,
+        eFCntl            = 72,
         eTruncate         = 76,
         eFTruncate        = 77,
         eGetCwd           = 79,
@@ -183,6 +179,10 @@ namespace Syscall
         eSymlink          = 88,
         eReadLink         = 89,
         eChMod            = 90,
+        eFChMod           = 91,
+        eChown            = 92,
+        eFChown           = 93,
+        eLChown           = 94,
         eUmask            = 95,
         eGetTimeOfDay     = 96,
         eGetResourceLimit = 97,
@@ -211,6 +211,7 @@ namespace Syscall
         ePanic            = 255,
         eOpenAt           = 257,
         eMkDirAt          = 258,
+        eMkNodAt          = 259,
         eFStatAt          = 262,
         eUnlinkAt         = 263,
         eRenameAt         = 264,
@@ -225,12 +226,10 @@ namespace Syscall
     };
 
     StringView GetName(usize index);
-    void       RegisterHandler(usize                                         index,
-                               std::function<ErrorOr<uintptr_t>(Arguments&)> handler,
-                               String                                        name);
-#define RegisterSyscall(index, handler)                                        \
-    ::Syscall::RegisterHandler(ToUnderlying(index), handler, #handler)
-#define RegisterSyscall2(id, handler)                                          \
+    void       RegisterHandler(usize                                        index,
+                               std::function<ErrorOr<upointer>(Arguments&)> handler,
+                               String                                       name);
+#define RegisterSyscall(id, handler)                                           \
     s_Syscalls[id] = new Wrapper<decltype(handler)>(#handler, handler);
 
     void InstallAll();

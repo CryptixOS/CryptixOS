@@ -44,8 +44,8 @@ namespace EFI
         Pointer end            = current.Offset(memoryMapSize);
         if (!current || entryCount == 0)
         {
-            return false;
             LogError("EFI: Couldn't acquire efi memory map");
+            return false;
         }
 
         LogTrace(

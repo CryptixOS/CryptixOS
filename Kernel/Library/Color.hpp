@@ -25,7 +25,7 @@ class Color
     constexpr static u32 ALPHA_BITS_SHIFT = 24;
 
     constexpr Color()                     = default;
-    inline constexpr Color(u32 rgba)
+    explicit inline constexpr Color(u32 rgba)
     {
         m_Red   = (rgba & RED_BITS_MASK) >> RED_BITS_SHIFT;
         m_Green = (rgba & GREEN_BITS_MASK) >> GREEN_BITS_SHIFT;

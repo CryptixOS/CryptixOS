@@ -6,27 +6,28 @@
  */
 #pragma once
 
-#include <API/Posix/signal.h>
-#include <API/Posix/sys/select.h>
-#include <API/Posix/sys/statfs.h>
-#include <API/Posix/utime.h>
 #include <API/Syscall.hpp>
 #include <API/UnixTypes.hpp>
 
+#include <API/Posix/signal.h>
 #include <Prism/Utility/PathView.hpp>
 
+struct dirent;
+struct fd_set;
+struct utimbuf;
+struct statfs;
 namespace API::VFS
 {
-    ErrorOr<isize> Read(i32 fdNum, u8* out, usize bytes);
-    ErrorOr<isize> Write(i32 fdNum, const u8* in, usize bytes);
-    ErrorOr<isize> Open(PathView path, i32 flags, mode_t mode);
-    ErrorOr<isize> Close(i32 fdNum);
+    ErrorOr<isize> Read(isize fdNum, u8* out, usize bytes);
+    ErrorOr<isize> Write(isize fdNum, const u8* in, usize bytes);
+    ErrorOr<isize> Open(PathView path, isize flags, mode_t mode);
+    ErrorOr<isize> Close(isize fdNum);
 
     ErrorOr<isize> Stat(const char* path, stat* out);
     ErrorOr<isize> FStat(isize fdNum, stat* out);
     ErrorOr<isize> LStat(const char* path, stat* out);
 
-    ErrorOr<isize> LSeek(isize fdNum, off_t offset, i32 whence);
+    ErrorOr<isize> LSeek(isize fdNum, off_t offset, isize whence);
     ErrorOr<isize> IoCtl(isize fdNum, usize request, usize argument);
 
     ErrorOr<isize> PRead(isize fdNum, void* out, usize count, off_t offset);
@@ -36,9 +37,10 @@ namespace API::VFS
 
     ErrorOr<isize> Dup(isize oldFdNum);
     ErrorOr<isize> Dup2(isize oldFdNum, isize newFdNum);
+    ErrorOr<isize> FCntl(isize fdNum, isize op, pointer arg);
 
     ErrorOr<isize> Truncate(PathView path, off_t length);
-    ErrorOr<isize> FTruncate(i32 fdNum, off_t length);
+    ErrorOr<isize> FTruncate(isize fdNum, off_t length);
     ErrorOr<isize> GetCwd(char* buffer, usize size);
     ErrorOr<isize> ChDir(const char* filename);
     ErrorOr<isize> FChDir(isize fdNum);
@@ -52,15 +54,24 @@ namespace API::VFS
     ErrorOr<isize> Symlink(const char* target, const char* linkPath);
     ErrorOr<isize> ReadLink(PathView path, char* out, usize size);
     ErrorOr<isize> ChMod(const char* path, mode_t mode);
+    ErrorOr<isize> FChMod(isize fdNum, mode_t mode);
 
     ErrorOr<isize> Mount(const char* path, const char* target,
                          const char* filesystemType, usize flags,
                          const void* data);
 
+    CTOS_NO_SANITIZE("alignment")
+    ErrorOr<isize> GetDEnts64(isize dirFdNum, dirent* const outBuffer,
+                              usize count);
+    ErrorOr<isize> OpenAt(isize dirFdNum, const char* path, isize flags,
+                          mode_t mode);
     ErrorOr<isize> MkDirAt(isize dirFdNum, const char* path, mode_t mode);
+    ErrorOr<isize> MkNodAt(isize dirFdNum, const char* path, mode_t mode,
+                           dev_t dev);
     ErrorOr<isize> ReadLinkAt(isize dirFdNum, const char* path, char* out,
                               usize bufferSize);
-    ErrorOr<isize> FChModAt(isize dirFdNum, PathView path, mode_t mode);
+    ErrorOr<isize> FChModAt(isize dirFdNum, const char* path, mode_t mode,
+                            isize flags);
     ErrorOr<isize> PSelect6(isize fdCount, fd_set* readFds, fd_set* writeFds,
                             fd_set* exceptFds, const timeval* timeout,
                             const sigset_t* sigmask);
@@ -82,12 +93,3 @@ namespace API::VFS
                              isize newDirFdNum, const char* newPath,
                              usize flags);
 } // namespace API::VFS
-namespace Syscall::VFS
-{
-    ErrorOr<isize> SysFcntl(Syscall::Arguments& args);
-
-    [[clang::no_sanitize("alignment")]] ErrorOr<isize>
-                 SysGetDents64(Syscall::Arguments& args);
-    ErrorOr<isize> SysOpenAt(Syscall::Arguments& args);
-    ErrorOr<isize> SysFStatAt(Syscall::Arguments& args);
-} // namespace Syscall::VFS

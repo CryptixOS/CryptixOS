@@ -212,6 +212,14 @@ namespace VFS
         if (flags & O_PATH) accMode = FileAccessMode::eNone;
 
         auto dentry = maybeEntry.Value();
+        auto inode  = dentry->INode();
+        if (inode && inode->IsCharDevice())
+        {
+            auto device = DevTmpFs::Lookup(inode->Stats().st_dev);
+            if (device)
+                return new FileDescriptor(dentry, device, flags, accMode);
+        }
+
         return new FileDescriptor(dentry, flags, accMode);
     }
 
@@ -270,16 +278,18 @@ namespace VFS
         if (target.Empty()) return Error(EINVAL);
 
         PathResolver targetResolver(parent, target);
-        auto         targetEntry
-            = TryOrRet(targetResolver.Resolve(PathLookupFlags::eRegular));
+        auto         targetEntry = TryOrRet(targetResolver.Resolve(
+            PathLookupFlags::eRegular | PathLookupFlags::eMountPoint));
 
-        bool isRoot = targetEntry == RootDirectoryEntry();
+        bool         isRoot      = targetEntry == RootDirectoryEntry();
         if (!isRoot && !targetEntry->IsDirectory())
         {
             LogError("VFS: '{}' target is not a directory", target);
             return Error(ENOTDIR);
         }
 
+        if (targetEntry->IsMountPoint() || MountPoint::Lookup(targetEntry))
+            return Error(EBUSY);
         Ref<MountPoint> mountPoint = CreateRef<MountPoint>(targetEntry, fs);
         auto            fsRoot     = TryOrRetFmt(
             fs->Mount(sourcePath, data), Error(result.Error()),
@@ -394,39 +404,53 @@ namespace VFS
                        path.BaseName(), targetPath);
     }
 
-    Ref<DirectoryEntry> Link(Ref<DirectoryEntry> oldParent, PathView oldPath,
-                             Ref<DirectoryEntry> newParent, PathView newPath,
-                             i32 flags)
+    ErrorOr<Ref<DirectoryEntry>> Link(Ref<DirectoryEntry> oldParent,
+                                      StringView          oldName,
+                                      Ref<DirectoryEntry> newParent,
+                                      StringView newName, i32 flags)
     {
-        if (!oldParent) oldParent = RootDirectoryEntry();
-        if (!newParent) newParent = RootDirectoryEntry();
+        Assert(oldParent);
+        Assert(newParent);
 
-        auto maybeOldPathRes = ResolvePath(oldParent, oldPath);
-        auto maybeNewPathRes = ResolvePath(newParent, newPath);
+        auto oldEntry = oldParent->Lookup(oldName);
+        if (!oldEntry) return Error(ENOENT);
+        if (oldEntry->IsDirectory()) return Error(EPERM);
 
-        auto oldPathRes      = maybeOldPathRes.Value();
-        auto newPathRes      = maybeNewPathRes.Value();
+        auto newEntry = newParent->Lookup(oldName);
+        if (newEntry) return Error(EEXIST);
 
-        auto oldEntry        = oldPathRes.Entry;
-        Ref  newEntry        = newPathRes.Entry;
-        newParent            = newPathRes.Parent;
+        newEntry            = CreateRef<DirectoryEntry>(nullptr, newName);
 
-        if (newEntry) return_err(nullptr, EEXIST);
-        if (!newParent) return_err(nullptr, ENOENT);
-        if (!newParent->IsDirectory()) return_err(nullptr, ENOTDIR);
-
-        newEntry = new DirectoryEntry(newParent, newPathRes.BaseName);
         auto newParentINode = newParent->INode();
+        TryOrRet(newParentINode->Link(oldEntry, newEntry));
 
-        auto maybeNewEntry  = newParentINode->Link(oldEntry, newEntry);
-        if (!maybeNewEntry) return_err(nullptr, maybeNewEntry.Error());
+        newParent->InsertChild(newEntry);
+        newEntry->SetParent(newParent);
 
-        return maybeNewEntry.Value();
+        LogInfo("Link result => oldEntry: `{}`, newEntry: `{}`",
+                oldEntry->Path(), newEntry->Path());
+        LogInfo("old parent name: `{}`, new parent name: `{}`",
+                oldParent->Name(), newParent->Name());
+        LogInfo("old parent path: `{}`, new parent path: `{}`",
+                oldParent->Path(), newParent->Path());
+        LogInfo("old name: `{}`, new name: `{}`", oldName, newName);
+        return newEntry;
+    }
+    ErrorOr<Ref<DirectoryEntry>> Link(PathView oldPath, PathView newPath,
+                                      i32 flags)
+    {
+        auto oldParent = TryOrRet(ResolveParent(RootDirectoryEntry(), oldPath));
+        auto newParent = TryOrRet(ResolveParent(RootDirectoryEntry(), newPath));
+
+        return Link(oldParent, oldPath.BaseName(), newParent,
+                    newPath.BaseName(), flags);
     }
 
     bool Unlink(Ref<DirectoryEntry> parent, PathView path, i32 flags)
     {
-        if (!parent) parent = RootDirectoryEntry();
+        if (!parent)
+            parent = path.StartsWith("/") ? RootDirectoryEntry()
+                                          : Process::Current()->CWD();
 
         ToDo();
         return false;

@@ -1,4 +1,6 @@
 name: CI Meson
+permissions:
+  contents: write
 
 on:
   push:

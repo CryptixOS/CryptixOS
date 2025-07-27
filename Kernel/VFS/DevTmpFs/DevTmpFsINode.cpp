@@ -133,9 +133,9 @@ ErrorOr<Ref<DirectoryEntry>> DevTmpFsINode::Symlink(Ref<DirectoryEntry> entry,
                                                     PathView targetPath)
 {
     auto dentry     = TryOrRet(CreateNode(entry, 0777 | S_IFLNK, 0));
-    auto inode      = reinterpret_cast<DevTmpFsINode*>(dentry->INode());
+    CTOS_UNUSED auto inode      = reinterpret_cast<DevTmpFsINode*>(dentry->INode());
 
-    inode->m_Target = targetPath;
+    // inode->m_Target = targetPath;
     return dentry;
 }
 
@@ -195,9 +195,9 @@ isize DevTmpFsINode::Write(const void* buffer, off_t offset, usize bytes)
     return bytes;
 }
 
-i32 DevTmpFsINode::IoCtl(usize request, usize arg)
+ErrorOr<isize> DevTmpFsINode::IoCtl(usize request, usize arg)
 {
-    if (!m_Device) return_err(-1, ENOTTY);
+    if (!m_Device) return Error(ENOTTY);
 
     return m_Device->IoCtl(request, arg);
 }

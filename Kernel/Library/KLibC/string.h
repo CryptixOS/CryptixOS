@@ -21,9 +21,6 @@ extern "C"
     size_t strlen(const char* str) throw();
     char*  strdup(const char* str) throw();
 
-    char*  strcat(char* dest, const char* src) throw();
-    char*  strncat(char* dest, const char* src, size_t len) throw();
-
     char*  strchr(const char* str, int ch);
 
     int    strcmp(const char* str1, const char* str2) throw();

@@ -4,40 +4,126 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Drivers/Storage/GPT.hpp>
 #include <Drivers/Storage/PartitionTable.hpp>
 #include <Drivers/Storage/StorageDevice.hpp>
 
+#include <Prism/Utility/Checksum.hpp>
+
 bool PartitionTable::Load(class StorageDevice& device)
 {
-    m_Device              = &device;
-    MasterBootRecord* mbr = new MasterBootRecord;
-    device.Read(mbr, 0, sizeof(MasterBootRecord));
+    m_Device = &device;
+    m_Mbr    = CreateScope<MasterBootRecord>();
+    Assert(m_Mbr);
+    device.Read(m_Mbr.Raw(), 0, sizeof(MasterBootRecord));
 
-    bool loaded = false;
-    if (IsProtective(mbr)) loaded = ParseGPT();
-    if (!loaded) loaded = ParseMBR(mbr);
-
-    delete mbr;
-    return loaded;
+    if (ParseGPT()) return true;
+    return ParseMBR();
 }
 
-bool PartitionTable::IsProtective(MasterBootRecord* mbr)
+inline constexpr u8 MBR_SYSTEMID_EBR = 0x05;
+
+bool                PartitionTable::ParseGPT()
 {
-    // TODO(v1tr10l7): Check whether it is protective mbr
-    MBREntry& firstEntry = mbr->PartitionEntries[0];
+    MBREntry& firstEntry = m_Mbr->PartitionEntries[0];
     if (firstEntry.Status != 0 || firstEntry.Type != 0xee
         || firstEntry.FirstSector != 1)
         return false;
 
-    return false;
-}
+    usize                       headerSize = sizeof(GPT::PartitionHeader);
+    Scope<GPT::PartitionHeader> gptHeader = CreateScope<GPT::PartitionHeader>();
+    auto                        nread
+        = TryOrRetVal(m_Device->Read(gptHeader.Raw(), 512, headerSize), false);
+    if (static_cast<usize>(nread) != headerSize) return false;
 
-inline constexpr u8 MBR_SYSTEMID_EBR = 0x05;
-bool                PartitionTable::ParseMBR(MasterBootRecord* mbr)
+    u64 headerSignature = *reinterpret_cast<u64*>(gptHeader->Signature);
+    if (headerSignature != GPT::HEADER_SIGNATURE)
+    {
+        LogError("GPT: Invalid header signature => {:#x}", headerSignature);
+        return false;
+    }
+    if (gptHeader->HeaderSize < GPT::HEADER_LENGTH)
+    {
+        LogError("GPT: Invalid header size => {:#x}, should be: {:#x}",
+                 gptHeader->HeaderSize, GPT::HEADER_LENGTH);
+        return false;
+    }
+
+    u32 oldCrc             = gptHeader->Crc32Header;
+    gptHeader->Crc32Header = 0;
+    u32 crc32 = CRC32::DoChecksum(reinterpret_cast<u8*>(gptHeader.Raw()), 92);
+    gptHeader->Crc32Header = oldCrc;
+
+    if (crc32 != oldCrc)
+        LogError("GPT: Invalid crc32 header checksum, crc32: {}, old crc32: {}",
+                 crc32, oldCrc);
+    if (gptHeader->Reserved != 0)
+        LogWarn("GPT: Header's reserved field is: {:#x}, should be 0",
+                gptHeader->Reserved);
+    if (gptHeader->CurrentLBA != 1)
+        LogWarn("GPT: Invalid header lba: {:#x}", gptHeader->CurrentLBA);
+    LogDebug("GPT: Backup header LBA: {:#x}", gptHeader->BackupLBA);
+    if (gptHeader->FirstBlock > gptHeader->LastBlock)
+    {
+        LogError("GPT: Invalid table bounds: {:#x}-{:#x}",
+                 gptHeader->FirstBlock, gptHeader->LastBlock);
+    }
+
+    usize partitionArraySize = gptHeader->PartitionCount * gptHeader->EntrySize;
+
+    Scope<u8[]> partitionArray = new u8[partitionArraySize];
+    nread = TryOrRetVal(m_Device->Read(partitionArray.Raw(),
+                                       gptHeader->PartitionArrayLBA * 512,
+                                       partitionArraySize),
+                        false);
+    if (static_cast<usize>(nread) != partitionArraySize)
+        LogWarn(
+            "GPT: Failed to read whole partition array into memory, loaded "
+            "{:#x} bytes",
+            nread);
+
+    u32 partitionArrayCrc32
+        = CRC32::DoChecksum(partitionArray.Raw(), partitionArraySize);
+    if (partitionArrayCrc32 != gptHeader->PartitionArrayCRC32)
+        LogError(
+            "GPT: Invalid partition array crc32 checksum: computed => {:#x}, "
+            "actual => {:#x}",
+            partitionArrayCrc32, gptHeader->PartitionArrayCRC32);
+
+    GPT::Entry entry{};
+    for (usize offset = 0, index = 0; offset < partitionArraySize;
+         offset += sizeof(GPT::Entry))
+    {
+        Memory::Copy(&entry, partitionArray.Raw() + offset, sizeof(entry));
+        if (*reinterpret_cast<u32*>(entry.UniqueGUID) == 0
+            && *reinterpret_cast<u32*>(&entry.UniqueGUID[8]) == 0)
+            continue;
+        if (entry.Attributes
+            & (GPT::Attributes::eDontMount | GPT::Attributes::eLegacy))
+            continue;
+
+        u64   firstBlock = entry.StartLBA;
+        u64   lastBlock  = entry.EndLBA;
+        u64   attributes = ToUnderlying(entry.Attributes);
+        Entry partition{};
+        partition.FirstBlock = firstBlock;
+        partition.LastBlock  = lastBlock;
+        partition.Attributes = attributes;
+
+        LogDebug(
+            "GPT: Discovered partition[{}]: {{ .StartLBA: {}, .EndLBA: {}, "
+            ".Attributes: {} }}",
+            index++, firstBlock, lastBlock, attributes);
+        m_Entries.PushBack(partition);
+    }
+
+    return true;
+}
+bool PartitionTable::ParseMBR()
 {
     for (usize i = 0; i < 4; i++)
     {
-        MBREntry& entry = mbr->PartitionEntries[i];
+        MBREntry& entry = m_Mbr->PartitionEntries[i];
         if (entry.FirstSector == 0x00) continue;
 
         u64 firstBlock = entry.FirstSector;
@@ -83,4 +169,3 @@ bool PartitionTable::ParseEBR(MasterBootRecord& ebr, usize offset)
     delete nextEbr;
     return true;
 }
-bool PartitionTable::ParseGPT() { return false; }

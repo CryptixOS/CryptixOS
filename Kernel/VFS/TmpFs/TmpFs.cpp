@@ -32,15 +32,22 @@ ErrorOr<::Ref<DirectoryEntry>> TmpFs::Mount(StringView  sourcePath,
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
                : nullptr;
 
-    m_MaxSize       = PMM::GetTotalMemory() / 2;
-    m_MaxINodeCount = PMM::GetTotalMemory() / PMM::PAGE_SIZE / 2;
+    m_BlockSize      = PMM::PAGE_SIZE;
+    m_BytesLimit     = PMM::GetTotalMemory() / 2;
 
-    m_RootEntry     = new DirectoryEntry(nullptr, "/");
-    auto inodeOr    = CreateNode(nullptr, m_RootEntry, 0644 | S_IFDIR, 0);
-    RetOnError(inodeOr);
+    m_MaxBlockCount  = 64_kib;
+    m_UsedBlockCount = 0;
 
-    m_Root = inodeOr.Value();
+    m_MaxINodeCount  = PMM::GetTotalMemory() / PMM::PAGE_SIZE / 2;
+    m_FreeINodeCount = m_MaxINodeCount;
+
+    m_MaxSize        = PMM::GetTotalMemory() / 2;
+
+    m_RootEntry      = new DirectoryEntry(nullptr, "/");
+    m_Root = TryOrRet(CreateNode(nullptr, m_RootEntry, 0644 | S_IFDIR, 0));
+
     m_RootEntry->Bind(m_Root);
+    m_RootEntry->SetParent(m_RootEntry);
 
     return m_RootEntry;
 }
@@ -48,6 +55,9 @@ ErrorOr<::Ref<DirectoryEntry>> TmpFs::Mount(StringView  sourcePath,
 ErrorOr<INode*> TmpFs::AllocateNode(StringView name, mode_t mode)
 {
     if (m_NextINodeIndex >= m_MaxINodeCount) return Error(ENOSPC);
+    else if (FreeINodeCount() == 0) return Error(ENOSPC);
+    --m_FreeINodeCount;
+
     auto inode = new TmpFsINode(name, this, mode);
     if (!inode) return Error(ENOMEM);
     // TODO(v1tr10l7): uid, gid
@@ -92,7 +102,7 @@ ErrorOr<void> TmpFs::Stats(statfs& stats)
     stats.f_type   = TMPFS_MAGIC;
     stats.f_bsize  = PMM::PAGE_SIZE;
     stats.f_blocks = m_MaxBlockCount;
-    stats.f_bfree = stats.f_bavail = m_FreeBlockCount;
+    stats.f_bfree = stats.f_bavail = m_MaxBlockCount - m_UsedBlockCount;
 
     stats.f_files                  = m_MaxINodeCount;
     stats.f_ffree                  = m_FreeINodeCount / INODE_SIZE;

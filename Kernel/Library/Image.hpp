@@ -109,7 +109,7 @@ namespace PNG
         i32                    m_Height = 0;
         u8                     m_Depth  = 0;
         u8                     m_Color;
-        ColorType              m_ColorType;
+        ColorType              m_ColorType = ColorType::eGrayscale;
         CompressionMethod      m_CompressionMethod;
         u8                     m_Filter;
         InterlaceMethod        m_Interlace;

@@ -214,6 +214,13 @@ ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
 
     return 0;
 }
+ErrorOr<Ref<FileDescriptor>> Process::GetFileDescriptor(isize fdNum)
+{
+    auto fd = m_FdTable.GetFd(fdNum);
+    if (!fd) return Error(EBADF);
+
+    return fd;
+}
 
 Vector<String> SplitArguments(const String& str)
 {
@@ -301,55 +308,57 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
                                 rusage* rusage)
 {
-    Process*         process = Process::GetCurrent();
-    Vector<Process*> procs;
-    if (m_Children.Empty()) return Error(ECHILD);
-
-    if (pid < -1)
-    {
-        pid_t gid = -pid;
-        auto  it  = std::find_if(m_Children.begin(), m_Children.end(),
-                                 [gid](Process* proc) -> bool
-                                 {
-                                   if (proc->PGid() == gid) return true;
-                                   return false;
-                               });
-        if (it == m_Children.end()) return Error(ECHILD);
-        procs.PushBack(*it);
-    }
-    else if (pid == -1) procs = process->m_Children;
-    else if (pid == 0)
-    {
-        auto it = std::find_if(m_Children.begin(), m_Children.end(),
-                               [process](Process* proc) -> bool
-                               {
-                                   if (proc->PGid() == process->PGid())
-                                       return true;
-                                   return false;
-                               });
-
-        if (it == m_Children.end()) return Error(ECHILD);
-        procs.PushBack(*it);
-    }
-    else if (pid > 0)
-    {
-        auto it = std::find_if(m_Children.begin(), m_Children.end(),
-                               [pid](Process* proc) -> bool
-                               {
-                                   if (proc->Pid() == pid) return true;
-                                   return false;
-                               });
-
-        if (it == m_Children.end()) return Error(ECHILD);
-        procs.PushBack(*it);
-    }
-
+    bool           block = !(flags & WNOHANG);
     Vector<Event*> events;
-    for (auto& proc : procs) events.PushBack(&proc->m_Event);
-
-    bool block = !(flags & WNOHANG);
     for (;;)
     {
+        events.Clear();
+        events.ShrinkToFit();
+        Process*         process = Process::GetCurrent();
+        Vector<Process*> procs;
+        if (m_Children.Empty()) return Error(ECHILD);
+
+        if (pid < -1)
+        {
+            pid_t gid = -pid;
+            auto  it  = std::find_if(m_Children.begin(), m_Children.end(),
+                                     [gid](Process* proc) -> bool
+                                     {
+                                       if (proc->PGid() == gid) return true;
+                                       return false;
+                                   });
+            if (it == m_Children.end()) return Error(ECHILD);
+            procs.PushBack(*it);
+        }
+        else if (pid == -1) procs = process->m_Children;
+        else if (pid == 0)
+        {
+            auto it = std::find_if(m_Children.begin(), m_Children.end(),
+                                   [process](Process* proc) -> bool
+                                   {
+                                       if (proc->PGid() == process->PGid())
+                                           return true;
+                                       return false;
+                                   });
+
+            if (it == m_Children.end()) return Error(ECHILD);
+            procs.PushBack(*it);
+        }
+        else if (pid > 0)
+        {
+            auto it = std::find_if(m_Children.begin(), m_Children.end(),
+                                   [pid](Process* proc) -> bool
+                                   {
+                                       if (proc->Pid() == pid) return true;
+                                       return false;
+                                   });
+
+            if (it == m_Children.end()) return Error(ECHILD);
+            procs.PushBack(*it);
+        }
+
+        for (auto& proc : procs) events.PushBack(&proc->m_Event);
+
         auto ret = Event::Await(Span(events.Raw(), events.Size()), block);
         if (!ret.HasValue()) return Error(EINTR);
 
@@ -393,8 +402,9 @@ ErrorOr<Process*> Process::Fork()
         uintptr_t physicalSpace = PMM::CallocatePages<uintptr_t>(pageCount);
         Assert(physicalSpace);
 
-        std::memcpy(Pointer(physicalSpace).ToHigherHalf<void*>(),
-                    range->PhysicalBase().ToHigherHalf<void*>(), range->Size());
+        Memory::Copy(Pointer(physicalSpace).ToHigherHalf<void*>(),
+                     range->PhysicalBase().ToHigherHalf<void*>(),
+                     range->Size());
         pageMap->MapRange(range->VirtualBase(), physicalSpace, range->Size(),
                           PageAttributes::eRWXU | PageAttributes::eWriteBack);
 

@@ -12,7 +12,6 @@ packages:
     pkgs_required:
       - base-files
       - mlibc
-      - prism
     configure: 
       - args:
         - 'meson'
@@ -166,7 +165,7 @@ packages:
     build:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/sbin']
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/root']
-      - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/init.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/init']
+      - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/init.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/init', '-mno-sse', '-mno-mmx', '-mno-sse2', '-lm', '-static']
       - args: ['@OPTION:arch-triple@-gcc', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/Init/test_tty.c',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/test_tty']
       
   - name: less
@@ -380,7 +379,7 @@ packages:
       subdir: 'sources'
       version: '0.1'
     pkgs_required:
-      - cryptix-utils
+      # - cryptix-utils
       - coreutils
       - file 
       - less

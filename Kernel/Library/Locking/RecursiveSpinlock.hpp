@@ -64,7 +64,7 @@ class RecursiveSpinlock : public NonCopyable<RecursiveSpinlock>
  */
 class ScopedRecursiveLock final : public NonCopyable<ScopedRecursiveLock> {
 public:
-    ScopedRecursiveLock(RecursiveSpinlock& lock, bool disableInterrupts = false)
+    explicit ScopedRecursiveLock(RecursiveSpinlock& lock, bool disableInterrupts = false)
         : m_Lock(lock), m_DisableInterrupts(disableInterrupts)
     {
         m_Lock.Acquire(m_DisableInterrupts);

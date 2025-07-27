@@ -19,9 +19,6 @@ namespace std
     using ::strlen;
     using ::strdup;
 
-    using ::strcat;
-    using ::strncat;
-
     using ::strchr;
 
     using ::strcmp;

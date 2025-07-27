@@ -109,18 +109,18 @@ namespace Stacktrace
         PMM::FreePages(fileStart.FromHigherHalf(), filePageCount);
         LogInfo("Stacktrace: kernel symbols loaded");
 
-        #if CTOS_DUMP_INIT_ARRAY != 0
+#if CTOS_DUMP_INIT_ARRAY != 0
         LogTrace("System: Dumping init array =>");
         for (ConstructorFunction* entry = __init_array_start;
              entry < __init_array_end; entry++)
         {
             ConstructorFunction constructor = *entry;
-            auto sym = GetSymbol(constructor);
+            auto                sym         = GetSymbol(constructor);
             if (!sym) continue;
-            
+
             LogTrace("\t{:#016p} => {}", Pointer(constructor).Raw(), sym->Name);
         }
-        #endif
+#endif
 
         return true;
     }
@@ -142,6 +142,8 @@ namespace Stacktrace
                 = symbol ? llvm::demangle(symbol->Name.Raw()) : "??";
             LogMessage("[\u001b[33mStacktrace\u001b[0m]: {}. {} <{:#x}>\n",
                        i + 1, demangledName, rip.Raw());
+
+            if (symbol->Name.StartsWith("interrupt_handler")) break;
         }
     }
 }; // namespace Stacktrace

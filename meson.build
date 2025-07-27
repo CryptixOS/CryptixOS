@@ -39,6 +39,7 @@ include_directories = [
 ### Compiler arguments
 warnings = [
   #'-Wno-error=#warnings',
+  '-Wimplicit-fallthrough',
   '-Wno-builtin-macro-redefined',
   '-Wno-macro-redefined', # clang
   '-Wno-nan-infinity-disabled', # clang 
@@ -294,7 +295,7 @@ root_image = custom_target(
     './Meta/create_image.py',
     '--input', meson.project_source_root() / 'Kernel',
     '--output', '@OUTPUT@',
-    '--partition-table', 'mbr',
+    '--partition-table', 'gpt',
     '--size', '728MiB',
   ],
   depends: ext_mods,

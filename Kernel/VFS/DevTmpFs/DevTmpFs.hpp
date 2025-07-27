@@ -14,7 +14,7 @@
 class DevTmpFs : public Filesystem
 {
   public:
-    DevTmpFs(u32 flags);
+    explicit DevTmpFs(u32 flags);
 
     virtual ErrorOr<::Ref<DirectoryEntry>>
     Mount(StringView sourcePath, const void* data = nullptr) override;
@@ -22,9 +22,10 @@ class DevTmpFs : public Filesystem
     virtual ErrorOr<INode*> AllocateNode(StringView name,
                                          INodeMode  mode) override;
 
-    virtual bool Populate(DirectoryEntry* dentry) override { return true; }
+    virtual bool   Populate(DirectoryEntry* dentry) override { return true; }
 
-    static bool             RegisterDevice(Device* device);
+    static bool    RegisterDevice(Device* device);
+    static Device* Lookup(dev_t id);
 
   private:
     static UnorderedMap<dev_t, Device*> s_Devices;

@@ -18,7 +18,7 @@
 class BochsAdapter : public PCI::Device
 {
   public:
-    BochsAdapter(PCI::DeviceAddress address)
+    explicit BochsAdapter(PCI::DeviceAddress address)
         : Device(address)
     {
     }

@@ -10,10 +10,18 @@
 
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Core/Types.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Memory/Scope.hpp>
+
+namespace GPT
+{
+    struct PartitionHeader;
+};
 
 class PartitionTable
 {
   public:
+    constexpr PartitionTable() = default;
     bool Load(class StorageDevice& device);
 
     struct Entry
@@ -37,12 +45,11 @@ class PartitionTable
     auto end() { return m_Entries.end(); }
 
   private:
-    StorageDevice* m_Device;
-    Vector<Entry>  m_Entries;
+    StorageDevice*          m_Device = nullptr;
+    Vector<Entry>           m_Entries{};
+    Scope<MasterBootRecord> m_Mbr = nullptr;
 
-    bool           IsProtective(struct MasterBootRecord* mbr);
-
-    bool           ParseMBR(MasterBootRecord* mbr);
-    bool           ParseEBR(MasterBootRecord& ebr, usize offset = 0);
-    bool           ParseGPT();
+    bool                    ParseGPT();
+    bool                    ParseMBR();
+    bool                    ParseEBR(MasterBootRecord& ebr, usize offset = 0);
 };

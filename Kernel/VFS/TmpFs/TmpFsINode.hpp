@@ -25,7 +25,7 @@ extern bool g_LogTmpFs;
 class TmpFsINode final : public INode
 {
   public:
-    TmpFsINode(class Filesystem* fs);
+    explicit TmpFsINode(class Filesystem* fs);
     TmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
                uid_t uid = 0, gid_t gid = 0);
 
@@ -44,12 +44,6 @@ class TmpFsINode final : public INode
     {
         return m_Children;
     }
-    virtual void  InsertChild(INode* node, StringView name) override;
-    virtual isize Read(void* buffer, off_t offset, usize bytes) override;
-    virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
-    virtual ErrorOr<isize> Truncate(usize size) override;
-
-    virtual ErrorOr<void> Rename(INode* newParent, StringView newName) override;
 
     virtual ErrorOr<Ref<DirectoryEntry>>
     CreateNode(Ref<DirectoryEntry> entry, mode_t mode, dev_t dev) override;
@@ -62,13 +56,23 @@ class TmpFsINode final : public INode
     virtual ErrorOr<Ref<DirectoryEntry>>
     Link(Ref<DirectoryEntry> oldEntry, Ref<DirectoryEntry> entry) override;
 
+    virtual void  InsertChild(INode* node, StringView name) override;
+    virtual isize Read(void* buffer, off_t offset, usize bytes) override;
+    virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
+    virtual ErrorOr<Path>  ReadLink() override;
+
+    virtual ErrorOr<isize> Truncate(usize size) override;
+    virtual ErrorOr<void> Rename(INode* newParent, StringView newName) override;
+
     virtual ErrorOr<void> Unlink(Ref<DirectoryEntry> entry) override;
     virtual ErrorOr<void> RmDir(Ref<DirectoryEntry> entry) override;
-    virtual ErrorOr<void> Link(PathView path) override;
+
+    virtual ErrorOr<void> FlushMetadata() override { return {}; }
 
   private:
     Buffer                           m_Buffer;
     UnorderedMap<StringView, INode*> m_Children;
+    String                           m_Target = ""_s;
 
     friend class TmpFs;
 };

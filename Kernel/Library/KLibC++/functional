@@ -6,9 +6,11 @@
  */
 #pragma once
 
+#include <Compiler.hpp>
+
+#include <cassert>
 #include <cstdint>
 #include <cstring>
-#include <cassert>
 #include_next <functional>
 
 constexpr inline size_t _hash(const void* ptr, uint64_t len,
@@ -39,12 +41,13 @@ constexpr inline size_t _hash(const void* ptr, uint64_t len,
 
     switch (len & 7)
     {
-        case 7: h ^= static_cast<uint64_t>(data2[6]) << 48;
-        case 6: h ^= static_cast<uint64_t>(data2[5]) << 40;
-        case 5: h ^= static_cast<uint64_t>(data2[4]) << 32;
-        case 4: h ^= static_cast<uint64_t>(data2[3]) << 24;
-        case 3: h ^= static_cast<uint64_t>(data2[2]) << 16;
-        case 2: h ^= static_cast<uint64_t>(data2[1]) << 8;
+        CTOS_FALLTHROUGH;
+        case 7: h ^= static_cast<uint64_t>(data2[6]) << 48; CTOS_FALLTHROUGH;
+        case 6: h ^= static_cast<uint64_t>(data2[5]) << 40; CTOS_FALLTHROUGH;
+        case 5: h ^= static_cast<uint64_t>(data2[4]) << 32; CTOS_FALLTHROUGH;
+        case 4: h ^= static_cast<uint64_t>(data2[3]) << 24; CTOS_FALLTHROUGH;
+        case 3: h ^= static_cast<uint64_t>(data2[2]) << 16; CTOS_FALLTHROUGH;
+        case 2: h ^= static_cast<uint64_t>(data2[1]) << 8; CTOS_FALLTHROUGH;
         case 1: h ^= static_cast<uint64_t>(data2[0]); h *= m;
     };
 
@@ -73,8 +76,8 @@ namespace std
 
         function() noexcept = default;
         function(std::nullptr_t) noexcept {}
-        //function(const function& other)     = default;
-        //function(function&& other) noexcept = default;
+        // function(const function& other)     = default;
+        // function(function&& other) noexcept = default;
 
         template <typename F>
         function(F f)
@@ -83,15 +86,14 @@ namespace std
         }
         function(function& f)
         {
-            _callable = f._callable;
+            _callable   = f._callable;
             f._callable = nullptr;
         }
         function(function&& f)
         {
-            _callable = f._callable;
+            _callable   = f._callable;
             f._callable = nullptr;
         }
-
 
         ~function()
         {
@@ -114,21 +116,21 @@ namespace std
         {
             if (_callable) delete _callable;
             _callable = new callableFunc<F>(f);
-            
+
             return *this;
         }
         function& operator=(function&& other)
         {
             if (_callable) delete _callable;
-            _callable = other._callable;
+            _callable       = other._callable;
             other._callable = nullptr;
 
             return *this;
         }
 
-        /*function& operator=(std::nullptr_t) noexcept { if (_callable) delete _callable; _callable = nullptr; }
-        template <typename F>
-        function& operator=(F&& f)
+        /*function& operator=(std::nullptr_t) noexcept { if (_callable) delete
+        _callable; _callable = nullptr; } template <typename F> function&
+        operator=(F&& f)
         {
             if (_callable) delete _callable;
             _callable = new callableFunc<F>(f);
@@ -143,9 +145,9 @@ namespace std
             _callable       = temp;
         }
 
-        explicit operator bool() const { return _callable != nullptr ; }
+        explicit operator bool() const { return _callable != nullptr; }
 
-        R operator()(Args... args) const
+        R        operator()(Args... args) const
         {
             assert(_callable);
             return _callable->invoke(args...);

@@ -16,6 +16,7 @@
 
 #include <Memory/PMM.hpp>
 #include <Prism/String/StringUtils.hpp>
+using namespace StringUtils;
 
 Vector<Terminal*>                Terminal::s_Terminals = {};
 Span<Framebuffer, DynamicExtent> s_Framebuffers;
@@ -148,8 +149,9 @@ const Vector<Terminal*>& Terminal::EnumerateTerminals()
     }
     if (!s_Terminals.Empty()) return s_Terminals;
 
-    LogTrace("Terminal: Initializing terminals for {} framebuffers...", s_Framebuffers.Size());
-    for (auto& framebuffer : s_Framebuffers) 
+    LogTrace("Terminal: Initializing terminals for {} framebuffers...",
+             s_Framebuffers.Size());
+    for (auto& framebuffer : s_Framebuffers)
     {
         auto terminal = VideoTerminal::Create(framebuffer);
         s_Terminals.PushBack(terminal);
@@ -227,7 +229,7 @@ void Terminal::OnEscapeChar(char c)
 }
 void Terminal::OnCsi(char c)
 {
-    if (std::isdigit(c))
+    if (IsDigit(c))
     {
         m_State = State::eControlSequenceParams;
 
@@ -300,6 +302,7 @@ void Terminal::OnCsi(char c)
         case 'X':
         case 'a':
             LogWarn("Terminal: Sequence 'ESC[{:c}' is not implemented yet", c);
+            CTOS_FALLTHROUGH;
         case 'c':
         {
             break;

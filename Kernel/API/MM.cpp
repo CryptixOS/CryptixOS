@@ -59,7 +59,6 @@ namespace API::MM
 
         Ref<FileDescriptor> fd = nullptr;
         if (fdNum != -1) fd = current->GetFileHandle(fdNum);
-
         if (offset != 0) return Error(EINVAL);
 
         auto&       addressSpace = current->AddressSpace();

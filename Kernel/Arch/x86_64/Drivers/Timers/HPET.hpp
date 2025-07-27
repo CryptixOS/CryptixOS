@@ -19,7 +19,7 @@ namespace HPET
         static ErrorOr<TimerBlock*> GetFromTable(Pointer hpetPhys);
 
         TimerBlock() = default;
-        TimerBlock(Table* hpet);
+        explicit TimerBlock(Table* hpet);
 
         void Disable() const;
 

@@ -75,9 +75,12 @@ namespace VFS
                                          StringView name, PathView targetPath);
     ErrorOr<Ref<DirectoryEntry>> Symlink(PathView path, PathView targetPath);
 
-    Ref<DirectoryEntry> Link(Ref<DirectoryEntry> oldParent, PathView oldPath,
-                             Ref<DirectoryEntry> newParent, PathView newPath,
-                             i32 flags = 0);
+    ErrorOr<Ref<DirectoryEntry>> Link(Ref<DirectoryEntry> oldParent,
+                                      StringView            oldName,
+                                      Ref<DirectoryEntry> newParent,
+                                      StringView newName, i32 flags = 0);
+    ErrorOr<Ref<DirectoryEntry>> Link(PathView oldPath, PathView newPath,
+                                      i32 flags = 0);
 
     bool Unlink(Ref<DirectoryEntry> parent, PathView path, i32 flags = 0);
 }; // namespace VFS

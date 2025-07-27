@@ -50,10 +50,10 @@ extern "C"
     int printf(const char* restrict format, ...)
         __attribute__((format(printf, 1, 2)));
     //    int scanf(const char* restrict format, ...);
-    int snprintf(char* restrict s, size_t n, const char* format, ...)
-        __attribute__((format(printf, 3, 4)));
-    int sprintf(char* restrict s, const char* format, ...)
-        __attribute__((format(printf, 2, 3)));
+    // int snprintf(char* restrict s, size_t n, const char* format, ...)
+    //     __attribute__((format(printf, 3, 4)));
+    // int sprintf(char* restrict s, const char* format, ...)
+    //     __attribute__((format(printf, 2, 3)));
     //    int sscanf(const char* restrict s, const char* restrict format, ...);
     //    int vfprintf(FILE* restrict stream, const char* restrict format,
     //                 va_list args) __attribute__((format(printf, 2, 0)));

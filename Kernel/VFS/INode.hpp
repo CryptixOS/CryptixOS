@@ -43,8 +43,8 @@ class INode
         DeviceID  RootDeviceID = 0;
         DeviceID  DeviceID     = 0;
 
-        UserID    UID          = 0;
-        GroupID   GID          = 0;
+        ::UserID  UID          = 0;
+        ::GroupID GID          = 0;
 
         timespec  AccessTime{};
         timespec  ModificationTime{};
@@ -55,9 +55,6 @@ class INode
     INode(StringView name);
     INode(StringView name, class Filesystem* fs);
     virtual ~INode() {}
-
-    // virtual Ref<DirectoryEntry> Ref() { return nullptr; }
-    StringView               GetTarget() const { return m_Target; }
 
     inline class Filesystem* Filesystem() { return m_Filesystem; }
     virtual const stat       Stats();
@@ -72,24 +69,37 @@ class INode
 
     virtual ErrorOr<Ref<DirectoryEntry>> Lookup(Ref<DirectoryEntry> dentry);
 
-    inline StringView Name() { return m_Name; }
-    mode_t            Mode() const;
+    inline StringView                    Name() { return m_Name; }
+    DeviceID                             BackingDeviceID() const;
+    INodeID                              ID() const;
+    INodeMode                            Mode() const;
+    nlink_t                              LinkCount() const;
+    ::UserID                             UserID() const;
+    ::GroupID                            GroupID() const;
+    DeviceID                             DeviceID() const;
+    isize                                Size() const;
+    blksize_t                            BlockSize() const;
+    blkcnt_t                             BlockCount() const;
 
-    bool              IsFilesystemRoot() const;
-    bool              IsEmpty();
-    bool              ReadOnly();
-    bool              Immutable();
-    bool              CanWrite(const Credentials& creds) const;
+    timespec                             AccessTime() const;
+    timespec                             ModificationTime() const;
+    timespec                             StatusChangeTime() const;
 
-    inline bool       IsCharDevice() const { return S_ISCHR(m_Metadata.Mode); }
-    inline bool       IsFifo() const { return S_ISFIFO(m_Metadata.Mode); }
-    inline bool       IsDirectory() const { return S_ISDIR(m_Metadata.Mode); }
-    inline bool       IsRegular() const { return S_ISREG(m_Metadata.Mode); }
-    inline bool       IsSymlink() const { return S_ISLNK(m_Metadata.Mode); }
-    inline bool       IsSocket() const { return S_ISSOCK(m_Metadata.Mode); }
+    bool                                 IsFilesystemRoot() const;
+    bool                                 IsEmpty();
+    bool                                 ReadOnly();
+    bool                                 Immutable();
+    bool        CanWrite(const Credentials& creds) const;
 
-    bool              ValidatePermissions(const Credentials& creds, u32 acc);
-    void              UpdateATime();
+    inline bool IsCharDevice() const { return S_ISCHR(m_Metadata.Mode); }
+    inline bool IsFifo() const { return S_ISFIFO(m_Metadata.Mode); }
+    inline bool IsDirectory() const { return S_ISDIR(m_Metadata.Mode); }
+    inline bool IsRegular() const { return S_ISREG(m_Metadata.Mode); }
+    inline bool IsSymlink() const { return S_ISLNK(m_Metadata.Mode); }
+    inline bool IsSocket() const { return S_ISSOCK(m_Metadata.Mode); }
+
+    bool        ValidatePermissions(const Credentials& creds, u32 acc);
+    void        UpdateATime();
 
     virtual ErrorOr<Ref<DirectoryEntry>> CreateNode(Ref<DirectoryEntry> entry,
                                                     mode_t mode, dev_t dev = 0);
@@ -102,44 +112,39 @@ class INode
     virtual ErrorOr<Ref<DirectoryEntry>> Link(Ref<DirectoryEntry> oldEntry,
                                               Ref<DirectoryEntry> entry);
 
-    virtual void      InsertChild(INode* node, StringView name)            = 0;
-    virtual isize     Read(void* buffer, off_t offset, usize bytes)        = 0;
-    virtual isize     Write(const void* buffer, off_t offset, usize bytes) = 0;
-    virtual i32 IoCtl(usize request, usize arg) { return_err(-1, ENODEV); }
+    virtual void  InsertChild(INode* node, StringView name)            = 0;
+    virtual isize Read(void* buffer, off_t offset, usize bytes)        = 0;
+    virtual isize Write(const void* buffer, off_t offset, usize bytes) = 0;
+    virtual ErrorOr<isize> IoCtl(usize request, usize arg)
+    {
+        return Error(ENODEV);
+    }
+    virtual ErrorOr<Path>  ReadLink();
+
     virtual ErrorOr<isize> Truncate(usize size) { return Error(ENOSYS); }
     virtual ErrorOr<void>  Rename(INode* newParent, StringView newName)
     {
         return Error(ENOSYS);
     }
 
-    virtual ErrorOr<void>                Unlink(Ref<DirectoryEntry> entry);
-    virtual ErrorOr<void>                RmDir(Ref<DirectoryEntry> entry)
+    virtual ErrorOr<void> Unlink(Ref<DirectoryEntry> entry);
+    virtual ErrorOr<void> RmDir(Ref<DirectoryEntry> entry)
     {
         return Error(ENOSYS);
     }
-    virtual ErrorOr<void>  Link(PathView path) { return Error(ENOSYS); }
-    virtual ErrorOr<isize> ReadLink(UserBuffer& outBuffer);
 
-    virtual ErrorOr<isize> CheckPermissions(mode_t mask);
+    virtual ErrorOr<isize> CheckPermissions(INodeMode mask);
 
-    virtual ErrorOr<void>  SetOwner(uid_t uid, gid_t gid);
-    virtual ErrorOr<void>  ChangeMode(mode_t mode);
+    virtual ErrorOr<void>  SetOwner(::UserID uid, ::GroupID gid);
+    virtual ErrorOr<void>  ChangeMode(INodeMode mode);
     virtual ErrorOr<void>  UpdateTimestamps(timespec atime = {},
                                             timespec mtime = {},
                                             timespec ctime = {});
     virtual ErrorOr<void>  FlushMetadata() { return Error(ENOSYS); }
 
-    inline bool            Populate()
-    {
-        return true;
-        // return (!m_Populated && IsDirectory()) ? m_Filesystem->Populate()
-        //                                        : true;
-    }
-
   protected:
     INode*            m_Parent;
     String            m_Name;
-    String            m_Target;
     Spinlock          m_Lock;
     Metadata          m_Metadata = {};
 

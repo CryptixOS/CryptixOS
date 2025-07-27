@@ -36,7 +36,7 @@ Fat32FsINode::Fat32FsINode(StringView name, class Filesystem* fs, mode_t mode)
     Fat32DirectoryEntry entry;
     if (S_ISDIR(mode))
     {
-        u32 cluster = 0; // m_Filesystem->AllocateClusters(1);
+        u32 cluster = m_Fat32Fs->AllocateClusters(1);
         if (!cluster)
         {
             errno = ENOSPC;

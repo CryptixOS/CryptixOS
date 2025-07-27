@@ -12,14 +12,16 @@ args = [ '-fsanitize=undefined']
 if arch == 'aarch64'
   args += [
     '-mgeneral-regs-only', '-march=armv8-a+nofp+nosimd',
-    '-mcmodel=small'
+    '-mcmodel=small',
+    '-fno-PIC',
 ]
 endif
 
 ld_args = [
-  '-nostdlib',
-  '-static',
-  '-relocatable',
+  # '-nostdlib',
+  # '-static',
+  # '-relocatable',
+  '-r',
 ]
 
 subdir(arch)

@@ -150,7 +150,7 @@ namespace E1000e
     class Adapter : public NetworkAdapter, PCI::Device
     {
       public:
-        Adapter(PCI::DeviceAddress address)
+        explicit Adapter(PCI::DeviceAddress address)
             : PCI::Device(address)
         {
             m_Bar0 = GetBar(0);
@@ -192,7 +192,7 @@ namespace E1000e
                 rx->Status  = 0;
             }
 
-            auto rx = Pointer(m_RxDescriptors.Raw()).FromHigherHalf();
+            auto rx = Pointer(m_RxDescriptors.Raw()).FromHigherHalf<u64>();
             Write<u32>(Register::eTxDescLow, rx >> 32);
             Write<u32>(Register::eTxDescLow, rx & u32(~0));
 
@@ -346,6 +346,6 @@ static PCI::Driver s_Driver = {
     .Remove = RemoveDevice,
 };
 
-extern "C" bool ModuleInit() { return PCI::RegisterDriver(s_Driver); }
+extern "C" CTOS_EXPORT bool ModuleInit() { return PCI::RegisterDriver(s_Driver); }
 
 MODULE_INIT(e1000e, ModuleInit);

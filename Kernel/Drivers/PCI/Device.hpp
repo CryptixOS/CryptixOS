@@ -88,7 +88,7 @@ namespace PCI
 
     struct Domain
     {
-        Domain() = delete;
+        Domain() = default;
         Domain(u32 id, u8 busStart, u8 busEnd)
             : ID(id)
             , BusStart(busStart)
@@ -111,7 +111,7 @@ namespace PCI
     class Device
     {
       public:
-        Device(const DeviceAddress& address);
+        explicit Device(const DeviceAddress& address);
 
         ErrorOr<void>               Enable();
 

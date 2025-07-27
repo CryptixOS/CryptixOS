@@ -52,6 +52,7 @@ ErrorOr<Ref<DirectoryEntry>> PathResolver::Resolve(bool followLinks)
 ErrorOr<Ref<DirectoryEntry>> PathResolver::Resolve(PathLookupFlags flags)
 {
     Assert(m_State == ResolutionState::eInitialized);
+    m_Flags = flags;
 
     auto view
         = (flags & PathLookupFlags::eParent) ? m_Path.ParentPath() : m_Path;
@@ -73,7 +74,8 @@ ErrorOr<Ref<DirectoryEntry>> PathResolver::Resolve(PathLookupFlags flags)
         m_CurrentSegment = segment;
 
         m_State          = ResolutionState::eTerminated;
-        m_DirectoryEntry = FollowMounts().Value();
+        if (!(segment.IsLast && m_Flags & PathLookupFlags::eMountPoint))
+            m_DirectoryEntry = FollowMounts().Value();
 
         if (segment.Type != PathSegmentType::eRegular)
         {
@@ -83,6 +85,13 @@ ErrorOr<Ref<DirectoryEntry>> PathResolver::Resolve(PathLookupFlags flags)
                 if (flags & PathLookupFlags::eNegativeEntry
                     && m_DirectoryEntry->Lookup(m_Path.BaseName()))
                     return Error(EEXIST);
+
+                if (m_DirectoryEntry && m_DirectoryEntry->IsMountPoint()
+                    && !(m_CurrentSegment.IsLast
+                         && m_Flags & PathLookupFlags::eMountPoint))
+                    m_DirectoryEntry
+                        = m_DirectoryEntry->FollowMounts().Promote();
+
                 return m_DirectoryEntry;
             }
             continue;
@@ -104,6 +113,10 @@ ErrorOr<Ref<DirectoryEntry>> PathResolver::Resolve(PathLookupFlags flags)
     if (flags & PathLookupFlags::eNegativeEntry && m_DirectoryEntry
         && m_DirectoryEntry->Lookup(m_Path.BaseName()))
         return Error(EEXIST);
+
+    if (m_DirectoryEntry && m_DirectoryEntry->IsMountPoint()
+        && !(m_CurrentSegment.IsLast && m_Flags & PathLookupFlags::eMountPoint))
+        m_DirectoryEntry = m_DirectoryEntry->FollowMounts().Promote();
     return m_DirectoryEntry;
 }
 
@@ -111,6 +124,7 @@ ErrorOr<void> PathResolver::Step()
 {
     m_Parent         = m_DirectoryEntry;
     m_DirectoryEntry = m_DirectoryEntry->Lookup(m_CurrentSegment.Name);
+
     m_BaseName       = Path(m_CurrentSegment.Name);
     if (!m_DirectoryEntry) return Terminate(ENOENT);
 
@@ -124,6 +138,10 @@ ErrorOr<void> PathResolver::Step()
         return {};
     }
 
+    while (
+        m_DirectoryEntry && m_DirectoryEntry->IsMountPoint()
+        && !(m_CurrentSegment.IsLast && m_Flags & PathLookupFlags::eMountPoint))
+        m_DirectoryEntry = m_DirectoryEntry->FollowMounts().Promote();
     if (m_DirectoryEntry->IsSymlink())
     {
         auto result = FollowSymlinks();
@@ -151,7 +169,6 @@ ErrorOr<Ref<DirectoryEntry>> PathResolver::FollowDown()
     m_CurrentSegment = segment;
 
     m_State          = ResolutionState::eTerminated;
-    m_DirectoryEntry = FollowMounts().Value();
 
     if (segment.Type != PathSegmentType::eRegular)
     {
@@ -188,7 +205,7 @@ ErrorOr<Ref<DirectoryEntry>> PathResolver::FollowSymlink()
         return Error(ELOOP);
 
     auto inode  = m_DirectoryEntry->INode();
-    auto target = inode->GetTarget();
+    auto target = TryOrRet(inode->ReadLink());
     if (target.Empty()) return m_DirectoryEntry;
 
     auto parent  = m_DirectoryEntry->Parent().Promote();
@@ -206,10 +223,11 @@ Ref<DirectoryEntry> PathResolver::FollowDots()
 
     if (m_CurrentSegment.IsLast)
     {
-        m_State          = ResolutionState::eFinished;
-        m_Parent         = m_DirectoryEntry->GetEffectiveParent().Promote();
-        m_DirectoryEntry = m_DirectoryEntry->FollowMounts().Promote();
-        m_BaseName       = m_DirectoryEntry->Name();
+        m_State  = ResolutionState::eFinished;
+        m_Parent = m_DirectoryEntry->GetEffectiveParent().Promote();
+        if (!(m_Flags & PathLookupFlags::eMountPoint))
+            m_DirectoryEntry = m_DirectoryEntry->FollowMounts().Promote();
+        m_BaseName = m_DirectoryEntry->Name();
     }
     else if (m_Position == static_cast<isize>(m_Tokens.Size() - 1))
         m_State = ResolutionState::eLast;

@@ -89,9 +89,10 @@ class Process
         // TODO(v1tr10l7): What should we return, if there is no parent??
         return 0;
     }
-    inline Process*           Parent() const { return m_Parent; }
-    inline pid_t              Pid() const { return m_Pid; }
-    inline StringView         Name() const { return m_Name; }
+    inline Process*   Parent() const { return m_Parent; }
+    inline pid_t      Pid() const { return m_Pid; }
+    inline StringView Name() const { return m_Name; }
+    constexpr bool    IsSuperUser() const { return m_Credentials.euid == 0; }
     inline const Credentials& Credentials() const { return m_Credentials; }
     inline Optional<i32>      Status() const { return m_Status; }
 
@@ -135,7 +136,8 @@ class Process
     i32            CloseFd(i32 fd);
     ErrorOr<isize> OpenPipe(i32* pipeFds);
     inline bool    IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
-    inline Ref<FileDescriptor> GetFileHandle(i32 fd)
+    ErrorOr<Ref<FileDescriptor>> GetFileDescriptor(isize fdNum);
+    inline Ref<FileDescriptor>   GetFileHandle(i32 fd)
     {
         return m_FdTable.GetFd(fd);
     }
@@ -157,8 +159,8 @@ class Process
     String              m_Name        = "?";
 
     struct Credentials  m_Credentials = {};
-    class TTY*          m_TTY;
-    PrivilegeLevel      m_Ring = PrivilegeLevel::eUnprivileged;
+    class TTY*          m_TTY         = nullptr;
+    PrivilegeLevel      m_Ring        = PrivilegeLevel::eUnprivileged;
     Optional<i32>       m_Status;
     bool                m_Exited     = false;
 

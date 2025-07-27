@@ -17,8 +17,9 @@
 #include <Prism/Memory/Memory.hpp>
 #include <Prism/Memory/Pointer.hpp>
 #include <Prism/Memory/Ref.hpp>
+#include <Prism/Memory/WeakRef.hpp>
 
-class AddressSpace
+class AddressSpace : public NonCopyable<AddressSpace>
 {
   public:
     AddressSpace();
@@ -35,16 +36,15 @@ class AddressSpace
     Ref<Region> Find(Pointer virt) const;
     bool        Contains(Pointer virt) const { return Find(virt) != nullptr; }
 
-    inline Ref<Region> operator[](Pointer virt)
-    {
-        return m_RegionTree[virt.Raw()];
-    }
-    void Clear();
+    inline Ref<Region> operator[](Pointer virt) { return m_RegionTree[virt]; }
+    void               Clear();
 
-    auto begin() { return m_RegionTree.begin(); }
-    auto end() { return m_RegionTree.end(); }
+    auto               begin() { return m_RegionTree.begin(); }
+    auto               end() { return m_RegionTree.end(); }
 
-    RedBlackTree<uintptr_t, Ref<Region>> m_RegionTree;
+    RedBlackTree<Pointer, Ref<Region>> m_RegionTree;
+
+    void                               Dump();
 
   private:
     Spinlock     m_Lock;

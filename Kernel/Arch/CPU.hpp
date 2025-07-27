@@ -8,6 +8,7 @@
 
 #include <Memory/VMM.hpp>
 #include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
 
 #include <Time/TimeStep.hpp>
 
@@ -55,35 +56,46 @@ namespace CPU
     };
 
     template <typename F, typename... Args>
-        requires(!std::same_as<std::invoke_result_t<F, Args...>, void>)
+        requires(!SameAs<Prism::InvokeResultType<F, Args...>, void>)
     inline decltype(auto) AsUser(F&& f, Args&&... args)
     {
         UserMemoryProtectionGuard guard;
 
-        return f(std::forward<Args>(args)...);
+        return f(Forward<Args>(args)...);
     }
     template <typename T>
         requires(!SameAs<T, void>)
-    inline constexpr decltype(auto) CopyFromUser(const T& value)
+    inline decltype(auto) CopyFromUser(const T& value)
     {
         UserMemoryProtectionGuard guard;
 
         return value;
     }
+    inline Path CopyStringFromUser(const char* string)
+    {
+        return AsUser([string]() -> Path { return string; });
+    }
+
     template <typename T>
         requires(!SameAs<T, void>)
-    inline constexpr void CopyToUser(T* userBuffer, const T& value)
+    inline void CopyToUser(T* userBuffer, const T& value)
     {
         UserMemoryProtectionGuard guard;
 
         *userBuffer = value;
+    }
+    inline void CopyStringToUser(StringView source, char* dest)
+    {
+        UserMemoryProtectionGuard guard;
+
+        source.Copy(dest, source.Size());
     }
 
     template <typename F, typename... Args>
     inline static void AsUser(F&& f, Args&&... args)
     {
         UserMemoryProtectionGuard guard;
-        f(std::forward<Args>(args)...);
+        f(Forward<Args>(args)...);
     }
 
     bool DuringSyscall();

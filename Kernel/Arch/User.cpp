@@ -17,7 +17,7 @@ namespace Arch
         Assert(!InUserRange(src, count));
         CPU::UserMemoryProtectionGuard guard;
 
-        std::memcpy(dest.As<void>(), src.As<void>(), count);
+        Memory::Copy(dest.As<void>(), src.As<void>(), count);
         return {};
     }
     ErrorOr<void> CopyFromUser(Pointer dest, Pointer src, usize count)
@@ -26,7 +26,7 @@ namespace Arch
         Assert(!InUserRange(dest, count));
         CPU::UserMemoryProtectionGuard guard;
 
-        std::memcpy(dest.As<void>(), src.As<void>(), count);
+        Memory::Copy(dest.As<void>(), src.As<void>(), count);
         return {};
     }
     ErrorOr<void> FillUser(Pointer buffer, isize value, usize count)
@@ -34,7 +34,7 @@ namespace Arch
         if (!InUserRange(buffer, count)) return Error(EFAULT);
         CPU::UserMemoryProtectionGuard guard;
 
-        std::memset(buffer.As<void>(), value, count);
+        Memory::Fill(buffer.As<void>(), value, count);
         return {};
     }
 }; // namespace Arch

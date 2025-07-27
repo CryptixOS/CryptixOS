@@ -32,15 +32,15 @@ struct [[gnu::packed]] EthernetHeader
 };
 struct [[gnu::packed]] ArpPacket
 {
-    HardwareType HardwareType;
-    ProtocolType ProtocolType;
-    u8           HardwareAddressLength;
-    u8           ProtocolAddressLength;
-    ArpOpCode    OpCode;
-    u8           SourceHardwareAddress[6];
-    u32          SourceIPv4;
-    u8           DestinationHardwareAddress[6];
-    u32          DestIPv4;
+    enum HardwareType HardwareType;
+    enum ProtocolType ProtocolType;
+    u8                HardwareAddressLength;
+    u8                ProtocolAddressLength;
+    ArpOpCode         OpCode;
+    u8                SourceHardwareAddress[6];
+    u32               SourceIPv4;
+    u8                DestinationHardwareAddress[6];
+    u32               DestIPv4;
 };
 
 class NetworkAdapter

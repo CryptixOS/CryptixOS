@@ -25,7 +25,7 @@ class PageMap
 {
   public:
     PageMap();
-    PageMap(Pointer topLevel);
+    explicit PageMap(Pointer topLevel);
 
     void                             operator=(Pointer topLevel);
 

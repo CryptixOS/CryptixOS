@@ -15,7 +15,7 @@
 class TmpFs : public Filesystem
 {
   public:
-    TmpFs(u32 flags);
+    explicit TmpFs(u32 flags);
 
     inline usize GetSize() const { return m_Size; }
     inline usize GetMaxSize() const { return m_MaxSize; }
@@ -31,11 +31,13 @@ class TmpFs : public Filesystem
 
     virtual ErrorOr<void> Stats(statfs& stats) override;
 
+    constexpr usize       FreeINodeCount() const { return m_FreeINodeCount; }
+
   private:
     usize                  m_MaxBlockCount      = 0;
-    usize                  m_FreeBlockCount     = 0;
+    Atomic<usize>          m_UsedBlockCount     = 0;
     usize                  m_MaxINodeCount      = 0;
-    usize                  m_FreeINodeCount     = PMM::PAGE_SIZE << 2;
+    Atomic<usize>          m_FreeINodeCount     = PMM::PAGE_SIZE << 2;
     usize                  m_MaxSize            = 0;
 
     usize                  m_Size               = 0;

@@ -81,12 +81,12 @@ namespace PCI
         }
 
       private:
-        Domain                         m_Domain;
+        Domain                         m_Domain{};
         AccessMechanism*               m_AccessMechanism = nullptr;
-        Vector<Bus*>                   m_RootBuses;
+        Vector<Bus*>                   m_RootBuses{};
 
-        Pointer                        m_Address;
-        uacpi_namespace_node*          m_RootNode;
+        Pointer                        m_Address  = nullptr;
+        uacpi_namespace_node*          m_RootNode = nullptr;
 
         static Vector<IrqRoute>        s_IrqRoutes;
 

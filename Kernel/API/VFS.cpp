@@ -5,17 +5,24 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <API/Limits.hpp>
+#include <API/UnixTypes.hpp>
+#include <API/VFS.hpp>
+
 #include <API/Posix/dirent.h>
 #include <API/Posix/fcntl.h>
 #include <API/Posix/sys/mman.h>
-#include <API/UnixTypes.hpp>
-#include <API/VFS.hpp>
+#include <API/Posix/sys/select.h>
+#include <API/Posix/sys/statfs.h>
+#include <API/Posix/time.h>
+#include <API/Posix/utime.h>
 
 #include <Arch/CPU.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 
+#include <Prism/Memory/Scope.hpp>
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Path.hpp>
 #include <Time/Time.hpp>
 
@@ -28,7 +35,8 @@
 
 namespace API::VFS
 {
-    ErrorOr<::VFS::PathResolution> ResolveAtFd(i32 dirFdNum, PathView path,
+    using namespace ::VFS;
+    ErrorOr<::VFS::PathResolution> ResolveAtFd(isize dirFdNum, PathView path,
                                                isize flags)
     {
         auto process = Process::GetCurrent();
@@ -79,7 +87,7 @@ namespace API::VFS
         return res;
     }
 
-    ErrorOr<isize> Read(i32 fdNum, u8* out, usize bytes)
+    ErrorOr<isize> Read(isize fdNum, u8* out, usize bytes)
     {
         Process* current = Process::GetCurrent();
         if (!current->ValidateWrite(out, bytes)) return Error(EFAULT);
@@ -90,7 +98,7 @@ namespace API::VFS
         CPU::UserMemoryProtectionGuard guard;
         return fd->Read(out, bytes);
     }
-    ErrorOr<isize> Write(i32 fdNum, const u8* in, usize bytes)
+    ErrorOr<isize> Write(isize fdNum, const u8* in, usize bytes)
     {
         Process* current = Process::GetCurrent();
         if (!current->ValidateRead(in, bytes)) return Error(EFAULT);
@@ -101,7 +109,7 @@ namespace API::VFS
         CPU::UserMemoryProtectionGuard guard;
         return fd->Write(in, bytes);
     }
-    ErrorOr<isize> Open(PathView path, i32 flags, mode_t mode)
+    ErrorOr<isize> Open(PathView path, isize flags, mode_t mode)
     {
         Process* current = Process::GetCurrent();
         if (!current->ValidateRead(path.Raw(), Limits::MAX_PATH_LENGTH))
@@ -110,7 +118,7 @@ namespace API::VFS
 
         return current->OpenAt(AT_FDCWD, path, flags, mode);
     }
-    ErrorOr<isize> Close(i32 fdNum)
+    ErrorOr<isize> Close(isize fdNum)
     {
         Process* current = Process::GetCurrent();
         return current->CloseFd(fdNum);
@@ -128,7 +136,7 @@ namespace API::VFS
         return API::VFS::FStatAt(AT_FDCWD, path, AT_SYMLINK_NOFOLLOW, out);
     }
 
-    ErrorOr<isize> LSeek(isize fdNum, off_t offset, i32 whence)
+    ErrorOr<isize> LSeek(isize fdNum, off_t offset, isize whence)
     {
         auto process = Process::Current();
         auto fd      = process->GetFileHandle(fdNum);
@@ -149,8 +157,8 @@ namespace API::VFS
             case FIONCLEX: fd->SetCloseOnExec(false); return 0;
             case FIONBIO:
             {
-                i32 nonblocking
-                    = CPU::CopyFromUser(*reinterpret_cast<i32*>(argument));
+                isize nonblocking
+                    = CPU::CopyFromUser(*reinterpret_cast<isize*>(argument));
 
                 auto flags = fd->GetDescriptionFlags();
                 if (nonblocking) flags |= O_NONBLOCK;
@@ -161,8 +169,8 @@ namespace API::VFS
             }
             case FIOASYNC:
             {
-                i32 fasync
-                    = CPU::CopyFromUser(*reinterpret_cast<i32*>(argument));
+                isize fasync
+                    = CPU::CopyFromUser(*reinterpret_cast<isize*>(argument));
 
                 auto flags = fd->GetDescriptionFlags();
                 if (fasync) flags |= FASYNC;
@@ -227,23 +235,20 @@ namespace API::VFS
     ErrorOr<isize> Access(const char* filename, mode_t mode)
     {
         auto process = Process::Current();
-        if (!process->ValidateRead(filename)) return Error(EFAULT);
-        Path path = CPU::AsUser([filename]() -> Path { return filename; });
-        return 0;
+        if (!process->ValidateRead(filename, Limits::MAX_PATH_LENGTH))
+            return Error(EFAULT);
+        Path path = CPU::CopyStringFromUser(filename);
 
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
         if (mode != (mode & S_IRWXO)) return Error(EINVAL);
 
-        auto maybePathRes
-            = ::VFS::ResolvePath(::VFS::RootDirectoryEntry(), path);
-        RetOnError(maybePathRes);
-        auto pathRes = maybePathRes.Value();
+        auto pathRes = TryOrRet(VFS::ResolvePath(nullptr, path));
 
         auto entry   = pathRes.Entry;
-        if (!entry) return Error(errno);
+        if (!entry) return Error(ENOENT);
 
         auto inode = entry->INode();
-        if (!inode) return Error(errno);
+        if (!inode) return Error(ENOENT);
 
         auto status = inode->CheckPermissions(mode);
         if (!status && (mode & S_IWOTH) /* && inode->ReadOnly()*/
@@ -264,6 +269,38 @@ namespace API::VFS
         Process* process = Process::Current();
 
         return process->DupFd(oldFdNum, newFdNum, 0);
+    }
+    ErrorOr<isize> FCntl(isize fdNum, isize op, pointer arg)
+    {
+        Process*            current = Process::GetCurrent();
+        Ref<FileDescriptor> fd = TryOrRet(current->GetFileDescriptor(fdNum));
+
+        bool                cloExec = true;
+        switch (op)
+        {
+            case F_DUPFD: cloExec = false; CTOS_FALLTHROUGH;
+            case F_DUPFD_CLOEXEC:
+            {
+                isize newFdNum = -1;
+                for (newFdNum = arg; current->GetFileHandle(newFdNum);
+                     newFdNum++);
+                return API::VFS::Dup3(fdNum, newFdNum, cloExec ? O_CLOEXEC : 0);
+            }
+            case F_GETFD: return fd->GetFlags();
+            case F_SETFD:
+                if (!fd) return Error(EBADF);
+                fd->SetFlags(arg);
+                break;
+            case F_GETFL: return fd->GetDescriptionFlags();
+            case F_SETFL:
+                if (arg & O_ACCMODE) return Error(EINVAL);
+                fd->SetDescriptionFlags(arg);
+                break;
+
+            default: return Error(EINVAL);
+        }
+
+        return 0;
     }
 
     ErrorOr<isize> Truncate(PathView path, off_t length)
@@ -292,7 +329,7 @@ namespace API::VFS
 
         return inode->Truncate(length);
     }
-    ErrorOr<isize> FTruncate(i32 fdNum, off_t length)
+    ErrorOr<isize> FTruncate(isize fdNum, off_t length)
     {
         if (length < 0) return Error(EINVAL);
         Process*            current = Process::GetCurrent();
@@ -408,7 +445,7 @@ namespace API::VFS
         if (!current->ValidateRead(pathname, Limits::MAX_PATH_LENGTH))
             return Error(EFAULT);
 
-        auto path = CPU::AsUser([pathname]() -> Path { return pathname; });
+        auto path = CPU::CopyStringFromUser(pathname);
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
         return current->OpenAt(AT_FDCWD, path, O_CREAT | O_WRONLY | O_TRUNC,
@@ -429,25 +466,70 @@ namespace API::VFS
     }
     ErrorOr<isize> ChMod(const char* path, mode_t mode)
     {
-        return FChModAt(AT_FDCWD, path, mode);
+        return FChModAt(AT_FDCWD, path, mode, 0);
+    }
+    ErrorOr<isize> FChMod(isize fdNum, mode_t mode)
+    {
+        return FChModAt(fdNum, ".", mode, 0);
     }
 
-    ErrorOr<isize> Mount(const char* path, const char* target,
+    ErrorOr<isize> Mount(const char* pathname, const char* targetPath,
                          const char* filesystemType, usize flags,
                          const void* data)
     {
         Process* current = Process::GetCurrent();
-        CtosUnused(current);
-        auto getString = [](const char* string) -> String
-        { return CPU::AsUser([string]() -> String { return string; }); };
+        if (!current->IsSuperUser()) return ErrorCode(EPERM);
 
-        auto success = ::VFS::Mount(nullptr, getString(path), getString(target),
-                                    getString(filesystemType), flags, data);
+        if (pathname
+            && !current->ValidateRead(pathname, Limits::MAX_PATH_LENGTH))
+            return Error(EFAULT);
+        if (!current->ValidateRead(targetPath, Limits::MAX_PATH_LENGTH))
+            return Error(EFAULT);
+        if (!current->ValidateRead(filesystemType, 255)) return Error(EFAULT);
+        if (data && !current->ValidateRead(data, PMM::PAGE_SIZE))
+            return Error(EFAULT);
 
-        if (!success) return Error(errno);
+        Path source = pathname ? CPU::CopyStringFromUser(pathname) : ""_p;
+        Path target = targetPath ? CPU::CopyStringFromUser(targetPath) : ""_p;
+        if (target.Empty()) return Error(ENOENT);
+
+        if (!filesystemType) return Error(EINVAL);
+        String fsType = CPU::CopyStringFromUser(filesystemType).StrView();
+        if (fsType.Empty()) return ErrorCode(ENODEV);
+
+        Scope<u8[]> options = new u8[CPU::CopyStringFromUser(
+                                         reinterpret_cast<const char*>(data))
+                                         .Size()];
+
+        LogDebug("VFS: Mounting `{}`({}) at `{}`", source, fsType, target);
+        auto mountPoint = TryOrRet(::VFS::Mount(nullptr, source, target, fsType,
+                                                flags, options.Raw()));
+
         return 0;
     }
 
+    CTOS_NO_SANITIZE("alignment")
+    ErrorOr<isize> GetDEnts64(isize fdNum, dirent* const outBuffer, usize count)
+    {
+        auto current = Process::Current();
+        if (!outBuffer
+            || !current->ValidateRead(outBuffer, Limits::MAX_PATH_LENGTH))
+            return Error(EFAULT);
+
+        Ref<FileDescriptor> fd = TryOrRet(current->GetFileDescriptor(fdNum));
+        LogDebug("SysGetDents64: {{ Path: {} }}", fd->DirectoryEntry()->Path());
+
+        CPU::UserMemoryProtectionGuard guard;
+        return fd->GetDirEntries(outBuffer, count);
+    }
+    ErrorOr<isize> OpenAt(isize dirFdNum, const char* pathname, isize flags,
+                          mode_t mode)
+    {
+        Process* current = Process::GetCurrent();
+        Path     path    = CPU::CopyStringFromUser(pathname);
+
+        return current->OpenAt(dirFdNum, path, flags, mode);
+    }
     ErrorOr<isize> MkDirAt(isize dirFdNum, const char* pathname, mode_t mode)
     {
         auto process = Process::Current();
@@ -461,14 +543,27 @@ namespace API::VFS
                 return pathname;
             });
 
-        auto         pathRes   = TryOrRet(ResolveAtFd(dirFdNum, path, 0));
-        auto         directory = pathRes.Entry;
+        auto pathRes   = TryOrRet(ResolveAtFd(dirFdNum, path, 0));
+        auto directory = pathRes.Parent;
+        auto baseName  = pathRes.BaseName;
 
-        PathResolver resolver(directory, path);
-        directory = TryOrRet(resolver.Resolve(
-            PathLookupFlags::eParent | PathLookupFlags::eNegativeEntry));
+        return ::VFS::CreateDirectory(directory, baseName, mode);
+    }
+    ErrorOr<isize> MkNodAt(isize dirFdNum, const char* pathname, mode_t mode,
+                           dev_t dev)
+    {
+        auto process = Process::Current();
+        if (!process->ValidateRead(pathname, 255)) return Error(EFAULT);
 
-        return ::VFS::CreateDirectory(directory, path.BaseName(), mode);
+        auto getPath = [](const char* path) -> Path
+        { return CPU::AsUser([path]() -> Path { return path; }); };
+
+        auto path      = getPath(pathname);
+        auto pathRes   = TryOrRet(ResolveAtFd(dirFdNum, path, 0));
+        auto directory = pathRes.Parent;
+        auto baseName  = pathRes.BaseName;
+
+        return ::VFS::CreateNode(directory, baseName, mode, dev);
     }
     ErrorOr<isize> ReadLinkAt(isize dirFdNum, const char* pathView,
                               char* outBuffer, usize bufferSize)
@@ -482,35 +577,38 @@ namespace API::VFS
 
         auto entry   = pathRes.Entry;
         if (!entry) return Error(ENOENT);
-        auto inode = entry->INode();
+        auto inode     = entry->INode();
 
-        auto userBufferSuccess
-            = UserBuffer::ForUserBuffer(outBuffer, bufferSize);
-        if (!userBufferSuccess) return Error(userBufferSuccess.Error());
-        auto userBuffer = userBufferSuccess.Value();
+        auto linkValue = TryOrRet(inode->ReadLink());
+        CPU::AsUser(
+            [&]()
+            {
+                Memory::Copy(outBuffer, linkValue.Raw(),
+                             Min(linkValue.Size(), bufferSize));
+            });
 
-        auto success    = inode->ReadLink(userBuffer);
-        if (!success) return Error(success.Error());
-
-        return success.Value();
+        return 0;
     }
-    ErrorOr<isize> FChModAt(isize dirFdNum, PathView pathView, mode_t mode)
+    ErrorOr<isize> FChModAt(isize dirFdNum, const char* pathView, mode_t mode,
+                            isize flags)
     {
-        Path path      = CPU::AsUser([pathView]() -> Path { return pathView; });
-        auto pathResOr = ResolveAtFd(dirFdNum, path, mode);
-        RetOnError(pathResOr);
-        auto pathRes = pathResOr.Value();
+        Path path    = CPU::CopyStringFromUser(pathView);
+        auto pathRes = TryOrRet(ResolveAtFd(dirFdNum, path, mode));
 
         auto entry   = pathRes.Entry;
         if (!entry) return Error(ENOENT);
 
-        auto inode = entry->INode();
-        auto ret   = inode->ChangeMode(mode);
+        auto process = Process::Current();
 
-        RetOnError(ret);
-        ret = inode->FlushMetadata();
-        RetOnError(ret);
+        auto inode   = entry->INode();
+        if (!process->IsSuperUser()
+            && process->Credentials().uid != inode->UserID())
+            return Error(EPERM);
+        // TODO(v1tr10l7): Validate group id
 
+        RetOnError(inode->ChangeMode(mode));
+        // TODO(v1tr10l7): don't flush metadata immediately
+        RetOnError(inode->FlushMetadata());
         return 0;
     }
     ErrorOr<isize> PSelect6(isize fdCount, fd_set* readFds, fd_set* writeFds,
@@ -668,11 +766,25 @@ namespace API::VFS
 
         auto oldPathName = getPath(oldPath);
         auto newPathName = getPath(newPath);
+        LogTrace("VFS::LinkAt Entry => linking `{}` to `{}`...", oldPathName,
+                 newPathName);
 
-        auto entry = ::VFS::Link(nullptr, oldPathName, nullptr, newPathName, 0);
-        if (!entry) return Error(errno);
+        auto oldPathRes  = TryOrRet(ResolveAtFd(oldDirFdNum, oldPath, 0));
+        auto newPathRes  = TryOrRet(ResolveAtFd(newDirFdNum, newPath, 0));
 
-        return 0;
+        auto oldParent   = oldPathRes.Parent;
+        auto newParent   = newPathRes.Parent;
+
+        auto oldBaseName = oldPathRes.BaseName;
+        auto newBaseName = newPathRes.BaseName;
+
+        auto err
+            = ::VFS::Link(oldParent, oldBaseName, newParent, newBaseName, 0);
+        if (!err)
+            LogError("VFS: Failed to link `{}` to `{}`, err => {}", oldPathName,
+                     newPathName, StringUtils::ToString(err.Error()));
+
+        return err;
     }
     ErrorOr<isize> SymlinkAt(const char* targetPath, isize newDirFdNum,
                              const char* linkPath)
@@ -680,16 +792,14 @@ namespace API::VFS
         auto getPath = [](const char* path) -> Path
         { return CPU::AsUser([path]() -> Path { return path; }); };
 
-        auto         target    = getPath(targetPath);
-        auto         link      = getPath(linkPath);
+        auto target    = getPath(targetPath);
+        auto link      = getPath(linkPath);
 
-        auto         pathRes   = TryOrRet(ResolveAtFd(newDirFdNum, link, 0));
-        auto         directory = pathRes.Entry;
+        auto pathRes   = TryOrRet(ResolveAtFd(newDirFdNum, link, 0));
+        auto directory = pathRes.Parent;
+        auto baseName  = pathRes.BaseName;
 
-        PathResolver resolver(directory, link);
-        directory = TryOrRet(resolver.Resolve(PathLookupFlags::eParent));
-
-        return ::VFS::Symlink(directory, link.BaseName(), target);
+        return ::VFS::Symlink(directory, baseName, target);
     }
 
     ErrorOr<isize> UtimensAt(i64 dirFdNum, const char* pathname,
@@ -793,84 +903,3 @@ namespace API::VFS
         return 0;
     }
 }; // namespace API::VFS
-
-namespace Syscall::VFS
-{
-    using Syscall::Arguments;
-    using namespace ::VFS;
-
-    ErrorOr<isize> SysFcntl(Arguments& args)
-    {
-        i32                 fdNum   = static_cast<i32>(args.Args[0]);
-        i32                 op      = static_cast<i32>(args.Args[1]);
-        uintptr_t           arg     = reinterpret_cast<uintptr_t>(args.Args[2]);
-
-        Process*            current = Process::GetCurrent();
-        Ref<FileDescriptor> fd      = current->GetFileHandle(fdNum);
-        if (!fd) return Error(EBADF);
-
-        bool cloExec = true;
-        switch (op)
-        {
-            case F_DUPFD: cloExec = false;
-            case F_DUPFD_CLOEXEC:
-            {
-                isize newFdNum = -1;
-                for (newFdNum = arg; current->GetFileHandle(newFdNum);
-                     newFdNum++);
-                return API::VFS::Dup3(fdNum, newFdNum, cloExec ? O_CLOEXEC : 0);
-            }
-            case F_GETFD: return fd->GetFlags();
-            case F_SETFD:
-                if (!fd) return Error(EBADF);
-                fd->SetFlags(arg);
-                break;
-            case F_GETFL: return fd->GetDescriptionFlags();
-            case F_SETFL:
-                if (arg & O_ACCMODE) return Error(EINVAL);
-                fd->SetDescriptionFlags(arg);
-                break;
-
-            default:
-                LogError("Syscall::VFS::SysFcntl: Unknown opcode");
-                return Error(EINVAL);
-        }
-
-        return 0;
-    }
-
-    [[clang::no_sanitize("alignment")]] ErrorOr<isize>
-    SysGetDents64(Arguments& args)
-    {
-        u32           fdNum     = static_cast<u32>(args.Args[0]);
-        dirent* const outBuffer = reinterpret_cast<dirent* const>(args.Args[1]);
-        u32           count     = static_cast<u32>(args.Args[2]);
-
-        Process*      current   = Process::GetCurrent();
-        if (!outBuffer
-            || !current->ValidateRead(outBuffer, Limits::MAX_PATH_LENGTH))
-            return Error(EFAULT);
-
-        Ref<FileDescriptor> fd = current->GetFileHandle(fdNum);
-        if (!fd) return Error(EBADF);
-
-        LogDebug("SysGetDents64: {{ Path: {} }}", fd->DirectoryEntry()->Path());
-
-        CPU::UserMemoryProtectionGuard guard;
-        return fd->GetDirEntries(outBuffer, count);
-    }
-
-    ErrorOr<isize> SysOpenAt(Arguments& args)
-    {
-        Process* current = Process::GetCurrent();
-
-        i32      dirFd   = static_cast<i32>(args.Args[0]);
-        PathView path;
-        CPU::AsUser([&path, &args]()
-                    { path = reinterpret_cast<const char*>(args.Args[1]); });
-        i32    flags = static_cast<i32>(args.Args[2]);
-        mode_t mode  = static_cast<mode_t>(args.Args[3]);
-
-        return current->OpenAt(dirFd, path, flags, mode);
-    }
-}; // namespace Syscall::VFS

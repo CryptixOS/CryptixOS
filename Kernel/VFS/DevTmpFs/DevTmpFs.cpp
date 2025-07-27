@@ -4,11 +4,11 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Time/Time.hpp>
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/DevTmpFs/DevTmpFsINode.hpp>
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/VFS.hpp>
-#include <Time/Time.hpp>
 
 UnorderedMap<dev_t, Device*> DevTmpFs::s_Devices{};
 
@@ -70,4 +70,11 @@ bool DevTmpFs::RegisterDevice(Device* device)
 
     s_Devices[device->ID()] = device;
     return true;
+}
+Device* DevTmpFs::Lookup(dev_t id)
+{
+    auto device = s_Devices.Find(id);
+    if (device != s_Devices.end()) return device->Value;
+
+    return nullptr;
 }

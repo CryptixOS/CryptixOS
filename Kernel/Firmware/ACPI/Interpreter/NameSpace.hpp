@@ -15,7 +15,7 @@ namespace ACPI
     class NameSpace
     {
       public:
-        NameSpace(StringView name, NameSpace* parent = nullptr);
+        explicit NameSpace(StringView name, NameSpace* parent = nullptr);
         void                                 Dump(usize tabs = 0);
 
         NameSpace*                           Insert(StringView name);

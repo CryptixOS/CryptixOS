@@ -16,7 +16,7 @@ class Ext2FsINode;
 class Ext2Fs : public Filesystem
 {
   public:
-    Ext2Fs(u32 flags)
+    explicit Ext2Fs(u32 flags)
         : Filesystem("Ext2Fs", flags)
     {
     }
@@ -49,13 +49,13 @@ class Ext2Fs : public Filesystem
                      usize count);
 
   private:
-    INode*            m_Device = nullptr;
+    INode*            m_Device                     = nullptr;
     // u64               m_DeviceID;
 
-    Ext2FsSuperBlock* m_SuperBlock;
-    usize             m_BlockSize;
-    usize             m_FragmentSize;
-    usize             m_BlockGroupDescriptionCount;
+    Ext2FsSuperBlock* m_SuperBlock                 = nullptr;
+    usize             m_BlockSize                  = 0;
+    usize             m_FragmentSize               = 0;
+    usize             m_BlockGroupDescriptionCount = 0;
     friend class Ext2FsAllocator;
     Ext2FsAllocator m_Allocator;
 

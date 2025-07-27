@@ -11,27 +11,42 @@
 //--------------------------------------------------------------------------
 
 #define CTOS_SECTION(name, ...)                                                \
-    [[gnu::section(name) __VA_OPT__(, ) __VA_ARGS__]]
+    [[CTOS_ATTR_PREFIX::section(name) __VA_OPT__(, ) __VA_ARGS__]]
 
-#define CTOS_ALWAYS_INLINE             [[gnu::always_inline]]
+#ifdef __clang__
+    #define CTOS_ATTR_PREFIX gnu
+    #define CTOS_COMPILER_CLANG
+    #define CTOS_COMPILER_NAME_STR "clang"
+#elifdef __GNUC__
+    #define CTOS_ATTR_PREFIX gnu
+    #define CTOS_COMPILER_GCC
+    #define CTOS_COMPILER_NAME_STR "gcc"
+#else
+    #error "Unsupported compiler"
+#endif
+
+#define CTOS_ATTRIBUTE(name)           [[CTOS_ATTR_PREFIX::name]]
+#define CTOS_ALWAYS_INLINE             CTOS_ATTRIBUTE(always_inline)
 #define CTOS_UNUSED                    [[maybe_unused]]
-#define CTOS_FORCE_EMIT                [[gnu::used]]
+#define CTOS_FORCE_EMIT                [[CTOS_ATTR_PREFIX::used]]
 #define CTOS_FALLTHROUGH               [[fallthrough]]
 #define CTOS_NORETURN                  [[noreturn]]
 #define CTOS_NODISCARD                 [[nodiscard]]
 #define CTOS_WEAK                      [[weak]]
 #define CTOS_LIKELY                    [[likely]]
 #define CTOS_UNLIKELY                  [[unlikely]]
-#define CTOS_PACKED                    [[packed]]
+#define CTOS_PACKED                    [[gnu::packed]]
 #define CTOS_PACKED_ALIGNED(alignment) [[gnu::packed, gnu::aligned(alignment)]]
 
-#define CTOS_SECTION_FORCE_EMIT(name, ...)                                     \
-    CTOS_SECTION(name, gnu::used __VA_OPT__(, ) __VA_ARGS__)
+#define CTOS_NO_SANITIZE(name)         [[clang::no_sanitize(name)]]
 
-#define CTOS_CDECL               __attribute__(("cdecl"))
-#define CTOS_FASTCALL            __attribute__(("fastcall"))
-#define CTOS_SYSVABI             __attribute__(("sysv_abi"))
-#define CTOS_NAKED               __attribute__(("naked"))
+#define CTOS_SECTION_FORCE_EMIT(name, ...)                                     \
+    CTOS_SECTION(name, CTOS_ATTR_PREFIX::used __VA_OPT__(, ) __VA_ARGS__)
+
+#define CTOS_CDECL               CTOS_ATTRIBUTE(cdecl)
+#define CTOS_FASTCALL            CTOS_ATTRIBUTE(rastcall)
+#define CTOS_SYSVABI             CTOS_ATTRIBUTE(sysv_abi)
+#define CTOS_NAKED               CTOS_ATTRIBUTE(naked)
 
 #define CTOS_EXPORT              __attribute__((visibility("default")))
 

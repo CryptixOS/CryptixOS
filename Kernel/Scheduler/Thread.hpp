@@ -135,8 +135,8 @@ struct Thread
 
     Spinlock    m_Lock;
     tid_t       m_Tid;
-    ThreadState m_State = ThreadState::eIdle;
-    errno_t     m_ErrorCode;
+    ThreadState m_State     = ThreadState::eIdle;
+    errno_t     m_ErrorCode = no_error;
     Process*    m_Parent;
     Pointer     m_StackVirt;
 

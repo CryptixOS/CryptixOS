@@ -23,6 +23,8 @@ constexpr u16   SIGNATURE        = 0xaa55;
 
 struct [[gnu::packed]] MasterBootRecord
 {
+    MasterBootRecord() = default;
+
     u8       Code[446];
     MBREntry PartitionEntries[4];
     u16      Signature;

@@ -303,6 +303,9 @@ namespace System
         lookup.Bind<LookupKernelSymbol>();
         status = image->ApplyRelocations(lookup);
         image->ForEachSymbolEntry(it);
+        module->Initialize = image->EntryPoint().Raw<ModuleInitProc>();
+        LogInfo("System: Found module's init entry point => {:#x}",
+                image->EntryPoint().Raw());
 
         // image->ForEachSymbolEntry(it);
         // status = image->ResolveSymbols(lookup);
