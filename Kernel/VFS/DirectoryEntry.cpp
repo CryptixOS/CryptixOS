@@ -178,16 +178,18 @@ DirectoryEntry::TraverseDirectories(::Ref<class DirectoryEntry> parent,
 ErrorOr<void> DirectoryEntry::PopulateDirectoryEntries()
 {
     if (m_Populated) return {};
+    if (!INode()) return Error(ENOENT);
 
     DirectoryIterator iterator;
     iterator.BindLambda(
         [this](StringView name, loff_t offset, usize ino, u64 type) -> bool
         {
-            if (!m_Children.Contains(name)) Lookup(name);
+            Lookup(name);
 
             return true;
         });
 
+    INode()->TraverseDirectories(nullptr, iterator);
     m_Populated = true;
     return {};
 }

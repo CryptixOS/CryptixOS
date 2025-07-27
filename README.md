@@ -147,6 +147,9 @@ To run CryptixOS in QEMU:
 - ✅ Kernel Module Loader
 
 ### 💾 Storage
+- ✅ MBR
+- ⬜ EBR
+- ✅ GPT
 - ✅ NVMe
 - ⬜ AHCI
 - ⬜ SCSI
