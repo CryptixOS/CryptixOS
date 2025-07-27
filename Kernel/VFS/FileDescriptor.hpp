@@ -161,6 +161,7 @@ class FileDescriptor : public RefCounted
     i32                      m_DescriptionFlags = 0;
 
     DirectoryEntries         m_DirEntries;
+    DirectoryEntry::Iterator m_DirectoryIterator;
 
     inline DirectoryEntries& GetDirEntries() { return m_DirEntries; }
     bool                     GenerateDirEntries();

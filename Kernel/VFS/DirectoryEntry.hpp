@@ -6,13 +6,17 @@
  */
 #pragma once
 
+#include <API/Posix/sys/stat.h>
 #include <Library/Locking/Spinlock.hpp>
 
 #include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Core/Error.hpp>
+
 #include <Prism/Memory/Ref.hpp>
 #include <Prism/Memory/WeakRef.hpp>
 
 #include <Prism/String/String.hpp>
+#include <Prism/Utility/Delegate.hpp>
 #include <Prism/Utility/Path.hpp>
 
 class INode;
@@ -83,13 +87,28 @@ class DirectoryEntry : public RefCounted
     ::WeakRef<DirectoryEntry> FollowSymlinks(usize cnt = 0);
 
     WeakRef<DirectoryEntry>   GetEffectiveParent();
-    ::Ref<DirectoryEntry>     Lookup(const String& name);
 
-    bool                      IsMountPoint() const;
-    bool                      IsDirectory() const;
-    bool                      IsRegular() const;
-    bool                      IsSymlink() const;
-    bool                      IsSpecial() const;
+    using Iterator
+        = UnorderedMap<StringView, ::Ref<class DirectoryEntry>>::Iterator<>;
+    using ConstIterator
+        = UnorderedMap<StringView, ::Ref<class DirectoryEntry>>::ConstIterator;
+    Iterator      begin() { return m_Children.begin(); }
+    ConstIterator begin() const { return m_Children.begin(); }
+    Iterator      end() { return m_Children.end(); }
+    ConstIterator end() const { return m_Children.end(); }
+
+    using DirectoryIterator
+        = Delegate<bool(StringView name, loff_t offset, usize ino, u64 type)>;
+    ErrorOr<void> TraverseDirectories(::Ref<class DirectoryEntry> parent,
+                                      DirectoryIterator           iterator);
+    ::Ref<DirectoryEntry> Lookup(const String& name);
+    ErrorOr<void>         PopulateDirectoryEntries();
+
+    bool                  IsMountPoint() const;
+    bool                  IsDirectory() const;
+    bool                  IsRegular() const;
+    bool                  IsSymlink() const;
+    bool                  IsSpecial() const;
 
   private:
     friend class INode;
@@ -99,6 +118,8 @@ class DirectoryEntry : public RefCounted
     String                    m_Name      = "";
     DirectoryEntryFlags       m_Flags     = DirectoryEntryFlags::eNegative;
     class INode*              m_INode     = nullptr;
+    bool                      m_Populated = false;
+    usize                     m_DirOffset = 0;
 
     ::WeakRef<DirectoryEntry> m_Parent    = nullptr;
     ::Ref<DirectoryEntry>     m_MountGate = nullptr;

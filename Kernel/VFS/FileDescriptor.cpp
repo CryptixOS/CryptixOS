@@ -53,9 +53,10 @@ usize DirectoryEntries::CopyAndPop(u8* out, usize capacity)
 
 FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry, i32 flags,
                                FileAccessMode accMode)
+    : m_DirectoryEntry(dentry)
+    , m_DirectoryIterator(dentry->begin())
 {
-    m_DirectoryEntry = dentry;
-    auto inode       = dentry->INode();
+    auto inode = dentry->INode();
     if (inode) m_File = new File(inode);
 
     m_DescriptionFlags = flags
@@ -226,23 +227,25 @@ bool FileDescriptor::GenerateDirEntries()
     dirEntries.Clear();
 
     auto current = DirectoryEntry()->FollowMounts()->FollowSymlinks();
+    auto success = current->PopulateDirectoryEntries();
+    if (!success) return success.Error();
 
-    auto iterator
-        = [&](StringView name, loff_t offset, usize ino, usize type) -> bool
+    if (m_DirectoryIterator == current->end())
+        m_DirectoryIterator = current->begin();
+    for (; m_DirectoryIterator != current->end();
+         m_DirectoryIterator++, m_Offset++)
     {
-        dirEntries.Push(name, offset, ino, type);
-        if (StringView(DirectoryEntry()->Path().Raw()).StartsWith("/mnt"))
-            LogTrace("name: => {}, path => {}", name, DirectoryEntry()->Path());
+        auto entry = m_DirectoryIterator->Value;
+        auto inode = entry->INode();
+        if (!inode) continue;
 
-        return true;
-    };
-    (void)iterator;
-    Delegate<bool(StringView, loff_t, usize, usize)> delegate;
-    delegate.BindLambda(iterator);
-
-    auto inode  = current->INode();
-    auto result = inode->TraverseDirectories(current.Promote(), delegate);
-    CtosUnused(result);
+        auto   name  = entry->Name();
+        auto   stats = inode->Stats();
+        ino_t  ino   = stats.st_ino;
+        mode_t mode  = stats.st_mode;
+        auto   type  = IF2DT(mode);
+        dirEntries.Push(name, m_Offset, ino, type);
+    }
 
     // . && ..
     auto cwd = Process::Current()->CWD();
