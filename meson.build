@@ -295,7 +295,7 @@ root_image = custom_target(
     './Meta/create_image.py',
     '--input', meson.project_source_root() / 'Kernel',
     '--output', '@OUTPUT@',
-    '--partition-table', 'mbr',
+    '--partition-table', 'gpt',
     '--size', '728MiB',
   ],
   depends: ext_mods,
