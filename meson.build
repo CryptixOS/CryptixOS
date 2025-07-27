@@ -39,6 +39,7 @@ include_directories = [
 ### Compiler arguments
 warnings = [
   #'-Wno-error=#warnings',
+  '-Wimplicit-fallthrough',
   '-Wno-builtin-macro-redefined',
   '-Wno-macro-redefined', # clang
   '-Wno-nan-infinity-disabled', # clang 
