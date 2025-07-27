@@ -1,7 +1,147 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/mount.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#define MAX_LINE_LENGTH 1024
+#define MAX_FIELDS      6
+
+struct MountPoint
+{
+    char* Source;         // Device or server
+    char* Target;         // Mount point
+    char* FilesystemType; // Filesystem type
+    char* Options;        // Mount options
+    int   Frequency;      // Dump frequency
+    int   FsckPassNumber; // Fsck pass number
+};
+
+void TrimNewline(char* str)
+{
+    size_t len = strlen(str);
+    if (len && str[len - 1] == '\n') str[len - 1] = '\0';
+}
+void ParseMountOptions(const char* opts, unsigned long& flags, char** fsOptions)
+{
+    flags = 0;
+    if (!opts) return;
+
+    char*  options      = strdup(opts);
+    char*  token        = strtok(options, ",");
+    size_t optionLength = 0;
+
+    fsOptions[0]        = NULL;
+
+    while (token)
+    {
+        if (!strcmp(token, "ro")) flags |= MS_RDONLY;
+        else if (!strcmp(token, "noatime")) flags |= MS_NOATIME;
+        else if (!strcmp(token, "relatime")) flags |= MS_RELATIME;
+        else if (!strcmp(token, "nosuid")) flags |= MS_NOSUID;
+        else if (!strcmp(token, "nodev")) flags |= MS_NODEV;
+        else if (!strcmp(token, "noexec")) flags |= MS_NOEXEC;
+        else if (!strcmp(token, "sync")) flags |= MS_SYNCHRONOUS;
+        else if (!strcmp(token, "dirsync")) flags |= MS_DIRSYNC;
+        else fsOptions[optionLength++] = strdup(token);
+
+        token = strtok(NULL, ",");
+    }
+
+    fsOptions[optionLength] = NULL;
+    free(options);
+}
+
+int parseMountPoint(const char* line, MountPoint& entry)
+{
+    char* fields[MAX_FIELDS] = {0};
+    char* temp               = strdup(line);
+    char* token              = strtok(temp, " \t");
+    int   fieldCount         = 0;
+
+    while (token && fieldCount < MAX_FIELDS)
+    {
+        fields[fieldCount++] = token;
+        token                = strtok(NULL, " \t");
+    }
+
+    if (fieldCount < 4)
+    {
+        free(temp);
+        return 0; // not enough fields
+    }
+
+    entry.Source         = strdup(fields[0]);
+    entry.Target         = strdup(fields[1]);
+    entry.FilesystemType = strdup(fields[2]);
+    entry.Options        = strdup(fields[3]);
+    entry.Frequency      = (fieldCount >= 5) ? atoi(fields[4]) : 0;
+    entry.FsckPassNumber = (fieldCount >= 6) ? atoi(fields[5]) : 0;
+
+    free(temp);
+    return 1;
+}
+
+void freeMountPoint(MountPoint& entry)
+{
+    free(entry.Source);
+    free(entry.Target);
+    free(entry.FilesystemType);
+    free(entry.Options);
+}
+
+int mountFStab()
+{
+    FILE* file = fopen("/etc/fstab", "r");
+    if (!file)
+    {
+        perror("Failed to open /etc/fstab");
+        return EXIT_FAILURE;
+    }
+
+    char line[MAX_LINE_LENGTH];
+    int  lineNumber = 0;
+
+    while (fgets(line, sizeof(line), file))
+    {
+        lineNumber++;
+        TrimNewline(line);
+
+        // Skip comments and empty lines
+        if (line[0] == '#' || strlen(line) == 0) continue;
+
+        MountPoint entry;
+        if (parseMountPoint(line, entry))
+        {
+            printf("Mount %d:\n", lineNumber);
+            printf("  Source   : %s\n", entry.Source);
+            printf("  Target   : %s\n", entry.Target);
+            printf("  FilesystemType: %s\n", entry.FilesystemType);
+            printf("  Options : %s\n", entry.Options);
+            printf("  Frequency   : %d\n", entry.Frequency);
+            printf("  FsckPassNumber : %d\n\n", entry.FsckPassNumber);
+            int mountStatus = mount(entry.Source, entry.Target,
+                                    entry.FilesystemType, 0, entry.Options);
+            printf("mount status: %d\n", mountStatus);
+            if (mountStatus == -1)
+                fprintf(stderr,
+                        "init: failed to mount `%s` filesystem at `%s`, "
+                        "source: %s, flags: `%s`\nerror code: %s\n",
+                        entry.FilesystemType, entry.Target, entry.Source,
+                        entry.Options, strerror(errno));
+
+            freeMountPoint(entry);
+        }
+        else
+            fprintf(stderr, "Skipping invalid or incomplete line %d\n",
+                    lineNumber);
+    }
+
+    fclose(file);
+    return EXIT_SUCCESS;
+}
 
 int main()
 {
@@ -10,6 +150,10 @@ int main()
     setenv("HOME", "/root", 1);
     setenv("PATH", "/usr/local/bin:/usr/bin:/usr/sbin", 1);
 
+    puts("\e[2JWelcome to CryptixOS!\n");
+    if (mountFStab() != EXIT_SUCCESS)
+        perror("init: failed to mount fstab entries");
+
     const char* path = "/usr/bin/bash";
     if (access(path, X_OK) == -1)
     {
@@ -17,7 +161,6 @@ int main()
         return EXIT_FAILURE;
     }
 
-    puts("\e[2JWelcome to CryptixOS!\n");
     for (;;)
     {
         puts("init: launching shell...\n");
