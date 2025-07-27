@@ -19,14 +19,14 @@
 
 #include <cctype>
 
-constexpr const char*        FAT32_IDENTIFIER_STRING       = "FAT32   ";
-constexpr usize              FAT32_FS_INFO_SIGNATURE       = 0x41615252;
-constexpr usize              FAT32_FS_INFO_OFFSET          = 484;
-constexpr usize              FAT32_REAL_FS_INFO_SIGNATURE  = 0x61417272;
-constexpr usize              FAT32_REAL_FS_INFO_SIGNATURE2 = 0xaa550000;
+constexpr const char*          FAT32_IDENTIFIER_STRING       = "FAT32   ";
+constexpr usize                FAT32_FS_INFO_SIGNATURE       = 0x41615252;
+constexpr usize                FAT32_FS_INFO_OFFSET          = 484;
+constexpr usize                FAT32_REAL_FS_INFO_SIGNATURE  = 0x61417272;
+constexpr usize                FAT32_REAL_FS_INFO_SIGNATURE2 = 0xaa550000;
 
 ErrorOr<::Ref<DirectoryEntry>> Fat32Fs::Mount(StringView  sourcePath,
-                                            const void* data)
+                                              const void* data)
 {
     m_MountData
         = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
@@ -312,6 +312,13 @@ usize Fat32Fs::GetChainSize(u32 cluster)
     }
 
     return count;
+}
+
+u32 Fat32Fs::AllocateCluster() { return AllocateClusters(1); }
+u32 Fat32Fs::AllocateClusters(usize count)
+{
+    ToDoWarn();
+    return 0;
 }
 u32 Fat32Fs::GetNextCluster(u32 cluster)
 {

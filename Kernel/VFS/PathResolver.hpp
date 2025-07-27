@@ -31,6 +31,7 @@ enum class PathLookupFlags
     eParent        = 2,
     eFollowLinks   = 4,
     eNegativeEntry = 8,
+    eMountPoint    = 16,
 };
 constexpr PathLookupFlags operator|(PathLookupFlags lhs, PathLookupFlags rhs)
 {
@@ -101,6 +102,7 @@ class PathResolver
     Vector<String>              m_Tokens;
     isize                       m_Position     = 0;
     isize                       m_SymlinkDepth = 0;
+    PathLookupFlags             m_Flags        = PathLookupFlags::eRegular;
 
     struct Segment
     {

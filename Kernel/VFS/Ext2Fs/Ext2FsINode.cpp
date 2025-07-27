@@ -246,7 +246,7 @@ ErrorOr<void> Ext2FsINode::AddDirectoryEntry(Ext2FsDirectoryEntry& dentry)
     auto  buffer = Pointer(PMM::CallocatePages(pageCount)).ToHigherHalf<u8*>();
     m_Fs->ReadINode(m_Meta, buffer, 0, m_Meta.GetSize());
 
-    usize nameSize  = std::strlen(reinterpret_cast<char*>(dentry.Name));
+    usize nameSize  = StringView(reinterpret_cast<char*>(dentry.Name)).Size();
     usize required  = (sizeof(Ext2FsDirectoryEntry) + nameSize + 3) & ~3;
     dentry.NameSize = nameSize;
 

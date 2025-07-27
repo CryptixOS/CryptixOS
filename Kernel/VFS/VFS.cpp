@@ -270,16 +270,18 @@ namespace VFS
         if (target.Empty()) return Error(EINVAL);
 
         PathResolver targetResolver(parent, target);
-        auto         targetEntry
-            = TryOrRet(targetResolver.Resolve(PathLookupFlags::eRegular));
+        auto         targetEntry = TryOrRet(targetResolver.Resolve(
+            PathLookupFlags::eRegular | PathLookupFlags::eMountPoint));
 
-        bool isRoot = targetEntry == RootDirectoryEntry();
+        bool         isRoot      = targetEntry == RootDirectoryEntry();
         if (!isRoot && !targetEntry->IsDirectory())
         {
             LogError("VFS: '{}' target is not a directory", target);
             return Error(ENOTDIR);
         }
 
+        if (targetEntry->IsMountPoint() || MountPoint::Lookup(targetEntry))
+            return Error(EBUSY);
         Ref<MountPoint> mountPoint = CreateRef<MountPoint>(targetEntry, fs);
         auto            fsRoot     = TryOrRetFmt(
             fs->Mount(sourcePath, data), Error(result.Error()),

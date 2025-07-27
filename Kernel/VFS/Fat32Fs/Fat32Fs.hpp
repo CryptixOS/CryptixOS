@@ -34,6 +34,9 @@ class Fat32Fs final : public Filesystem
 
     bool  ReadBytes(u32 cluster, u8* out, off_t offset, usize bytes);
     usize GetChainSize(u32 cluster);
+
+    u32   AllocateCluster();
+    u32   AllocateClusters(usize count);
     u32   GetNextCluster(u32 cluster);
     u32   SkipCluster(u32 cluster, usize count, bool& endCluster);
 
