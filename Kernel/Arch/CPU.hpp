@@ -65,26 +65,26 @@ namespace CPU
     }
     template <typename T>
         requires(!SameAs<T, void>)
-    inline constexpr decltype(auto) CopyFromUser(const T& value)
+    inline decltype(auto) CopyFromUser(const T& value)
     {
         UserMemoryProtectionGuard guard;
 
         return value;
     }
-    inline constexpr Path CopyStringFromUser(const char* string)
+    inline Path CopyStringFromUser(const char* string)
     {
         return AsUser([string]() -> Path { return string; });
     }
 
     template <typename T>
         requires(!SameAs<T, void>)
-    inline constexpr void CopyToUser(T* userBuffer, const T& value)
+    inline void CopyToUser(T* userBuffer, const T& value)
     {
         UserMemoryProtectionGuard guard;
 
         *userBuffer = value;
     }
-    inline constexpr void CopyStringToUser(StringView source, char* dest)
+    inline void CopyStringToUser(StringView source, char* dest)
     {
         UserMemoryProtectionGuard guard;
 
