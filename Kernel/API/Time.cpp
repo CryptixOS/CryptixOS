@@ -4,8 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <API/Posix/sys/mman.h>
-#include <API/Posix/time.h>
 #include <API/Time.hpp>
 
 #include <Arch/x86_64/Drivers/Timers/RTC.hpp>
@@ -13,14 +11,11 @@
 #include <Scheduler/Process.hpp>
 #include <Time/Time.hpp>
 
-namespace Syscall::Time
+namespace API::Time
 {
-    ErrorOr<i32> SysGetTimeOfDay(Arguments& args)
+    ErrorOr<isize> GetTimeOfDay(struct timeval* tv, struct timezone* tz)
     {
-        timeval*  tv      = reinterpret_cast<timeval*>(args.Args[0]);
-        timezone* tz      = reinterpret_cast<timezone*>(args.Args[1]);
-
-        Process*  current = Process::GetCurrent();
+        Process* current = Process::GetCurrent();
 
         // TODO(v1tr10l7): Provide better abstraction over time management
         if (tv)
@@ -49,14 +44,12 @@ namespace Syscall::Time
 
         return 0;
     }
-    ErrorOr<i32> SysSetTimeOfDay(Arguments& args)
+    ErrorOr<isize> SetTimeOfDay(const struct timeval*  tv,
+                                const struct timezone* tz)
     {
-        timeval*  tv      = reinterpret_cast<timeval*>(args.Args[0]);
-        timezone* tz      = reinterpret_cast<timezone*>(args.Args[1]);
-
         // TODO(v1tr10l7): Check if user has sufficient permissions to set time
         // of day
-        Process*  current = Process::GetCurrent();
+        Process* current = Process::GetCurrent();
         if (tv)
         {
             if (!current->ValidateRead(tv)) return Error(EFAULT);
@@ -80,11 +73,7 @@ namespace Syscall::Time
 
         return Error(ENOSYS);
     }
-} // namespace Syscall::Time
-
-namespace API::Time
-{
-    ErrorOr<isize> SysClockGetTime(clockid_t clockID, timespec* res)
+    ErrorOr<isize> ClockGetTime(clockid_t clockID, timespec* res)
     {
         timespec ts;
 

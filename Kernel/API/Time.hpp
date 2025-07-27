@@ -9,16 +9,11 @@
 #include <API/Syscall.hpp>
 #include <API/UnixTypes.hpp>
 
-#include <cerrno>
-#include <expected>
-
-namespace Syscall::Time
-{
-    ErrorOr<i32> SysGetTimeOfDay(Syscall::Arguments& args);
-    ErrorOr<i32> SysSetTimeOfDay(Syscall::Arguments& args);
-} // namespace Syscall::Time
-
 namespace API::Time
 {
-    ErrorOr<isize> SysClockGetTime(clockid_t id, timespec* res);
-};
+    ErrorOr<isize> GetTimeOfDay(struct timeval* restrict tv,
+                                struct timezone* tz);
+    ErrorOr<isize> SetTimeOfDay(const struct timeval* restrict tv,
+                                const struct timezone* tz);
+    ErrorOr<isize> ClockGetTime(clockid_t id, timespec* res);
+}; // namespace API::Time

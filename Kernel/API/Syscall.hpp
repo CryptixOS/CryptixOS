@@ -168,7 +168,7 @@ namespace Syscall
         eWait4            = 61,
         eKill             = 62,
         eUname            = 63,
-        eFcntl            = 72,
+        eFCntl            = 72,
         eTruncate         = 76,
         eFTruncate        = 77,
         eGetCwd           = 79,

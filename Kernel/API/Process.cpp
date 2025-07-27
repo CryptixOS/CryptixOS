@@ -7,15 +7,17 @@
 #include <API/Posix/sys/mman.h>
 #include <API/Posix/sys/wait.h>
 #include <API/Process.hpp>
-
 #include <Arch/InterruptGuard.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
+#include <Time/Time.hpp>
 
 namespace API::Process
 {
+    using ::Process;
+
     ErrorOr<isize> SigProcMask(i32 how, const sigset_t* newSet,
                                sigset_t* oldSet)
     {
@@ -54,12 +56,65 @@ namespace API::Process
         Scheduler::Yield();
         return 0;
     }
+    ErrorOr<isize> NanoSleep(const timespec* duration, timespec* rem)
+    {
+        LogDebug("SysNanoSleep");
+        auto current = Process::Current();
+        if (!current->ValidateRead(duration, sizeof(timespec))
+            || (rem && !current->ValidateRead(rem, sizeof(timespec))))
+            return Error(EFAULT);
+        if (duration->tv_sec < 0 || duration->tv_nsec < 0
+            || (rem && (rem->tv_sec < 0 || rem->tv_nsec < 0)))
+            return Error(EINVAL);
+
+        auto errorOr = Time::Sleep(duration, rem);
+        if (!errorOr) return errorOr.error();
+
+        return 0;
+    }
 
     ErrorOr<pid_t> Pid()
     {
         auto process = ::Process::Current();
         return process->Pid();
     }
+
+    ErrorOr<pid_t> Fork()
+    {
+        class Process* process = ::Process::Current();
+
+        CPU::SetInterruptFlag(false);
+        auto procOrError = process->Fork();
+
+        return procOrError ? procOrError.value()->Pid() : procOrError.error();
+    }
+    ErrorOr<isize> Execve(char* pathname, char** argv, char** envp)
+    {
+        CPU::SetInterruptFlag(false);
+
+        auto process = Process::Current();
+        Path path    = CPU::CopyStringFromUser(pathname);
+
+        process->Exec(path.Raw(), argv, envp);
+        return process->Exit(-1);
+    }
+    ErrorOr<isize> Exit(isize exitcode)
+    {
+        auto* process = ::Process::Current();
+
+        CPU::SetInterruptFlag(false);
+        return process->Exit(exitcode);
+    }
+    ErrorOr<isize> Wait4(pid_t pid, isize* wstatus, isize flags,
+                          rusage* rusage)
+    {
+        auto           thread  = Thread::Current();
+        class Process* process = thread->Parent();
+
+        return process->WaitPid(pid, reinterpret_cast<i32*>(wstatus), flags,
+                                rusage);
+    }
+
     ErrorOr<mode_t> Umask(mode_t mask)
     {
         auto process = ::Process::Current();
@@ -247,15 +302,5 @@ namespace Syscall::Process
 
         if (current->Sid() != process->Sid()) return Error(EPERM);
         return process->Sid();
-    }
-    ErrorOr<i32> SysNanoSleep(Arguments& args)
-    {
-        const timespec* duration = args.Get<const timespec*>(0);
-        timespec*       rem      = args.Get<timespec*>(1);
-
-        (void)duration;
-        (void)rem;
-        // FIXME(v1tr10l7): sleep
-        return Error(ENOSYS);
     }
 }; // namespace Syscall::Process

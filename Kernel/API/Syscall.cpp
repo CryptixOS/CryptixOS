@@ -6,7 +6,6 @@
  */
 #include <API/MM.hpp>
 #include <API/Process.hpp>
-#include <API/SyscallEntryPoints.hpp>
 #include <API/System.hpp>
 #include <API/Time.hpp>
 #include <API/VFS.hpp>
@@ -25,9 +24,9 @@ namespace Syscall
     struct Syscall
     {
         String                                        Name;
-        std::function<ErrorOr<uintptr_t>(Arguments&)> Handler;
+        std::function<ErrorOr<upointer>(Arguments&)> Handler;
 
-        inline ErrorOr<uintptr_t> operator()(Arguments& args)
+        inline ErrorOr<upointer> operator()(Arguments& args)
         {
             if (Handler.operator bool()) return Handler(args);
 
@@ -46,7 +45,7 @@ namespace Syscall
     }
     void
     RegisterHandler(usize                                              index,
-                    std::function<ErrorOr<uintptr_t>(Arguments& args)> handler,
+                    std::function<ErrorOr<upointer>(Arguments& args)> handler,
                     String                                             name)
     {
         syscalls[index] = {name, handler};
@@ -56,12 +55,12 @@ namespace Syscall
     constexpr usize  ARCH_SET_FS = 0x1002;
     constexpr usize  ARCH_GET_FS = 0x1003;
     constexpr usize  ARCH_GET_GS = 0x1004;
-    static uintptr_t SysArchPrCtl(Arguments& args)
+    static upointer SysArchPrCtl(Arguments& args)
     {
 #ifdef CTOS_TARGET_X86_64
         auto                           thread = CPU::GetCurrentThread();
         i32                            op     = args.Args[0];
-        uintptr_t                      addr   = args.Args[1];
+        upointer                      addr   = args.Args[1];
 
         CPU::UserMemoryProtectionGuard guard;
         switch (op)
@@ -75,10 +74,10 @@ namespace Syscall
                 CPU::SetFSBase(thread->FsBase());
                 break;
             case ARCH_GET_FS:
-                *reinterpret_cast<uintptr_t*>(addr) = thread->FsBase();
+                *reinterpret_cast<upointer*>(addr) = thread->FsBase();
                 break;
             case ARCH_GET_GS:
-                *reinterpret_cast<uintptr_t*>(addr) = thread->GsBase();
+                *reinterpret_cast<upointer*>(addr) = thread->GsBase();
                 break;
 
             default: return_err(-1, EINVAL);
@@ -113,21 +112,19 @@ namespace Syscall
         RegisterSyscall2(ID::ePRead64, API::VFS::PRead);
         RegisterSyscall2(ID::ePWrite64, API::VFS::PWrite);
         RegisterSyscall2(ID::eAccess, API::VFS::Access);
-        RegisterSyscall(ID::ePipe, SysPipe);
+        // RegisterSyscall2(ID::ePipe, API::VFS::Pipe);
         RegisterSyscall2(ID::eSchedYield, API::Process::SchedYield);
         RegisterSyscall2(ID::eDup, API::VFS::Dup);
         RegisterSyscall2(ID::eDup2, API::VFS::Dup2);
-        RegisterSyscall(ID::eNanoSleep, SysNanoSleep);
+        RegisterSyscall2(ID::eNanoSleep, API::Process::NanoSleep);
         RegisterSyscall2(ID::ePid, API::Process::Pid);
-        RegisterSyscall(ID::eExit, Process::SysExit);
-        RegisterSyscall(ID::eWait4, Process::SysWait4);
+        RegisterSyscall2(ID::eFork, API::Process::Fork);
+        RegisterSyscall2(ID::eExecve, API::Process::Execve);
+        RegisterSyscall2(ID::eExit, API::Process::Exit);
+        RegisterSyscall2(ID::eWait4, API::Process::Wait4);
         RegisterSyscall(ID::eKill, Process::SysKill);
-        RegisterSyscall2(ID::eGetUid, API::Process::GetUid);
-        RegisterSyscall2(ID::eGetGid, API::Process::GetGid);
         RegisterSyscall2(ID::eUname, API::System::Uname);
-        RegisterSyscall2(ID::eGetResourceLimit, API::System::GetResourceLimit);
-        RegisterSyscall2(ID::eGetResourceUsage, API::System::GetResourceUsage);
-        RegisterSyscall(ID::eFcntl, VFS::SysFcntl);
+        RegisterSyscall2(ID::eFCntl, API::VFS::FCntl);
         RegisterSyscall2(ID::eTruncate, API::VFS::Truncate);
         RegisterSyscall2(ID::eFTruncate, API::VFS::FTruncate);
         RegisterSyscall2(ID::eGetCwd, API::VFS::GetCwd);
@@ -143,7 +140,11 @@ namespace Syscall
         RegisterSyscall2(ID::eReadLink, API::VFS::ReadLink);
         RegisterSyscall2(ID::eChMod, API::VFS::ChMod);
         RegisterSyscall2(ID::eUmask, API::Process::Umask);
-        RegisterSyscall(ID::eGetTimeOfDay, Time::SysGetTimeOfDay);
+        RegisterSyscall2(ID::eGetTimeOfDay, API::Time::GetTimeOfDay);
+        RegisterSyscall2(ID::eGetResourceLimit, API::System::GetResourceLimit);
+        RegisterSyscall2(ID::eGetResourceUsage, API::System::GetResourceUsage);
+        RegisterSyscall2(ID::eGetUid, API::Process::GetUid);
+        RegisterSyscall2(ID::eGetGid, API::Process::GetGid);
         RegisterSyscall2(ID::eGet_eUid, API::Process::GetEUid);
         RegisterSyscall2(ID::eGet_eGid, API::Process::GetEGid);
         RegisterSyscall(ID::eSet_pGid, Process::SysSet_pGid);
@@ -154,18 +155,15 @@ namespace Syscall
         RegisterSyscall(ID::eSid, Process::SysSid);
         RegisterSyscall2(ID::eUTime, API::VFS::UTime);
         RegisterSyscall2(ID::eStatFs, API::VFS::StatFs);
-        RegisterSyscall(ID::eFork, Process::SysFork);
-        RegisterSyscall(ID::eExecve, Process::SysExecve);
         RegisterSyscall(ID::eArchPrCtl, SysArchPrCtl);
-        RegisterSyscall(ID::eSetTimeOfDay, Time::SysSetTimeOfDay);
+        RegisterSyscall2(ID::eSetTimeOfDay, API::Time::SetTimeOfDay);
         RegisterSyscall2(ID::eMount, API::VFS::Mount);
         RegisterSyscall2(ID::eReboot, API::System::Reboot);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
-        RegisterSyscall(ID::eGetDents64, VFS::SysGetDents64);
-        RegisterSyscall(ID::eClockGetTime, SysClockGetTime);
-        RegisterSyscall(ID::eNanoSleep, Process::SysNanoSleep);
+        RegisterSyscall2(ID::eGetDents64, API::VFS::GetDEnts64);
+        RegisterSyscall2(ID::eClockGetTime, API::Time::ClockGetTime);
         RegisterSyscall2(ID::ePanic, API::System::SysPanic);
-        RegisterSyscall(ID::eOpenAt, VFS::SysOpenAt);
+        RegisterSyscall2(ID::eOpenAt, API::VFS::OpenAt);
         RegisterSyscall2(ID::eMkDirAt, API::VFS::MkDirAt);
         RegisterSyscall2(ID::eMkNodAt, API::VFS::MkNodAt);
         RegisterSyscall2(ID::eFStatAt, API::VFS::FStatAt);
@@ -224,7 +222,7 @@ namespace Syscall
         }
 
         errno = no_error;
-        std::array<uintptr_t, 6> arr
+        std::array<upointer, 6> arr
             = {args.Args[0], args.Args[1], args.Args[2],
                args.Args[3], args.Args[4], args.Args[5]};
 #define SYSCALL_LOG_ERR   false
@@ -239,27 +237,34 @@ namespace Syscall
             auto ret = s_Syscalls[static_cast<ID>(args.Index)]->Run(arr);
 
             if (ret) args.ReturnValue = ret.value();
-            else if (g_LogSyscalls)
+            else if (static_cast<ID>(args.Index) != ID::eMMap)
             {
-                auto syscallID   = static_cast<ID>(args.Index);
-                auto syscallName = StringUtils::ToString(syscallID);
-                syscallName.RemovePrefix(1);
+                if (g_LogSyscalls)
+                {
+                    auto syscallID   = static_cast<ID>(args.Index);
+                    auto syscallName = StringUtils::ToString(syscallID);
+                    syscallName.RemovePrefix(1);
 
-                SyscallError("Syscall: '{}' caused error", syscallName);
-                args.ReturnValue = -intptr_t(ret.error());
+                    SyscallError("Syscall: '{}' caused error", syscallName);
+                }
+                args.ReturnValue = -ipointer(ret.error());
             }
             return;
         }
 
         auto ret = syscalls[args.Index](args);
         if (ret) args.ReturnValue = ret.value();
-        else if (g_LogSyscalls)
+        else
         {
-            auto syscallID   = static_cast<ID>(args.Index);
-            auto syscallName = StringUtils::ToString(syscallID);
-            syscallName.RemovePrefix(1);
-            SyscallError("Syscall: '{}' caused error", syscallName,
-                         args.ReturnValue = -intptr_t(ret.error()));
+            args.ReturnValue = -ipointer(ret.Error());
+            if (g_LogSyscalls)
+            {
+                auto syscallID   = static_cast<ID>(args.Index);
+                auto syscallName = StringUtils::ToString(syscallID);
+                syscallName.RemovePrefix(1);
+                SyscallError("Syscall: '{}' caused error", syscallName,
+                             args.ReturnValue);
+            }
         }
         CPU::OnSyscallLeave();
     }

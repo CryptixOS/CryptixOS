@@ -10,13 +10,22 @@
 #include <API/Syscall.hpp>
 #include <API/UnixTypes.hpp>
 
+struct timespec;
+struct rusage;
 namespace API::Process
 {
     ErrorOr<isize>  SigProcMask(i32 how, const sigset_t* newSet,
                                 sigset_t* oldSet);
     ErrorOr<isize>  SchedYield();
+    ErrorOr<isize>  NanoSleep(const timespec* duration, timespec* rem);
 
     ErrorOr<pid_t>  Pid();
+    ErrorOr<pid_t>  Fork();
+    ErrorOr<isize>  Execve(char* pathname, char** argv, char** envp);
+    ErrorOr<isize>  Exit(isize exitcode);
+    ErrorOr<isize>  Wait4(pid_t pid, isize* wstatus, isize flags,
+                          rusage* rusage);
+
     ErrorOr<mode_t> Umask(mode_t mask);
 
     ErrorOr<uid_t>  GetUid();
@@ -38,10 +47,6 @@ namespace API::Process
 
 namespace Syscall::Process
 {
-    ErrorOr<pid_t> SysFork(Syscall::Arguments& args);
-    ErrorOr<i32>   SysExecve(Syscall::Arguments& args);
-    ErrorOr<i32>   SysExit(Syscall::Arguments& args);
-    ErrorOr<i32>   SysWait4(Syscall::Arguments& args);
     ErrorOr<i32>   SysKill(Syscall::Arguments& args);
 
     ErrorOr<pid_t> SysSet_pGid(Syscall::Arguments& args);
@@ -49,6 +54,4 @@ namespace Syscall::Process
     ErrorOr<pid_t> SysSetSid(Syscall::Arguments& args);
     ErrorOr<pid_t> SysGet_pGid(Syscall::Arguments& args);
     ErrorOr<pid_t> SysSid(Syscall::Arguments& args);
-
-    ErrorOr<i32>   SysNanoSleep(Syscall::Arguments& args);
 }; // namespace Syscall::Process

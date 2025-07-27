@@ -8,7 +8,6 @@ srcs += files(
   'MM.cpp',
   'Process.cpp',
   'Syscall.cpp',
-  'SyscallEntryPoints.cpp',
   'System.cpp',
   'Time.cpp',
   'VFS.cpp',
