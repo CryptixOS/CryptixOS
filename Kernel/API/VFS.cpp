@@ -35,6 +35,7 @@
 
 namespace API::VFS
 {
+    using namespace ::VFS;
     ErrorOr<::VFS::PathResolution> ResolveAtFd(isize dirFdNum, PathView path,
                                                isize flags)
     {
@@ -234,23 +235,20 @@ namespace API::VFS
     ErrorOr<isize> Access(const char* filename, mode_t mode)
     {
         auto process = Process::Current();
-        if (!process->ValidateRead(filename)) return Error(EFAULT);
-        Path path = CPU::AsUser([filename]() -> Path { return filename; });
-        return 0;
+        if (!process->ValidateRead(filename, Limits::MAX_PATH_LENGTH))
+            return Error(EFAULT);
+        Path path = CPU::CopyStringFromUser(filename);
 
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
         if (mode != (mode & S_IRWXO)) return Error(EINVAL);
 
-        auto maybePathRes
-            = ::VFS::ResolvePath(::VFS::RootDirectoryEntry(), path);
-        RetOnError(maybePathRes);
-        auto pathRes = maybePathRes.Value();
+        auto pathRes = TryOrRet(VFS::ResolvePath(nullptr, path));
 
         auto entry   = pathRes.Entry;
-        if (!entry) return Error(errno);
+        if (!entry) return Error(ENOENT);
 
         auto inode = entry->INode();
-        if (!inode) return Error(errno);
+        if (!inode) return Error(ENOENT);
 
         auto status = inode->CheckPermissions(mode);
         if (!status && (mode & S_IWOTH) /* && inode->ReadOnly()*/
