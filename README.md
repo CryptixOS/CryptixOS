@@ -1,6 +1,6 @@
 # 🧬 CryptixOS
 
-**CryptixOS** is a modern, modular, Unix-like operating system for `x86_64` and `aarch64`, written entirely in C++. It features its own kernel, standard library (`Prism`), and build system. Designed for clarity, extensibility, and education, CryptixOS serves as a powerful base for learning OS development or building your own custom system from scratch.
+**CryptixOS** is a modern, modular, Unix-like operating system for `x86_64` and `aarch64`, written entirely in C++. It features its own kernel, and standard library (`Prism`). Designed for clarity, extensibility, and education, CryptixOS serves as a powerful base for learning OS development or building your own custom system from scratch.
 
 ![License](https://img.shields.io/github/license/CryptixOS/CryptixOS)
 ![Architecture](https://img.shields.io/badge/arch-x86__64%20%7C%20aarch64-blue)
@@ -55,14 +55,14 @@ This step ensures you have the tools and libraries needed for building the OS.
 ## 🧱 Building the Kernel & Image
 Once the sysroot is ready:
 ```
-./Meta/setup.sh <x86_64|aarch64>   # Configure for your target architecture
-./Meta/build.sh                    # Build the kernel and generate a bootable .iso
+./Meta/run.py --target-arch x86_64 --compiler clang --build-type release setup # Configure for your target architecture
+./Meta/run.py --target-arch x86_64 --compiler clang --build-type release build # Build the kernel and generate a bootable .iso
 ```
 
 ## 💻 Running in an Emulator
 To run CryptixOS in QEMU:
 ```
-./Meta/run.sh <run_uefi|run_bios>
+./Meta/run.py --target-arch x86_64 --compiler clang --build-type release <run_uefi|run_bios>
 ```
 - Use run_uefi to boot via UEFI.
 - Use run_bios for BIOS boot (x86_64 only).
