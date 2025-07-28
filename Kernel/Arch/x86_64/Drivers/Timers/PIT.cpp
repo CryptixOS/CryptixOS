@@ -30,6 +30,8 @@ PIT::PIT()
     m_Handler->eoiFirst = true;
 
     m_TimerVector       = m_Handler->GetInterruptVector();
+    InterruptManager::Unmask(IRQ_HINT - 0x20);
+
     LogInfo("PIT: Installed on interrupt gate #{:#x}", m_TimerVector);
 }
 

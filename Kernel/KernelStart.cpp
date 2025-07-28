@@ -109,7 +109,6 @@ static void eternal()
             Process::Current()->Exit(-1);
         }
 
-        LogTrace("Kernel thread");
         Arch::Pause();
     }
 }
