@@ -14,7 +14,6 @@
 #include <Drivers/PCI/Device.hpp>
 #include <Drivers/USB/HostController.hpp>
 #include <Drivers/USB/UHCI/Definitions.hpp>
-#include <Drivers/USB/UHCI/UHCiDescriptorPool.hpp>
 
 #include <Memory/IORegion.hpp>
 #include <Prism/Core/TypeTraits.hpp>
