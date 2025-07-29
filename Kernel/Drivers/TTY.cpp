@@ -281,14 +281,14 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         case TIOCSCTTY:
             if (current->Sid() != current->Pid() || current->TTY())
                 return_err(-1, EINVAL);
-            if (m_ControlSid && current->Credentials().uid != 0)
+            if (m_ControlSid && current->Credentials().UserID != 0)
                 return_err(-1, EPERM);
             current->SetTTY(this);
-            m_ControlSid = current->Credentials().sid;
+            m_ControlSid = current->Credentials().SessionID;
             break;
         case TIOCNOTTY:
             if (current->TTY() != this
-                || m_ControlSid != current->Credentials().sid)
+                || m_ControlSid != current->Credentials().SessionID)
                 return_err(-1, EINVAL);
 
             current->SetTTY(nullptr);
@@ -336,7 +336,7 @@ void TTY::Initialize()
     {
         LogTrace("TTY: Creating device /dev/tty{}...", minor);
 
-        auto tty = new TTY(Prism::FormatString("tty{}", minor), terminal, minor);
+        auto tty = new TTY(fmt::format("tty{}", minor).data(), terminal, minor);
         s_TTYs.PushBack(tty);
 
         auto result = DeviceManager::RegisterCharDevice(tty);

@@ -30,8 +30,8 @@ SynthFsINode::SynthFsINode(StringView name, class Filesystem* fs, INodeID id,
     if (process)
     {
         const auto& creds = process->Credentials();
-        m_Metadata.GID    = creds.gid;
-        m_Metadata.UID    = creds.uid;
+        m_Metadata.GID    = creds.GroupID;
+        m_Metadata.UID    = creds.UserID;
     }
 
     m_Metadata.AccessTime       = Time::GetReal();

@@ -600,7 +600,7 @@ namespace API::VFS
 
         auto inode   = entry->INode();
         if (!process->IsSuperUser()
-            && process->Credentials().uid != inode->UserID())
+            && process->Credentials().UserID != inode->UserID())
             return Error(EPERM);
         // TODO(v1tr10l7): Validate group id
 

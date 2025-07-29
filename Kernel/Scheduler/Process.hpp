@@ -30,14 +30,17 @@ enum class PrivilegeLevel
 class INode;
 struct Credentials
 {
-    uid_t              uid;
-    gid_t              gid;
-    uid_t              euid;
-    gid_t              egid;
-    uid_t              suid;
-    gid_t              sgid;
-    pid_t              sid;
-    pid_t              pgid;
+    UserID             UserID;
+    GroupID            GroupID;
+    ::UserID           EffectiveUserID;
+    ::GroupID          EffectiveGroupID;
+    ::UserID           FilesystemUserID;
+    ::GroupID          FilesystemGroupID;
+
+    ::UserID           SetUserID;
+    ::GroupID          SetGroupID;
+    ProcessID          SessionID;
+    ProcessID          ProcessGroupID;
 
     static Credentials s_Root;
 };
@@ -82,7 +85,7 @@ class Process
         return ValidateWrite(address, sizeof(T));
     }
 
-    inline pid_t ParentPid() const
+    inline ProcessID ParentPid() const
     {
         if (m_Parent) return m_Parent->m_Pid;
 
@@ -90,30 +93,47 @@ class Process
         return 0;
     }
     inline Process*   Parent() const { return m_Parent; }
-    inline pid_t      Pid() const { return m_Pid; }
+    inline ProcessID  Pid() const { return m_Pid; }
     inline StringView Name() const { return m_Name; }
-    constexpr bool    IsSuperUser() const { return m_Credentials.euid == 0; }
+    constexpr bool    IsSuperUser() const
+    {
+        return m_Credentials.EffectiveUserID == 0;
+    }
     inline const Credentials& Credentials() const { return m_Credentials; }
     inline Optional<i32>      Status() const { return m_Status; }
 
     inline Thread*            MainThread() { return m_MainThread; }
     inline AddressSpace&      AddressSpace() { return m_AddressSpace; }
 
-    inline pid_t              Sid() const { return m_Credentials.sid; }
-    inline pid_t              PGid() const { return m_Credentials.pgid; }
+    inline ProcessID          Sid() const { return m_Credentials.SessionID; }
+    inline ProcessID PGid() const { return m_Credentials.ProcessGroupID; }
 
-    pid_t                     SetSid();
-    inline void               SetPGid(pid_t pgid) { m_Credentials.pgid = pgid; }
+    inline void      SetUID(UserID uid) { m_Credentials.EffectiveUserID = uid; }
+    inline void    SetGID(GroupID gid) { m_Credentials.EffectiveGroupID = gid; }
 
-    inline TTY*               TTY() const { return m_TTY; }
-    inline void               SetTTY(class TTY* tty) { m_TTY = tty; }
+    ErrorOr<isize> SetReUID(UserID ruid, UserID euid);
+    ErrorOr<isize> SetReGID(GroupID rgid, GroupID egid);
+    ErrorOr<isize> SetResUID(UserID ruid, UserID euid, UserID suid);
+    ErrorOr<isize> SetResGID(GroupID rgid, GroupID egid, GroupID sgid);
+
+    ProcessID      SetSid();
+    inline void SetPGid(ProcessID pgid) { m_Credentials.ProcessGroupID = pgid; }
+
+    inline TTY* TTY() const { return m_TTY; }
+    inline void SetTTY(class TTY* tty) { m_TTY = tty; }
 
     inline const Vector<Process*>& Children() const { return m_Children; }
     inline const Vector<Process*>& Zombies() const { return m_Zombies; }
     inline const Vector<Thread*>&  Threads() const { return m_Threads; }
 
-    inline bool IsSessionLeader() const { return m_Pid == m_Credentials.sid; }
-    inline bool IsGroupLeader() const { return m_Pid == m_Credentials.pgid; }
+    inline bool                    IsSessionLeader() const
+    {
+        return m_Pid == m_Credentials.SessionID;
+    }
+    inline bool IsGroupLeader() const
+    {
+        return m_Pid == m_Credentials.ProcessGroupID;
+    }
     inline bool IsChild(Process* process) const
     {
         for (const auto& child : m_Children)
@@ -128,7 +148,7 @@ class Process
     inline mode_t              Umask() const { return m_Umask; }
     mode_t                     Umask(mode_t mask);
 
-    static void                SendGroupSignal(pid_t pgid, i32 signal);
+    static void                SendGroupSignal(ProcessID pgid, i32 signal);
     void                       SendSignal(i32 signal);
 
     ErrorOr<isize> OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
@@ -142,12 +162,12 @@ class Process
         return m_FdTable.GetFd(fd);
     }
 
-    ErrorOr<pid_t>    WaitPid(pid_t pid, i32* wstatus, i32 flags,
-                              struct rusage* rusage);
+    ErrorOr<ProcessID> WaitPid(ProcessID pid, i32* wstatus, i32 flags,
+                               struct rusage* rusage);
 
-    ErrorOr<Process*> Fork();
-    ErrorOr<i32>      Exec(String path, char** argv, char** envp);
-    i32               Exit(i32 code);
+    ErrorOr<Process*>  Fork();
+    ErrorOr<i32>       Exec(String path, char** argv, char** envp);
+    i32                Exit(i32 code);
 
     friend struct Thread;
 
@@ -155,7 +175,7 @@ class Process
 
   private:
     Process*            m_Parent      = nullptr;
-    pid_t               m_Pid         = -1;
+    ProcessID           m_Pid         = -1;
     String              m_Name        = "?";
 
     struct Credentials  m_Credentials = {};

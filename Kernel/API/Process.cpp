@@ -82,11 +82,14 @@ namespace API::Process
     ErrorOr<pid_t> Fork()
     {
         class Process* process = ::Process::Current();
+        Assert(process);
 
         CPU::SetInterruptFlag(false);
-        auto procOrError = process->Fork();
+        auto newProcess = TryOrRet(process->Fork());
+        Assert(newProcess);
 
-        return procOrError ? procOrError.value()->Pid() : procOrError.error();
+        LogDebug("API: process forked");
+        return newProcess->Pid();
     }
     ErrorOr<isize> Execve(char* pathname, char** argv, char** envp)
     {
@@ -145,32 +148,38 @@ namespace API::Process
     ErrorOr<uid_t> GetUid()
     {
         auto process = ::Process::Current();
-        return process->Credentials().uid;
+        return process->Credentials().UserID;
     }
     ErrorOr<gid_t> GetGid()
     {
         auto process = ::Process::Current();
-        return process->Credentials().gid;
+        return process->Credentials().GroupID;
     }
     ErrorOr<isize> SetUid(uid_t uid)
     {
-        // auto process = ::Process::Current();
-        return Error(ENOSYS);
+        LogDebug("API: SetUid => {}", uid);
+        auto process = Process::Current();
+        process->SetUID(uid);
+
+        return {};
     }
     ErrorOr<isize> SetGid(gid_t gid)
     {
-        // auto process = ::Process::Current();
-        return Error(ENOSYS);
+        LogDebug("API: SetGid => {}", gid);
+        auto process = Process::Current();
+        process->SetGID(gid);
+
+        return {};
     }
     ErrorOr<uid_t> GetEUid()
     {
         auto process = ::Process::Current();
-        return process->Credentials().euid;
+        return process->Credentials().EffectiveUserID;
     }
     ErrorOr<gid_t> GetEGid()
     {
         auto process = ::Process::Current();
-        return process->Credentials().egid;
+        return process->Credentials().EffectiveGroupID;
     }
     ErrorOr<isize> SetPGid(pid_t pid, pid_t pgid)
     {
@@ -211,6 +220,27 @@ namespace API::Process
 
         return current->SetSid();
     }
+    ErrorOr<isize> SetReUid(uid_t ruid, uid_t euid)
+    {
+        auto process = Process::Current();
+        return process->SetReUID(ruid, euid);
+    }
+    ErrorOr<isize> SetReGid(gid_t rgid, gid_t egid)
+    {
+        auto process = Process::Current();
+        return process->SetReGID(rgid, egid);
+    }
+    ErrorOr<isize> SetResUid(uid_t ruid, uid_t euid, uid_t suid)
+    {
+        auto process = Process::Current();
+        return process->SetResUID(ruid, euid, suid);
+    }
+    ErrorOr<isize> SetResGid(gid_t rgid, gid_t egid, gid_t sgid)
+    {
+        auto process = Process::Current();
+        return process->SetResGID(rgid, egid, sgid);
+    }
+
     ErrorOr<pid_t> GetPGid(pid_t pid)
     {
         // FIXME(v1tr10l7): validate whether pid is a child of the calling

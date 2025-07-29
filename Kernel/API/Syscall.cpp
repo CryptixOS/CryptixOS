@@ -120,12 +120,18 @@ namespace Syscall
         RegisterSyscall(ID::eGetResourceUsage, API::System::GetResourceUsage);
         RegisterSyscall(ID::eGetUid, API::Process::GetUid);
         RegisterSyscall(ID::eGetGid, API::Process::GetGid);
+        RegisterSyscall(ID::eSetUid, API::Process::SetUid);
+        RegisterSyscall(ID::eSetGid, API::Process::SetGid);
         RegisterSyscall(ID::eGet_eUid, API::Process::GetEUid);
         RegisterSyscall(ID::eGet_eGid, API::Process::GetEGid);
         RegisterSyscall(ID::eSet_pGid, API::Process::SetPGid);
         RegisterSyscall(ID::eGet_pPid, API::Process::GetPPid);
         RegisterSyscall(ID::eGetPgrp, API::Process::GetPGrp);
         RegisterSyscall(ID::eSetSid, API::Process::SetSid);
+        RegisterSyscall(ID::eSetReUid, API::Process::SetReUid);
+        RegisterSyscall(ID::eSetReGid, API::Process::SetReGid);
+        RegisterSyscall(ID::eSetResUid, API::Process::SetResUid);
+        RegisterSyscall(ID::eSetResGid, API::Process::SetResGid);
         RegisterSyscall(ID::eGet_pGid, API::Process::GetPGid);
         RegisterSyscall(ID::eSid, API::Process::GetSid);
         RegisterSyscall(ID::eUTime, API::VFS::UTime);

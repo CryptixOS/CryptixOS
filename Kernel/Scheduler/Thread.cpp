@@ -123,7 +123,21 @@ Thread::Thread(Process* parent, Pointer pc, bool user)
 
     CPU::PrepareThread(this, pc, 0);
 }
-Thread::~Thread() {}
+Thread::~Thread()
+{
+    for (auto& region : m_Stacks)
+    {
+        auto  phys      = region->PhysicalBase();
+        usize pageCount = Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE);
+        PMM::FreePages(phys, pageCount);
+    }
+
+    PMM::FreePages(m_FpuStorage, m_FpuStoragePageCount);
+    PMM::FreePages(m_KernelStack,
+                   Math::DivRoundUp(CPU::KERNEL_STACK_SIZE, PMM::PAGE_SIZE));
+    PMM::FreePages(m_PageFaultStack,
+                   Math::DivRoundUp(CPU::KERNEL_STACK_SIZE, PMM::PAGE_SIZE));
+}
 
 void Thread::SendSignal(u8 signal)
 {
@@ -163,7 +177,7 @@ bool Thread::DispatchSignal(u8 signal)
         case SIGPROF:
         case SIGTERM:
             // TODO(v1tr10l7): Terminate
-            if (m_Parent->m_Pid != m_Parent->m_Credentials.pgid)
+            if (m_Parent->m_Pid != m_Parent->m_Credentials.ProcessGroupID)
                 m_Parent->Exit(0);
             break;
         case SIGCHLD:

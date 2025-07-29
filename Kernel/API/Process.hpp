@@ -43,6 +43,10 @@ namespace API::Process
     ErrorOr<pid_t>  GetPGrp(pid_t pid);
 
     ErrorOr<pid_t>  SetSid();
+    ErrorOr<isize>  SetReUid(uid_t ruid, uid_t euid);
+    ErrorOr<isize>  SetReGid(gid_t rgid, gid_t egid);
+    ErrorOr<isize>  SetResUid(uid_t ruid, uid_t euid, uid_t suid);
+    ErrorOr<isize>  SetResGid(gid_t rgid, gid_t egid, gid_t sgid);
 
     ErrorOr<pid_t>  GetPGid(pid_t pid);
     ErrorOr<pid_t>  GetSid(pid_t pid);

@@ -28,14 +28,17 @@ inline usize AllocatePid()
 }
 
 Credentials Credentials::s_Root = {
-    .uid  = 0,
-    .gid  = 0,
-    .euid = 0,
-    .egid = 0,
-    .suid = 0,
-    .sgid = 0,
-    .sid  = 0,
-    .pgid = 0,
+    .UserID            = 0,
+    .GroupID           = 0,
+    .EffectiveUserID   = 0,
+    .EffectiveGroupID  = 0,
+    .FilesystemUserID  = 0,
+    .FilesystemGroupID = 0,
+
+    .SetUserID         = 0,
+    .SetGroupID        = 0,
+    .SessionID         = 0,
+    .ProcessGroupID    = 0,
 };
 
 Process::Process(Process* parent, StringView name,
@@ -140,8 +143,39 @@ bool Process::ValidateAddress(Pointer address, i32 accessMode, usize size)
 
 pid_t Process::SetSid()
 {
-    m_Credentials.sid = m_Credentials.pgid = m_Pid;
+    m_Credentials.SessionID = m_Credentials.ProcessGroupID = m_Pid;
     return m_Pid;
+}
+
+ErrorOr<isize> Process::SetReUID(uid_t ruid, uid_t euid)
+{
+    m_Credentials.UserID          = ruid;
+    m_Credentials.EffectiveUserID = euid;
+
+    return {};
+}
+ErrorOr<isize> Process::SetReGID(gid_t rgid, gid_t egid)
+{
+    m_Credentials.GroupID          = rgid;
+    m_Credentials.EffectiveGroupID = egid;
+
+    return {};
+}
+ErrorOr<isize> Process::SetResUID(uid_t ruid, uid_t euid, uid_t suid)
+{
+    m_Credentials.UserID          = ruid;
+    m_Credentials.EffectiveUserID = euid;
+    m_Credentials.SetUserID       = suid;
+
+    return {};
+}
+ErrorOr<isize> Process::SetResGID(gid_t rgid, gid_t egid, gid_t sgid)
+{
+    m_Credentials.GroupID          = rgid;
+    m_Credentials.EffectiveGroupID = egid;
+    m_Credentials.SetGroupID       = sgid;
+
+    return {};
 }
 
 mode_t Process::Umask(mode_t mask)
@@ -156,7 +190,8 @@ void Process::SendGroupSignal(pid_t pgid, i32 signal)
 {
     auto& processMap = Scheduler::GetProcessMap();
     for (auto [pid, process] : processMap)
-        if (process->Credentials().pgid == pgid) process->SendSignal(signal);
+        if (process->Credentials().ProcessGroupID == pgid)
+            process->SendSignal(signal);
 }
 void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
@@ -259,9 +294,17 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
     m_FdTable.Clear();
     m_FdTable.OpenStdioStreams();
 
+    for (const auto& [virt, region] : m_AddressSpace)
+    {
+        auto  phys      = region->PhysicalBase();
+        usize pageCount = Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE);
+        PMM::FreePages(phys, pageCount);
+    }
+
     m_Name = path;
     Arch::VMM::DestroyPageMap(PageMap);
     delete PageMap;
+
     PageMap = new class PageMap();
 
     Vector<StringView> argvArr;
@@ -384,7 +427,9 @@ ErrorOr<Process*> Process::Fork()
     Assert(currentThread && currentThread->m_Parent == this);
 
     Process* newProcess = Scheduler::CreateProcess(this, m_Name, m_Credentials);
+    Assert(newProcess);
 
+    LogTrace("Process: new process created!");
     // TODO(v1tr10l7): implement PageMap::Fork;
     class PageMap* pageMap = new class PageMap();
     if (!pageMap) return Error(ENOMEM);
@@ -395,6 +440,7 @@ ErrorOr<Process*> Process::Fork()
     m_Children.PushBack(newProcess);
 
     newProcess->m_AddressSpace.Clear();
+    LogDebug("Process: Copying the address space");
     for (const auto& [base, range] : m_AddressSpace)
     {
         usize pageCount
@@ -428,6 +474,7 @@ ErrorOr<Process*> Process::Fork()
     }
 
     newProcess->m_NextTid.Store(m_NextTid.Load());
+    LogDebug("Process: Copying fd table");
     for (const auto& [i, fd] : m_FdTable)
     {
         // Ref<FileDescriptor> newFd = new FileDescriptor(fd);
@@ -438,6 +485,7 @@ ErrorOr<Process*> Process::Fork()
     thread->m_IsEnqueued       = false;
     newProcess->m_UserStackTop = m_UserStackTop;
 
+    LogDebug("Process: enqueing thread");
     Scheduler::EnqueueThread(thread);
 
     LogDebug("Process: Spawned {}", newProcess->m_Pid);

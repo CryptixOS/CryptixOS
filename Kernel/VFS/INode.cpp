@@ -33,8 +33,8 @@ INode::INode(StringView name, class Filesystem* fs)
 
     if (!process) return;
 
-    m_Metadata.UID = process->Credentials().euid;
-    m_Metadata.GID = process->Credentials().egid;
+    m_Metadata.UID = process->Credentials().EffectiveUserID;
+    m_Metadata.GID = process->Credentials().EffectiveGroupID;
 }
 
 const stat INode::Stats()
@@ -84,10 +84,10 @@ bool INode::ReadOnly() { return false; }
 bool INode::Immutable() { return false; }
 bool INode::CanWrite(const Credentials& creds) const
 {
-    if (creds.euid == 0 || m_Metadata.Mode & S_IWOTH) return true;
-    if (creds.euid == m_Metadata.UID && m_Metadata.Mode & S_IWUSR) return true;
+    if (creds.EffectiveUserID == 0 || m_Metadata.Mode & S_IWOTH) return true;
+    if (creds.EffectiveUserID == m_Metadata.UID && m_Metadata.Mode & S_IWUSR) return true;
 
-    return m_Metadata.GID == creds.egid && m_Metadata.Mode & S_IWGRP;
+    return m_Metadata.GID == creds.EffectiveGroupID && m_Metadata.Mode & S_IWGRP;
 }
 
 bool INode::ValidatePermissions(const Credentials& creds, u32 acc)
