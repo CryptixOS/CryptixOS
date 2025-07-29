@@ -15,7 +15,7 @@
 #include <Boot/BootInfo.hpp>
 #include <Boot/CommandLine.hpp>
 
-#include <Drivers/MemoryDevices.hpp>
+#include <Drivers/Core/MemoryDevices.hpp>
 #include <Drivers/PCI/PCI.hpp>
 #include <Drivers/Serial.hpp>
 #include <Drivers/TTY.hpp>
@@ -102,7 +102,8 @@ static void eternal()
 {
     for (;;)
     {
-        auto status = Time::NanoSleep(1000 * 1000 * 5);
+        LogTrace("Kernel thread");
+        auto status = Time::NanoSleep(5'000'000'000zu);
         if (!status)
         {
             LogError("Sleeping failed");

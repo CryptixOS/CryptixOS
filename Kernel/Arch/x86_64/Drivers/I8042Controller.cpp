@@ -12,7 +12,7 @@
 
 #include <Arch/x86_64/Drivers/I8042Controller.hpp>
 
-#include <Drivers/DeviceManager.hpp>
+#include <Drivers/Core/DeviceManager.hpp>
 #include <Drivers/HID/Ps2KeyboardDevice.hpp>
 #include <Firmware/ACPI/ACPI.hpp>
 

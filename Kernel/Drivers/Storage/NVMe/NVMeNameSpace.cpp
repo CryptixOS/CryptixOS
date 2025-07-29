@@ -8,7 +8,7 @@
 #include <Arch/InterruptHandler.hpp>
 #include <Arch/InterruptManager.hpp>
 
-#include <Drivers/DeviceManager.hpp>
+#include <Drivers/Core/DeviceManager.hpp>
 #include <Drivers/Storage/NVMe/NVMeController.hpp>
 #include <Drivers/Storage/NVMe/NVMeNameSpace.hpp>
 #include <Drivers/Storage/StorageDevicePartition.hpp>

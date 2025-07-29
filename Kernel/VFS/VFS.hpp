@@ -9,7 +9,7 @@
 #include <API/UnixTypes.hpp>
 #include <Common.hpp>
 
-#include <Drivers/FilesystemDriver.hpp>
+#include <Drivers/Core/FilesystemDriver.hpp>
 
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Memory/Ref.hpp>

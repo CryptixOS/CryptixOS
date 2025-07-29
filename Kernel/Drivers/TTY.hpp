@@ -7,7 +7,7 @@
 #pragma once
 
 #include <API/Posix/termios.h>
-#include <Drivers/CharacterDevice.hpp>
+#include <Drivers/Core/CharacterDevice.hpp>
 
 #include <Prism/Containers/CircularQueue.hpp>
 #include <Prism/Containers/Deque.hpp>

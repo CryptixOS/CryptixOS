@@ -7,7 +7,7 @@
 #include <API/System.hpp>
 #include <Boot/CommandLine.hpp>
 
-#include <Drivers/DeviceManager.hpp>
+#include <Drivers/Core/DeviceManager.hpp>
 #include <Prism/String/StringUtils.hpp>
 
 #include <System/System.hpp>

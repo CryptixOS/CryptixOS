@@ -8,9 +8,10 @@
 #include <Arch/x86_64/Drivers/PCSpeaker.hpp>
 #include <Arch/x86_64/IO.hpp>
 
-#include <Drivers/CharacterDevice.hpp>
-#include <Drivers/DeviceManager.hpp>
-#include <Drivers/GenericDriver.hpp>
+#include <Drivers/Core/CharacterDevice.hpp>
+#include <Drivers/Core/DeviceManager.hpp>
+#include <Drivers/Core/GenericDriver.hpp>
+
 #include <Library/Module.hpp>
 
 #include <Prism/Core/Types.hpp>

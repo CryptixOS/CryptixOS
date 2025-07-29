@@ -6,7 +6,7 @@
  */
 
 #include <API/UnixTypes.hpp>
-#include <Drivers/Device.hpp>
+#include <Drivers/Core/Device.hpp>
 #include <Library/ZLib.hpp>
 
 #include <Prism/String/StringUtils.hpp>

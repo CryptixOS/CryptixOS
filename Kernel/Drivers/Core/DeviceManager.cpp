@@ -4,8 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Drivers/CharacterDevice.hpp>
-#include <Drivers/DeviceManager.hpp>
+#include <Drivers/Core/CharacterDevice.hpp>
+#include <Drivers/Core/DeviceManager.hpp>
 
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/VFS.hpp>

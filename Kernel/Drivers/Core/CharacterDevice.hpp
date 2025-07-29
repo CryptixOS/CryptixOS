@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Drivers/Device.hpp>
+#include <Drivers/Core/Device.hpp>
 #include <Prism/Utility/Delegate.hpp>
 
 class CharacterDevice : public Device

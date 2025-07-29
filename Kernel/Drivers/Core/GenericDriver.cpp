@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Drivers/GenericDriver.hpp>
+#include <Drivers/Core/GenericDriver.hpp>
 
 static Vector<GenericDriver*> s_GenericDrivers;
 

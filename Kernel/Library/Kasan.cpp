@@ -10,8 +10,8 @@
 #include <Debug/Panic.hpp>
 
 #include <Library/Kasan.hpp>
-#include <Prism/Utility/Math.hpp>
 #include <Prism/String/StringUtils.hpp>
+#include <Prism/Utility/Math.hpp>
 
 namespace MM
 {
@@ -21,11 +21,31 @@ using MM::HigherHalfOffset;
 
 namespace Kasan
 {
-    constexpr usize SHADOW_SCALE_OFFSET = 3;
-    constexpr usize SHADOW_SCALE        = Bit(SHADOW_SCALE_OFFSET);
-    constexpr usize SHADOW_MASK         = SHADOW_SCALE - 1;
+    CTOS_UNUSED constexpr usize SHADOW_MAPPING_OFFSET          = 0x06fe'0000;
+    CTOS_UNUSED constexpr usize SHADOW_SHIFT                   = 3;
+    CTOS_UNUSED constexpr usize SHADOW_GRANULE_SIZE            = (1ul << SHADOW_SHIFT);
+    CTOS_UNUSED constexpr usize SHADOW_MASK                    = (SHADOW_GRANULE_SIZE - 1);
+    CTOS_UNUSED constexpr usize SHADOW_UNPOISONED_MAGIC        = 0x00;
+    CTOS_UNUSED constexpr usize SHADOW_RESERVED_MAGIC          = 0xff;
+    CTOS_UNUSED constexpr usize SHADOW_GLOBAL_REDZONE_MAGIC    = 0xf9;
+    CTOS_UNUSED constexpr usize SHADOW_HEAP_HEAD_REDZONE_MAGIC = 0xfa;
+    CTOS_UNUSED constexpr usize SHADOW_HEAP_TAIL_REDZONE_MAGIC = 0xfb;
+    CTOS_UNUSED constexpr usize SHADOW_HEAP_FREE_MAGIC         = 0xfd;
+    CTOS_UNUSED constexpr usize HEAP_HEAD_REDZONE_SIZE         = 0x20;
+    CTOS_UNUSED constexpr usize HEAP_TAIL_REDZONE_SIZE         = 0x20;
 
-    constexpr usize ALLOCA_REDZONE_SIZE = 32;
+    CTOS_UNUSED constexpr usize MemoryToShadow(Pointer address)
+    {
+        return (address >> SHADOW_SHIFT).Raw() + SHADOW_MAPPING_OFFSET;
+    }
+    CTOS_UNUSED constexpr usize ShadowToMemory(Pointer address)
+    {
+        return (address.Raw() - SHADOW_MAPPING_OFFSET) << SHADOW_SHIFT;
+    }
+
+    CTOS_UNUSED constexpr usize SHADOW_SCALE        = Bit(SHADOW_SHIFT);
+
+    CTOS_UNUSED constexpr usize ALLOCA_REDZONE_SIZE = 32;
 
     enum class AccessType
     {
@@ -42,7 +62,7 @@ namespace Kasan
         Pointer hhdmOffset = HigherHalfOffset();
 
         s_ShadowBase       = shadowBase;
-        s_ShadowOffset     = s_ShadowBase - (hhdmOffset >> SHADOW_SCALE_OFFSET);
+        s_ShadowOffset     = s_ShadowBase - (hhdmOffset >> SHADOW_SHIFT);
         s_Initialized      = true;
     }
 
@@ -65,7 +85,7 @@ namespace Kasan
 
     static ShadowType* va_to_shadow(Pointer address)
     {
-        return Pointer(address.Raw<u64>() >> SHADOW_SCALE_OFFSET)
+        return Pointer(address.Raw<u64>() >> SHADOW_SHIFT)
             .Offset<Pointer>(s_ShadowOffset)
             .As<ShadowType>();
     }
@@ -79,7 +99,7 @@ namespace Kasan
         Assert((size % SHADOW_SCALE) == 0);
 
         auto* shadow     = va_to_shadow(address);
-        auto  shadowSize = size >> SHADOW_SCALE_OFFSET;
+        auto  shadowSize = size >> SHADOW_SHIFT;
         Memory::Fill(shadow, ToUnderlying(type), shadowSize);
     }
     void MarkRegion(Pointer address, usize validSize, usize totalSize,
@@ -92,9 +112,9 @@ namespace Kasan
         Assert((totalSize % SHADOW_SCALE) == 0);
 
         auto* shadow          = va_to_shadow(address);
-        auto  validShadowSize = validSize >> SHADOW_SCALE_OFFSET;
+        auto  validShadowSize = validSize >> SHADOW_SHIFT;
         Memory::Fill(shadow, ToUnderlying(ShadowType::eUnpoisoned8Bytes),
-                    validShadowSize);
+                     validShadowSize);
         auto unalignedSize = validSize & SHADOW_MASK;
         if (unalignedSize)
             *(shadow + validShadowSize)
@@ -102,9 +122,9 @@ namespace Kasan
 
         auto poisonedShadowSize
             = (totalSize - Math::RoundUpToPowerOfTwo(validSize, SHADOW_SCALE))
-           >> SHADOW_SCALE_OFFSET;
+           >> SHADOW_SHIFT;
         Memory::Fill(shadow + validShadowSize + (unalignedSize != 0),
-                    ToUnderlying(type), poisonedShadowSize);
+                     ToUnderlying(type), poisonedShadowSize);
     }
 
     static bool Check1ShadowByte(Pointer address, ShadowType& shadowType)
@@ -122,8 +142,8 @@ namespace Kasan
     }
     static bool Check2ShadowBytes(Pointer address, ShadowType& shadowType)
     {
-        if ((address.Raw<u64>() >> SHADOW_SCALE_OFFSET)
-            != (address.Offset<u64>(1) >> SHADOW_SCALE_OFFSET)) [[unlikely]]
+        if ((address.Raw<u64>() >> SHADOW_SHIFT)
+            != (address.Offset<u64>(1) >> SHADOW_SHIFT)) [[unlikely]]
             return Check1ShadowByte(address, shadowType)
                 && Check1ShadowByte(address.Offset(1), shadowType);
 
@@ -140,8 +160,8 @@ namespace Kasan
     }
     static bool Check4ShadowBytes(Pointer address, ShadowType& shadowType)
     {
-        if ((address.Raw<u64>() >> SHADOW_SCALE_OFFSET)
-            != (address.Offset<usize>(3) >> SHADOW_SCALE_OFFSET)) [[unlikely]]
+        if ((address.Raw<u64>() >> SHADOW_SHIFT)
+            != (address.Offset<usize>(3) >> SHADOW_SHIFT)) [[unlikely]]
             return Check2ShadowBytes(address, shadowType)
                 && Check2ShadowBytes(address.Offset<Pointer>(2), shadowType);
 
@@ -158,8 +178,8 @@ namespace Kasan
     }
     static bool Check8ShadowBytes(Pointer address, ShadowType& shadowType)
     {
-        if ((address.Raw<u64>() >> SHADOW_SCALE_OFFSET)
-            != (address.Offset<usize>(7)) >> SHADOW_SCALE_OFFSET) [[unlikely]]
+        if ((address.Raw<u64>() >> SHADOW_SHIFT)
+            != (address.Offset<usize>(7)) >> SHADOW_SHIFT) [[unlikely]]
             return Check4ShadowBytes(address, shadowType)
                 && Check4ShadowBytes(address.Offset<Pointer>(4), shadowType);
 

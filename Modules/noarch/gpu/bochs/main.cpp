@@ -8,7 +8,7 @@
     #include <Arch/x86_64/IO.hpp>
 #endif
 
-#include <Drivers/Device.hpp>
+#include <Drivers/Core/Device.hpp>
 #include <Drivers/PCI/Device.hpp>
 #include <Drivers/PCI/PCI.hpp>
 

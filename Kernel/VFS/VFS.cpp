@@ -7,7 +7,7 @@
 #include <API/Limits.hpp>
 #include <Arch/CPU.hpp>
 
-#include <Drivers/Device.hpp>
+#include <Drivers/Core/Device.hpp>
 #include <Library/Locking/Spinlock.hpp>
 #include <Library/Locking/SpinlockProtected.hpp>
 

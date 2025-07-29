@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Drivers/Device.hpp>
+#include <Drivers/Core/Device.hpp>
 
 #include <Prism/Containers/UnorderedMap.hpp>
 #include <VFS/Filesystem.hpp>

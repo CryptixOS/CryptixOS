@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Drivers/Device.hpp>
+#include <Drivers/Core/Device.hpp>
 
 Optional<DeviceMajor> Device::s_LeastMajor = 0;
 Bitmap                Device::s_AllocatedMajors{};

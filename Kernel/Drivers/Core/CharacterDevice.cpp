@@ -4,8 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Drivers/CharacterDevice.hpp>
-#include <Drivers/DeviceManager.hpp>
+#include <Drivers/Core/CharacterDevice.hpp>
+#include <Drivers/Core/DeviceManager.hpp>
 
 CharacterDevice::CharacterDevice(StringView name, dev_t id)
     : Device(name, id)
