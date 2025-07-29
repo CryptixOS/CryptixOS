@@ -16,7 +16,7 @@
 TmpFsINode::TmpFsINode(class Filesystem* fs)
     : INode(fs)
 {
-    m_Metadata.DeviceID         = fs->DeviceID();
+    m_Metadata.DeviceID         = fs->BackingDeviceID();
     m_Metadata.ID               = fs->NextINodeIndex();
     m_Metadata.LinkCount        = 1;
     m_Metadata.RootDeviceID     = 0;
@@ -32,7 +32,7 @@ TmpFsINode::TmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
                        uid_t uid, gid_t gid)
     : INode(name, fs)
 {
-    m_Metadata.DeviceID         = fs->DeviceID();
+    m_Metadata.DeviceID         = fs->BackingDeviceID();
     m_Metadata.ID               = fs->NextINodeIndex();
     m_Metadata.LinkCount        = 1;
     m_Metadata.Mode             = mode;
@@ -66,8 +66,8 @@ ErrorOr<void> TmpFsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
     usize offset = 0;
     for (const auto [name, inode] : Children())
     {
-        usize  ino  = inode->Stats().st_ino;
-        mode_t mode = inode->Stats().st_mode;
+        usize  ino  = inode->ID();
+        mode_t mode = inode->Mode();
         auto   type = IF2DT(mode);
 
         if (!iterator(name, offset, ino, type)) break;
@@ -96,10 +96,8 @@ ErrorOr<Ref<DirectoryEntry>> TmpFsINode::CreateNode(Ref<DirectoryEntry> entry,
 {
     if (m_Children.Contains(entry->Name())) return Error(EEXIST);
 
-    auto maybeINode = m_Filesystem->AllocateNode(entry->Name(), mode);
-    RetOnError(maybeINode);
+    auto inode = reinterpret_cast<TmpFsINode*>(TryOrRet(m_Filesystem->AllocateNode(entry->Name(), mode)));
 
-    auto inode             = reinterpret_cast<TmpFsINode*>(maybeINode.Value());
     inode->m_Name          = entry->Name();
     inode->m_Metadata.Mode = mode;
     if (S_ISREG(mode))

@@ -20,10 +20,6 @@ DevTmpFs::DevTmpFs(u32 flags)
 ErrorOr<::Ref<DirectoryEntry>> DevTmpFs::Mount(StringView  sourcePath,
                                                const void* data)
 {
-    m_MountData
-        = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
-               : nullptr;
-
     if (m_Root) VFS::RecursiveDelete(m_Root);
 
     m_RootEntry    = new DirectoryEntry(nullptr, "/");

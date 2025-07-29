@@ -25,7 +25,7 @@ namespace API::System
 
         CPU::UserMemoryProtectionGuard guard;
         Kernel::NAME.Copy(out->sysname, sizeof(out->sysname));
-        std::strncpy(out->nodename, "cryptix", sizeof(out->nodename));
+        Kernel::NAME.Copy(out->nodename, sizeof(out->nodename));
         Kernel::VERSION_STRING.Copy(out->release, sizeof(out->release));
 
         auto version = Kernel::BUILD_DATE + " ";

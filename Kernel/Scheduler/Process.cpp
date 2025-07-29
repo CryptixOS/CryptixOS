@@ -379,6 +379,7 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
 
 ErrorOr<Process*> Process::Fork()
 {
+    LogDebug("Process: Forking {}...", m_Pid);
     Thread* currentThread = CPU::GetCurrentThread();
     Assert(currentThread && currentThread->m_Parent == this);
 
@@ -439,11 +440,13 @@ ErrorOr<Process*> Process::Fork()
 
     Scheduler::EnqueueThread(thread);
 
+    LogDebug("Process: Spawned {}", newProcess->m_Pid);
     return newProcess;
 }
 
 i32 Process::Exit(i32 code)
 {
+    LogDebug("Process: Exiting {} with exit code => {}", m_Pid, code);
     AssertMsg(this != Scheduler::GetKernelProcess(),
               "Process::Exit(): The process with pid 1 tries to exit!");
     CPU::SetInterruptFlag(false);
@@ -494,6 +497,7 @@ i32 Process::Exit(i32 code)
 
     Event::Trigger(&m_Event, false);
 
+    LogDebug("Process: {} exited with exit code: {}", m_Pid, code);
     Scheduler::Yield();
     AssertNotReached();
 }

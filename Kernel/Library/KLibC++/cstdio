@@ -10,25 +10,6 @@
 
 namespace std
 {
-    using ::FILE;
-
-    using ::fputc;
-    using ::fputs;
-    using ::fputws;
-
     using ::fprintf;
-    using ::fwrite;
-
-    using ::printf;
-    using ::vprintf;
-
-    // using ::sprintf;
-    using ::vsprintf;
-
-    // using ::snprintf;
-    using ::vsnprintf;
-
-    using ::putchar;
-
     [[gnu::noreturn]] void terminate() noexcept;
 } // namespace std

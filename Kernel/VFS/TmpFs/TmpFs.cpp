@@ -28,10 +28,6 @@ TmpFs::TmpFs(u32 flags)
 ErrorOr<::Ref<DirectoryEntry>> TmpFs::Mount(StringView  sourcePath,
                                             const void* data)
 {
-    m_MountData
-        = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
-               : nullptr;
-
     m_BlockSize      = PMM::PAGE_SIZE;
     m_BytesLimit     = PMM::GetTotalMemory() / 2;
 

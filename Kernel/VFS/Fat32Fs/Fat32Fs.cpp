@@ -28,10 +28,6 @@ constexpr usize                FAT32_REAL_FS_INFO_SIGNATURE2 = 0xaa550000;
 ErrorOr<::Ref<DirectoryEntry>> Fat32Fs::Mount(StringView  sourcePath,
                                               const void* data)
 {
-    m_MountData
-        = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
-               : nullptr;
-
     auto sourceEntry = VFS::ResolvePath(nullptr, sourcePath)
                            .ValueOr(VFS::PathResolution{})
                            .Entry;
@@ -182,16 +178,15 @@ bool Fat32Fs::Populate(DirectoryEntry* dentry)
 
         if (!isLfn)
         {
-            usize nameSize = 8 - CountSpacePadding(entry->Name, 8);
-            usize extSize  = 3 - CountSpacePadding(entry->Name + 8, 3);
-            if (nameSize)
-                std::strncpy(nameBuffer.Raw(),
-                             reinterpret_cast<char*>(entry->Name), nameSize);
+            usize      nameSize = 8 - CountSpacePadding(entry->Name, 8);
+            usize      extSize  = 3 - CountSpacePadding(entry->Name + 8, 3);
+
+            StringView nameView(reinterpret_cast<char*>(entry->Name), nameSize);
+            if (!nameView.Empty()) nameView.Copy(nameBuffer.Raw(), nameSize);
             if (extSize)
             {
                 nameBuffer[nameSize] = '.';
-                std::strncpy(nameBuffer.Raw() + nameSize + 1,
-                             reinterpret_cast<char*>(entry->Name) + 8, extSize);
+                nameView.Copy(nameBuffer.Raw() + nameSize + 1, extSize, 8);
             }
         }
 

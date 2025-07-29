@@ -39,10 +39,6 @@ ErrorOr<::Ref<DirectoryEntry>> EchFs::Mount(StringView  sourcePath,
     if (!sourceEntry || !sourceEntry->INode()) return nullptr;
     auto source = sourceEntry->INode();
 
-    m_MountData
-        = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
-               : nullptr;
-
     m_IdentityTable = new EchFsIdentityTable;
     if (!m_IdentityTable) return nullptr;
     m_SourceDevice = source;
@@ -118,7 +114,7 @@ ErrorOr<::Ref<DirectoryEntry>> EchFs::Mount(StringView  sourcePath,
     }
 
     m_NativeRoot->m_Metadata.DeviceID
-        = reinterpret_cast<Filesystem*>(this)->DeviceID();
+        = reinterpret_cast<Filesystem*>(this)->BackingDeviceID();
     m_NativeRoot->m_Metadata.ID               = 2;
     m_NativeRoot->m_Metadata.Mode             = 0644 | S_IFDIR;
     m_NativeRoot->m_Metadata.LinkCount        = 2;
@@ -175,7 +171,7 @@ bool EchFs::Populate(EchFsINode* native)
         EchFsINode* child = new EchFsINode(
             name, reinterpret_cast<Filesystem*>(this), mode, entry, offset);
         child->m_Metadata.DeviceID
-            = reinterpret_cast<Filesystem*>(this)->DeviceID();
+            = reinterpret_cast<Filesystem*>(this)->BackingDeviceID();
         child->m_Metadata.ID           = 2;
         child->m_Metadata.Mode         = mode;
         child->m_Metadata.LinkCount    = 1;

@@ -19,7 +19,7 @@ DevTmpFsINode::DevTmpFsINode(StringView name, class Filesystem* fs, mode_t mode,
 {
     m_Device                = device;
 
-    m_Metadata.DeviceID     = fs->DeviceID();
+    m_Metadata.DeviceID     = fs->BackingDeviceID();
     m_Metadata.ID           = fs->NextINodeIndex();
     m_Metadata.LinkCount    = 1;
     m_Metadata.Mode         = mode;
@@ -132,8 +132,8 @@ DevTmpFsINode::CreateDirectory(Ref<DirectoryEntry> entry, mode_t mode)
 ErrorOr<Ref<DirectoryEntry>> DevTmpFsINode::Symlink(Ref<DirectoryEntry> entry,
                                                     PathView targetPath)
 {
-    auto dentry     = TryOrRet(CreateNode(entry, 0777 | S_IFLNK, 0));
-    CTOS_UNUSED auto inode      = reinterpret_cast<DevTmpFsINode*>(dentry->INode());
+    auto             dentry = TryOrRet(CreateNode(entry, 0777 | S_IFLNK, 0));
+    CTOS_UNUSED auto inode  = reinterpret_cast<DevTmpFsINode*>(dentry->INode());
 
     // inode->m_Target = targetPath;
     return dentry;

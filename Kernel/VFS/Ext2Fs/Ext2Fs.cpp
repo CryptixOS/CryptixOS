@@ -168,19 +168,15 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
         Ext2FsDirectoryEntry* entry
             = reinterpret_cast<Ext2FsDirectoryEntry*>(buffer + i);
 
-        char* nameBuffer = new char[entry->NameSize + 1];
-        std::strncpy(nameBuffer, reinterpret_cast<char*>(entry->Name),
-                     entry->NameSize);
-        nameBuffer[entry->NameSize] = 0;
-
+        String name
+            = StringView(reinterpret_cast<char*>(entry->Name), entry->NameSize);
         if (entry->INodeIndex == 0)
         {
-            delete[] nameBuffer;
             i += entry->Size;
 
             continue;
         }
-        if (!std::strcmp(nameBuffer, ".") || !std::strcmp(nameBuffer, ".."))
+        if (name == "."_sv || name == ".."_sv)
         {
             i += entry->Size;
             continue;
@@ -208,7 +204,7 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
                 break;
         }
 
-        Ext2FsINode* newNode          = new Ext2FsINode(nameBuffer, this, mode);
+        Ext2FsINode* newNode          = new Ext2FsINode(name, this, mode);
         newNode->m_Metadata.UID       = inodeMeta.UID;
         newNode->m_Metadata.GID       = inodeMeta.GID;
         newNode->m_Metadata.ID        = entry->INodeIndex;
@@ -231,7 +227,6 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
         if (newNode->IsSymlink())
             ;
 
-        delete[] nameBuffer;
         i += entry->Size;
     }
 

@@ -29,6 +29,20 @@ constexpr dev_t MakeDevice(DeviceMajor major, DeviceMinor minor)
 
     return dev;
 }
+constexpr DeviceMajor GetDeviceMajor(dev_t dev)
+{
+    u32 major = (dev & static_cast<dev_t>(0x0000'0000'000f'ff00u)) >> 8;
+    major |= (dev & static_cast<dev_t>(0xffff'f000'0000'0000u)) >> 32;
+
+    return major;
+}
+constexpr DeviceMinor GetDeviceMinor(dev_t dev)
+{
+    u32 minor = dev & static_cast<dev_t>(0x0000'0000'0000'00ffu);
+    minor |= (dev & static_cast<dev_t>(0x0000'0fff'fff0'0000u)) >> 12;
+
+    return minor;
+}
 
 class Device : public File
 {

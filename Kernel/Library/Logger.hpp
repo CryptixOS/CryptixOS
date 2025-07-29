@@ -9,6 +9,8 @@
 #include <Prism/Core/Types.hpp>
 #include <Prism/Debug/Log.hpp>
 
+#include <cstdarg>
+
 constexpr usize LOG_SINK_E9              = Bit(0);
 constexpr usize LOG_SINK_SERIAL          = Bit(1);
 constexpr usize LOG_SINK_TERMINAL        = Bit(2);

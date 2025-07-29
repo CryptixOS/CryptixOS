@@ -15,7 +15,7 @@ Fat32FsINode::Fat32FsINode(StringView name, class Filesystem* fs, mode_t mode)
     : INode(name, fs)
     , m_Fat32Fs(reinterpret_cast<Fat32Fs*>(fs))
 {
-    m_Metadata.DeviceID         = fs->DeviceID();
+    m_Metadata.DeviceID         = fs->BackingDeviceID();
     m_Metadata.ID               = fs->NextINodeIndex();
     m_Metadata.LinkCount        = 1;
     m_Metadata.Mode             = mode;
