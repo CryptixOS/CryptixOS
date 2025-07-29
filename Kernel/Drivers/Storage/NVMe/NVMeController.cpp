@@ -35,7 +35,7 @@ namespace NVMe
         }
 
         StringView path = fmt::format("/dev/{}", Name()).data();
-        VFS::CreateNode(path, 0666, ID());
+        VFS::CreateNode(path, 0666 | S_IFCHR, ID());
     }
 
     bool Controller::Initialize()
@@ -73,20 +73,16 @@ namespace NVMe
             = new Queue(m_CrAddress, queueId, m_DoorbellStride, m_QueueSlots);
         // TODO(v1tr10l7): Set Msi-X irq
 
-        Pointer asq
-            = m_AdminQueue->GetSubmit();
-        Pointer acq
-            = m_AdminQueue->GetComplete();
+        Pointer asq = m_AdminQueue->GetSubmit();
+        Pointer acq = m_AdminQueue->GetComplete();
 
         m_Register->AdminQueueAttributes.SubmitQueueSize   = m_QueueSlots - 1;
         m_Register->AdminQueueAttributes.CompleteQueueSize = m_QueueSlots - 1;
 
-        m_Register->AdminSubmissionQueue
-            = asq.FromHigherHalf();
-        m_Register->AdminCompletionQueue
-            = acq.FromHigherHalf();
+        m_Register->AdminSubmissionQueue                 = asq.FromHigherHalf();
+        m_Register->AdminCompletionQueue                 = acq.FromHigherHalf();
 
-        m_Register->Configuration.IoSubmitQueueEntrySize   = 6;
+        m_Register->Configuration.IoSubmitQueueEntrySize = 6;
         m_Register->Configuration.IoCompleteQueueEntrySize = 4;
         m_Register->Configuration.Enable                   = true;
 
