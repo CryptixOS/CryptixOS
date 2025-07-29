@@ -37,7 +37,8 @@ class PageMap
 
     void* NextLevel(PageTableEntry& entry, bool allocate, uintptr_t virt = -1);
 
-    bool  ValidateAddress(Pointer address, PageAttributes flags = PageAttributes::eRead);
+    bool  ValidateAddress(Pointer        address,
+                          PageAttributes flags = PageAttributes::eRead);
     PageTableEntry*  Virt2Pte(PageTable* topLevel, Pointer virt, bool allocate,
                               u64 pageSize);
     Pointer          Virt2Phys(Pointer        virt,

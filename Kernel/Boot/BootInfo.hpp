@@ -44,14 +44,16 @@ struct BootInformation
     Span<Framebuffer, DynamicExtent>    Framebuffers;
 
     // Physical address of the RSDP structure
-    Pointer                             RSDP           = nullptr;
+    Pointer                             RSDP                    = nullptr;
     // Physical address of the Device Tree Blob
-    Pointer                             DeviceTreeBlob = nullptr;
+    Pointer                             DeviceTreeBlob          = nullptr;
     // Physical address of the SMBIOS 32 bit EntryPoint structure
-    Pointer                             SmBios32Phys   = nullptr;
+    Pointer                             SmBios32Phys            = nullptr;
     // Physical address of the SMBIOS 64 bit EntryPoint structure
-    Pointer                             SmBios64Phys   = nullptr;
+    Pointer                             SmBios64Phys            = nullptr;
 
-    Pointer                             EfiSystemTable = nullptr;
+    Pointer                             EfiSystemTable          = nullptr;
+
+    Pointer                             LowestAllocatedAddress  = 0;
+    Pointer                             HighestAllocatedAddress = 0;
 };
-

@@ -86,7 +86,7 @@ namespace Stacktrace
             current += 3;
 
             StringView name = current;
-            while (*(++current))
+            while (*(++current) && current < fileEnd.As<char>())
                 if (*current == '\n') break;
 
             Symbol ksym;
@@ -105,9 +105,9 @@ namespace Stacktrace
             ++current;
         }
 
-        u64 filePageCount = Math::DivRoundUp(module->Size, PMM::PAGE_SIZE);
-        PMM::FreePages(fileStart.FromHigherHalf(), filePageCount);
         LogInfo("Stacktrace: kernel symbols loaded");
+        // u64 filePageCount = Math::DivRoundUp(module->Size, PMM::PAGE_SIZE);
+        // PMM::FreePages(fileStart.FromHigherHalf(), filePageCount);
 
 #if CTOS_DUMP_INIT_ARRAY != 0
         LogTrace("System: Dumping init array =>");
@@ -124,10 +124,8 @@ namespace Stacktrace
 
         return true;
     }
-    void Print(usize maxFrames)
+    void Print(StackFrame* stackFrame, usize maxFrames)
     {
-        auto stackFrame = reinterpret_cast<StackFrame*>(CtosGetFrameAddress(0));
-
         for (usize i = 0; stackFrame && i < maxFrames; i++)
         {
             auto rip = stackFrame->InstructionPointer;
@@ -145,5 +143,10 @@ namespace Stacktrace
 
             if (symbol->Name.StartsWith("interrupt_handler")) break;
         }
+    }
+    void Print(usize maxFrames)
+    {
+        return Print(reinterpret_cast<StackFrame*>(CtosGetFrameAddress(0)),
+                     maxFrames);
     }
 }; // namespace Stacktrace

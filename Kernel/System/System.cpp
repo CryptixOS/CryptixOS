@@ -76,20 +76,16 @@ namespace System
 
     static void MapBootModule(const BootModuleInfo& module)
     {
-        PageMap* pageMap   = VMM::GetKernelPageMap();
-        Pointer  virtBase  = module.LoadAddress;
-        usize    size      = module.Size;
-        usize    pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
+        PageMap*     pageMap   = VMM::GetKernelPageMap();
+        Pointer      virtBase  = module.LoadAddress.ToHigherHalf();
+        usize        size      = module.Size;
+        auto         flags = PageAttributes::eRWX | PageAttributes::eWriteBack;
 
-        for (usize i = 0; i < pageCount; i++)
-        {
-            usize offset = PMM::PAGE_SIZE * i;
-            auto  virt   = virtBase.Offset<Pointer>(offset);
-            auto  phys   = virt.FromHigherHalf();
+        static usize index = 0;
+        LogDebug("System: Mapping module[{}] at {:#x}-{:#x}", index++,
+                 virtBase.Raw(), virtBase.Offset(size));
 
-            if (pageMap->ValidateAddress(virt)) continue;
-            Assert(pageMap->Map(virt, phys));
-        }
+        pageMap->MapRange(virtBase, virtBase.FromHigherHalf(), size, flags);
     }
     void PrepareBootModules(Span<BootModuleInfo> bootModules)
     {
@@ -111,7 +107,8 @@ namespace System
         using EntryType   = ACPI::SRAT::Type;
 
         LogTrace("System: Retrieving numa domains information from SRAT table");
-        auto    srat      = ACPI::GetTable<SRAT>("SRAT");
+        auto srat = ACPI::GetTable<SRAT>("SRAT");
+        if (!srat) return;
         usize   length    = srat->Header.Length;
 
         Pointer start     = srat;
