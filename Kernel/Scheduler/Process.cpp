@@ -485,7 +485,7 @@ ErrorOr<Process*> Process::Fork()
     thread->m_IsEnqueued       = false;
     newProcess->m_UserStackTop = m_UserStackTop;
 
-    LogDebug("Process: enqueing thread");
+    LogDebug("Process: enqueuing thread");
     Scheduler::EnqueueThread(thread);
 
     LogDebug("Process: Spawned {}", newProcess->m_Pid);
