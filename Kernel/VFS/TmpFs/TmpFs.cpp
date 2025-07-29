@@ -54,25 +54,8 @@ ErrorOr<INode*> TmpFs::AllocateNode(StringView name, mode_t mode)
     else if (FreeINodeCount() == 0) return Error(ENOSPC);
     --m_FreeINodeCount;
 
-    auto inode = new TmpFsINode(name, this, mode);
+    auto inode = new TmpFsINode(name, this, NextINodeIndex(), mode);
     if (!inode) return Error(ENOMEM);
-    // TODO(v1tr10l7): uid, gid
-
-    inode->m_Metadata.ID               = NextINodeIndex();
-    inode->m_Metadata.BlockSize        = PMM::PAGE_SIZE;
-    inode->m_Metadata.BlockCount       = 0;
-    inode->m_Metadata.RootDeviceID     = 0;
-
-    auto currentTime                   = Time::GetReal();
-    inode->m_Metadata.AccessTime       = currentTime;
-    inode->m_Metadata.ModificationTime = currentTime;
-    inode->m_Metadata.ChangeTime       = currentTime;
-
-    if (S_ISDIR(mode))
-    {
-        ++inode->m_Metadata.LinkCount;
-        inode->m_Metadata.Size = 2 * DIRECTORY_ENTRY_SIZE;
-    }
 
     --m_FreeINodeCount;
     return inode;
@@ -88,7 +71,7 @@ ErrorOr<INode*> TmpFs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
         return maybeEntry.Value()->INode();
     }
 
-    return new TmpFsINode(entry->Name(), this, mode, 0, 0);
+    return new TmpFsINode(entry->Name(), this, NextINodeIndex(), mode);
 }
 
 ErrorOr<void> TmpFs::Stats(statfs& stats)

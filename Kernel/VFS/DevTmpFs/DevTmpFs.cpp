@@ -22,7 +22,7 @@ ErrorOr<::Ref<DirectoryEntry>> DevTmpFs::Mount(StringView  sourcePath,
 {
     if (m_Root) VFS::RecursiveDelete(m_Root);
 
-    m_RootEntry    = new DirectoryEntry(nullptr, "/");
+    m_RootEntry    = CreateRef<DirectoryEntry>(nullptr, "/");
     auto maybeRoot = AllocateNode(m_RootEntry->Name(), 0755 | S_IFDIR);
     RetOnError(maybeRoot);
 
@@ -34,25 +34,9 @@ ErrorOr<::Ref<DirectoryEntry>> DevTmpFs::Mount(StringView  sourcePath,
 
 ErrorOr<INode*> DevTmpFs::AllocateNode(StringView name, mode_t mode)
 {
-    auto inode = new DevTmpFsINode(name, this, mode);
+    auto inode = new DevTmpFsINode(name, this, NextINodeIndex(), mode);
     if (!inode) return Error(ENOMEM);
     // TODO(v1tr10l7): uid, gid
-
-    inode->m_Metadata.ID               = NextINodeIndex();
-    inode->m_Metadata.BlockSize        = PMM::PAGE_SIZE;
-    inode->m_Metadata.BlockCount       = 0;
-    inode->m_Metadata.RootDeviceID     = 0;
-
-    auto currentTime                   = Time::GetReal();
-    inode->m_Metadata.AccessTime       = currentTime;
-    inode->m_Metadata.ModificationTime = currentTime;
-    inode->m_Metadata.ChangeTime       = currentTime;
-
-    if (S_ISDIR(mode))
-    {
-        ++inode->m_Metadata.LinkCount;
-        inode->m_Metadata.Size = 2 * PMM::PAGE_SIZE;
-    }
 
     // --m_FreeINodeCount;
     return inode;

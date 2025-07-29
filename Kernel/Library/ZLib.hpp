@@ -11,8 +11,8 @@
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Core/Types.hpp>
 
-#include <Prism/Memory/Endian.hpp>
 #include <Prism/Memory/BitStream.hpp>
+#include <Prism/Memory/Endian.hpp>
 #include <Prism/Memory/Pointer.hpp>
 
 namespace ZLib
@@ -38,7 +38,7 @@ namespace ZLib
         };
 
         Header() = default;
-        Header(u16 header)
+        explicit Header(u16 header)
             : Data(header)
         {
         }
@@ -83,9 +83,12 @@ namespace ZLib
         }
         ~Decompressor();
 
-        bool         Decompress(usize initialSize = 0);
+        bool       Decompress(usize initialSize = 0);
 
-        inline u8*   DecompressedData() const { return reinterpret_cast<u8*>(m_OutputBuffer); }
+        inline u8* DecompressedData() const
+        {
+            return reinterpret_cast<u8*>(m_OutputBuffer);
+        }
         inline usize DecompressedSize() const
         {
             return m_OutputPointer - m_OutputBuffer;

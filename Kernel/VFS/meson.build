@@ -13,6 +13,7 @@ srcs += files(
   'INode.cpp',
   'MountPoint.cpp',
   'PathResolver.cpp',
+  'SynthFsINode.cpp',
   'VFS.cpp',
 )
 

@@ -7,8 +7,10 @@
 #include <API/Limits.hpp>
 #include <Arch/CPU.hpp>
 
+#include <Drivers/Device.hpp>
 #include <Library/Locking/Spinlock.hpp>
 #include <Library/Locking/SpinlockProtected.hpp>
+
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 
@@ -191,8 +193,8 @@ namespace VFS
             ;
         return dentry;
     }
-    ErrorOr<FileDescriptor*> Open(Ref<DirectoryEntry> parent, PathView path,
-                                  isize flags, mode_t mode)
+    ErrorOr<Ref<FileDescriptor>> Open(Ref<DirectoryEntry> parent, PathView path,
+                                      isize flags, mode_t mode)
     {
         auto maybeEntry = OpenDirectoryEntry(parent, path, flags, mode);
         RetOnError(maybeEntry);
@@ -215,12 +217,20 @@ namespace VFS
         auto inode  = dentry->INode();
         if (inode && inode->IsCharDevice())
         {
-            auto device = DevTmpFs::Lookup(inode->Stats().st_dev);
+            dev_t id     = inode->DeviceID();
+            auto  device = DevTmpFs::Lookup(id);
             if (device)
-                return new FileDescriptor(dentry, device, flags, accMode);
+            {
+                DeviceMajor major = GetDeviceMajor(id);
+                DeviceMinor minor = GetDeviceMinor(id);
+
+                LogTrace("VFS: Opening device with id: {}.{}", major, minor);
+                return CreateRef<FileDescriptor>(dentry, device, flags,
+                                                 accMode);
+            }
         }
 
-        return new FileDescriptor(dentry, flags, accMode);
+        return CreateRef<FileDescriptor>(dentry, flags, accMode);
     }
 
     ErrorOr<PathResolution> ResolvePath(Ref<DirectoryEntry> parent,

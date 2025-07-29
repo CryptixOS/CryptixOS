@@ -167,8 +167,8 @@ ErrorOr<void> INode::SetOwner(uid_t uid, gid_t gid)
 }
 ErrorOr<void> INode::ChangeMode(mode_t mode)
 {
-    m_Metadata.Mode = mode;
-    m_Dirty         = true;
+    m_Metadata.Mode |= (mode & 0777);
+    m_Dirty = true;
 
     return {};
 }

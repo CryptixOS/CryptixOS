@@ -43,7 +43,7 @@ namespace VFS
     ErrorOr<Ref<DirectoryEntry>> OpenDirectoryEntry(Ref<DirectoryEntry> parent,
                                                     PathView path, isize flags,
                                                     mode_t mode);
-    ErrorOr<FileDescriptor*>     Open(Ref<DirectoryEntry> parent, PathView path,
+    ErrorOr<Ref<FileDescriptor>> Open(Ref<DirectoryEntry> parent, PathView path,
                                       isize flags, mode_t mode);
 
     ErrorOr<PathResolution>      ResolvePath(Ref<DirectoryEntry> parent,
@@ -76,7 +76,7 @@ namespace VFS
     ErrorOr<Ref<DirectoryEntry>> Symlink(PathView path, PathView targetPath);
 
     ErrorOr<Ref<DirectoryEntry>> Link(Ref<DirectoryEntry> oldParent,
-                                      StringView            oldName,
+                                      StringView          oldName,
                                       Ref<DirectoryEntry> newParent,
                                       StringView newName, i32 flags = 0);
     ErrorOr<Ref<DirectoryEntry>> Link(PathView oldPath, PathView newPath,
