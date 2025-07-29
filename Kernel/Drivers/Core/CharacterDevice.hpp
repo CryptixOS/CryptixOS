@@ -22,6 +22,7 @@ class CharacterDevice : public Device
                                               DeviceMinor minorBase = 0,
                                               usize       count     = 1);
 
+    static ErrorOr<void>             RegisterBaseMemoryDevices();
     static ErrorOr<void>    Register(dev_t id, CharacterDevice* device);
     static CharacterDevice* Lookup(dev_t deviceID);
 
