@@ -410,32 +410,30 @@ namespace API::VFS
         auto process = Process::Current();
         if (!process->ValidateRead(pathname, 255)) return Error(EFAULT);
 
-        auto path = CPU::AsUser(
-            [&pathname]() -> Path
-            {
-                if (!pathname || *pathname == 0) return "";
+        Path path = pathname ? CPU::CopyStringFromUser(pathname) : ""_p;
 
-                return pathname;
-            });
-
-        auto cwd = process->CWD();
+        auto cwd  = process->CWD();
         Assert(cwd);
 
-        auto maybePathRes = ::VFS::ResolvePath(cwd, path, true);
-        RetOnError(maybePathRes);
+        auto entryName = path.BaseName().Empty() ? path.ParentPath().BaseName()
+                                                 : path.BaseName();
+        LogDebug("VFS::RmDir: Removing {} from {}, full path: {}", entryName,
+                 path.BaseName().Empty() ? path.ParentPath().ParentPath()
+                                         : path.ParentPath(),
+                 path);
+        auto parentEntry = TryOrRet(
+            VFS::ResolveParent(path.StartsWith("/") ? nullptr : cwd, path));
+        auto parentINode = parentEntry->INode();
 
-        auto pathRes     = maybePathRes.Value();
-
-        auto entry       = pathRes.Entry;
-        auto parentINode = pathRes.Parent->INode();
-
+        auto entry       = parentEntry->Lookup(entryName);
+        if (!entry) return Error(ENOENT);
         if (!parentINode->IsDirectory() || !entry->IsDirectory())
             return Error(ENOTDIR);
 
         // FIXME(v1tr10l7): error handling, posix compliance
-        auto status = parentINode->RmDir(entry);
-
-        RetOnError(status);
+        LogDebug("VFS::RmDir: Calling parentINode->RmDir(entry);");
+        RetOnError(parentINode->RmDir(entry));
+        LogDebug("VFS::RmDir: Successfully removed directory");
 
         return 0;
     }

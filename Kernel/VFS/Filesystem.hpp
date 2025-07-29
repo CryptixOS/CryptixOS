@@ -114,6 +114,13 @@ class Filesystem : public RefCounted
         return Error(ENOSYS);
     }
     /**
+     * @brief Free an inode.
+     * @param inode Pointer to the inode to be freed
+     *
+     * @return ErrorOr<void> Nothing or error.
+     */
+    virtual ErrorOr<void>          FreeINode(INode* inode) { return Error(ENOSYS); }
+    /**
      * @brief Populate directory contents, if lazy-loading is used.
      * @param Directory entry to populate.
      *

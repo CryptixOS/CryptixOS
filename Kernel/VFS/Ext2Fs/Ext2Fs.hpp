@@ -31,7 +31,7 @@ class Ext2Fs : public Filesystem
     inline Ext2FsSuperBlock* GetSuperBlock() const { return m_SuperBlock; }
     inline usize             GetBlockSize() const { return m_BlockSize; }
 
-    void                     FreeINode(usize inode);
+    ErrorOr<void>            FreeINode(INode* inode) override;
 
     isize SetINodeBlock(Ext2FsINodeMeta& meta, u32 inode, u32 iblock,
                         u32 dblock);

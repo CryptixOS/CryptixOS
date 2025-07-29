@@ -229,25 +229,29 @@ ErrorOr<void> SynthFsINode::Unlink(Ref<DirectoryEntry> entry)
 
     auto currentTime = Time::GetReal();
     auto atime = m_Filesystem->ShouldUpdateATime() ? currentTime : timespec{};
+
     UpdateTimestamps(atime, currentTime, currentTime);
     inode->m_Metadata.ChangeTime = currentTime;
     --inode->m_Metadata.LinkCount;
 
-    if (inode->m_Metadata.LinkCount == 0)
+    auto inodeLinkCount = inode->m_Metadata.LinkCount;
+    if (inodeLinkCount == 0 + inode->IsDirectory())
     {
         m_Children.Erase(it);
-        delete entry->INode();
+        IgnoreUnused(m_Filesystem->FreeINode(inode));
     }
 
     auto parent = entry->Parent();
+    Assert(parent);
     parent->RemoveChild(entry);
 
-    LogTrace("VFS::TmpFs: Unlinked inode => `{}`, link count => {}",
-             entry->Name(), inode->m_Metadata.LinkCount);
     return {};
 }
 ErrorOr<void> SynthFsINode::RmDir(Ref<DirectoryEntry> entry)
 {
+    auto inode = reinterpret_cast<SynthFsINode*>(entry->INode());
+    if (!inode->Children().Empty()) return Error(ENOTEMPTY);
+
     m_Lock.Acquire();
     --m_Metadata.LinkCount;
     m_Lock.Release();

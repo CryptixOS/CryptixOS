@@ -84,8 +84,9 @@ void DirectoryEntry::InsertChild(::Ref<class DirectoryEntry> entry)
 void DirectoryEntry::RemoveChild(::Ref<class DirectoryEntry> entry)
 {
     ScopedLock guard(m_Lock);
+    Assert(entry);
 
-    auto       it = m_Children.Find(entry->Name());
+    auto it = m_Children.Find(entry->Name());
     if (it == m_Children.end()) return;
 
     m_Children.Erase(it);
@@ -180,16 +181,19 @@ ErrorOr<void> DirectoryEntry::PopulateDirectoryEntries()
     if (m_Populated) return {};
     if (!INode()) return Error(ENOENT);
 
-    DirectoryIterator iterator;
+    Vector<StringView> inodes;
+    DirectoryIterator  iterator;
     iterator.BindLambda(
-        [this](StringView name, loff_t offset, usize ino, u64 type) -> bool
+        [&inodes](StringView name, loff_t offset, usize ino, u64 type) -> bool
         {
-            Lookup(name);
+            inodes.PushBack(name);
 
             return true;
         });
 
     INode()->TraverseDirectories(nullptr, iterator);
+    for (const auto name : inodes) Lookup(name);
+
     m_Populated = true;
     return {};
 }
