@@ -48,7 +48,7 @@ namespace CPU
         (void)ctx;
     }
 
-    void Reschedule(TimeStep) {}
+    void Reschedule(Timestep) {}
 
     void HaltAll() {}
     void WakeUp(usize, bool) {}
