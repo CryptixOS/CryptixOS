@@ -21,6 +21,7 @@
 class INode;
 class DirectoryEntry;
 using INodeMode = mode_t;
+using DeviceID  = dev_t;
 
 /**
  * @class Filesystem
@@ -56,6 +57,12 @@ class Filesystem : public RefCounted
      */
     inline StringView            Name() const { return m_Name; }
     /**
+     * @brief Get the id of the backing device on which filesystem sits.
+     *
+     * @return DeviceID Backing device ID of the filesystem.
+     */
+    inline DeviceID              BackingDeviceID() const { return m_DeviceID; }
+    /**
      * @brief Get the root DirectoryEntry of this filesystem.
      *
      * @return DirectoryEntry* Pointer to the root directory entry.
@@ -68,12 +75,6 @@ class Filesystem : public RefCounted
      * @return ino_t Next inode index (auto-incremented).
      */
     inline ino_t                 NextINodeIndex() { return m_NextINodeIndex++; }
-    /**
-     * @brief Get the device ID of the backing device.
-     *
-     * @return dev_t Device ID.
-     */
-    inline dev_t                 DeviceID() const { return m_DeviceID; }
     /**
      * @brief Get the name of the backing device.
      *
@@ -118,7 +119,7 @@ class Filesystem : public RefCounted
      *
      * @return true if successful or not needed, false on failure.
      */
-    virtual bool   Populate(DirectoryEntry* entry)                      = 0;
+    virtual bool          Populate(DirectoryEntry* entry) = 0;
 
     /**
      * @brief Return filesystem statistics (like block size, usage).
