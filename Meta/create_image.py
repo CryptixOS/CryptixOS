@@ -36,8 +36,8 @@ def parse_size(size_str: str) -> int:
 def create_filesystems(image: Image, src_path: str):
     part_table_type = PartitionTableType(args.partition_table.lower())
     image.create_partition_table(part_table_type)
-    image.mkpart('primary', '2048s', '64MiB')
-    image.mkpart('primary', '64MiB', '92MiB')
+    image.mkpart('primary', '2048s', '1024MiB')
+    image.mkpart('primary', '1024MiB', '100%')
     filesystems = ['fat32', 'ext2']
     for i, fs in enumerate(filesystems):
         image.mkfs(i + 1, fs)
