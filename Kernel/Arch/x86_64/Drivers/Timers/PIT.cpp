@@ -38,7 +38,7 @@ PIT::PIT()
 void          PIT::Initialize() { s_Instance = Instance(); }
 bool          PIT::IsInitialized() { return s_Instance != nullptr; }
 
-ErrorOr<void> PIT::Start(TimerMode mode, TimeStep interval)
+ErrorOr<void> PIT::Start(TimerMode mode, Timestep interval)
 {
     if (mode == TimerMode::eOneShot) m_CurrentMode = Mode::eOneShot;
     else if (mode == TimerMode::ePeriodic) m_CurrentMode = Mode::eSquareWave;

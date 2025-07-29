@@ -128,16 +128,6 @@ ErrorOr<void> I8042Controller::Initialize()
 
     LogInfo("I8042: Initialized");
     return {};
-    auto handler = InterruptManager::AllocateHandler(0x21);
-    handler->Reserve();
-    handler->SetHandler(I8042Controller::HandleInterrupt);
-    InterruptManager::Unmask(0x01);
-
-    while (!IsInputEmpty());
-
-    LogInfo("I8042: Allocated IRQ handler for vector: {:#x}",
-            handler->GetInterruptVector());
-    return {};
 }
 
 bool I8042Controller::IsOutputEmpty()

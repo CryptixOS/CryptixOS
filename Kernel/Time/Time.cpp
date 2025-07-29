@@ -20,7 +20,7 @@ namespace Time
 {
     struct Timer
     {
-        explicit Timer(timespec when)
+        explicit Timer(Timestep when)
             : When(when)
         {
             Arm();
@@ -28,7 +28,7 @@ namespace Time
 
         Optional<usize> Index = NullOpt;
         bool            Fired = false;
-        timespec        When  = {0, 0};
+        Timestep        When{0};
         Event           Event;
 
         void            Arm();
@@ -113,11 +113,7 @@ namespace Time
 
     ErrorOr<void> NanoSleep(usize ns)
     {
-        isize    ins      = static_cast<isize>(ns);
-
-        timespec duration = {.tv_sec = ins / 1'000'000'000, .tv_nsec = ins};
-
-        Timer*   timer    = new Timer(duration);
+        Timer* timer = new Timer(ns);
         timer->Event.Await(true);
         timer->Disarm();
 
@@ -127,10 +123,16 @@ namespace Time
     ErrorOr<void> Sleep(const timespec* duration, timespec* remaining)
     {
         LogDebug("Sleeping");
-        Timer* timer = new Timer(*duration);
+        usize ns = static_cast<usize>(duration->tv_sec) * 1'000'000'000;
+        if (ns == 0) ns = static_cast<usize>(duration->tv_nsec);
+
+        Timer* timer = new Timer(ns);
+
         if (!timer->Event.Await(true))
         {
-            if (remaining) *remaining = timer->When;
+            if (remaining)
+                *remaining = {static_cast<isize>(timer->When.Seconds()),
+                              static_cast<isize>(timer->When.Nanoseconds())};
             timer->Disarm();
             return Error(EINTR);
         }
@@ -151,8 +153,9 @@ namespace Time
             {
                 if (timer->Fired) continue;
 
-                timer->When -= timespec(0, ns);
-                if (timer->When == timespec(0, 0))
+                if (ns >= timer->When.Nanoseconds()) timer->When = 0_ns;
+                else timer->When -= ns;
+                if (timer->When == 0_ns)
                 {
                     timer->Event.Trigger(false);
                     timer->Fired = true;

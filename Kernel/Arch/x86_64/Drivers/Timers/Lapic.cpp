@@ -126,7 +126,7 @@ void Lapic::SendIpi(u32 flags, u32 m_ID)
 }
 void          Lapic::SendEOI() { Write(LAPIC_EOI_REGISTER, LAPIC_EOI_ACK); }
 
-ErrorOr<void> Lapic::Start(TimerMode tm, TimeStep interval)
+ErrorOr<void> Lapic::Start(TimerMode tm, Timestep interval)
 {
     Mode  mode   = tm == TimerMode::eOneShot ? Mode::eOneshot : Mode::ePeriodic;
     u8    vector = m_InterruptHandler->GetInterruptVector();

@@ -11,7 +11,7 @@
 #include <Prism/Utility/Delegate.hpp>
 #include <Prism/Core/Error.hpp>
 
-#include <Time/TimeStep.hpp>
+#include <Prism/Utility/Time.hpp>
 
 enum class TimerMode
 {
@@ -36,7 +36,7 @@ class HardwareTimer
         m_OnTickCallback.Bind<Callback>();
     }
 
-    virtual ErrorOr<void> Start(TimerMode mode, TimeStep interval) = 0;
+    virtual ErrorOr<void> Start(TimerMode mode, Timestep interval) = 0;
     virtual void          Stop()                                   = 0;
 
     virtual ErrorOr<void> SetFrequency(usize frequency)            = 0;

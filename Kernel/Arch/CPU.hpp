@@ -10,7 +10,7 @@
 #include <Prism/Memory/Memory.hpp>
 #include <Prism/Utility/Path.hpp>
 
-#include <Time/TimeStep.hpp>
+#include <Prism/Utility/Time.hpp>
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
     #include <Arch/x86_64/CPU.hpp>
@@ -43,7 +43,7 @@ namespace CPU
     void    SaveThread(Thread* thread, CPUContext* ctx);
     void    LoadThread(Thread* thread, CPUContext* ctx);
 
-    void    Reschedule(TimeStep us);
+    void    Reschedule(Timestep us);
 
     void    HaltAll();
     void    WakeUp(usize id, bool everyone);

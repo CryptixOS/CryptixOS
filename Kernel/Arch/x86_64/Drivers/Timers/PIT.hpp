@@ -22,7 +22,7 @@ class PIT : public HardwareTimer, public Singleton<PIT>
 
     StringView    GetModelString() const override { return "i8253"_sv; }
 
-    ErrorOr<void> Start(TimerMode mode, TimeStep interval) override;
+    ErrorOr<void> Start(TimerMode mode, Timestep interval) override;
     void          Stop() override;
 
     u8            GetInterruptVector();

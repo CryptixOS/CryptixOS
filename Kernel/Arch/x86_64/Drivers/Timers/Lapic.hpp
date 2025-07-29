@@ -33,7 +33,7 @@ class Lapic : public HardwareTimer, public Singleton<Lapic>
 
     static void   PanicIpi();
 
-    ErrorOr<void> Start(TimerMode mode, TimeStep interval) override;
+    ErrorOr<void> Start(TimerMode mode, Timestep interval) override;
     void          Stop() override;
 
     ErrorOr<void> SetFrequency(usize frequency) override

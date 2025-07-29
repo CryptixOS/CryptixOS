@@ -553,7 +553,7 @@ namespace CPU
 
         *ctx = thread->Context;
     }
-    void Reschedule(TimeStep interval)
+    void Reschedule(Timestep interval)
     {
         Assert(Lapic::Instance()->Start(TimerMode::eOneShot, interval));
     }
