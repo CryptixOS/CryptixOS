@@ -11,7 +11,7 @@
 
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptManager.hpp>
-#ifdef CTOS_TARGET_X86_64
+#ifdef 0
     #include <Arch/x86_64/Drivers/Timers/KVMClock.hpp>
 #endif
 
@@ -295,7 +295,7 @@ kernelStart(const BootInformation& info)
     auto thread
         = process->CreateThread(kernelThread, false, CPU::GetCurrent()->ID);
 
-#ifdef CTOS_TARGET_X86_64
+#ifdef 0
     KVM::Clock::Initialize();
 #endif
 
