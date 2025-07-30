@@ -129,6 +129,9 @@ namespace CPU
         u64  rax, rbx, rcx, rdx;
     };
 
+    u32          KvmBase();
+    u64          RdTsc();
+
     void         Halt();
     void         HaltAll();
     void         WakeUp(usize id, bool everyone);

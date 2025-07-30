@@ -16,9 +16,7 @@
 #include <Scheduler/Thread.hpp>
 
 Thread::Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn)
-    : m_RunningOn(runOn)
-    , m_Self(this)
-    , m_State(ThreadState::eDequeued)
+    : m_State(ThreadState::eDequeued)
     , m_ErrorCode(no_error)
     , m_Parent(parent)
     , m_IsUser(false)
@@ -27,39 +25,44 @@ Thread::Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn)
 {
     m_Tid = parent->m_NextTid++;
     CPU::PrepareThread(this, pc, arg);
+    m_Tls.Self      = this;
+    m_Tls.RunningOn = runOn;
 }
 
 Thread* Thread::Current() { return CPU::GetCurrentThread(); }
 
-void    Thread::SetRunningOn(isize runningOn) { m_RunningOn = runningOn; }
+void    Thread::SetRunningOn(isize runningOn) { m_Tls.RunningOn = runningOn; }
 
-Pointer Thread::GetStack() const { return m_Stack; }
-void    Thread::SetStack(Pointer stack) { m_Stack = stack; }
+Pointer Thread::GetStack() const { return m_Tls.Stack; }
+void    Thread::SetStack(Pointer stack) { m_Tls.Stack = stack; }
 
-Pointer Thread::PageFaultStack() const { return m_PageFaultStack; }
-Pointer Thread::KernelStack() const { return m_KernelStack; }
+Pointer Thread::PageFaultStack() const { return m_Tls.PageFaultStack; }
+Pointer Thread::KernelStack() const { return m_Tls.KernelStack; }
 
-void Thread::SetPageFaultStack(Pointer pfstack) { m_PageFaultStack = pfstack; }
-void Thread::SetKernelStack(Pointer kstack) { m_KernelStack = kstack; }
+void    Thread::SetPageFaultStack(Pointer pfstack)
+{
+    m_Tls.PageFaultStack = pfstack;
+}
+void    Thread::SetKernelStack(Pointer kstack) { m_Tls.KernelStack = kstack; }
 
-Pointer Thread::FpuStorage() const { return m_FpuStorage; }
+Pointer Thread::FpuStorage() const { return m_Tls.FpuStorage; }
 void    Thread::SetFpuStorage(Pointer fpuStorage, usize pageCount)
 {
-    m_FpuStorage          = fpuStorage;
-    m_FpuStoragePageCount = pageCount;
+    m_Tls.FpuStorage          = fpuStorage;
+    m_Tls.FpuStoragePageCount = pageCount;
 }
 
 Thread::Thread(Process* parent, Vector<StringView>& argv,
                Vector<StringView>& envp, ExecutableProgram& program, i64 runOn)
-    : m_RunningOn(CPU::GetCurrent()->ID)
-    , m_Self(this)
-    , m_State(ThreadState::eDequeued)
+    : m_State(ThreadState::eDequeued)
     , m_ErrorCode(no_error)
     , m_Parent(parent)
     , m_IsUser(true)
     , m_IsEnqueued(false)
 {
-    m_Tid = parent->m_NextTid++;
+    m_Tls.RunningOn = CPU::Current()->ID;
+    m_Tls.Self      = this;
+    m_Tid           = parent->m_NextTid++;
 
     if (!parent->PageMap) parent->PageMap = VMM::GetKernelPageMap();
 
@@ -89,20 +92,21 @@ Thread::Thread(Process* parent, Vector<StringView>& argv,
 
     auto [stackTopWritable, stackTopVirt] = mapUserStack();
 
-    m_Stack = program.PrepareStack(stackTopWritable, stackTopVirt, argv, envp);
+    m_Tls.Stack
+        = program.PrepareStack(stackTopWritable, stackTopVirt, argv, envp);
     CPU::PrepareThread(this, program.EntryPoint(), 0);
 }
 
 Thread::Thread(Process* parent, Pointer pc, bool user)
-    : m_RunningOn(CPU::GetCurrent()->ID)
-    , m_Self(this)
-    , m_State(ThreadState::eDequeued)
+    : m_State(ThreadState::eDequeued)
     , m_ErrorCode(no_error)
     , m_Parent(parent)
     , m_IsUser(user)
     , m_IsEnqueued(false)
 {
-    m_Tid = parent->m_NextTid++;
+    m_Tls.RunningOn = CPU::GetCurrent()->ID;
+    m_Tls.Self      = this;
+    m_Tid           = parent->m_NextTid++;
 
     Pointer stackPhys
         = PMM::CallocatePages<uintptr_t>(CPU::USER_STACK_SIZE / PMM::PAGE_SIZE);
@@ -119,7 +123,7 @@ Thread::Thread(Process* parent, Pointer pc, bool user)
     Pointer stackTopWritable
         = stackPhys.Offset<Pointer>(CPU::USER_STACK_SIZE).ToHigherHalf();
 
-    m_Stack = Math::AlignDown(stackTopWritable, 16);
+    m_Tls.Stack = Math::AlignDown(stackTopWritable, 16);
 
     CPU::PrepareThread(this, pc, 0);
 }
@@ -132,10 +136,10 @@ Thread::~Thread()
         PMM::FreePages(phys, pageCount);
     }
 
-    PMM::FreePages(m_FpuStorage, m_FpuStoragePageCount);
-    PMM::FreePages(m_KernelStack,
+    PMM::FreePages(m_Tls.FpuStorage, m_Tls.FpuStoragePageCount);
+    PMM::FreePages(m_Tls.KernelStack,
                    Math::DivRoundUp(CPU::KERNEL_STACK_SIZE, PMM::PAGE_SIZE));
-    PMM::FreePages(m_PageFaultStack,
+    PMM::FreePages(m_Tls.PageFaultStack,
                    Math::DivRoundUp(CPU::KERNEL_STACK_SIZE, PMM::PAGE_SIZE));
 }
 
@@ -216,17 +220,18 @@ Thread* Thread::Fork(Process* process)
 {
     Thread* newThread
         = process->CreateThread(Context.rip, m_IsUser, CPU::GetCurrent()->ID);
-    newThread->m_Self  = newThread;
-    newThread->m_Stack = m_Stack;
+    newThread->m_Tls.Self  = newThread;
+    newThread->m_Tls.Stack = m_Tls.Stack;
 
-    Pointer kstack     = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
-                                                        / PMM::PAGE_SIZE);
-    newThread->m_KernelStack = kstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
-        CPU::KERNEL_STACK_SIZE);
+    Pointer kstack = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
+                                                    / PMM::PAGE_SIZE);
+    newThread->m_Tls.KernelStack
+        = kstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
+            CPU::KERNEL_STACK_SIZE);
 
     Pointer pfstack = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
                                                      / PMM::PAGE_SIZE);
-    newThread->m_PageFaultStack
+    newThread->m_Tls.PageFaultStack
         = pfstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
             CPU::KERNEL_STACK_SIZE);
 
@@ -249,12 +254,13 @@ Thread* Thread::Fork(Process* process)
             CreateRef<Region>(newStackPhys, newStackPhys, stackSize));
     }
 
-    newThread->m_FpuStoragePageCount = m_FpuStoragePageCount;
-    newThread->m_FpuStorage
-        = Pointer(PMM::CallocatePages<uintptr_t>(m_FpuStoragePageCount))
+    newThread->m_Tls.FpuStoragePageCount = m_Tls.FpuStoragePageCount;
+    newThread->m_Tls.FpuStorage
+        = Pointer(PMM::CallocatePages<uintptr_t>(m_Tls.FpuStoragePageCount))
               .ToHigherHalf<uintptr_t>();
-    Memory::Copy(newThread->m_FpuStorage, m_FpuStorage,
-                 m_FpuStoragePageCount * PMM::PAGE_SIZE);
+
+    Memory::Copy(newThread->m_Tls.FpuStorage, m_Tls.FpuStorage,
+                 m_Tls.FpuStoragePageCount * PMM::PAGE_SIZE);
 
     newThread->m_Parent    = process;
     newThread->Context     = SavedContext;

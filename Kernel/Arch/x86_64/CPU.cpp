@@ -346,6 +346,38 @@ namespace CPU
 
         return interruptFlag;
     }
+
+    bool InHypervisor()
+    {
+        ID id(1);
+
+        return id.rcx & Bit(31);
+    }
+    u32 KvmBase()
+    {
+        if (!InHypervisor()) return 0;
+
+        for (u32 base = 0x40000000; base < 0x40010000; base += 0x100)
+        {
+            ID  id(base);
+
+            u32 signature[3]
+                = {static_cast<u32>(id.rbx), static_cast<u32>(id.rcx),
+                   static_cast<u32>(id.rdx)};
+            if (!Memory::Compare("KVMKVMKVM\0\0\0", signature, 12)) return base;
+        }
+
+        return 0;
+    }
+    u64 RdTsc()
+    {
+        u32 a = 0;
+        u32 d = 0;
+
+        __asm__ volatile("lfence; rdtsc" : "=a"(a), "=d"(d));
+        return static_cast<u64>(a) | (static_cast<u64>(d) << 32);
+    }
+
     void Halt() { __asm__ volatile("hlt"); }
     void HaltAll()
     {
@@ -471,10 +503,10 @@ namespace CPU
     CPU*    Current() { return GetCurrent(); }
     Thread* GetCurrentThread()
     {
-        Thread* currentThread;
-        __asm__ volatile("mov %%gs:8, %0" : "=r"(currentThread)::"memory");
+        Thread* thread;
+        __asm__ volatile("mov %%gs:8, %0" : "=r"(thread)::"memory");
 
-        return currentThread;
+        return thread;
     }
 
     void PrepareThread(Thread* thread, Pointer pc, Pointer arg)
@@ -547,7 +579,7 @@ namespace CPU
 
         thread->Parent()->PageMap->Load();
 
-        SetGSBase(reinterpret_cast<u64>(thread));
+        SetGSBase(reinterpret_cast<u64>(&thread->m_Tls));
         SetKernelGSBase(thread->GsBase());
         SetFSBase(thread->FsBase());
 

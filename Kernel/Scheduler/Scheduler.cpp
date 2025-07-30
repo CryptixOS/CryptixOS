@@ -246,8 +246,8 @@ void Scheduler::Yield(bool saveCtx)
     else
     {
 #ifdef CTOS_TARGET_X86_64
-        CPU::SetGSBase(reinterpret_cast<uintptr_t>(CPU::Current()->Idle));
-        CPU::SetKernelGSBase(reinterpret_cast<uintptr_t>(CPU::Current()->Idle));
+        CPU::SetGSBase(reinterpret_cast<uintptr_t>(&CPU::Current()->Idle->m_Tls));
+        CPU::SetKernelGSBase(reinterpret_cast<uintptr_t>(&CPU::Current()->Idle->m_Tls));
 #endif
     }
 

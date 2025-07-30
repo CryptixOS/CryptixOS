@@ -24,6 +24,11 @@
 #include <Prism/Containers/IntrusiveList.hpp>
 #include <Scheduler/Event.hpp>
 
+namespace CPU
+{
+    Thread* GetCurrentThread();
+};
+
 enum class ThreadState
 {
     eReady,
@@ -36,8 +41,22 @@ enum class ThreadState
     eExited,
 };
 
+struct Thread;
+struct ThreadTLS
+{
+    isize   RunningOn;
+    Thread* Self;
+    Pointer Stack;
+
+    Pointer KernelStack;
+    Pointer PageFaultStack;
+
+    usize   FpuStoragePageCount;
+    Pointer FpuStorage;
+};
+
 class Process;
-struct Thread
+struct Thread : public RefCounted
 {
     Thread() = default;
     Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn = -1);
@@ -122,23 +141,25 @@ struct Thread
 
   private:
     ///// DON'T MOVE /////
-    isize       m_RunningOn = -1;
-    Thread*     m_Self      = this;
-    Pointer     m_Stack;
-
-    Pointer     m_KernelStack;
-    Pointer     m_PageFaultStack;
-
-    usize       m_FpuStoragePageCount;
-    Pointer     m_FpuStorage;
+    // isize          m_RunningOn = -1;
+    // Thread*        m_Self      = this;
+    // Pointer        m_Stack;
+    //
+    // Pointer        m_KernelStack;
+    // Pointer        m_PageFaultStack;
+    //
+    // usize          m_FpuStoragePageCount;
+    // Pointer        m_FpuStorage;
     ///// ^^^^^^^^^^ /////
 
-    Spinlock    m_Lock;
-    tid_t       m_Tid;
-    ThreadState m_State     = ThreadState::eIdle;
-    errno_t     m_ErrorCode = no_error;
-    Process*    m_Parent;
-    Pointer     m_StackVirt;
+    Spinlock       m_Lock;
+    tid_t          m_Tid;
+    ThreadState    m_State     = ThreadState::eIdle;
+    errno_t        m_ErrorCode = no_error;
+    Process*       m_Parent;
+    Pointer        m_StackVirt;
+
+    friend Thread* CPU::GetCurrentThread();
 
   public:
     CPUContext Context;
@@ -146,8 +167,8 @@ struct Thread
     Spinlock   YieldAwaitLock;
 
   private:
-    Vector<Ref<Region>> m_Stacks;
-    bool                m_IsUser = false;
+    Vector<::Ref<Region>> m_Stacks;
+    bool                  m_IsUser = false;
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
     Pointer m_GsBase;
@@ -156,10 +177,14 @@ struct Thread
     Pointer m_El0Base;
 #endif
 
-    bool                 m_IsEnqueued     = false;
-    sigset_t             m_SignalMask     = 0;
-    sigset_t             m_PendingSignals = 0;
+    bool     m_IsEnqueued     = false;
+    sigset_t m_SignalMask     = 0;
+    sigset_t m_PendingSignals = 0;
 
+  public:
+    ThreadTLS m_Tls;
+
+  private:
     struct Event         m_Event;
     Deque<struct Event*> m_Events;
     usize                m_Which = 0;
