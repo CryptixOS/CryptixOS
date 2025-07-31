@@ -29,12 +29,6 @@ namespace Stacktrace
 {
     namespace
     {
-        struct StackFrame
-        {
-            StackFrame* Base;
-            Pointer     InstructionPointer;
-        };
-
         Vector<Symbol> s_Symbols;
         Pointer        s_LowestKernelSymbolAddress  = 0xffffffff;
         Pointer        s_HighestKernelSymbolAddress = 0x00000000;
