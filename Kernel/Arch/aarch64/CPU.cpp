@@ -4,11 +4,13 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Arch/CPU.hpp"
+#include <Arch/CPU.hpp>
 
 namespace CPU
 {
-    bool GetInterruptFlag()
+    static ClockSource::List s_ClockSources;
+
+    bool                     GetInterruptFlag()
     {
         u64 daif = 0;
         __asm__ volatile("mrs %0, daif" : "=r"(daif));
@@ -24,14 +26,17 @@ namespace CPU
     usize GetOnlineCPUsCount() { return 1; }
 
     struct CPU;
-    CPU*    Current() { return nullptr; }
-    CPU*    GetCurrent() { return nullptr; }
-    u64     GetCurrentID() { return 0; }
-    Thread* GetCurrentThread() { return nullptr; }
+    CPU*               Current() { return nullptr; }
+    CPU*               GetCurrent() { return nullptr; }
+    u64                GetCurrentID() { return 0; }
+    Thread*            GetCurrentThread() { return nullptr; }
 
-    bool    SwapInterruptFlag(bool) { return false; }
+    ClockSource::List& ClockSources() { return s_ClockSources; }
+    ClockSource*       HighResolutionClock() { return nullptr; }
 
-    void    PrepareThread(Thread* thread, Pointer pc, Pointer)
+    bool               SwapInterruptFlag(bool) { return false; }
+
+    void               PrepareThread(Thread* thread, Pointer pc, Pointer)
     {
         (void)thread;
         (void)pc;
