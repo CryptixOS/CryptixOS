@@ -22,7 +22,7 @@ namespace API::Process
                                sigset_t* oldSet)
     {
         auto     process     = ::Process::Current();
-        Thread*  thread      = Thread::Current();
+        auto  thread      = Thread::Current();
         sigset_t currentMask = thread->SignalMask();
 
         if (oldSet)
