@@ -6,9 +6,9 @@
  */
 #pragma once
 
-#if CTOS_ARCH == CTOS_ARCH_X86_64
+#ifdef CTOS_TARGET_X86_64
     #include <Arch/x86_64/CPU.hpp>
-#elif CTOS_ARCH == CTOS_ARCH_AARCH64
+#elifdef CTOS_TARGET_AARCH64
     #include <Arch/aarch64/CPU.hpp>
 #endif
 
