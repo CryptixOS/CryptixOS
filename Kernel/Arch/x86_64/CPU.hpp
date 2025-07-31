@@ -12,18 +12,20 @@
 
 #include <Arch/x86_64/CPUContext.hpp>
 #include <Arch/x86_64/CPUID.hpp>
-#include <Arch/x86_64/Drivers/Timers/Lapic.hpp>
+#include <Arch/x86_64/Drivers/Time/Lapic.hpp>
 #include <Arch/x86_64/GDT.hpp>
 #include <Arch/x86_64/IDT.hpp>
 
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
+#include <Time/ClockSource.hpp>
+
 struct Thread;
 namespace CPU
 {
-    using FPUSaveFunc    = void (*)(uintptr_t ctx);
-    using FPURestoreFunc = void (*)(uintptr_t ctx);
+    using FPUSaveFunc    = void (*)(upointer ctx);
+    using FPURestoreFunc = void (*)(upointer ctx);
 
     namespace PAT
     {
@@ -47,6 +49,8 @@ namespace CPU
 
         constexpr usize IA32_PAT                 = 0x277;
         constexpr usize IA32_PAT_RESET           = 0x0007040600070406;
+
+        constexpr usize KVM_SYSTEM_TIME          = 0x4b564d01;
 
         constexpr usize IA32_EFER                = 0xc0000080;
         constexpr usize STAR                     = 0xc0000081;
@@ -92,15 +96,15 @@ namespace CPU
         usize            ID    = 0;
         void*            Empty = nullptr;
 
-        uintptr_t        ThreadStack;
-        uintptr_t        KernelStack;
+        upointer         ThreadStack;
+        upointer         KernelStack;
 
         u64              LapicID  = 0;
         bool             IsOnline = false;
         TaskStateSegment TSS{};
 
         usize            FpuStorageSize = 512;
-        uintptr_t        FpuStorage     = 0;
+        upointer         FpuStorage     = 0;
 
         FPUSaveFunc      FpuSave        = nullptr;
         FPURestoreFunc   FpuRestore     = nullptr;
@@ -109,9 +113,16 @@ namespace CPU
         bool             DuringSyscall = false;
         usize            LastSyscallID = usize(-1);
 
-        errno_t          Error;
+        ErrorCode        Error;
         Thread*          Idle;
         Thread*          CurrentThread;
+
+        using HookType = IntrusiveRefListHook<CPU, CPU*>;
+        friend class IntrusiveRefList<CPU, HookType>;
+        friend struct IntrusiveRefListHook<CPU, CPU*>;
+
+        using List = IntrusiveRefList<CPU, HookType>;
+        HookType Hook;
     };
 
     KERNEL_INIT_CODE
@@ -129,42 +140,47 @@ namespace CPU
         u64  rax, rbx, rcx, rdx;
     };
 
-    u32          KvmBase();
-    u64          RdTsc();
+    u32                KvmBase();
+    u64                RdTsc();
 
-    void         Halt();
-    void         HaltAll();
-    void         WakeUp(usize id, bool everyone);
+    void               Halt();
+    void               HaltAll();
+    void               WakeUp(usize id, bool everyone);
 
-    void         WriteXCR(u64 reg, u64 value);
-    u64          ReadCR0();
-    u64          ReadCR2();
-    void         WriteCR0(u64 value);
-    u64          ReadCR4();
-    void         WriteCR4(u64 value);
+    void               WriteXCR(u64 reg, u64 value);
+    u64                ReadCR0();
+    u64                ReadCR2();
+    void               WriteCR0(u64 value);
+    u64                ReadCR4();
+    void               WriteCR4(u64 value);
 
-    u64          ReadMSR(u32 msr);
-    void         WriteMSR(u32 msr, u64 value);
+    u64                ReadMSR(u32 msr);
+    void               WriteMSR(u32 msr, u64 value);
 
-    Pointer      GetFSBase();
-    Pointer      GetGSBase();
-    Pointer      GetKernelGSBase();
+    Pointer            GetFSBase();
+    Pointer            GetGSBase();
+    Pointer            GetKernelGSBase();
 
-    void         SetFSBase(Pointer address);
-    void         SetGSBase(Pointer address);
-    void         SetKernelGSBase(Pointer address);
+    void               SetFSBase(Pointer address);
+    void               SetGSBase(Pointer address);
+    void               SetKernelGSBase(Pointer address);
 
-    Vector<CPU>& GetCPUs();
-    u64          GetOnlineCPUsCount();
-    u64          GetBspId();
-    CPU&         GetBsp();
+    u64                GetBspId();
+    CPU&               GetBsp();
+    CPU&               GetCPU(usize id);
 
-    u64          GetCurrentID();
-    void         Reschedule(Timestep interval);
+    CPU::List&         GetCPUs();
+    u64                GetOnlineCPUsCount();
+    u64                GetCurrentID();
 
-    bool         EnableSSE();
-    void         EnablePAT();
-    void         EnableSMEP();
-    void         EnableSMAP();
-    void         EnableUMIP();
+    ClockSource::List& ClockSources();
+    ClockSource*       HighResolutionClock();
+
+    void               Reschedule(Timestep interval);
+
+    bool               EnableSSE();
+    void               EnablePAT();
+    void               EnableSMEP();
+    void               EnableSMAP();
+    void               EnableUMIP();
 }; // namespace CPU

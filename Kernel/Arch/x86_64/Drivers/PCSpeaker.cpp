@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/x86_64/Drivers/PCSpeaker.hpp>
-#include <Arch/x86_64/Drivers/Timers/PIT.hpp>
+#include <Arch/x86_64/Drivers/Time/PIT.hpp>
 #include <Arch/x86_64/IO.hpp>
 
 namespace PCSpeaker

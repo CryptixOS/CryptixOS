@@ -16,24 +16,14 @@ srcs += files(
   'idt.S',
   'memory.S',
   'syscall.S',
-
-  'Drivers/I8042Controller.cpp',
-  'Drivers/IoApic.cpp',
-  'Drivers/PCI.cpp',
-  'Drivers/PCSpeaker.cpp',
-  'Drivers/PIC.cpp',
-  'Drivers/Serial.cpp',
-
-  'Drivers/Timers/HPET.cpp',
-  'Drivers/Timers/Lapic.cpp',
-  'Drivers/Timers/PIT.cpp',
-  'Drivers/Timers/RTC.cpp',
 )
 asm_sources = files(
   'idt.S',
   'memory.S',
   'syscall.S',
 )
+
+subdir('Drivers')
 
 c_args += [
   '-march=x86-64',

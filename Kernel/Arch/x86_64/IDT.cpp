@@ -13,9 +13,15 @@
 #include <Arch/x86_64/IDT.hpp>
 
 #include <Firmware/ACPI/MADT.hpp>
+#include <Library/Stacktrace.hpp>
 
 #include <Memory/PageFault.hpp>
 #include <Prism/Containers/Array.hpp>
+
+namespace Stacktrace
+{
+    void Print(StackFrame* stackFrame, usize maxFrames);
+}; // namespace Stacktrace
 
 #pragma region exception_names
 auto s_ExceptionNames = ToArray({
@@ -115,6 +121,11 @@ static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
 [[noreturn]] static void raiseException(CPUContext* ctx)
 {
     u64 cpuID = CPU::GetCurrentID();
+    using Stacktrace::StackFrame;
+    StackFrame frame;
+    frame.Base               = Pointer(ctx->rbp).As<StackFrame>();
+    frame.InstructionPointer = ctx->rip;
+    Stacktrace::Print(&frame, 6);
 
     EarlyPanic(
         "Captured exception[%#x] on cpu %zu: '%s'\n\rError Code: "

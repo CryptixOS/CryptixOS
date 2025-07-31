@@ -13,9 +13,9 @@
 #include <Arch/x86_64/Drivers/IoApic.hpp>
 #include <Arch/x86_64/Drivers/PCSpeaker.hpp>
 #include <Arch/x86_64/Drivers/PIC.hpp>
-#include <Arch/x86_64/Drivers/Timers/HPET.hpp>
-#include <Arch/x86_64/Drivers/Timers/PIT.hpp>
-#include <Arch/x86_64/Drivers/Timers/RTC.hpp>
+#include <Arch/x86_64/Drivers/Time/HPET.hpp>
+#include <Arch/x86_64/Drivers/Time/PIT.hpp>
+#include <Arch/x86_64/Drivers/Time/RTC.hpp>
 #include <Arch/x86_64/IO.hpp>
 
 #include <Drivers/HID/Ps2Controller.hpp>

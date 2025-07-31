@@ -11,9 +11,6 @@
 
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptManager.hpp>
-#if 0
-    #include <Arch/x86_64/Drivers/Timers/KVMClock.hpp>
-#endif
 
 #include <Boot/BootInfo.hpp>
 #include <Boot/CommandLine.hpp>
@@ -185,7 +182,7 @@ static void kernelThread()
         LogWarn("ELF: Could not find any builtin drivers");
 
     auto moduleDirectory
-        = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), "/lib/modules/")
+        = VFS::ResolvePath(VFS::RootDirectoryEntry(), "/lib/modules/")
               .ValueOr(VFS::PathResolution{})
               .Entry;
     if (moduleDirectory)
@@ -294,10 +291,6 @@ kernelStart(const BootInformation& info)
     auto process = Scheduler::GetKernelProcess();
     auto thread
         = process->CreateThread(kernelThread, false, CPU::GetCurrent()->ID);
-
-#if 0
-    KVM::Clock::Initialize();
-#endif
 
     Scheduler::EnqueueThread(thread);
 

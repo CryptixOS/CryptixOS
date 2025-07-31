@@ -5,6 +5,8 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/Arch.hpp>
+#include <Arch/CPU.hpp>
+
 #include <Debug/Assertions.hpp>
 
 #include <Library/Locking/Spinlock.hpp>
@@ -144,8 +146,24 @@ namespace Time
 
     void Tick(usize ns)
     {
-        s_RealTime += ns;
-        s_Monotonic += ns;
+        auto highResClock = CPU::HighResolutionClock();
+
+        if (highResClock)
+        {
+            auto maybeNs = highResClock->Now();
+            auto prev    = s_RealTime;
+
+            if (maybeNs)
+            {
+                s_RealTime = s_RealTime = *maybeNs;
+                ns                      = s_RealTime - prev;
+            }
+        }
+        else
+        {
+            s_RealTime += ns;
+            s_Monotonic += ns;
+        }
 
         if (s_TimersLock.TestAndAcquire())
         {

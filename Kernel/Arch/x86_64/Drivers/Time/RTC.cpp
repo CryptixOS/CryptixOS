@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/x86_64/Drivers/Timers/RTC.hpp>
+#include <Arch/x86_64/Drivers/Time/RTC.hpp>
 
 #include <Arch/Arch.hpp>
 #include <Arch/x86_64/CMOS.hpp>

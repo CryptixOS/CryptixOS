@@ -5,7 +5,8 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/x86_64/CPU.hpp>
-#include <Arch/x86_64/Drivers/Timers/PIT.hpp>
+#include <Arch/x86_64/Drivers/Time/KVMClock.hpp>
+#include <Arch/x86_64/Drivers/Time/PIT.hpp>
 
 #include <Boot/BootInfo.hpp>
 #include <Debug/Panic.hpp>
@@ -49,10 +50,13 @@ namespace CPU
             __asm__ volatile("fxrstor (%0)" : : "r"(ctx) : "memory");
         }
 
-        Vector<CPU> s_CPUs;
-        CPU*        s_BSP             = nullptr;
-        u64         s_BspLapicId      = 0;
-        usize       s_OnlineCPUsCount = 1;
+        CPU*              s_BSP        = nullptr;
+        u64               s_BspLapicId = 0;
+        CPU::List         s_CPUs;
+        usize             s_OnlineCPUsCount = 1;
+
+        ClockSource::List s_ClockSources;
+        KVM::Clock*       s_KvmClock = nullptr;
     } // namespace
 
     extern "C" __attribute__((noreturn)) void syscall_entry();
@@ -194,6 +198,10 @@ namespace CPU
                   KERNEL_STACK_SIZE / PMM::PAGE_SIZE))
             + KERNEL_STACK_SIZE;
         IDT::SetIST(14, 2);
+
+        if (s_KvmClock && !s_KvmClock->Enable())
+            LogError("CPU[{}]: Failed to initialize kvm clock", Current()->ID);
+        else LogTrace("CPU[{}]: Successfully enabled kvm clock", Current()->ID);
     }
 
     KERNEL_INIT_CODE
@@ -202,20 +210,26 @@ namespace CPU
         limine_mp_response* smp      = SMP_Response();
         usize               cpuCount = smp->cpu_count;
 
-        s_CPUs.Resize(cpuCount);
-        s_BspLapicId = smp->bsp_lapic_id;
+        s_BspLapicId                 = smp->bsp_lapic_id;
 
         LogTrace("BSP: Initializing...");
+        for (usize i = 0; i < cpuCount; i++) s_CPUs.PushBack(new CPU);
+
+        auto maybeKVMClock = KVM::Clock::Create();
+        if (maybeKVMClock) s_ClockSources.PushBack(s_KvmClock = *maybeKVMClock);
+
         for (usize i = 0; i < cpuCount; i++)
         {
             limine_mp_info* smpInfo = smp->cpus[i];
             // Find the bsp
             if (smpInfo->lapic_id != s_BspLapicId) continue;
 
-            smpInfo->extra_argument = Pointer(&s_CPUs[i]);
-            s_CPUs[i].LapicID       = smpInfo->lapic_id;
-            s_CPUs[i].ID            = i;
-            s_CPUs[i].Lock          = new Spinlock;
+            auto& cpu               = GetCPU(i);
+
+            smpInfo->extra_argument = Pointer(&cpu);
+            cpu.LapicID             = smpInfo->lapic_id;
+            cpu.ID                  = i;
+            cpu.Lock                = new Spinlock;
 
             CPU* current = reinterpret_cast<CPU*>(smpInfo->extra_argument);
             s_BSP        = current;
@@ -267,18 +281,24 @@ namespace CPU
         };
 
         auto smpResponse = SMP_Response();
-        for (usize i = 0; i < smpResponse->cpu_count; i++)
+        for (usize i = 0; auto cpu : s_CPUs)
         {
-            auto cpu = smpResponse->cpus[i];
-            if (cpu->lapic_id == s_BspLapicId) continue;
+            auto cpuInfo = smpResponse->cpus[i];
+            if (cpuInfo->lapic_id == s_BspLapicId)
+            {
+                ++i;
+                continue;
+            }
 
-            cpu->extra_argument = reinterpret_cast<uintptr_t>(&s_CPUs[i]);
-            s_CPUs[i].LapicID   = cpu->lapic_id;
-            s_CPUs[i].ID        = i;
-            s_CPUs[i].Lock      = new Spinlock;
+            cpuInfo->extra_argument = Pointer(cpu);
+            cpu->LapicID            = cpuInfo->lapic_id;
+            cpu->ID                 = i;
+            cpu->Lock               = new Spinlock;
 
-            cpu->goto_address   = apEntryPoint;
-            while (!s_CPUs[i].IsOnline) Arch::Pause();
+            cpuInfo->goto_address   = apEntryPoint;
+            while (!cpu->IsOnline) Arch::Pause();
+
+            ++i;
         }
 
         auto handler = IDT::GetHandler(255);
@@ -390,7 +410,7 @@ namespace CPU
                 Lapic::Instance()->InterruptVector() | (0b10 << 18), 0);
         else
             Lapic::Instance()->SendIpi(
-                Lapic::Instance()->InterruptVector() | s_CPUs[id].LapicID, 0);
+                Lapic::Instance()->InterruptVector() | GetCPU(id).LapicID, 0);
     }
 
     void WriteMSR(u32 msr, u64 value)
@@ -483,22 +503,35 @@ namespace CPU
         WriteMSR(MSR::KERNEL_GS_BASE, address);
     }
 
-    Vector<CPU>& GetCPUs() { return s_CPUs; }
+    u64  GetBspId() { return s_BspLapicId; }
+    CPU& GetBsp() { return *s_BSP; }
+    CPU& GetCPU(usize id)
+    {
+        for (usize i = 0; auto cpu : s_CPUs)
+        {
+            if (i == id) return *cpu;
+            ++i;
+        }
 
-    u64          GetOnlineCPUsCount() { return s_OnlineCPUsCount; }
-    u64          GetBspId() { return s_BspLapicId; }
-    CPU&         GetBsp() { return *s_BSP; }
+        AssertNotReached();
+    }
 
-    u64          GetCurrentID()
+    CPU::List& GetCPUs() { return s_CPUs; }
+    u64        GetOnlineCPUsCount() { return s_OnlineCPUsCount; }
+    u64        GetCurrentID()
     {
         return GetOnlineCPUsCount() > 1 ? GetCurrent()->ID : s_BspLapicId;
     }
-    CPU* GetCurrent()
+
+    ClockSource::List& ClockSources() { return s_ClockSources; }
+    ClockSource*       HighResolutionClock() { return s_KvmClock; }
+
+    CPU*               GetCurrent()
     {
         usize id;
         __asm__ volatile("mov %%gs:0, %0" : "=r"(id)::"memory");
 
-        return &s_CPUs[id];
+        return &GetCPU(id);
     }
     CPU*    Current() { return GetCurrent(); }
     Thread* GetCurrentThread()

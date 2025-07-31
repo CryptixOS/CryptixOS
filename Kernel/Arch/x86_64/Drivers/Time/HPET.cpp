@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/x86_64/Drivers/Timers/HPET.hpp>
+#include <Arch/x86_64/Drivers/Time/HPET.hpp>
 
 #include <Firmware/ACPI/ACPI.hpp>
 

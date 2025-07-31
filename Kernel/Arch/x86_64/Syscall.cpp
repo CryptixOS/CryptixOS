@@ -34,7 +34,7 @@ namespace Syscall
         args.Args[4]          = ctx->r8;
         args.Args[5]          = ctx->r9;
 
-        Thread* current       = CPU::GetCurrentThread();
+        auto current       = CPU::GetCurrentThread();
         current->SavedContext = *ctx;
 
         Handle(args);
