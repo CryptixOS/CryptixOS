@@ -18,8 +18,6 @@
 
 #include <VFS/Initrd/Ustar.hpp>
 
-#include <cstring>
-
 namespace Ustar
 {
     bool Validate(Pointer address)

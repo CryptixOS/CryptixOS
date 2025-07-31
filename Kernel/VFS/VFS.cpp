@@ -375,7 +375,7 @@ namespace VFS
     ErrorOr<Ref<DirectoryEntry>> CreateFile(Ref<DirectoryEntry> directory,
                                             StringView name, mode_t mode)
     {
-        mode &= S_IFMT;
+        mode &= ~S_IFMT;
         mode |= S_IFREG;
 
         return CreateNode(directory, name, mode, 0);
@@ -389,7 +389,7 @@ namespace VFS
     ErrorOr<Ref<DirectoryEntry>> CreateDirectory(Ref<DirectoryEntry> directory,
                                                  StringView name, mode_t mode)
     {
-        mode &= S_IFMT;
+        mode &= ~S_IFMT;
         mode |= S_IFDIR;
 
         return CreateNode(directory, name, mode, 0);

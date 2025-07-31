@@ -28,7 +28,7 @@ INode::INode(StringView name, class Filesystem* fs)
     : m_Name(name)
     , m_Filesystem(fs)
 {
-    Thread*  thread  = CPU::GetCurrentThread();
+    auto  thread  = CPU::GetCurrentThread();
     Process* process = thread ? thread->Parent() : nullptr;
 
     if (!process) return;
