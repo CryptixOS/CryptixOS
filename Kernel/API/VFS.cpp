@@ -471,6 +471,11 @@ namespace API::VFS
         return FChModAt(fdNum, ".", mode, 0);
     }
 
+    ErrorOr<isize> SyncFilesystems()
+    {
+        VFS::Sync();
+        return 0;
+    }
     ErrorOr<isize> Mount(const char* pathname, const char* targetPath,
                          const char* filesystemType, usize flags,
                          const void* data)
@@ -867,6 +872,19 @@ namespace API::VFS
 
         auto* process = Process::GetCurrent();
         return process->DupFd(oldFdNum, newFdNum, flags);
+    }
+
+    ErrorOr<isize> SyncFs(isize fdNum)
+    {
+        auto process = Process::Current();
+        auto fd      = TryOrRet(process->GetFileDescriptor(fdNum));
+        auto inode   = fd->INode();
+
+        auto fs      = inode->Filesystem();
+        if (!fs) return Error(ENODEV);
+
+        fs->Sync();
+        return 0;
     }
     ErrorOr<isize> RenameAt2(isize oldDirFdNum, const char* oldPath,
                              isize newDirFdNum, const char* newPath,

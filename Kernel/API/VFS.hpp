@@ -56,6 +56,7 @@ namespace API::VFS
     ErrorOr<isize> ChMod(const char* path, mode_t mode);
     ErrorOr<isize> FChMod(isize fdNum, mode_t mode);
 
+    ErrorOr<isize> SyncFilesystems();
     ErrorOr<isize> Mount(const char* path, const char* target,
                          const char* filesystemType, usize flags,
                          const void* data);
@@ -89,6 +90,8 @@ namespace API::VFS
     ErrorOr<isize> UtimensAt(i64 dirFdNum, const char* path,
                              const timespec times[2], i64 flags);
     ErrorOr<isize> Dup3(isize oldFdNum, isize newFdNum, isize flags);
+
+    ErrorOr<isize> SyncFs(isize fdNum);
     ErrorOr<isize> RenameAt2(isize oldDirFdNum, const char* oldPath,
                              isize newDirFdNum, const char* newPath,
                              usize flags);

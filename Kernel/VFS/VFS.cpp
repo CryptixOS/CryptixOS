@@ -7,7 +7,8 @@
 #include <API/Limits.hpp>
 #include <Arch/CPU.hpp>
 
-#include <Drivers/Core/Device.hpp>
+#include <Drivers/Core/DeviceManager.hpp>
+
 #include <Library/Locking/Spinlock.hpp>
 #include <Library/Locking/SpinlockProtected.hpp>
 
@@ -30,6 +31,8 @@
 namespace VFS
 {
     static SpinlockProtected<FilesystemDriver::List> s_FilesystemDrivers;
+
+    static bool                s_Initialized        = false;
     static Ref<DirectoryEntry> s_RootDirectoryEntry = nullptr;
 
     template <typename T>
@@ -80,7 +83,25 @@ namespace VFS
         auto colonel = Scheduler::KernelProcess();
         auto syncd   = colonel->CreateThread(filesystemSyncDaemon, 0);
         Scheduler::EnqueueThread(syncd.Raw());
+
+        using DeviceManager::DeviceIterator;
+        DeviceIterator deviceIterator;
+        deviceIterator.BindLambda(
+            [](auto device) -> bool
+            {
+                auto path = "/dev/"_s + device->Name();
+                if (!CreateNode(path, S_IFCHR | 0666, device->ID()))
+                    LogError("VFS: Failed to create device node for: `{}`",
+                             path);
+
+                return true;
+            });
+
+        DeviceManager::IterateDevices(deviceIterator);
+        s_Initialized = true;
     }
+    bool                           IsInitialized() { return s_Initialized; }
+
     ErrorOr<Ref<FilesystemDriver>> FindFilesystemDriver(StringView name)
     {
         Ref<FilesystemDriver> found = nullptr;

@@ -24,6 +24,8 @@ class FileDescriptor;
 namespace VFS
 {
     void                           Initialize();
+    bool                           IsInitialized();
+
     ErrorOr<Ref<FilesystemDriver>> FindFilesystem(StringView name);
 
     ErrorOr<void> RegisterFilesystem(Ref<FilesystemDriver> driver);

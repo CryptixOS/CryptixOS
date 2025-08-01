@@ -68,15 +68,24 @@ class Device : public File
 
     virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
                                 isize offset = -1)
-        = 0;
-    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) = 0;
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes)
+    {
+        return Error(ENOSYS);
+    };
     virtual ErrorOr<isize> Write(const void* src, off_t offset, usize bytes)
-        = 0;
+    {
+        return Error(ENOSYS);
+    }
     virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
                                  isize offset = -1)
-        = 0;
+    {
+        return Error(ENOSYS);
+    }
 
-    virtual i32 IoCtl(usize request, uintptr_t argp) = 0;
+    virtual i32 IoCtl(usize request, uintptr_t argp) { return -1; };
 
     static void Initialize();
 

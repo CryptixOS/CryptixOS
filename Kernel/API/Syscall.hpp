@@ -197,8 +197,8 @@ namespace Syscall
         eGet_pPid         = 110,
         eGetPgrp          = 111,
         eSetSid           = 112,
-        eSetReUid        = 113,
-        eSetReGid        = 114,
+        eSetReUid         = 113,
+        eSetReGid         = 114,
         eSetResUid        = 117,
         eSetResGid        = 119,
         eGet_pGid         = 121,
@@ -206,6 +206,7 @@ namespace Syscall
         eUTime            = 132,
         eStatFs           = 137,
         eArchPrCtl        = 158,
+        eSync             = 162,
         eSetTimeOfDay     = 164,
         eMount            = 165,
         eUMount           = 166,
@@ -228,6 +229,7 @@ namespace Syscall
         ePSelect6         = 270,
         eUtimensAt        = 280,
         eDup3             = 292,
+        eSyncFs           = 306,
         eRenameAt2        = 316,
     };
 

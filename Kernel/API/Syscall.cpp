@@ -138,6 +138,7 @@ namespace Syscall
         RegisterSyscall(ID::eStatFs, API::VFS::StatFs);
         RegisterSyscall(ID::eArchPrCtl, ArchPrCtl);
         RegisterSyscall(ID::eSetTimeOfDay, API::Time::SetTimeOfDay);
+        RegisterSyscall(ID::eSync, API::VFS::SyncFilesystems);
         RegisterSyscall(ID::eMount, API::VFS::Mount);
         RegisterSyscall(ID::eReboot, API::System::Reboot);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
@@ -157,6 +158,7 @@ namespace Syscall
         RegisterSyscall(ID::ePSelect6, API::VFS::PSelect6);
         RegisterSyscall(ID::eUtimensAt, API::VFS::UtimensAt);
         RegisterSyscall(ID::eDup3, API::VFS::Dup3);
+        RegisterSyscall(ID::eSyncFs, API::VFS::SyncFs);
         RegisterSyscall(ID::eRenameAt2, API::VFS::RenameAt2);
     }
     void Handle(Arguments& args)
