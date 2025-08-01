@@ -25,9 +25,10 @@ namespace KVM
     class Clock final : public ClockSource
     {
       public:
-        static ErrorOr<Clock*>    Create();
+        static ErrorOr<Clock*> Create();
+        Clock();
 
-        virtual StringView        Name() const override;
+        virtual StringView        Name() const PM_NOEXCEPT override;
 
         virtual ErrorOr<void>     Enable() override;
         virtual ErrorOr<void>     Disable() override;

@@ -4,17 +4,20 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Scheduler/Scheduler.hpp>
-
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptHandler.hpp>
 #include <Arch/InterruptManager.hpp>
-#include <Arch/x86_64/Drivers/IoApic.hpp>
+
+#ifdef CTOS_TARGET_X86_64
+    #include <Arch/x86_64/Drivers/IoApic.hpp>
+    #include <Arch/x86_64/Drivers/Time/Lapic.hpp>
+#endif
 
 #include <Library/Locking/Spinlock.hpp>
 #include <Memory/PMM.hpp>
 
 #include <Scheduler/Process.hpp>
+#include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 #include <Time/Time.hpp>
 

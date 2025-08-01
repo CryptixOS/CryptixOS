@@ -18,8 +18,12 @@ namespace KVM
 
         return new Clock;
     }
+    Clock::Clock()
+        : ClockSource(Name())
+    {
+    }
 
-    StringView    Clock::Name() const { return "KVM Clock"_sv; }
+    StringView    Clock::Name() const PM_NOEXCEPT { return "kvm"_sv; }
 
     ErrorOr<void> Clock::Enable()
     {

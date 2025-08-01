@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Arch/CPU.hpp>
 #include <Arch/InterruptManager.hpp>
 
 #include <Arch/x86_64/CPU.hpp>
@@ -12,6 +13,7 @@
 
 #include <Arch/x86_64/Drivers/IoApic.hpp>
 #include <Arch/x86_64/Drivers/PIC.hpp>
+#include <Arch/x86_64/Drivers/Time/Lapic.hpp>
 
 #include <Firmware/ACPI/MADT.hpp>
 
@@ -33,14 +35,14 @@ namespace InterruptManager
     void Mask(u8 vector)
     {
         if (IoApic::IsAnyEnabled())
-            IoApic::SetIrqRedirect(CPU::GetCurrent()->LapicID, vector,
+            IoApic::SetIrqRedirect(CPU::Current()->LapicID, vector,
                                    vector - 0x20, false);
         else I8259A::Instance().Mask(vector - 0x20);
     }
     void Unmask(u8 vector)
     {
         if (IoApic::IsAnyEnabled())
-            IoApic::SetIrqRedirect(CPU::GetCurrent()->LapicID, vector,
+            IoApic::SetIrqRedirect(CPU::Current()->LapicID, vector,
                                    vector - 0x20, true);
         else I8259A::Instance().Unmask(vector - 0x20);
     }

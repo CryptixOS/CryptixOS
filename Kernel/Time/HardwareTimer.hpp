@@ -6,6 +6,8 @@
  */
 #pragma once
 
+#include <Drivers/Core/CharacterDevice.hpp>
+
 #include <Prism/Containers/IntrusiveRefList.hpp>
 #include <Prism/Core/Error.hpp>
 #include <Prism/Core/Types.hpp>
@@ -20,10 +22,13 @@ enum class TimerMode
     ePeriodic,
 };
 
-class HardwareTimer
+class HardwareTimer : public CharacterDevice
 {
   public:
-    HardwareTimer()                        = default;
+    HardwareTimer(StringView name)
+        : CharacterDevice(name, ID())
+    {
+    }
     virtual ~HardwareTimer()               = default;
 
     virtual StringView ModelString() const = 0;
@@ -50,7 +55,19 @@ class HardwareTimer
     using List = IntrusiveRefList<HardwareTimer, HookType>;
 
   protected:
-    OnTickCallback m_OnTickCallback = nullptr;
+    OnTickCallback     m_OnTickCallback = nullptr;
 
-    HookType       Hook;
+    HookType           Hook;
+
+    static DeviceMajor Major()
+    {
+        static DeviceMajor major = AllocateMajor().Value();
+
+        return major;
+    }
+    static DeviceID ID()
+    {
+        static Atomic<DeviceMinor> nextMinor = 0;
+        return MakeDevice(Major(), nextMinor++);
+    }
 };

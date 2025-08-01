@@ -21,11 +21,14 @@ class Lapic : public HardwareTimer, public Singleton<Lapic>
         eTscDeadline = 2,
     };
 
+    Lapic();
     void          Initialize();
 
     static bool   IsInitialized() { return s_Initialized; }
 
+    StringView    Name() const PM_NOEXCEPT override { return "lapic"_sv; }
     StringView    ModelString() const override { return "Local APIC"_sv; }
+
     virtual usize InterruptVector() const override;
     virtual bool  IsCPULocal() const override { return true; }
 
@@ -53,10 +56,30 @@ class Lapic : public HardwareTimer, public Singleton<Lapic>
 
     class InterruptHandler* m_InterruptHandler = nullptr;
 
-    u32                     Read(u32 reg);
-    void                    Write(u32 reg, u64 value);
+    virtual ErrorOr<isize>  Read(const UserBuffer& out, usize count,
+                                 isize offset = -1) override
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override
+    {
+        return Error(ENOSYS);
+    };
+    virtual ErrorOr<isize> Write(const void* src, off_t offset,
+                                 usize bytes) override
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                 isize offset = -1) override
+    {
+        return Error(ENOSYS);
+    }
 
-    void                    CalibrateTimer();
+    u32  Read(u32 reg);
+    void Write(u32 reg, u64 value);
+
+    void CalibrateTimer();
     void SetNmi(u8 vector, u8 currentCPUID, u8 cpuID, u16 flags, u8 lint);
 
     static void Tick(CPUContext* context);

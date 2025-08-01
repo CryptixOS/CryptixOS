@@ -17,6 +17,7 @@
 PIT* PIT::s_Instance = nullptr;
 
 PIT::PIT()
+    : HardwareTimer(Name())
 {
     LogTrace("PIT: Initializing...");
     auto success = SetFrequency(FREQUENCY / 10);

@@ -8,20 +8,19 @@
 
 #include <Common.hpp>
 
-#include <Arch/CPU.hpp>
-
 #include <Arch/x86_64/CPUContext.hpp>
 #include <Arch/x86_64/CPUID.hpp>
 #include <Arch/x86_64/CPUIntrinsics.hpp>
-#include <Arch/x86_64/Drivers/Time/Lapic.hpp>
 #include <Arch/x86_64/GDT.hpp>
 #include <Arch/x86_64/IDT.hpp>
 
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
-#include <Time/ClockSource.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
 
+class ClockSource;
 struct Thread;
 namespace CPU
 {

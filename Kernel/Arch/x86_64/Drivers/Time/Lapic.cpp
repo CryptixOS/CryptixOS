@@ -53,6 +53,10 @@ bool                           Checkm_X2Apic()
     return false;
 }
 
+Lapic::Lapic()
+    : HardwareTimer(Name())
+{
+}
 void Lapic::Initialize()
 {
     LogTrace("LAPIC: Initializing for cpu #{}...", CPU::GetCurrent()->LapicID);

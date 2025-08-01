@@ -19,8 +19,7 @@
 #include <Prism/Utility/Path.hpp>
 #include <Prism/Utility/Time.hpp>
 
-#include <Time/ClockSource.hpp>
-
+class ClockSource;
 struct Thread;
 struct CPUContext;
 namespace CPU
@@ -35,24 +34,23 @@ namespace CPU
 
     u64             GetOnlineCPUsCount();
     struct CPU;
-    CPU*               Current();
-    u64                GetCurrentID();
-    CPU*               GetCurrent();
+    CPU*         Current();
+    u64          GetCurrentID();
+    CPU*         GetCurrent();
 
-    ClockSource::List& ClockSources();
-    ClockSource*       HighResolutionClock();
+    ClockSource* HighResolutionClock();
 
-    Thread*            GetCurrentThread();
+    Thread*      GetCurrentThread();
 
-    void PrepareThread(Thread* thread, Pointer pc, Pointer arg = 0);
+    void         PrepareThread(Thread* thread, Pointer pc, Pointer arg = 0);
 
-    void SaveThread(Thread* thread, CPUContext* ctx);
-    void LoadThread(Thread* thread, CPUContext* ctx);
+    void         SaveThread(Thread* thread, CPUContext* ctx);
+    void         LoadThread(Thread* thread, CPUContext* ctx);
 
-    void Reschedule(Timestep us);
+    void         Reschedule(Timestep us);
 
-    void HaltAll();
-    void WakeUp(usize id, bool everyone);
+    void         HaltAll();
+    void         WakeUp(usize id, bool everyone);
 
     // NOTE(v1tr10l7): allows accessing usermode memory from ring0
     struct UserMemoryProtectionGuard

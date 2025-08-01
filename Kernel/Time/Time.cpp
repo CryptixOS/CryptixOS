@@ -8,6 +8,7 @@
 #include <Arch/CPU.hpp>
 
 #include <Debug/Assertions.hpp>
+#include <Drivers/Core/DeviceManager.hpp>
 
 #include <Library/Locking/Spinlock.hpp>
 #include <Library/Logger.hpp>
@@ -99,8 +100,10 @@ namespace Time
                      { return it->ModelString() == timer->ModelString(); });
         if (found != s_HardwareTimers.end()) return Error(EEXIST);
 
-        LogTrace("Time: Registered hardware timer => {}", timer->ModelString());
         s_HardwareTimers.PushBack(timer);
+        DeviceManager::RegisterCharDevice(timer);
+
+        LogTrace("Time: Registered hardware timer => {}", timer->ModelString());
         return {};
     }
     ErrorOr<void> RegisterClockSource(ClockSource* clock)
@@ -110,8 +113,10 @@ namespace Time
                             { return it->Name() == clock->Name(); });
         if (found != s_ClockSources.end()) return Error(EEXIST);
 
-        LogTrace("Time: Registered hardware timer => {}", clock->Name());
         s_ClockSources.PushBack(clock);
+        DeviceManager::RegisterCharDevice(clock);
+
+        LogTrace("Time: Registered hardware timer => {}", clock->Name());
         return {};
     }
 

@@ -5,7 +5,9 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/x86_64/CPU.hpp>
+
 #include <Arch/x86_64/Drivers/Time/KVMClock.hpp>
+#include <Arch/x86_64/Drivers/Time/Lapic.hpp>
 #include <Arch/x86_64/Drivers/Time/PIT.hpp>
 
 #include <Boot/BootInfo.hpp>
@@ -52,12 +54,12 @@ namespace CPU
             __asm__ volatile("fxrstor (%0)" : : "r"(ctx) : "memory");
         }
 
-        CPU*              s_BSP        = nullptr;
-        u64               s_BspLapicId = 0;
-        CPU::List         s_CPUs;
-        usize             s_OnlineCPUsCount = 1;
+        CPU*        s_BSP        = nullptr;
+        u64         s_BspLapicId = 0;
+        CPU::List   s_CPUs;
+        usize       s_OnlineCPUsCount = 1;
 
-        KVM::Clock*       s_KvmClock = nullptr;
+        KVM::Clock* s_KvmClock        = nullptr;
     } // namespace
 
     extern "C" CTOS_NORETURN void syscall_entry();
@@ -447,9 +449,9 @@ namespace CPU
         return GetOnlineCPUsCount() > 1 ? GetCurrent()->ID : s_BspLapicId;
     }
 
-    ClockSource*       HighResolutionClock() { return s_KvmClock; }
+    ClockSource* HighResolutionClock() { return s_KvmClock; }
 
-    CPU*               GetCurrent()
+    CPU*         GetCurrent()
     {
         usize id;
         __asm__ volatile("mov %%gs:0, %0" : "=r"(id)::"memory");
