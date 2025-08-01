@@ -159,7 +159,7 @@ To run CryptixOS in QEMU:
 - ✅ PIT
 - ✅ Local APIC Timer
 - ✅ RTC
-- ⬜ KVM Clock
+- ✅ KVM Clock
 - ✅ HPET
 
 ### ⚡ IRQ Controllers
