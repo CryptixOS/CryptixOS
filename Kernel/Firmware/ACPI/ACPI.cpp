@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Arch/PowerManager.hpp>
 #include <Boot/CommandLine.hpp>
 
 #include <Firmware/ACPI/ACPI.hpp>
@@ -13,8 +14,11 @@
 #include <Memory/ScopedMapping.hpp>
 #include <Memory/VMM.hpp>
 
+#include <Prism/Containers/Array.hpp>
+
 #include <uacpi/context.h>
 #include <uacpi/event.h>
+#include <uacpi/notify.h>
 #include <uacpi/resources.h>
 #include <uacpi/uacpi.h>
 #include <uacpi/utilities.h>
@@ -178,6 +182,25 @@ namespace ACPI
                 return UACPI_ITERATION_DECISION_CONTINUE;
             }
 
+            const auto powerButtonIDs = ToArray<const char*>({
+                "PNP0C0C",
+                nullptr,
+            });
+            if (uacpi_device_matches_pnp_id(node, powerButtonIDs.Raw()))
+            {
+                uacpi_install_notify_handler(
+                    node,
+                    [](uacpi_handle, uacpi_namespace_node*,
+                       uacpi_u64 value) -> uacpi_status
+                    {
+                        if (value != 0x80) return UACPI_STATUS_OK;
+
+                        PowerManager::PowerOff();
+                        return UACPI_STATUS_OK;
+                    },
+                    nullptr);
+            }
+
             LogInfo("ACPI: Found device - {}", info->name.text);
             uacpi_free_namespace_node_info(info);
             return UACPI_ITERATION_DECISION_CONTINUE;
@@ -244,6 +267,18 @@ namespace ACPI
                   "ACPI: Failed to initialize namespace");
         uAcpiCall(uacpi_finalize_gpe_initialization(),
                   "ACPI: Failed to finalize gpe initialization!");
+
+        uAcpiCall(uacpi_install_fixed_event_handler(
+                      UACPI_FIXED_EVENT_POWER_BUTTON,
+                      [](uacpi_handle) -> uacpi_interrupt_ret
+                      {
+                          uacpi_kernel_schedule_work(
+                              UACPI_WORK_GPE_EXECUTION, [](uacpi_handle)
+                              { PowerManager::PowerOff(); }, nullptr);
+                          return UACPI_INTERRUPT_HANDLED;
+                      },
+                      nullptr),
+                  "ACPI: Failed to install gpe handler for POWER_BUTTON event");
     }
     void EnumerateDevices()
     {
