@@ -23,6 +23,7 @@ class FileDescriptor;
 
 namespace VFS
 {
+    void                           Initialize();
     ErrorOr<Ref<FilesystemDriver>> FindFilesystem(StringView name);
 
     ErrorOr<void> RegisterFilesystem(Ref<FilesystemDriver> driver);
@@ -56,6 +57,8 @@ namespace VFS
                                    PathView target, StringView fsName,
                                    i32 flags = 0, const void* data = nullptr);
     bool Unmount(Ref<DirectoryEntry> parent, PathView path, i32 flags = 0);
+
+    ErrorOr<void>                Sync();
 
     ErrorOr<Ref<DirectoryEntry>> CreateNode(Ref<DirectoryEntry> parent,
                                             StringView name, mode_t mode,

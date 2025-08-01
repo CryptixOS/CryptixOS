@@ -119,7 +119,14 @@ class Filesystem : public RefCounted
      *
      * @return ErrorOr<void> Nothing or error.
      */
-    virtual ErrorOr<void>          FreeINode(INode* inode) { return Error(ENOSYS); }
+    virtual ErrorOr<void> FreeINode(INode* inode) { return Error(ENOSYS); }
+
+    /**
+     * @brief Synchronize the filesystem to the storage device.
+     *
+     * @return ErrorOr<void> Nothing or error.
+     */
+    virtual ErrorOr<void> Sync() { return Error(ENOSYS); }
     /**
      * @brief Populate directory contents, if lazy-loading is used.
      * @param Directory entry to populate.

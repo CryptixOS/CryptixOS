@@ -11,8 +11,8 @@
 #include <Library/Locking/Spinlock.hpp>
 #include <Library/Locking/SpinlockProtected.hpp>
 
-#include <Scheduler/Process.hpp>
-#include <Scheduler/Thread.hpp>
+#include <Scheduler/Scheduler.hpp>
+#include <Time/Time.hpp>
 
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/DirectoryEntry.hpp>
@@ -20,6 +20,7 @@
 #include <VFS/Ext2Fs/Ext2Fs.hpp>
 #include <VFS/Fat32Fs/Fat32Fs.hpp>
 #include <VFS/INode.hpp>
+#include <VFS/Initrd/Initrd.hpp>
 #include <VFS/MountPoint.hpp>
 #include <VFS/PathResolver.hpp>
 #include <VFS/ProcFs/ProcFs.hpp>
@@ -29,8 +30,57 @@
 namespace VFS
 {
     static SpinlockProtected<FilesystemDriver::List> s_FilesystemDrivers;
-    static Ref<DirectoryEntry>     s_RootDirectoryEntry = nullptr;
+    static Ref<DirectoryEntry> s_RootDirectoryEntry = nullptr;
 
+    template <typename T>
+    static void registerFilesystem(StringView name)
+    {
+        auto fs            = CreateRef<FilesystemDriver>();
+
+        fs->Owner          = nullptr;
+        fs->FilesystemName = name;
+        fs->FlagsMask      = 0;
+
+        fs->Instantiate = []() -> ErrorOr<Ref<Filesystem>> { return new T(0); };
+        fs->Destroy     = [](Ref<Filesystem>) -> ErrorOr<void> { return {}; };
+
+        VFS::RegisterFilesystem(fs);
+    }
+
+    static void registerFilesystems()
+    {
+        registerFilesystem<TmpFs>("tmpfs");
+        registerFilesystem<DevTmpFs>("devfs");
+        registerFilesystem<ProcFs>("proc");
+        registerFilesystem<Fat32Fs>("vfat");
+        registerFilesystem<Ext2Fs>("ext2");
+        registerFilesystem<EchFs>("echfs");
+    }
+
+    static void filesystemSyncDaemon()
+    {
+        for (;;)
+        {
+            Time::NanoSleep(15'000'000'000);
+            Sync();
+        }
+    }
+
+    void Initialize()
+    {
+        registerFilesystems();
+        Assert(MountRoot("tmpfs"));
+        Initrd::Initialize();
+
+        CreateDirectory("/dev", 0755);
+        Assert(Mount(nullptr, "", "/dev", "devfs"));
+
+        Scheduler::InitializeProcFs();
+
+        auto colonel = Scheduler::KernelProcess();
+        auto syncd   = colonel->CreateThread(filesystemSyncDaemon, 0);
+        Scheduler::EnqueueThread(syncd.Raw());
+    }
     ErrorOr<Ref<FilesystemDriver>> FindFilesystemDriver(StringView name)
     {
         Ref<FilesystemDriver> found = nullptr;
@@ -329,6 +379,22 @@ namespace VFS
         // TODO: Unmount
         ToDo();
         return false;
+    }
+
+    ErrorOr<void> Sync()
+    {
+        MountPoint::Iterator iterator;
+        iterator.BindLambda(
+            [](Ref<MountPoint> mount) -> bool
+            {
+                auto fs = mount->Filesystem();
+                fs->Sync();
+
+                return true;
+            });
+
+        MountPoint::Iterate(iterator);
+        return {};
     }
 
     ErrorOr<Ref<DirectoryEntry>> CreateNode(Ref<DirectoryEntry> directory,

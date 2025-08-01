@@ -71,7 +71,7 @@ namespace EFI
 {
     bool Initialize(Pointer systemTable, const EfiMemoryMap& memoryMap);
 };
-bool g_LogTmpFs = false;
+bool        g_LogTmpFs = false;
 
 static void eternal()
 {
@@ -113,7 +113,7 @@ static bool loadInitProcess(Path initPath)
     VMM::UnmapKernelInitCode();
 
     (void)eternal;
-    auto colonel   = Scheduler::GetKernelProcess();
+    auto colonel   = Scheduler::KernelProcess();
     auto newThread = colonel->CreateThread(reinterpret_cast<uintptr_t>(eternal),
                                            false, CPU::Current()->ID);
     Scheduler::EnqueueThread(newThread.Raw());
@@ -124,14 +124,7 @@ static bool loadInitProcess(Path initPath)
 
 static void kernelThread()
 {
-    registerFilesystems();
-    Assert(VFS::MountRoot("tmpfs"));
-    Initrd::Initialize();
-
-    VFS::CreateDirectory("/dev", 0755 | S_IFDIR);
-    Assert(VFS::Mount(nullptr, "", "/dev", "devfs"));
-
-    Scheduler::InitializeProcFs();
+    VFS::Initialize();
 
     CharacterDevice::RegisterBaseMemoryDevices();
     Arch::ProbeDevices();
