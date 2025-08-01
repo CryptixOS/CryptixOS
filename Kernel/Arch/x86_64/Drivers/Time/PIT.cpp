@@ -30,8 +30,6 @@ PIT::PIT()
     m_Handler->eoiFirst = true;
 
     m_TimerVector       = m_Handler->GetInterruptVector();
-    InterruptManager::Unmask(IRQ_HINT - 0x20);
-
     LogInfo("PIT: Installed on interrupt gate #{:#x}", m_TimerVector);
 }
 
@@ -47,6 +45,8 @@ ErrorOr<void> PIT::Start(TimerMode mode, Timestep interval)
     usize reloadValue = (interval.Milliseconds() * BASE_FREQUENCY) / 3000;
     SetReloadValue(reloadValue);
     IO::Out<byte>(COMMAND, CHANNEL0_DATA | SEND_WORD | m_CurrentMode);
+
+    InterruptManager::Unmask(m_TimerVector);
 
     return {};
 }

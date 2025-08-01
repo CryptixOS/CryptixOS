@@ -18,6 +18,8 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
+#include <Time/Time.hpp>
+
 u8                         g_PanicIpiVector = 255;
 
 extern limine_mp_response* SMP_Response();
@@ -55,13 +57,12 @@ namespace CPU
         CPU::List         s_CPUs;
         usize             s_OnlineCPUsCount = 1;
 
-        ClockSource::List s_ClockSources;
         KVM::Clock*       s_KvmClock = nullptr;
     } // namespace
 
-    extern "C" __attribute__((noreturn)) void syscall_entry();
+    extern "C" CTOS_NORETURN void syscall_entry();
 
-    void                                      Identify()
+    void                          Identify()
     {
         ID  id(1);
         u8  steppingID     = id.rax & 0x0f;
@@ -216,7 +217,8 @@ namespace CPU
         for (usize i = 0; i < cpuCount; i++) s_CPUs.PushBack(new CPU);
 
         auto maybeKVMClock = KVM::Clock::Create();
-        if (maybeKVMClock) s_ClockSources.PushBack(s_KvmClock = *maybeKVMClock);
+        if (maybeKVMClock)
+            Time::RegisterClockSource(s_KvmClock = *maybeKVMClock);
 
         for (usize i = 0; i < cpuCount; i++)
         {
@@ -250,6 +252,7 @@ namespace CPU
             SetGSBase(smpInfo->extra_argument);
 
             Lapic::Instance()->Initialize();
+            Assert(Time::RegisterTimer(Lapic::Instance()));
             InitializeCPU(smpInfo);
             current->IsOnline = true;
         }
@@ -389,16 +392,7 @@ namespace CPU
 
         return 0;
     }
-    u64 RdTsc()
-    {
-        u32 a = 0;
-        u32 d = 0;
 
-        __asm__ volatile("lfence; rdtsc" : "=a"(a), "=d"(d));
-        return static_cast<u64>(a) | (static_cast<u64>(d) << 32);
-    }
-
-    void Halt() { __asm__ volatile("hlt"); }
     void HaltAll()
     {
         Lapic::Instance()->SendIpi(g_PanicIpiVector | (0b10 < 18), 0);
@@ -413,76 +407,6 @@ namespace CPU
                 Lapic::Instance()->InterruptVector() | GetCPU(id).LapicID, 0);
     }
 
-    void WriteMSR(u32 msr, u64 value)
-    {
-        const u64 rdx = value >> 32;
-        const u64 rax = value;
-        __asm__ volatile("wrmsr" : : "a"(rax), "d"(rdx), "c"(msr) : "memory");
-    }
-    u64 ReadMSR(u32 msr)
-    {
-        u64 rdx = 0;
-        u64 rax = 0;
-        __asm__ volatile("rdmsr" : "=a"(rax), "=d"(rdx) : "c"(msr) : "memory");
-        return (rdx << 32) | rax;
-    }
-
-    void WriteXCR(u64 reg, u64 value)
-    {
-        u32 a = value;
-        u32 d = value >> 32;
-        __asm__ volatile("xsetbv" ::"a"(a), "d"(d), "c"(reg) : "memory");
-    }
-
-    u64 ReadCR0()
-    {
-        u64 ret;
-        __asm__ volatile("mov %%cr0, %0" : "=r"(ret)::"memory");
-
-        return ret;
-    }
-
-    u64 ReadCR2()
-    {
-        u64 ret;
-        __asm__ volatile("mov %%cr2, %0" : "=r"(ret)::"memory");
-
-        return ret;
-    }
-
-    u64 ReadCR3()
-    {
-        u64 ret;
-        __asm__ volatile("mov %%cr3, %0" : "=r"(ret)::"memory");
-
-        return ret;
-    }
-    void WriteCR0(u64 value)
-    {
-        __asm__ volatile("mov %0, %%cr0" ::"r"(value) : "memory");
-    }
-
-    void WriteCR2(u64 value)
-    {
-        __asm__ volatile("mov %0, %%cr2" ::"r"(value) : "memory");
-    }
-    void WriteCR3(u64 value)
-    {
-        __asm__ volatile("mov %0, %%cr3" ::"r"(value) : "memory");
-    }
-
-    void WriteCR4(u64 value)
-    {
-        __asm__ volatile("mov %0, %%cr4" ::"r"(value) : "memory");
-    }
-
-    u64 ReadCR4()
-    {
-        u64 ret;
-        __asm__ volatile("mov %%cr4, %0" : "=r"(ret)::"memory");
-
-        return ret;
-    }
     void Stac()
     {
         if (ReadCR4() & Bit(21)) __asm__ volatile("stac" ::: "cc");
@@ -523,7 +447,6 @@ namespace CPU
         return GetOnlineCPUsCount() > 1 ? GetCurrent()->ID : s_BspLapicId;
     }
 
-    ClockSource::List& ClockSources() { return s_ClockSources; }
     ClockSource*       HighResolutionClock() { return s_KvmClock; }
 
     CPU*               GetCurrent()

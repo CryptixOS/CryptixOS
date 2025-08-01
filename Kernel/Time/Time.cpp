@@ -12,6 +12,7 @@
 #include <Library/Locking/Spinlock.hpp>
 #include <Library/Logger.hpp>
 
+#include <Prism/Algorithm/Find.hpp>
 #include <Prism/Containers/Deque.hpp>
 #include <Prism/Utility/Time.hpp>
 
@@ -39,15 +40,16 @@ namespace Time
 
     namespace
     {
-        Vector<HardwareTimer*> s_HardwareTimers;
-        HardwareTimer*         s_SchedulerTimer = nullptr;
+        HardwareTimer::List s_HardwareTimers;
+        ClockSource::List   s_ClockSources;
+        HardwareTimer*      s_SchedulerTimer = nullptr;
 
-        Timestep               s_BootTime;
-        Timestep               s_RealTime;
-        Timestep               s_Monotonic;
+        Timestep            s_BootTime;
+        Timestep            s_RealTime;
+        Timestep            s_Monotonic;
 
-        Deque<Timer*>          s_ArmedTimers;
-        Spinlock               s_TimersLock;
+        Deque<Timer*>       s_ArmedTimers;
+        Spinlock            s_TimersLock;
     } // namespace
 
     void Timer::Arm()
@@ -76,26 +78,49 @@ namespace Time
         auto now    = static_cast<usize>(Arch::GetEpoch());
         s_RealTime  = now * 1'000'000'000;
         s_Monotonic = s_RealTime;
-
-        LogTrace("Time: Probing available timers...");
-        Arch::ProbeTimers(s_HardwareTimers);
         Assert(s_HardwareTimers.Size() > 0);
 
         LogInfo("Time: Detected {} timers", s_HardwareTimers.Size());
-        for (usize i = 0; auto& timer : s_HardwareTimers)
-            LogInfo("Time: Timer[{}] = '{}'", i++, timer->GetModelString());
-
-        s_SchedulerTimer = s_HardwareTimers.Front();
+        auto cpuLocalTimer
+            = FindIf(s_HardwareTimers.begin(), s_HardwareTimers.end(),
+                     [](auto it) -> bool { return it->IsCPULocal(); });
+        s_SchedulerTimer = cpuLocalTimer != s_HardwareTimers.end()
+                             ? *cpuLocalTimer
+                             : s_HardwareTimers.Head();
     }
 
     HardwareTimer* GetSchedulerTimer() { return s_SchedulerTimer; }
 
-    Timestep       GetBootTime() { return s_BootTime; }
-    Timestep       GetTimeSinceBoot() { return GetRealTime() - s_BootTime; }
-    Timestep       GetRealTime() { return s_RealTime; }
-    Timestep       GetMonotonicTime() { return s_Monotonic; }
+    ErrorOr<void>  RegisterTimer(HardwareTimer* timer)
+    {
+        auto found
+            = FindIf(s_HardwareTimers.begin(), s_HardwareTimers.end(),
+                     [timer](auto it) -> bool
+                     { return it->ModelString() == timer->ModelString(); });
+        if (found != s_HardwareTimers.end()) return Error(EEXIST);
 
-    timespec       GetReal()
+        LogTrace("Time: Registered hardware timer => {}", timer->ModelString());
+        s_HardwareTimers.PushBack(timer);
+        return {};
+    }
+    ErrorOr<void> RegisterClockSource(ClockSource* clock)
+    {
+        auto found = FindIf(s_ClockSources.begin(), s_ClockSources.end(),
+                            [clock](auto it) -> bool
+                            { return it->Name() == clock->Name(); });
+        if (found != s_ClockSources.end()) return Error(EEXIST);
+
+        LogTrace("Time: Registered hardware timer => {}", clock->Name());
+        s_ClockSources.PushBack(clock);
+        return {};
+    }
+
+    Timestep GetBootTime() { return s_BootTime; }
+    Timestep GetTimeSinceBoot() { return GetRealTime() - s_BootTime; }
+    Timestep GetRealTime() { return s_RealTime; }
+    Timestep GetMonotonicTime() { return s_Monotonic; }
+
+    timespec GetReal()
     {
         timespec real;
         real.tv_sec  = s_RealTime.Seconds();

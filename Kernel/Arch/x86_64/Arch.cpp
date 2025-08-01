@@ -20,7 +20,7 @@
 
 #include <Drivers/HID/Ps2Controller.hpp>
 
-#include <Time/HardwareTimer.hpp>
+#include <Time/Time.hpp>
 
 namespace Arch
 {
@@ -33,6 +33,7 @@ namespace Arch
         IoApic::Initialize();
         if (!HPET::DetectAndSetup()) LogError("HPET: Not Available");
 
+        Assert(Time::RegisterTimer(PIT::Instance()));
         CPU::InitializeBSP();
         CPU::StartAPs();
 
@@ -70,12 +71,6 @@ namespace Arch
                 I8042Command::eResetCPU))
             return;
         IO::Out<word>(0x604, 0x2000);
-    }
-    KERNEL_INIT_CODE
-    void ProbeTimers(Vector<HardwareTimer*>& timers)
-    {
-        if (Lapic::IsInitialized()) timers.PushBack(Lapic::Instance());
-        if (PIT::IsInitialized()) timers.PushBack(PIT::Instance());
     }
     time_t GetEpoch() { return RTC::CurrentTime(); }
 }; // namespace Arch

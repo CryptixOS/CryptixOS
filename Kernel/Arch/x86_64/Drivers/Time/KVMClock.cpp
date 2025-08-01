@@ -44,7 +44,7 @@ namespace KVM
         volatile auto pvclock = &m_Info;
         while (pvclock->Version % 2) Arch::Pause();
 
-        auto time = static_cast<u128>(CPU::RdTsc()) - pvclock->TscTimestamp;
+        auto time = static_cast<u128>(CPU::ReadTsc()) - pvclock->TscTimestamp;
         if (pvclock->TscShift >= 0) time <<= pvclock->TscShift;
         else time >>= -pvclock->TscShift;
 

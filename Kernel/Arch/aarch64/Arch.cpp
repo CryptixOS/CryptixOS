@@ -31,7 +31,5 @@ namespace Arch
         return !interruptsDisabled;
     }
 
-    void ProbeTimers(Vector<HardwareTimer*>&) {}
-
     void Reboot() {}
 } // namespace Arch

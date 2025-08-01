@@ -11,12 +11,16 @@
 #include <Prism/Core/Types.hpp>
 #include <Prism/Utility/Time.hpp>
 
+#include <Time/ClockSource.hpp>
 #include <Time/HardwareTimer.hpp>
 
 namespace Time
 {
     void           Initialize(DateTime bootTime);
     HardwareTimer* GetSchedulerTimer();
+
+    ErrorOr<void>  RegisterTimer(HardwareTimer* timer);
+    ErrorOr<void>  RegisterClockSource(ClockSource* clock);
 
     Timestep       GetBootTime();
     Timestep       GetTimeSinceBoot();

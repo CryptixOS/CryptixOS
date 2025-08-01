@@ -12,6 +12,7 @@
 
 #include <Arch/x86_64/CPUContext.hpp>
 #include <Arch/x86_64/CPUID.hpp>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
 #include <Arch/x86_64/Drivers/Time/Lapic.hpp>
 #include <Arch/x86_64/GDT.hpp>
 #include <Arch/x86_64/IDT.hpp>
@@ -140,47 +141,35 @@ namespace CPU
         u64  rax, rbx, rcx, rdx;
     };
 
-    u32                KvmBase();
-    u64                RdTsc();
+    u32          KvmBase();
+    u64          RdTsc();
 
-    void               Halt();
-    void               HaltAll();
-    void               WakeUp(usize id, bool everyone);
+    void         HaltAll();
+    void         WakeUp(usize id, bool everyone);
 
-    void               WriteXCR(u64 reg, u64 value);
-    u64                ReadCR0();
-    u64                ReadCR2();
-    void               WriteCR0(u64 value);
-    u64                ReadCR4();
-    void               WriteCR4(u64 value);
+    Pointer      GetFSBase();
+    Pointer      GetGSBase();
+    Pointer      GetKernelGSBase();
 
-    u64                ReadMSR(u32 msr);
-    void               WriteMSR(u32 msr, u64 value);
+    void         SetFSBase(Pointer address);
+    void         SetGSBase(Pointer address);
+    void         SetKernelGSBase(Pointer address);
 
-    Pointer            GetFSBase();
-    Pointer            GetGSBase();
-    Pointer            GetKernelGSBase();
+    u64          GetBspId();
+    CPU&         GetBsp();
+    CPU&         GetCPU(usize id);
 
-    void               SetFSBase(Pointer address);
-    void               SetGSBase(Pointer address);
-    void               SetKernelGSBase(Pointer address);
+    CPU::List&   GetCPUs();
+    u64          GetOnlineCPUsCount();
+    u64          GetCurrentID();
 
-    u64                GetBspId();
-    CPU&               GetBsp();
-    CPU&               GetCPU(usize id);
+    ClockSource* HighResolutionClock();
 
-    CPU::List&         GetCPUs();
-    u64                GetOnlineCPUsCount();
-    u64                GetCurrentID();
+    void         Reschedule(Timestep interval);
 
-    ClockSource::List& ClockSources();
-    ClockSource*       HighResolutionClock();
-
-    void               Reschedule(Timestep interval);
-
-    bool               EnableSSE();
-    void               EnablePAT();
-    void               EnableSMEP();
-    void               EnableSMAP();
-    void               EnableUMIP();
+    bool         EnableSSE();
+    void         EnablePAT();
+    void         EnableSMEP();
+    void         EnableSMAP();
+    void         EnableUMIP();
 }; // namespace CPU

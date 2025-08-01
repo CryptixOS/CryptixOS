@@ -25,8 +25,9 @@ class Lapic : public HardwareTimer, public Singleton<Lapic>
 
     static bool   IsInitialized() { return s_Initialized; }
 
-    StringView    GetModelString() const override { return "Local APIC"_sv; }
+    StringView    ModelString() const override { return "Local APIC"_sv; }
     virtual usize InterruptVector() const override;
+    virtual bool  IsCPULocal() const override { return true; }
 
     void          SendIpi(u32 flags, u32 id);
     void          SendEOI();

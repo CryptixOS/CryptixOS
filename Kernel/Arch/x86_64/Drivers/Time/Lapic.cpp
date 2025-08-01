@@ -13,6 +13,7 @@
 
 #include <Memory/VMM.hpp>
 #include <Scheduler/Scheduler.hpp>
+#include <Time/Time.hpp>
 
 constexpr u32                  LAPIC_EOI_ACK                      = 0x00;
 CTOS_UNUSED constexpr u32      APIC_BASE_MSR                      = 0x1b;
@@ -54,7 +55,6 @@ bool                           Checkm_X2Apic()
 
 void Lapic::Initialize()
 {
-    PIT::Initialize();
     LogTrace("LAPIC: Initializing for cpu #{}...", CPU::GetCurrent()->LapicID);
     m_X2Apic = Checkm_X2Apic();
     LogInfo("LAPIC: m_X2Apic available: {}", m_X2Apic);
@@ -176,10 +176,10 @@ void Lapic::CalibrateTimer()
     Write(LAPIC_TIMER_INITIAL_COUNT_REGISTER, 0xffffffff);
 
     Write(LAPIC_TIMER_REGISTER, Read(LAPIC_TIMER_REGISTER) & ~Bit(16));
-    // HPET::GetDevices()[0].Sleep(10 * 1000);
+    // HPET::GetDevices()[0].Sleep(1000);
     Write(LAPIC_TIMER_REGISTER, Read(LAPIC_TIMER_REGISTER) | Bit(16));
 
-    m_TicksPerMs = (0xffffffff - Read(LAPIC_TIMER_CURRENT_COUNT_REGISTER)) / 10;
+    m_TicksPerMs = (0xffffffff - Read(LAPIC_TIMER_CURRENT_COUNT_REGISTER));
 }
 void Lapic::SetNmi(u8 vector, u8 currentCPUID, u8 cpuID, u16 flags, u8 lint)
 {

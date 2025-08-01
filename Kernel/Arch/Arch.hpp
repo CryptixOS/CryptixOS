@@ -33,7 +33,5 @@ namespace Arch
     void              PowerOff();
     void              Reboot();
 
-    KERNEL_INIT_CODE
-    void   ProbeTimers(Vector<HardwareTimer*>& timers);
-    time_t GetEpoch();
+    time_t            GetEpoch();
 }; // namespace Arch

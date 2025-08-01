@@ -30,19 +30,19 @@ namespace InterruptManager
         return IDT::AllocateHandler(hint);
     }
 
-    void Mask(u8 irq)
+    void Mask(u8 vector)
     {
         if (IoApic::IsAnyEnabled())
-            IoApic::SetIrqRedirect(CPU::GetCurrent()->LapicID, irq + 0x20, irq,
-                                   false);
-        else I8259A::Instance().Mask(irq);
+            IoApic::SetIrqRedirect(CPU::GetCurrent()->LapicID, vector,
+                                   vector - 0x20, false);
+        else I8259A::Instance().Mask(vector - 0x20);
     }
-    void Unmask(u8 irq)
+    void Unmask(u8 vector)
     {
         if (IoApic::IsAnyEnabled())
-            IoApic::SetIrqRedirect(CPU::GetCurrent()->LapicID, irq + 0x20, irq,
-                                   true);
-        else I8259A::Instance().Unmask(irq);
+            IoApic::SetIrqRedirect(CPU::GetCurrent()->LapicID, vector,
+                                   vector - 0x20, true);
+        else I8259A::Instance().Unmask(vector - 0x20);
     }
 
     void SendEOI(u8 vector)

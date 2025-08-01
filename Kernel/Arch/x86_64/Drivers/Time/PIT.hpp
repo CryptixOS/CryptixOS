@@ -20,7 +20,7 @@ class PIT : public HardwareTimer, public Singleton<PIT>
     static void   Initialize();
     static bool   IsInitialized();
 
-    StringView    GetModelString() const override { return "i8253"_sv; }
+    StringView    ModelString() const override { return "i8253"_sv; }
 
     ErrorOr<void> Start(TimerMode mode, Timestep interval) override;
     void          Stop() override;

@@ -8,9 +8,7 @@
 
 namespace CPU
 {
-    static ClockSource::List s_ClockSources;
-
-    bool                     GetInterruptFlag()
+    bool GetInterruptFlag()
     {
         u64 daif = 0;
         __asm__ volatile("mrs %0, daif" : "=r"(daif));
@@ -26,17 +24,16 @@ namespace CPU
     usize GetOnlineCPUsCount() { return 1; }
 
     struct CPU;
-    CPU*               Current() { return nullptr; }
-    CPU*               GetCurrent() { return nullptr; }
-    u64                GetCurrentID() { return 0; }
-    Thread*            GetCurrentThread() { return nullptr; }
+    CPU*         Current() { return nullptr; }
+    CPU*         GetCurrent() { return nullptr; }
+    u64          GetCurrentID() { return 0; }
+    Thread*      GetCurrentThread() { return nullptr; }
 
-    ClockSource::List& ClockSources() { return s_ClockSources; }
-    ClockSource*       HighResolutionClock() { return nullptr; }
+    ClockSource* HighResolutionClock() { return nullptr; }
 
-    bool               SwapInterruptFlag(bool) { return false; }
+    bool         SwapInterruptFlag(bool) { return false; }
 
-    void               PrepareThread(Thread* thread, Pointer pc, Pointer)
+    void         PrepareThread(Thread* thread, Pointer pc, Pointer)
     {
         (void)thread;
         (void)pc;

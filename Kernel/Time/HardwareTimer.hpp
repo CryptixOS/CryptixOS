@@ -6,11 +6,12 @@
  */
 #pragma once
 
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Core/Error.hpp>
 #include <Prism/Core/Types.hpp>
+
 #include <Prism/String/StringView.hpp>
 #include <Prism/Utility/Delegate.hpp>
-#include <Prism/Core/Error.hpp>
-
 #include <Prism/Utility/Time.hpp>
 
 enum class TimerMode
@@ -22,11 +23,12 @@ enum class TimerMode
 class HardwareTimer
 {
   public:
-    HardwareTimer()                           = default;
-    virtual ~HardwareTimer()                  = default;
+    HardwareTimer()                        = default;
+    virtual ~HardwareTimer()               = default;
 
-    virtual StringView GetModelString() const = 0;
+    virtual StringView ModelString() const = 0;
     virtual usize      InterruptVector() const { return usize(-1); };
+    virtual bool       IsCPULocal() const { return false; }
 
     using OnTickCallback = Delegate<void(struct CPUContext*)>;
 
@@ -41,6 +43,14 @@ class HardwareTimer
 
     virtual ErrorOr<void> SetFrequency(usize frequency)            = 0;
 
+    using HookType = IntrusiveRefListHook<HardwareTimer, HardwareTimer*>;
+    friend class IntrusiveRefList<HardwareTimer, HookType>;
+    friend struct IntrusiveRefListHook<HardwareTimer, HardwareTimer*>;
+
+    using List = IntrusiveRefList<HardwareTimer, HookType>;
+
   protected:
     OnTickCallback m_OnTickCallback = nullptr;
+
+    HookType       Hook;
 };
