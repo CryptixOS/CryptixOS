@@ -12,7 +12,7 @@
 #include <Library/UserBuffer.hpp>
 
 #include <Prism/Containers/Bitmap.hpp>
-#include <Prism/Containers/IntrusiveList.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
 #include <Prism/Utility/Atomic.hpp>
 #include <Prism/Utility/Optional.hpp>
 #include <VFS/File.hpp>
@@ -81,7 +81,9 @@ class Device : public File
     static void Initialize();
 
     Device*     Next() const { return Hook.Next; }
-    using List = IntrusiveList<Device>;
+
+    using HookType = IntrusiveRefListHook<Device, Device*>;
+    using List     = IntrusiveRefList<Device, HookType>;
 
   protected:
     StringView                   m_Name = ""_sv;
@@ -95,12 +97,12 @@ class Device : public File
     static void                  FreeMajor(DeviceMajor major);
 
   private:
-    friend class IntrusiveList<Device>;
-    friend struct IntrusiveListHook<Device>;
+    friend class IntrusiveRefList<Device, HookType>;
+    friend struct IntrusiveRefListHook<Device, Device*>;
 
-    IntrusiveListHook<Device> Hook;
+    HookType           Hook;
 
-    static DeviceMinor        AllocateMinor()
+    static DeviceMinor AllocateMinor()
     {
         // TODO(v1tr10l7): Allocate minor numbers per major
         static Atomic<DeviceMinor> s_Base = 1000;
