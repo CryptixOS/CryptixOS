@@ -883,7 +883,7 @@ namespace API::VFS
         auto fs      = inode->Filesystem();
         if (!fs) return Error(ENODEV);
 
-        fs->Sync();
+        RetOnError(fs->Sync());
         return 0;
     }
     ErrorOr<isize> RenameAt2(isize oldDirFdNum, const char* oldPath,
