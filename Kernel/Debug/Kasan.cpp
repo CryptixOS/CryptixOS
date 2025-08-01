@@ -7,9 +7,9 @@
 #include <Common.hpp>
 
 #include <Debug/Assertions.hpp>
+#include <Debug/Kasan.hpp>
 #include <Debug/Panic.hpp>
 
-#include <Library/Kasan.hpp>
 #include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
 
@@ -21,10 +21,10 @@ using MM::HigherHalfOffset;
 
 namespace Kasan
 {
-    CTOS_UNUSED constexpr usize SHADOW_MAPPING_OFFSET          = 0x06fe'0000;
-    CTOS_UNUSED constexpr usize SHADOW_SHIFT                   = 3;
-    CTOS_UNUSED constexpr usize SHADOW_GRANULE_SIZE            = (1ul << SHADOW_SHIFT);
-    CTOS_UNUSED constexpr usize SHADOW_MASK                    = (SHADOW_GRANULE_SIZE - 1);
+    CTOS_UNUSED constexpr usize SHADOW_MAPPING_OFFSET = 0x06fe'0000;
+    CTOS_UNUSED constexpr usize SHADOW_SHIFT          = 3;
+    CTOS_UNUSED constexpr usize SHADOW_GRANULE_SIZE   = (1ul << SHADOW_SHIFT);
+    CTOS_UNUSED constexpr usize SHADOW_MASK = (SHADOW_GRANULE_SIZE - 1);
     CTOS_UNUSED constexpr usize SHADOW_UNPOISONED_MAGIC        = 0x00;
     CTOS_UNUSED constexpr usize SHADOW_RESERVED_MAGIC          = 0xff;
     CTOS_UNUSED constexpr usize SHADOW_GLOBAL_REDZONE_MAGIC    = 0xf9;

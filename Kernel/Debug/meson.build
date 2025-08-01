@@ -5,6 +5,7 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 srcs += files(
+  'Kasan.cpp',
   'Panic.cpp',
 )
 
