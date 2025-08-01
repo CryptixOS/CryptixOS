@@ -13,6 +13,11 @@
 
 namespace Stacktrace
 {
+    struct StackFrame
+    {
+        StackFrame* Base;
+        Pointer     InstructionPointer;
+    };
     struct Symbol
     {
         String                         Name;

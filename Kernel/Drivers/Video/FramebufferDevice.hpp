@@ -9,7 +9,7 @@
 #include <API/Posix/linux/fb.h>
 
 #include <Drivers/Video/Framebuffer.hpp>
-#include <Drivers/CharacterDevice.hpp>
+#include <Drivers/Core/CharacterDevice.hpp>
 
 class FramebufferDevice : public CharacterDevice
 {

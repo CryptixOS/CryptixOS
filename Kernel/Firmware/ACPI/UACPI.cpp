@@ -420,7 +420,7 @@ namespace uACPI
             handler->SetHandler(OnInterrupt);
             s_Handlers[irq] = uhandler;
             s_Contexts[irq] = ctx;
-            InterruptManager::Unmask(irq);
+            InterruptManager::Unmask(handler->GetInterruptVector());
 
             *reinterpret_cast<usize*>(outIrqHandle)
                 = handler->GetInterruptVector();

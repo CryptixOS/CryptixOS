@@ -15,7 +15,7 @@
 #include <Boot/BootInfo.hpp>
 #include <Boot/CommandLine.hpp>
 
-#include <Drivers/MemoryDevices.hpp>
+#include <Drivers/Core/CharacterDevice.hpp>
 #include <Drivers/PCI/PCI.hpp>
 #include <Drivers/Serial.hpp>
 #include <Drivers/TTY.hpp>
@@ -71,45 +71,20 @@ namespace EFI
 {
     bool Initialize(Pointer systemTable, const EfiMemoryMap& memoryMap);
 };
-bool g_LogTmpFs = false;
-
-template <typename T>
-static void registerFilesystem(StringView name)
-{
-    auto fs            = CreateRef<FilesystemDriver>();
-
-    fs->Owner          = nullptr;
-    fs->FilesystemName = name;
-    fs->FlagsMask      = 0;
-
-    fs->Instantiate    = []() -> ErrorOr<Ref<Filesystem>> { return new T(0); };
-    fs->Destroy        = [](Ref<Filesystem>) -> ErrorOr<void> { return {}; };
-
-    VFS::RegisterFilesystem(fs);
-}
-
-void registerFilesystems()
-{
-    registerFilesystem<TmpFs>("tmpfs");
-    registerFilesystem<DevTmpFs>("devfs");
-    registerFilesystem<ProcFs>("proc");
-    registerFilesystem<Fat32Fs>("vfat");
-    registerFilesystem<Ext2Fs>("ext2");
-    registerFilesystem<EchFs>("echfs");
-}
+bool        g_LogTmpFs = false;
 
 static void eternal()
 {
     for (;;)
     {
-        auto status = Time::NanoSleep(1000 * 1000 * 5);
+        LogTrace("Kernel thread");
+        auto status = Time::NanoSleep(5'000'000'000zu);
         if (!status)
         {
             LogError("Sleeping failed");
             Process::Current()->Exit(-1);
         }
 
-        LogTrace("Kernel thread");
         Arch::Pause();
     }
 }
@@ -138,26 +113,20 @@ static bool loadInitProcess(Path initPath)
     VMM::UnmapKernelInitCode();
 
     (void)eternal;
-    auto colonel   = Scheduler::GetKernelProcess();
+    auto colonel   = Scheduler::KernelProcess();
     auto newThread = colonel->CreateThread(reinterpret_cast<uintptr_t>(eternal),
                                            false, CPU::Current()->ID);
-    Scheduler::EnqueueThread(newThread);
-    Scheduler::EnqueueThread(userThread);
+    Scheduler::EnqueueThread(newThread.Raw());
+    Scheduler::EnqueueThread(userThread.Raw());
 
     return true;
 }
 
 static void kernelThread()
 {
-    registerFilesystems();
-    Assert(VFS::MountRoot("tmpfs"));
-    Initrd::Initialize();
+    VFS::Initialize();
 
-    VFS::CreateDirectory("/dev", 0755 | S_IFDIR);
-    Assert(VFS::Mount(nullptr, "", "/dev", "devfs"));
-
-    Scheduler::InitializeProcFs();
-
+    CharacterDevice::RegisterBaseMemoryDevices();
     Arch::ProbeDevices();
     PCI::Initialize();
 
@@ -175,23 +144,13 @@ static void kernelThread()
     if (!FramebufferDevice::Initialize())
         LogError("kernel: Failed to initialize fbdev");
     TTY::Initialize();
-    MemoryDevices::Initialize();
-
-    // IgnoreUnused(
-    //     VFS::Mount(nullptr, "/dev/nvme0n2p2"_sv, "/mnt/ext2"_sv, "ext2"_sv));
-    // IgnoreUnused(
-    //     VFS::Mount(nullptr, "/dev/nvme0n2p1"_sv, "/mnt/vfat"_sv, "vfat"_sv));
-    // IgnoreUnused(
-    //     VFS::Mount(nullptr, "/dev/nvme0n2p3"_sv, "/mnt/echfs"_sv,
-    //     "echfs"_sv));
-
     if (!USB::Initialize()) LogWarn("USB: Failed to initialize");
 
     if (!System::LoadModules())
         LogWarn("ELF: Could not find any builtin drivers");
 
     auto moduleDirectory
-        = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), "/lib/modules/")
+        = VFS::ResolvePath(VFS::RootDirectoryEntry(), "/lib/modules/")
               .ValueOr(VFS::PathResolution{})
               .Entry;
     if (moduleDirectory)
@@ -268,6 +227,11 @@ kernelStart(const BootInformation& info)
     LogInfo("Boot: Kernel Virtual Address: {:#p}",
             memoryInfo.KernelVirtualBase);
 
+    LogDebug("BootInfo: Lowest allocated address => {:#x}",
+             info.LowestAllocatedAddress.Raw());
+    LogDebug("BootInfo: Highest allocated address => {:#x}",
+             info.HighestAllocatedAddress.Raw());
+
     MM::Initialize();
     Serial::Initialize();
     // DONT MOVE END
@@ -296,7 +260,7 @@ kernelStart(const BootInformation& info)
     auto thread
         = process->CreateThread(kernelThread, false, CPU::GetCurrent()->ID);
 
-    Scheduler::EnqueueThread(thread);
+    Scheduler::EnqueueThread(thread.Raw());
 
     Syscall::InstallAll();
     Scheduler::PrepareAP(true);

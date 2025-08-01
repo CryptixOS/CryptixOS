@@ -5,14 +5,11 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 srcs += files(
-  'CharacterDevice.cpp',
-  'Device.cpp',
-  'DeviceManager.cpp',
-  'GenericDriver.cpp',
   'TTY.cpp',
   'Terminal.cpp',
 )
 
+subdir('Core')
 subdir('HID')
 subdir('PCI')
 subdir('Storage')

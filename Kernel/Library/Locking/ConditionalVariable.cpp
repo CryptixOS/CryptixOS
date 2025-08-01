@@ -8,7 +8,7 @@
 
 void ConditionalVariable::Wait(Mutex& mutex)
 {
-    Thread* thread = Thread::Current();
+    auto thread = Thread::Current();
     {
         ScopedLock guard(m_Lock);
         m_Event.Listeners.EmplaceBack(thread, 0);

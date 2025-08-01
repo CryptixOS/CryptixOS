@@ -57,7 +57,8 @@ class Image:
             trace(f'mounting {device} at {os.path.abspath(tmpdirname)}')
             run(['mount', f'{self.loop}p{index}', os.path.abspath(tmpdirname)])
             trace(f'copying the files from `{src_path}` to mounted device at `{os.path.abspath(tmpdirname)}`')
-            run(['cp', '-r', f'{src_path}', f'{os.path.abspath(tmpdirname)}/'])
+            os.system(f'zsh -c "cp -r {src_path}/* {os.path.abspath(tmpdirname)}/"')
+            # run(['cp', '-r', f'{src_path}', f'{os.path.abspath(tmpdirname)}/'])
             trace(f'unmounting {device} from {os.path.abspath(tmpdirname)}')
             run(['umount', f'{os.path.abspath(tmpdirname)}'])
 

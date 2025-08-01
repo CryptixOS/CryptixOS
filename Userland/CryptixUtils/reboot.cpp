@@ -16,7 +16,7 @@ using namespace cryptix;
 int main()
 {
     printf("The system will reboot...\n");
-    auto ret = Syscall(SYS_REBOOT, RebootCmd::eRestart);
+    Syscall(SYS_REBOOT, RebootCmd::eRestart);
     // reboot(LINUX_REBOOT_CMD_RESTART);
 
     return EXIT_FAILURE;

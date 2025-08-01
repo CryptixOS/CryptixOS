@@ -81,6 +81,11 @@ namespace KernelHeap
         usize pageCount = Math::DivRoundUp(s_EarlyHeapSize, PMM::PAGE_SIZE);
 
         auto  pageMap   = VMM::GetKernelPageMap();
+        auto  flags     = PageAttributes::eRWX | PageAttributes::eWriteBack;
+        pageMap->MapRange(baseVirt, baseVirt.FromHigherHalf(), s_EarlyHeapSize,
+                          flags);
+        return;
+
         for (usize i = 0; i < pageCount; i++)
         {
             auto offset = i * PMM::PAGE_SIZE;

@@ -6,6 +6,7 @@
 #*/
 srcs += files(
   'ConditionalVariable.cpp',
+  'Mutex.cpp',
   'RecursiveMutex.cpp',
   'Semaphore.cpp',
   'Spinlock.cpp',

@@ -8,7 +8,7 @@
 
 #include <stdlib.h>
 
-#include "Prism/Core/Types.hpp"
+#include <Prism/Core/Types.hpp>
 
 extern "C"
 {
@@ -77,40 +77,6 @@ extern "C"
         return length;
     }
 
-    char* strdup(const char* str) throw()
-    {
-        usize len        = strlen(str) + 1;
-
-        void* new_string = malloc(len);
-        if (!new_string) return nullptr;
-
-        return static_cast<char*>(memcpy(new_string, str, len));
-    }
-
-    char* strcat(char* dest, const char* src) throw()
-    {
-        char* ptr = dest + strlen(dest);
-        while (*src != '\0') *ptr++ = *src++;
-
-        *ptr = '\0';
-        return dest;
-    }
-
-    char* strncat(char* dest, const char* src, usize len) throw()
-    {
-        char* ptr = dest + strlen(dest);
-        while (*src != '\0' && len-- > 0) *ptr++ = *src++;
-
-        *ptr = '\0';
-        return dest;
-    }
-
-    /*char* strchr(const char* str, int ch) throw()
-    {
-        while (*str && *str != ch) str++;
-        return const_cast<char*>(ch == *str ? str : nullptr);
-    }*/
-
     int strcmp(const char* str1, const char* str2) throw()
     {
         while (*str1 && *str2 && *str1 == *str2)
@@ -130,62 +96,5 @@ extern "C"
         }
 
         return len != 0 ? *str1 - *str2 : 0;
-    }
-
-    char* strcpy(char* dest, const char* src) throw()
-    {
-        char* ptr = dest;
-        while (*src != '\0')
-        {
-            *dest = *src;
-            dest++;
-            src++;
-        }
-
-        *dest = '\0';
-        return ptr;
-    }
-
-    char* strncpy(char* dest, const char* src, usize len) throw()
-    {
-        char* ret = dest;
-        while (*src != '\0' && len-- > 0)
-        {
-            *dest = *src;
-            dest++;
-            src++;
-        }
-
-        *dest = '\0';
-        return ret;
-    }
-
-    /*char* strstr(const char* str, const char* substr) throw()
-    {
-        const char *a = str, *b = substr;
-        while (true)
-        {
-            if (*b == 0) return const_cast<char*>(str);
-            if (*a == 0) return nullptr;
-
-            if (*a++ != *b++)
-            {
-                a = ++str;
-                b = substr;
-            }
-        }
-    }*/
-
-    void strrev(char* str)
-    {
-        char  a;
-        usize len = strlen(reinterpret_cast<const char*>(str));
-
-        for (usize i = 0, j = len - 1; i < j; i++, j--)
-        {
-            a      = str[i];
-            str[i] = str[j];
-            str[j] = a;
-        }
     }
 } // extern "C"

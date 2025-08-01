@@ -144,6 +144,8 @@ namespace
         used,
         section(".limine_requests_end"))) volatile LIMINE_REQUESTS_END_MARKER;
 
+    static BootInformation* s_BootInformation;
+
 #define HigherHalfPointer(addr) addr.Offset(s_HhdmRequest.response->offset)
     Pointer AllocateBootMemory(usize bytes)
     {
@@ -163,6 +165,10 @@ namespace
             entry->base += bytes;
             entry->length -= bytes;
 
+            s_BootInformation->LowestAllocatedAddress
+                = Min(s_BootInformation->LowestAllocatedAddress, address);
+            s_BootInformation->HighestAllocatedAddress
+                = Max(s_BootInformation->HighestAllocatedAddress, address);
             return HigherHalfPointer(address);
         }
 
@@ -403,6 +409,7 @@ namespace
 
     void SetupBootInfo(BootInformation& info)
     {
+        s_BootInformation              = &info;
         auto bootInfoResponse          = s_BootloaderInfoRequest.response;
         auto executableCmdlineResponse = s_ExecutableCmdlineRequest.response;
         auto dateAtBootResponse        = s_DateAtBootRequest.response;

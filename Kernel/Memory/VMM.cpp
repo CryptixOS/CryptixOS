@@ -10,7 +10,9 @@
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
+
 #include <Scheduler/Process.hpp>
 
 extern "C" symbol      limine_requests_addr_start;
@@ -61,46 +63,66 @@ namespace VMM
         s_KernelPageMap = new PageMap();
         Assert(s_KernelPageMap->TopLevel() != 0);
 
-        usize baseMemorySize   = 3_gib;
+        usize baseMemorySize = 4_gib;
+        Assert(baseMemorySize == 0x100000000);
         auto [pageSize, flags] = s_KernelPageMap->RequiredSize(baseMemorySize);
 
         Assert(s_KernelPageMap->MapRange(
             GetHigherHalfOffset(), 0, baseMemorySize,
-            PageAttributes::eRW | flags | PageAttributes::eWriteBack));
+            PageAttributes::eRWX | flags | PageAttributes::eWriteBack));
 
         auto memoryMap = PMM::MemoryZones();
-        for (const auto& entry : memoryMap)
+
+        usize                    highestAddress = 0;
+        for (usize index = 0; const auto& entry : memoryMap)
         {
-            if ((entry.Base() <= baseMemorySize)
+            Pointer base   = Math::AlignDown(entry.Base(), PMM::PAGE_SIZE);
+            Pointer top    = Math::AlignUp(entry.Base().Offset(entry.Length()),
+                                           PMM::PAGE_SIZE);
+
+            highestAddress = Max(highestAddress, top.Raw());
+            if (top <= baseMemorySize
                 || entry.Type() == MemoryZoneType::eReserved)
+            {
+                ++index;
                 continue;
+            }
+            while (base < top && base < baseMemorySize) base += PMM::PAGE_SIZE;
 
-            Pointer base = Math::AlignDown(entry.Base(), GetPageSize());
-            Pointer top  = Math::AlignUp(entry.Base().Offset(entry.Length()),
-                                         GetPageSize());
+            auto type = ToString(entry.Type());
+            LogDebug(
+                "VMM: Entry[{}]: {{ .Base: {:#016x}, .Top: {:#016x}, .Type: {} "
+                "}}",
+                index, base.ToHigherHalf().Raw(), top.ToHigherHalf().Raw(),
+                type);
 
-            auto    size = (top - base).Raw();
+            auto size              = (top - base).Raw();
             auto [pageSize, flags] = s_KernelPageMap->RequiredSize(size);
 
             auto alignedSize       = Math::AlignDown(size, pageSize);
 
-            flags |= PageAttributes::eWriteBack;
             if (entry.Type() == MemoryZoneType::eFramebuffer)
                 flags |= PageAttributes::eWriteCombining;
-
+            else if (entry.Type() == MemoryZoneType::eKernelAndModules)
+            {
+                ++index;
+                continue;
+            }
+            else flags |= PageAttributes::eWriteBack;
             Assert(!s_KernelPageMap->ValidateAddress(base.ToHigherHalf()));
-            Assert(s_KernelPageMap->MapRange(
-                base.ToHigherHalf(), base, alignedSize,
-                PageAttributes::eRW | flags | PageAttributes::eWriteBack));
 
+            Assert(s_KernelPageMap->MapRange(base.ToHigherHalf(), base,
+                                             alignedSize,
+                                             PageAttributes::eRWX | flags));
             Assert(s_KernelPageMap->ValidateAddress(base.ToHigherHalf()));
+            ++index;
             base += alignedSize;
 
-            Assert(s_KernelPageMap->MapRange(
-                base.ToHigherHalf(), base, size - alignedSize,
-                PageAttributes::eRW | PageAttributes::eWriteBack));
+            if (size > alignedSize)
+                Assert(s_KernelPageMap->MapRange(
+                    base.ToHigherHalf(), base, size - alignedSize,
+                    PageAttributes::eRWX | PageAttributes::eWriteBack));
         }
-
         // const void* sectionRanges[6][2] = {
         //     { limine_requests_addr_start, limine_requests_addr_end },
         //     { text_start_addr, text_end_addr },
@@ -135,15 +157,13 @@ namespace VMM
                                              | PageAttributes::eWriteBack));
 
         {
-            auto    memoryTop = PMM::GetMemoryTop();
-            Pointer base
-                = Pointer(Math::AlignUp(memoryTop, 1_gib)).ToHigherHalf();
-            s_VirtualAddressSpace = base.Offset(4_gib);
+            s_VirtualAddressSpace
+                = Pointer(highestAddress).Offset(1_gib); // base.Offset(4_gib);
         }
 
         Pointer initVirt = kernel_init_start_addr;
         auto    initPhys = initVirt - kernelVirt + kernelPhys;
-        auto    initSize = Pointer(kernel_init_end_addr) - textVirt;
+        auto    initSize = Pointer(kernel_init_end_addr) - initVirt;
 
         LogTrace("VMM: Mapping .kernel_init_code  => {:#016x}-{:#016x}",
                  initVirt, initVirt.Offset(initSize));

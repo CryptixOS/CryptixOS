@@ -9,7 +9,6 @@ srcs += files(
   'ExecutableProgram.cpp',
   'ICxxAbi.cpp',
   'Image.cpp',
-  'Kasan.cpp',
   'Logger.cpp',
   'Stacktrace.cpp',
   'ZLib.cpp',

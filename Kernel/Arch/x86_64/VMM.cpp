@@ -189,7 +189,6 @@ Pointer PageMap::Virt2Phys(Pointer virt, PageAttributes flags)
 
 bool PageMap::InternalMap(Pointer virt, Pointer phys, PageAttributes flags)
 {
-
     auto pageSize = GetPageSize(flags);
     if (pageSize == LLPAGE_SIZE && !s_1GibPages)
     {

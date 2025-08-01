@@ -12,19 +12,8 @@
 namespace std
 {
     using ::malloc;
-    using ::calloc;
     using ::realloc;
     using ::free;
-
-    using ::atoi;
-    using ::atol;
-    using ::atoll;
-
-    using ::strtol;
-    using ::strtoll;
-
-    using ::strtoul;
-    using ::strtoull;
 
     extern "C" __attribute__((noreturn)) void abort() throw();
 } // namespace std

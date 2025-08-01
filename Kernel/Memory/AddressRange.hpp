@@ -30,6 +30,15 @@ class AddressRange final
     {
         return address >= m_Base && address < End();
     }
+    constexpr bool Contains(Pointer base, usize length) const
+    {
+        auto end          = base.Offset(length);
+
+        auto currentStart = Base();
+        auto currentEnd   = End();
+
+        return (end <= currentStart || base >= currentEnd);
+    }
 
     bool Intersects(AddressRange const& other) const
     {

@@ -7,7 +7,7 @@
 #include <API/System.hpp>
 #include <Boot/CommandLine.hpp>
 
-#include <Drivers/DeviceManager.hpp>
+#include <Drivers/Core/DeviceManager.hpp>
 #include <Prism/String/StringUtils.hpp>
 
 #include <System/System.hpp>
@@ -211,10 +211,6 @@ ErrorOr<::Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
                                            const void* data)
 {
     ScopedLock guard(m_Lock);
-    m_MountData
-        = data ? reinterpret_cast<void*>(strdup(static_cast<const char*>(data)))
-               : nullptr;
-
     if (m_Root) VFS::RecursiveDelete(m_Root);
 
     m_RootEntry    = new DirectoryEntry(nullptr, "/");

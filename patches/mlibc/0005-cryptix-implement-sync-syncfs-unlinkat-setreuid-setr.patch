@@ -1,0 +1,342 @@
+From 1a4afe6bfff6cc2aa752dc4f33f07b898bfbb421 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Fri, 1 Aug 2025 05:35:03 +0200
+Subject: [PATCH] [cryptix]: implement sync, syncfs, unlinkat, setreuid,
+ setregid, setresuid, setresgid syscalls
+
+---
+ sysdeps/cryptix/include/cryptix/syscall.h |   9 +
+ sysdeps/cryptix/sysdeps/process.cpp       | 237 ++++++++++++++--------
+ sysdeps/cryptix/sysdeps/vfs.cpp           |  16 +-
+ 3 files changed, 176 insertions(+), 86 deletions(-)
+
+diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
+index 8da6bb90..154dd5e0 100644
+--- a/sysdeps/cryptix/include/cryptix/syscall.h
++++ b/sysdeps/cryptix/include/cryptix/syscall.h
+@@ -66,15 +66,22 @@ constexpr size_t SYS_GETRLIMIT = 97;
+ constexpr size_t SYS_GETRUSAGE = 98;
+ constexpr size_t SYS_GETUID = 102;
+ constexpr size_t SYS_GETGID = 104;
++constexpr size_t SYS_SETUID = 105;
++constexpr size_t SYS_SETGID = 106;
+ constexpr size_t SYS_GETEUID = 107;
+ constexpr size_t SYS_GETEGID = 108;
+ constexpr size_t SYS_SETPGID = 109;
+ constexpr size_t SYS_GETPPID = 110;
+ constexpr size_t SYS_SETSID = 112;
++constexpr size_t SYS_SETREUID = 113;
++constexpr size_t SYS_SETREGID = 114;
++constexpr size_t SYS_SETRESUID = 117;
++constexpr size_t SYS_SETRESGID = 119;
+ constexpr size_t SYS_GETPGID = 121;
+ constexpr size_t SYS_GETSID = 124;
+ constexpr size_t SYS_STATFS = 137;
+ constexpr size_t SYS_ARCH_PRCTL = 158;
++constexpr size_t SYS_SYNC = 162;
+ constexpr size_t SYS_MOUNT = 165;
+ constexpr size_t SYS_UMOUNT = 166;
+ constexpr size_t SYS_REBOOT = 169;
+@@ -85,12 +92,14 @@ constexpr size_t SYS_OPENAT = 257;
+ constexpr size_t SYS_MKDIRAT = 258;
+ constexpr size_t SYS_MKNODAT = 259;
+ constexpr size_t SYS_FSTATAT = 262;
++constexpr size_t SYS_UNLINKAT = 263;
+ constexpr size_t SYS_RENAMEAT = 264;
+ constexpr size_t SYS_LINKAT = 265;
+ constexpr size_t SYS_SYMLINKAT = 266;
+ constexpr size_t SYS_READLINKAT = 267;
+ constexpr size_t SYS_FCHMODAT = 268;
+ constexpr size_t SYS_UTIMENSAT = 280;
++constexpr size_t SYS_SYNCFS = 306;
+ 
+ #pragma endregion
+ 
+diff --git a/sysdeps/cryptix/sysdeps/process.cpp b/sysdeps/cryptix/sysdeps/process.cpp
+index 0b6fe77f..fdab72ad 100644
+--- a/sysdeps/cryptix/sysdeps/process.cpp
++++ b/sysdeps/cryptix/sysdeps/process.cpp
+@@ -4,89 +4,156 @@
+ #include <algorithm>
+ #include <cryptix/syscall.h>
+ 
+-namespace mlibc
+-{
+-    pid_t sys_getpid() { return Syscall(SYS_GETPID); }
+-    void  sys_exit(int code)
+-    {
+-        Syscall(SYS_EXIT, code);
+-
+-        __builtin_unreachable();
+-    }
+-    int sys_waitpid(pid_t pid, int* status, int flags, struct rusage* ru,
+-                    pid_t* ret_pid)
+-    {
+-        auto ret = Syscall(SYS_WAIT4, pid, status, flags, ru);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *ret_pid = ret;
+-        return 0;
+-    }
+-
+-    uid_t sys_getuid() { return Syscall(SYS_GETUID); }
+-    gid_t sys_getgid() { return Syscall(SYS_GETGID); }
+-    uid_t sys_geteuid() { return Syscall(SYS_GETEUID); }
+-    gid_t sys_getegid() { return Syscall(SYS_GETEGID); }
+-    int   sys_setpgid(pid_t pid, pid_t pgid)
+-    {
+-        auto ret = Syscall(SYS_SETPGID, pid, pgid);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    pid_t sys_getppid() { return Syscall(SYS_GETPPID); }
+-    pid_t sys_setsid(pid_t* out)
+-    {
+-        auto ret = Syscall(SYS_SETSID);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *out = ret;
+-        return 0;
+-    }
+-    pid_t sys_getpgid(pid_t pid, pid_t* out)
+-    {
+-        auto ret = Syscall(SYS_GETPGID, pid);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *out = ret;
+-        return 0;
+-    }
+-    pid_t sys_getsid(pid_t pid, pid_t* out)
+-    {
+-        auto ret = Syscall(SYS_GETSID, pid);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *out = ret;
+-        return 0;
+-    }
+-
+-    int sys_fork(pid_t* child)
+-    {
+-        auto ret = Syscall(SYS_FORK);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *child = ret;
+-        return 0;
+-    }
+-    int sys_execve(const char* path, char* const argv[], char* const envp[])
+-    {
+-        return Syscall(SYS_EXECVE, path, argv, envp);
+-    }
+-
+-    int sys_futex_tid()
+-    {
+-        // TODO(v1tr10l7): implement sys_futex_tid
+-        return 0;
+-    }
+-
+-    int sys_gethostname(char* buffer, size_t bufsize)
+-    {
+-        utsname data{};
+-        auto    e = sys_uname(&data);
+-        if (e) return e;
+-
+-        size_t hostname_size = strlen(data.nodename);
+-        memcpy(buffer, data.nodename, std::min(bufsize, hostname_size));
+-        return 0;
+-    }
++namespace mlibc {
++pid_t sys_getpid() { return Syscall(SYS_GETPID); }
++void sys_exit(int code) {
++	Syscall(SYS_EXIT, code);
++
++	__builtin_unreachable();
++}
++int sys_waitpid(pid_t pid, int *status, int flags, struct rusage *ru, pid_t *ret_pid) {
++	auto ret = Syscall(SYS_WAIT4, pid, status, flags, ru);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*ret_pid = static_cast<pid_t>(ret);
++	return 0;
++}
++
++uid_t sys_getuid() {
++	auto ret = Syscall(SYS_GETUID);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return static_cast<pid_t>(ret);
++}
++gid_t sys_getgid() {
++	auto ret = Syscall(SYS_GETGID);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return static_cast<pid_t>(ret);
++}
++int sys_setuid(uid_t uid) {
++	auto ret = Syscall(SYS_SETUID, uid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_setgid(gid_t gid) {
++	auto ret = Syscall(SYS_SETGID, gid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++uid_t sys_geteuid() {
++	auto ret = Syscall(SYS_GETEUID);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return ret;
++}
++gid_t sys_getegid() {
++	auto ret = Syscall(SYS_GETEGID);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return ret;
++}
++int sys_setpgid(pid_t pid, pid_t pgid) {
++	auto ret = Syscall(SYS_SETPGID, pid, pgid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++pid_t sys_getppid() {
++	auto ret = Syscall(SYS_GETPPID);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return static_cast<pid_t>(ret);
++}
++pid_t sys_setsid(pid_t *out) {
++	auto ret = Syscall(SYS_SETSID);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*out = static_cast<pid_t>(ret);
++	return 0;
++}
++int sys_setreuid(uid_t ruid, uid_t euid) {
++	auto ret = Syscall(SYS_SETREUID, ruid, euid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_setregid(gid_t rgid, gid_t egid) {
++	auto ret = Syscall(SYS_SETREGID, rgid, egid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_setresuid(uid_t ruid, uid_t euid, uid_t suid) {
++	auto ret = Syscall(SYS_SETRESUID, ruid, euid, suid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid) {
++	auto ret = Syscall(SYS_SETRESGID, rgid, egid, sgid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++pid_t sys_getpgid(pid_t pid, pid_t *out) {
++	auto ret = Syscall(SYS_GETPGID, pid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*out = ret;
++	return 0;
++}
++pid_t sys_getsid(pid_t pid, pid_t *out) {
++	auto ret = Syscall(SYS_GETSID, pid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*out = ret;
++	return 0;
++}
++
++int sys_fork(pid_t *child) {
++	auto ret = Syscall(SYS_FORK);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*child = static_cast<pid_t>(ret);
++	return 0;
++}
++int sys_execve(const char *path, char *const argv[], char *const envp[]) {
++	return Syscall(SYS_EXECVE, path, argv, envp);
++}
++
++int sys_futex_tid() {
++	// TODO(v1tr10l7): implement sys_futex_tid
++	return 0;
++}
++
++int sys_gethostname(char *buffer, size_t bufsize) {
++	utsname data{};
++	auto e = sys_uname(&data);
++	if (e)
++		return e;
++
++	size_t hostname_size = strlen(data.nodename);
++	memcpy(buffer, data.nodename, std::min(bufsize, hostname_size));
++	return 0;
++}
+ }; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/vfs.cpp b/sysdeps/cryptix/sysdeps/vfs.cpp
+index 3b7db2ca..58bb14d0 100644
+--- a/sysdeps/cryptix/sysdeps/vfs.cpp
++++ b/sysdeps/cryptix/sysdeps/vfs.cpp
+@@ -269,7 +269,7 @@ int sys_statfs(const char *path, struct statfs *out) {
+ 
+ 	return 0;
+ }
+-
++void sys_sync() { Syscall(SYS_SYNC); }
+ int sys_mount(
+     const char *source,
+     const char *target,
+@@ -317,6 +317,13 @@ int sys_mknodat(int dirfd, const char *path, int mode, int dev) {
+ 
+ 	return 0;
+ }
++int sys_unlinkat(int dirfd, const char *path, int flags) {
++	auto ret = Syscall(SYS_UNLINKAT, dirfd, path, flags);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
+ int sys_renameat(int olddirfd, const char *old_path, int newdirfd, const char *new_path) {
+ 	auto ret = Syscall(SYS_RENAMEAT, olddirfd, old_path, newdirfd, new_path);
+ 	if (auto e = syscall_error(ret); e)
+@@ -422,4 +429,11 @@ int sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2
+ 
+ 	return 0;
+ }
++int sys_syncfs(int fd) {
++	auto ret = Syscall(SYS_SYNCFS, fd);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
+ } // namespace mlibc
+-- 
+2.50.1
+

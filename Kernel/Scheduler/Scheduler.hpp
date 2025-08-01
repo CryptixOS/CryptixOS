@@ -33,6 +33,7 @@ class Scheduler
 
     static void     Yield(bool saveCtx = false);
 
+    static Process* KernelProcess();
     static Process* GetKernelProcess();
 
     static Process* CreateProcess(Process* parent, StringView name,
@@ -41,9 +42,6 @@ class Scheduler
 
     static bool     ValidatePid(pid_t pid);
     static Process* GetProcess(pid_t pid);
-
-    static Thread*  CreateKernelThread(uintptr_t pc, uintptr_t arg,
-                                       usize runningOn = -1);
 
     static void     EnqueueThread(Thread* thread);
     static void     EnqueueNotReady(Thread* thread);

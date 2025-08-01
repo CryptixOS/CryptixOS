@@ -410,32 +410,30 @@ namespace API::VFS
         auto process = Process::Current();
         if (!process->ValidateRead(pathname, 255)) return Error(EFAULT);
 
-        auto path = CPU::AsUser(
-            [&pathname]() -> Path
-            {
-                if (!pathname || *pathname == 0) return "";
+        Path path = pathname ? CPU::CopyStringFromUser(pathname) : ""_p;
 
-                return pathname;
-            });
-
-        auto cwd = process->CWD();
+        auto cwd  = process->CWD();
         Assert(cwd);
 
-        auto maybePathRes = ::VFS::ResolvePath(cwd, path, true);
-        RetOnError(maybePathRes);
+        auto entryName = path.BaseName().Empty() ? path.ParentPath().BaseName()
+                                                 : path.BaseName();
+        LogDebug("VFS::RmDir: Removing {} from {}, full path: {}", entryName,
+                 path.BaseName().Empty() ? path.ParentPath().ParentPath()
+                                         : path.ParentPath(),
+                 path);
+        auto parentEntry = TryOrRet(
+            VFS::ResolveParent(path.StartsWith("/") ? nullptr : cwd, path));
+        auto parentINode = parentEntry->INode();
 
-        auto pathRes     = maybePathRes.Value();
-
-        auto entry       = pathRes.Entry;
-        auto parentINode = pathRes.Parent->INode();
-
+        auto entry       = parentEntry->Lookup(entryName);
+        if (!entry) return Error(ENOENT);
         if (!parentINode->IsDirectory() || !entry->IsDirectory())
             return Error(ENOTDIR);
 
         // FIXME(v1tr10l7): error handling, posix compliance
-        auto status = parentINode->RmDir(entry);
-
-        RetOnError(status);
+        LogDebug("VFS::RmDir: Calling parentINode->RmDir(entry);");
+        RetOnError(parentINode->RmDir(entry));
+        LogDebug("VFS::RmDir: Successfully removed directory");
 
         return 0;
     }
@@ -473,6 +471,11 @@ namespace API::VFS
         return FChModAt(fdNum, ".", mode, 0);
     }
 
+    ErrorOr<isize> SyncFilesystems()
+    {
+        VFS::Sync();
+        return 0;
+    }
     ErrorOr<isize> Mount(const char* pathname, const char* targetPath,
                          const char* filesystemType, usize flags,
                          const void* data)
@@ -602,7 +605,7 @@ namespace API::VFS
 
         auto inode   = entry->INode();
         if (!process->IsSuperUser()
-            && process->Credentials().uid != inode->UserID())
+            && process->Credentials().UserID != inode->UserID())
             return Error(EPERM);
         // TODO(v1tr10l7): Validate group id
 
@@ -869,6 +872,19 @@ namespace API::VFS
 
         auto* process = Process::GetCurrent();
         return process->DupFd(oldFdNum, newFdNum, flags);
+    }
+
+    ErrorOr<isize> SyncFs(isize fdNum)
+    {
+        auto process = Process::Current();
+        auto fd      = TryOrRet(process->GetFileDescriptor(fdNum));
+        auto inode   = fd->INode();
+
+        auto fs      = inode->Filesystem();
+        if (!fs) return Error(ENODEV);
+
+        RetOnError(fs->Sync());
+        return 0;
     }
     ErrorOr<isize> RenameAt2(isize oldDirFdNum, const char* oldPath,
                              isize newDirFdNum, const char* newPath,

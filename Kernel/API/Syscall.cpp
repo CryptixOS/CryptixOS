@@ -120,18 +120,25 @@ namespace Syscall
         RegisterSyscall(ID::eGetResourceUsage, API::System::GetResourceUsage);
         RegisterSyscall(ID::eGetUid, API::Process::GetUid);
         RegisterSyscall(ID::eGetGid, API::Process::GetGid);
+        RegisterSyscall(ID::eSetUid, API::Process::SetUid);
+        RegisterSyscall(ID::eSetGid, API::Process::SetGid);
         RegisterSyscall(ID::eGet_eUid, API::Process::GetEUid);
         RegisterSyscall(ID::eGet_eGid, API::Process::GetEGid);
         RegisterSyscall(ID::eSet_pGid, API::Process::SetPGid);
         RegisterSyscall(ID::eGet_pPid, API::Process::GetPPid);
         RegisterSyscall(ID::eGetPgrp, API::Process::GetPGrp);
         RegisterSyscall(ID::eSetSid, API::Process::SetSid);
+        RegisterSyscall(ID::eSetReUid, API::Process::SetReUid);
+        RegisterSyscall(ID::eSetReGid, API::Process::SetReGid);
+        RegisterSyscall(ID::eSetResUid, API::Process::SetResUid);
+        RegisterSyscall(ID::eSetResGid, API::Process::SetResGid);
         RegisterSyscall(ID::eGet_pGid, API::Process::GetPGid);
         RegisterSyscall(ID::eSid, API::Process::GetSid);
         RegisterSyscall(ID::eUTime, API::VFS::UTime);
         RegisterSyscall(ID::eStatFs, API::VFS::StatFs);
         RegisterSyscall(ID::eArchPrCtl, ArchPrCtl);
         RegisterSyscall(ID::eSetTimeOfDay, API::Time::SetTimeOfDay);
+        RegisterSyscall(ID::eSync, API::VFS::SyncFilesystems);
         RegisterSyscall(ID::eMount, API::VFS::Mount);
         RegisterSyscall(ID::eReboot, API::System::Reboot);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
@@ -151,6 +158,7 @@ namespace Syscall
         RegisterSyscall(ID::ePSelect6, API::VFS::PSelect6);
         RegisterSyscall(ID::eUtimensAt, API::VFS::UtimensAt);
         RegisterSyscall(ID::eDup3, API::VFS::Dup3);
+        RegisterSyscall(ID::eSyncFs, API::VFS::SyncFs);
         RegisterSyscall(ID::eRenameAt2, API::VFS::RenameAt2);
     }
     void Handle(Arguments& args)

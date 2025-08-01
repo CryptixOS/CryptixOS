@@ -4,8 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Drivers/CharacterDevice.hpp>
-#include <Drivers/DeviceManager.hpp>
+#include <Drivers/Core/CharacterDevice.hpp>
+#include <Drivers/Core/DeviceManager.hpp>
 
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/VFS.hpp>
@@ -30,8 +30,12 @@ namespace DeviceManager
         s_Devices.PushBack(cdev);
         DevTmpFs::RegisterDevice(cdev);
 
+        // NOTE(v1tr10l7): The vfs will create missing nodes during it's
+        // initialization
+        if (!VFS::IsInitialized()) return {};
+
         auto path          = "/dev/"_s + cdev->Name();
-        auto devTmpFsEntry = VFS::CreateNode(path, 0666, cdev->ID());
+        auto devTmpFsEntry = VFS::CreateNode(path, S_IFCHR | 0666, cdev->ID());
         if (!devTmpFsEntry)
         {
             s_Devices.PopBack();
@@ -71,13 +75,13 @@ namespace DeviceManager
     {
         auto device = s_Devices.Head();
         for (; device; device = device->Next())
-            if (iterator(device)) break;
+            if (!iterator(device)) break;
     }
     void IterateCharDevices(CharDeviceIterator iterator)
     {
         auto cdev = s_CharDevices.Head();
         for (; cdev; cdev = cdev->Next())
-            if (iterator(cdev)) break;
+            if (!iterator(cdev)) break;
     }
 
     const Vector<Device*>& GetBlockDevices() { return s_BlockDevices; }

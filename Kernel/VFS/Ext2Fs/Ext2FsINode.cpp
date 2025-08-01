@@ -16,7 +16,7 @@ Ext2FsINode::Ext2FsINode(StringView name, Ext2Fs* fs, mode_t mode)
     : INode(name, fs)
     , m_Fs(fs)
 {
-    m_Metadata.DeviceID         = fs->DeviceID();
+    m_Metadata.DeviceID         = fs->BackingDeviceID();
     m_Metadata.ID               = fs->NextINodeIndex();
     m_Metadata.Mode             = mode;
     m_Metadata.LinkCount        = 1;
@@ -52,8 +52,8 @@ ErrorOr<void> Ext2FsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
         if (i < m_DirectoryOffset) continue;
 
         char* nameBuffer = new char[entry->NameSize + 1];
-        std::strncpy(nameBuffer, reinterpret_cast<char*>(entry->Name),
-                     entry->NameSize);
+        StringView(reinterpret_cast<char*>(entry->Name))
+            .Copy(nameBuffer, entry->NameSize);
         nameBuffer[entry->NameSize] = 0;
         if (entry->INodeIndex == 0)
         {
@@ -61,7 +61,9 @@ ErrorOr<void> Ext2FsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
             bufferOffset += entry->Size;
             continue;
         }
-        if (!std::strcmp(nameBuffer, ".") && !std::strcmp(nameBuffer, ".."))
+
+        if (StringView(nameBuffer) == "."_sv
+            && StringView(nameBuffer) == ".."_sv)
         {
             bufferOffset += entry->Size;
             continue;
@@ -203,7 +205,7 @@ ErrorOr<void> Ext2FsINode::ChMod(mode_t mode)
 
 void Ext2FsINode::Initialize(ino_t index, mode_t mode, u16 type)
 {
-    m_Metadata.DeviceID             = m_Fs->DeviceID();
+    m_Metadata.DeviceID             = m_Fs->BackingDeviceID();
     m_Metadata.ID                   = index;
     m_Metadata.LinkCount            = 1;
     m_Metadata.Mode                 = mode;
@@ -235,8 +237,8 @@ void Ext2FsINode::Initialize(ino_t index, mode_t mode, u16 type)
     m_Meta.ExtendedAttributeBlock = 0;
     m_Meta.SizeHigh               = 0;
     m_Meta.FragmentAddress        = 0;
-    std::memset(m_Meta.OperatingSystemSpecific2, 0,
-                sizeof(m_Meta.OperatingSystemSpecific2));
+    Memory::Fill(m_Meta.OperatingSystemSpecific2, 0,
+                 sizeof(m_Meta.OperatingSystemSpecific2));
 }
 ErrorOr<void> Ext2FsINode::AddDirectoryEntry(Ext2FsDirectoryEntry& dentry)
 {
@@ -265,14 +267,14 @@ ErrorOr<void> Ext2FsINode::AddDirectoryEntry(Ext2FsDirectoryEntry& dentry)
             previousEntry->Size = contracted;
             auto entry = reinterpret_cast<Ext2FsDirectoryEntry*>(buffer + offset
                                                                  + contracted);
-            std::memset(entry, 0, entry->Size);
+            Memory::Fill(entry, 0, entry->Size);
 
             entry->INodeIndex = dentry.INodeIndex;
             entry->Size       = available;
             entry->NameSize   = nameSize;
             entry->Type       = dentry.Type;
-            std::strncpy(reinterpret_cast<char*>(entry->Name),
-                         reinterpret_cast<char*>(dentry.Name), nameSize + 1);
+            StringView(reinterpret_cast<char*>(dentry.Name))
+                .Copy(reinterpret_cast<char*>(entry->Name), nameSize + 1);
 
             m_Fs->WriteINode(m_Meta, buffer, m_Metadata.ID, 0,
                              m_Meta.GetSize());
@@ -297,13 +299,13 @@ ErrorOr<void> Ext2FsINode::AddDirectoryEntry(Ext2FsDirectoryEntry& dentry)
 
     Ext2FsDirectoryEntry* entry
         = reinterpret_cast<Ext2FsDirectoryEntry*>(buffer + offset);
-    std::memset(entry, 0, sizeof(*entry));
+    Memory::Fill(entry, 0, sizeof(*entry));
     entry->INodeIndex = dentry.INodeIndex;
     entry->Size       = newEntry.GetSize() - offset;
     entry->NameSize   = nameSize;
     entry->Type       = dentry.Type;
-    std::strncpy(reinterpret_cast<char*>(entry->Name),
-                 reinterpret_cast<char*>(dentry.Name), nameSize + 1);
+    StringView(reinterpret_cast<char*>(dentry.Name))
+        .Copy(reinterpret_cast<char*>(entry->Name), nameSize + 1);
 
     m_Fs->WriteINode(m_Meta, buffer, m_Metadata.ID, 0, m_Meta.GetSize());
     PMM::FreePages(buffer, pageCount);

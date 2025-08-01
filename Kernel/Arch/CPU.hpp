@@ -6,18 +6,20 @@
  */
 #pragma once
 
-#include <Memory/VMM.hpp>
-#include <Prism/Memory/Memory.hpp>
-#include <Prism/Utility/Path.hpp>
-
-#include <Time/TimeStep.hpp>
-
-#if CTOS_ARCH == CTOS_ARCH_X86_64
+#ifdef CTOS_TARGET_X86_64
     #include <Arch/x86_64/CPU.hpp>
-#elif CTOS_ARCH == CTOS_ARCH_AARCH64
+#elifdef CTOS_TARGET_AARCH64
     #include <Arch/aarch64/CPU.hpp>
 #endif
 
+#include <Memory/VMM.hpp>
+
+#include <Prism/Memory/Memory.hpp>
+
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Utility/Time.hpp>
+
+class ClockSource;
 struct Thread;
 struct CPUContext;
 namespace CPU
@@ -31,22 +33,24 @@ namespace CPU
     bool            SwapInterruptFlag(bool enabled);
 
     u64             GetOnlineCPUsCount();
-
     struct CPU;
-    CPU*    Current();
-    CPU*    GetCurrent();
-    u64     GetCurrentID();
-    Thread* GetCurrentThread();
+    CPU*         Current();
+    u64          GetCurrentID();
+    CPU*         GetCurrent();
 
-    void    PrepareThread(Thread* thread, Pointer pc, Pointer arg = 0);
+    ClockSource* HighResolutionClock();
 
-    void    SaveThread(Thread* thread, CPUContext* ctx);
-    void    LoadThread(Thread* thread, CPUContext* ctx);
+    Thread*      GetCurrentThread();
 
-    void    Reschedule(TimeStep us);
+    void         PrepareThread(Thread* thread, Pointer pc, Pointer arg = 0);
 
-    void    HaltAll();
-    void    WakeUp(usize id, bool everyone);
+    void         SaveThread(Thread* thread, CPUContext* ctx);
+    void         LoadThread(Thread* thread, CPUContext* ctx);
+
+    void         Reschedule(Timestep us);
+
+    void         HaltAll();
+    void         WakeUp(usize id, bool everyone);
 
     // NOTE(v1tr10l7): allows accessing usermode memory from ring0
     struct UserMemoryProtectionGuard

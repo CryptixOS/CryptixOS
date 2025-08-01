@@ -6,12 +6,15 @@
  */
 #pragma once
 
+#include <Drivers/Core/CharacterDevice.hpp>
+
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Core/Error.hpp>
 #include <Prism/Core/Types.hpp>
+
 #include <Prism/String/StringView.hpp>
 #include <Prism/Utility/Delegate.hpp>
-#include <Prism/Core/Error.hpp>
-
-#include <Time/TimeStep.hpp>
+#include <Prism/Utility/Time.hpp>
 
 enum class TimerMode
 {
@@ -19,14 +22,18 @@ enum class TimerMode
     ePeriodic,
 };
 
-class HardwareTimer
+class HardwareTimer : public CharacterDevice
 {
   public:
-    HardwareTimer()                           = default;
-    virtual ~HardwareTimer()                  = default;
+    HardwareTimer(StringView name)
+        : CharacterDevice(name, ID())
+    {
+    }
+    virtual ~HardwareTimer()               = default;
 
-    virtual StringView GetModelString() const = 0;
+    virtual StringView ModelString() const = 0;
     virtual usize      InterruptVector() const { return usize(-1); };
+    virtual bool       IsCPULocal() const { return false; }
 
     using OnTickCallback = Delegate<void(struct CPUContext*)>;
 
@@ -36,11 +43,31 @@ class HardwareTimer
         m_OnTickCallback.Bind<Callback>();
     }
 
-    virtual ErrorOr<void> Start(TimerMode mode, TimeStep interval) = 0;
+    virtual ErrorOr<void> Start(TimerMode mode, Timestep interval) = 0;
     virtual void          Stop()                                   = 0;
 
     virtual ErrorOr<void> SetFrequency(usize frequency)            = 0;
 
+    using HookType = IntrusiveRefListHook<HardwareTimer, HardwareTimer*>;
+    friend class IntrusiveRefList<HardwareTimer, HookType>;
+    friend struct IntrusiveRefListHook<HardwareTimer, HardwareTimer*>;
+
+    using List = IntrusiveRefList<HardwareTimer, HookType>;
+
   protected:
-    OnTickCallback m_OnTickCallback = nullptr;
+    OnTickCallback     m_OnTickCallback = nullptr;
+
+    HookType           Hook;
+
+    static DeviceMajor Major()
+    {
+        static DeviceMajor major = AllocateMajor().Value();
+
+        return major;
+    }
+    static DeviceID ID()
+    {
+        static Atomic<DeviceMinor> nextMinor = 0;
+        return MakeDevice(Major(), nextMinor++);
+    }
 };

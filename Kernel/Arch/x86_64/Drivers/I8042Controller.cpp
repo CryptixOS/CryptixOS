@@ -12,7 +12,7 @@
 
 #include <Arch/x86_64/Drivers/I8042Controller.hpp>
 
-#include <Drivers/DeviceManager.hpp>
+#include <Drivers/Core/DeviceManager.hpp>
 #include <Drivers/HID/Ps2KeyboardDevice.hpp>
 #include <Firmware/ACPI/ACPI.hpp>
 
@@ -24,8 +24,7 @@ Ref<Ps2KeyboardDevice>  s_Keyboard;
 Ps2Controller*          Ps2Controller::s_Instance = nullptr;
 static I8042Controller* s_Controller              = nullptr;
 
-static Ps2DeviceType    ToPs2DeviceType(Optional<u8> byte1,
-                                        Optional<u8> byte2)
+static Ps2DeviceType    ToPs2DeviceType(Optional<u8> byte1, Optional<u8> byte2)
 {
     if (!byte1 && !byte2) return Ps2DeviceType::eATKeyboard;
     else if (byte1.ValueOr(1) == 0x00 && !byte2)
@@ -72,7 +71,7 @@ ErrorOr<void> I8042Controller::Probe()
     handler->Reserve();
     handler->SetHandler(I8042Controller::HandleInterrupt);
 
-    InterruptManager::Unmask(0x01);
+    InterruptManager::Unmask(handler->GetInterruptVector());
     return ret;
 }
 
@@ -127,16 +126,6 @@ ErrorOr<void> I8042Controller::Initialize()
     EnumerateDevices();
 
     LogInfo("I8042: Initialized");
-    return {};
-    auto handler = InterruptManager::AllocateHandler(0x21);
-    handler->Reserve();
-    handler->SetHandler(I8042Controller::HandleInterrupt);
-    InterruptManager::Unmask(0x01);
-
-    while (!IsInputEmpty());
-
-    LogInfo("I8042: Allocated IRQ handler for vector: {:#x}",
-            handler->GetInterruptVector());
     return {};
 }
 

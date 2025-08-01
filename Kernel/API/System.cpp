@@ -4,6 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Version.hpp>
+
 #include <API/System.hpp>
 
 #include <Arch/Arch.hpp>
@@ -12,9 +14,9 @@
 #include <Drivers/Terminal.hpp>
 
 #include <Prism/String/String.hpp>
-#include <Scheduler/Process.hpp>
 
-#include <Version.hpp>
+#include <Scheduler/Process.hpp>
+#include <Scheduler/Thread.hpp>
 
 namespace API::System
 {
@@ -25,7 +27,7 @@ namespace API::System
 
         CPU::UserMemoryProtectionGuard guard;
         Kernel::NAME.Copy(out->sysname, sizeof(out->sysname));
-        std::strncpy(out->nodename, "cryptix", sizeof(out->nodename));
+        Kernel::NAME.Copy(out->nodename, sizeof(out->nodename));
         Kernel::VERSION_STRING.Copy(out->release, sizeof(out->release));
 
         auto version = Kernel::BUILD_DATE + " ";

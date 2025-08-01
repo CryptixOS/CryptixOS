@@ -37,8 +37,8 @@ class INode
         usize     Size         = 0;
         usize     LinkCount    = 0;
 
-        usize     BlockCount   = 0;
         usize     BlockSize    = 0;
+        usize     BlockCount   = 0;
 
         DeviceID  RootDeviceID = 0;
         DeviceID  DeviceID     = 0;

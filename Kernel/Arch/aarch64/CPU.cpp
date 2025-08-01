@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "Arch/CPU.hpp"
+#include <Arch/CPU.hpp>
 
 namespace CPU
 {
@@ -24,14 +24,16 @@ namespace CPU
     usize GetOnlineCPUsCount() { return 1; }
 
     struct CPU;
-    CPU*    Current() { return nullptr; }
-    CPU*    GetCurrent() { return nullptr; }
-    u64     GetCurrentID() { return 0; }
-    Thread* GetCurrentThread() { return nullptr; }
+    CPU*         Current() { return nullptr; }
+    CPU*         GetCurrent() { return nullptr; }
+    u64          GetCurrentID() { return 0; }
+    Thread*      GetCurrentThread() { return nullptr; }
 
-    bool    SwapInterruptFlag(bool) { return false; }
+    ClockSource* HighResolutionClock() { return nullptr; }
 
-    void    PrepareThread(Thread* thread, Pointer pc, Pointer)
+    bool         SwapInterruptFlag(bool) { return false; }
+
+    void         PrepareThread(Thread* thread, Pointer pc, Pointer)
     {
         (void)thread;
         (void)pc;
@@ -48,7 +50,7 @@ namespace CPU
         (void)ctx;
     }
 
-    void Reschedule(TimeStep) {}
+    void Reschedule(Timestep) {}
 
     void HaltAll() {}
     void WakeUp(usize, bool) {}

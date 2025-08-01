@@ -26,7 +26,7 @@
 #endif
 
 #define CTOS_ATTRIBUTE(name)           [[CTOS_ATTR_PREFIX::name]]
-#define CTOS_ALWAYS_INLINE             CTOS_ATTRIBUTE(always_inline)
+#define CTOS_ALWAYS_INLINE             CTOS_ATTRIBUTE(always_inline) inline
 #define CTOS_UNUSED                    [[maybe_unused]]
 #define CTOS_FORCE_EMIT                [[CTOS_ATTR_PREFIX::used]]
 #define CTOS_FALLTHROUGH               [[fallthrough]]

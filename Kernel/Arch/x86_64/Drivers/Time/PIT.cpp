@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/x86_64/Drivers/Timers/PIT.hpp>
+#include <Arch/x86_64/Drivers/Time/PIT.hpp>
 
 #include <Arch/InterruptHandler.hpp>
 
@@ -17,6 +17,7 @@
 PIT* PIT::s_Instance = nullptr;
 
 PIT::PIT()
+    : HardwareTimer(Name())
 {
     LogTrace("PIT: Initializing...");
     auto success = SetFrequency(FREQUENCY / 10);
@@ -36,7 +37,7 @@ PIT::PIT()
 void          PIT::Initialize() { s_Instance = Instance(); }
 bool          PIT::IsInitialized() { return s_Instance != nullptr; }
 
-ErrorOr<void> PIT::Start(TimerMode mode, TimeStep interval)
+ErrorOr<void> PIT::Start(TimerMode mode, Timestep interval)
 {
     if (mode == TimerMode::eOneShot) m_CurrentMode = Mode::eOneShot;
     else if (mode == TimerMode::ePeriodic) m_CurrentMode = Mode::eSquareWave;
@@ -45,6 +46,8 @@ ErrorOr<void> PIT::Start(TimerMode mode, TimeStep interval)
     usize reloadValue = (interval.Milliseconds() * BASE_FREQUENCY) / 3000;
     SetReloadValue(reloadValue);
     IO::Out<byte>(COMMAND, CHANNEL0_DATA | SEND_WORD | m_CurrentMode);
+
+    InterruptManager::Unmask(m_TimerVector);
 
     return {};
 }

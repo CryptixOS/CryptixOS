@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Drivers/Device.hpp>
+#include <Drivers/Core/Device.hpp>
 #include <Drivers/Storage/PartitionTable.hpp>
 
 class StorageDevice : public Device

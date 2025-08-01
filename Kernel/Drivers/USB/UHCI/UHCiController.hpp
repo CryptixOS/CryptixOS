@@ -10,7 +10,7 @@
     #include <Arch/x86_64/IO.hpp>
 #endif
 
-#include <Drivers/Device.hpp>
+#include <Drivers/Core/Device.hpp>
 #include <Drivers/PCI/Device.hpp>
 #include <Drivers/USB/HostController.hpp>
 #include <Drivers/USB/UHCI/Definitions.hpp>
@@ -23,7 +23,7 @@ namespace USB::UHCI
     class Controller : public HostController, public PCI::Device, public Device
     {
       public:
-        Controller(const PCI::DeviceAddress& address)
+        explicit Controller(const PCI::DeviceAddress& address)
             : PCI::Device(address)
             , ::Device(180, 0)
         {
@@ -139,8 +139,7 @@ namespace USB::UHCI
             if (reg == Register::eStartOfFrameModify)
                 m_IoRegisters.Write<u8>(ToUnderlying(reg), value & 0xff);
             else if (reg == Register::eFrameListBaseAddress)
-                m_IoRegisters.Write<u32>(ToUnderlying(reg),
-                                           value & 0xffffffff);
+                m_IoRegisters.Write<u32>(ToUnderlying(reg), value & 0xffffffff);
             else m_IoRegisters.Write<u16>(ToUnderlying(reg), value & 0xffff);
         }
 

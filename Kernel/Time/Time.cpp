@@ -5,11 +5,15 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/Arch.hpp>
+#include <Arch/CPU.hpp>
+
 #include <Debug/Assertions.hpp>
+#include <Drivers/Core/DeviceManager.hpp>
 
 #include <Library/Locking/Spinlock.hpp>
 #include <Library/Logger.hpp>
 
+#include <Prism/Algorithm/Find.hpp>
 #include <Prism/Containers/Deque.hpp>
 #include <Prism/Utility/Time.hpp>
 
@@ -20,7 +24,7 @@ namespace Time
 {
     struct Timer
     {
-        explicit Timer(timespec when)
+        explicit Timer(Timestep when)
             : When(when)
         {
             Arm();
@@ -28,7 +32,7 @@ namespace Time
 
         Optional<usize> Index = NullOpt;
         bool            Fired = false;
-        timespec        When  = {0, 0};
+        Timestep        When{0};
         Event           Event;
 
         void            Arm();
@@ -37,15 +41,16 @@ namespace Time
 
     namespace
     {
-        Vector<HardwareTimer*> s_HardwareTimers;
-        HardwareTimer*         s_SchedulerTimer = nullptr;
+        HardwareTimer::List s_HardwareTimers;
+        ClockSource::List   s_ClockSources;
+        HardwareTimer*      s_SchedulerTimer = nullptr;
 
-        Timestep               s_BootTime;
-        Timestep               s_RealTime;
-        Timestep               s_Monotonic;
+        Timestep            s_BootTime;
+        Timestep            s_RealTime;
+        Timestep            s_Monotonic;
 
-        Deque<Timer*>          s_ArmedTimers;
-        Spinlock               s_TimersLock;
+        Deque<Timer*>       s_ArmedTimers;
+        Spinlock            s_TimersLock;
     } // namespace
 
     void Timer::Arm()
@@ -74,26 +79,53 @@ namespace Time
         auto now    = static_cast<usize>(Arch::GetEpoch());
         s_RealTime  = now * 1'000'000'000;
         s_Monotonic = s_RealTime;
-
-        LogTrace("Time: Probing available timers...");
-        Arch::ProbeTimers(s_HardwareTimers);
         Assert(s_HardwareTimers.Size() > 0);
 
         LogInfo("Time: Detected {} timers", s_HardwareTimers.Size());
-        for (usize i = 0; auto& timer : s_HardwareTimers)
-            LogInfo("Time: Timer[{}] = '{}'", i++, timer->GetModelString());
-
-        s_SchedulerTimer = s_HardwareTimers.Front();
+        auto cpuLocalTimer
+            = FindIf(s_HardwareTimers.begin(), s_HardwareTimers.end(),
+                     [](auto it) -> bool { return it->IsCPULocal(); });
+        s_SchedulerTimer = cpuLocalTimer != s_HardwareTimers.end()
+                             ? *cpuLocalTimer
+                             : s_HardwareTimers.Head();
     }
 
     HardwareTimer* GetSchedulerTimer() { return s_SchedulerTimer; }
 
-    Timestep       GetBootTime() { return s_BootTime; }
-    Timestep       GetTimeSinceBoot() { return GetRealTime() - s_BootTime; }
-    Timestep       GetRealTime() { return s_RealTime; }
-    Timestep       GetMonotonicTime() { return s_Monotonic; }
+    ErrorOr<void>  RegisterTimer(HardwareTimer* timer)
+    {
+        auto found
+            = FindIf(s_HardwareTimers.begin(), s_HardwareTimers.end(),
+                     [timer](auto it) -> bool
+                     { return it->ModelString() == timer->ModelString(); });
+        if (found != s_HardwareTimers.end()) return Error(EEXIST);
 
-    timespec       GetReal()
+        s_HardwareTimers.PushBack(timer);
+        DeviceManager::RegisterCharDevice(timer);
+
+        LogTrace("Time: Registered hardware timer => {}", timer->ModelString());
+        return {};
+    }
+    ErrorOr<void> RegisterClockSource(ClockSource* clock)
+    {
+        auto found = FindIf(s_ClockSources.begin(), s_ClockSources.end(),
+                            [clock](auto it) -> bool
+                            { return it->Name() == clock->Name(); });
+        if (found != s_ClockSources.end()) return Error(EEXIST);
+
+        s_ClockSources.PushBack(clock);
+        DeviceManager::RegisterCharDevice(clock);
+
+        LogTrace("Time: Registered hardware timer => {}", clock->Name());
+        return {};
+    }
+
+    Timestep GetBootTime() { return s_BootTime; }
+    Timestep GetTimeSinceBoot() { return GetRealTime() - s_BootTime; }
+    Timestep GetRealTime() { return s_RealTime; }
+    Timestep GetMonotonicTime() { return s_Monotonic; }
+
+    timespec GetReal()
     {
         timespec real;
         real.tv_sec  = s_RealTime.Seconds();
@@ -113,11 +145,7 @@ namespace Time
 
     ErrorOr<void> NanoSleep(usize ns)
     {
-        isize    ins      = static_cast<isize>(ns);
-
-        timespec duration = {.tv_sec = ins / 1'000'000'000, .tv_nsec = ins};
-
-        Timer*   timer    = new Timer(duration);
+        Timer* timer = new Timer(ns);
         timer->Event.Await(true);
         timer->Disarm();
 
@@ -127,10 +155,16 @@ namespace Time
     ErrorOr<void> Sleep(const timespec* duration, timespec* remaining)
     {
         LogDebug("Sleeping");
-        Timer* timer = new Timer(*duration);
+        usize ns = static_cast<usize>(duration->tv_sec) * 1'000'000'000;
+        if (ns == 0) ns = static_cast<usize>(duration->tv_nsec);
+
+        Timer* timer = new Timer(ns);
+
         if (!timer->Event.Await(true))
         {
-            if (remaining) *remaining = timer->When;
+            if (remaining)
+                *remaining = {static_cast<isize>(timer->When.Seconds()),
+                              static_cast<isize>(timer->When.Nanoseconds())};
             timer->Disarm();
             return Error(EINTR);
         }
@@ -142,8 +176,24 @@ namespace Time
 
     void Tick(usize ns)
     {
-        s_RealTime += ns;
-        s_Monotonic += ns;
+        auto highResClock = CPU::HighResolutionClock();
+
+        if (highResClock)
+        {
+            auto maybeNs = highResClock->Now();
+            auto prev    = s_RealTime;
+
+            if (maybeNs)
+            {
+                s_RealTime = s_RealTime = *maybeNs;
+                ns                      = s_RealTime - prev;
+            }
+        }
+        else
+        {
+            s_RealTime += ns;
+            s_Monotonic += ns;
+        }
 
         if (s_TimersLock.TestAndAcquire())
         {
@@ -151,8 +201,9 @@ namespace Time
             {
                 if (timer->Fired) continue;
 
-                timer->When -= timespec(0, ns);
-                if (timer->When == timespec(0, 0))
+                if (ns >= timer->When.Nanoseconds()) timer->When = 0_ns;
+                else timer->When -= ns;
+                if (timer->When == 0_ns)
                 {
                     timer->Event.Trigger(false);
                     timer->Fired = true;

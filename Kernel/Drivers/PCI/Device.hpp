@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Drivers/Device.hpp>
+#include <Drivers/Core/Device.hpp>
 #include <Drivers/PCI/Access.hpp>
 #include <Drivers/PCI/Definitions.hpp>
 #include <Drivers/PCI/MSI.hpp>

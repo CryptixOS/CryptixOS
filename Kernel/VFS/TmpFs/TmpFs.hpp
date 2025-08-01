@@ -25,25 +25,20 @@ class TmpFs : public Filesystem
 
     virtual ErrorOr<INode*> AllocateNode(StringView name,
                                          INodeMode  mode) override;
-    virtual bool    Populate(DirectoryEntry* dentry) override { return true; }
-    ErrorOr<INode*> CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
-                               mode_t mode, dev_t dev);
+    virtual ErrorOr<void>   FreeINode(INode* inode) override;
 
+    virtual bool Populate(DirectoryEntry* dentry) override { return true; }
     virtual ErrorOr<void> Stats(statfs& stats) override;
-
     constexpr usize       FreeINodeCount() const { return m_FreeINodeCount; }
 
   private:
-    usize                  m_MaxBlockCount      = 0;
-    Atomic<usize>          m_UsedBlockCount     = 0;
-    usize                  m_MaxINodeCount      = 0;
-    Atomic<usize>          m_FreeINodeCount     = PMM::PAGE_SIZE << 2;
-    usize                  m_MaxSize            = 0;
+    usize         m_MaxBlockCount  = 0;
+    Atomic<usize> m_UsedBlockCount = 0;
+    usize         m_MaxINodeCount  = 0;
+    Atomic<usize> m_FreeINodeCount = PMM::PAGE_SIZE << 2;
+    usize         m_MaxSize        = 0;
 
-    usize                  m_Size               = 0;
-    // FIXME(v1tr10l7): hardcoded for now
+    usize         m_Size           = 0;
 
-    constexpr static usize DIRECTORY_ENTRY_SIZE = 20;
-    constexpr static usize INODE_SIZE           = 1024;
     friend class TmpFsINode;
 };

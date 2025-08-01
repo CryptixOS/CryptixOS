@@ -6,7 +6,8 @@
  */
 #pragma once
 
-#include <Drivers/Device.hpp>
+#include <Drivers/Core/Device.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
 #include <Prism/Utility/Delegate.hpp>
 
 class CharacterDevice : public Device
@@ -22,6 +23,7 @@ class CharacterDevice : public Device
                                               DeviceMinor minorBase = 0,
                                               usize       count     = 1);
 
+    static ErrorOr<void>             RegisterBaseMemoryDevices();
     static ErrorOr<void>    Register(dev_t id, CharacterDevice* device);
     static CharacterDevice* Lookup(dev_t deviceID);
 
@@ -31,11 +33,12 @@ class CharacterDevice : public Device
     using CharacterDeviceIterator = Delegate<bool(CharacterDevice* cdev)>;
     static void Iterate(CharacterDeviceIterator iterator);
 
-    using List = IntrusiveList<CharacterDevice>;
+    using HookType = IntrusiveRefListHook<CharacterDevice, CharacterDevice*>;
+    using List     = IntrusiveRefList<CharacterDevice, HookType>;
 
   private:
-    friend class IntrusiveList<CharacterDevice>;
-    friend struct IntrusiveListHook<CharacterDevice>;
+    friend class IntrusiveRefList<CharacterDevice, HookType>;
+    friend struct IntrusiveRefListHook<CharacterDevice, CharacterDevice*>;
 
-    IntrusiveListHook<CharacterDevice> Hook;
+    HookType Hook;
 };

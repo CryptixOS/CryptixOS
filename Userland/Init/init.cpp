@@ -19,22 +19,30 @@ struct MountPoint
     int   FsckPassNumber; // Fsck pass number
 };
 
-void TrimNewline(char* str)
+static size_t countOccurrences(const char* string, char c)
+{
+    size_t count = 0;
+    while (*string++)
+        if (*string == c) ++count;
+
+    return count;
+}
+
+void trimNewLine(char* str)
 {
     size_t len = strlen(str);
     if (len && str[len - 1] == '\n') str[len - 1] = '\0';
 }
-void ParseMountOptions(const char* opts, unsigned long& flags, char** fsOptions)
+size_t parseMountOptions(char*& opts)
 {
-    flags = 0;
-    if (!opts) return;
+    size_t flags = 0;
+    if (!opts) return 0;
 
     char*  options      = strdup(opts);
     char*  token        = strtok(options, ",");
     size_t optionLength = 0;
 
-    fsOptions[0]        = NULL;
-
+    char*  current      = opts;
     while (token)
     {
         if (!strcmp(token, "ro")) flags |= MS_RDONLY;
@@ -45,13 +53,15 @@ void ParseMountOptions(const char* opts, unsigned long& flags, char** fsOptions)
         else if (!strcmp(token, "noexec")) flags |= MS_NOEXEC;
         else if (!strcmp(token, "sync")) flags |= MS_SYNCHRONOUS;
         else if (!strcmp(token, "dirsync")) flags |= MS_DIRSYNC;
-        else fsOptions[optionLength++] = strdup(token);
+        else strcpy(current, token);
 
+        current += strlen(token);
         token = strtok(NULL, ",");
     }
 
-    fsOptions[optionLength] = NULL;
-    free(options);
+    delete options;
+    *current = 0;
+    return flags;
 }
 
 int parseMountPoint(const char* line, MountPoint& entry)
@@ -69,8 +79,8 @@ int parseMountPoint(const char* line, MountPoint& entry)
 
     if (fieldCount < 4)
     {
-        free(temp);
-        return 0; // not enough fields
+        delete temp;
+        return 0;
     }
 
     entry.Source         = strdup(fields[0]);
@@ -80,16 +90,16 @@ int parseMountPoint(const char* line, MountPoint& entry)
     entry.Frequency      = (fieldCount >= 5) ? atoi(fields[4]) : 0;
     entry.FsckPassNumber = (fieldCount >= 6) ? atoi(fields[5]) : 0;
 
-    free(temp);
+    delete temp;
     return 1;
 }
 
 void freeMountPoint(MountPoint& entry)
 {
-    free(entry.Source);
-    free(entry.Target);
-    free(entry.FilesystemType);
-    free(entry.Options);
+    delete entry.Source;
+    delete entry.Target;
+    delete entry.FilesystemType;
+    delete entry.Options;
 }
 
 int mountFStab()
@@ -107,7 +117,7 @@ int mountFStab()
     while (fgets(line, sizeof(line), file))
     {
         lineNumber++;
-        TrimNewline(line);
+        trimNewLine(line);
 
         // Skip comments and empty lines
         if (line[0] == '#' || strlen(line) == 0) continue;
@@ -115,15 +125,11 @@ int mountFStab()
         MountPoint entry;
         if (parseMountPoint(line, entry))
         {
-            printf("Mount %d:\n", lineNumber);
-            printf("  Source   : %s\n", entry.Source);
-            printf("  Target   : %s\n", entry.Target);
-            printf("  FilesystemType: %s\n", entry.FilesystemType);
-            printf("  Options : %s\n", entry.Options);
-            printf("  Frequency   : %d\n", entry.Frequency);
-            printf("  FsckPassNumber : %d\n\n", entry.FsckPassNumber);
-            int mountStatus = mount(entry.Source, entry.Target,
-                                    entry.FilesystemType, 0, entry.Options);
+            size_t mountFlags = parseMountOptions(entry.Options);
+            printf("options: %s\n", entry.Options);
+            int mountStatus
+                = mount(entry.Source, entry.Target, entry.FilesystemType,
+                        mountFlags, entry.Options);
             printf("mount status: %d\n", mountStatus);
             if (mountStatus == -1)
                 fprintf(stderr,
@@ -154,7 +160,7 @@ int main()
     if (mountFStab() != EXIT_SUCCESS)
         perror("init: failed to mount fstab entries");
 
-    const char* path = "/usr/bin/bash";
+    static const char* path = "/usr/bin/bash";
     if (access(path, X_OK) == -1)
     {
         perror("init: failed to access shell");

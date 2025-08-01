@@ -4,17 +4,20 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Scheduler/Scheduler.hpp>
-
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptHandler.hpp>
 #include <Arch/InterruptManager.hpp>
-#include <Arch/x86_64/Drivers/IoApic.hpp>
+
+#ifdef CTOS_TARGET_X86_64
+    #include <Arch/x86_64/Drivers/IoApic.hpp>
+    #include <Arch/x86_64/Drivers/Time/Lapic.hpp>
+#endif
 
 #include <Library/Locking/Spinlock.hpp>
 #include <Memory/PMM.hpp>
 
 #include <Scheduler/Process.hpp>
+#include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 #include <Time/Time.hpp>
 
@@ -167,13 +170,13 @@ void Scheduler::InitializeProcFs()
 }
 void Scheduler::PrepareAP(bool start)
 {
-    Process* process    = Process::CreateIdleProcess();
+    Process* process = Process::CreateIdleProcess();
 
-    auto     idleThread = process->CreateThread(
-        reinterpret_cast<uintptr_t>(Arch::Halt), false, CPU::Current()->ID);
+    auto     idleThread
+        = process->CreateThread(Arch::Halt, false, CPU::Current()->ID);
     idleThread->SetState(ThreadState::eReady);
 
-    CPU::Current()->Idle = idleThread;
+    CPU::Current()->Idle = idleThread.Raw();
 
     if (start)
     {
@@ -246,8 +249,10 @@ void Scheduler::Yield(bool saveCtx)
     else
     {
 #ifdef CTOS_TARGET_X86_64
-        CPU::SetGSBase(reinterpret_cast<uintptr_t>(CPU::Current()->Idle));
-        CPU::SetKernelGSBase(reinterpret_cast<uintptr_t>(CPU::Current()->Idle));
+        CPU::SetGSBase(
+            reinterpret_cast<uintptr_t>(&CPU::Current()->Idle->m_Tls));
+        CPU::SetKernelGSBase(
+            reinterpret_cast<uintptr_t>(&CPU::Current()->Idle->m_Tls));
 #endif
     }
 
@@ -268,6 +273,7 @@ void Scheduler::Yield(bool saveCtx)
 }
 
 Process* Scheduler::GetKernelProcess() { return s_KernelProcess; }
+Process* Scheduler::KernelProcess() { return s_KernelProcess; }
 
 Process* Scheduler::CreateProcess(Process* parent, StringView name,
                                   const Credentials& creds)
@@ -360,9 +366,9 @@ Thread* Scheduler::PickReadyThread()
 
     for (; newThread && newThread->State() != ThreadState::eReady;)
     {
-        if (newThread->IsDead())
+        if (newThread->IsDead() && newThread->Parent()->IsDead())
         {
-            delete newThread;
+            delete newThread->Parent();
             continue;
         }
         else if (newThread->IsBlocked())
@@ -400,8 +406,9 @@ void Scheduler::SwitchContext(Thread* newThread, CPUContext* oldContext)
     CPU::LoadThread(newThread, oldContext);
 
     if (currentThread && currentThread->IsDead()
+        && currentThread->Parent()->IsDead()
         && currentThread != CPU::Current()->Idle)
-        delete currentThread;
+        delete currentThread->Parent();
 }
 
 void Scheduler::Tick(CPUContext* ctx)

@@ -12,7 +12,7 @@
 #include <Library/UserBuffer.hpp>
 
 #include <Prism/Containers/Bitmap.hpp>
-#include <Prism/Containers/IntrusiveList.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
 #include <Prism/Utility/Atomic.hpp>
 #include <Prism/Utility/Optional.hpp>
 #include <VFS/File.hpp>
@@ -28,6 +28,20 @@ constexpr dev_t MakeDevice(DeviceMajor major, DeviceMinor minor)
     dev |= dev_t(minor & 0xffffff00u) << 12;
 
     return dev;
+}
+constexpr DeviceMajor GetDeviceMajor(dev_t dev)
+{
+    u32 major = (dev & static_cast<dev_t>(0x0000'0000'000f'ff00u)) >> 8;
+    major |= (dev & static_cast<dev_t>(0xffff'f000'0000'0000u)) >> 32;
+
+    return major;
+}
+constexpr DeviceMinor GetDeviceMinor(dev_t dev)
+{
+    u32 minor = dev & static_cast<dev_t>(0x0000'0000'0000'00ffu);
+    minor |= (dev & static_cast<dev_t>(0x0000'0fff'fff0'0000u)) >> 12;
+
+    return minor;
 }
 
 class Device : public File
@@ -54,20 +68,31 @@ class Device : public File
 
     virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
                                 isize offset = -1)
-        = 0;
-    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) = 0;
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes)
+    {
+        return Error(ENOSYS);
+    };
     virtual ErrorOr<isize> Write(const void* src, off_t offset, usize bytes)
-        = 0;
+    {
+        return Error(ENOSYS);
+    }
     virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
                                  isize offset = -1)
-        = 0;
+    {
+        return Error(ENOSYS);
+    }
 
-    virtual i32 IoCtl(usize request, uintptr_t argp) = 0;
+    virtual i32 IoCtl(usize request, uintptr_t argp) { return -1; };
 
     static void Initialize();
 
     Device*     Next() const { return Hook.Next; }
-    using List = IntrusiveList<Device>;
+
+    using HookType = IntrusiveRefListHook<Device, Device*>;
+    using List     = IntrusiveRefList<Device, HookType>;
 
   protected:
     StringView                   m_Name = ""_sv;
@@ -81,12 +106,12 @@ class Device : public File
     static void                  FreeMajor(DeviceMajor major);
 
   private:
-    friend class IntrusiveList<Device>;
-    friend struct IntrusiveListHook<Device>;
+    friend class IntrusiveRefList<Device, HookType>;
+    friend struct IntrusiveRefListHook<Device, Device*>;
 
-    IntrusiveListHook<Device> Hook;
+    HookType           Hook;
 
-    static DeviceMinor        AllocateMinor()
+    static DeviceMinor AllocateMinor()
     {
         // TODO(v1tr10l7): Allocate minor numbers per major
         static Atomic<DeviceMinor> s_Base = 1000;

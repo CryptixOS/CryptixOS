@@ -41,11 +41,14 @@ struct FilesystemDriver : public RefCounted
     /** @name Internal linkage
      *  @{
      */
-    friend class IntrusiveRefList<FilesystemDriver>;
-    friend struct IntrusiveRefListHook<FilesystemDriver>;
+    using HookType
+        = IntrusiveRefListHook<FilesystemDriver, ::Ref<FilesystemDriver>>;
+    friend class IntrusiveRefList<FilesystemDriver, HookType>;
+    friend struct IntrusiveRefListHook<FilesystemDriver,
+                                       ::Ref<FilesystemDriver>>;
 
-    using List = IntrusiveRefList<FilesystemDriver>;
+    using List = IntrusiveRefList<FilesystemDriver, HookType>;
     ///> Internal hook for filesystem drivers intrusive list.
-    IntrusiveRefListHook<FilesystemDriver> Hook;
+    HookType Hook;
     /// @}
 };

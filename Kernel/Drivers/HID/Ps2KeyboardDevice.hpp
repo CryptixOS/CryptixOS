@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Drivers/CharacterDevice.hpp>
+#include <Drivers/Core/CharacterDevice.hpp>
 #include <Drivers/HID/Ps2Controller.hpp>
 
 #include <Prism/Memory/Scope.hpp>

@@ -148,19 +148,17 @@ qemu_args = [
   # CPU
   # enable all host cpu features
   '-cpu', 'max',
-  # use acceleration if available
-  '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
   # use 4 cores
   '-smp', '4',
 
   # setup NUMA nodes
-  '-object', 'memory-backend-ram,id=ram0,size=1024M',
-  '-object', 'memory-backend-ram,id=ram1,size=1024M',
-  '-numa', 'node,cpus=0-1,memdev=ram0',
-  '-numa', 'node,cpus=2-3,memdev=ram1',
+  # '-object', 'memory-backend-ram,id=ram0,size=2048M',
+  # '-object', 'memory-backend-ram,id=ram1,size=2048M',
+  # '-numa', 'node,cpus=0-1,memdev=ram0',
+  # '-numa', 'node,cpus=2-3,memdev=ram1',
 
-  # use 2G of memory
-  '-m', '2G',
+  # use 3G of memory
+  '-m', '3G',
 
   # reset the cpu
   '-d', 'cpu_reset',
@@ -168,7 +166,7 @@ qemu_args = [
   '-d', 'int,guest_errors',
 
   # don't reboot nor shutdown on triple fault
-  #'-no-shutdown', '-no-reboot',
+  '-no-shutdown', '-no-reboot',
   # output qemu logs to > qemu.log
   '-D', meson.project_source_root() / 'qemu.log',
   # enable boot menu
@@ -272,7 +270,6 @@ else
 endif
 # ==============================================================================
 
-
 # ==============================================================================
 ### Targets
 iso_dir = 'iso_root'
@@ -293,10 +290,10 @@ root_image = custom_target(
   output: 'image.hdd',
   command: [
     './Meta/create_image.py',
-    '--input', meson.project_source_root() / 'Kernel',
+    '--input', meson.project_source_root() / 'sysroot',
     '--output', '@OUTPUT@',
     '--partition-table', 'gpt',
-    '--size', '728MiB',
+    '--size', '2GiB',
   ],
   depends: ext_mods,
   build_by_default: true,
@@ -415,7 +412,12 @@ run_bios = custom_target(
   'run_bios',
   input: [iso, root_image],
   output: 'run_bios',
-  command: [qemu, qemu_args, '-cdrom', '@INPUT0@'],
+  command: [
+    qemu, qemu_args,
+    '-cdrom', '@INPUT0@',
+    # use acceleration if available
+    '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
+  ],
   build_by_default: true,
   console: true,
   install: false,
@@ -428,7 +430,13 @@ ovmf = ovmf_binaries.get_variable(ovmf_id)
 run_uefi = custom_target(
   input: [iso, root_image],
   output: 'run_uefi',
-  command: [qemu, qemu_args, '-cdrom', '@INPUT0@', '-bios', ovmf],
+  command: [
+    qemu, qemu_args,
+    '-cdrom', '@INPUT0@',
+    '-bios', ovmf,
+    # use acceleration if available
+    '-M', 'accel=kvm:hvf:whpx:haxm:tcg',
+  ],
   console: true,
   install: false,
   depends: [iso, root_image]

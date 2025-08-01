@@ -19,19 +19,8 @@ extern "C"
     void*  memchr(const void* ptr, int ch, size_t len);
 
     size_t strlen(const char* str) throw();
-    char*  strdup(const char* str) throw();
-
-    char*  strchr(const char* str, int ch);
-
     int    strcmp(const char* str1, const char* str2) throw();
     int    strncmp(const char* str1, const char* str2, size_t len) throw();
-
-    char*  strcpy(char* dest, const char* src) throw();
-    char*  strncpy(char* dest, const char* src, size_t len) throw();
-
-    char*  strstr(const char* str, const char* substr);
-    void   strrev(char* str);
-
 #ifdef __cplusplus
 } // extern "C"
 #endif

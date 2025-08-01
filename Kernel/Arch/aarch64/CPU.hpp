@@ -16,8 +16,8 @@ namespace CPU
         usize     ID;
         void*     Empty;
 
-        uintptr_t ThreadStack;
-        uintptr_t KernelStack;
+        upointer ThreadStack;
+        upointer KernelStack;
 
         usize     HardwareID;
         bool      IsOnline = false;

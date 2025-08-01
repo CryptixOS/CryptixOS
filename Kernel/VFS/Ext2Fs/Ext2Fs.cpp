@@ -168,19 +168,15 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
         Ext2FsDirectoryEntry* entry
             = reinterpret_cast<Ext2FsDirectoryEntry*>(buffer + i);
 
-        char* nameBuffer = new char[entry->NameSize + 1];
-        std::strncpy(nameBuffer, reinterpret_cast<char*>(entry->Name),
-                     entry->NameSize);
-        nameBuffer[entry->NameSize] = 0;
-
+        String name
+            = StringView(reinterpret_cast<char*>(entry->Name), entry->NameSize);
         if (entry->INodeIndex == 0)
         {
-            delete[] nameBuffer;
             i += entry->Size;
 
             continue;
         }
-        if (!std::strcmp(nameBuffer, ".") || !std::strcmp(nameBuffer, ".."))
+        if (name == "."_sv || name == ".."_sv)
         {
             i += entry->Size;
             continue;
@@ -208,12 +204,12 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
                 break;
         }
 
-        Ext2FsINode* newNode          = new Ext2FsINode(nameBuffer, this, mode);
-        newNode->m_Metadata.UID       = inodeMeta.UID;
-        newNode->m_Metadata.GID       = inodeMeta.GID;
-        newNode->m_Metadata.ID        = entry->INodeIndex;
-        newNode->m_Metadata.Size      = inodeMeta.GetSize();
-        newNode->m_Metadata.LinkCount = inodeMeta.HardLinkCount;
+        Ext2FsINode* newNode           = new Ext2FsINode(name, this, mode);
+        newNode->m_Metadata.UID        = inodeMeta.UID;
+        newNode->m_Metadata.GID        = inodeMeta.GID;
+        newNode->m_Metadata.ID         = entry->INodeIndex;
+        newNode->m_Metadata.Size       = inodeMeta.GetSize();
+        newNode->m_Metadata.LinkCount  = inodeMeta.HardLinkCount;
         newNode->m_Metadata.BlockCount = newNode->m_Metadata.Size / m_BlockSize;
 
         newNode->m_Metadata.AccessTime.tv_sec        = inodeMeta.AccessTime;
@@ -231,7 +227,6 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
         if (newNode->IsSymlink())
             ;
 
-        delete[] nameBuffer;
         i += entry->Size;
     }
 
@@ -239,11 +234,12 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
     return true;
 }
 
-void Ext2Fs::FreeINode(usize inode)
+ErrorOr<void> Ext2Fs::FreeINode(INode* inode)
 {
-    --inode;
+    auto id = inode->ID();
+    --id;
 
-    usize blockGroupIndex = inode / m_SuperBlock->INodesPerGroup;
+    usize blockGroupIndex = id / m_SuperBlock->INodesPerGroup;
     Ext2FsBlockGroupDescriptor blockGroup;
     ReadBlockGroupDescriptor(&blockGroup, blockGroupIndex);
 
@@ -253,7 +249,7 @@ void Ext2Fs::FreeINode(usize inode)
                    blockGroup.INodeUsageBitmapAddress * m_BlockSize,
                    m_BlockSize);
 
-    bitmap.SetIndex(inode % m_SuperBlock->INodesPerGroup, false);
+    bitmap.SetIndex(id % m_SuperBlock->INodesPerGroup, false);
     m_Device->Write(bitmap.Raw(),
                     blockGroup.INodeUsageBitmapAddress * m_BlockSize,
                     m_BlockSize);
@@ -265,6 +261,7 @@ void Ext2Fs::FreeINode(usize inode)
     FlushSuperBlock();
 
     bitmap.Free();
+    return {};
 }
 
 isize Ext2Fs::SetINodeBlock(Ext2FsINodeMeta& meta, u32 inode, u32 iblock,

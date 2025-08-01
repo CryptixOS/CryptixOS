@@ -9,7 +9,7 @@
 #include <API/UnixTypes.hpp>
 #include <Common.hpp>
 
-#include <Drivers/FilesystemDriver.hpp>
+#include <Drivers/Core/FilesystemDriver.hpp>
 
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Memory/Ref.hpp>
@@ -23,6 +23,9 @@ class FileDescriptor;
 
 namespace VFS
 {
+    void                           Initialize();
+    bool                           IsInitialized();
+
     ErrorOr<Ref<FilesystemDriver>> FindFilesystem(StringView name);
 
     ErrorOr<void> RegisterFilesystem(Ref<FilesystemDriver> driver);
@@ -43,7 +46,7 @@ namespace VFS
     ErrorOr<Ref<DirectoryEntry>> OpenDirectoryEntry(Ref<DirectoryEntry> parent,
                                                     PathView path, isize flags,
                                                     mode_t mode);
-    ErrorOr<FileDescriptor*>     Open(Ref<DirectoryEntry> parent, PathView path,
+    ErrorOr<Ref<FileDescriptor>> Open(Ref<DirectoryEntry> parent, PathView path,
                                       isize flags, mode_t mode);
 
     ErrorOr<PathResolution>      ResolvePath(Ref<DirectoryEntry> parent,
@@ -56,6 +59,8 @@ namespace VFS
                                    PathView target, StringView fsName,
                                    i32 flags = 0, const void* data = nullptr);
     bool Unmount(Ref<DirectoryEntry> parent, PathView path, i32 flags = 0);
+
+    ErrorOr<void>                Sync();
 
     ErrorOr<Ref<DirectoryEntry>> CreateNode(Ref<DirectoryEntry> parent,
                                             StringView name, mode_t mode,
@@ -76,7 +81,7 @@ namespace VFS
     ErrorOr<Ref<DirectoryEntry>> Symlink(PathView path, PathView targetPath);
 
     ErrorOr<Ref<DirectoryEntry>> Link(Ref<DirectoryEntry> oldParent,
-                                      StringView            oldName,
+                                      StringView          oldName,
                                       Ref<DirectoryEntry> newParent,
                                       StringView newName, i32 flags = 0);
     ErrorOr<Ref<DirectoryEntry>> Link(PathView oldPath, PathView newPath,

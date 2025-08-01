@@ -7,10 +7,13 @@
 #include <API/Limits.hpp>
 #include <Arch/CPU.hpp>
 
+#include <Drivers/Core/DeviceManager.hpp>
+
 #include <Library/Locking/Spinlock.hpp>
 #include <Library/Locking/SpinlockProtected.hpp>
-#include <Scheduler/Process.hpp>
-#include <Scheduler/Thread.hpp>
+
+#include <Scheduler/Scheduler.hpp>
+#include <Time/Time.hpp>
 
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/DirectoryEntry.hpp>
@@ -18,6 +21,7 @@
 #include <VFS/Ext2Fs/Ext2Fs.hpp>
 #include <VFS/Fat32Fs/Fat32Fs.hpp>
 #include <VFS/INode.hpp>
+#include <VFS/Initrd/Initrd.hpp>
 #include <VFS/MountPoint.hpp>
 #include <VFS/PathResolver.hpp>
 #include <VFS/ProcFs/ProcFs.hpp>
@@ -27,7 +31,76 @@
 namespace VFS
 {
     static SpinlockProtected<FilesystemDriver::List> s_FilesystemDrivers;
-    static Ref<DirectoryEntry>     s_RootDirectoryEntry = nullptr;
+
+    static bool                s_Initialized        = false;
+    static Ref<DirectoryEntry> s_RootDirectoryEntry = nullptr;
+
+    template <typename T>
+    static void registerFilesystem(StringView name)
+    {
+        auto fs            = CreateRef<FilesystemDriver>();
+
+        fs->Owner          = nullptr;
+        fs->FilesystemName = name;
+        fs->FlagsMask      = 0;
+
+        fs->Instantiate = []() -> ErrorOr<Ref<Filesystem>> { return new T(0); };
+        fs->Destroy     = [](Ref<Filesystem>) -> ErrorOr<void> { return {}; };
+
+        VFS::RegisterFilesystem(fs);
+    }
+
+    static void registerFilesystems()
+    {
+        registerFilesystem<TmpFs>("tmpfs");
+        registerFilesystem<DevTmpFs>("devfs");
+        registerFilesystem<ProcFs>("proc");
+        registerFilesystem<Fat32Fs>("vfat");
+        registerFilesystem<Ext2Fs>("ext2");
+        registerFilesystem<EchFs>("echfs");
+    }
+
+    static void filesystemSyncDaemon()
+    {
+        for (;;)
+        {
+            Time::NanoSleep(15'000'000'000);
+            Sync();
+        }
+    }
+
+    void Initialize()
+    {
+        registerFilesystems();
+        Assert(MountRoot("tmpfs"));
+        Initrd::Initialize();
+
+        CreateDirectory("/dev", 0755);
+        Assert(Mount(nullptr, "", "/dev", "devfs"));
+
+        Scheduler::InitializeProcFs();
+
+        auto colonel = Scheduler::KernelProcess();
+        auto syncd   = colonel->CreateThread(filesystemSyncDaemon, 0);
+        Scheduler::EnqueueThread(syncd.Raw());
+
+        using DeviceManager::DeviceIterator;
+        DeviceIterator deviceIterator;
+        deviceIterator.BindLambda(
+            [](auto device) -> bool
+            {
+                auto path = "/dev/"_s + device->Name();
+                if (!CreateNode(path, S_IFCHR | 0666, device->ID()))
+                    LogError("VFS: Failed to create device node for: `{}`",
+                             path);
+
+                return true;
+            });
+
+        DeviceManager::IterateDevices(deviceIterator);
+        s_Initialized = true;
+    }
+    bool                           IsInitialized() { return s_Initialized; }
 
     ErrorOr<Ref<FilesystemDriver>> FindFilesystemDriver(StringView name)
     {
@@ -191,8 +264,8 @@ namespace VFS
             ;
         return dentry;
     }
-    ErrorOr<FileDescriptor*> Open(Ref<DirectoryEntry> parent, PathView path,
-                                  isize flags, mode_t mode)
+    ErrorOr<Ref<FileDescriptor>> Open(Ref<DirectoryEntry> parent, PathView path,
+                                      isize flags, mode_t mode)
     {
         auto maybeEntry = OpenDirectoryEntry(parent, path, flags, mode);
         RetOnError(maybeEntry);
@@ -215,12 +288,20 @@ namespace VFS
         auto inode  = dentry->INode();
         if (inode && inode->IsCharDevice())
         {
-            auto device = DevTmpFs::Lookup(inode->Stats().st_dev);
+            dev_t id     = inode->DeviceID();
+            auto  device = DevTmpFs::Lookup(id);
             if (device)
-                return new FileDescriptor(dentry, device, flags, accMode);
+            {
+                DeviceMajor major = GetDeviceMajor(id);
+                DeviceMinor minor = GetDeviceMinor(id);
+
+                LogTrace("VFS: Opening device with id: {}.{}", major, minor);
+                return CreateRef<FileDescriptor>(dentry, device, flags,
+                                                 accMode);
+            }
         }
 
-        return new FileDescriptor(dentry, flags, accMode);
+        return CreateRef<FileDescriptor>(dentry, flags, accMode);
     }
 
     ErrorOr<PathResolution> ResolvePath(Ref<DirectoryEntry> parent,
@@ -321,6 +402,22 @@ namespace VFS
         return false;
     }
 
+    ErrorOr<void> Sync()
+    {
+        MountPoint::Iterator iterator;
+        iterator.BindLambda(
+            [](Ref<MountPoint> mount) -> bool
+            {
+                auto fs = mount->Filesystem();
+                fs->Sync();
+
+                return true;
+            });
+
+        MountPoint::Iterate(iterator);
+        return {};
+    }
+
     ErrorOr<Ref<DirectoryEntry>> CreateNode(Ref<DirectoryEntry> directory,
                                             StringView name, mode_t mode,
                                             dev_t dev, PathView target)
@@ -365,7 +462,7 @@ namespace VFS
     ErrorOr<Ref<DirectoryEntry>> CreateFile(Ref<DirectoryEntry> directory,
                                             StringView name, mode_t mode)
     {
-        mode &= S_IFMT;
+        mode &= ~S_IFMT;
         mode |= S_IFREG;
 
         return CreateNode(directory, name, mode, 0);
@@ -379,7 +476,7 @@ namespace VFS
     ErrorOr<Ref<DirectoryEntry>> CreateDirectory(Ref<DirectoryEntry> directory,
                                                  StringView name, mode_t mode)
     {
-        mode &= S_IFMT;
+        mode &= ~S_IFMT;
         mode |= S_IFDIR;
 
         return CreateNode(directory, name, mode, 0);

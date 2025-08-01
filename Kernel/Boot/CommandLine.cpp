@@ -10,8 +10,7 @@
 
 #include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/String/String.hpp>
-
-#include <cctype>
+#include <Prism/String/StringUtils.hpp>
 
 namespace CommandLine
 {
@@ -29,7 +28,7 @@ namespace CommandLine
         {
             // Skip leading whitespace
             while (pos < args.Size()
-                   && std::isspace(static_cast<unsigned char>(args[pos])))
+                   && StringUtils::IsSpace(static_cast<unsigned char>(args[pos])))
                 ++pos;
 
             // Ensure there's an argument to process
@@ -43,7 +42,7 @@ namespace CommandLine
 
                 // Find the end of the argument
                 while (pos < args.Size()
-                       && !std::isspace(static_cast<unsigned char>(args[pos])))
+                       && !StringUtils::IsSpace(static_cast<unsigned char>(args[pos])))
                     ++pos;
 
                 // Extract the argument substring

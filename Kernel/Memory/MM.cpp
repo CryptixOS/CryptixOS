@@ -50,10 +50,14 @@ namespace MM
         {
             for (usize i = 0; i < s_MemoryMap.EntryCount; i++)
             {
-                auto& entry = s_MemoryMap.Entries[i];
+                auto& entry    = s_MemoryMap.Entries[i];
+                auto  base     = Math::AlignUp(entry.Base(), PMM::PAGE_SIZE);
+                usize misalign = base - entry.Base().Raw();
+
                 if (entry.Type() == MemoryZoneType::eUsable
-                    && entry.Length() > bytes)
-                    return entry.Allocate(bytes);
+                    && entry.Length() > bytes + misalign)
+                    return Math::AlignUp(entry.Allocate(bytes + misalign),
+                                         PMM::PAGE_SIZE);
             }
 
             return nullptr;

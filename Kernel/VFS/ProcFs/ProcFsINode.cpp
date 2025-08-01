@@ -28,7 +28,7 @@ ProcFsINode::ProcFsINode(StringView name, class Filesystem* fs, mode_t mode,
 {
     Assert(!S_ISDIR(mode) || !m_Property);
 
-    m_Metadata.DeviceID     = m_Filesystem->DeviceID();
+    m_Metadata.DeviceID     = m_Filesystem->BackingDeviceID();
     m_Metadata.ID           = m_Filesystem->NextINodeIndex();
     m_Metadata.LinkCount    = 1;
     m_Metadata.Mode         = mode;
