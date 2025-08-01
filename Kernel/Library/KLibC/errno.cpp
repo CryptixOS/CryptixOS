@@ -6,13 +6,13 @@
  */
 #include <errno.h>
 
-#include "Arch/CPU.hpp"
-#include "Scheduler/Thread.hpp"
+#include <Arch/CPU.hpp>
+#include <Scheduler/Thread.hpp>
 
 static errno_t      error;
 
 extern "C" errno_t* __errno_location()
 {
-    Thread* thread = CPU::GetCurrentThread();
+    auto thread = CPU::GetCurrentThread();
     return reinterpret_cast<errno_t*>(thread ? &thread->ErrorCode() : &error);
 }

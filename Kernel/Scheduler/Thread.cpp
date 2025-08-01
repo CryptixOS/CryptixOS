@@ -216,11 +216,11 @@ bool Thread::DispatchSignal(u8 signal)
     return false;
 }
 
-Thread* Thread::Fork(Process* process)
+::Ref<Thread> Thread::Fork(Process* process)
 {
-    Thread* newThread
+    auto newThread
         = process->CreateThread(Context.rip, m_IsUser, CPU::GetCurrent()->ID);
-    newThread->m_Tls.Self  = newThread;
+    newThread->m_Tls.Self  = newThread.Raw();
     newThread->m_Tls.Stack = m_Tls.Stack;
 
     Pointer kstack = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE

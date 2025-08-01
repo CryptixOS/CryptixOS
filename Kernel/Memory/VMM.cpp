@@ -12,6 +12,7 @@
 
 #include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
+
 #include <Scheduler/Process.hpp>
 
 extern "C" symbol      limine_requests_addr_start;

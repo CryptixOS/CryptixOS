@@ -45,7 +45,7 @@ Process::Process(Process* parent, StringView name,
                  const struct Credentials& creds)
     : m_Parent(parent)
     , m_Pid(AllocatePid())
-    , m_Name(name.Raw())
+    , m_Name(name)
     , m_Credentials(creds)
     , m_Ring(PrivilegeLevel::eUnprivileged)
     , m_NextTid(m_Pid)
@@ -101,7 +101,7 @@ Process* Process::CreateIdleProcess()
     return idle;
 }
 
-Thread* Process::CreateThread(Pointer rip, bool isUser, i64 runOn)
+Ref<Thread> Process::CreateThread(Pointer rip, bool isUser, i64 runOn)
 {
     auto thread      = new Thread(this, rip, 0, runOn);
     thread->m_IsUser = isUser;
@@ -111,9 +111,9 @@ Thread* Process::CreateThread(Pointer rip, bool isUser, i64 runOn)
     m_Threads.PushBack(thread);
     return thread;
 }
-Thread* Process::CreateThread(Vector<StringView>& argv,
-                              Vector<StringView>& envp,
-                              ExecutableProgram& program, i64 runOn)
+Ref<Thread> Process::CreateThread(Vector<StringView>& argv,
+                                  Vector<StringView>& envp,
+                                  ExecutableProgram& program, i64 runOn)
 {
     auto thread = new Thread(this, argv, envp, program, runOn);
 
@@ -199,7 +199,7 @@ ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 {
     Ref parent = CWD();
     if (CPU::AsUser([path]() -> bool { return path.Absolute(); }))
-        parent = VFS::RootDirectoryEntry().Raw();
+        parent = VFS::RootDirectoryEntry();
     else if (dirFd != AT_FDCWD)
     {
         Ref<FileDescriptor> descriptor = GetFileHandle(dirFd);
@@ -211,10 +211,10 @@ ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
 
     auto descriptor
         = CPU::AsUser([&]() -> ErrorOr<Ref<FileDescriptor>>
-                      { return VFS::Open(parent.Raw(), path, flags, mode); });
-    if (!descriptor) return Error(descriptor.error());
+                      { return VFS::Open(parent, path, flags, mode); });
+    if (!descriptor) return Error(descriptor.Error());
 
-    return m_FdTable.Insert(descriptor.value());
+    return m_FdTable.Insert(descriptor.Value());
 }
 ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
 {
@@ -260,7 +260,7 @@ ErrorOr<Ref<FileDescriptor>> Process::GetFileDescriptor(isize fdNum)
 Vector<String> SplitArguments(const String& str)
 {
     Vector<String> segments;
-    String         path(str.Raw(), str.Size());
+    String         path = str;
 
     if (str.Empty()) return {""};
     usize start     = str[0] == ' ' ? 1 : 0;
@@ -277,7 +277,7 @@ Vector<String> SplitArguments(const String& str)
     while ((end = findSlash(start)) < path.Size())
     {
         usize      segmentLength = end - start;
-        StringView segment(path.Raw() + start, segmentLength);
+        StringView segment       = path.Substr(start, segmentLength);
         if (start != end) segments.PushBack(segment);
 
         start = end + 1;
@@ -285,7 +285,7 @@ Vector<String> SplitArguments(const String& str)
 
     // handle last segment
     if (start < path.Size())
-        segments.EmplaceBack(path.Raw() + start, path.Size() - start);
+        segments.EmplaceBack(path.Substr(start, path.Size() - start));
     return segments;
 }
 
@@ -310,22 +310,23 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
     Vector<StringView> argvArr;
     {
         CPU::UserMemoryProtectionGuard guard;
-        // for (auto& arg : args) argvArr.EmplaceBack(arg.Raw(), arg.Size());
+        // for (auto& arg : args) argvArr.EmplaceBack(arg, arg.Size());
     }
 
     static ExecutableProgram program;
 
-    if (!program.Load(path.Raw(), PageMap, m_AddressSpace))
-        return Error(ENOEXEC);
+    if (!program.Load(path, PageMap, m_AddressSpace)) return Error(ENOEXEC);
 
     Thread* currentThread = CPU::GetCurrentThread();
     currentThread->SetState(ThreadState::eExited);
 
     for (auto& thread : m_Threads)
-    {
-        if (thread == currentThread) continue;
-        delete thread;
-    }
+        // NOTE(v1tr10l7): We don't won't this thread to be deleted just yet, as
+        // it is being executed right now. The scheduler will take care of
+        // finalizing dead processes,
+        // and then it will get cleanup up
+        if (thread == currentThread) m_MainThread = currentThread;
+    m_Threads.Clear();
 
     {
         CPU::UserMemoryProtectionGuard guard;
@@ -343,7 +344,7 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 
     auto thread
         = CreateThread(argvArr, envpArr, program, CPU::GetCurrent()->ID);
-    Scheduler::EnqueueThread(thread);
+    Scheduler::EnqueueThread(thread.Raw());
 
     Scheduler::Yield();
     return 0;
@@ -458,8 +459,7 @@ ErrorOr<Process*> Process::Fork()
         auto newRegion
             = new Region(physicalSpace, range->VirtualBase(), range->Size());
         newRegion->SetAccessMode(range->Access());
-        newProcess->m_AddressSpace.Insert(range->VirtualBase().Raw(),
-                                          newRegion);
+        newProcess->m_AddressSpace.Insert(range->VirtualBase(), newRegion);
         continue;
         // auto newRegion = newProcess->m_AddressSpace.AllocateFixed(
         //     range->VirtualBase(), range->Size());
@@ -481,12 +481,12 @@ ErrorOr<Process*> Process::Fork()
         newProcess->m_FdTable.Insert(fd, i);
     }
 
-    Thread* thread             = currentThread->Fork(newProcess);
+    auto thread                = currentThread->Fork(newProcess);
     thread->m_IsEnqueued       = false;
     newProcess->m_UserStackTop = m_UserStackTop;
 
     LogDebug("Process: enqueuing thread");
-    Scheduler::EnqueueThread(thread);
+    Scheduler::EnqueueThread(thread.Raw());
 
     LogDebug("Process: Spawned {}", newProcess->m_Pid);
     return newProcess;
@@ -529,17 +529,21 @@ i32 Process::Exit(i32 code)
 
     // TODO(v1tr10l7): Free stacks
 
-    for (Thread* thread : m_Threads)
+    for (auto thread : m_Threads)
     {
         // TODO(v1tr10l7): Wake up threads
         // auto state = thread->m_State;
         thread->SetState(ThreadState::eExited);
+        m_MainThread = thread;
 
         // if (thread != currentThread && state != ThreadState::eRunning)
         //   CPU::WakeUp(thread->runningOn, false);
     }
+    m_Threads.Clear();
 
     currentThread->SetState(ThreadState::eExited);
+    m_State = ProcessState::eDead;
+
     Scheduler::RemoveProcess(m_Pid);
     VMM::LoadPageMap(*VMM::GetKernelPageMap(), false);
 

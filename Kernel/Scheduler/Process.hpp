@@ -19,12 +19,19 @@
 #include <Library/ExecutableProgram.hpp>
 #include <Prism/String/String.hpp>
 
+#include <Scheduler/Thread.hpp>
 #include <VFS/FileDescriptorTable.hpp>
 
 enum class PrivilegeLevel
 {
     ePrivileged,
     eUnprivileged,
+};
+enum class ProcessState
+{
+    eIdle    = 0,
+    eRunning = 1,
+    eDead    = 2,
 };
 
 class INode;
@@ -45,8 +52,6 @@ struct Credentials
     static Credentials s_Root;
 };
 
-struct Thread;
-
 class Process
 {
   public:
@@ -58,11 +63,11 @@ class Process
     static Process* CreateKernelProcess();
     static Process* CreateIdleProcess();
 
-    Thread* CreateThread(Pointer rip, bool isUser = true, i64 runOn = -1);
-    Thread* CreateThread(Vector<StringView>& argv, Vector<StringView>& envp,
-                         ExecutableProgram& program, i64 runOn = -1);
+    Ref<Thread> CreateThread(Pointer rip, bool isUser = true, i64 runOn = -1);
+    Ref<Thread> CreateThread(Vector<StringView>& argv, Vector<StringView>& envp,
+                             ExecutableProgram& program, i64 runOn = -1);
 
-    bool    ValidateAddress(const Pointer address, i32 accessMode, usize size);
+    bool ValidateAddress(const Pointer address, i32 accessMode, usize size);
     inline bool ValidateRead(const Pointer address, usize size)
     {
         return ValidateAddress(address, PROT_READ, size);
@@ -92,17 +97,20 @@ class Process
         // TODO(v1tr10l7): What should we return, if there is no parent??
         return 0;
     }
-    inline Process*   Parent() const { return m_Parent; }
-    inline ProcessID  Pid() const { return m_Pid; }
-    inline StringView Name() const { return m_Name; }
-    constexpr bool    IsSuperUser() const
+    inline Process*     Parent() const { return m_Parent; }
+    inline ProcessID    Pid() const { return m_Pid; }
+    inline StringView   Name() const { return m_Name; }
+    inline ProcessState State() const { return m_State; }
+    inline bool    IsDead() const { return m_State == ProcessState::eDead; }
+
+    constexpr bool IsSuperUser() const
     {
         return m_Credentials.EffectiveUserID == 0;
     }
     inline const Credentials& Credentials() const { return m_Credentials; }
     inline Optional<i32>      Status() const { return m_Status; }
 
-    inline Thread*            MainThread() { return m_MainThread; }
+    inline Ref<Thread>        MainThread() { return m_MainThread; }
     inline AddressSpace&      AddressSpace() { return m_AddressSpace; }
 
     inline ProcessID          Sid() const { return m_Credentials.SessionID; }
@@ -122,11 +130,11 @@ class Process
     inline TTY* TTY() const { return m_TTY; }
     inline void SetTTY(class TTY* tty) { m_TTY = tty; }
 
-    inline const Vector<Process*>& Children() const { return m_Children; }
-    inline const Vector<Process*>& Zombies() const { return m_Zombies; }
-    inline const Vector<Thread*>&  Threads() const { return m_Threads; }
+    inline const Vector<Process*>&    Children() const { return m_Children; }
+    inline const Vector<Process*>&    Zombies() const { return m_Zombies; }
+    inline const Vector<Ref<Thread>>& Threads() const { return m_Threads; }
 
-    inline bool                    IsSessionLeader() const
+    inline bool                       IsSessionLeader() const
     {
         return m_Pid == m_Credentials.SessionID;
     }
@@ -177,6 +185,7 @@ class Process
     Process*            m_Parent      = nullptr;
     ProcessID           m_Pid         = -1;
     String              m_Name        = "?";
+    ProcessState        m_State       = ProcessState::eRunning;
 
     struct Credentials  m_Credentials = {};
     class TTY*          m_TTY         = nullptr;
@@ -184,11 +193,11 @@ class Process
     Optional<i32>       m_Status;
     bool                m_Exited     = false;
 
-    Thread*             m_MainThread = nullptr;
-    Atomic<tid_t>       m_NextTid    = m_Pid;
+    Ref<Thread>         m_MainThread = nullptr;
+    Atomic<ThreadID>    m_NextTid    = m_Pid;
     Vector<Process*>    m_Children;
     Vector<Process*>    m_Zombies;
-    Vector<Thread*>     m_Threads;
+    Vector<Ref<Thread>> m_Threads;
 
     Ref<DirectoryEntry> m_RootDirectoryEntry = nullptr;
     Ref<DirectoryEntry> m_CWD                = nullptr;

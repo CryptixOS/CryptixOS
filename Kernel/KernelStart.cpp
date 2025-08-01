@@ -73,31 +73,6 @@ namespace EFI
 };
 bool g_LogTmpFs = false;
 
-template <typename T>
-static void registerFilesystem(StringView name)
-{
-    auto fs            = CreateRef<FilesystemDriver>();
-
-    fs->Owner          = nullptr;
-    fs->FilesystemName = name;
-    fs->FlagsMask      = 0;
-
-    fs->Instantiate    = []() -> ErrorOr<Ref<Filesystem>> { return new T(0); };
-    fs->Destroy        = [](Ref<Filesystem>) -> ErrorOr<void> { return {}; };
-
-    VFS::RegisterFilesystem(fs);
-}
-
-void registerFilesystems()
-{
-    registerFilesystem<TmpFs>("tmpfs");
-    registerFilesystem<DevTmpFs>("devfs");
-    registerFilesystem<ProcFs>("proc");
-    registerFilesystem<Fat32Fs>("vfat");
-    registerFilesystem<Ext2Fs>("ext2");
-    registerFilesystem<EchFs>("echfs");
-}
-
 static void eternal()
 {
     for (;;)
@@ -141,8 +116,8 @@ static bool loadInitProcess(Path initPath)
     auto colonel   = Scheduler::GetKernelProcess();
     auto newThread = colonel->CreateThread(reinterpret_cast<uintptr_t>(eternal),
                                            false, CPU::Current()->ID);
-    Scheduler::EnqueueThread(newThread);
-    Scheduler::EnqueueThread(userThread);
+    Scheduler::EnqueueThread(newThread.Raw());
+    Scheduler::EnqueueThread(userThread.Raw());
 
     return true;
 }
@@ -292,7 +267,7 @@ kernelStart(const BootInformation& info)
     auto thread
         = process->CreateThread(kernelThread, false, CPU::GetCurrent()->ID);
 
-    Scheduler::EnqueueThread(thread);
+    Scheduler::EnqueueThread(thread.Raw());
 
     Syscall::InstallAll();
     Scheduler::PrepareAP(true);

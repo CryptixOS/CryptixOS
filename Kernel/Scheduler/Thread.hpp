@@ -107,7 +107,7 @@ struct Thread : public RefCounted
     }
     constexpr bool  ReadyForCleanup() { return IsDead(); }
 
-    Thread*         Fork(Process* parent);
+    ::Ref<Thread>   Fork(Process* parent);
 
     inline sigset_t SignalMask() const { return m_SignalMask; }
     inline void     SetSignalMask(sigset_t mask) { m_SignalMask = mask; }
