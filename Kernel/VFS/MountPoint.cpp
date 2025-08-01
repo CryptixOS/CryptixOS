@@ -34,7 +34,7 @@ void                  MountPoint::Attach(::Ref<MountPoint> mountPoint)
 
 ::Ref<MountPoint> MountPoint::Head() { return s_MountPoints.Head(); }
 ::Ref<MountPoint> MountPoint::Tail() { return s_MountPoints.Tail(); }
-void              MountPoint::Iterate(MountPointIterator iterator)
+void              MountPoint::Iterate(Iterator iterator)
 {
     auto current = Head();
     for (; current; current = current->NextMountPoint())
