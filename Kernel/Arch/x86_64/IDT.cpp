@@ -70,6 +70,8 @@ constexpr u32 GATE_TYPE_TRAP      = 0xf;
 
 namespace Exception
 {
+    constexpr u8 DEBUG      = 0x01;
+    constexpr u8 NMI        = 0x02;
     constexpr u8 BREAKPOINT = 0x03;
     constexpr u8 PAGE_FAULT = 0x0e;
 }; // namespace Exception
@@ -78,7 +80,7 @@ namespace MM
     void HandlePageFault(const PageFaultInfo& info);
 };
 
-struct [[gnu::packed]] IDTEntry
+struct CTOS_PACKED IDTEntry
 {
     u16 IsrLow;
     u16 KernelCS;
@@ -211,11 +213,13 @@ namespace IDT
     {
         for (u32 i = 0; i < 256; i++)
         {
+            u8 gateType = GATE_TYPE_INTERRUPT;
+            if (i == Exception::DEBUG || i == Exception::BREAKPOINT
+                || i == Exception::NMI)
+                gateType = GATE_TYPE_TRAP;
 
-            idtWriteEntry(
-                i, reinterpret_cast<uintptr_t>(interrupt_handlers[i]),
-                IDT_ENTRY_PRESENT
-                    | (i < 0x20 ? GATE_TYPE_TRAP : GATE_TYPE_INTERRUPT));
+            idtWriteEntry(i, reinterpret_cast<uintptr_t>(interrupt_handlers[i]),
+                          IDT_ENTRY_PRESENT | gateType);
 
             s_InterruptHandlers[i].SetInterruptVector(i);
             if (i < 32) exceptionHandlers[i] = raiseException;
