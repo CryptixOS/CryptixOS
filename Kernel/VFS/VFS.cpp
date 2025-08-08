@@ -7,6 +7,7 @@
 #include <API/Limits.hpp>
 #include <Arch/CPU.hpp>
 
+#include <Drivers/Core/BlockDevice.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
 
 #include <Library/Locking/Spinlock.hpp>
@@ -32,8 +33,8 @@ namespace VFS
 {
     static SpinlockProtected<FilesystemDriver::List> s_FilesystemDrivers;
 
-    static bool                s_Initialized        = false;
-    static Ref<DirectoryEntry> s_RootDirectoryEntry = nullptr;
+    static bool                                      s_Initialized = false;
+    static Ref<DirectoryEntry> s_RootDirectoryEntry                = nullptr;
 
     template <typename T>
     static void registerFilesystem(StringView name)
@@ -84,20 +85,24 @@ namespace VFS
         auto syncd   = colonel->CreateThread(filesystemSyncDaemon, 0);
         Scheduler::EnqueueThread(syncd.Raw());
 
-        using DeviceManager::DeviceIterator;
-        DeviceIterator deviceIterator;
-        deviceIterator.BindLambda(
-            [](auto device) -> bool
-            {
-                auto path = "/dev/"_s + device->Name();
-                if (!CreateNode(path, S_IFCHR | 0666, device->ID()))
-                    LogError("VFS: Failed to create device node for: `{}`",
-                             path);
+        using DeviceManager::BlockDeviceIterator;
+        using DeviceManager::CharDeviceIterator;
+        CharDeviceIterator  cdevIterator;
+        BlockDeviceIterator blkdevIterator;
+        auto                iterator = [](auto device) -> bool
+        {
+            auto path = "/dev/"_s + device->Name();
+            if (!CreateNode(path, S_IFCHR | 0666, device->ID()))
+                LogError("VFS: Failed to create device node for: `{}`", path);
 
-                return true;
-            });
+            return true;
+        };
 
-        DeviceManager::IterateDevices(deviceIterator);
+        cdevIterator.BindLambda(iterator);
+        blkdevIterator.BindLambda(iterator);
+
+        DeviceManager::IterateCharDevices(cdevIterator);
+        DeviceManager::IterateBlockDevices(blkdevIterator);
         s_Initialized = true;
     }
     bool                           IsInitialized() { return s_Initialized; }
@@ -286,18 +291,19 @@ namespace VFS
 
         auto dentry = maybeEntry.Value();
         auto inode  = dentry->INode();
+
         if (inode && inode->IsCharDevice())
         {
             dev_t id     = inode->DeviceID();
-            auto  device = DevTmpFs::Lookup(id);
+            auto  device = DeviceManager::LookupCharDevice(id);
             if (device)
             {
                 DeviceMajor major = GetDeviceMajor(id);
                 DeviceMinor minor = GetDeviceMinor(id);
 
                 LogTrace("VFS: Opening device with id: {}.{}", major, minor);
-                return CreateRef<FileDescriptor>(dentry, device, flags,
-                                                 accMode);
+                // return CreateRef<FileDescriptor>(dentry, device, flags,
+                //                                  accMode);
             }
         }
 

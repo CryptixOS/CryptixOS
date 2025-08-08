@@ -8,8 +8,8 @@
 
 #include <API/Posix/linux/fb.h>
 
-#include <Drivers/Video/Framebuffer.hpp>
 #include <Drivers/Core/CharacterDevice.hpp>
+#include <Drivers/Video/Framebuffer.hpp>
 
 class FramebufferDevice : public CharacterDevice
 {
@@ -31,8 +31,10 @@ class FramebufferDevice : public CharacterDevice
     virtual i32            IoCtl(usize request, uintptr_t argp) override;
 
   private:
-    Framebuffer       m_Framebuffer;
+    Framebuffer        m_Framebuffer;
 
-    fb_var_screeninfo m_VariableScreenInfo;
-    fb_fix_screeninfo m_FixedScreenInfo;
+    static DeviceMajor ReserveMajor();
+
+    fb_var_screeninfo  m_VariableScreenInfo;
+    fb_fix_screeninfo  m_FixedScreenInfo;
 };

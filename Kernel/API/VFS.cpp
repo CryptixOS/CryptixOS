@@ -876,6 +876,8 @@ namespace API::VFS
 
     ErrorOr<isize> SyncFs(isize fdNum)
     {
+        LogDebug("API: SyncFs");
+
         auto process = Process::Current();
         auto fd      = TryOrRet(process->GetFileDescriptor(fdNum));
         auto inode   = fd->INode();
@@ -883,7 +885,14 @@ namespace API::VFS
         auto fs      = inode->Filesystem();
         if (!fs) return Error(ENODEV);
 
-        RetOnError(fs->Sync());
+        auto status = fs->Sync();
+        if (!status)
+        {
+            LogError("API: SyncFs Failed => {}", ToString(status.Error()));
+            return Error(status.Error());
+        }
+
+        LogDebug("API: SyncFs succeeded");
         return 0;
     }
     ErrorOr<isize> RenameAt2(isize oldDirFdNum, const char* oldPath,

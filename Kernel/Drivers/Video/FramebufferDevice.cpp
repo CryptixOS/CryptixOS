@@ -4,6 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/DeviceIDs.hpp>
+
 #include <Drivers/Core/DeviceManager.hpp>
 #include <Drivers/Terminal.hpp>
 #include <Drivers/Video/FramebufferDevice.hpp>
@@ -14,18 +16,18 @@
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
 
-static FramebufferDevice* s_PrimaryFramebuffer = nullptr;
+static FramebufferDevice*  s_PrimaryFramebuffer = nullptr;
+static Atomic<DeviceMinor> s_NextFramebufferID  = 0;
 
-FramebufferDevice::FramebufferDevice(StringView          name,
-                                     Framebuffer& framebuffer)
-    : CharacterDevice(name, MakeDevice(AllocateMajor().Value(), 0))
+FramebufferDevice::FramebufferDevice(StringView name, Framebuffer& framebuffer)
+    : CharacterDevice(name, MakeDevice(ReserveMajor(), s_NextFramebufferID++))
 {
     m_Framebuffer              = framebuffer;
 
     m_Stats.st_size            = 0;
     m_Stats.st_blocks          = 0;
     m_Stats.st_blksize         = 4096;
-    m_Stats.st_rdev            = 0;
+    m_Stats.st_rdev            = ID();
     m_Stats.st_mode            = 0666 | S_IFCHR;
 
     m_FixedScreenInfo.smem_len = m_FixedScreenInfo.mmio_len
@@ -63,7 +65,7 @@ FramebufferDevice::FramebufferDevice(StringView          name,
 
 bool FramebufferDevice::Initialize()
 {
-    auto  framebuffers     = Terminal::Framebuffers();
+    auto framebuffers = Terminal::Framebuffers();
 
     if (framebuffers.Empty())
     {
@@ -136,12 +138,12 @@ i32 FramebufferDevice::IoCtl(usize request, uintptr_t argp)
         case FBIOGET_VSCREENINFO:
             // TODO(v1tr10l7): should we validate those pointers here?
             Memory::Copy(reinterpret_cast<u8*>(argp), &m_VariableScreenInfo,
-                        sizeof(m_VariableScreenInfo));
+                         sizeof(m_VariableScreenInfo));
             return 0;
         case FBIOGET_FSCREENINFO:
             // TODO(v1tr10l7): >>>>
             Memory::Copy(reinterpret_cast<u8*>(argp), &m_FixedScreenInfo,
-                        sizeof(m_FixedScreenInfo));
+                         sizeof(m_FixedScreenInfo));
             return 0;
         case FBIOPUT_VSCREENINFO:
             m_VariableScreenInfo = *reinterpret_cast<fb_var_screeninfo*>(argp);
@@ -151,4 +153,12 @@ i32 FramebufferDevice::IoCtl(usize request, uintptr_t argp)
 
     errno = ENOSYS;
     return -1;
+}
+
+DeviceMajor FramebufferDevice::ReserveMajor()
+{
+    static DeviceMajor major = []() -> DeviceMajor
+    { return AllocateMajor(API::DeviceMajor::FRAMEBUFFER).Value(); }();
+
+    return major;
 }

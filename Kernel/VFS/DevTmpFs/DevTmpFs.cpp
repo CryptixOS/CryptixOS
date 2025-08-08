@@ -12,8 +12,6 @@
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/VFS.hpp>
 
-UnorderedMap<dev_t, Device*> DevTmpFs::s_Devices{};
-
 DevTmpFs::DevTmpFs(u32 flags)
     : Filesystem("DevTmpFs", flags)
 {
@@ -84,21 +82,4 @@ ErrorOr<void> DevTmpFs::Stats(statfs& stats)
     stats.f_flags                  = m_Flags;
 
     return {};
-}
-
-bool DevTmpFs::RegisterDevice(Device* device)
-{
-    Assert(device);
-
-    if (s_Devices.Contains(device->ID())) return false;
-
-    s_Devices[device->ID()] = device;
-    return true;
-}
-Device* DevTmpFs::Lookup(dev_t id)
-{
-    auto device = s_Devices.Find(id);
-    if (device != s_Devices.end()) return device->Value;
-
-    return nullptr;
 }

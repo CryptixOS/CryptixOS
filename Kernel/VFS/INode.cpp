@@ -28,7 +28,7 @@ INode::INode(StringView name, class Filesystem* fs)
     : m_Name(name)
     , m_Filesystem(fs)
 {
-    auto  thread  = CPU::GetCurrentThread();
+    auto     thread  = CPU::GetCurrentThread();
     Process* process = thread ? thread->Parent() : nullptr;
 
     if (!process) return;
@@ -40,13 +40,13 @@ INode::INode(StringView name, class Filesystem* fs)
 const stat INode::Stats()
 {
     stat stats{};
-    stats.st_dev     = m_Metadata.DeviceID;
+    stats.st_dev     = m_Metadata.RootDeviceID;
     stats.st_ino     = m_Metadata.ID;
     stats.st_nlink   = m_Metadata.LinkCount;
     stats.st_mode    = m_Metadata.Mode;
     stats.st_uid     = m_Metadata.UID;
     stats.st_gid     = m_Metadata.GID;
-    stats.st_rdev    = m_Metadata.RootDeviceID;
+    stats.st_rdev    = m_Metadata.DeviceID;
     stats.st_size    = m_Metadata.Size;
     stats.st_blksize = m_Metadata.BlockSize;
     stats.st_blocks  = m_Metadata.BlockCount;
@@ -85,9 +85,11 @@ bool INode::Immutable() { return false; }
 bool INode::CanWrite(const Credentials& creds) const
 {
     if (creds.EffectiveUserID == 0 || m_Metadata.Mode & S_IWOTH) return true;
-    if (creds.EffectiveUserID == m_Metadata.UID && m_Metadata.Mode & S_IWUSR) return true;
+    if (creds.EffectiveUserID == m_Metadata.UID && m_Metadata.Mode & S_IWUSR)
+        return true;
 
-    return m_Metadata.GID == creds.EffectiveGroupID && m_Metadata.Mode & S_IWGRP;
+    return m_Metadata.GID == creds.EffectiveGroupID
+        && m_Metadata.Mode & S_IWGRP;
 }
 
 bool INode::ValidatePermissions(const Credentials& creds, u32 acc)

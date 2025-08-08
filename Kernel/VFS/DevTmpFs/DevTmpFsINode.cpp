@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Drivers/Core/DeviceManager.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <Scheduler/Process.hpp>
@@ -23,13 +24,22 @@ DevTmpFsINode::DevTmpFsINode(StringView name, class Filesystem* fs, INodeID id,
 ErrorOr<Ref<DirectoryEntry>>
 DevTmpFsINode::CreateNode(Ref<DirectoryEntry> entry, mode_t mode, dev_t dev)
 {
-    auto dentry = TryOrRet(SynthFsINode::CreateNode(entry, mode, 0));
+    auto dentry = TryOrRet(SynthFsINode::CreateNode(entry, mode, dev));
     auto inode  = reinterpret_cast<DevTmpFsINode*>(dentry->INode());
 
-    if (inode->IsCharDevice() || S_ISBLK(mode))
+    if (inode->IsCharDevice())
     {
-        auto it = DevTmpFs::s_Devices.Find(dev);
-        if (it != DevTmpFs::s_Devices.end()) inode->m_Device = it->Value;
+        auto device
+            = reinterpret_cast<Device*>(DeviceManager::LookupCharDevice(dev));
+
+        inode->m_Device = device;
+    }
+    else if (inode->IsBlockDevice())
+    {
+        auto device
+            = reinterpret_cast<Device*>(DeviceManager::LookupBlockDevice(dev));
+
+        inode->m_Device = device;
     }
 
     return entry;

@@ -8,16 +8,12 @@
 
 #include <Drivers/Storage/StorageDevice.hpp>
 
-class StorageDevicePartition : public Device
+class StorageDevicePartition : public BlockDevice
 {
   public:
-    StorageDevicePartition(StorageDevice& device, u64 firstBlock, u64 lastBlock,
-                           u16 majorID, u16 minorID);
-
-    virtual StringView Name() const noexcept override
-    {
-        return m_Device.Name();
-    }
+    StorageDevicePartition(StringView name, StorageDevice& device,
+                           u64 firstBlock, u64 lastBlock, u16 majorID,
+                           u16 minorID);
 
     virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override
     {

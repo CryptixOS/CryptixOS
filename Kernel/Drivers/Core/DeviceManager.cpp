@@ -4,31 +4,37 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Drivers/Core/BlockDevice.hpp>
 #include <Drivers/Core/CharacterDevice.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
 
-#include <VFS/DevTmpFs/DevTmpFs.hpp>
+#include <Library/Locking/SpinlockProtected.hpp>
+
 #include <VFS/VFS.hpp>
 
 namespace DeviceManager
 {
-    static Spinlock              s_DeviceLock;
-    static Device::List          s_Devices;
-
-    static Spinlock              s_CharDeviceLock;
-    static CharacterDevice::List s_CharDevices;
-    static Vector<Device*>       s_BlockDevices;
-
-    ErrorOr<void>                RegisterCharDevice(CharacterDevice* cdev)
+    namespace
     {
-        if (LookupDevice(cdev->ID())) return Error(EEXIST);
+        Spinlock                                 s_DeviceLock;
+        Device::List                             s_Devices;
+
+        Spinlock                                 s_CharDeviceLock;
+        UnorderedMap<DeviceID, CharacterDevice*> s_CharDevices;
+        Spinlock                                 s_BlockDeviceLock;
+        UnorderedMap<DeviceID, BlockDevice*>     s_BlockDevices;
+    }; // namespace
+
+    ErrorOr<void> RegisterCharDevice(CharacterDevice* cdev)
+    {
+        auto id = cdev->ID();
+        if (LookupCharDevice(id)) return Error(EEXIST);
 
         ScopedLock cdevGuard(s_CharDeviceLock);
-        s_CharDevices.PushBack(cdev);
+        s_CharDevices[id] = cdev;
 
         ScopedLock deviceGuard(s_DeviceLock);
         s_Devices.PushBack(cdev);
-        DevTmpFs::RegisterDevice(cdev);
 
         // NOTE(v1tr10l7): The vfs will create missing nodes during it's
         // initialization
@@ -39,50 +45,62 @@ namespace DeviceManager
         if (!devTmpFsEntry)
         {
             s_Devices.PopBack();
-            s_CharDevices.PopBack();
+            s_CharDevices.Erase(id);
             return Error(ENXIO);
         }
 
         return {};
     }
-    void RegisterBlockDevice(Device* device)
+    ErrorOr<void> RegisterBlockDevice(BlockDevice* bdev)
     {
-        s_BlockDevices.PushBack(device);
+        auto id = bdev->ID();
+        if (LookupBlockDevice(id)) return Error(EEXIST);
+
+        ScopedLock bdevGuard(s_BlockDeviceLock);
+        s_BlockDevices[id] = bdev;
+
+        ScopedLock deviceGuard(s_DeviceLock);
+        s_Devices.PushBack(bdev);
+
+        // NOTE(v1tr10l7): The vfs will create missing nodes during it's
+        // initialization
+        if (!VFS::IsInitialized()) return {};
+
+        auto path          = "/dev/"_s + bdev->Name();
+        auto devTmpFsEntry = VFS::CreateNode(path, S_IFBLK | 0666, bdev->ID());
+        if (!devTmpFsEntry)
+        {
+            s_Devices.PopBack();
+            s_BlockDevices.Erase(id);
+            return Error(ENXIO);
+        }
+
+        return {};
     }
 
-    Device*          DevicesHead() { return s_Devices.Head(); }
-    Device*          DevicesTail() { return s_Devices.Tail(); }
-
-    CharacterDevice* CharDevicesHead() { return s_CharDevices.Head(); }
-    CharacterDevice* CharDevicesTail() { return s_CharDevices.Tail(); }
-
-    Device*          LookupDevice(dev_t id)
+    CharacterDevice* LookupCharDevice(DeviceID id)
     {
-        auto device = s_Devices.Head();
-        while (device && device->ID() != id) device = device->Next();
+        auto it = s_CharDevices.Find(id);
+        if (it != s_CharDevices.end()) return it->Value;
 
-        return device;
+        return nullptr;
     }
-    CharacterDevice* LookupCharDevice(dev_t id)
+    BlockDevice* LookupBlockDevice(DeviceID id)
     {
-        auto cdev = s_CharDevices.Head();
-        while (cdev && cdev->ID() != id) cdev = cdev->Next();
+        auto it = s_BlockDevices.Find(id);
+        if (it != s_BlockDevices.end()) return it->Value;
 
-        return cdev;
+        return nullptr;
     }
 
-    void IterateDevices(DeviceIterator iterator)
-    {
-        auto device = s_Devices.Head();
-        for (; device; device = device->Next())
-            if (!iterator(device)) break;
-    }
     void IterateCharDevices(CharDeviceIterator iterator)
     {
-        auto cdev = s_CharDevices.Head();
-        for (; cdev; cdev = cdev->Next())
+        for (const auto [id, cdev] : s_CharDevices)
             if (!iterator(cdev)) break;
     }
-
-    const Vector<Device*>& GetBlockDevices() { return s_BlockDevices; }
+    void IterateBlockDevices(BlockDeviceIterator iterator)
+    {
+        for (const auto [id, bdev] : s_BlockDevices)
+            if (!iterator(bdev)) break;
+    }
 }; // namespace DeviceManager

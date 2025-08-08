@@ -40,6 +40,7 @@ class File
     virtual ErrorOr<isize> Truncate(off_t size);
 
     virtual bool           IsCharDevice() const { return false; }
+    virtual bool           IsBlockDevice() const { return false; }
     virtual bool           IsFifo() const { return false; }
     virtual bool           IsDirectory() const { return false; }
     virtual bool           IsRegular() const { return false; }

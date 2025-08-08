@@ -6,14 +6,14 @@
  */
 #pragma once
 
-#include <Drivers/Core/Device.hpp>
+#include <Drivers/Core/BlockDevice.hpp>
 #include <Drivers/Storage/PartitionTable.hpp>
 
-class StorageDevice : public Device
+class StorageDevice : public BlockDevice
 {
   public:
-    StorageDevice(u16 major, u16 minor)
-        : Device(major, minor)
+    StorageDevice(StringView name, DeviceID id)
+        : BlockDevice(name, id)
     {
     }
 

@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Drivers/Core/DeviceManager.hpp>
 #include <Drivers/Storage/NVMe/NVMeController.hpp>
 #include <Drivers/Storage/NVMe/NVMeQueue.hpp>
 #include <Memory/PMM.hpp>
@@ -21,10 +22,9 @@ namespace NVMe
 
     Controller::Controller(const PCI::DeviceAddress& address)
         : PCI::Device(address)
-        , ::Device(241, s_ControllerCount.Load())
+        , CharacterDevice(MakeDevice(241, s_ControllerCount.Load()))
         , m_Index(s_ControllerCount++)
     {
-        if (m_Index == 0) DevTmpFs::RegisterDevice(this);
         m_Name += StringUtils::ToString(m_Index);
 
         LogTrace("NVMe{}: Initializing...", m_Index);
@@ -34,8 +34,7 @@ namespace NVMe
             return;
         }
 
-        StringView path = fmt::format("/dev/{}", Name()).data();
-        VFS::CreateNode(path, 0666 | S_IFCHR, ID());
+        DeviceManager::RegisterCharDevice(this);
     }
 
     bool Controller::Initialize()
@@ -235,7 +234,10 @@ namespace NVMe
     }
     bool Controller::AddNameSpace(u32 namespaceID)
     {
-        NameSpace* nameSpace = new NameSpace(namespaceID, this);
+        auto nameFormatted = fmt::format("{}n{}", Name(), namespaceID);
+        auto name = StringView(nameFormatted.data(), nameFormatted.size());
+
+        NameSpace* nameSpace = new NameSpace(name, namespaceID, this);
         if (!nameSpace) return false;
         if (!nameSpace->Initialize())
         {

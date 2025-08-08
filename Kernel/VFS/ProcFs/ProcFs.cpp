@@ -7,6 +7,7 @@
 #include <API/System.hpp>
 #include <Boot/CommandLine.hpp>
 
+#include <Drivers/Core/BlockDevice.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
 #include <Prism/String/StringUtils.hpp>
 
@@ -52,7 +53,8 @@ struct ProcFsModulesProperty : public ProcFsProperty
         Buffer.Clear();
         Buffer.Resize(PMM::PAGE_SIZE);
 
-        for (Ref<Module> module : System::Modules()) Write("{}\n", module->Name);
+        for (Ref<Module> module : System::Modules())
+            Write("{}\n", module->Name);
     }
 };
 struct ProcFsMountsProperty : public ProcFsProperty
@@ -82,16 +84,21 @@ struct ProcFsPartitionsProperty : public ProcFsProperty
         Buffer.Resize(PMM::PAGE_SIZE);
 
         Write("major\tminor\t#blocks\tname\n");
-        for (auto& partition : DeviceManager::GetBlockDevices())
-        {
-            u16         major      = partition->ID();
-            u16         minor      = partition->ID();
-            const stat& stats      = partition->Stats();
-            u64         blockCount = stats.st_blocks;
-            StringView  name       = partition->Name();
+        DeviceManager::BlockDeviceIterator iterator;
+        iterator.BindLambda(
+            [this](auto device) -> bool
+            {
+                u16         major      = device->ID();
+                u16         minor      = device->ID();
+                const stat& stats      = device->Stats();
+                u64         blockCount = stats.st_blocks;
+                StringView  name       = device->Name();
 
-            Write("{}\t{}\t{}\t{}\n", major, minor, blockCount, name);
-        }
+                Write("{}\t{}\t{}\t{}\n", major, minor, blockCount, name);
+                return true;
+            });
+
+        DeviceManager::IterateBlockDevices(iterator);
     }
 };
 struct ProcFsUptimeProperty : public ProcFsProperty
@@ -208,7 +215,7 @@ void ProcFs::RemoveProcess(pid_t pid)
     s_Processes.Erase(pid);
 }
 ErrorOr<::Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
-                                           const void* data)
+                                             const void* data)
 {
     ScopedLock guard(m_Lock);
     if (m_Root) VFS::RecursiveDelete(m_Root);

@@ -13,10 +13,13 @@
 class CharacterDevice : public Device
 {
   public:
-    CharacterDevice(StringView name, dev_t id);
+    CharacterDevice(StringView name, DeviceID id);
+    CharacterDevice(StringView name, DeviceMajor major, DeviceMinor minor);
+    CharacterDevice(DeviceID id);
 
-    inline constexpr dev_t           ID() const { return m_ID; }
-    CharacterDevice*                 Next() const;
+    inline constexpr DeviceID        ID() const { return m_ID; }
+
+    virtual bool                     IsCharDevice() const { return true; }
 
     static ErrorOr<CharacterDevice*> Allocate(StringView  name,
                                               DeviceMajor major,
@@ -24,21 +27,9 @@ class CharacterDevice : public Device
                                               usize       count     = 1);
 
     static ErrorOr<void>             RegisterBaseMemoryDevices();
-    static ErrorOr<void>    Register(dev_t id, CharacterDevice* device);
-    static CharacterDevice* Lookup(dev_t deviceID);
-
-    static CharacterDevice* Head();
-    static CharacterDevice* Tail();
+    static ErrorOr<void>    Register(DeviceID id, CharacterDevice* device);
+    static CharacterDevice* Lookup(DeviceID deviceID);
 
     using CharacterDeviceIterator = Delegate<bool(CharacterDevice* cdev)>;
     static void Iterate(CharacterDeviceIterator iterator);
-
-    using HookType = IntrusiveRefListHook<CharacterDevice, CharacterDevice*>;
-    using List     = IntrusiveRefList<CharacterDevice, HookType>;
-
-  private:
-    friend class IntrusiveRefList<CharacterDevice, HookType>;
-    friend struct IntrusiveRefListHook<CharacterDevice, CharacterDevice*>;
-
-    HookType Hook;
 };

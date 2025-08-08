@@ -6,13 +6,14 @@
  */
 #pragma once
 
+#include <API/DeviceIDs.hpp>
 #include <Drivers/Core/CharacterDevice.hpp>
 
 class NullDevice final : public CharacterDevice
 {
   public:
     NullDevice()
-        : CharacterDevice("null", MakeDevice(1, 0))
+        : CharacterDevice("null", API::DeviceMajor::MEMORY, 0)
     {
     }
     virtual StringView     Name() const noexcept override { return "null"; }

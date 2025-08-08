@@ -52,6 +52,11 @@ class Device : public File
         , m_ID(id)
     {
     }
+    Device(StringView name, DeviceMajor major, DeviceMinor minor)
+        : m_Name(name)
+        , m_ID(MakeDevice(major, minor))
+    {
+    }
     Device(DeviceMajor major, DeviceMinor minor)
         : m_ID(MakeDevice(major, minor))
     {
@@ -62,7 +67,7 @@ class Device : public File
     }
 
     constexpr inline dev_t ID() const noexcept { return m_ID; }
-    virtual StringView     Name() const noexcept = 0;
+    virtual StringView     Name() const noexcept { return m_Name; };
 
     virtual const stat&    Stats() { return m_Stats; }
 
