@@ -65,14 +65,12 @@ namespace NVMe
     class NameSpace : public StorageDevice
     {
       public:
-        NameSpace(u32 id, class Controller* controller);
+        NameSpace(StringView name, u32 id, class Controller* controller);
         virtual ~NameSpace() = default;
 
-        bool               Initialize();
+        bool         Initialize();
 
-        inline usize       GetMaxPhysRPgs() const { return m_MaxPhysRPages; }
-
-        virtual StringView Name() const noexcept override;
+        inline usize GetMaxPhysRPgs() const { return m_MaxPhysRPages; }
 
         virtual ErrorOr<isize> Read(void* dest, off_t offset,
                                     usize bytes) override;

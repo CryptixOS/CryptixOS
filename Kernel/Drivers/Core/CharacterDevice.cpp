@@ -11,14 +11,21 @@
 #include <Drivers/Core/CharacterDevice.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
 
-CharacterDevice::CharacterDevice(StringView name, dev_t id)
+CharacterDevice::CharacterDevice(StringView name, DeviceID id)
     : Device(name, id)
 {
 }
+CharacterDevice::CharacterDevice(StringView name, DeviceMajor major,
+                                 DeviceMinor minor)
+    : Device(name, major, minor)
+{
+}
+CharacterDevice::CharacterDevice(DeviceID id)
+    : Device(id)
+{
+}
 
-CharacterDevice* CharacterDevice::Next() const { return Hook.Next; }
-
-ErrorOr<void>    CharacterDevice::RegisterBaseMemoryDevices()
+ErrorOr<void> CharacterDevice::RegisterBaseMemoryDevices()
 {
     CharacterDevice* devices[] = {
         new NullDevice,
@@ -26,6 +33,7 @@ ErrorOr<void>    CharacterDevice::RegisterBaseMemoryDevices()
         new FullDevice,
     };
 
+    IgnoreUnused(AllocateMajor(1));
     for (auto device : devices)
     {
         if (!device) return Error(ENOMEM);
@@ -40,22 +48,13 @@ ErrorOr<void>    CharacterDevice::RegisterBaseMemoryDevices()
 
     return {};
 }
-ErrorOr<void> CharacterDevice::Register(dev_t id, CharacterDevice* device)
+ErrorOr<void> CharacterDevice::Register(DeviceID id, CharacterDevice* device)
 {
     return DeviceManager::RegisterCharDevice(device);
 }
-CharacterDevice* CharacterDevice::Lookup(dev_t deviceID)
+CharacterDevice* CharacterDevice::Lookup(DeviceID deviceID)
 {
     return DeviceManager::LookupCharDevice(deviceID);
-}
-
-CharacterDevice* CharacterDevice::Head()
-{
-    return DeviceManager::CharDevicesHead();
-}
-CharacterDevice* CharacterDevice::Tail()
-{
-    return DeviceManager::CharDevicesHead();
 }
 
 void CharacterDevice::Iterate(CharacterDeviceIterator iterator)

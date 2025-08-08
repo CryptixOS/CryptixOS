@@ -497,6 +497,7 @@ i32 Process::Exit(i32 code)
     LogDebug("Process: Exiting {} with exit code => {}", m_Pid, code);
     AssertMsg(this != Scheduler::GetKernelProcess(),
               "Process::Exit(): The process with pid 1 tries to exit!");
+    Assert(m_Pid != 1  && "Process: init process tries to exit");
     CPU::SetInterruptFlag(false);
     ScopedLock guard(m_Lock);
 

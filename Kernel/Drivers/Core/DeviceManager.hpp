@@ -8,31 +8,24 @@
 
 #include <API/Posix/sys/stat.h>
 
-#include <Prism/Core/Error.hpp>
 #include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/Error.hpp>
 #include <Prism/Utility/Delegate.hpp>
 
 class CharacterDevice;
+class BlockDevice;
 class Device;
 namespace DeviceManager
 {
-    using DeviceIterator     = Delegate<bool(Device* device)>;
-    using CharDeviceIterator = Delegate<bool(CharacterDevice* cdev)>;
+    using CharDeviceIterator  = Delegate<bool(CharacterDevice* cdev)>;
+    using BlockDeviceIterator = Delegate<bool(BlockDevice* device)>;
 
-    ErrorOr<void>          RegisterCharDevice(CharacterDevice* device);
-    void                   RegisterBlockDevice(Device* device);
+    ErrorOr<void>    RegisterCharDevice(CharacterDevice* device);
+    ErrorOr<void>    RegisterBlockDevice(BlockDevice* device);
 
-    Device*                DevicesHead();
-    Device*                DevicesTail();
+    CharacterDevice* LookupCharDevice(dev_t id);
+    BlockDevice*     LookupBlockDevice(dev_t id);
 
-    CharacterDevice*       CharDevicesHead();
-    CharacterDevice*       CharDevicesTail();
-
-    Device*                LookupDevice(dev_t id);
-    CharacterDevice*       LookupCharDevice(dev_t id);
-
-    void                   IterateDevices(DeviceIterator iterator);
-    void                   IterateCharDevices(CharDeviceIterator iterator);
-
-    const Vector<Device*>& GetBlockDevices();
+    void             IterateCharDevices(CharDeviceIterator iterator);
+    void             IterateBlockDevices(BlockDeviceIterator iterator);
 }; // namespace DeviceManager

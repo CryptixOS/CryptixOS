@@ -81,7 +81,7 @@ ErrorOr<Ref<DirectoryEntry>> SynthFsINode::CreateNode(Ref<DirectoryEntry> entry,
         TryOrRet(m_Filesystem->AllocateNode(entry->Name(), mode)));
 
     inode->m_Parent = this;
-    if (S_ISREG(mode))
+    if (inode->IsRegular())
     {
         inode->m_Metadata.Size = inode->GetDefaultSize();
         inode->m_Buffer.Resize(GetDefaultSize());

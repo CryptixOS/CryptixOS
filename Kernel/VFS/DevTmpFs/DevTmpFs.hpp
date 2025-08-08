@@ -26,18 +26,14 @@ class DevTmpFs : public Filesystem
     virtual bool Populate(DirectoryEntry* dentry) override { return true; }
     virtual ErrorOr<void> Stats(statfs& stats) override;
 
-    static bool           RegisterDevice(Device* device);
-    static Device*        Lookup(dev_t id);
-
   private:
-    usize                               m_MaxBlockCount  = 0;
-    Atomic<usize>                       m_UsedBlockCount = 0;
-    usize                               m_MaxINodeCount  = 0;
-    Atomic<usize>                       m_FreeINodeCount = PMM::PAGE_SIZE << 2;
-    usize                               m_MaxSize        = 0;
+    usize         m_MaxBlockCount  = 0;
+    Atomic<usize> m_UsedBlockCount = 0;
+    usize         m_MaxINodeCount  = 0;
+    Atomic<usize> m_FreeINodeCount = PMM::PAGE_SIZE << 2;
+    usize         m_MaxSize        = 0;
 
-    usize                               m_Size           = 0;
+    usize         m_Size           = 0;
 
-    static UnorderedMap<dev_t, Device*> s_Devices;
     friend class DevTmpFsINode;
 };

@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <Drivers/Core/CharacterDevice.hpp>
 #include <Drivers/PCI/Device.hpp>
 #include <Drivers/Storage/NVMe/NVMeNameSpace.hpp>
 #include <Drivers/Storage/NVMe/NVMeQueue.hpp>
@@ -156,7 +157,7 @@ namespace NVMe
         u64                     AdminCompletionQueue;
     };
 
-    class Controller : public PCI::Device, public Device
+    class Controller : public PCI::Device, public CharacterDevice
     {
       public:
         explicit Controller(const PCI::DeviceAddress& address);
@@ -205,22 +206,22 @@ namespace NVMe
         String m_Name                                    = "nvme"_s;
         usize  m_Index                                   = 0;
         ControllerRegister volatile* volatile m_Register = nullptr;
-        Pointer                             m_CrAddress;
+        Pointer                       m_CrAddress;
 
-        u64                                 m_QueueSlots     = 0;
-        u64                                 m_DoorbellStride = 0;
+        u64                           m_QueueSlots     = 0;
+        u64                           m_DoorbellStride = 0;
 
-        Spinlock                            m_Lock;
-        class Queue*                        m_AdminQueue    = nullptr;
-        usize                               m_MaxTransShift = 0;
+        Spinlock                      m_Lock;
+        class Queue*                  m_AdminQueue    = nullptr;
+        usize                         m_MaxTransShift = 0;
         UnorderedMap<u32, NameSpace*> m_NameSpaces;
 
-        static Atomic<usize>                s_ControllerCount;
+        static Atomic<usize>          s_ControllerCount;
 
-        i32                                 Identify(ControllerInfo* info);
-        bool  DetectNameSpaces(u32 namespaceCount);
+        i32                           Identify(ControllerInfo* info);
+        bool                          DetectNameSpaces(u32 namespaceCount);
 
-        isize SetQueueCount(i32 count);
-        bool  AddNameSpace(u32 id);
+        isize                         SetQueueCount(i32 count);
+        bool                          AddNameSpace(u32 id);
     };
 }; // namespace NVMe

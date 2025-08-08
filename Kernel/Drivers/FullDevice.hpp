@@ -6,13 +6,14 @@
  */
 #pragma once
 
+#include <API/DeviceIDs.hpp>
 #include <Drivers/Core/CharacterDevice.hpp>
 
 class FullDevice final : public CharacterDevice
 {
   public:
     FullDevice()
-        : CharacterDevice("full", MakeDevice(1, 7))
+        : CharacterDevice("full", API::DeviceMajor::MEMORY, 7)
     {
     }
 

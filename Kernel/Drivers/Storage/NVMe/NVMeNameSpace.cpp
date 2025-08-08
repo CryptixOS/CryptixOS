@@ -20,8 +20,8 @@
 
 namespace NVMe
 {
-    NameSpace::NameSpace(u32 id, Controller* controller)
-        : StorageDevice(259, 0)
+    NameSpace::NameSpace(StringView name, u32 id, Controller* controller)
+        : StorageDevice(name, MakeDevice(259, 0))
         , m_ID(id)
         , m_Controller(controller)
     {
@@ -46,48 +46,25 @@ namespace NVMe
         m_Stats.st_size    = info->TotalBlockCount * m_LbaSize;
         m_Stats.st_blocks  = info->TotalBlockCount;
         m_Stats.st_blksize = m_LbaSize;
-        m_Stats.st_rdev    = 0;
+        m_Stats.st_rdev    = ID();
         m_Stats.st_mode    = 0666 | S_IFBLK;
 
-        DevTmpFs::RegisterDevice(this);
-
-        StringView path
-            = fmt::format("/dev/{}n{}", m_Controller->Name(), m_ID).data();
-        LogTrace("NVMe: Creating device at '{}'", path);
-        VFS::CreateNode(path, m_Stats.st_mode, ID());
         DeviceManager::RegisterBlockDevice(this);
-        // TODO(v1tr10l7): enumerate partitions
+        StringView path = fmt::format("/dev/{}", Name()).data();
+        LogTrace("NVMe: Creating namespace node at `{}`", path);
 
         m_PartitionTable.Load(*this);
-
-        for (usize i = 0; i < m_IoQueue->GetDepth(); i++)
-        {
-            break;
-            auto handler = InterruptManager::AllocateHandler();
-            handler->Reserve();
-            /*
-            if (!MsiXSet(CPU::GetCurrent()->LapicID,
-                         handler->GetInterruptVector(), -1))
-            {
-                if (i == 0)
-                    LogError(
-                        "Could not install any irq handlers for io queues");
-                break;
-            }*/
-        }
-
         usize i = 1;
         for (const auto& entry : m_PartitionTable)
         {
-            StorageDevicePartition* partition = new StorageDevicePartition(
-                *this, entry.FirstBlock, entry.LastBlock, 292, i);
-            DevTmpFs::RegisterDevice(partition);
-            DeviceManager::RegisterBlockDevice(partition);
+            StringView name = fmt::format("{}p{}", Name(), i).data();
 
-            StringView partitionPath
-                = fmt::format("/dev/{}n{}p{}", m_Controller->Name(), m_ID, i)
-                      .data();
-            VFS::CreateNode(partitionPath, m_Stats.st_mode, partition->ID());
+            StorageDevicePartition* partition = new StorageDevicePartition(
+                name, *this, entry.FirstBlock, entry.LastBlock, 292, i);
+
+            DeviceManager::RegisterBlockDevice(partition);
+            LogTrace("NVMe: Addining a device partition at `{}`",
+                     fmt::format("/dev/{}", name.Raw()).data());
 
             ++i;
         }
@@ -110,7 +87,7 @@ namespace NVMe
             if (chunk > m_CacheBlockSize - off) chunk = m_CacheBlockSize - off;
 
             Memory::Copy(reinterpret_cast<u8*>(dest) + progress,
-                        &m_Cache[slot].Cache[off], chunk);
+                         &m_Cache[slot].Cache[off], chunk);
             progress += chunk;
         }
 
@@ -158,12 +135,6 @@ namespace NVMe
                                     isize offset)
     {
         return NameSpace::Write(in.Raw(), offset, count);
-    }
-
-    StringView NameSpace::Name() const noexcept
-    {
-        auto name = fmt::format("{}n{}", m_Controller->Name(), m_ID);
-        return StringView(name.data(), name.size());
     }
 
     bool NameSpace::Identify(NameSpaceInfo* nsid)
@@ -238,7 +209,7 @@ namespace NVMe
         else cmd.Prp1 = Pointer(dest).FromHigherHalf<u64>();
 
         u16 status = m_IoQueue->AwaitSubmit(&cmd);
-        AssertFmt(!status, "nvme: failed to read/write with status {:#x}\n",
+        AssertFmt(!status, "NVMe: Failed to read/write with status {:#x}\n",
                   status);
         return 0;
     }
