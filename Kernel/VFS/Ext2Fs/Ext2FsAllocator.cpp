@@ -55,7 +55,7 @@ usize Ext2FsAllocator::AllocateBlock(Ext2FsINodeMeta& meta, u32 inode)
     m_Filesystem->ReadBlockGroupDescriptor(&blockGroup, blockGroupIndex);
     Bitmap blockBitmap;
     blockBitmap.Allocate(m_BlockSize * 8);
-    std::memset(blockBitmap.Raw(), 0xff, m_BlockSize);
+    Memory::Fill(blockBitmap.Raw(), 0xff, m_BlockSize);
 
     m_Device->Read(blockBitmap.Raw(),
                    blockGroup.BlockUsageBitmapAddress * m_BlockSize,

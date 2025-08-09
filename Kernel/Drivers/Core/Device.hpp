@@ -61,40 +61,17 @@ class Device : public File
         : m_ID(MakeDevice(major, minor))
     {
     }
-    Device(DeviceMajor major)
-        : Device(major, AllocateMinor())
-    {
-    }
 
     constexpr inline dev_t ID() const noexcept { return m_ID; }
     virtual StringView     Name() const noexcept { return m_Name; };
 
     virtual const stat&    Stats() { return m_Stats; }
 
-    virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
-                                isize offset = -1)
-    {
-        return Error(ENOSYS);
-    }
-    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes)
-    {
-        return Error(ENOSYS);
-    };
-    virtual ErrorOr<isize> Write(const void* src, off_t offset, usize bytes)
-    {
-        return Error(ENOSYS);
-    }
-    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
-                                 isize offset = -1)
-    {
-        return Error(ENOSYS);
-    }
+    virtual i32            IoCtl(usize request, uintptr_t argp) { return -1; };
 
-    virtual i32 IoCtl(usize request, uintptr_t argp) { return -1; };
+    static void            Initialize();
 
-    static void Initialize();
-
-    Device*     Next() const { return Hook.Next; }
+    Device*                Next() const { return Hook.Next; }
 
     using HookType = IntrusiveRefListHook<Device, Device*>;
     using List     = IntrusiveRefList<Device, HookType>;
@@ -104,26 +81,9 @@ class Device : public File
     dev_t                        m_ID;
     stat                         m_Stats;
 
-    static Optional<DeviceMajor> s_LeastMajor;
-    static Bitmap                s_AllocatedMajors;
-
-    static Optional<DeviceMajor> AllocateMajor(usize hint = 0);
-    static void                  FreeMajor(DeviceMajor major);
-
   private:
     friend class IntrusiveRefList<Device, HookType>;
     friend struct IntrusiveRefListHook<Device, Device*>;
 
-    HookType           Hook;
-
-    static DeviceMinor AllocateMinor()
-    {
-        // TODO(v1tr10l7): Allocate minor numbers per major
-        static Atomic<DeviceMinor> s_Base = 1000;
-
-        return s_Base++;
-    }
-
-    static Optional<DeviceMajor> FindFreeMajor(isize start, isize end);
-    static Optional<DeviceMajor> FindFreeMajor(DeviceMajor hint);
+    HookType Hook;
 };

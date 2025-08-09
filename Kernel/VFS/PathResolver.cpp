@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <VFS/MountPoint.hpp>
 #include <VFS/PathResolver.hpp>
 #include <VFS/VFS.hpp>
 

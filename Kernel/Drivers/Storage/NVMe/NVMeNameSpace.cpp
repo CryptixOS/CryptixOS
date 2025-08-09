@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/DeviceIDs.hpp>
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptHandler.hpp>
 #include <Arch/InterruptManager.hpp>
@@ -21,7 +22,7 @@
 namespace NVMe
 {
     NameSpace::NameSpace(StringView name, u32 id, Controller* controller)
-        : StorageDevice(name, MakeDevice(259, 0))
+        : StorageDevice(name, MakeDevice(API::DeviceMajor::BLOCK_EXTENDED, 0))
         , m_ID(id)
         , m_Controller(controller)
     {
@@ -46,6 +47,7 @@ namespace NVMe
         m_Stats.st_size    = info->TotalBlockCount * m_LbaSize;
         m_Stats.st_blocks  = info->TotalBlockCount;
         m_Stats.st_blksize = m_LbaSize;
+        m_BlockSize        = m_LbaSize;
         m_Stats.st_rdev    = ID();
         m_Stats.st_mode    = 0666 | S_IFBLK;
 
@@ -60,7 +62,8 @@ namespace NVMe
             StringView name = fmt::format("{}p{}", Name(), i).data();
 
             StorageDevicePartition* partition = new StorageDevicePartition(
-                name, *this, entry.FirstBlock, entry.LastBlock, 292, i);
+                name, *this, entry.FirstBlock, entry.LastBlock,
+                API::DeviceMajor::BLOCK_EXTENDED, i);
 
             DeviceManager::RegisterBlockDevice(partition);
             LogTrace("NVMe: Addining a device partition at `{}`",

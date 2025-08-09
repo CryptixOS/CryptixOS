@@ -6,34 +6,9 @@
  */
 #include <Drivers/Core/Device.hpp>
 
-Optional<DeviceMajor> Device::s_LeastMajor = 0;
-Bitmap                Device::s_AllocatedMajors{};
-
-void                  Device::Initialize() { s_AllocatedMajors.Allocate(4096); }
-Optional<DeviceMajor> Device::AllocateMajor(usize hint)
+namespace DeviceManager
 {
-    Optional<DeviceMajor> allocated = FindFreeMajor(hint);
-    if (!allocated) return NullOpt;
+    void Initialize();
+};
 
-    if (allocated == s_LeastMajor) s_LeastMajor = FindFreeMajor(0);
-    s_AllocatedMajors.SetIndex(allocated.Value(), true);
-    return allocated;
-}
-
-Optional<DeviceMajor> Device::FindFreeMajor(isize start, isize end)
-{
-    Optional<DeviceMajor> allocated = NullOpt;
-
-    for (isize i = start; i < end; i++)
-        if (!s_AllocatedMajors.GetIndex(i)) allocated = i;
-
-    return allocated;
-}
-Optional<DeviceMajor> Device::FindFreeMajor(DeviceMajor hint)
-{
-    usize                 last  = s_AllocatedMajors.GetSize();
-    Optional<DeviceMajor> major = FindFreeMajor(hint, last);
-    if (!major) major = FindFreeMajor(0, hint);
-
-    return major;
-}
+void Device::Initialize() { DeviceManager::Initialize(); }

@@ -11,6 +11,10 @@
 #include <Drivers/Core/CharacterDevice.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
 
+#include <Library/Locking/SpinlockProtected.hpp>
+
+static SpinlockProtected<Array<bool, 256>> s_AllocatedMajors{};
+
 CharacterDevice::CharacterDevice(StringView name, DeviceID id)
     : Device(name, id)
 {
@@ -18,10 +22,6 @@ CharacterDevice::CharacterDevice(StringView name, DeviceID id)
 CharacterDevice::CharacterDevice(StringView name, DeviceMajor major,
                                  DeviceMinor minor)
     : Device(name, major, minor)
-{
-}
-CharacterDevice::CharacterDevice(DeviceID id)
-    : Device(id)
 {
 }
 
@@ -33,7 +33,7 @@ ErrorOr<void> CharacterDevice::RegisterBaseMemoryDevices()
         new FullDevice,
     };
 
-    IgnoreUnused(AllocateMajor(1));
+    IgnoreUnused(DeviceManager::AllocateCharMajor(API::DeviceMajor::MEMORY));
     for (auto device : devices)
     {
         if (!device) return Error(ENOMEM);

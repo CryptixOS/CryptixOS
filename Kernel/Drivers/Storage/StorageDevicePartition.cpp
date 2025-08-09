@@ -21,4 +21,5 @@ StorageDevicePartition::StorageDevicePartition(StringView     name,
     m_Stats.st_blocks  = m_Stats.st_size / m_Stats.st_blksize;
     m_Stats.st_rdev    = ID();
     m_Stats.st_mode    = 0666 | S_IFBLK;
+    m_BlockSize        = m_Device.BlockSize();
 }

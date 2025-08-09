@@ -9,8 +9,8 @@
 #include <VFS/Ext2Fs/Ext2FsAllocator.hpp>
 #include <VFS/Ext2Fs/Ext2FsStructures.hpp>
 
+#include <VFS/File.hpp>
 #include <VFS/Filesystem.hpp>
-#include <VFS/INode.hpp>
 
 class Ext2FsINode;
 class Ext2Fs : public Filesystem
@@ -49,7 +49,7 @@ class Ext2Fs : public Filesystem
                      usize count);
 
   private:
-    INode*            m_Device                     = nullptr;
+    File*             m_Device                     = nullptr;
     // u64               m_DeviceID;
 
     Ext2FsSuperBlock* m_SuperBlock                 = nullptr;

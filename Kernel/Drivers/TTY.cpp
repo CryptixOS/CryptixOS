@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/DeviceIDs.hpp>
 #include <API/Posix/signal.h>
 #include <API/Posix/sys/ttydefaults.h>
 
@@ -32,7 +33,10 @@ Vector<TTY*> TTY::s_TTYs{};
 TTY*         TTY::s_CurrentTTY = nullptr;
 
 TTY::TTY(StringView name, Terminal* terminal, usize minor)
-    : CharacterDevice("tty", MakeDevice(4, minor))
+    : CharacterDevice(name,
+                      MakeDevice(name == "tty"_sv ? API::DeviceMajor::TTYAUX
+                                                  : API::DeviceMajor::TTY,
+                                 minor))
     , m_Name(name)
     , m_Terminal(terminal)
 {
@@ -330,8 +334,10 @@ void TTY::Initialize()
     AssertPMM_Ready();
 
     auto& terminals = Terminal::EnumerateTerminals();
+    Assert(DeviceManager::AllocateCharMajor(API::DeviceMajor::TTY));
+    Assert(DeviceManager::AllocateCharMajor(API::DeviceMajor::TTYAUX));
 
-    usize minor     = 1;
+    usize minor = 1;
     for (auto& terminal : terminals)
     {
         LogTrace("TTY: Creating device /dev/tty{}...", minor);

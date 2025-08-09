@@ -17,8 +17,8 @@
 class ClockSource : public CharacterDevice
 {
   public:
-    ClockSource(StringView name)
-        : CharacterDevice(name, ID())
+    ClockSource(StringView name, DeviceMajor major, DeviceMinor minor)
+        : CharacterDevice(name, major, minor)
     {
     }
     virtual StringView        Name() const PM_NOEXCEPT = 0;
@@ -33,19 +33,6 @@ class ClockSource : public CharacterDevice
     friend struct IntrusiveRefListHook<ClockSource, ClockSource*>;
 
     using List = IntrusiveRefList<ClockSource, HookType>;
-
-  protected:
-    static DeviceMajor Major()
-    {
-        static DeviceMajor major = AllocateMajor().Value();
-
-        return major;
-    }
-    static DeviceID ID()
-    {
-        static Atomic<DeviceMinor> nextMinor = 0;
-        return MakeDevice(Major(), nextMinor++);
-    }
 
   private:
     HookType Hook;

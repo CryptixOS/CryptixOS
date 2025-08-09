@@ -52,7 +52,18 @@ Process::Process(Process* parent, StringView name,
     , m_CWD(VFS::RootDirectoryEntry())
 
 {
-    m_FdTable.OpenStdioStreams();
+    // OpenAt(AT_FDCWD, "/dev/tty", O_RDWR, 0);
+    // OpenAt(AT_FDCWD, "/dev/tty", O_RDWR, 0);
+    // OpenAt(AT_FDCWD, "/dev/tty", O_RDWR, 0);
+
+    Ref ttyNode
+        = VFS::ResolvePath(VFS::RootDirectoryEntry(), "/dev/tty").Value().Entry;
+
+    auto tty
+        = VFS::Open(VFS::RootDirectoryEntry(), "/dev/tty", O_RDWR, 0).Value();
+    m_FdTable.Insert(tty, 0);
+    m_FdTable.Insert(tty, 1);
+    m_FdTable.Insert(tty, 2);
 }
 
 Process* Process::GetCurrent()
@@ -147,21 +158,21 @@ pid_t Process::SetSid()
     return m_Pid;
 }
 
-ErrorOr<isize> Process::SetReUID(uid_t ruid, uid_t euid)
+ErrorOr<isize> Process::SetReUID(UserID ruid, UserID euid)
 {
     m_Credentials.UserID          = ruid;
     m_Credentials.EffectiveUserID = euid;
 
     return {};
 }
-ErrorOr<isize> Process::SetReGID(gid_t rgid, gid_t egid)
+ErrorOr<isize> Process::SetReGID(GroupID rgid, GroupID egid)
 {
     m_Credentials.GroupID          = rgid;
     m_Credentials.EffectiveGroupID = egid;
 
     return {};
 }
-ErrorOr<isize> Process::SetResUID(uid_t ruid, uid_t euid, uid_t suid)
+ErrorOr<isize> Process::SetResUID(UserID ruid, UserID euid, UserID suid)
 {
     m_Credentials.UserID          = ruid;
     m_Credentials.EffectiveUserID = euid;
@@ -169,7 +180,7 @@ ErrorOr<isize> Process::SetResUID(uid_t ruid, uid_t euid, uid_t suid)
 
     return {};
 }
-ErrorOr<isize> Process::SetResGID(gid_t rgid, gid_t egid, gid_t sgid)
+ErrorOr<isize> Process::SetResGID(GroupID rgid, GroupID egid, GroupID sgid)
 {
     m_Credentials.GroupID          = rgid;
     m_Credentials.EffectiveGroupID = egid;
@@ -292,7 +303,11 @@ Vector<String> SplitArguments(const String& str)
 ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 {
     m_FdTable.Clear();
-    m_FdTable.OpenStdioStreams();
+    auto tty
+        = VFS::Open(VFS::RootDirectoryEntry(), "/dev/tty", O_RDWR, 0).Value();
+    m_FdTable.Insert(tty, 0);
+    m_FdTable.Insert(tty, 1);
+    m_FdTable.Insert(tty, 2);
 
     for (const auto& [virt, region] : m_AddressSpace)
     {
@@ -497,7 +512,7 @@ i32 Process::Exit(i32 code)
     LogDebug("Process: Exiting {} with exit code => {}", m_Pid, code);
     AssertMsg(this != Scheduler::GetKernelProcess(),
               "Process::Exit(): The process with pid 1 tries to exit!");
-    Assert(m_Pid != 1  && "Process: init process tries to exit");
+    Assert(m_Pid != 1 && "Process: init process tries to exit");
     CPU::SetInterruptFlag(false);
     ScopedLock guard(m_Lock);
 
