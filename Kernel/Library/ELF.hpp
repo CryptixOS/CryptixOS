@@ -36,6 +36,7 @@ namespace ELF
 
         Pointer       Raw() const { return m_Image.Raw(); }
         inline const struct Header& Header() const { return m_Header; }
+        inline ObjectType           Type() const { return m_Header.Type; }
 
         usize                       ProgramHeaderCount();
         struct ProgramHeader*       ProgramHeader(usize index);

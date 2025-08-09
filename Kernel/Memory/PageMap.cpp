@@ -97,6 +97,12 @@ bool PageMap::Remap(Pointer virtOld, Pointer virtNew, PageAttributes flags)
 
     return Map(virtNew, phys, flags);
 }
+bool PageMap::Protect(Pointer virt, PageAttributes flags)
+{
+    ScopedLock guard(m_Lock);
+    return InternalProtect(virt, flags);
+}
+
 bool PageMap::MapRange(Pointer virt, Pointer phys, usize size,
                        PageAttributes flags)
 {
@@ -125,6 +131,15 @@ bool PageMap::UnmapRange(Pointer virt, usize size, PageAttributes flags)
     usize pageSize = Arch::VMM::GetPageSize(flags);
     for (usize i = 0; i < size; i += pageSize)
         if (!Unmap(virt.Offset(i), flags)) return false;
+
+    return true;
+}
+
+bool PageMap::ProtectRange(Pointer virt, usize size, PageAttributes flags)
+{
+    usize pageSize = Arch::VMM::GetPageSize(flags);
+    for (usize i = 0; i < size; i += pageSize)
+        if (!Protect(virt.Offset(i), flags)) return false;
 
     return true;
 }

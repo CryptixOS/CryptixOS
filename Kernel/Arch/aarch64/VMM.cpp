@@ -330,6 +330,17 @@ bool PageMap::InternalUnmap(Pointer virt, PageAttributes flags)
         : "memory");
     return true;
 }
+bool PageMap::InternalProtect(Pointer virt, PageAttributes flags)
+{
+    usize pageSize = Arch::VMM::GetPageSize(flags);
+    auto  entry    = Virt2Pte(m_TopLevel, virt, false, pageSize);
+    if (!entry) return false;
+
+    auto nativeFlags = ToNativeFlags(flags);
+    entry->SetFlags(nativeFlags, true);
+
+    return true;
+}
 
 bool PageMap::SetFlags(Pointer virt, PageAttributes flags)
 {

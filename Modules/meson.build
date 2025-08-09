@@ -15,13 +15,16 @@ if arch == 'aarch64'
     '-mcmodel=small',
     '-fno-PIC',
 ]
+else
+  args += '-fpic'
 endif
 
 ld_args = [
   # '-nostdlib',
   # '-static',
   # '-relocatable',
-  '-r',
+  '-znoexecstack',
+  '-shared',
 ]
 
 subdir(arch)

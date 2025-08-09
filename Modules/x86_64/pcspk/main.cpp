@@ -4,6 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/DeviceIDs.hpp>
+
 #include <Arch/CPU.hpp>
 #include <Arch/x86_64/Drivers/PCSpeaker.hpp>
 #include <Arch/x86_64/IO.hpp>
@@ -23,7 +25,7 @@ class PCSpeakerDevice : public CharacterDevice
 {
   public:
     PCSpeakerDevice()
-        : CharacterDevice("pcspk", MakeDevice(AllocateMajor().Value(), 0))
+        : CharacterDevice("pcspk", API::DeviceMajor::MISCELLANEOUS, 254)
     {
     }
 

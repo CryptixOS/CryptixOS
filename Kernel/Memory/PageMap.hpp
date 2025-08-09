@@ -50,6 +50,7 @@ class PageMap
 
     bool             InternalUnmap(Pointer        virt,
                                    PageAttributes flags = static_cast<PageAttributes>(0));
+    bool             InternalProtect(Pointer virt, PageAttributes flags);
 
     ErrorOr<Pointer> MapIoRegion(Pointer phys, usize length,
                                  PageAttributes flags
@@ -72,6 +73,7 @@ class PageMap
     bool        Remap(Pointer virtOld, Pointer virtNew,
                       PageAttributes flags
                       = PageAttributes::eRW | PageAttributes::eWriteBack);
+    bool        Protect(Pointer virt, PageAttributes flags);
 
     bool        MapRange(Pointer virt, Pointer phys, usize size,
                          PageAttributes flags
@@ -81,6 +83,8 @@ class PageMap
                            = PageAttributes::eRW | PageAttributes::eWriteBack);
     bool        UnmapRange(Pointer virt, usize size,
                            PageAttributes flags = static_cast<PageAttributes>(0));
+
+    bool        ProtectRange(Pointer virt, usize size, PageAttributes flags);
 
     bool        MapRegion(const Ref<Region> region,
                           const usize       pageSize = PMM::PAGE_SIZE);

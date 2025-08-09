@@ -346,6 +346,10 @@ static PCI::Driver s_Driver = {
     .Remove = RemoveDevice,
 };
 
-extern "C" CTOS_EXPORT bool ModuleInit() { return PCI::RegisterDriver(s_Driver); }
+extern "C" CTOS_EXPORT bool ModuleInit()
+{
+    LogDebug("e1000");
+    return PCI::RegisterDriver(s_Driver);
+}
 
 MODULE_INIT(e1000e, ModuleInit);

@@ -119,6 +119,41 @@ namespace ELF
 
     ErrorOr<void> Image::ApplyRelocations(SymbolLookup lookup)
     {
+        Pointer highestAddress = 0;
+        for (usize i = 0; i < m_Header.ProgramEntryCount; i++)
+        {
+            auto programHeader = ProgramHeader(i);
+            if (programHeader->Type != HeaderType::eLoad
+                && programHeader->Type != HeaderType::eDynamic)
+                continue;
+
+            u64 top = programHeader->VirtualAddress
+                    + programHeader->SegmentSizeInMemory;
+            top = ((top - 1) / programHeader->Alignment + 1)
+                * programHeader->Alignment;
+            highestAddress = Max(highestAddress.Raw(), top);
+        }
+
+        m_LoadBase = VMM::AllocateSpace(highestAddress);
+        for (usize i = 0; i < highestAddress; i += PMM::PAGE_SIZE)
+        {
+            auto phys    = PMM::AllocatePages(1);
+            auto pageMap = VMM::GetKernelPageMap();
+
+            pageMap->Map(m_LoadBase.Offset(i), phys, PageAttributes::eRWX);
+        }
+        for (usize i = 0; i < ProgramHeaderCount(); ++i)
+        {
+            auto programHeader = ProgramHeader(i);
+            if (programHeader->Type == HeaderType::eLoad
+                || programHeader->Type == HeaderType::eDynamic)
+            {
+                Memory::Copy(m_LoadBase.Offset(programHeader->VirtualAddress),
+                             m_Image.Raw() + programHeader->Offset,
+                             programHeader->SegmentSizeInFile);
+            }
+        }
+
         for (usize i = 0; i < SectionHeaderCount(); ++i)
         {
             auto& relocSection = *SectionHeader(i);
@@ -128,8 +163,8 @@ namespace ELF
             u32 targetIndex = relocSection.Info;
             if (targetIndex >= SectionHeaderCount()) return Error(ENOEXEC);
 
-            auto&       targetSection = *SectionHeader(targetIndex);
-            u8*         targetBase    = m_Image.Raw() + targetSection.Offset;
+            auto& targetSection = *SectionHeader(targetIndex);
+            u8*   targetBase    = m_LoadBase.Offset<u8*>(targetSection.Offset);
 
             // Symbol table and string table
             const auto& symtabSection = *SectionHeader(relocSection.Link);
@@ -159,54 +194,56 @@ namespace ELF
                 const auto& sym     = symbols[symIndex];
                 const char* symName = strtab + sym.Name;
 
-                if (sym.SectionIndex != SHN_UNDEF)
-                {
-                    if (sym.SectionIndex >= SectionHeaderCount())
-                        return Error(ENOEXEC);
-
-                    const auto& defSection = *SectionHeader(sym.SectionIndex);
-                    symAddr                = reinterpret_cast<u64>(
-                        m_Image.Raw() + defSection.Offset + sym.Value);
-                }
-                else
-                {
-                    symAddr = lookup(symName);
-                    if (!symAddr && symName == "_GLOBAL_OFFSET_TABLE_"_sv)
-                    {
-                        if (m_GotSection)
-                        {
-                            auto gotBase
-                                = m_LoadBase.Offset(m_GotSection->Offset);
-                            symAddr = gotBase;
-                        }
-                        else LogError(".got section was not found in the executable");
-                        // return Error(ENOEXEC);
-                    }
-                    else if (!symAddr)
-                        LogError("ELF: Unresolved symbol: {}", symName);
-                }
+                // if (sym.SectionIndex != SHN_UNDEF)
+                // {
+                //     if (sym.SectionIndex >= SectionHeaderCount())
+                //         return Error(ENOEXEC);
+                //
+                //     const auto& defSection =
+                //     *SectionHeader(sym.SectionIndex); symAddr =
+                //     reinterpret_cast<u64>(
+                //         m_Image.Raw() + defSection.Offset + sym.Value);
+                // }
+                // else
+                // {
+                //     symAddr = lookup(symName);
+                //     if (!symAddr && symName ==
+                //     "_GLOBAL_OFFSET_TABLE_"_sv)
+                //     {
+                //         if (m_GotSection)
+                //         {
+                //             auto gotBase
+                //                 =
+                //                 m_LoadBase.Offset(m_GotSection->Offset);
+                //             symAddr = gotBase;
+                //         }
+                //         else
+                //             LogError(
+                //                 ".got section was not found in the
+                //                 executable");
+                //         // return Error(ENOEXEC);
+                //     }
+                //     else if (!symAddr)
+                //         LogError("ELF: Unresolved symbol: {}", symName);
+                // }
 
                 switch (type)
                 {
                     case RelocationType::e64:
+                    case RelocationType::eGlobDat:
+                    case RelocationType::eJumpSlot:
                     {
-                        u64 value                      = symAddr + reloc.Addend;
-                        *reinterpret_cast<u64*>(patch) = value;
-                        break;
-                    }
-                    case RelocationType::ePC32:
-                    {
-                        i32 value
-                            = static_cast<i32>(symAddr + reloc.Addend
-                                               - reinterpret_cast<u64>(patch));
-                        *reinterpret_cast<i32*>(patch) = value;
+                        if (sym.SectionIndex == SHN_UNDEF)
+                            symAddr = lookup(symName);
+                        else symAddr = m_LoadBase.Offset(sym.Value);
+
+                        *reinterpret_cast<u64*>(patch) = symAddr;
                         break;
                     }
                     case RelocationType::eRelative:
                     {
-                        u64 value = reinterpret_cast<u64>(m_Image.Raw()
-                                                          + reloc.Addend);
-                        *reinterpret_cast<u64*>(patch) = value;
+                        symAddr = m_LoadBase.Offset(reloc.Addend);
+                        *reinterpret_cast<u64*>(patch) = symAddr;
                         break;
                     }
                     default:
@@ -214,6 +251,9 @@ namespace ELF
                                  static_cast<u32>(type));
                         return Error(ENOEXEC);
                 }
+
+                if (symName == "ModuleInit"_sv)
+                    m_AuxiliaryVector.EntryPoint = symAddr;
             }
         }
 
@@ -334,9 +374,10 @@ namespace ELF
         ByteStream<Endian::eNative> stream(m_Image.Raw(), m_Image.Size());
 
         stream >> m_Header;
-        if (std::strncmp(reinterpret_cast<char*>(&m_Header.Magic), ELF::MAGIC,
-                         4)
-            != 0)
+        auto signature
+            = StringView(reinterpret_cast<char*>(&m_Header.Magic), 4);
+
+        if (signature != ELF::MAGIC)
         {
             LogError("ELF: Invalid magic");
             return Error(ENOEXEC);
@@ -402,6 +443,18 @@ namespace ELF
 
                 default: break;
             }
+
+            auto aligned = Math::AlignDown(
+                Pointer(m_Image.Raw()).Offset(current->VirtualAddress),
+                PMM::PAGE_SIZE);
+            auto size = Math::AlignUp(
+                current->SegmentSizeInMemory
+                    + Pointer(m_Image.Raw()).Offset(current->VirtualAddress)
+                    - aligned,
+                PMM::PAGE_SIZE);
+
+            VMM::GetKernelPageMap()->ProtectRange(aligned, size,
+                                                  PageAttributes::eRWX);
         }
 
         m_AuxiliaryVector.Type       = AuxiliaryValueType::eInterpreterBase;
