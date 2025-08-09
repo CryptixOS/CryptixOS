@@ -15,6 +15,7 @@
 #include <Memory/VMM.hpp>
 
 #include <Prism/Containers/Array.hpp>
+#include <Prism/String/StringUtils.hpp>
 
 #include <uacpi/context.h>
 #include <uacpi/event.h>
@@ -164,13 +165,15 @@ namespace ACPI
                 Interpreter::ExecuteTable(dsdt);
         }
 
-        uacpi_iteration_decision EnumerateDevice(void*                 ctx,
-                                                 uacpi_namespace_node* node,
-                                                 uacpi_u32 node_depth)
+        uacpi_iteration_decision
+        EnumerateDevice(void* ctx, uacpi_namespace_node* node, uacpi_u32)
         {
-            uacpi_namespace_node_info* info;
-            (void)node_depth;
+            uacpi_object_type nodeType;
+            uacpi_namespace_node_type(node, &nodeType);
+            const char* nodeTypeString = uacpi_object_type_to_string(nodeType);
+            LogDebug("ACPI: Discovered node with type: {}", nodeTypeString);
 
+            uacpi_namespace_node_info* info;
             uacpi_status ret = uacpi_get_namespace_node_info(node, &info);
             if (uacpi_unlikely_error(ret))
             {
@@ -180,6 +183,35 @@ namespace ACPI
                          path, uacpi_status_to_string(ret));
                 uacpi_free_absolute_path(path);
                 return UACPI_ITERATION_DECISION_CONTINUE;
+            }
+
+            const char* path
+                = uacpi_namespace_node_generate_absolute_path(node);
+            LogDebug("ACPI: Namespace Node path => {}", path);
+            uacpi_free_absolute_path(path);
+
+            uacpi_resources* resources = nullptr;
+            uacpi_get_device_resources(node, "_CRS", &resources);
+
+            usize i = 0;
+
+            if (resources)
+            {
+                uacpi_for_each_resource(
+                    resources,
+                    [](void*           userData,
+                       uacpi_resource* resource) -> uacpi_iteration_decision
+                    {
+                        usize& i = *reinterpret_cast<usize*>(userData);
+                        uacpi_resource_type type
+                            = static_cast<uacpi_resource_type>(resource->type);
+                        auto resourceName = StringUtils::ToString(type);
+
+                        LogDebug("ACPI: Resource[{}] => {}", i++, resourceName);
+                        return UACPI_ITERATION_DECISION_CONTINUE;
+                    },
+                    &i);
+                uacpi_free_resources(resources);
             }
 
             const auto powerButtonIDs = ToArray<const char*>({
@@ -203,6 +235,7 @@ namespace ACPI
 
             LogInfo("ACPI: Found device - {}", info->name.text);
             uacpi_free_namespace_node_info(info);
+
             return UACPI_ITERATION_DECISION_CONTINUE;
         }
     } // namespace
