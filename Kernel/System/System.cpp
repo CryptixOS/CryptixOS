@@ -242,8 +242,6 @@ namespace System
 
     ErrorOr<void> LoadModule(PathView path)
     {
-        if (path == "init"_sv) return Error(ENOEXEC);
-
         auto pathRes = TryOrRet(VFS::ResolvePath(nullptr, path));
         auto entry   = pathRes.Entry;
 
@@ -277,26 +275,67 @@ namespace System
 
         module->Image = image;
 
-        ELF::Image::SymbolEntryEnumerator it;
-        it.BindLambda(
-            [&](ELF::Symbol& symbol, StringView name) -> bool
-            {
-                if (name == "ModuleInit")
-                {
-                    LogInfo("System: Found module's init entry point => {:#x}",
-                            symbol.Value);
-                    module->Initialize
-                        = reinterpret_cast<ModuleInitProc>(symbol.Value);
-                }
-
-                return true;
-            });
-
         ELF::Image::SymbolLookup lookup;
         lookup.Bind<LookupKernelSymbol>();
-        status = image->ApplyRelocations(lookup);
-        image->ForEachSymbolEntry(it);
-        module->Initialize = image->EntryPoint();
+        status                              = image->ApplyRelocations(lookup);
+        module->Initialize                  = image->EntryPoint();
+
+        ELF::SectionHeader* modInfoSection  = nullptr;
+
+        usize               shstrndx        = image->Header().SectionNamesIndex;
+        auto                shstrtabSection = image->SectionHeader(shstrndx);
+        const char*         sectionHeaderStringTable
+            = image->Raw().Offset<const char*>(shstrtabSection->Offset);
+        for (usize i = 0; i < image->SectionHeaderCount(); i++)
+        {
+            auto       section     = image->SectionHeader(i);
+            StringView sectionName = sectionHeaderStringTable + section->Name;
+
+            if (sectionName.StartsWith(".modinfo"_sv))
+            {
+                modInfoSection = section;
+                break;
+            }
+        }
+
+        LogTrace("System: Reading module metadata for '{}'", module->Name);
+        if (modInfoSection)
+        {
+            const char* modInfoData
+                = image->Raw().Offset<const char*>(modInfoSection->Offset);
+            usize      modInfoSize = modInfoSection->Size;
+
+            StringView modInfo     = StringView(modInfoData, modInfoSize);
+            usize      pos         = 0;
+            while (pos < modInfoSize)
+            {
+                // Get the next null-terminated entry inside the section
+                usize entryEnd = modInfo.Find('\0', pos);
+                if (entryEnd == StringView::NPos)
+                    break; // no more null terminators
+
+                StringView entry = modInfo.Substr(pos, entryEnd - pos);
+                if (entry.Empty()) break; // reached double-null terminator
+
+                usize equalPos = entry.Find('=');
+                if (equalPos != StringView::NPos)
+                {
+                    StringView key   = entry.Substr(0, equalPos);
+                    StringView value = entry.Substr(equalPos + 1);
+
+                    if (key == "author"_sv)
+                        LogDebug("ModInfo[author] => {}", String(value));
+                    else if (key == "description"_sv)
+                        LogDebug("ModInfo[description] => {}", String(value));
+                    else if (key == "license"_sv)
+                        LogDebug("ModInfo[license] => {}", String(value));
+                    else if (key == "version"_sv)
+                        LogDebug("ModInfo[version] => {}", String(value));
+                }
+
+                pos = entryEnd + 1; // move past the null terminator
+            }
+        }
 
         if (!status)
             LogError("System: Failed to resolve symbols of module `{}`",

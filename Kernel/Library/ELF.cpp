@@ -135,6 +135,9 @@ namespace ELF
         }
 
         m_LoadBase = VMM::AllocateSpace(highestAddress);
+        LogTrace("ELF: Allocated address space => {:#x}-{:#x}",
+                 m_LoadBase.Raw(), highestAddress.Raw());
+
         for (usize i = 0; i < highestAddress; i += PMM::PAGE_SIZE)
         {
             auto phys    = PMM::AllocatePages(1);
@@ -222,39 +225,6 @@ namespace ELF
 
                 const auto& sym     = symbols[symIndex];
                 const char* symName = strtab + sym.Name;
-
-                // if (sym.SectionIndex != SHN_UNDEF)
-                // {
-                //     if (sym.SectionIndex >= SectionHeaderCount())
-                //         return Error(ENOEXEC);
-                //
-                //     const auto& defSection =
-                //     *SectionHeader(sym.SectionIndex); symAddr =
-                //     reinterpret_cast<u64>(
-                //         m_Image.Raw() + defSection.Offset + sym.Value);
-                // }
-                // else
-                // {
-                //     symAddr = lookup(symName);
-                //     if (!symAddr && symName ==
-                //     "_GLOBAL_OFFSET_TABLE_"_sv)
-                //     {
-                //         if (m_GotSection)
-                //         {
-                //             auto gotBase
-                //                 =
-                //                 m_LoadBase.Offset(m_GotSection->Offset);
-                //             symAddr = gotBase;
-                //         }
-                //         else
-                //             LogError(
-                //                 ".got section was not found in the
-                //                 executable");
-                //         // return Error(ENOEXEC);
-                //     }
-                //     else if (!symAddr)
-                //         LogError("ELF: Unresolved symbol: {}", symName);
-                // }
 
                 switch (type)
                 {

@@ -79,11 +79,16 @@ namespace ELF
             return m_AuxiliaryVector.ProgramHeaderEntrySize;
         }
 
-        inline Pointer  InitArray() const { return m_InitArray; }
-        inline Pointer  FiniArray() const { return m_FiniArray; }
+        inline Pointer InitArray() const { return m_InitArray; }
+        inline Pointer FiniArray() const { return m_FiniArray; }
 
-        inline usize    InitArraySize() const { return m_InitArraySize; }
-        inline usize    FiniArraySize() const { return m_FiniArraySize; }
+        inline usize   InitArraySize() const { return m_InitArraySize; }
+        inline usize   FiniArraySize() const { return m_FiniArraySize; }
+
+        inline struct SectionHeader* StringSection() const
+        {
+            return m_StringSection;
+        }
 
         inline PathView InterpreterPath() const { return m_InterpreterPath; }
 

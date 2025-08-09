@@ -63,3 +63,14 @@ struct Module : public RefCounted
     extern "C" CTOS_SECTION(MODULE_SECTION_NAME "." #name,                     \
                             CTOS_FORCE_EMIT) void (*Terminate)()               \
         = exit;
+
+#define CTOS_MODULE_INFO_STRING(name, value)                                   \
+    CTOS_SECTION_FORCE_EMIT(".modinfo")                                        \
+    alignas(0x01) static const char CtUniqueName(modinfo)[]                    \
+        = CtStringify(name) "=" value;
+
+#define CTOS_MODULE_AUTHOR(author_) CTOS_MODULE_INFO_STRING(author, author_)
+#define CTOS_MODULE_DESCRIPTION(description_)                                  \
+    CTOS_MODULE_INFO_STRING(description, description_)
+#define CTOS_MODULE_LICENSE(license_) CTOS_MODULE_INFO_STRING(license, license_)
+#define CTOS_MODULE_VERSION(version_) CTOS_MODULE_INFO_STRING(version, version_)

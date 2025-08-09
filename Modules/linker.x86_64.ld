@@ -14,6 +14,7 @@ PHDRS
     data        PT_LOAD     FLAGS(6);
     dynamic     PT_DYNAMIC  FLAGS(6);
     modules     0x60000001  FLAGS(4);
+    modinfo     0x60000002  FLAGS(4);
 }
 
 SECTIONS
@@ -37,6 +38,10 @@ SECTIONS
     .modules : {
         KEEP(*(.modules))
     } :rodata :modules
+
+    .modinfo : {
+        KEEP(*(.modinfo))
+    } :rodata :modinfo
 
     .init_array : {
         PROVIDE_HIDDEN(__start_init_array = .);
