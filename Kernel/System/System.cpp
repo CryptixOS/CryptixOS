@@ -5,6 +5,8 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Boot/BootModuleInfo.hpp>
+#include <Drivers/PCI/PCI.hpp>
+
 #include <Firmware/ACPI/ACPI.hpp>
 #include <Firmware/ACPI/SRAT.hpp>
 
@@ -64,6 +66,12 @@ namespace System
                 if (name.Empty()) return true;
 
                 s_KernelSymbols[name] = value;
+                if (name.Contains("PCI") && name.Contains("RegisterDriver"))
+                {
+                    LogDebug("Found relevant kernel symbol: `{}` => {:#x}",
+                             name, value);
+                }
+
                 return true;
             });
 
@@ -76,9 +84,9 @@ namespace System
 
     static void MapBootModule(const BootModuleInfo& module)
     {
-        PageMap*     pageMap   = VMM::GetKernelPageMap();
-        Pointer      virtBase  = module.LoadAddress.ToHigherHalf();
-        usize        size      = module.Size;
+        PageMap*     pageMap  = VMM::GetKernelPageMap();
+        Pointer      virtBase = module.LoadAddress.ToHigherHalf();
+        usize        size     = module.Size;
         auto         flags = PageAttributes::eRWX | PageAttributes::eWriteBack;
 
         static usize index = 0;
@@ -240,10 +248,9 @@ namespace System
 
     ErrorOr<void> LoadModule(PathView path)
     {
-        auto maybePathRes = VFS::ResolvePath(nullptr, path);
-        RetOnError(maybePathRes);
+        if (path == "init"_sv) return Error(ENOEXEC);
 
-        auto pathRes = maybePathRes.Value();
+        auto pathRes = TryOrRet(VFS::ResolvePath(nullptr, path));
         auto entry   = pathRes.Entry;
 
         if (!entry) return Error(ENOENT);
@@ -253,7 +260,7 @@ namespace System
     {
         if (!entry) return Error(EFAULT);
 
-        auto module            = new Module;
+        Ref module             = new Module;
 
         module->Name           = entry->Name();
         module->Initialized    = false;
@@ -265,22 +272,21 @@ namespace System
         {
             LogError("System: Failed to load the module located at `{}`",
                      entry->Path());
-            delete module;
             return Error(status.Error());
+        }
+        else if (image->Type() != ELF::ObjectType::eShared)
+        {
+            LogError("System: The module at `{}` is not a shared image",
+                     entry->Path());
+            return Error(ENOEXEC);
         }
 
         module->Image = image;
-#if 0
-        LogTrace("Module: Dumping symbols...");
-        image->DumpSymbols();
-#endif
 
         ELF::Image::SymbolEntryEnumerator it;
         it.BindLambda(
             [&](ELF::Symbol& symbol, StringView name) -> bool
             {
-                // if (symbol.SectionIndex != 0) return true;
-
                 if (name == "ModuleInit")
                 {
                     LogInfo("System: Found module's init entry point => {:#x}",
@@ -300,26 +306,26 @@ namespace System
         lookup.Bind<LookupKernelSymbol>();
         status = image->ApplyRelocations(lookup);
         image->ForEachSymbolEntry(it);
-        module->Initialize = image->EntryPoint().Raw<ModuleInitProc>();
-        LogInfo("System: Found module's init entry point => {:#x}",
-                image->EntryPoint().Raw());
+        module->Initialize = image->EntryPoint();
 
-        // image->ForEachSymbolEntry(it);
-        // status = image->ResolveSymbols(lookup);
         if (!status)
             LogError("System: Failed to resolve symbols of module `{}`",
                      module->Name);
         else
             LogInfo("System: Successfully resolved symbols of module `{}`",
                     module->Name);
-        // if (module->Initialize) module->Initialize();
-        // else
-        //     LogError("System: Module `{}` doesn't have any entry point",
-        //              module->Name);
+        if (module->Initialize)
+        {
+            LogInfo("System: Found `{}` module's init entry point => {:#x}",
+                    module->Name, image->EntryPoint().Raw());
+            module->Initialize();
+        }
+        else
+            LogError("System: Module `{}` doesn't have any entry point",
+                     module->Name);
         //
         // TODO(v1tr10l7): Load the module
 
-        // delete module;
         return Error(ENOSYS);
     }
     ErrorOr<void> LoadModule(Ref<Module> module)

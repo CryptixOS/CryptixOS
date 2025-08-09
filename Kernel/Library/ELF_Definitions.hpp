@@ -8,10 +8,11 @@
 
 #include <Prism/Core/Types.hpp>
 #include <Prism/Memory/Pointer.hpp>
+#include <Prism/String/StringView.hpp>
 
 namespace ELF
 {
-    constexpr const char MAGIC[] = "\177ELF";
+    constexpr StringView MAGIC = "\177ELF"_sv;
     enum class Bitness : u8
     {
         e32Bit = 0b01,
@@ -45,7 +46,7 @@ namespace ELF
         eNuxiCloudAbi       = 0x11,
         eStratusTechOpenVOS = 0x12,
     };
-    enum class ObjectType : u8
+    enum class ObjectType : u16
     {
         eUnknown     = 0x00,
         eRelocatable = 0x01,
@@ -128,7 +129,7 @@ namespace ELF
 
     constexpr usize VERSION = 1;
 
-    struct [[gnu::packed]] Header
+    struct CTOS_PACKED Header
     {
         u32                 Magic;
         enum Bitness        Bitness;
@@ -136,7 +137,7 @@ namespace ELF
         u8                  HeaderVersion;
         ABI                 Abi;
         u64                 Padding;
-        u16                 Type;
+        ObjectType          Type;
         enum InstructionSet InstructionSet;
         u32                 ElfVersion;
         u64                 EntryPoint;
@@ -172,7 +173,7 @@ namespace ELF
         eWriteable  = 2,
         eReadable   = 4,
     };
-    struct [[gnu::packed]] ProgramHeader
+    struct CTOS_PACKED ProgramHeader
     {
         HeaderType        Type;
         SegmentAttributes Attributes;
@@ -184,7 +185,7 @@ namespace ELF
         u64               Alignment;
     };
 
-    struct [[gnu::packed]] SectionHeader
+    struct CTOS_PACKED SectionHeader
     {
         u32       Name;
         u32       Type;
@@ -217,7 +218,7 @@ namespace ELF
         eExtendedSectionIndices = 0x12,
     };
 
-    struct [[gnu::packed]] Symbol
+    struct CTOS_PACKED Symbol
     {
         u32 Name;
         u8  Info;
@@ -252,7 +253,7 @@ namespace ELF
         eTLSDESC_CALL = 20, // TLS call
         eIRELATIVE    = 37, // IFUNC-style relative relocation (PLT)
     };
-    struct [[gnu::packed]] RelocationEntry
+    struct CTOS_PACKED RelocationEntry
     {
         u64 Offset;
         u64 Info;
