@@ -24,14 +24,16 @@ class File
 
     virtual ~File() = default;
 
-    virtual class INode*        INode() const;
+    virtual class INode*   INode() const;
 
-    virtual usize               Size() const;
+    virtual usize          Size() const;
 
-    virtual ErrorOr<isize>      Read(const UserBuffer& out, usize count,
-                                     isize offset = -1);
-    virtual ErrorOr<isize>      Write(const UserBuffer& in, usize count,
-                                      isize offset = -1);
+    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes);
+    virtual ErrorOr<isize> Write(const void* src, off_t offset, usize bytes);
+    virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                isize offset = -1);
+    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                 isize offset = -1);
     virtual ErrorOr<const stat> Stat() const;
     virtual ErrorOr<isize>      Seek(i32 whence, off_t offset)
     {

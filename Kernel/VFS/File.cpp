@@ -15,6 +15,20 @@ File::File(class INode* inode)
 class INode* File::INode() const { return m_INode; }
 usize File::Size() const { return m_INode ? m_INode->Stats().st_size : 0; }
 
+ErrorOr<isize> File::Read(void* dest, off_t offset, usize bytes)
+{
+    ScopedLock guard(m_Lock);
+    if (m_INode->IsDirectory()) return Error(EISDIR);
+
+    return m_INode->Read(dest, offset, bytes);
+}
+ErrorOr<isize> File::Write(const void* src, off_t offset, usize bytes)
+{
+    ScopedLock guard(m_Lock);
+    if (m_INode->IsDirectory()) return Error(EISDIR);
+
+    return m_INode->Write(src, offset, bytes);
+}
 ErrorOr<isize> File::Read(const UserBuffer& out, usize count, isize offset)
 {
     ScopedLock guard(m_Lock);
@@ -38,7 +52,4 @@ ErrorOr<const stat> File::Stat() const
     return m_INode->Stats();
 }
 
-ErrorOr<isize> File::Truncate(off_t size) 
-{
-    return m_INode->Truncate(size);
-}
+ErrorOr<isize> File::Truncate(off_t size) { return m_INode->Truncate(size); }

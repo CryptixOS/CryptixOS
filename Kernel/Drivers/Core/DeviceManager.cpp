@@ -16,6 +16,12 @@ namespace DeviceManager
 {
     namespace
     {
+        Optional<DeviceMajor>                    s_LeastCharMajor = 0;
+        Bitmap                                   s_CharMajors{};
+
+        Optional<DeviceMajor>                    s_LeastBlockMajor = 0;
+        Bitmap                                   s_BlockMajors{};
+
         Spinlock                                 s_DeviceLock;
         Device::List                             s_Devices;
 
@@ -24,6 +30,56 @@ namespace DeviceManager
         Spinlock                                 s_BlockDeviceLock;
         UnorderedMap<DeviceID, BlockDevice*>     s_BlockDevices;
     }; // namespace
+
+    static Optional<DeviceMajor> FindFreeMajor(Bitmap& majors, isize start,
+                                               isize end);
+    static Optional<DeviceMajor> FindFreeMajor(Bitmap&     majors,
+                                               DeviceMajor hint);
+
+    void                         Initialize()
+    {
+        s_CharMajors.Allocate(4096);
+        s_BlockMajors.Allocate(4096);
+    }
+    Optional<DeviceMajor> AllocateCharMajor(usize hint)
+    {
+        Optional<DeviceMajor> allocated = FindFreeMajor(s_CharMajors, hint);
+        if (!allocated) return NullOpt;
+
+        if (allocated == s_LeastCharMajor)
+            s_LeastCharMajor = FindFreeMajor(s_CharMajors, 0);
+        s_CharMajors.SetIndex(allocated.Value(), true);
+        return allocated;
+    }
+    Optional<DeviceMajor> AllocateBlockMajor(usize hint)
+    {
+        Optional<DeviceMajor> allocated = FindFreeMajor(s_BlockMajors, hint);
+        if (!allocated) return NullOpt;
+
+        if (allocated == s_LeastBlockMajor)
+            s_LeastBlockMajor = FindFreeMajor(s_BlockMajors, 0);
+        s_BlockMajors.SetIndex(allocated.Value(), true);
+        return allocated;
+    }
+
+    static Optional<DeviceMajor> FindFreeMajor(Bitmap& majors, isize start,
+                                               isize end)
+    {
+        Optional<DeviceMajor> allocated = NullOpt;
+
+        for (isize i = start; i < end; i++)
+            if (!majors.GetIndex(i)) allocated = i;
+
+        return allocated;
+    }
+    static Optional<DeviceMajor> FindFreeMajor(Bitmap& majors, DeviceMajor hint)
+    {
+        usize                 last  = majors.GetSize();
+        Optional<DeviceMajor> major = FindFreeMajor(majors, hint, last);
+        if (!major) major = FindFreeMajor(majors, 0, hint);
+
+        return major;
+    }
 
     ErrorOr<void> RegisterCharDevice(CharacterDevice* cdev)
     {

@@ -22,7 +22,15 @@ class BlockDevice : public Device
     {
     }
 
-    inline constexpr dev_t ID() const { return m_ID; }
+    inline constexpr dev_t       ID() const { return m_ID; }
+    inline constexpr usize       BlockSize() const { return m_BlockSize; }
 
-    virtual bool           IsBlockDevice() const { return true; }
+    virtual bool                 IsBlockDevice() const { return true; }
+
+    static Optional<DeviceMajor> AllocateMajor(usize hint);
+    static Optional<DeviceMajor> FindFreeMajor(isize start, isize end);
+    static Optional<DeviceMajor> FindFreeMajor(DeviceMajor hint);
+
+  protected:
+    usize m_BlockSize = 0;
 };

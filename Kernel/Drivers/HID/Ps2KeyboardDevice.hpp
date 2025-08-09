@@ -6,7 +6,10 @@
  */
 #pragma once
 
+#include <API/DeviceIDs.hpp>
+
 #include <Drivers/Core/CharacterDevice.hpp>
+#include <Drivers/Core/DeviceManager.hpp>
 #include <Drivers/HID/Ps2Controller.hpp>
 
 #include <Prism/Memory/Scope.hpp>
@@ -55,7 +58,7 @@ class Ps2KeyboardDevice : public RefCounted, public CharacterDevice
 
     Ps2KeyboardDevice(Ps2Controller* controller, PS2_DevicePort port,
                       ScanCodeSet scanCodeSet)
-        : CharacterDevice("atkbd", MakeDevice(AllocateMajor().Value(), 0))
+        : CharacterDevice("atkbd", API::DeviceMajor::MISCELLANEOUS, 0)
         , m_Controller(controller)
         , m_Port(port)
         , m_ScanCodeSet(scanCodeSet)

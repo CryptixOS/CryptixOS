@@ -102,7 +102,7 @@ ErrorOr<isize> FileDescriptor::Read(const UserBuffer& out, usize count,
 
     if (offset < 0) offset = m_Offset;
 
-    isize bytesRead = m_File->Read(out, count, offset).ValueOr(0);
+    isize bytesRead = m_File->Read(out.Raw(), offset, count).ValueOr(0);
     offset += bytesRead;
 
     m_Offset = offset;
@@ -118,7 +118,7 @@ ErrorOr<isize> FileDescriptor::Write(const UserBuffer& in, usize count,
     if (!m_File) return Error(ENOENT);
     if (offset < 0) offset = m_Offset;
 
-    isize bytesWritten = m_File->Write(in, count, offset).ValueOr(0);
+    isize bytesWritten = m_File->Write(in.Raw(), offset, count).ValueOr(0);
     offset += bytesWritten;
 
     m_Offset = offset;

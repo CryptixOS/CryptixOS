@@ -31,10 +31,8 @@ class FramebufferDevice : public CharacterDevice
     virtual i32            IoCtl(usize request, uintptr_t argp) override;
 
   private:
-    Framebuffer        m_Framebuffer;
-
-    static DeviceMajor ReserveMajor();
-
-    fb_var_screeninfo  m_VariableScreenInfo;
-    fb_fix_screeninfo  m_FixedScreenInfo;
+    Framebuffer       m_Framebuffer;
+;
+    fb_var_screeninfo m_VariableScreenInfo;
+    fb_fix_screeninfo m_FixedScreenInfo;
 };

@@ -19,15 +19,15 @@ class Ext2FsAllocator
     usize AllocateBlock(Ext2FsINodeMeta& meta, u32 inode);
 
   private:
-    Ext2Fs*      m_Filesystem      = nullptr;
-    class INode* m_Device          = nullptr;
+    Ext2Fs*     m_Filesystem      = nullptr;
+    class File* m_Device          = nullptr;
 
-    usize        m_BlockSize       = 0;
-    usize        m_BlockCount      = 0;
-    usize        m_BlockGroupCount = 0;
-    usize        m_BlocksPerGroup  = 0;
+    usize       m_BlockSize       = 0;
+    usize       m_BlockCount      = 0;
+    usize       m_BlockGroupCount = 0;
+    usize       m_BlocksPerGroup  = 0;
 
-    usize        LocateFreeGroup(usize blockCount = 1);
-    usize        AllocateINodeInGroup(usize                       blockGroupIndex,
-                                      Ext2FsBlockGroupDescriptor& blockGroup);
+    usize       LocateFreeGroup(usize blockCount = 1);
+    usize       AllocateINodeInGroup(usize                       blockGroupIndex,
+                                     Ext2FsBlockGroupDescriptor& blockGroup);
 };

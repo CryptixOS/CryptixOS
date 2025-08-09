@@ -34,11 +34,19 @@ struct ProcFsProperty
     template <typename... Args>
     void Write(fmt::format_string<Args...> format, Args&&... args)
     {
-        if (Offset >= Buffer.Size()) Offset = 0;
-        auto result
-            = fmt::format_to_n(Buffer.Raw() + Offset, Buffer.Size() - Offset,
-                               format, Forward<Args>(args)...);
-        Offset += result.size;
+        if (Offset < Buffer.Size())
+        {
+            auto result = fmt::format_to_n(Buffer.Raw() + Offset,
+                                           Buffer.Size() - Offset, format,
+                                           Forward<Args>(args)...);
+            if (Offset + result.size < Buffer.Size())
+            {
+                Offset += result.size;
+                return;
+            }
+        }
+
+        Offset = Buffer.Size();
     }
     isize Read(u8* outBuffer, off_t offset, usize count);
 

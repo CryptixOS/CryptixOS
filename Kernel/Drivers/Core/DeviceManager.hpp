@@ -10,7 +10,9 @@
 
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Core/Error.hpp>
+
 #include <Prism/Utility/Delegate.hpp>
+#include <Prism/Utility/Optional.hpp>
 
 class CharacterDevice;
 class BlockDevice;
@@ -19,6 +21,9 @@ namespace DeviceManager
 {
     using CharDeviceIterator  = Delegate<bool(CharacterDevice* cdev)>;
     using BlockDeviceIterator = Delegate<bool(BlockDevice* device)>;
+
+    Optional<u32>    AllocateCharMajor(usize hint);
+    Optional<u32>    AllocateBlockMajor(usize hint);
 
     ErrorOr<void>    RegisterCharDevice(CharacterDevice* device);
     ErrorOr<void>    RegisterBlockDevice(BlockDevice* device);

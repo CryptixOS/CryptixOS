@@ -4,6 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/DeviceIDs.hpp>
+
 #include <Drivers/Core/DeviceManager.hpp>
 #include <Drivers/Storage/NVMe/NVMeController.hpp>
 #include <Drivers/Storage/NVMe/NVMeQueue.hpp>
@@ -22,18 +24,24 @@ namespace NVMe
 
     Controller::Controller(const PCI::DeviceAddress& address)
         : PCI::Device(address)
-        , CharacterDevice(MakeDevice(241, s_ControllerCount.Load()))
+        , CharacterDevice(
+              fmt::format("nvme{}", s_ControllerCount.Load()).data(), 241,
+              s_ControllerCount.Load())
         , m_Index(s_ControllerCount++)
     {
         m_Name += StringUtils::ToString(m_Index);
 
         LogTrace("NVMe{}: Initializing...", m_Index);
+
         if (!Initialize())
         {
             LogError("NVMe{}: Failed to initialize", m_Index);
             return;
         }
 
+        Assert(DeviceManager::AllocateCharMajor(241));
+        Assert(DeviceManager::AllocateBlockMajor(
+            API::DeviceMajor::BLOCK_EXTENDED));
         DeviceManager::RegisterCharDevice(this);
     }
 

@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/DeviceIDs.hpp>
 #include <Arch/x86_64/CPU.hpp>
 #include <Arch/x86_64/Drivers/Time/KVMClock.hpp>
 
@@ -19,7 +20,7 @@ namespace KVM
         return new Clock;
     }
     Clock::Clock()
-        : ClockSource(Name())
+        : ClockSource(Name(), API::DeviceMajor::MISCELLANEOUS, 232)
     {
     }
 

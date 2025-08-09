@@ -4,6 +4,9 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Drivers/Core/BlockDevice.hpp>
+#include <Drivers/Core/DeviceManager.hpp>
+
 #include <Prism/Containers/Bitmap.hpp>
 #include <Time/Time.hpp>
 
@@ -21,7 +24,8 @@ ErrorOr<::Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
                            .Entry;
     if (!sourceEntry || !sourceEntry->INode()) return Error(ENODEV);
 
-    m_Device     = sourceEntry->INode();
+    auto id  = sourceEntry->INode()->DeviceID();
+    m_Device = reinterpret_cast<File*>(DeviceManager::LookupBlockDevice(id));
 
     m_SuperBlock = new Ext2FsSuperBlock;
     ReadSuperBlock();
@@ -66,7 +70,7 @@ ErrorOr<::Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
     ReadINodeEntry(&root->m_Meta, 2);
 
     root->m_Metadata.ID        = 2;
-    root->m_Metadata.DeviceID  = m_Device->Stats().st_rdev;
+    root->m_Metadata.DeviceID  = reinterpret_cast<BlockDevice*>(m_Device)->ID();
     root->m_Metadata.LinkCount = root->m_Meta.HardLinkCount;
     root->m_Metadata.Size      = root->m_Meta.SizeLow
                           | (static_cast<u64>(root->m_Meta.SizeHigh) << 32);
@@ -400,7 +404,8 @@ usize Ext2Fs::AllocateBlock(Ext2FsINodeMeta& meta, u32 inode)
     usize allocatedBlock = m_Allocator.AllocateBlock(meta, inode);
     if (!allocatedBlock) return 0;
 
-    meta.SectorCount += m_BlockSize / m_Device->Stats().st_blksize;
+    meta.SectorCount
+        += m_BlockSize / reinterpret_cast<BlockDevice*>(m_Device)->BlockSize();
     WriteINodeEntry(meta, inode);
 
     --m_SuperBlock->FreeBlockCount;

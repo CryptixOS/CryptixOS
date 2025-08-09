@@ -20,7 +20,8 @@ static FramebufferDevice*  s_PrimaryFramebuffer = nullptr;
 static Atomic<DeviceMinor> s_NextFramebufferID  = 0;
 
 FramebufferDevice::FramebufferDevice(StringView name, Framebuffer& framebuffer)
-    : CharacterDevice(name, MakeDevice(ReserveMajor(), s_NextFramebufferID++))
+    : CharacterDevice(name, MakeDevice(API::DeviceMajor::FRAMEBUFFER,
+                                       s_NextFramebufferID++))
 {
     m_Framebuffer              = framebuffer;
 
@@ -65,6 +66,7 @@ FramebufferDevice::FramebufferDevice(StringView name, Framebuffer& framebuffer)
 
 bool FramebufferDevice::Initialize()
 {
+    Assert(DeviceManager::AllocateCharMajor(API::DeviceMajor::FRAMEBUFFER));
     auto framebuffers = Terminal::Framebuffers();
 
     if (framebuffers.Empty())
@@ -153,12 +155,4 @@ i32 FramebufferDevice::IoCtl(usize request, uintptr_t argp)
 
     errno = ENOSYS;
     return -1;
-}
-
-DeviceMajor FramebufferDevice::ReserveMajor()
-{
-    static DeviceMajor major = []() -> DeviceMajor
-    { return AllocateMajor(API::DeviceMajor::FRAMEBUFFER).Value(); }();
-
-    return major;
 }

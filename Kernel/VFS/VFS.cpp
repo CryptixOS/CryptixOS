@@ -272,10 +272,9 @@ namespace VFS
     ErrorOr<Ref<FileDescriptor>> Open(Ref<DirectoryEntry> parent, PathView path,
                                       isize flags, mode_t mode)
     {
-        auto maybeEntry = OpenDirectoryEntry(parent, path, flags, mode);
-        RetOnError(maybeEntry);
+        auto dentry = TryOrRet(OpenDirectoryEntry(parent, path, flags, mode));
 
-        auto           acc     = flags & O_ACCMODE;
+        auto acc    = flags & O_ACCMODE;
         FileAccessMode accMode = FileAccessMode::eNone;
         switch (acc)
         {
@@ -289,21 +288,19 @@ namespace VFS
         }
         if (flags & O_PATH) accMode = FileAccessMode::eNone;
 
-        auto dentry = maybeEntry.Value();
-        auto inode  = dentry->INode();
-
+        auto inode = dentry->INode();
         if (inode && inode->IsCharDevice())
         {
-            dev_t id     = inode->DeviceID();
-            auto  device = DeviceManager::LookupCharDevice(id);
+            DeviceID id     = inode->DeviceID();
+            auto     device = DeviceManager::LookupCharDevice(id);
             if (device)
             {
                 DeviceMajor major = GetDeviceMajor(id);
                 DeviceMinor minor = GetDeviceMinor(id);
 
                 LogTrace("VFS: Opening device with id: {}.{}", major, minor);
-                // return CreateRef<FileDescriptor>(dentry, device, flags,
-                //                                  accMode);
+                // return CreateRef<FileDescriptor>(
+                //     dentry, reinterpret_cast<File*>(device), flags, accMode);
             }
         }
 

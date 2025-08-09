@@ -15,7 +15,6 @@ class CharacterDevice : public Device
   public:
     CharacterDevice(StringView name, DeviceID id);
     CharacterDevice(StringView name, DeviceMajor major, DeviceMinor minor);
-    CharacterDevice(DeviceID id);
 
     inline constexpr DeviceID        ID() const { return m_ID; }
 

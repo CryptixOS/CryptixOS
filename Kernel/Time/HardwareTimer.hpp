@@ -55,19 +55,7 @@ class HardwareTimer : public CharacterDevice
     using List = IntrusiveRefList<HardwareTimer, HookType>;
 
   protected:
-    OnTickCallback     m_OnTickCallback = nullptr;
+    OnTickCallback m_OnTickCallback = nullptr;
 
-    HookType           Hook;
-
-    static DeviceMajor Major()
-    {
-        static DeviceMajor major = AllocateMajor().Value();
-
-        return major;
-    }
-    static DeviceID ID()
-    {
-        static Atomic<DeviceMinor> nextMinor = 0;
-        return MakeDevice(Major(), nextMinor++);
-    }
+    HookType       Hook;
 };
