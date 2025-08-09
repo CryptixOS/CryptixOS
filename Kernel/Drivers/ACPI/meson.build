@@ -6,5 +6,6 @@
 #*/
 srcs += files(
   'Bus.cpp',
+  'Device.cpp',
 )
 

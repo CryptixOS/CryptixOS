@@ -7,12 +7,34 @@
 #pragma once
 
 #include <Library/Locking/Spinlock.hpp>
-#include <Prism/Core/Types.hpp>
+
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Core/Error.hpp>
 
 namespace ACPI
 {
+    struct DeviceHandle;
     struct Driver
     {
-        String Name;
+        String           Name;
+        Span<StringView> MatchIDs;
+
+        using HookType = IntrusiveRefListHook<Driver, Driver*>;
+
+        friend class IntrusiveRefList<Driver,
+                                      IntrusiveRefListHook<Driver, Driver*>>;
+        friend struct IntrusiveRefListHook<Driver, Driver*>;
+
+        using List
+            = IntrusiveRefList<Driver, IntrusiveRefListHook<Driver, Driver*>>;
+
+        HookType Hook;
+
+        using ProbeFn  = ErrorOr<void> (*)(DeviceHandle* handle, StringView id);
+        using RemoveFn = void (*)(DeviceHandle* handle);
+
+        ProbeFn  Probe;
+        RemoveFn Remove;
     };
 }; // namespace ACPI

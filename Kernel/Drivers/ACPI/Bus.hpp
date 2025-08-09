@@ -8,7 +8,22 @@
 
 #include <Compiler.hpp>
 
-namespace ACPI::Bus
+#include <Drivers/ACPI/Driver.hpp>
+#include <Prism/Core/Error.hpp>
+
+namespace ACPI
 {
-    KERNEL_INIT_SECTION void Initialize();
-}; // namespace ACPI::Bus
+    class Device;
+    namespace Bus
+    {
+        KERNEL_INIT_SECTION void Initialize();
+
+        ErrorOr<void>            RegisterDriver(Driver* driver);
+        void                     UnregisterDriver(Driver* driver);
+
+        ErrorOr<void>            DispatchDriver(Driver* driver);
+
+        ErrorOr<void>            RegisterDevice(ACPI::Device* device);
+        void                     UnregisterDevice(ACPI::Device* device);
+    }; // namespace Bus
+}; // namespace ACPI
