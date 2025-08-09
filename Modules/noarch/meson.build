@@ -4,15 +4,4 @@
 #*
 #* SPDX-License-Identifier: GPL-3
 #*/
-modules = [
-  'net/rtl8139',
-  'net/e1000e',
-]
-
-foreach name : modules
-  external = false
-  module = []
-  subdir(name)
-  all_modules += { name: [external, module] }
-endforeach
-
+subdir('net')

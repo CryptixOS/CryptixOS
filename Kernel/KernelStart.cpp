@@ -15,6 +15,7 @@
 #include <Boot/BootInfo.hpp>
 #include <Boot/CommandLine.hpp>
 
+#include <Drivers/ACPI/Bus.hpp>
 #include <Drivers/Core/CharacterDevice.hpp>
 #include <Drivers/PCI/PCI.hpp>
 #include <Drivers/Serial.hpp>
@@ -136,7 +137,8 @@ static void kernelThread()
     {
         ACPI::Enable();
         ACPI::LoadNameSpace();
-        ACPI::EnumerateDevices();
+        // ACPI::EnumerateDevices();
+        ACPI::Bus::Initialize();
     }
     PCI::InitializeIrqRoutes();
 #endif

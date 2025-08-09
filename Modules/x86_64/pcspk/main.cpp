@@ -88,12 +88,15 @@ namespace
         return {};
     }
 
-    GenericDriver s_PCSpeakerDriver = {
+    static GenericDriver s_PCSpeakerDriver = {
         .Name   = "pcspk",
         .Probe  = Probe,
         .Remove = nullptr,
     };
 
-    bool ModuleInit() { return RegisterGenericDriver(s_PCSpeakerDriver); }
+    extern "C" CTOS_EXPORT bool ModuleInit()
+    {
+        return RegisterGenericDriver(s_PCSpeakerDriver);
+    }
 } // namespace
 MODULE_INIT(pcspk, ModuleInit);

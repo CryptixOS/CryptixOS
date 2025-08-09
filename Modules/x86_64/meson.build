@@ -4,7 +4,7 @@
 #*
 #* SPDX-License-Identifier: GPL-3
 #*/
-modules = [
+x86_64_modules = [
   'ps2',
   'pcspk'
 ]
@@ -19,7 +19,7 @@ args += [
   '-mcmodel=large',
 ]
 
-foreach name : modules
+foreach name : x86_64_modules
   external = false
   module = []
   subdir(name)

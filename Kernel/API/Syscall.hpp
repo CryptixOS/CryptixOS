@@ -211,6 +211,7 @@ namespace Syscall
         eMount            = 165,
         eUMount           = 166,
         eReboot           = 169,
+        eInitModule       = 175,
         eGetTid           = 186,
         eGetDents64       = 217,
         eClockGetTime     = 228,
@@ -230,6 +231,7 @@ namespace Syscall
         eUtimensAt        = 280,
         eDup3             = 292,
         eSyncFs           = 306,
+        eFinitModule      = 313,
         eRenameAt2        = 316,
     };
 

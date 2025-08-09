@@ -45,9 +45,9 @@ foreach name, mod : all_modules
       pic: false,
       build_by_default: true,
   )
-  ext_mods += custom_target(name.split('/')[1] + '.ko',
+  ext_mods += custom_target(name + '.ko',
     input: lib.extract_all_objects(recursive: true),
-    output: name.split('/')[1] + '.ko',
+    output: name + '.ko',
     command: ['ld.lld', ld_args, '-T', meson.current_source_dir() / 'linker.' + arch + '.ld', '@INPUT@', '-o', '@OUTPUT@'],
     build_by_default: true,
     install: false,
