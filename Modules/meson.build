@@ -13,12 +13,11 @@ if arch == 'aarch64'
   args += [
     '-mgeneral-regs-only', '-march=armv8-a+nofp+nosimd',
     '-mcmodel=small',
-    '-fno-PIC',
 ]
-else
-  args += '-fpic'
 endif
 
+
+args += '-fpic'
 ld_args = [
   # '-nostdlib',
   # '-static',
