@@ -452,6 +452,7 @@ void I8042Controller::EnumerateDevices()
 
     auto scancodeSet = Ps2ScanCodeSet::eSet1;
 
+    InputDevice::Initialize();
     Assert(DeviceManager::AllocateCharMajor(API::DeviceMajor::MISCELLANEOUS));
     s_Keyboard
         = CreateRef<Ps2KeyboardDevice>(this, DevicePort::ePort1, scancodeSet);

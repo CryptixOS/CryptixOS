@@ -11,6 +11,7 @@
 #include <Drivers/Core/CharacterDevice.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
 #include <Drivers/HID/Ps2Controller.hpp>
+#include <Drivers/Input/Input.hpp>
 
 #include <Prism/Memory/Scope.hpp>
 #include <Prism/Memory/WeakRef.hpp>
@@ -46,7 +47,7 @@ constexpr inline KeyModifier& operator&=(KeyModifier& lhs, KeyModifier rhs)
     return (lhs = static_cast<KeyModifier>(result));
 }
 
-class Ps2KeyboardDevice : public RefCounted, public CharacterDevice
+class Ps2KeyboardDevice : public RefCounted, public InputDevice
 {
   public:
     enum class ScanCodeSet
@@ -58,7 +59,7 @@ class Ps2KeyboardDevice : public RefCounted, public CharacterDevice
 
     Ps2KeyboardDevice(Ps2Controller* controller, PS2_DevicePort port,
                       ScanCodeSet scanCodeSet)
-        : CharacterDevice("atkbd", API::DeviceMajor::MISCELLANEOUS, 0)
+        : InputDevice("atkbd", InputDevice::AllocateMinor())
         , m_Controller(controller)
         , m_Port(port)
         , m_ScanCodeSet(scanCodeSet)
