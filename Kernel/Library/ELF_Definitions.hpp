@@ -260,6 +260,66 @@ namespace ELF
         i64 Addend;
     };
 
+    enum class DynamicEntryType : i64
+    {
+        eNull             = 0,  // DT_NULL
+        eNeeded           = 1,  // DT_NEEDED
+        ePltRelSize       = 2,  // DT_PLTRELSZ
+        ePltGot           = 3,  // DT_PLTGOT
+        eHash             = 4,  // DT_HASH
+        eStrTab           = 5,  // DT_STRTAB
+        eSymTab           = 6,  // DT_SYMTAB
+        eRela             = 7,  // DT_RELA
+        eRelaSize         = 8,  // DT_RELASZ
+        eRelaEnt          = 9,  // DT_RELAENT
+        eStrSize          = 10, // DT_STRSZ
+        eSymEnt           = 11, // DT_SYMENT
+        eInit             = 12, // DT_INIT
+        eFini             = 13, // DT_FINI
+        eSoName           = 14, // DT_SONAME
+        eRPath            = 15, // DT_RPATH (deprecated)
+        eSymbolic         = 16, // DT_SYMBOLIC
+        eRel              = 17, // DT_REL
+        eRelSize          = 18, // DT_RELSZ
+        eRelEnt           = 19, // DT_RELENT
+        ePltRel           = 20, // DT_PLTREL
+        eDebug            = 21, // DT_DEBUG
+        eTextRel          = 22, // DT_TEXTREL
+        eJmpRel           = 23, // DT_JMPREL
+        eBindNow          = 24, // DT_BIND_NOW
+        eInitArray        = 25, // DT_INIT_ARRAY
+        eFiniArray        = 26, // DT_FINI_ARRAY
+        eInitArraySize    = 27, // DT_INIT_ARRAYSZ
+        eFiniArraySize    = 28, // DT_FINI_ARRAYSZ
+        eRunPath          = 29, // DT_RUNPATH
+        eFlags            = 30, // DT_FLAGS
+        eEncoding         = 32, // DT_ENCODING (unspecified meaning)
+        ePreInitArray     = 32, // DT_PREINIT_ARRAY
+        ePreInitArraySize = 33, // DT_PREINIT_ARRAYSZ
+        eSymTabShIndex    = 34, // DT_SYMTAB_SHNDX
+        eRelr             = 35, // DT_RELR
+        eRelrSize         = 36, // DT_RELRSZ
+        eRelrEnt          = 37, // DT_RELRENT
+
+        // Values in OS-specific range
+        eLoOs             = 0x6000000d, // DT_LOOS
+        eHiOs             = 0x6ffff000, // DT_HIOS
+
+        // Values in Processor-specific range
+        eLoProc           = 0x70000000, // DT_LOPROC
+        eHiProc           = 0x7fffffff  // DT_HIPROC
+    };
+
+    struct CTOS_PACKED DynamicEntry
+    {
+        DynamicEntryType Tag; /* Dynamic entry type */
+        union
+        {
+            u64 Value;   /* Integer value */
+            u64 Address; /* Address value */
+        } Data;
+    };
+
     enum class AuxiliaryValueType
     {
         eNull                   = 0,

@@ -79,6 +79,12 @@ namespace ELF
             return m_AuxiliaryVector.ProgramHeaderEntrySize;
         }
 
+        inline Pointer  InitArray() const { return m_InitArray; }
+        inline Pointer  FiniArray() const { return m_FiniArray; }
+
+        inline usize    InitArraySize() const { return m_InitArraySize; }
+        inline usize    FiniArraySize() const { return m_FiniArraySize; }
+
         inline PathView InterpreterPath() const { return m_InterpreterPath; }
 
       private:
@@ -87,6 +93,11 @@ namespace ELF
 
         struct Header                 m_Header;
         AuxiliaryVector               m_AuxiliaryVector;
+
+        Pointer                       m_InitArray     = nullptr;
+        Pointer                       m_FiniArray     = nullptr;
+        usize                         m_InitArraySize = 0;
+        usize                         m_FiniArraySize = 0;
 
         struct SectionHeader*         m_SymbolSection = nullptr;
         struct SectionHeader*         m_StringSection = nullptr;

@@ -152,6 +152,35 @@ namespace ELF
                              m_Image.Raw() + programHeader->Offset,
                              programHeader->SegmentSizeInFile);
             }
+
+            if (programHeader->Type == HeaderType::eDynamic)
+            {
+                const auto dynamicTable = reinterpret_cast<DynamicEntry*>(
+                    m_Image.Raw() + programHeader->Offset);
+                for (usize j = 0; j < programHeader->SegmentSizeInFile
+                                          / sizeof(DynamicEntry);
+                     j++)
+                {
+                    const auto& entry = dynamicTable[j];
+                    switch (entry.Tag)
+                    {
+                        case DynamicEntryType::eInitArray:
+                            m_InitArray = m_LoadBase.Offset(entry.Data.Address);
+                            break;
+                        case DynamicEntryType::eFiniArray:
+                            m_FiniArray = m_LoadBase.Offset(entry.Data.Address);
+                            break;
+                        case DynamicEntryType::eInitArraySize:
+                            m_InitArraySize = entry.Data.Value;
+                            break;
+                        case DynamicEntryType::eFiniArraySize:
+                            m_FiniArraySize = entry.Data.Value;
+                            break;
+
+                        default: break;
+                    };
+                }
+            }
         }
 
         for (usize i = 0; i < SectionHeaderCount(); ++i)

@@ -66,12 +66,6 @@ namespace System
                 if (name.Empty()) return true;
 
                 s_KernelSymbols[name] = value;
-                if (name.Contains("PCI") && name.Contains("RegisterDriver"))
-                {
-                    LogDebug("Found relevant kernel symbol: `{}` => {:#x}",
-                             name, value);
-                }
-
                 return true;
             });
 
@@ -294,11 +288,7 @@ namespace System
                     module->Initialize
                         = reinterpret_cast<ModuleInitProc>(symbol.Value);
                 }
-                // LogTrace("Symbol => {}", name);
-                // u64 resolvedValue = System::LookupKernelSymbol(name);
-                // LogTrace("Resolved symbol =>\n\tName: {}, Value: {:#x}",
-                // name,
-                //          resolvedValue);
+
                 return true;
             });
 
@@ -318,6 +308,14 @@ namespace System
         {
             LogInfo("System: Found `{}` module's init entry point => {:#x}",
                     module->Name, image->EntryPoint().Raw());
+
+            auto initArray     = image->InitArray();
+            auto initArraySize = image->InitArraySize();
+
+            auto arr           = reinterpret_cast<void (**)()>(initArray.Raw());
+            for (usize i = 0; arr && i < initArraySize / sizeof(upointer); i++)
+                if (auto f = arr[i]) f();
+
             module->Initialize();
         }
         else
