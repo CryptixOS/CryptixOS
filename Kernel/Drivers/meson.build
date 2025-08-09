@@ -9,8 +9,10 @@ srcs += files(
   'Terminal.cpp',
 )
 
+subdir('ACPI')
 subdir('Core')
 subdir('HID')
+subdir('Input')
 subdir('PCI')
 subdir('Storage')
 subdir('USB')

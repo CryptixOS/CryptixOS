@@ -15,5 +15,5 @@ bool                          RegisterGenericDriver(GenericDriver& driver)
 
     // TODO(v1tr10l7): Drivers are for now dispatched immediately after
     // registration
-    return driver.Probe().has_value();
+    return driver.Probe().HasValue();
 }

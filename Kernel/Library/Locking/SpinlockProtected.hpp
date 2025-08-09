@@ -81,7 +81,7 @@ class SpinlockProtected : public NonCopyable<SpinlockProtected<T>>,
         CTOS_ALWAYS_INLINE U&       Acquire() { return m_Value; }
 
       private:
-        U&                            m_Value;
+        U&                  m_Value;
         ScopedRecursiveLock m_Lock;
     };
 
