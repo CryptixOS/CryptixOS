@@ -220,7 +220,7 @@ namespace System
         }
     }
 
-    ErrorOr<void> LoadModules()
+    ErrorOr<void> LoadBuiltinModules()
     {
 
         auto modulesStart = module_init_start_addr;
@@ -243,6 +243,27 @@ namespace System
 
         return {};
     }
+    ErrorOr<void> LoadExternalModules()
+    {
+        auto pathRes = TryOrRet(
+            VFS::ResolvePath(VFS::RootDirectoryEntry(), "/lib/modules/"));
+        auto         moduleDirectory = pathRes.Entry;
+
+        Vector<Path> modulesToLoad;
+        if (moduleDirectory)
+        {
+            for (const auto& [name, child] : moduleDirectory->Children())
+            {
+                auto modPath = fmt::format("/lib/modules/{}", name);
+                modulesToLoad.PushBack(modPath.data());
+            }
+        }
+        for (isize i = static_cast<isize>(modulesToLoad.Size()) - 1; i >= 0;
+             i--)
+            LoadModule(modulesToLoad[i]);
+
+        return {};
+    }
 
     ErrorOr<void> LoadModule(PathView path)
     {
@@ -250,20 +271,9 @@ namespace System
         auto entry   = pathRes.Entry;
 
         if (!entry) return Error(ENOENT);
-        return LoadModule(entry);
-    }
-    ErrorOr<void> LoadModule(Ref<DirectoryEntry> entry)
-    {
-        if (!entry) return Error(EFAULT);
-
-        Ref module            = CreateRef<Module>();
-        module->Name          = entry->Name();
-
-        module->Initialized   = false;
-        module->Failed        = false;
-
-        Ref<ELF::Image> image = module->Image = CreateRef<ELF::Image>();
+        Ref<ELF::Image> image  = CreateRef<ELF::Image>();
         auto            status = image->Load(entry->INode(), MODULE_LOAD_BASE);
+
         if (!status)
         {
             LogError("System: Failed to load the module located at `{}`",
@@ -277,15 +287,27 @@ namespace System
             return Error(ENOEXEC);
         }
 
-        module->Image = image;
-
-        ELF::Image::SymbolLookup lookup;
-        lookup.Bind<LookupKernelSymbol>();
-        status             = image->ApplyRelocations(lookup);
-        module->Initialize = image->EntryPoint();
+        return LoadModule(image);
+    }
+    ErrorOr<void> LoadModule(Ref<ELF::Image> image)
+    {
+        Ref module          = CreateRef<Module>();
+        module->Initialized = false;
+        module->Failed      = false;
+        module->Image       = image;
 
         LogTrace("System: Reading module metadata for '{}'", module->Name);
         module->ParseModuleInfo();
+
+        ELF::Image::SymbolLookup lookup;
+        lookup.Bind<LookupKernelSymbol>();
+        auto status        = image->ApplyRelocations(lookup);
+        module->Initialize = image->EntryPoint();
+
+        LogTrace("System: Found the entry point of module `{}` at `{:#x}`",
+                 module->Name, u64(module->Initialize));
+        LogTrace("System: Looked up symbol => {:#x}",
+                 module->Image->LookupSymbol("ModuleInit"));
 
         if (!status)
             LogError("System: Failed to resolve symbols of module `{}`",
@@ -315,6 +337,23 @@ namespace System
         }
 
         s_Modules.With([module](auto& list) { list.PushBack(module); });
+
+        ELF::Image::SymbolEnumerator it;
+        it.BindLambda(
+            [&](StringView name, Pointer value) -> bool
+            {
+                if (name.Empty()) return true;
+
+                if (s_KernelSymbols.Contains(name)) return true;
+
+                // FIXME(v1tr10l7): better strategy might be to not store all of
+                // the symbols in kernel symbol table, and just use dependencies
+                // elf images
+                s_KernelSymbols[name] = value;
+                return true;
+            });
+
+        image->ForEachSymbol(it);
         return {};
     }
     ErrorOr<void> LoadModule(Ref<Module> module)

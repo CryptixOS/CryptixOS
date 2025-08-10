@@ -11,7 +11,6 @@
 
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptManager.hpp>
-#include <Arch/x86_64/Drivers/Time/PIT.hpp>
 
 #include <Boot/BootInfo.hpp>
 #include <Boot/CommandLine.hpp>
@@ -149,22 +148,14 @@ static void kernelThread()
     TTY::Initialize();
     if (!USB::Initialize()) LogWarn("USB: Failed to initialize");
 
-    if (!System::LoadModules())
-        LogWarn("ELF: Could not find any builtin drivers");
+    if (!System::LoadBuiltinModules())
+        LogWarn("Kernel: Could not find any builtin drivers");
 
-    auto moduleDirectory
-        = VFS::ResolvePath(VFS::RootDirectoryEntry(), "/lib/modules/")
-              .ValueOr(VFS::PathResolution{})
-              .Entry;
-    if (moduleDirectory)
-    {
-        for (const auto& [name, child] : moduleDirectory->Children())
-            System::LoadModule(child);
-    }
+    if (!System::LoadExternalModules())
+        LogWarn("Kernel: Failed to load the external modules");
+
     if (!System::DispatchModules())
         LogError("Kernel: Failed to dispatch kernel modules");
-
-    PIT::Instance()->Start(TimerMode::eOneShot, 5'000_ms);
 
     LogTrace("Loading init process...");
     auto initPath = CommandLine::GetString("init");

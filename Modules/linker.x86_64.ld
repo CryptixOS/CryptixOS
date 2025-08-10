@@ -13,8 +13,8 @@ PHDRS
     rodata      PT_LOAD     FLAGS(4);
     data        PT_LOAD     FLAGS(6);
     dynamic     PT_DYNAMIC  FLAGS(6);
-    modules     0x60000001  FLAGS(4);
-    modinfo     0x60000002  FLAGS(4);
+    module_init PT_LOAD     FLAGS(6);
+    modinfo     PT_LOAD     FLAGS(4);
 }
 
 SECTIONS
@@ -35,10 +35,10 @@ SECTIONS
         *(.got.*)
     } :rodata
 
-    .modules : {
-        KEEP(*(.modules))
-    } :rodata :modules
 
+    .module_init : {
+        KEEP(*(.module_init))
+    } :rodata :module_init
     .modinfo : {
         KEEP(*(.modinfo))
     } :rodata :modinfo

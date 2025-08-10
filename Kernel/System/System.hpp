@@ -34,10 +34,11 @@ namespace System
     const BootModuleInfo*                FindBootModule(StringView name);
     void                                 InitializeNumaDomains();
 
-    ErrorOr<void>                        LoadModules();
+    ErrorOr<void>                        LoadBuiltinModules();
+    ErrorOr<void>                        LoadExternalModules();
 
     ErrorOr<void>                        LoadModule(PathView path);
-    ErrorOr<void>                        LoadModule(Ref<DirectoryEntry> entry);
+    ErrorOr<void>                        LoadModule(Ref<ELF::Image> image);
     ErrorOr<void>                        LoadModule(Ref<Module> module);
 
     ErrorOr<void>                        DispatchModules();

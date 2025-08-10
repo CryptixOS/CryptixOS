@@ -17,17 +17,30 @@ if arch == 'aarch64'
 endif
 
 
-args += '-fpic'
+args += [
+  '-fpic', 
+]
 ld_args = [
   # '-nostdlib',
   # '-static',
   # '-relocatable',
   '-znoexecstack',
   '-shared',
+  # '-Wl,--whole-archive',
+  # '-fno-eliminate-unused-debug-symbols',
 ]
 
 subdir(arch)
 subdir('noarch')
+
+modules = ['serio']
+
+foreach name : modules
+  external = false
+  module = []
+  subdir(name)
+  all_modules += { name: [external, module] }
+endforeach
 
 foreach name, mod : all_modules
   external = mod[0]

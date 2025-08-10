@@ -30,11 +30,13 @@ namespace ELF
     class Image : public RefCounted
     {
       public:
-        ErrorOr<void> LoadFromMemory(u8* data, usize size);
-        ErrorOr<void> Load(FileDescriptor* file, Pointer loadBase = 0);
-        ErrorOr<void> Load(INode* inode, Pointer loadBase = 0);
+        ErrorOr<void>  LoadFromMemory(u8* data, usize size);
+        ErrorOr<void>  Load(FileDescriptor* file, Pointer loadBase = 0);
+        ErrorOr<void>  Load(INode* inode, Pointer loadBase = 0);
 
-        Pointer       Raw() const { return m_Image.Raw(); }
+        inline Pointer Raw() const { return m_Image.Raw(); }
+        inline Pointer LoadBase() const { return m_LoadBase; }
+
         inline const struct Header& Header() const { return m_Header; }
         inline ObjectType           Type() const { return m_Header.Type; }
 
@@ -61,7 +63,7 @@ namespace ELF
         ErrorOr<void>  ResolveSymbols(SymbolLookup lookup);
         ErrorOr<void>  ResolveSymbols(struct SectionHeader& section,
                                       SymbolLookup          lookup);
-        Pointer        LookupSymbol(StringView name);
+        Pointer        LookupSymbol(StringView name) const;
         void           DumpSymbols();
 
         StringView     LookupString(usize index);

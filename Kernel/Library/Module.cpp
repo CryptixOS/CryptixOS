@@ -6,6 +6,11 @@
  */
 #include <Library/Module.hpp>
 
+namespace System
+{
+    Ref<Module> FindModule(StringView name);
+};
+
 void Module::ParseModuleInfo()
 {
     usize       stringSectionIndex = Image->Header().SectionNamesIndex;
@@ -19,7 +24,14 @@ void Module::ParseModuleInfo()
         auto&      section     = *Image->SectionHeader(i);
         StringView sectionName = sectionNames + section.Name;
 
-        if (sectionName.StartsWith(".modinfo"_sv))
+        if (sectionName.StartsWith(".module_init"_sv))
+        {
+            auto& preludium
+                = *Image->Raw().Offset<ModulePreludium*>(section.Offset);
+            Preludium = &preludium;
+            Name      = Preludium->Name;
+        }
+        else if (sectionName.StartsWith(".modinfo"_sv))
         {
             modInfoSection = &section;
             break;
@@ -63,6 +75,15 @@ void Module::ParseModuleInfo()
             {
                 Info.Version = value;
                 LogDebug("ModInfo[version] => {}", value);
+            }
+            else if (key == "softdep"_sv)
+            {
+                StringView depsView = value;
+                auto       pre      = "pre: "_sv;
+                if (depsView.StartsWith(pre)) depsView.RemovePrefix(pre.Size());
+                RequiredDependencies = depsView.Split(' ');
+
+                LogDebug("ModInfo[softdep] => {}", value);
             }
 
             pos = entryEnd + 1;

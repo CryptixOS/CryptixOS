@@ -22,6 +22,11 @@
 
 using namespace Prism;
 
+CTOS_MODULE_AUTHOR("v1tr10l7");
+CTOS_MODULE_DESCRIPTION("e1000e PCI Network Adapter driver");
+CTOS_MODULE_LICENSE("GPL-3");
+CTOS_MODULE_VERSION("0.01");
+
 namespace Intel
 {
     constexpr usize VENDOR_ID               = 0x8086;

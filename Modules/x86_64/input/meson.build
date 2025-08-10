@@ -5,8 +5,7 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 modules = [
-  'e1000e',
-  'rtl8139',
+  'i8042',
 ]
 
 foreach name : modules
@@ -15,4 +14,3 @@ foreach name : modules
   subdir(name)
   all_modules += { name: [external, module] }
 endforeach
-

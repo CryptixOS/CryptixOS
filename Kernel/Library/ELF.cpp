@@ -30,8 +30,7 @@
 
 namespace ELF
 {
-    constexpr usize SHN_UNDEF  = 0;
-    constexpr usize SHN_LOPROC = 0xff00;
+    constexpr usize SHN_UNDEF = 0;
 
     ErrorOr<void>   Image::LoadFromMemory(u8* data, usize size)
     {
@@ -119,10 +118,11 @@ namespace ELF
 
     ErrorOr<void> Image::ApplyRelocations(SymbolLookup lookup)
     {
-        Pointer highestAddress = 0;
+        usize size = 0;
         for (usize i = 0; i < m_Header.ProgramEntryCount; i++)
         {
             auto programHeader = ProgramHeader(i);
+            if (programHeader->SegmentSizeInFile == 0) continue;
             if (programHeader->Type != HeaderType::eLoad
                 && programHeader->Type != HeaderType::eDynamic)
                 continue;
@@ -131,28 +131,31 @@ namespace ELF
                     + programHeader->SegmentSizeInMemory;
             top = ((top - 1) / programHeader->Alignment + 1)
                 * programHeader->Alignment;
-            highestAddress = Max(highestAddress.Raw(), top);
+            size = Max(size, top);
         }
+        size *= 2;
 
-        m_LoadBase = VMM::AllocateSpace(highestAddress);
+        m_LoadBase = VMM::AllocateSpace(Math::AlignUp(size, PMM::PAGE_SIZE));
         LogTrace("ELF: Allocated address space => {:#x}-{:#x}",
-                 m_LoadBase.Raw(), highestAddress.Raw());
+                 m_LoadBase.Raw(), size);
 
-        for (usize i = 0; i < highestAddress; i += PMM::PAGE_SIZE)
-        {
-            auto phys    = PMM::AllocatePages(1);
-            auto pageMap = VMM::GetKernelPageMap();
+        auto  pageMap   = VMM::GetKernelPageMap();
+        usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
+        auto  phys      = PMM::CallocatePages(pageCount);
+        pageMap->MapRange(m_LoadBase, phys, size, PageAttributes::eRWX);
 
-            pageMap->Map(m_LoadBase.Offset(i), phys, PageAttributes::eRWX);
-        }
         for (usize i = 0; i < ProgramHeaderCount(); ++i)
         {
             auto programHeader = ProgramHeader(i);
             if (programHeader->Type == HeaderType::eLoad
                 || programHeader->Type == HeaderType::eDynamic)
             {
-                Memory::Copy(m_LoadBase.Offset(programHeader->VirtualAddress),
-                             m_Image.Raw() + programHeader->Offset,
+                auto headerStart
+                    = m_LoadBase.Offset(programHeader->VirtualAddress);
+                auto headerEnd = headerStart + programHeader->SegmentSizeInFile;
+                Assert(headerEnd <= m_LoadBase.Offset(size));
+
+                Memory::Copy(headerStart, m_Image.Raw() + programHeader->Offset,
                              programHeader->SegmentSizeInFile);
             }
 
@@ -186,6 +189,7 @@ namespace ELF
             }
         }
 
+        m_Symbols.Clear();
         for (usize i = 0; i < SectionHeaderCount(); ++i)
         {
             auto& relocSection = *SectionHeader(i);
@@ -223,8 +227,9 @@ namespace ELF
                 u64 symAddr  = 0;
                 if (symIndex >= symCount) return Error(ENOEXEC);
 
-                const auto& sym     = symbols[symIndex];
+                auto&       sym     = symbols[symIndex];
                 const char* symName = strtab + sym.Name;
+                usize       loadEnd = m_LoadBase.Offset(size);
 
                 switch (type)
                 {
@@ -233,16 +238,41 @@ namespace ELF
                     case RelocationType::eJumpSlot:
                     {
                         if (sym.SectionIndex == SHN_UNDEF)
+                        {
                             symAddr = lookup(symName);
-                        else symAddr = m_LoadBase.Offset(sym.Value);
+                            if (!symAddr)
+                                LogWarn(
+                                    "ELF: Failed to resolve `{}` symbol's "
+                                    "address",
+                                    symName);
+                        }
+                        else
+                        {
+                            symAddr = m_LoadBase.Offset(sym.Value);
+                            if (symAddr < m_LoadBase.Raw()
+                                || symAddr >= loadEnd)
+                                LogWarn(
+                                    "ELF: The address at `{:#x}` is out of "
+                                    "bounds",
+                                    symAddr);
+                        }
 
                         *reinterpret_cast<u64*>(patch) = symAddr;
+                        m_Symbols[symName]             = symAddr;
+
                         break;
                     }
                     case RelocationType::eRelative:
                     {
                         symAddr = m_LoadBase.Offset(reloc.Addend);
                         *reinterpret_cast<u64*>(patch) = symAddr;
+                        m_Symbols[symName]             = symAddr;
+
+                        if (symAddr < m_LoadBase.Raw() || symAddr >= loadEnd)
+                            LogWarn(
+                                "ELF: The address at `{:#x}` is out of "
+                                "bounds",
+                                symAddr);
                         break;
                     }
                     default:
@@ -261,33 +291,6 @@ namespace ELF
 
     ErrorOr<void> Image::ResolveSymbols(SymbolLookup lookup)
     {
-        for (usize i = 0; i < m_Header.SectionEntryCount; ++i)
-        {
-            struct SectionHeader& sectionHeader = *SectionHeader(i);
-
-            if (sectionHeader.Type == ToUnderlying(SectionType::eNoBits))
-            {
-                usize pageCount
-                    = Math::DivRoundUp(sectionHeader.Size, PMM::PAGE_SIZE);
-                auto phys             = PMM::CallocatePages(pageCount);
-                sectionHeader.Address = VMM::AllocateSpace(sectionHeader.Size);
-
-                VMM::MapKernelRange(sectionHeader.Address, phys,
-                                    sectionHeader.Size, PageAttributes::eRWXU);
-            }
-            else
-            {
-                sectionHeader.Address
-                    = Pointer(m_Image.Raw() + sectionHeader.Offset).Raw();
-                if (sectionHeader.Alignment
-                    && (sectionHeader.Address & (sectionHeader.Alignment - 1)))
-                    LogWarn(
-                        "ELF: Section address is probably not aligned "
-                        "correctly: {:#x} {}",
-                        sectionHeader.Address, sectionHeader.Alignment);
-            }
-        }
-
         for (usize i = 0; i < SectionHeaderCount(); i++)
         {
             auto& section = *SectionHeader(i);
@@ -303,42 +306,40 @@ namespace ELF
     ErrorOr<void> Image::ResolveSymbols(struct SectionHeader& section,
                                         SymbolLookup          lookup)
     {
-        auto stringTable
-            = Pointer(m_Image.Raw() + m_Header.SectionHeaderTableOffset
-                      + m_Header.SectionEntrySize * section.Link)
-                  .As<struct SectionHeader>();
-        char* strings
-            = reinterpret_cast<char*>(stringTable->Offset + m_Image.Raw());
-        Symbol* symbolTable
-            = Pointer(m_Image.Raw() + section.Offset).As<Symbol>();
+        u32         targetIndex   = section.Info;
+        auto&       targetSection = *SectionHeader(targetIndex);
+        u8*         targetBase = m_LoadBase.Offset<u8*>(targetSection.Offset);
 
-        usize symbolCount = section.Size / sizeof(Symbol);
-        for (usize symbol = 0; symbol < symbolCount; ++symbol)
+        const auto& symbolTableSection = *SectionHeader(section.Link);
+        const auto& stringTableSection
+            = *SectionHeader(symbolTableSection.Link);
+
+        auto* symbols     = reinterpret_cast<Symbol*>(m_Image.Raw()
+                                                      + symbolTableSection.Offset);
+        auto* stringTable = reinterpret_cast<const char*>(
+            m_Image.Raw() + stringTableSection.Offset);
+        auto* relocs     = reinterpret_cast<RelocationEntry*>(m_Image.Raw()
+                                                              + section.Offset);
+        usize relocCount = section.Size / sizeof(RelocationEntry);
+
+        for (usize r = 0; r < relocCount; ++r)
         {
-            if (symbolTable[symbol].SectionIndex > 0
-                && symbolTable[symbol].SectionIndex < SHN_LOPROC)
-            {
-                auto shdr = Pointer(m_Header.SectionHeaderTableOffset
-                                    + m_Header.SectionEntrySize
-                                          * symbolTable[symbol].SectionIndex
-                                    + m_Image.Raw())
-                                .As<struct SectionHeader>();
-                symbolTable[symbol].Value += shdr->Address;
-            }
-            else if (symbolTable[symbol].SectionIndex == SHN_UNDEF)
-                symbolTable[symbol].Value
-                    = lookup(strings + symbolTable[symbol].Name);
+            const auto& reloc    = relocs[r];
+            u32         symIndex = reloc.Info >> 32;
+            u8*         patch    = targetBase + reloc.Offset;
 
-            if (symbolTable[symbol].Name
-                && !std::strcmp(strings + symbolTable[symbol].Name, "metadata"))
-                LogTrace("ELF: Found module data => {:#x}",
-                         symbolTable[symbol].Value);
+            u64         symAddr  = 0;
+
+            const auto& sym      = symbols[symIndex];
+            const char* symName  = stringTable + sym.Name;
+            if (sym.SectionIndex == SHN_UNDEF) symAddr = lookup(symName);
+            *reinterpret_cast<u64*>(patch) = symAddr;
         }
 
         return {};
     }
 
-    Pointer Image::LookupSymbol(StringView symbol)
+    Pointer Image::LookupSymbol(StringView symbol) const
     {
         auto it = m_Symbols.Find(symbol);
         if (it == m_Symbols.end()) return nullptr;

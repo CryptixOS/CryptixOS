@@ -1,12 +1,11 @@
 #*
-#* Created by v1tr10l7 on 09.08.2025.
+#* Created by v1tr10l7 on 10.08.2025.
 #* Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
 #*
 #* SPDX-License-Identifier: GPL-3
 #*/
 modules = [
-  'e1000e',
-  'rtl8139',
+  'hpet',
 ]
 
 foreach name : modules
@@ -15,4 +14,3 @@ foreach name : modules
   subdir(name)
   all_modules += { name: [external, module] }
 endforeach
-

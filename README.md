@@ -195,6 +195,13 @@ To run CryptixOS in QEMU:
 - ✅ Rtl8139
 - ⬜ Virtio NIC
 
+### 🌐 Socket Families
+- ⬜ Unix
+- ⬜ IPv4
+- ⬜ IPv6
+- ⬜ NetLink
+- ⬜ Bluetooth
+
 ## 📁 Virtual File System
 
 - ⬜ Named Pipes

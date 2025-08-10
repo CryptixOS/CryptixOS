@@ -4,11 +4,6 @@
 #*
 #* SPDX-License-Identifier: GPL-3
 #*/
-x86_64_modules = [
-  'ps2',
-  'pcspk'
-]
-
 args += [
   #'-march=x86_64',
   '-msoft-float',
@@ -18,8 +13,13 @@ args += [
   '-mno-red-zone',
   '-mcmodel=large',
 ]
+subdir('input')
 
-foreach name : x86_64_modules
+modules = [
+  'pcspk'
+]
+
+foreach name : modules
   external = false
   module = []
   subdir(name)

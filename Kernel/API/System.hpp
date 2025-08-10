@@ -26,6 +26,10 @@ namespace API::System
     ErrorOr<isize>     Uname(utsname* out);
     ErrorOr<isize>     GetResourceLimit(isize resource, rlimit* rlimit);
     ErrorOr<isize>     GetResourceUsage(isize who, rusage* usage);
+
     ErrorOr<isize>     Reboot(RebootCommand cmd);
+    ErrorOr<isize>     InitModule(upointer image, usize size,
+                                  const char** parameters);
+
     ErrorOr<uintptr_t> SysPanic(const char* errorMessage);
 } // namespace API::System

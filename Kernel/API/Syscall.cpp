@@ -141,6 +141,7 @@ namespace Syscall
         RegisterSyscall(ID::eSync, API::VFS::SyncFilesystems);
         RegisterSyscall(ID::eMount, API::VFS::Mount);
         RegisterSyscall(ID::eReboot, API::System::Reboot);
+        RegisterSyscall(ID::eInitModule, API::System::InitModule);
         // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
         RegisterSyscall(ID::eGetDents64, API::VFS::GetDEnts64);
         RegisterSyscall(ID::eClockGetTime, API::Time::ClockGetTime);

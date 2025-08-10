@@ -64,7 +64,9 @@ struct Module : public RefCounted
     ModuleState                         State = ModuleState::eEmpty;
 
     ModuleInformation                   Info;
-    List                                Dependencies;
+    Vector<String>                      RequiredDependencies;
+    Vector<::Ref<Module>>               Dependencies;
+
     Span<InitArrayEntry, DynamicExtent> InitArray;
     Span<InitArrayEntry, DynamicExtent> FiniArray;
 
@@ -73,7 +75,8 @@ struct Module : public RefCounted
 
     IntrusiveRefListHook<Module>        Hook;
 
-    ::Ref<ELF::Image>                   Image = nullptr;
+    ModulePreludium*                    Preludium = nullptr;
+    ::Ref<ELF::Image>                   Image     = nullptr;
 
     ModuleInitProc                      Initialize;
     ModuleTerminateProc                 Terminate;

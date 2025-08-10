@@ -17,9 +17,12 @@
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
+#include <System/System.hpp>
 
 namespace API::System
 {
+    using namespace ::System;
+
     ErrorOr<isize> Uname(utsname* out)
     {
         auto process = Process::GetCurrent();
@@ -99,8 +102,30 @@ namespace API::System
 
         return Error(ENOSYS);
     }
+    ErrorOr<isize> InitModule(upointer moduleImage, usize imageSize,
+                              const char** parameters)
+    {
+        // TODO(v1tr10l7): parameters
+        auto process = Process::Current();
+        if (!process->ValidateWrite(moduleImage, imageSize))
+            return Error(EFAULT);
+        if (!process->IsSuperUser()) return Error(EPERM);
 
-    ErrorOr<uintptr_t> SysPanic(const char* errorMessage)
+        auto image = CreateRef<ELF::Image>();
+        RetOnError(CPU::AsUser(
+            [&image, moduleImage, imageSize]() -> auto
+            {
+                return image->LoadFromMemory(Pointer(moduleImage).As<u8>(),
+                                             imageSize);
+            }));
+
+        auto status = System::LoadModule(image);
+        if (!status) return Error(status.Error());
+
+        return 0;
+    }
+
+    ErrorOr<upointer> SysPanic(const char* errorMessage)
     {
         CPU::UserMemoryProtectionGuard guard;
 
