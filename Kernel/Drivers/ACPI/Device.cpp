@@ -17,7 +17,30 @@ namespace ACPI
 
     Device::Device(DeviceHandle* handle)
     {
+        Memory::Fill(&m_IoResource, 0, sizeof(m_IoResource));
+        Memory::Fill(&m_IrqResource, 0, sizeof(m_IrqResource));
+
         m_IrqResource = Try(Bus::IrqResourceForHandle(handle));
         m_IoResource  = Try(Bus::IoResourceForHandle(handle));
+
+        if (!m_IrqResource.IRQs.Empty())
+        {
+            LogTrace("ACPI: Retrieved the irq resource for device");
+            LogTrace("ACPI: Triggering => {}", m_IrqResource.Triggering);
+            LogTrace("ACPI: Polarity => {}", m_IrqResource.Polarity);
+            LogTrace("ACPI: Sharing => {}", m_IrqResource.Sharing);
+            LogTrace("ACPI: WakeCapability => {}",
+                     m_IrqResource.WakeCapability);
+        }
+        for (usize i = 0; usize irq : m_IrqResource.IRQs)
+            LogTrace("ACPI: IRQ[{}] => {}", i++, irq);
+
+        if (m_IoResource.Least == 0 && m_IoResource.Highest == 0) return;
+        LogTrace("ACPI: Retrieved the io resources for device");
+
+        LogTrace("ACPI: Least IO port => {:#x}", m_IoResource.Least);
+        LogTrace("ACPI: Highest IO port => {:#x}", m_IoResource.Highest);
+        LogTrace("ACPI: Alignment => {:#x}", m_IoResource.Alignment);
+        LogTrace("ACPI: Length => {:#x}", m_IoResource.Length);
     }
 }; // namespace ACPI

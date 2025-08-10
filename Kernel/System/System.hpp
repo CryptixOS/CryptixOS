@@ -12,6 +12,7 @@
 #include <Prism/Containers/RedBlackTree.hpp>
 #include <Prism/Containers/Span.hpp>
 #include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Core/Iterator.hpp>
 
 #include <Prism/Memory/Pointer.hpp>
 #include <Prism/Memory/Ref.hpp>
@@ -24,12 +25,14 @@ namespace ELF
 
 class DirectoryEntry;
 struct BootModuleInfo;
+using ModuleIterator = Delegate<IterationResult(Ref<Module> module)>;
+
 namespace System
 {
     ErrorOr<void> LoadKernelSymbols(const BootModuleInfo& kernelExecutable);
     void          PrepareBootModules(Span<BootModuleInfo> bootModules);
     const BootModuleInfo*                FindBootModule(StringView name);
-    void InitializeNumaDomains();
+    void                                 InitializeNumaDomains();
 
     ErrorOr<void>                        LoadModules();
 
@@ -37,7 +40,9 @@ namespace System
     ErrorOr<void>                        LoadModule(Ref<DirectoryEntry> entry);
     ErrorOr<void>                        LoadModule(Ref<Module> module);
 
-    Module::List&                        Modules();
+    ErrorOr<void>                        DispatchModules();
+
+    void                                 ForEachModule(ModuleIterator iterator);
     Ref<Module>                          FindModule(StringView name);
 
     PathView                             KernelExecutablePath();

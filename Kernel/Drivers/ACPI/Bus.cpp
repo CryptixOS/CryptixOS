@@ -206,6 +206,9 @@ namespace ACPI
             }
 
             if (!probedDevices) return Error(ENODEV);
+
+            LogTrace("ACPI: Probed #{} devices for driver => {}", probedDevices,
+                     driver->Name);
             return {};
         }
 

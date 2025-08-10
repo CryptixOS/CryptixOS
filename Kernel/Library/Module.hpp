@@ -27,35 +27,68 @@ namespace ELF
 
 using ModuleInitProc      = bool (*)();
 using ModuleTerminateProc = void (*)();
-struct CTOS_PACKED_ALIGNED(8) ModuleHeader
+struct CTOS_PACKED_ALIGNED(8) ModulePreludium
 {
     const char*         Name;
 
     ModuleInitProc      Initialize;
     ModuleTerminateProc Terminate;
 };
+
+struct ModuleInformation
+{
+    String Author;
+    String Description;
+    String License;
+    String Version;
+};
+using InitArrayEntry = void (*)();
+using FiniArrayEntry = void (*)();
+
+enum class ModuleState
+{
+    eEmpty    = 0x00,
+    eLoaded   = 0x01,
+    eReady    = 0x02,
+    eRunning  = 0x03,
+    eUnloaded = 0x04,
+};
 struct Module : public RefCounted
 {
-    StringView Name;
-    bool       Initialized;
-    bool       Failed;
-
     friend class IntrusiveRefList<Module>;
     friend struct IntrusiveRefListHook<Module>;
 
     using List = IntrusiveRefList<Module>;
-    IntrusiveRefListHook<Module> Hook;
 
-    ::Ref<ELF::Image>            Image = nullptr;
+    String                              Name;
+    ModuleState                         State = ModuleState::eEmpty;
 
-    ModuleInitProc               Initialize;
-    ModuleTerminateProc          Terminate;
+    ModuleInformation                   Info;
+    List                                Dependencies;
+    Span<InitArrayEntry, DynamicExtent> InitArray;
+    Span<InitArrayEntry, DynamicExtent> FiniArray;
 
-    static bool                  Load();
+    bool                                Initialized;
+    bool                                Failed;
+
+    IntrusiveRefListHook<Module>        Hook;
+
+    ::Ref<ELF::Image>                   Image = nullptr;
+
+    ModuleInitProc                      Initialize;
+    ModuleTerminateProc                 Terminate;
+
+    void                                ParseModuleInfo();
+
+    void                                Prepare();
+    ErrorOr<void>                       Dispatch();
+    void                                Unload();
+
+    static bool                         Load();
 };
 
 #define MODULE_INIT(name, init)                                                \
-    extern "C" MODULE_SECTION const ModuleHeader CtConcatenateName(            \
+    extern "C" MODULE_SECTION const ModulePreludium CtConcatenateName(         \
         kernel_module, CtUniqueName(name))                                     \
         = {.Name = #name, .Initialize = init, .Terminate = nullptr}
 
@@ -74,3 +107,5 @@ struct Module : public RefCounted
     CTOS_MODULE_INFO_STRING(description, description_)
 #define CTOS_MODULE_LICENSE(license_) CTOS_MODULE_INFO_STRING(license, license_)
 #define CTOS_MODULE_VERSION(version_) CTOS_MODULE_INFO_STRING(version, version_)
+
+#define CTOS_MODULE_SOFTDEP(deps)     CTOS_MODULE_INFO_STRING(softdep, deps)

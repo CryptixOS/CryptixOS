@@ -11,15 +11,18 @@
 #include <Firmware/ACPI/SRAT.hpp>
 
 #include <Library/ELF.hpp>
+#include <Library/Locking/SpinlockProtected.hpp>
 #include <Library/Module.hpp>
+
 #include <Memory/VMM.hpp>
+#include <Prism/String/StringUtils.hpp>
 
 #include <System/System.hpp>
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/VFS.hpp>
 
-extern "C" ModuleHeader module_init_start_addr[];
-extern "C" ModuleHeader module_init_end_addr[];
+extern "C" ModulePreludium module_init_start_addr[];
+extern "C" ModulePreludium module_init_end_addr[];
 
 namespace System
 {
@@ -31,7 +34,7 @@ namespace System
         Span<BootModuleInfo, DynamicExtent> s_BootModules;
 
         static constexpr Pointer            MODULE_LOAD_BASE = nullptr;
-        Module::List                        s_Modules;
+        SpinlockProtected<Module::List>     s_Modules;
     }; // namespace
 
     ErrorOr<void> LoadKernelSymbols(const BootModuleInfo& kernelExecutable)
@@ -222,7 +225,7 @@ namespace System
 
         auto modulesStart = module_init_start_addr;
         auto modulesEnd   = module_init_end_addr;
-        for (ModuleHeader* moduleHeader = modulesStart;
+        for (ModulePreludium* moduleHeader = modulesStart;
              moduleHeader < modulesEnd; moduleHeader++)
         {
             auto module         = CreateRef<Module>();
@@ -231,6 +234,7 @@ namespace System
             module->Failed      = false;
             module->Initialize  = moduleHeader->Initialize;
             module->Terminate   = moduleHeader->Terminate;
+            module->State       = ModuleState::eReady;
 
             auto status         = System::LoadModule(module);
             if (!status)
@@ -252,13 +256,13 @@ namespace System
     {
         if (!entry) return Error(EFAULT);
 
-        Ref module             = new Module;
+        Ref module            = CreateRef<Module>();
+        module->Name          = entry->Name();
 
-        module->Name           = entry->Name();
-        module->Initialized    = false;
-        module->Failed         = false;
+        module->Initialized   = false;
+        module->Failed        = false;
 
-        Ref<ELF::Image> image  = CreateRef<ELF::Image>();
+        Ref<ELF::Image> image = module->Image = CreateRef<ELF::Image>();
         auto            status = image->Load(entry->INode(), MODULE_LOAD_BASE);
         if (!status)
         {
@@ -277,65 +281,11 @@ namespace System
 
         ELF::Image::SymbolLookup lookup;
         lookup.Bind<LookupKernelSymbol>();
-        status                              = image->ApplyRelocations(lookup);
-        module->Initialize                  = image->EntryPoint();
-
-        ELF::SectionHeader* modInfoSection  = nullptr;
-
-        usize               shstrndx        = image->Header().SectionNamesIndex;
-        auto                shstrtabSection = image->SectionHeader(shstrndx);
-        const char*         sectionHeaderStringTable
-            = image->Raw().Offset<const char*>(shstrtabSection->Offset);
-        for (usize i = 0; i < image->SectionHeaderCount(); i++)
-        {
-            auto       section     = image->SectionHeader(i);
-            StringView sectionName = sectionHeaderStringTable + section->Name;
-
-            if (sectionName.StartsWith(".modinfo"_sv))
-            {
-                modInfoSection = section;
-                break;
-            }
-        }
+        status             = image->ApplyRelocations(lookup);
+        module->Initialize = image->EntryPoint();
 
         LogTrace("System: Reading module metadata for '{}'", module->Name);
-        if (modInfoSection)
-        {
-            const char* modInfoData
-                = image->Raw().Offset<const char*>(modInfoSection->Offset);
-            usize      modInfoSize = modInfoSection->Size;
-
-            StringView modInfo     = StringView(modInfoData, modInfoSize);
-            usize      pos         = 0;
-            while (pos < modInfoSize)
-            {
-                // Get the next null-terminated entry inside the section
-                usize entryEnd = modInfo.Find('\0', pos);
-                if (entryEnd == StringView::NPos)
-                    break; // no more null terminators
-
-                StringView entry = modInfo.Substr(pos, entryEnd - pos);
-                if (entry.Empty()) break; // reached double-null terminator
-
-                usize equalPos = entry.Find('=');
-                if (equalPos != StringView::NPos)
-                {
-                    StringView key   = entry.Substr(0, equalPos);
-                    StringView value = entry.Substr(equalPos + 1);
-
-                    if (key == "author"_sv)
-                        LogDebug("ModInfo[author] => {}", String(value));
-                    else if (key == "description"_sv)
-                        LogDebug("ModInfo[description] => {}", String(value));
-                    else if (key == "license"_sv)
-                        LogDebug("ModInfo[license] => {}", String(value));
-                    else if (key == "version"_sv)
-                        LogDebug("ModInfo[version] => {}", String(value));
-                }
-
-                pos = entryEnd + 1; // move past the null terminator
-            }
-        }
+        module->ParseModuleInfo();
 
         if (!status)
             LogError("System: Failed to resolve symbols of module `{}`",
@@ -348,22 +298,24 @@ namespace System
             LogInfo("System: Found `{}` module's init entry point => {:#x}",
                     module->Name, image->EntryPoint().Raw());
 
-            auto initArray     = image->InitArray();
-            auto initArraySize = image->InitArraySize();
+            module->InitArray
+                = Span(image->InitArray().As<InitArrayEntry>(),
+                       image->InitArraySize() / sizeof(InitArrayEntry));
+            module->FiniArray
+                = Span(image->FiniArray().As<FiniArrayEntry>(),
+                       image->FiniArraySize() / sizeof(FiniArrayEntry));
 
-            auto arr           = reinterpret_cast<void (**)()>(initArray.Raw());
-            for (usize i = 0; arr && i < initArraySize / sizeof(upointer); i++)
-                if (auto f = arr[i]) f();
-
-            module->Initialize();
+            module->State = ModuleState::eLoaded;
         }
         else
+        {
             LogError("System: Module `{}` doesn't have any entry point",
                      module->Name);
-        //
-        // TODO(v1tr10l7): Load the module
+            return Error(ENOEXEC);
+        }
 
-        return Error(ENOSYS);
+        s_Modules.With([module](auto& list) { list.PushBack(module); });
+        return {};
     }
     ErrorOr<void> LoadModule(Ref<Module> module)
     {
@@ -376,10 +328,10 @@ namespace System
             return Error(EEXIST);
         }
 
-        s_Modules.PushBack(module);
+        s_Modules.With([module](auto& list) { list.PushBack(module); });
         LogTrace("System: Dispatching module `{}`...", name);
 
-        auto status = module->Initialize();
+        auto status = module->Dispatch();
         if (!status)
         {
             LogError("System: Failed to initialize module `{}`", name);
@@ -390,13 +342,46 @@ namespace System
         return {};
     }
 
-    Module::List& Modules() { return s_Modules; }
-    Ref<Module>   FindModule(StringView name)
+    ErrorOr<void> DispatchModules()
     {
-        for (Ref<Module> module : s_Modules)
-            if (module->Name == name) return module;
+        s_Modules.ForEach(
+            [](auto module)
+            {
+                if (module->State < ModuleState::eLoaded) return;
 
-        return nullptr;
+                module->Prepare();
+                auto status = module->Dispatch();
+
+                if (!status)
+                    LogError(
+                        "System: Failed to dispatch module `{}` with error "
+                        "code => {}",
+                        module->Name, ToString(status.Error()));
+            });
+
+        return {};
+    }
+
+    void ForEachModule(ModuleIterator iterator)
+    {
+        IterationResult result = IterationResult::eContinue;
+        s_Modules.ForEach(
+            [&iterator, &result](auto module)
+            {
+                if (result == IterationResult::eContinue)
+                    result = iterator(module);
+            });
+    }
+    Ref<Module> FindModule(StringView name)
+    {
+        Ref<Module> found = nullptr;
+        s_Modules.ForEach(
+            [&found, name](auto module)
+            {
+                if (!found && module->Name == name) found = module;
+            });
+
+        return found;
     }
 
     PathView          KernelExecutablePath() { return s_KernelExecutable.Path; }

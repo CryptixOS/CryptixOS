@@ -53,8 +53,13 @@ struct ProcFsModulesProperty : public ProcFsProperty
         Buffer.Clear();
         Buffer.Resize(PMM::PAGE_SIZE);
 
-        for (Ref<Module> module : System::Modules())
-            Write("{}\n", module->Name);
+        ModuleIterator iterator;
+        iterator.BindLambda(
+            [this](auto module) -> IterationResult
+            {
+                Write("{}\n", module->Name);
+                return IterationResult::eContinue;
+            });
     }
 };
 struct ProcFsMountsProperty : public ProcFsProperty

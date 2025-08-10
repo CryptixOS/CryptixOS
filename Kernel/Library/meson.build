@@ -10,6 +10,7 @@ srcs += files(
   'ICxxAbi.cpp',
   'Image.cpp',
   'Logger.cpp',
+  'Module.cpp',
   'Stacktrace.cpp',
   'ZLib.cpp',
 )
