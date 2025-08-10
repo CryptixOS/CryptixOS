@@ -37,6 +37,8 @@ namespace API::VFS
 
     ErrorOr<isize> Dup(isize oldFdNum);
     ErrorOr<isize> Dup2(isize oldFdNum, isize newFdNum);
+
+    ErrorOr<isize> Socket(isize domain, isize type, isize protocol);
     ErrorOr<isize> FCntl(isize fdNum, isize op, pointer arg);
 
     ErrorOr<isize> Truncate(PathView path, off_t length);

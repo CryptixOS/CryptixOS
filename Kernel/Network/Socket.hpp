@@ -6,35 +6,17 @@
  */
 #pragma once
 
+#include <API/Sockets.hpp>
 #include <Prism/Core/Types.hpp>
+#include <VFS/File.hpp>
 
-enum class SocketDomain
-{
-    eUnspecified = 0,
-    eLocal       = 1,
-    eIPv4        = 2,
-    eIPv6        = 10,
-};
-enum class SocketType
-{
-    eStream   = 1,
-    eDataGram = 2,
-    eRaw      = 3,
-};
-enum class NetworkProtocol
-{
-    eTcp = 0
-};
-
-class Socket
+class Socket : public File
 {
   public:
-    static Socket* Create(SocketDomain domain, SocketType type,
-                          NetworkProtocol protocol);
-
-    virtual isize  SetOption(i32 level, i32 option, const void*, usize count);
-
     Socket(SocketDomain domain, SocketType type, NetworkProtocol protocol);
+
+    static ErrorOr<Socket*> Create(SocketDomain domain, SocketType type,
+                                   NetworkProtocol protocol);
 
   protected:
     SocketDomain    m_Domain = SocketDomain::eUnspecified;

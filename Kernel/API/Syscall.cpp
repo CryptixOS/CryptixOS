@@ -92,6 +92,7 @@ namespace Syscall
         RegisterSyscall(ID::eDup2, API::VFS::Dup2);
         RegisterSyscall(ID::eNanoSleep, API::Process::NanoSleep);
         RegisterSyscall(ID::ePid, API::Process::Pid);
+        RegisterSyscall(ID::eSocket, API::VFS::Socket);
         RegisterSyscall(ID::eFork, API::Process::Fork);
         RegisterSyscall(ID::eExecve, API::Process::Execve);
         RegisterSyscall(ID::eExit, API::Process::Exit);

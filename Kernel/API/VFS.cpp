@@ -18,6 +18,7 @@
 
 #include <Arch/CPU.hpp>
 
+#include <Network/Socket.hpp>
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 
@@ -269,6 +270,30 @@ namespace API::VFS
         Process* process = Process::Current();
 
         return process->DupFd(oldFdNum, newFdNum, 0);
+    }
+
+    ErrorOr<isize> Socket(isize domain, isize type, isize protocol)
+    {
+        auto socket   = TryOrRet(Socket::Create(
+            static_cast<SocketDomain>(domain), static_cast<SocketType>(type),
+            static_cast<NetworkProtocol>(protocol)));
+
+        auto dentry   = new DirectoryEntry("/");
+        auto socketFd = CreateRef<FileDescriptor>(
+            dentry, reinterpret_cast<File*>(socket), O_RDWR,
+            FileAccessMode::eRead | FileAccessMode::eWrite);
+        auto process = Process::Current();
+        auto status  = process->InsertFd(socketFd);
+
+        if (!status)
+        {
+            delete dentry;
+            socketFd.Reset();
+
+            return Error(status.Error());
+        }
+
+        return *status;
     }
     ErrorOr<isize> FCntl(isize fdNum, isize op, pointer arg)
     {

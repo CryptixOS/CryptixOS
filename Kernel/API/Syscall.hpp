@@ -158,6 +158,7 @@ namespace Syscall
         eDup2             = 33,
         eNanoSleep        = 35,
         ePid              = 39,
+        eSocket           = 41,
         eFork             = 57,
         eExecve           = 59,
         eExit             = 60,

@@ -248,6 +248,10 @@ ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
     return newFdNum;
 }
 i32            Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
+ErrorOr<isize> Process::InsertFd(Ref<FileDescriptor> fd)
+{
+    return m_FdTable.Insert(fd);
+}
 
 ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
 {

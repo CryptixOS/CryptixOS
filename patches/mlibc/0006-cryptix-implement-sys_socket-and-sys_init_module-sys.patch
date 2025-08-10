@@ -1,0 +1,155 @@
+From 38703a11d34bd1ab61924f580ba543b75f7484a8 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Sun, 10 Aug 2025 11:51:37 +0200
+Subject: [PATCH] [cryptix]: implement sys_socket, and sys_init_module syscalls
+
+---
+ sysdeps/cryptix/include/cryptix/syscall.h |  2 +
+ sysdeps/cryptix/sysdeps/system.cpp        | 91 +++++++++++++----------
+ sysdeps/cryptix/sysdeps/vfs.cpp           |  8 ++
+ 3 files changed, 61 insertions(+), 40 deletions(-)
+
+diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
+index 154dd5e0..353c6b97 100644
+--- a/sysdeps/cryptix/include/cryptix/syscall.h
++++ b/sysdeps/cryptix/include/cryptix/syscall.h
+@@ -39,6 +39,7 @@ constexpr size_t SYS_DUP = 32;
+ constexpr size_t SYS_DUP2 = 33;
+ constexpr size_t SYS_NANOSLEEP = 35;
+ constexpr size_t SYS_GETPID = 39;
++constexpr size_t SYS_SOCKET = 41;
+ constexpr size_t SYS_FORK = 57;
+ constexpr size_t SYS_EXECVE = 59;
+ constexpr size_t SYS_EXIT = 60;
+@@ -85,6 +86,7 @@ constexpr size_t SYS_SYNC = 162;
+ constexpr size_t SYS_MOUNT = 165;
+ constexpr size_t SYS_UMOUNT = 166;
+ constexpr size_t SYS_REBOOT = 169;
++constexpr size_t SYS_INIT_MODULE = 175;
+ constexpr size_t SYS_GETDENTS64 = 217;
+ constexpr size_t SYS_CLOCK_GETTIME = 228;
+ constexpr size_t SYS_PANIC = 255;
+diff --git a/sysdeps/cryptix/sysdeps/system.cpp b/sysdeps/cryptix/sysdeps/system.cpp
+index e49ec356..f6e8c5da 100644
+--- a/sysdeps/cryptix/sysdeps/system.cpp
++++ b/sysdeps/cryptix/sysdeps/system.cpp
+@@ -10,46 +10,57 @@
+ 
+ using namespace cryptix;
+ 
+-RebootCmd cryptix_reboot_cmd(unsigned int what)
+-{
+-    switch (what)
+-    {
+-        case 0x01234567: return RebootCmd::eRestart;
+-        case 0xCDEF0123: return RebootCmd::eHalt;
+-        case 0x4321FEDC: return RebootCmd::ePowerOff;
+-        case 0xA1B2C3D4: return RebootCmd::eRestart2;
+-        case 0xD000FCE2: return RebootCmd::eSuspend;
+-        case 0x45584543: return RebootCmd::eKexec;
+-
+-        default: break;
+-    }
+-
+-    return RebootCmd::eUndefined;
++RebootCmd cryptix_reboot_cmd(unsigned int what) {
++	switch (what) {
++		case 0x01234567:
++			return RebootCmd::eRestart;
++		case 0xCDEF0123:
++			return RebootCmd::eHalt;
++		case 0x4321FEDC:
++			return RebootCmd::ePowerOff;
++		case 0xA1B2C3D4:
++			return RebootCmd::eRestart2;
++		case 0xD000FCE2:
++			return RebootCmd::eSuspend;
++		case 0x45584543:
++			return RebootCmd::eKexec;
++
++		default:
++			break;
++	}
++
++	return RebootCmd::eUndefined;
++}
++
++namespace mlibc {
++int sys_getrlimit(int resource, struct rlimit *rlim) {
++	auto ret = Syscall(SYS_GETRLIMIT, resource, rlim);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
+ }
++int sys_getrusage(int who, struct rusage *usage) {
++	auto ret = Syscall(SYS_GETRUSAGE, who, usage);
++	if (auto e = syscall_error(ret); e)
++		return e;
+ 
+-namespace mlibc
+-{
+-    int sys_getrlimit(int resource, struct rlimit* rlim)
+-    {
+-        auto ret = Syscall(SYS_GETRLIMIT, resource, rlim);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_getrusage(int who, struct rusage* usage)
+-    {
+-        auto ret = Syscall(SYS_GETRUSAGE, who, usage);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_reboot(int what)
+-    {
+-        auto cmd = cryptix_reboot_cmd(what);
+-
+-        auto ret = Syscall(SYS_REBOOT, cmd);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
++	return 0;
++}
++int sys_reboot(int what) {
++	auto cmd = cryptix_reboot_cmd(what);
++
++	auto ret = Syscall(SYS_REBOOT, cmd);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_init_module(void *module, unsigned long length, const char *args) {
++	auto ret = Syscall(SYS_INIT_MODULE, module, length, args);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
+ }; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/vfs.cpp b/sysdeps/cryptix/sysdeps/vfs.cpp
+index 58bb14d0..cce2cfa0 100644
+--- a/sysdeps/cryptix/sysdeps/vfs.cpp
++++ b/sysdeps/cryptix/sysdeps/vfs.cpp
+@@ -158,6 +158,14 @@ int sys_dup2(int fd, int flags, int newfd) {
+ 
+ 	return 0;
+ }
++int sys_socket(int family, int type, int protocol, int *fd) {
++	auto ret = Syscall(SYS_SOCKET, family, type, protocol);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*fd = ret;
++	return 0;
++}
+ 
+ int sys_uname(struct utsname *out) {
+ 	auto ret = Syscall(SYS_UNAME, out);
+-- 
+2.50.1
+

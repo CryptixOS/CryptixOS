@@ -164,6 +164,7 @@ class Process
     ErrorOr<isize> OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
     ErrorOr<isize> DupFd(isize oldFdNum, isize newFdNum, isize flags);
     i32            CloseFd(i32 fd);
+    ErrorOr<isize> InsertFd(Ref<FileDescriptor> fd);
     ErrorOr<isize> OpenPipe(i32* pipeFds);
     inline bool    IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
     ErrorOr<Ref<FileDescriptor>> GetFileDescriptor(isize fdNum);
