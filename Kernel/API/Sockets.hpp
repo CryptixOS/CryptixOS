@@ -47,7 +47,7 @@ enum class NetLinkProtocol : i64
     eUserSock      = 0x02,
     eFireWall      = 0x03,
     eSockDiag      = 0x04,
-    eNetFitlerLog  = 0x05,
+    eNetFilterLog  = 0x05,
     eXFRM          = 0x06,
     eSELinux       = 0x07,
     eISCSI         = 0x08,
