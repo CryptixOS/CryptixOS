@@ -11,6 +11,7 @@
 #include <Arch/x86_64/Drivers/Time/PIT.hpp>
 
 #include <Boot/BootInfo.hpp>
+#include <Boot/CommandLine.hpp>
 #include <Debug/Panic.hpp>
 
 #include <Memory/MM.hpp>
@@ -259,7 +260,10 @@ namespace CPU
             current->IsOnline = true;
         }
 
-        IDT::SetIST(Lapic::Instance()->InterruptVector(), 1);
+        if (auto timer = CommandLine::String("scheduler.timer");
+            timer.Empty() || timer == "lapic"_sv)
+            IDT::SetIST(Lapic::Instance()->InterruptVector(), 1);
+        else IDT::SetIST(PIT::Instance()->InterruptVector(), 1);
         LogInfo("BSP: Initialized");
 
         Identify();
@@ -545,7 +549,7 @@ namespace CPU
     }
     void Reschedule(Timestep interval)
     {
-        Assert(Lapic::Instance()->Start(TimerMode::eOneShot, interval));
+        Time::SchedulerTimer()->Start(TimerMode::eOneShot, interval);
     }
 
     bool EnableSSE()

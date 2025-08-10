@@ -252,7 +252,10 @@ namespace IDT
         {
             if ((hint >= 0x20 && hint <= (0x20 + 15))
                 && !s_InterruptHandlers[hint].IsUsed())
-                return &s_InterruptHandlers[hint];
+            {
+                auto handler = &s_InterruptHandlers[hint];
+                handler->SetInterruptVector(hint);
+            }
         }
 
         for (usize i = hint; i < 256; i++)

@@ -8,11 +8,6 @@
 #include <Arch/InterruptHandler.hpp>
 #include <Arch/InterruptManager.hpp>
 
-#ifdef CTOS_TARGET_X86_64
-    #include <Arch/x86_64/Drivers/IoApic.hpp>
-    #include <Arch/x86_64/Drivers/Time/Lapic.hpp>
-#endif
-
 #include <Library/Locking/Spinlock.hpp>
 #include <Memory/PMM.hpp>
 
@@ -154,7 +149,7 @@ void Scheduler::Initialize()
     for (usize i = 0; i < cpuCount; i++)
         s_CPULocalData[i].PreemptionEnabled.Store(true);
     s_SchedulerEnabled = true;
-    Time::GetSchedulerTimer()->SetCallback<Tick>();
+    Time::SchedulerTimer()->SetCallback<Tick>();
 
     LogInfo("Scheduler: Kernel process created");
     LogInfo("Scheduler: Initialized");
@@ -182,7 +177,8 @@ void Scheduler::PrepareAP(bool start)
     {
         CPU::SetInterruptFlag(true);
 
-        CPU::WakeUp(0, true);
+        Time::SchedulerTimer()->Start(TimerMode::eOneShot, 1'000_ms);
+        // CPU::WakeUp(0, true);
         for (;;) Arch::Halt();
     }
 };
@@ -231,18 +227,14 @@ void Scheduler::Unblock(Thread* thread)
         EnqueueThread(thread);
     }
 
-#ifdef CTOS_TARGET_X86_64
-    Lapic::Instance()->SendIpi(Time::GetSchedulerTimer()->InterruptVector(),
-                               CPU::Current()->LapicID);
-#endif
+    Time::SchedulerTimer()->Start(TimerMode::eOneShot,
+                                  thread->Parent()->Quantum());
 }
 
 void Scheduler::Yield(bool saveCtx)
 {
     CPU::SetInterruptFlag(false);
-#ifdef CTOS_TARGET_X86_64
-    Lapic::Instance()->Stop();
-#endif
+    Time::SchedulerTimer()->Stop();
 
     Thread* currentThread = Thread::Current();
     if (saveCtx) currentThread->YieldAwaitLock.Acquire();
@@ -256,10 +248,8 @@ void Scheduler::Yield(bool saveCtx)
 #endif
     }
 
-#ifdef CTOS_TARGET_X86_64
-    Lapic::Instance()->SendIpi(Time::GetSchedulerTimer()->InterruptVector(),
-                               CPU::Current()->LapicID);
-#endif
+    Time::SchedulerTimer()->Start(TimerMode::eOneShot,
+                                  Process::Current()->Quantum());
 
     CPU::SetInterruptFlag(true);
 
@@ -424,5 +414,7 @@ void Scheduler::Tick(CPUContext* ctx)
         newThread->SetState(ThreadState::eRunning);
 
 reschedule:
-    CPU::Reschedule(newThread->Parent()->m_Quantum * 1_ms);
+    Time::SchedulerTimer()->Start(TimerMode::eOneShot,
+                                  newThread->Parent()->Quantum() * 1_ms);
+    // CPU::Reschedule(newThread->Parent()->m_Quantum * 1_ms);
 }

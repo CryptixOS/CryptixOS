@@ -7,6 +7,7 @@
 #include <Arch/Arch.hpp>
 #include <Arch/CPU.hpp>
 
+#include <Boot/CommandLine.hpp>
 #include <Debug/Assertions.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
 
@@ -82,15 +83,30 @@ namespace Time
         Assert(s_HardwareTimers.Size() > 0);
 
         LogInfo("Time: Detected {} timers", s_HardwareTimers.Size());
+        for (auto timer : s_HardwareTimers) timer->Stop();
+
         auto cpuLocalTimer
             = FindIf(s_HardwareTimers.begin(), s_HardwareTimers.end(),
                      [](auto it) -> bool { return it->IsCPULocal(); });
-        s_SchedulerTimer = cpuLocalTimer != s_HardwareTimers.end()
-                             ? *cpuLocalTimer
-                             : s_HardwareTimers.Head();
+        auto nonCpuLocalTimer
+            = FindIf(s_HardwareTimers.begin(), s_HardwareTimers.end(),
+                     [](auto it) -> bool { return !it->IsCPULocal(); });
+
+        auto requestedTimer = CommandLine::String("scheduler.timer");
+        LogTrace("Time: Requested `{}` timer for scheduling", requestedTimer);
+
+        if ((requestedTimer == "lapic"_sv || requestedTimer.Empty())
+            && cpuLocalTimer != s_HardwareTimers.end())
+            s_SchedulerTimer = *cpuLocalTimer;
+        else if (nonCpuLocalTimer != s_HardwareTimers.end())
+            s_SchedulerTimer = *nonCpuLocalTimer;
+        else s_SchedulerTimer = s_HardwareTimers.Head();
+
+        LogInfo("Time: Using `{}` as a timer for scheduling",
+                s_SchedulerTimer->ModelString());
     }
 
-    HardwareTimer* GetSchedulerTimer() { return s_SchedulerTimer; }
+    HardwareTimer* SchedulerTimer() { return s_SchedulerTimer; }
 
     ErrorOr<void>  RegisterTimer(HardwareTimer* timer)
     {

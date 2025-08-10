@@ -85,5 +85,8 @@ void PIT::SetReloadValue(u16 reloadValue)
 void PIT::Tick(struct CPUContext* ctx)
 {
     Instance()->m_Tick++;
+
+    auto& callback = Instance()->m_OnTickCallback;
+    if (callback) callback(ctx);
     Time::Tick((1'000 / FREQUENCY) * 1'000'000);
 }

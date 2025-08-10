@@ -156,6 +156,8 @@ class Process
     inline mode_t              Umask() const { return m_Umask; }
     mode_t                     Umask(mode_t mask);
 
+    inline Timestep            Quantum() const { return m_Quantum; }
+
     static void                SendGroupSignal(ProcessID pgid, i32 signal);
     void                       SendSignal(i32 signal);
 
@@ -207,7 +209,7 @@ class Process
     class AddressSpace  m_AddressSpace;
 
     Pointer             m_UserStackTop = 0x70000000000u;
-    usize               m_Quantum      = 1000;
+    usize               m_Quantum      = 1'000;
     Spinlock            m_Lock;
     Event               m_Event;
 

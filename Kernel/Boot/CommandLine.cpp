@@ -14,21 +14,22 @@
 
 namespace CommandLine
 {
-    static StringView                   s_KernelCommandLine = ""_sv;
-    static UnorderedMap<String, String> s_OptionMap;
+    static StringView s_KernelCommandLine = ""_sv;
+    static UnorderedMap<Prism::String, Prism::String> s_OptionMap;
 
-    void                                ParseArguments(StringView args)
+    void ParseArguments(StringView args)
     {
-        UnorderedMap<String, String>& result = s_OptionMap;
-        usize                         pos    = 0;
+        UnorderedMap<Prism::String, Prism::String>& result = s_OptionMap;
+        usize                                       pos    = 0;
         if (args.StartsWith("\"")) args.RemovePrefix(1);
         if (args.EndsWith("\"")) args.RemoveSuffix(1);
 
         while (pos < args.Size())
         {
             // Skip leading whitespace
-            while (pos < args.Size()
-                   && StringUtils::IsSpace(static_cast<unsigned char>(args[pos])))
+            while (
+                pos < args.Size()
+                && StringUtils::IsSpace(static_cast<unsigned char>(args[pos])))
                 ++pos;
 
             // Ensure there's an argument to process
@@ -42,7 +43,8 @@ namespace CommandLine
 
                 // Find the end of the argument
                 while (pos < args.Size()
-                       && !StringUtils::IsSpace(static_cast<unsigned char>(args[pos])))
+                       && !StringUtils::IsSpace(
+                           static_cast<unsigned char>(args[pos])))
                     ++pos;
 
                 // Extract the argument substring
@@ -53,15 +55,15 @@ namespace CommandLine
                 if (delimiterPos != StringView::NPos)
                 {
                     // Argument has a key=value format
-                    String key(arg.Substr(0, delimiterPos));
-                    auto   value = arg.Substr(delimiterPos + 1);
-                    result[key]  = String(value);
+                    Prism::String key(arg.Substr(0, delimiterPos));
+                    auto          value = arg.Substr(delimiterPos + 1);
+                    result[key]         = Prism::String(value);
 
                     continue;
                 }
 
                 // Argument is a flag without a value
-                result[String(arg)] = String("");
+                result[Prism::String(arg)] = String("");
                 continue;
             }
 
@@ -87,19 +89,27 @@ namespace CommandLine
     StringView KernelCommandLine() { return s_KernelCommandLine; }
 
     bool       Contains(StringView key) { return s_OptionMap.Contains(key); }
-    Optional<bool> GetBoolean(StringView key)
+
+    Optional<bool> Boolean(StringView key)
     {
-        auto it = s_OptionMap.Find(String(key));
+        auto it = s_OptionMap.Find(Prism::String(key));
         if (it != s_OptionMap.end())
             return it->Value == "true"_sv || it->Value == "1"_sv;
 
         return NullOpt;
     }
-    StringView GetString(StringView key)
+    StringView String(StringView key)
     {
-        auto it = s_OptionMap.Find(String(key));
+        auto it = s_OptionMap.Find(Prism::String(key));
         if (it != s_OptionMap.end()) return it->Value;
 
-        return "";
+        return ""_s;
+    }
+
+    Optional<bool> GetBoolean(StringView key) { return Boolean(key); }
+    StringView     GetString(StringView key)
+    {
+        auto value = String(key);
+        return value;
     }
 }; // namespace CommandLine

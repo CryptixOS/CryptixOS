@@ -17,7 +17,7 @@
 namespace Time
 {
     void           Initialize(DateTime bootTime);
-    HardwareTimer* GetSchedulerTimer();
+    HardwareTimer* SchedulerTimer();
 
     ErrorOr<void>  RegisterTimer(HardwareTimer* timer);
     ErrorOr<void>  RegisterClockSource(ClockSource* clock);

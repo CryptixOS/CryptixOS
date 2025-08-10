@@ -16,6 +16,10 @@ namespace CommandLine
 
     StringView     KernelCommandLine();
     bool           Contains(StringView key);
+
+    Optional<bool> Boolean(StringView key);
+    StringView     String(StringView key);
+
     Optional<bool> GetBoolean(StringView key);
     StringView     GetString(StringView key);
 }; // namespace CommandLine
