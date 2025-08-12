@@ -18,6 +18,9 @@ class Socket : public File
     static ErrorOr<Socket*> Create(SocketDomain domain, SocketType type,
                                    NetworkProtocol protocol);
 
+    virtual ErrorOr<void>   Bind(const struct sockaddr* addr, socklen_t addrlen)
+        = 0;
+
   protected:
     SocketDomain    m_Domain = SocketDomain::eUnspecified;
     SocketType      m_Type   = SocketType::eRaw;

@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Posix/linux/netlink.h>
 #include <Network/NetLinkSocket.hpp>
 
 NetLinkSocket::NetLinkSocket(SocketDomain domain, SocketType type,
@@ -23,4 +24,13 @@ ErrorOr<NetLinkSocket*> NetLinkSocket::Create(SocketDomain    domain,
         return Error(EPROTONOSUPPORT);
 
     return new NetLinkSocket(domain, type, protocol);
+}
+
+ErrorOr<void> NetLinkSocket::Bind(const struct sockaddr* addr, socklen_t len)
+{
+    sockaddr_nl nladdr
+        = CPU::CopyFromUser(*reinterpret_cast<const sockaddr_nl*>(addr));
+    if (nladdr.nl_family != AF_NETLINK) return Error(EINVAL);
+
+    return Error(ENOSYS);
 }

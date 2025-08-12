@@ -16,4 +16,7 @@ class NetLinkSocket : public Socket
 
     static ErrorOr<NetLinkSocket*> Create(SocketDomain domain, SocketType type,
                                           NetLinkProtocol protocol);
+
+    virtual ErrorOr<void>          Bind(const struct sockaddr* addr,
+                                        socklen_t              len) override;
 };
