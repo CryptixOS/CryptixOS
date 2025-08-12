@@ -6,7 +6,10 @@
  */
 #include <AtKeyboard.hpp>
 #include <Scancodes.hpp>
-#include <x86_64/input/i8042/I8042.hpp>
+
+#ifdef __x86_64__
+    #include <x86_64/input/i8042/I8042.hpp>
+#endif
 
 #include <Arch/PowerManager.hpp>
 #include <Boot/CommandLine.hpp>
@@ -203,6 +206,7 @@ extern "C" CTOS_EXPORT bool ModuleInit()
 {
     LogInfo("Hello, World from Kernel Module");
 
+#ifdef __x86_64__
     auto ctrl        = I8042::Instance();
     auto scancodeSet = Ps2ScanCodeSet::eSet1;
 
@@ -212,6 +216,7 @@ extern "C" CTOS_EXPORT bool ModuleInit()
     DeviceManager::RegisterCharDevice(kbd.Raw());
 
     ctrl->RegisterPort(SerioDevicePort::ePort1, kbd);
+#endif
     return true;
 }
 
