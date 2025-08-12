@@ -6,8 +6,6 @@
  */
 #include <API/DeviceIDs.hpp>
 #include <Arch/CPU.hpp>
-#include <Arch/InterruptHandler.hpp>
-#include <Arch/InterruptManager.hpp>
 
 #include <Drivers/Core/DeviceManager.hpp>
 #include <Drivers/Storage/NVMe/NVMeController.hpp>

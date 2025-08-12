@@ -10,6 +10,7 @@
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
+#include <System/InterruptHandler.hpp>
 
 CTOS_NO_KASAN void dumpProcessInfo()
 {
@@ -31,7 +32,7 @@ inline static void enterPanicMode()
 
 static Atomic<u64> s_HaltedCPUs = 0;
 [[noreturn]]
-void HaltAndCatchFire(CPUContext* context)
+IrqResult HaltAndCatchFire(Device*, CPUContext* context)
 {
     EarlyLogFatal("CPU[%d]: Halted", CPU::GetCurrentID());
 

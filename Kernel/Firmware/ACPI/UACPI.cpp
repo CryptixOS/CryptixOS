@@ -5,8 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/CPU.hpp>
-#include <Arch/InterruptHandler.hpp>
-#include <Arch/InterruptManager.hpp>
+#include <System/InterruptManager.hpp>
 
 #include <mutex>
 
@@ -405,25 +404,27 @@ namespace uACPI
 
         uacpi_interrupt_handler s_Handlers[255]{};
         uacpi_handle            s_Contexts[255]{};
-        void                    OnInterrupt(CPUContext* ctx)
+        IrqResult               OnInterrupt(Device*, CPUContext* ctx)
         {
             auto handler = s_Handlers[ctx->interruptVector];
             if (handler) handler(s_Contexts[ctx->interruptVector]);
+
+            return IrqResult::eHandled;
         }
 
         uacpi_status uacpi_kernel_install_interrupt_handler(
             uacpi_u32 irq, uacpi_interrupt_handler uhandler, uacpi_handle ctx,
             uacpi_handle* outIrqHandle)
         {
-            auto handler = InterruptManager::AllocateHandler(irq);
-            handler->Reserve();
+            Ref<InterruptDispatcher> handler
+                = InterruptManager::AllocateHandler(irq, nullptr, "uacpi");
+
             handler->SetHandler(OnInterrupt);
             s_Handlers[irq] = uhandler;
             s_Contexts[irq] = ctx;
-            InterruptManager::Unmask(handler->GetInterruptVector());
+            handler->Unmask();
 
-            *reinterpret_cast<usize*>(outIrqHandle)
-                = handler->GetInterruptVector();
+            *reinterpret_cast<usize*>(outIrqHandle) = handler->IrqLine() + 0x20;
             return UACPI_STATUS_OK;
         }
 

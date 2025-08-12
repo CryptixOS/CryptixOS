@@ -121,9 +121,8 @@ ErrorOr<Ref<ELF::Image>>
 ExecutableProgram::LoadImage(PathView path, PageMap* pageMap,
                              AddressSpace& addressSpace, bool interpreter)
 {
-    Ref entry = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), path)
-                    .Value()
-                    .Entry;
+    Ref entry
+        = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), path).Value().Entry;
     if (!entry) return Error(ENOENT);
 
     auto inode = entry->INode();
@@ -138,7 +137,8 @@ ExecutableProgram::LoadImage(PathView path, PageMap* pageMap,
 
     if (!image->Load(file.Raw(), m_LoadBase)) return Error(ENOEXEC);
 
-    auto forEachProgramHeader = [&](ELF::ProgramHeader* header) -> bool
+    auto forEachProgramHeader
+        = [&](ELF::ProgramHeader* header) -> IterationResult
     {
         if (header->Type == ELF::HeaderType::eLoad)
         {
@@ -168,10 +168,10 @@ ExecutableProgram::LoadImage(PathView path, PageMap* pageMap,
             //     m_InterpreterBase = std::min(m_InterpreterBase, virt);
         }
 
-        return true;
+        return IterationResult::eContinue;
     };
 
-    ELF::Image::ProgramHeaderEnumerator programHeaderIterator;
+    ELF::Image::ProgramHeaderIterator programHeaderIterator;
     programHeaderIterator.BindLambda(forEachProgramHeader);
 
     image->ForEachProgramHeader(programHeaderIterator);

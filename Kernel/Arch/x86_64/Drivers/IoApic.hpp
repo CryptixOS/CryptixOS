@@ -8,6 +8,7 @@
 
 #include <Common.hpp>
 
+#include <Drivers/InterruptController.hpp>
 #include <Prism/Containers/Vector.hpp>
 
 #include <Prism/Memory/Pointer.hpp>
@@ -194,4 +195,16 @@ class IoApic final
     inline usize   GetGsiCount() const { return m_RedirectionEntryCount; }
 
     static IoApic& GetIoApicForGsi(u32 gsi);
+};
+
+class IoApicController : public InterruptController
+{
+  public:
+    virtual ErrorOr<void> Initialize() override;
+    virtual ErrorOr<void> Shutdown() override;
+
+    virtual ErrorOr<void> Mask(u32 irq) override;
+    virtual ErrorOr<void> Unmask(u32 irq) override;
+
+    virtual ErrorOr<void> SendEOI(u32 irq) override;
 };

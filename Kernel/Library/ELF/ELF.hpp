@@ -8,7 +8,7 @@
 
 #include <Common.hpp>
 
-#include <Library/ELF_Definitions.hpp>
+#include <Library/ELF/ELF_Definitions.hpp>
 
 #include <Prism/Containers/RedBlackTree.hpp>
 #include <Prism/Core/Error.hpp>
@@ -45,17 +45,24 @@ namespace ELF
         usize                       SectionHeaderCount();
         struct SectionHeader*       SectionHeader(usize index);
 
-        using ProgramHeaderEnumerator = Delegate<bool(struct ProgramHeader*)>;
-        void ForEachProgramHeader(ProgramHeaderEnumerator enumerator);
+        using ProgramHeaderIterator
+            = Delegate<IterationResult(struct ProgramHeader*)>;
+        void ForEachProgramHeader(ProgramHeaderIterator& it);
 
-        using SectionHeaderEnumerator = Delegate<bool(struct SectionHeader*)>;
-        void ForEachSectionHeader(SectionHeaderEnumerator enumerator);
+        using SectionHeaderIterator
+            = Delegate<IterationResult(struct SectionHeader*)>;
+        void ForEachSectionHeader(SectionHeaderIterator& it);
 
-        using SymbolEntryEnumerator
-            = Delegate<bool(Symbol& symbol, StringView name)>;
-        void ForEachSymbolEntry(SymbolEntryEnumerator enumerator);
-        using SymbolEnumerator = Delegate<bool(StringView name, Pointer value)>;
-        void ForEachSymbol(SymbolEnumerator enumerator);
+        using RelocationEntryIterator = Delegate<IterationResult(
+            struct SectionHeader&, const struct RelocationEntry&)>;
+        void ForEachRelocationEntry(RelocationEntryIterator& it);
+
+        using SymbolEntryIterator
+            = Delegate<IterationResult(Symbol& symbol, StringView name)>;
+        void ForEachSymbolEntry(SymbolEntryIterator it);
+        using SymbolIterator
+            = Delegate<IterationResult(StringView name, Pointer value)>;
+        void ForEachSymbol(SymbolIterator it);
 
         using SymbolLookup = Delegate<u64(StringView name)>;
         ErrorOr<void>  ApplyRelocations(SymbolLookup lookup);

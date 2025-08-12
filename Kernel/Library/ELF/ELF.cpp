@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Library/ELF.hpp>
+#include <Library/ELF/ELF.hpp>
 #include <Library/Module.hpp>
 
 #include <Memory/AddressSpace.hpp>
@@ -80,20 +80,51 @@ namespace ELF
         return header.As<struct SectionHeader>();
     }
 
-    void Image::ForEachProgramHeader(ProgramHeaderEnumerator enumerator)
+    void Image::ForEachProgramHeader(ProgramHeaderIterator& it)
     {
         usize entryCount = m_Header.ProgramEntryCount;
         for (usize i = 0; i < entryCount; i++)
-            if (!enumerator(ProgramHeader(i))) break;
+            if (it(ProgramHeader(i)) == IterationResult::eBreak) break;
     }
-    void Image::ForEachSectionHeader(SectionHeaderEnumerator enumerator)
+    void Image::ForEachSectionHeader(SectionHeaderIterator& it)
     {
         usize entryCount = m_Header.SectionEntryCount;
         for (usize i = 0; i < entryCount; i++)
-            if (!enumerator(SectionHeader(i))) break;
+            if (it(SectionHeader(i)) == IterationResult::eBreak) break;
+    }
+    void Image::ForEachRelocationEntry(RelocationEntryIterator& it)
+    {
+        for (usize i = 0; i < SectionHeaderCount(); ++i)
+        {
+            auto& relocSection = *SectionHeader(i);
+            if (relocSection.Type != ToUnderlying(SectionType::eRelA)) continue;
+
+            // Target section that relocations apply to
+            u32 targetIndex = relocSection.Info;
+            if (targetIndex >= SectionHeaderCount())
+            {
+                LogWarn(
+                    "ELF: Invalid relocation section index => {}, section "
+                    "header count: {}",
+                    targetIndex, SectionHeaderCount());
+                continue;
+            }
+
+            auto* relocs = reinterpret_cast<RelocationEntry*>(
+                m_Image.Raw() + relocSection.Offset);
+            usize relocCount = relocSection.Size / sizeof(RelocationEntry);
+
+            for (usize r = 0; r < relocCount; ++r)
+            {
+                const auto& reloc = relocs[r];
+                if (it(relocSection, reloc) == IterationResult::eBreak)
+                    goto end;
+            }
+        }
+    end:
     }
 
-    void Image::ForEachSymbolEntry(SymbolEntryEnumerator enumerator)
+    void Image::ForEachSymbolEntry(SymbolEntryIterator it)
     {
         if (m_SymbolSection->Size == 0) return;
         if (m_StringSection->Size == 0) return;
@@ -105,15 +136,15 @@ namespace ELF
         for (usize i = 0; i < count; i++)
         {
             auto name = LookupString(symbolTable[i].Name);
-            if (!enumerator(symbolTable[i], name)) break;
+            if (it(symbolTable[i], name) == IterationResult::eBreak) break;
         }
     }
-    void Image::ForEachSymbol(SymbolEnumerator enumerator)
+    void Image::ForEachSymbol(SymbolIterator it)
     {
         if (m_Symbols.IsEmpty() && !LoadSymbols()) return;
 
         for (const auto& [name, value] : m_Symbols)
-            if (!enumerator(name, value)) break;
+            if (it(name, value) == IterationResult::eBreak) break;
     }
 
     ErrorOr<void> Image::ApplyRelocations(SymbolLookup lookup)
@@ -190,101 +221,106 @@ namespace ELF
         }
 
         m_Symbols.Clear();
-        for (usize i = 0; i < SectionHeaderCount(); ++i)
+        auto resolveSymbols
+            = [&](struct SectionHeader&         section,
+                  const struct RelocationEntry& reloc) -> IterationResult
         {
-            auto& relocSection = *SectionHeader(i);
-            if (relocSection.Type != ToUnderlying(SectionType::eRelA)) continue;
+            const auto& symbolTableSection = *SectionHeader(section.Link);
+            const auto& stringTableSection
+                = *SectionHeader(symbolTableSection.Link);
 
-            // Target section that relocations apply to
-            u32 targetIndex = relocSection.Info;
-            if (targetIndex >= SectionHeaderCount()) return Error(ENOEXEC);
+            auto* stringTable = reinterpret_cast<const char*>(
+                m_Image.Raw() + stringTableSection.Offset);
 
+            auto* symbols = reinterpret_cast<Symbol*>(
+                m_Image.Raw() + symbolTableSection.Offset);
+
+            u32         symbolIndex   = reloc.Info >> 32;
+            auto&       symbol        = symbols[symbolIndex];
+
+            const char* symbolName    = stringTable + symbol.Name;
+            u64         symbolAddress = 0;
+            if (symbol.SectionIndex == SHN_UNDEF)
+                symbolAddress = lookup(symbolName);
+            else symbolAddress = m_LoadBase.Offset(symbol.Value);
+
+            m_Symbols[symbolName] = symbolAddress;
+            return IterationResult::eContinue;
+        };
+        RelocationEntryIterator resolveSymbolsIt;
+        resolveSymbolsIt.BindLambda(resolveSymbols);
+        ForEachRelocationEntry(resolveSymbolsIt);
+
+        auto applyRelocation
+            = [&](struct SectionHeader&         section,
+                  const struct RelocationEntry& reloc) -> IterationResult
+        {
+            u32   targetIndex   = section.Info;
             auto& targetSection = *SectionHeader(targetIndex);
             u8*   targetBase    = m_LoadBase.Offset<u8*>(targetSection.Offset);
 
+            auto  type = static_cast<RelocationType>(reloc.Info & 0xffffffff);
+            u32   symbolIndex              = reloc.Info >> 32;
+            u8*   patch                    = targetBase + reloc.Offset;
+
             // Symbol table and string table
-            const auto& symtabSection = *SectionHeader(relocSection.Link);
-            const auto& strtabSection = *SectionHeader(symtabSection.Link);
+            const auto& symbolTableSection = *SectionHeader(section.Link);
+            const auto& stringTableSection
+                = *SectionHeader(symbolTableSection.Link);
 
-            auto*       symbols       = reinterpret_cast<Symbol*>(m_Image.Raw()
-                                                                  + symtabSection.Offset);
-            auto*       strtab        = reinterpret_cast<const char*>(
-                m_Image.Raw() + strtabSection.Offset);
-            usize symCount = symtabSection.Size / sizeof(Symbol);
+            auto* stringTable = reinterpret_cast<const char*>(
+                m_Image.Raw() + stringTableSection.Offset);
 
-            auto* relocs   = reinterpret_cast<RelocationEntry*>(
-                m_Image.Raw() + relocSection.Offset);
-            usize relocCount = relocSection.Size / sizeof(RelocationEntry);
+            auto* symbols = reinterpret_cast<Symbol*>(
+                m_Image.Raw() + symbolTableSection.Offset);
 
-            for (usize r = 0; r < relocCount; ++r)
+            auto&       symbol        = symbols[symbolIndex];
+            const char* symbolName    = stringTable + symbol.Name;
+
+            auto        symbolIt      = m_Symbols.Find(symbolName);
+            u64         symbolAddress = 0;
+            if (symbolIt != m_Symbols.end()) symbolAddress = symbolIt->Value;
+
+            usize loadEnd = m_LoadBase.Offset(size);
+
+            switch (type)
             {
-                const auto&    reloc = relocs[r];
-                RelocationType type
-                    = static_cast<RelocationType>(reloc.Info & 0xffffffff);
-                u32 symIndex = reloc.Info >> 32;
-                u8* patch    = targetBase + reloc.Offset;
-
-                u64 symAddr  = 0;
-                if (symIndex >= symCount) return Error(ENOEXEC);
-
-                auto&       sym     = symbols[symIndex];
-                const char* symName = strtab + sym.Name;
-                usize       loadEnd = m_LoadBase.Offset(size);
-
-                switch (type)
+                case RelocationType::e64:
+                case RelocationType::eGlobDat:
+                case RelocationType::eJumpSlot:
                 {
-                    case RelocationType::e64:
-                    case RelocationType::eGlobDat:
-                    case RelocationType::eJumpSlot:
-                    {
-                        if (sym.SectionIndex == SHN_UNDEF)
-                        {
-                            symAddr = lookup(symName);
-                            if (!symAddr)
-                                LogWarn(
-                                    "ELF: Failed to resolve `{}` symbol's "
-                                    "address",
-                                    symName);
-                        }
-                        else
-                        {
-                            symAddr = m_LoadBase.Offset(sym.Value);
-                            if (symAddr < m_LoadBase.Raw()
-                                || symAddr >= loadEnd)
-                                LogWarn(
-                                    "ELF: The address at `{:#x}` is out of "
-                                    "bounds",
-                                    symAddr);
-                        }
-
-                        *reinterpret_cast<u64*>(patch) = symAddr;
-                        m_Symbols[symName]             = symAddr;
-
-                        break;
-                    }
-                    case RelocationType::eRelative:
-                    {
-                        symAddr = m_LoadBase.Offset(reloc.Addend);
-                        *reinterpret_cast<u64*>(patch) = symAddr;
-                        m_Symbols[symName]             = symAddr;
-
-                        if (symAddr < m_LoadBase.Raw() || symAddr >= loadEnd)
-                            LogWarn(
-                                "ELF: The address at `{:#x}` is out of "
-                                "bounds",
-                                symAddr);
-                        break;
-                    }
-                    default:
-                        LogError("ELF: Unsupported relocation type: {}",
-                                 static_cast<u32>(type));
-                        return Error(ENOEXEC);
+                    *reinterpret_cast<u64*>(patch) = symbolAddress;
+                    break;
                 }
+                case RelocationType::eRelative:
+                {
+                    symbolAddress = m_LoadBase.Offset(reloc.Addend);
+                    *reinterpret_cast<u64*>(patch) = symbolAddress;
+                    m_Symbols[symbolName]          = symbolAddress;
 
-                if (symName == "ModuleInit"_sv)
-                    m_AuxiliaryVector.EntryPoint = symAddr;
+                    if (symbolAddress < m_LoadBase.Raw()
+                        || symbolAddress >= loadEnd)
+                        LogWarn(
+                            "ELF: The address at `{:#x}` is out of "
+                            "bounds",
+                            symbolAddress);
+                    break;
+                }
+                default:
+                    LogError("ELF: Unsupported relocation type: {}",
+                             static_cast<u32>(type));
+                    // return Error(ENOEXEC);
             }
-        }
+
+            if (symbolName == "ModuleInit"_sv)
+                m_AuxiliaryVector.EntryPoint = symbolAddress;
+
+            return IterationResult::eContinue;
+        };
+
+        RelocationEntryIterator relocIt;
+        relocIt.BindLambda(applyRelocation);
+        ForEachRelocationEntry(relocIt);
 
         return {};
     }
@@ -348,11 +384,11 @@ namespace ELF
     }
     void Image::DumpSymbols()
     {
-        SymbolEntryEnumerator it;
+        SymbolEntryIterator it;
 
-        usize                 i = 0;
+        usize               i = 0;
         it.BindLambda(
-            [&](Symbol& symbol, StringView name) -> bool
+            [&](Symbol& symbol, StringView name) -> IterationResult
             {
                 u64  value        = symbol.Value;
                 auto sectionIndex = symbol.SectionIndex;
@@ -364,7 +400,7 @@ namespace ELF
                                 : "Undefined");
 
                 ++i;
-                return true;
+                return IterationResult::eContinue;
             });
         ForEachSymbolEntry(it);
     }

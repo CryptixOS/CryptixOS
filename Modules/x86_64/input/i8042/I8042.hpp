@@ -1,15 +1,24 @@
 /*
- * Created by v1tr10l7 on 05.12.2024.
- * Copyright (c) 2024-2024, Szymon Zemke <v1tr10l7@proton.me>
+ * Created by v1tr10l7 on 10.08.2025.
+ * Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
  *
  * SPDX-License-Identifier: GPL-3
  */
 #pragma once
 
+#include <API/DeviceIDs.hpp>
+#include <Arch/x86_64/IO.hpp>
 #include <Arch/x86_64/Types.hpp>
+#include <Drivers/ACPI/Bus.hpp>
+#include <Drivers/ACPI/Device.hpp>
+#include <Drivers/Core/CharacterDevice.hpp>
+#include <Drivers/Input/Input.hpp>
 
-#include <Drivers/HID/Ps2Controller.hpp>
+#include <Modules/serio/SerioController.hpp>
+#include <Prism/String/StringUtils.hpp>
+#include <System/InterruptHandler.hpp>
 
+class InterruptDispatcher;
 enum class Ps2DeviceType
 {
     eUndefined = 0,
@@ -28,9 +37,16 @@ enum class Ps2DeviceType
     eNcdSunKeyboard
 };
 
-class I8042Controller : public Ps2Controller
+struct CPUContext;
+class I8042 : public ACPI::Device, public SerioController
 {
   public:
+    I8042(ACPI::DeviceHandle* handle, DeviceMajor major, DeviceMinor minor)
+        : ACPI::Device(handle)
+        , SerioController("i8042", 200, 200)
+    {
+    }
+
     enum class Port : u16
     {
         eBuffer  = 0x60,
@@ -108,39 +124,37 @@ class I8042Controller : public Ps2Controller
         eResend                 = 0xfe,
     };
 
-    static ErrorOr<void>    Probe();
-    static I8042Controller* GetInstance()
-    {
-        return reinterpret_cast<I8042Controller*>(s_Instance);
-    }
+    inline static I8042* Instance() { return s_Controller; }
 
-    ErrorOr<void>         Initialize();
+    ErrorOr<void>        Initialize();
 
-    virtual bool          IsOutputEmpty() override;
-    bool                  IsInputEmpty();
+    ErrorOr<void> RegisterPort(SerioDevicePort port, ::Ref<SerioDevice> device);
 
-    u8                    ReadBlocking();
-    void                  WriteBlocking(Port port, u8 data);
+    virtual bool  IsOutputEmpty();
+    bool          IsInputEmpty();
 
-    ErrorOr<u8>           TryRead();
-    ErrorOr<void>         TryWrite(Port port, u8 data);
+    u8            ReadBlocking();
+    void          WriteBlocking(Port port, u8 data);
 
-    ErrorOr<void>         FlushReadBuffer();
-    ErrorOr<void>         SendCommand(Command command);
+    ErrorOr<u8>   TryRead();
+    ErrorOr<void> TryWrite(Port port, u8 data);
+
+    ErrorOr<void> FlushReadBuffer();
+    ErrorOr<void> SendCommand(Command command);
     /*{
         WriteBlocking(Port::eCommand, ToUnderlying(command));
     }*/
 
-    ErrorOr<u8>           ReadDevicePort(DevicePort port);
-    ErrorOr<void>         WriteDevicePort(DevicePort port, byte data);
+    ErrorOr<u8>   ReadDevicePort(DevicePort port);
+    ErrorOr<void> WriteDevicePort(DevicePort port, byte data);
 
     virtual ErrorOr<void> SendDeviceCommand(DevicePort    port,
-                                            DeviceCommand command) override
+                                            DeviceCommand command)
     {
         return WriteDevicePort(port, ToUnderlying(command));
     }
-    virtual ErrorOr<void>
-    SendDeviceCommand(DevicePort port, DeviceCommand command, u8 data) override
+    virtual ErrorOr<void> SendDeviceCommand(DevicePort    port,
+                                            DeviceCommand command, u8 data)
     {
         auto successOr = SendDeviceCommand(port, command);
         if (!successOr) return successOr;
@@ -150,33 +164,37 @@ class I8042Controller : public Ps2Controller
         return {};
     }
 
-    virtual ErrorOr<void> EnableDevice(DevicePort port) override;
-    virtual ErrorOr<void> DisableDevice(DevicePort port) override;
+    virtual ErrorOr<void> EnableDevice(DevicePort port);
+    virtual ErrorOr<void> DisableDevice(DevicePort port);
 
-    virtual ErrorOr<void> EnablePort1Translation() override;
-    virtual ErrorOr<void> DisablePort1Translation() override;
-    virtual ErrorOr<void> ResetDevice(DevicePort port) override;
+    virtual ErrorOr<void> EnablePort1Translation();
+    virtual ErrorOr<void> DisablePort1Translation();
+    virtual ErrorOr<void> ResetDevice(DevicePort port);
+
+    static ErrorOr<void>  Probe(ACPI::DeviceHandle* handle, StringView);
+    static void           Remove(ACPI::DeviceHandle*);
 
   private:
-    static constexpr isize READ_WRITE_TIMEOUT = 10'000;
+    static constexpr isize     READ_WRITE_TIMEOUT = 10'000;
+    static I8042*              s_Controller;
 
-    bool                   m_Port1Available   = false;
-    bool                   m_Port2Available   = false;
+    ::Ref<InterruptDispatcher> m_IrqDispatcher  = nullptr;
 
-    static bool            QuerySupport();
-    static void            HandleInterrupt(struct CPUContext* context);
+    bool                       m_Port1Available = false;
+    bool                       m_Port2Available = false;
 
-    I8042Controller();
+    static bool                QuerySupport();
+    static IrqResult HandleInterrupt(::Device* device, CPUContext* context);
 
-    ErrorOr<void>          DisableDevices();
+    ErrorOr<void>    DisableDevices();
 
-    bool                   PerformSelfTest();
-    bool                   IsDualChannel();
+    bool             PerformSelfTest();
+    bool             IsDualChannel();
 
-    bool                   TestInterfaces();
-    bool                   TestSingleInterface(DevicePort port);
+    bool             TestInterfaces();
+    bool             TestSingleInterface(DevicePort port);
 
-    void                   EnumerateDevices();
+    void             EnumerateDevices();
     ErrorOr<Ps2DeviceType> ScanPortForDevices(DevicePort port);
 
     ErrorOr<void>          WaitForIncomingData();
@@ -186,11 +204,11 @@ class I8042Controller : public Ps2Controller
     void                   WritePort(Port port, u8 data);
 };
 
-using I8042Port          = I8042Controller::Port;
-using I8042Command       = I8042Controller::Command;
-using I8042Configuration = I8042Controller::Configuration;
-using I8042Response      = I8042Controller::Response;
-using PS2Port            = I8042Controller::DevicePort;
+using I8042Port          = I8042::Port;
+using I8042Command       = I8042::Command;
+using I8042Configuration = I8042::Configuration;
+using I8042Response      = I8042::Response;
+using PS2Port            = I8042::DevicePort;
 
 inline u8 operator~(I8042Configuration lhs) { return ~ToUnderlying(lhs); }
 inline u8 operator&(u8 lhs, const I8042Configuration rhs)

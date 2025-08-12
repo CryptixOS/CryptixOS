@@ -8,8 +8,11 @@
 
 #include <Prism/String/StringView.hpp>
 
+enum class IrqResult;
+
+class Device;
 [[noreturn]]
-void HaltAndCatchFire(struct CPUContext* context);
+IrqResult HaltAndCatchFire(class Device*, struct CPUContext* context);
 
 [[noreturn]]
 void panic(StringView message);

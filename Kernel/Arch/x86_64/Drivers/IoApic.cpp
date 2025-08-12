@@ -5,11 +5,14 @@
  * SPDX-License-Identifier: GPL-3
  */
 
+#include <Arch/CPU.hpp>
+
 #include <Arch/x86_64/CPU.hpp>
 #include <Arch/x86_64/IDT.hpp>
 
 #include <Arch/x86_64/Drivers/IoApic.hpp>
 #include <Arch/x86_64/Drivers/PIC.hpp>
+#include <Arch/x86_64/Drivers/Time/Lapic.hpp>
 
 #include <Firmware/ACPI/MADT.hpp>
 
@@ -24,8 +27,8 @@ IoApic::IoApic(Pointer baseAddress, u32 gsiBase)
     //                              PageAttributes::eRW
     //                                  | PageAttributes::eWriteThrough);
 
-    m_RegisterSelect = m_BaseAddressVirt.As<volatile u32>();
-    m_RegisterWindow = m_BaseAddressVirt.Offset<volatile u32*>(0x10);
+    m_RegisterSelect  = m_BaseAddressVirt.As<volatile u32>();
+    m_RegisterWindow  = m_BaseAddressVirt.Offset<volatile u32*>(0x10);
 
     m_RedirectionEntryCount
         = ((Read(IoApicRegister::eVersion) & 0xff0000) >> 16);
@@ -102,7 +105,7 @@ void IoApic::Initialize()
     }
 
     LogTrace("IoApic: Initializing...");
-    I8259A::Instance().MaskAllIRQs();
+    I8259A::Instance()->MaskAllIRQs();
     LogTrace("IoApic: Legacy PIC disabled");
 
     LogTrace("IoApic: Enumerating controllers...");
@@ -144,4 +147,38 @@ IoApic& IoApic::GetIoApicForGsi(u32 gsi)
     }
 
     Panic("Cannot determine IO APIC from GSI {}", gsi);
+}
+
+ErrorOr<void> IoApicController::Initialize()
+{
+    IoApic::Initialize();
+    return {};
+}
+ErrorOr<void> IoApicController::Shutdown()
+{
+    for (auto& ioApic : IoApic::GetIoApics()) ioApic.MaskAllEntries();
+    return {};
+}
+
+ErrorOr<void> IoApicController::Mask(u32 irq)
+{
+    if (!IoApic::IsAnyEnabled()) return Error(ENODEV);
+    IoApic::SetIrqRedirect(CPU::Current()->LapicID, irq + 0x20, irq, false);
+
+    return {};
+}
+ErrorOr<void> IoApicController::Unmask(u32 irq)
+{
+    if (!IoApic::IsAnyEnabled()) return Error(ENODEV);
+
+    IoApic::SetIrqRedirect(CPU::Current()->LapicID, irq + 0x20, irq, true);
+    return {};
+}
+
+ErrorOr<void> IoApicController::SendEOI(u32 irq)
+{
+    if (!IoApic::IsAnyEnabled()) return Error(ENODEV);
+    Lapic::Instance()->SendEOI();
+
+    return {};
 }

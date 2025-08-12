@@ -8,28 +8,28 @@
 
 #include <Drivers/InterruptController.hpp>
 #include <Prism/Core/Types.hpp>
+#include <Prism/Memory/Ref.hpp>
 
 class I8259A : public InterruptController
 {
   public:
-    static I8259A& Instance();
+    static ::Ref<I8259A>  Instance();
 
     virtual ErrorOr<void> Initialize() override;
     virtual ErrorOr<void> Shutdown() override;
 
-    virtual ErrorOr<InterruptHandler*> AllocateHandler(u8 hint = 0x20 + 0x10) override;
-    
-    virtual ErrorOr<void> Mask(u8 irq) override;
-    virtual ErrorOr<void> Unmask(u8 irq) override;
+    virtual ErrorOr<void> Mask(u32 irq) override;
+    virtual ErrorOr<void> Unmask(u32 irq) override;
 
-    virtual ErrorOr<void> SendEOI(u8 vector) override;
+    virtual ErrorOr<void> SendEOI(u32 vector) override;
 
-    void MaskAllIRQs();
-    void UnmaskAllIRQs();
+    void                  MaskAllIRQs();
+    void                  UnmaskAllIRQs();
 
-  private:
+    friend class ::Ref<I8259A>;
+
+  protected:
     I8259A() = default;
-    static I8259A s_Instance;
 
     void Remap(u8 masterOffset, u8 slaveOffset);
 
@@ -38,5 +38,5 @@ class I8259A : public InterruptController
     u16  GetIRR();
     u16  GetISR();
 
-    u16 GetIRQRegister(u8 ocw3);
+    u16  GetIRQRegister(u8 ocw3);
 }; // namespace PIC

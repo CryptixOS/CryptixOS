@@ -5,4 +5,8 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 external = true
-module = declare_dependency(sources: files('main.cpp'), include_directories: incs)
+module = declare_dependency(
+  sources: files('main.cpp'), 
+  include_directories: incdirs,
+  compile_args: args,
+)

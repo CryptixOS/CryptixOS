@@ -8,6 +8,7 @@
 #include <Arch/x86_64/CPU.hpp>
 
 #include <Scheduler/Thread.hpp>
+#include <System/InterruptManager.hpp>
 
 namespace Syscall
 {
@@ -16,10 +17,12 @@ namespace Syscall
     extern "C" void handleSyscall(CPUContext*);
     void            Initialize()
     {
-        auto handler = IDT::GetHandler(SYSCALL_VECTOR);
-        handler->SetHandler(handleSyscall);
-        handler->Reserve();
-
+        //TODO(v1tr10l7): fix the 0x80 syscall gate
+        
+        // auto handler
+        //     = InterruptManager::AllocateHandler(0x80, nullptr, "cryptix");
+        // handler->SetHandler(handleSyscall);
+        //
         IDT::SetDPL(SYSCALL_VECTOR, DPL_RING3);
     }
     extern "C" void handleSyscall(CPUContext* ctx)
@@ -34,7 +37,7 @@ namespace Syscall
         args.Args[4]          = ctx->r8;
         args.Args[5]          = ctx->r9;
 
-        auto current       = CPU::GetCurrentThread();
+        auto current          = CPU::GetCurrentThread();
         current->SavedContext = *ctx;
 
         Handle(args);

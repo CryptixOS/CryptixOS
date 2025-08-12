@@ -10,7 +10,6 @@ srcs += files(
   'CMOS.cpp',
   'GDT.cpp',
   'IDT.cpp',
-  'InterruptManager.cpp',
   'Syscall.cpp',
   'VMM.cpp',
   'idt.S',

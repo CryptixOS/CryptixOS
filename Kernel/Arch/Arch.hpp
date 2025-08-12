@@ -23,9 +23,9 @@ class HardwareTimer;
 namespace Arch
 {
     KERNEL_INIT_CODE
-    void Initialize();
+    void InstallExceptions();
     KERNEL_INIT_CODE
-    void              ProbeDevices();
+    void Initialize();
 
     [[noreturn]] void Halt();
     void              Pause();

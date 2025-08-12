@@ -1,17 +1,19 @@
 /*
- * Created by v1tr10l7 on 27.02.2025.
+ * Created by v1tr10l7 on 09.08.2025.
  * Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <AtKeyboard.hpp>
+#include <Scancodes.hpp>
+#include <x86_64/input/i8042/I8042.hpp>
+
 #include <Arch/PowerManager.hpp>
 #include <Boot/CommandLine.hpp>
-
-#include <Drivers/HID/PS2Scancodes.hpp>
-#include <Drivers/HID/Ps2KeyboardDevice.hpp>
 #include <Drivers/TTY.hpp>
 
-#include <cctype>
+#include <Prism/String/StringUtils.hpp>
+using namespace Prism;
 
 constexpr usize   SCANCODE_MAX               = std::size(PS2_Set1_Keys);
 constexpr usize   SCANCODE_CTRL_PRESS        = 0x1d;
@@ -37,22 +39,22 @@ constexpr usize   SCANCODE_DELETE_PRESS      = 0x53;
 
 extern AtomicBool g_LogSyscalls;
 
-void              Ps2KeyboardDevice::Initialize()
+void              AtKeyboard::Initialize()
 {
     // TODO(v1tr10l7): initialize the keyboard device
     if (!m_Controller->ResetDevice(m_Port))
     {
-        LogError("Ps2KeyboardDevice: Failed to reset the device");
+        LogError("AtKeyboard: Failed to reset the device");
         return;
     }
     if (!m_Controller->EnableDevice(m_Port))
     {
-        LogError("Ps2KeyboardDevice: Failed to enable the device's port");
+        LogError("AtKeyboard: Failed to enable the device's port");
         return;
     }
 }
 
-void Ps2KeyboardDevice::OnByteReceived(u8 byte)
+void AtKeyboard::OnByteReceived(u8 byte)
 {
     switch (m_ScanCodeSet)
     {
@@ -64,7 +66,7 @@ void Ps2KeyboardDevice::OnByteReceived(u8 byte)
     }
 }
 
-void Ps2KeyboardDevice::HandleScanCodeSet1Key(u8 raw)
+void AtKeyboard::HandleScanCodeSet1Key(u8 raw)
 {
     bool pressed = !(raw & 0x80);
 
@@ -166,7 +168,7 @@ void Ps2KeyboardDevice::HandleScanCodeSet1Key(u8 raw)
         c = PS2_Set1_Keys[raw].ShiftCapsLockCodePoint;
     CtosUnused(c);
 
-    if (m_Modifiers & KeyModifier::eControl) c = std::toupper(c) - 0x40;
+    if (m_Modifiers & KeyModifier::eControl) c = StringUtils::ToUpper(c) - 0x40;
 
     if (!pressed) return;
 
@@ -178,12 +180,39 @@ void Ps2KeyboardDevice::HandleScanCodeSet1Key(u8 raw)
         g_LogSyscalls = !g_LogSyscalls;
     Emit(&c, 1);
 }
-void Ps2KeyboardDevice::HandleScanCodeSet2Key(u8 raw) {}
+void AtKeyboard::HandleScanCodeSet2Key(u8 raw) {}
 
-void Ps2KeyboardDevice::Emit(const char* str, usize count)
+void AtKeyboard::Emit(const char* str, usize count)
 {
     TTY* current = TTY::GetCurrent();
     if (!current) return;
 
     current->SendBuffer(str, count);
 }
+
+#include <Library/Logger.hpp>
+#include <Library/Module.hpp>
+
+CTOS_MODULE_AUTHOR("v1tr10l7");
+CTOS_MODULE_DESCRIPTION("i8042 atkbd keyboard driver");
+CTOS_MODULE_LICENSE("GPL-3");
+CTOS_MODULE_VERSION("0.2");
+CTOS_MODULE_SOFTDEP("pre: i8042");
+
+extern "C" CTOS_EXPORT bool ModuleInit()
+{
+    LogInfo("Hello, World from Kernel Module");
+
+    auto ctrl        = I8042::Instance();
+    auto scancodeSet = Ps2ScanCodeSet::eSet1;
+
+    Assert(DeviceManager::AllocateCharMajor(API::DeviceMajor::MISCELLANEOUS));
+    auto kbd
+        = CreateRef<AtKeyboard>(ctrl, SerioDevicePort::ePort1, scancodeSet);
+    DeviceManager::RegisterCharDevice(kbd.Raw());
+
+    ctrl->RegisterPort(SerioDevicePort::ePort1, kbd);
+    return true;
+}
+
+MODULE_INIT(atkbd, ModuleInit);

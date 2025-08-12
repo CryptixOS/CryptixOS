@@ -41,8 +41,9 @@ ErrorOr<void> BitmapAllocator::Initialize(MemoryMap& memoryMap, usize pageSize)
     usize bitmapEntryCount = m_UsableMemoryTop.Raw() / pageSize;
     m_PageBitmap.Allocate(bitmapEntryCount);
     m_PageBitmap.SetAll(0xff);
+    LogInfo("PMM: Allocated {}KiB bitmap for {} pages", bitmapEntryCount / 1024, bitmapEntryCount);
 
-    Assert(m_PageBitmap.GetSize() != 0);
+    Assert(m_PageBitmap.BitCount() != 0);
     for (usize i = 0; i < memoryMap.EntryCount; i++)
     {
         auto& current = memoryMap.Entries[i];
@@ -106,7 +107,7 @@ Pointer BitmapAllocator::FindFreeRegions(usize& start, usize count, usize limit)
     usize contiguousPages = 0;
     while (start < limit)
     {
-        if (!m_PageBitmap.GetIndex(start++))
+        if (!m_PageBitmap.At(start++))
         {
             if (++contiguousPages == count)
             {

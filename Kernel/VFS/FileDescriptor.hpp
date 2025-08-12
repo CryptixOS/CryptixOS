@@ -69,12 +69,13 @@ class FileDescriptor : public RefCounted
   public:
     FileDescriptor(::Ref<DirectoryEntry> dentry, i32 flags,
                    FileAccessMode accMode);
-    FileDescriptor(::Ref<DirectoryEntry> dentry, File* file, i32 flags,
+    FileDescriptor(::Ref<DirectoryEntry> dentry, class File* file, i32 flags,
                    FileAccessMode accMode);
     virtual ~FileDescriptor();
 
     inline INode*         INode() const { return m_DirectoryEntry->INode(); }
     ::Ref<DirectoryEntry> DirectoryEntry() const { return m_DirectoryEntry; }
+    class File*           File() const { return m_File; }
     inline usize          GetOffset() const { return m_Offset; }
 
     inline i32            GetFlags() const { return m_Flags; }
@@ -154,7 +155,7 @@ class FileDescriptor : public RefCounted
   private:
     Spinlock                 m_Lock;
     ::Ref<::DirectoryEntry>  m_DirectoryEntry   = nullptr;
-    File*                    m_File             = nullptr;
+    class File*              m_File             = nullptr;
 
     FileAccessMode           m_AccessMode       = FileAccessMode::eRead;
     usize                    m_Offset           = 0;

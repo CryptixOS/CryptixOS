@@ -5,7 +5,6 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 srcs += files(
-  'ELF.cpp',
   'ExecutableProgram.cpp',
   'ICxxAbi.cpp',
   'Image.cpp',
@@ -15,6 +14,7 @@ srcs += files(
   'ZLib.cpp',
 )
 
+subdir('ELF')
 subdir('KLibC')
 subdir('KLibC++')
 subdir('Locking')

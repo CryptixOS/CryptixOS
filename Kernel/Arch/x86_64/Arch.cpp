@@ -9,7 +9,6 @@
 #include <Common.hpp>
 
 #include <Arch/x86_64/CPU.hpp>
-#include <Arch/x86_64/Drivers/I8042Controller.hpp>
 #include <Arch/x86_64/Drivers/IoApic.hpp>
 #include <Arch/x86_64/Drivers/PCSpeaker.hpp>
 #include <Arch/x86_64/Drivers/PIC.hpp>
@@ -18,21 +17,39 @@
 #include <Arch/x86_64/Drivers/Time/RTC.hpp>
 #include <Arch/x86_64/IO.hpp>
 
-#include <Drivers/HID/Ps2Controller.hpp>
-
 #include <Time/Time.hpp>
 
+namespace InterruptManager
+{
+    void SetController(Ref<InterruptController> ctrl);
+};
 namespace Arch
 {
     KERNEL_INIT_CODE
+    void InstallExceptions()
+    {
+        GDT::Initialize();
+        GDT::Load(0);
+
+        IDT::Initialize();
+        IDT::Load();
+    }
+    KERNEL_INIT_CODE
     void Initialize()
     {
-        auto status = I8259A::Instance().Initialize();
-        if (!status) LogError("Arch: Failed to initialize I8259A controller");
+        auto pic = I8259A::Instance();
+        if (!pic->Initialize())
+            LogError("Arch: Failed to initialize I8259A controller");
 
-        IoApic::Initialize();
+        auto ioApic = CreateRef<IoApicController>();
+        if (!ioApic->Initialize())
+        {
+            LogError("Arch: Failed to initialize io apic");
+            InterruptManager::SetController(pic);
+        }
+        else InterruptManager::SetController(ioApic);
+
         if (!HPET::DetectAndSetup()) LogError("HPET: Not Available");
-
         Assert(Time::RegisterTimer(PIT::Instance()));
         CPU::InitializeBSP();
         CPU::StartAPs();
@@ -44,15 +61,6 @@ namespace Arch
         LogInfo("Date: {:02}/{:02}/{:04} {:02}:{:02}:{:02}", RTC::GetDay(),
                 RTC::GetMonth(), RTC::GetCentury() * 100 + RTC::GetYear(),
                 RTC::GetHour(), RTC::GetMinute(), RTC::GetSecond());
-    }
-
-    KERNEL_INIT_CODE
-    void ProbeDevices()
-    {
-        auto result = I8042Controller::Probe();
-        if (!result)
-            LogError("Arch({}): Failed to probe the i8042 controller",
-                     CTOS_ARCH_STRING);
     }
 
     __attribute__((noreturn)) void Halt()
@@ -67,10 +75,26 @@ namespace Arch
     void PowerOff() {}
     void Reboot()
     {
-        if (!I8042Controller::GetInstance()->SendCommand(
-                I8042Command::eResetCPU))
-            return;
+        CPU::DisableInterrupts();
+
+        u8 status = 0;
+        do {
+            status = IO::In<byte>(0x64);
+            if (status & Bit(0)) IO::In<byte>(0x60);
+        } while (status & Bit(1));
+
+        IO::Out<byte>(0x64, 0xfe);
         IO::Out<word>(0x604, 0x2000);
+
+        // if it failed, just triple fault
+        struct CTOS_PACKED
+        {
+            u16      Limit = 0;
+            upointer Base  = 0;
+        } invalidIDT;
+        __asm__ volatile("lidt %0" ::"m"(invalidIDT));
+
+        for (;;) HaltAndCatchFire(nullptr, nullptr);
     }
     time_t GetEpoch() { return RTC::CurrentTime(); }
 }; // namespace Arch

@@ -62,6 +62,8 @@ class Device : public File
     {
     }
 
+    virtual ~Device() = default;
+
     constexpr inline dev_t ID() const noexcept { return m_ID; }
     virtual StringView     Name() const noexcept { return m_Name; };
 
@@ -77,9 +79,9 @@ class Device : public File
     using List     = IntrusiveRefList<Device, HookType>;
 
   protected:
-    StringView                   m_Name = ""_sv;
-    dev_t                        m_ID;
-    stat                         m_Stats;
+    StringView m_Name = ""_sv;
+    dev_t      m_ID;
+    stat       m_Stats;
 
   private:
     friend class IntrusiveRefList<Device, HookType>;

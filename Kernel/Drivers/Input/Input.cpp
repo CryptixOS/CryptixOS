@@ -37,7 +37,7 @@ DeviceMinor InputDevice::AllocateMinor()
                        usize end) -> Optional<DeviceMinor>
     {
         for (usize i = start; i < end; i++)
-            if (bitmap.GetIndex(i)) return i;
+            if (bitmap[i]) return i;
 
         return NullOpt;
     };

@@ -8,8 +8,6 @@
 
 #include <Common.hpp>
 
-#include <Arch/InterruptHandler.hpp>
-
 constexpr usize DPL_RING0 = 0x00;
 constexpr usize DPL_RING3 = 0x03;
 
@@ -17,9 +15,6 @@ namespace IDT
 {
     void              Initialize();
     void              Load();
-
-    InterruptHandler* AllocateHandler(u8 hint = 0x20 + 0x10);
-    InterruptHandler* GetHandler(u8 vector);
 
     void              SetIST(u8 vector, u32 value);
     void              SetDPL(u8 vector, u8 dpl = 3);

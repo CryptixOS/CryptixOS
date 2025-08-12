@@ -7,6 +7,11 @@
 #include <Drivers/ACPI/Driver.hpp>
 #include <Library/Module.hpp>
 
+CTOS_MODULE_AUTHOR("v1tr10l7");
+CTOS_MODULE_DESCRIPTION("high performance event timer driver");
+CTOS_MODULE_LICENSE("GPL-3");
+CTOS_MODULE_VERSION("0.2");
+
 class HPET
 {
   public:

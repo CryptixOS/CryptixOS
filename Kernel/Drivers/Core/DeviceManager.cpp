@@ -68,13 +68,13 @@ namespace DeviceManager
         Optional<DeviceMajor> allocated = NullOpt;
 
         for (isize i = start; i < end; i++)
-            if (!majors.GetIndex(i)) allocated = i;
+            if (!majors[i]) allocated = i;
 
         return allocated;
     }
     static Optional<DeviceMajor> FindFreeMajor(Bitmap& majors, DeviceMajor hint)
     {
-        usize                 last  = majors.GetSize();
+        usize                 last  = majors.BitCount();
         Optional<DeviceMajor> major = FindFreeMajor(majors, hint, last);
         if (!major) major = FindFreeMajor(majors, 0, hint);
 

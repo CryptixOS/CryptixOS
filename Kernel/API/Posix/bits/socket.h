@@ -198,3 +198,12 @@ constexpr usize SOL_VSOCK     = 287;
 
 /* Maximum queue length specifiable by listen.  */
 constexpr usize SOMAXCONN     = 4096;
+
+using socklen_t               = u32;
+using sa_family_t             = unsigned short int;
+
+struct sockaddr
+{
+    sa_family_t sa_family;
+    u8          sa_data[14];
+};

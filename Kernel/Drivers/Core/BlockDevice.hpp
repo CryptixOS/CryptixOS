@@ -22,6 +22,8 @@ class BlockDevice : public Device
     {
     }
 
+    virtual ~BlockDevice() = default;
+
     inline constexpr dev_t       ID() const { return m_ID; }
     inline constexpr usize       BlockSize() const { return m_BlockSize; }
 

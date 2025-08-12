@@ -5,7 +5,6 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 srcs += files(
-  'I8042Controller.cpp',
   'IoApic.cpp',
   'PCI.cpp',
   'PCSpeaker.cpp',

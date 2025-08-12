@@ -5,8 +5,6 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/CPU.hpp>
-#include <Arch/InterruptHandler.hpp>
-#include <Arch/InterruptManager.hpp>
 
 #include <Library/Locking/Spinlock.hpp>
 #include <Memory/PMM.hpp>
@@ -416,5 +414,4 @@ void Scheduler::Tick(CPUContext* ctx)
 reschedule:
     Time::SchedulerTimer()->Start(TimerMode::eOneShot,
                                   newThread->Parent()->Quantum() * 1_ms);
-    // CPU::Reschedule(newThread->Parent()->m_Quantum * 1_ms);
 }

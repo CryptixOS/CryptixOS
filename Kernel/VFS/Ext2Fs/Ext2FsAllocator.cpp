@@ -65,7 +65,7 @@ usize Ext2FsAllocator::AllocateBlock(Ext2FsINodeMeta& meta, u32 inode)
 
     for (usize block = 0; block < m_BlockSize * 8; block++)
     {
-        if (!blockBitmap.GetIndex(block))
+        if (!blockBitmap.At(block))
         {
             blockBitmap.SetIndex(block, true);
             foundBlock = blockGroupIndex * m_BlocksPerGroup + block;
@@ -124,7 +124,7 @@ usize Ext2FsAllocator::AllocateINodeInGroup(
 
         for (usize bit = 0; bit < 8; bit++)
         {
-            if (!bitmap.GetIndex(bit + (blockIndex * 8)))
+            if (!bitmap.At(bit + (blockIndex * 8)))
             {
                 inode = (blockGroupIndex * superBlock->INodesPerGroup)
                       + blockIndex * 8 + bit + 1;

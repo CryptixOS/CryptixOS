@@ -10,8 +10,6 @@
 #include <API/Syscall.hpp>
 
 #include <Arch/CPU.hpp>
-#include <Arch/InterruptManager.hpp>
-
 #include <Boot/BootInfo.hpp>
 #include <Boot/CommandLine.hpp>
 
@@ -128,7 +126,6 @@ static void kernelThread()
     VFS::Initialize();
 
     CharacterDevice::RegisterBaseMemoryDevices();
-    Arch::ProbeDevices();
     PCI::Initialize();
 
 #if CTOS_ACPI_DISABLE == 0
@@ -209,7 +206,7 @@ kernelStart(const BootInformation& info)
     // depends on this
     auto& memoryInfo = info.MemoryInformation;
     MM::PrepareInitialHeap(memoryInfo);
-    InterruptManager::InstallExceptions();
+    Arch::InstallExceptions();
     CommandLine::Initialize(info.KernelCommandLine);
 
     LogTrace("Kernel: Available framebuffers => {}", info.Framebuffers.Size());

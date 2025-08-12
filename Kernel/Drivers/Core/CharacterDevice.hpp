@@ -16,6 +16,8 @@ class CharacterDevice : public Device
     CharacterDevice(StringView name, DeviceID id);
     CharacterDevice(StringView name, DeviceMajor major, DeviceMinor minor);
 
+    virtual ~CharacterDevice() = default;
+
     inline constexpr DeviceID        ID() const { return m_ID; }
 
     virtual bool                     IsCharDevice() const { return true; }

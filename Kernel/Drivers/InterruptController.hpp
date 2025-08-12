@@ -6,19 +6,17 @@
  */
 #pragma once
 
-#include <Arch/InterruptHandler.hpp>
 #include <Prism/Core/Error.hpp>
+#include <Prism/Memory/RefCounted.hpp>
 
-class InterruptController 
+class InterruptController : public RefCounted
 {
-    public:
-        virtual ErrorOr<void> Initialize() = 0;
-        virtual ErrorOr<void> Shutdown() = 0;
+  public:
+    virtual ErrorOr<void> Initialize()     = 0;
+    virtual ErrorOr<void> Shutdown()       = 0;
 
-        virtual ErrorOr<InterruptHandler*> AllocateHandler(u8 hint = 0x20 + 0x10) = 0;
-        
-        virtual ErrorOr<void> Mask(u8 irq) = 0;
-        virtual ErrorOr<void> Unmask(u8 irq) = 0;
+    virtual ErrorOr<void> Mask(u32 irq)    = 0;
+    virtual ErrorOr<void> Unmask(u32 irq)  = 0;
 
-        virtual ErrorOr<void> SendEOI(u8 vector);
+    virtual ErrorOr<void> SendEOI(u32 irq) = 0;
 };

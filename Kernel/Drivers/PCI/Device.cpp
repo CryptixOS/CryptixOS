@@ -4,9 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/InterruptHandler.hpp>
-#include <Arch/InterruptManager.hpp>
-
 #ifdef CTOS_TARGET_X86_64
     #include <Arch/x86_64/Drivers/IoApic.hpp>
 #endif
@@ -19,6 +16,7 @@
 #include <Memory/VMM.hpp>
 
 #include <Prism/Utility/Math.hpp>
+#include <System/InterruptManager.hpp>
 
 namespace PCI
 {
@@ -27,7 +25,10 @@ namespace PCI
         if (!IsMMIO) return nullptr;
         if (Base) return Base;
 
-        if (VMM::GetKernelPageMap()->Virt2Phys(Address.ToHigherHalf<u64>()).Raw() == u64(-1))
+        if (VMM::GetKernelPageMap()
+                ->Virt2Phys(Address.ToHigherHalf<u64>())
+                .Raw()
+            == u64(-1))
         {
             usize   pageSize = PMM::PAGE_SIZE;
             Pointer base     = Math::AlignDown(Address.Raw(), pageSize);
@@ -255,17 +256,18 @@ namespace PCI
 
     bool Device::RegisterIrq(u64 cpuid, Delegate<void()> callback)
     {
-        auto handler = InterruptManager::AllocateHandler();
-        handler->Reserve();
+        Ref<InterruptDispatcher> handler
+            = InterruptManager::AllocateHandler(0x50, nullptr, "cryptix");
         handler->SetHandler(
-            [this](CPUContext*)
+            [this](::Device*, CPUContext*) -> IrqResult
             {
                 if (m_OnIrq) m_OnIrq.Invoke();
+                return IrqResult::eHandled;
             });
 
         m_OnIrq = callback;
-        if (MsiXSet(cpuid, handler->GetInterruptVector(), -1)) return true;
-        if (MsiSet(cpuid, handler->GetInterruptVector(), -1)) return true;
+        if (MsiXSet(cpuid, handler->IrqLine() + 0x20, -1)) return true;
+        if (MsiSet(cpuid, handler->IrqLine() + 0x20, -1)) return true;
 #ifdef CTOS_TARGET_X86_64
 
         auto  pin        = Read<u8>(RegisterOffset::eInterruptPin);
@@ -282,7 +284,7 @@ namespace PCI
         if (!route->ActiveHigh) flags |= Bit(1);
         if (!route->EdgeTriggered) flags |= Bit(3);
 
-        u8 vector = handler->GetInterruptVector();
+        u8 vector = handler->IrqLine() + 0x20;
         IoApic::SetGsiRedirect(cpuid, vector, route->Gsi, flags, true);
         return true;
 #endif

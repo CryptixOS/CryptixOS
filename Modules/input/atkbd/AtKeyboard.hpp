@@ -1,5 +1,5 @@
 /*
- * Created by v1tr10l7 on 27.02.2025.
+ * Created by v1tr10l7 on 11.08.2025.
  * Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
  *
  * SPDX-License-Identifier: GPL-3
@@ -10,8 +10,9 @@
 
 #include <Drivers/Core/CharacterDevice.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
-#include <Drivers/HID/Ps2Controller.hpp>
 #include <Drivers/Input/Input.hpp>
+
+#include <Modules/serio/SerioController.hpp>
 
 #include <Prism/Memory/Scope.hpp>
 #include <Prism/Memory/WeakRef.hpp>
@@ -47,7 +48,7 @@ constexpr inline KeyModifier& operator&=(KeyModifier& lhs, KeyModifier rhs)
     return (lhs = static_cast<KeyModifier>(result));
 }
 
-class Ps2KeyboardDevice : public RefCounted, public InputDevice
+class AtKeyboard : public SerioDevice
 {
   public:
     enum class ScanCodeSet
@@ -57,16 +58,16 @@ class Ps2KeyboardDevice : public RefCounted, public InputDevice
         eSet3,
     };
 
-    Ps2KeyboardDevice(Ps2Controller* controller, PS2_DevicePort port,
-                      ScanCodeSet scanCodeSet)
-        : InputDevice("atkbd", InputDevice::AllocateMinor())
-        , m_Controller(controller)
+    AtKeyboard(SerioController* ctrl, SerioDevicePort port,
+               ScanCodeSet scanCodeSet)
+        : SerioDevice("atkbd", ctrl)
+        , m_Controller(ctrl)
         , m_Port(port)
         , m_ScanCodeSet(scanCodeSet)
     {
         Initialize();
     }
-    virtual ~Ps2KeyboardDevice() = default;
+    virtual ~AtKeyboard() = default;
 
     void                   Initialize();
     virtual StringView     Name() const noexcept override { return m_Name; }
@@ -96,24 +97,24 @@ class Ps2KeyboardDevice : public RefCounted, public InputDevice
 
     virtual i32 IoCtl(usize request, uintptr_t argp) override
     {
-        // TODO(v1tr10l7): Ps2KeyboardDevice::IoCtl
+        // TODO(v1tr10l7): AtKeyboard::IoCtl
         return -1;
     }
 
-    void OnByteReceived(u8 byte);
+    virtual void OnByteReceived(u8 byte) override;
 
   private:
-    Ps2Controller* m_Controller = nullptr;
-    PS2_DevicePort m_Port;
-    ScanCodeSet    m_ScanCodeSet   = ScanCodeSet::eSet1;
+    SerioController* m_Controller = nullptr;
+    SerioDevicePort  m_Port;
+    ScanCodeSet      m_ScanCodeSet   = ScanCodeSet::eSet1;
 
-    KeyModifier    m_Modifiers     = KeyModifier::eNone;
-    bool           m_ExtraScanCode = false;
+    KeyModifier      m_Modifiers     = KeyModifier::eNone;
+    bool             m_ExtraScanCode = false;
 
-    void           HandleScanCodeSet1Key(u8 raw);
-    void           HandleScanCodeSet2Key(u8 raw);
+    void             HandleScanCodeSet1Key(u8 raw);
+    void             HandleScanCodeSet2Key(u8 raw);
 
-    void           Emit(const char* str, usize count);
+    void             Emit(const char* str, usize count);
 };
 
-using Ps2ScanCodeSet = Ps2KeyboardDevice::ScanCodeSet;
+using Ps2ScanCodeSet = AtKeyboard::ScanCodeSet;

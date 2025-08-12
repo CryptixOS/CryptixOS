@@ -9,6 +9,7 @@
 #include <API/Syscall.hpp>
 #include <API/UnixTypes.hpp>
 
+#include <API/Posix/bits/socket.h>
 #include <API/Posix/signal.h>
 #include <Prism/Utility/PathView.hpp>
 
@@ -39,6 +40,8 @@ namespace API::VFS
     ErrorOr<isize> Dup2(isize oldFdNum, isize newFdNum);
 
     ErrorOr<isize> Socket(isize domain, isize type, isize protocol);
+    ErrorOr<isize> Bind(isize sockFdNum, const struct sockaddr* addr,
+                        socklen_t addrlen);
     ErrorOr<isize> FCntl(isize fdNum, isize op, pointer arg);
 
     ErrorOr<isize> Truncate(PathView path, off_t length);

@@ -6,8 +6,6 @@
  */
 #include <Common.hpp>
 
-#include <Arch/InterruptHandler.hpp>
-
 extern "C" void raiseSyncException()
 {
     while (true) __asm__ volatile("wfi");
@@ -23,10 +21,11 @@ extern "C" void raiseIrq()
     while (true) __asm__ volatile("wfi");
 }
 
-namespace InterruptManager
+namespace Arch
 {
     extern "C" char* exception_handlers;
-    void             InstallExceptions()
+    KERNEL_INIT_CODE
+    void InstallExceptions()
     {
         __asm__ volatile("msr VBAR_EL1, %0" ::"r"(&exception_handlers));
         __asm__ volatile(
@@ -44,9 +43,4 @@ namespace InterruptManager
             :
             : "x0", "x1", "memory");
     }
-
-    InterruptHandler* AllocateHandler(u8 hint) { return nullptr; }
-
-    void              Mask(u8 vector) { (void)(vector); }
-    void              Unmask(u8 vector) { (void)(vector); }
-} // namespace InterruptManager
+}; // namespace Arch

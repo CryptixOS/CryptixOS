@@ -20,6 +20,7 @@
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
+#include <System/InterruptManager.hpp>
 
 #include <Time/Time.hpp>
 
@@ -310,10 +311,11 @@ namespace CPU
             ++i;
         }
 
-        auto handler = IDT::GetHandler(255);
-        handler->Reserve();
-        handler->SetInterruptVector(255);
-        handler->SetHandler(HaltAndCatchFire);
+        static Ref<InterruptDispatcher> dispatcher
+            = InterruptManager::AllocateHandler(g_PanicIpiVector, nullptr,
+                                                "cryptix");
+
+        dispatcher->SetHandler(HaltAndCatchFire);
     }
 
     ID::ID(u64 leaf, u64 subleaf)

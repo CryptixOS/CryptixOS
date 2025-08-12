@@ -9,6 +9,7 @@
 #include <Prism/Core/Singleton.hpp>
 #include <Prism/Utility/Atomic.hpp>
 
+#include <System/InterruptHandler.hpp>
 #include <Time/HardwareTimer.hpp>
 
 class Lapic : public HardwareTimer, public Singleton<Lapic>
@@ -47,17 +48,16 @@ class Lapic : public HardwareTimer, public Singleton<Lapic>
     }
 
   private:
-    static AtomicBool       s_Initialized;
+    static AtomicBool                s_Initialized;
 
-    u32                     m_ID               = 0;
-    uintptr_t               m_BaseAddress      = 0;
-    bool                    m_X2Apic           = false;
-    u64                     m_TicksPerMs       = 0;
+    u32                              m_ID          = 0;
+    upointer                         m_BaseAddress = 0;
+    bool                             m_X2Apic      = false;
+    u64                              m_TicksPerMs  = 0;
+    ::Ref<class InterruptDispatcher> m_Dispatcher  = nullptr;
 
-    class InterruptHandler* m_InterruptHandler = nullptr;
-
-    virtual ErrorOr<isize>  Read(const UserBuffer& out, usize count,
-                                 isize offset = -1) override
+    virtual ErrorOr<isize>           Read(const UserBuffer& out, usize count,
+                                          isize offset = -1) override
     {
         return Error(ENOSYS);
     }
@@ -82,5 +82,5 @@ class Lapic : public HardwareTimer, public Singleton<Lapic>
     void CalibrateTimer();
     void SetNmi(u8 vector, u8 currentCPUID, u8 cpuID, u16 flags, u8 lint);
 
-    static void Tick(CPUContext* context);
+    static IrqResult Tick(Device* device, CPUContext* context);
 };

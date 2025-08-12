@@ -13,6 +13,8 @@
 
 #include <Memory/VMM.hpp>
 #include <Scheduler/Scheduler.hpp>
+#include <System/InterruptManager.hpp>
+
 #include <Time/Time.hpp>
 
 constexpr u32                  LAPIC_EOI_ACK                      = 0x00;
@@ -78,7 +80,7 @@ void Lapic::Initialize()
                                          | PageAttributes::eUncacheableStrong);
     }
 
-    m_BaseAddress = ToHigherHalfAddress<uintptr_t>(base & ~(0xfff));
+    m_BaseAddress = ToHigherHalfAddress<upointer>(base & ~(0xfff));
     m_ID          = m_X2Apic ? Read(LAPIC_ID_REGISTER)
                              : (Read(LAPIC_ID_REGISTER) >> 24) & 0xff;
 
@@ -101,22 +103,18 @@ void Lapic::Initialize()
 
     if (!s_Initialized)
     {
-        s_Initialized      = true;
-        m_InterruptHandler = IDT::AllocateHandler();
-        m_InterruptHandler->Reserve();
-        LogInfo("LAPIC: Interrupt Vector: {}",
-                m_InterruptHandler->GetInterruptVector());
-        m_InterruptHandler->SetHandler(Tick);
+        s_Initialized = true;
+        m_Dispatcher = InterruptManager::AllocateHandler(0x30, this, "cryptix");
+        LogInfo("LAPIC: Allocated interrupt handler at irq line => {:#x}",
+                m_Dispatcher->IrqLine());
+        m_Dispatcher->SetHandler(Tick);
     }
     LogInfo("LAPIC: Initialized");
 };
 
-usize Lapic::InterruptVector() const
-{
-    return m_InterruptHandler->GetInterruptVector();
-}
+usize Lapic::InterruptVector() const { return m_Dispatcher->IrqLine() + 0x20; }
 
-void Lapic::SendIpi(u32 flags, u32 m_ID)
+void  Lapic::SendIpi(u32 flags, u32 m_ID)
 {
     if (!m_X2Apic)
     {
@@ -133,7 +131,7 @@ void          Lapic::SendEOI() { Write(LAPIC_EOI_REGISTER, LAPIC_EOI_ACK); }
 ErrorOr<void> Lapic::Start(TimerMode tm, Timestep interval)
 {
     Mode  mode   = tm == TimerMode::eOneShot ? Mode::eOneshot : Mode::ePeriodic;
-    u8    vector = m_InterruptHandler->GetInterruptVector();
+    u8    vector = m_Dispatcher->IrqLine() + 0x20;
     usize ms     = interval.Milliseconds();
 
     if (m_TicksPerMs == 0) CalibrateTimer();
@@ -199,7 +197,10 @@ void Lapic::SetNmi(u8 vector, u8 currentCPUID, u8 cpuID, u16 flags, u8 lint)
     else if (lint == 1) Write(LAPIC_LINT1_REGISTER, nmi);
 }
 
-void Lapic::Tick(CPUContext* context)
+IrqResult Lapic::Tick(Device* device, CPUContext* context)
 {
-    if (Instance()->m_OnTickCallback) Instance()->m_OnTickCallback(context);
+    auto lapic = reinterpret_cast<Lapic*>(device);
+
+    if (lapic->m_OnTickCallback) lapic->m_OnTickCallback(context);
+    return IrqResult::eHandled;
 }

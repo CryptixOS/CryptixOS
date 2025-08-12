@@ -4,11 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/InterruptHandler.hpp>
-
 #include <Arch/x86_64/CPU.hpp>
 #include <Arch/x86_64/CPUContext.hpp>
-#include <Arch/x86_64/Drivers/PIC.hpp>
 #include <Arch/x86_64/GDT.hpp>
 #include <Arch/x86_64/IDT.hpp>
 
@@ -17,7 +14,13 @@
 
 #include <Memory/PageFault.hpp>
 #include <Prism/Containers/Array.hpp>
+#include <System/InterruptHandler.hpp>
 
+namespace InterruptManager
+{
+    void      SendEOI(u32 irq);
+    IrqResult Handle(CPUContext* ctx);
+}; // namespace InterruptManager
 namespace Stacktrace
 {
     void Print(StackFrame* stackFrame, usize maxFrames);
@@ -88,7 +91,7 @@ struct CTOS_PACKED IDTEntry
     union
     {
         u8 Attributes;
-        struct [[gnu::packed]]
+        struct CTOS_PACKED
         {
             u8 GateType : 4;
             u8 Unused   : 1;
@@ -101,9 +104,8 @@ struct CTOS_PACKED IDTEntry
     u32 Reserved;
 };
 
-[[maybe_unused]] alignas(0x10) static IDTEntry s_IdtEntries[256] = {};
-extern "C" void*        interrupt_handlers[];
-static InterruptHandler s_InterruptHandlers[256];
+CTOS_UNUSED alignas(0x10) static IDTEntry s_IdtEntries[256] = {};
+extern "C" void* interrupt_handlers[];
 static void (*exceptionHandlers[32])(CPUContext*);
 
 static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
@@ -191,16 +193,11 @@ static void pageFault(CPUContext* ctx)
 }
 extern "C" void raiseInterrupt(CPUContext* ctx)
 {
-    auto& handler = s_InterruptHandlers[ctx->interruptVector];
-
     if (ctx->interruptVector < 0x20)
         return exceptionHandlers[ctx->interruptVector](ctx);
-    else if (handler.IsUsed())
+    else if (InterruptManager::Handle(ctx) == IrqResult::eHandled)
     {
-        if (handler.eoiFirst) InterruptManager::SendEOI(ctx->interruptVector);
-        handler(ctx);
-        if (!handler.eoiFirst) InterruptManager::SendEOI(ctx->interruptVector);
-
+        InterruptManager::SendEOI(ctx->interruptVector);
         return;
     }
 
@@ -221,7 +218,6 @@ namespace IDT
             idtWriteEntry(i, reinterpret_cast<uintptr_t>(interrupt_handlers[i]),
                           IDT_ENTRY_PRESENT | gateType);
 
-            s_InterruptHandlers[i].SetInterruptVector(i);
             if (i < 32) exceptionHandlers[i] = raiseException;
         }
 
@@ -233,7 +229,7 @@ namespace IDT
     }
     void Load()
     {
-        struct [[gnu::packed]]
+        struct CTOS_PACKED
         {
             u16      Limit;
             upointer Base;
@@ -241,39 +237,6 @@ namespace IDT
         idtr.Limit = sizeof(s_IdtEntries) - 1;
         idtr.Base  = reinterpret_cast<upointer>(s_IdtEntries);
         __asm__ volatile("lidt %0" : : "m"(idtr));
-    }
-
-    InterruptHandler* AllocateHandler(u8 hint)
-    {
-        LogTrace("IDT: Allocating handler...");
-        if (hint < 0x20) hint += 0x20;
-
-        if (MADT::LegacyPIC())
-        {
-            if ((hint >= 0x20 && hint <= (0x20 + 15))
-                && !s_InterruptHandlers[hint].IsUsed())
-            {
-                auto handler = &s_InterruptHandlers[hint];
-                handler->SetInterruptVector(hint);
-            }
-        }
-
-        for (usize i = hint; i < 256; i++)
-        {
-            if (!s_InterruptHandlers[i].IsUsed()
-                && !s_InterruptHandlers[i].IsReserved())
-            {
-                s_InterruptHandlers[i].Reserve();
-                s_InterruptHandlers[i].SetInterruptVector(i);
-                return &s_InterruptHandlers[i];
-            }
-        }
-
-        Panic("IDT: Out of interrupt handlers");
-    }
-    InterruptHandler* GetHandler(u8 vector)
-    {
-        return &s_InterruptHandlers[vector];
     }
 
     void SetIST(u8 vector, u32 value) { s_IdtEntries[vector].IST = value; }

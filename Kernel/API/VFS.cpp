@@ -10,6 +10,7 @@
 
 #include <API/Posix/dirent.h>
 #include <API/Posix/fcntl.h>
+#include <API/Posix/linux/netlink.h>
 #include <API/Posix/sys/mman.h>
 #include <API/Posix/sys/select.h>
 #include <API/Posix/sys/statfs.h>
@@ -295,6 +296,21 @@ namespace API::VFS
 
         return *status;
     }
+    ErrorOr<isize> Bind(isize sockFdNum, const struct sockaddr* addr,
+                        socklen_t addrlen)
+    {
+        auto                process = Process::Current();
+        Ref<FileDescriptor> sockFd
+            = TryOrRet(process->GetFileDescriptor(sockFdNum));
+        if (!sockFd->IsSocket()) return Error(ENOTSOCK);
+
+        auto socket = reinterpret_cast<class Socket*>(sockFd->File());
+        auto status = socket->Bind(addr, addrlen);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+
     ErrorOr<isize> FCntl(isize fdNum, isize op, pointer arg)
     {
         Process*            current = Process::GetCurrent();

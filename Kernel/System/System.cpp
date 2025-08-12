@@ -10,7 +10,7 @@
 #include <Firmware/ACPI/ACPI.hpp>
 #include <Firmware/ACPI/SRAT.hpp>
 
-#include <Library/ELF.hpp>
+#include <Library/ELF/ELF.hpp>
 #include <Library/Locking/SpinlockProtected.hpp>
 #include <Library/Module.hpp>
 
@@ -62,14 +62,14 @@ namespace System
             return Error(ENOEXEC);
         }
 
-        ELF::Image::SymbolEnumerator it;
+        ELF::Image::SymbolIterator it;
         it.BindLambda(
-            [&](StringView name, Pointer value) -> bool
+            [&](StringView name, Pointer value) -> IterationResult
             {
-                if (name.Empty()) return true;
+                if (name.Empty()) return IterationResult::eContinue;
 
                 s_KernelSymbols[name] = value;
-                return true;
+                return IterationResult::eContinue;
             });
 
         s_KernelImage.ForEachSymbol(it);
@@ -245,6 +245,13 @@ namespace System
     }
     ErrorOr<void> LoadExternalModules()
     {
+        LoadModule("/usr/lib/modules/pcspk.ko");
+        LoadModule("/usr/lib/modules/serio.ko");
+        LoadModule("/usr/lib/modules/e1000e.ko");
+        LoadModule("/usr/lib/modules/i8042.ko");
+        LoadModule("/usr/lib/modules/atkbd.ko");
+        return {};
+
         auto pathRes = TryOrRet(
             VFS::ResolvePath(VFS::RootDirectoryEntry(), "/lib/modules/"));
         auto         moduleDirectory = pathRes.Entry;
@@ -338,19 +345,19 @@ namespace System
 
         s_Modules.With([module](auto& list) { list.PushBack(module); });
 
-        ELF::Image::SymbolEnumerator it;
+        ELF::Image::SymbolIterator it;
         it.BindLambda(
-            [&](StringView name, Pointer value) -> bool
+            [&](StringView name, Pointer value) -> IterationResult
             {
-                if (name.Empty()) return true;
+                if (name.Empty()) return IterationResult::eContinue;
 
-                if (s_KernelSymbols.Contains(name)) return true;
+                // if (s_KernelSymbols.Contains(name)) return true;
 
                 // FIXME(v1tr10l7): better strategy might be to not store all of
                 // the symbols in kernel symbol table, and just use dependencies
                 // elf images
                 s_KernelSymbols[name] = value;
-                return true;
+                return IterationResult::eContinue;
             });
 
         image->ForEachSymbol(it);

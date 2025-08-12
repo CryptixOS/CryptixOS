@@ -81,8 +81,7 @@ namespace RTL8139
         {
             auto potentialBuffer = (m_TransmitNext + i) % 4;
             auto status          = Read<TransmitStatus>(static_cast<Register>(
-                potentialBuffer
-                + ToUnderlying(Register::eTransmitStatus0)));
+                potentialBuffer + ToUnderlying(Register::eTransmitStatus0)));
             if (status.Own == 1)
             {
                 bufferIndex = potentialBuffer;
@@ -171,7 +170,7 @@ namespace RTL8139
         receiverConfig.AcceptMulticast     = true;
         receiverConfig.AcceptBroadcast     = true;
         receiverConfig.Wrap                = true;
-        receiverConfig.MaxDma = ToUnderlying(DmaSize::e1024Bytes);
+        receiverConfig.MaxDma              = ToUnderlying(DmaSize::e1024Bytes);
         receiverConfig.BufferLength
             = ToUnderlying(ReceiverBufferLength::eK8P16);
         receiverConfig.EarlyThreshold = 0b111;
@@ -179,16 +178,15 @@ namespace RTL8139
 
         auto transmitConfig
             = Read<TransmitConfiguration>(Register::eTransmitConfig);
-        transmitConfig.RetryCount = 0;
-        transmitConfig.MaxDma     = ToUnderlying(DmaSize::e1024Bytes);
+        transmitConfig.RetryCount        = 0;
+        transmitConfig.MaxDma            = ToUnderlying(DmaSize::e1024Bytes);
         transmitConfig.InterframeGapTime = 0b11;
         Write<TransmitConfiguration>(Register::eTransmitConfig, transmitConfig);
 
         for (usize i = 0; auto& buffer : m_TransmitBuffers)
         {
-            buffer = new u8[TRANSMIT_BUFFER_SIZE];
-            usize bufferRegister
-                = ToUnderlying(Register::eTransmitBuffer0) + i;
+            buffer               = new u8[TRANSMIT_BUFFER_SIZE];
+            usize bufferRegister = ToUnderlying(Register::eTransmitBuffer0) + i;
 
             Write<u32>(
                 static_cast<Register>(bufferRegister),
@@ -257,6 +255,8 @@ namespace RTL8139
     ErrorOr<void> ProbeDevice(PCI::DeviceAddress&  address,
                               const PCI::DeviceID& id)
     {
+        return Error(ENOSYS);
+
         LogTrace("RTL8139: Detected pci nic device");
         auto nic = new AdapterCard(address);
 
@@ -267,16 +267,15 @@ namespace RTL8139
         }
         return {};
     }
-    void               RemoveDevice(PCI::Device& device) {}
-
-    static PCI::Driver s_Driver = {
-        .Name     = "rtl8139",
-        .MatchIDs = Span<PCI::DeviceID>(s_IdTable.begin(), s_IdTable.Size()),
-        .Probe    = ProbeDevice,
-        .Remove   = RemoveDevice,
-    };
-
-    bool ModuleInit() { return PCI::RegisterDriver(s_Driver); }
-
-    MODULE_INIT(rtl8139, ModuleInit);
+    void RemoveDevice(PCI::Device& device) {}
 }; // namespace RTL8139
+
+static PCI::Driver s_Driver = {
+    .Name     = "rtl8139",
+    .MatchIDs = Span<PCI::DeviceID>(RTL8139::s_IdTable.begin(),
+                                    RTL8139::s_IdTable.Size()),
+    .Probe    = RTL8139::ProbeDevice,
+    .Remove   = RTL8139::RemoveDevice,
+};
+extern "C" bool ModuleInit() { return PCI::RegisterDriver(s_Driver); }
+MODULE_INIT(rtl8139, ModuleInit);

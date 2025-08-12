@@ -21,6 +21,11 @@
 
 #include <VFS/VFS.hpp>
 
+CTOS_MODULE_AUTHOR("v1tr10l7");
+CTOS_MODULE_DESCRIPTION("pc speaker driver");
+CTOS_MODULE_LICENSE("GPL-3");
+CTOS_MODULE_VERSION("0.2");
+
 class PCSpeakerDevice : public CharacterDevice
 {
   public:

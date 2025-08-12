@@ -92,7 +92,7 @@ namespace Time
             = FindIf(s_HardwareTimers.begin(), s_HardwareTimers.end(),
                      [](auto it) -> bool { return !it->IsCPULocal(); });
 
-        auto requestedTimer = CommandLine::String("scheduler.timer");
+        auto requestedTimer = CommandLine::String("x86.sched_timer");
         LogTrace("Time: Requested `{}` timer for scheduling", requestedTimer);
 
         if ((requestedTimer == "lapic"_sv || requestedTimer.Empty())

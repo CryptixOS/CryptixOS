@@ -7,8 +7,8 @@
 #include <Common.hpp>
 
 #include <Arch/x86_64/Drivers/PIC.hpp>
-#include <Arch/x86_64/IO.hpp>
 #include <Arch/x86_64/IDT.hpp>
+#include <Arch/x86_64/IO.hpp>
 
 // https://pdos.csail.mit.edu/6.828/2005/readings/hardware/8259A.pdf
 inline static constexpr const u32 PIC1          = 0x20;
@@ -53,11 +53,11 @@ ICW1Flags operator|(ICW1Flags lhs, ICW1Flags rhs)
     return static_cast<ICW1Flags>(ret);
 }
 
-I8259A I8259A::s_Instance{};
-
-I8259A& I8259A::Instance()
+Ref<I8259A> I8259A::Instance()
 {
-    return s_Instance;
+    static ::Ref<I8259A> instance = new I8259A();
+
+    return instance;
 }
 
 ErrorOr<void> I8259A::Initialize()
@@ -73,12 +73,7 @@ ErrorOr<void> I8259A::Shutdown()
     return {};
 }
 
-ErrorOr<InterruptHandler*> I8259A::AllocateHandler(u8 hint)
-{
-    return IDT::AllocateHandler(hint);
-}
-
-ErrorOr<void> I8259A::Mask(u8 irq)
+ErrorOr<void> I8259A::Mask(u32 irq)
 {
     u8 picPort = PIC1_DATA;
     if (irq >= 8)
@@ -92,7 +87,7 @@ ErrorOr<void> I8259A::Mask(u8 irq)
 
     return {};
 }
-ErrorOr<void> I8259A::Unmask(u8 irq)
+ErrorOr<void> I8259A::Unmask(u32 irq)
 {
     u8 picPort = PIC1_DATA;
     if (irq >= 8)
@@ -106,7 +101,7 @@ ErrorOr<void> I8259A::Unmask(u8 irq)
     return {};
 }
 
-ErrorOr<void> I8259A::SendEOI(u8 irq)
+ErrorOr<void> I8259A::SendEOI(u32 irq)
 {
     if (HandleSpuriousInterrupt(irq)) return {};
 

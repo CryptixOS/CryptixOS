@@ -50,8 +50,8 @@
 
 #define CTOS_EXPORT              __attribute__((visibility("default")))
 
-#define CtStringifyInner(x)      #x
-#define CtStringify(x)           CtStringifyInner(x)
+#define CtStringifyInner(x...)   #x
+#define CtStringify(x...)        CtStringifyInner(x)
 
 #define CtConcatenateName(a, b)  CtConcatenateInner(a, b)
 #define CtConcatenateInner(a, b) a##b
@@ -62,18 +62,18 @@
 // Sections
 //--------------------------------------------------------------------------
 
-#define KERNEL_INIT_SECTION_NAME ".kernel_init"
-#define KERNEL_INIT_SECTION      CTOS_SECTION_FORCE_EMIT(KERNEL_INIT_SECTION_NAME)
+#define KERNEL_INIT_SECTION_NAME     ".kernel_init"
+#define KERNEL_INIT_SECTION          CTOS_SECTION_FORCE_EMIT(KERNEL_INIT_SECTION_NAME)
 
-#define MODULE_SECTION_NAME      ".module_init"
-#define MODULE_SECTION           CTOS_SECTION_FORCE_EMIT(MODULE_SECTION_NAME)
+#define MODULE_SECTION_NAME          ".module_init"
+#define MODULE_SECTION               CTOS_SECTION_FORCE_EMIT(MODULE_SECTION_NAME)
 
-#define MODULE_DATA_SECTION_NAME ".module_init.data"
+#define MODULE_DATA_SECTION_NAME     ".module_init.data"
 
 //--------------------------------------------------------------------------
 // Compiler builtins
 //--------------------------------------------------------------------------
 
 // NOTE(v1tr10l7): index must be a value between 0 - 63
-#define CtFrameAddress(index)    __builtin_frame_address(index)
-#define CtCurrentFrameAddress()  CtFrameAddress(0)
+#define CtFrameAddress(index)        __builtin_frame_address(index)
+#define CtCurrentFrameAddress()      CtFrameAddress(0)

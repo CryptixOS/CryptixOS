@@ -10,6 +10,7 @@
 #include <Prism/Core/Types.hpp>
 #include <Prism/Utility/Atomic.hpp>
 
+#include <System/InterruptHandler.hpp>
 #include <Time/HardwareTimer.hpp>
 
 class PIT : public HardwareTimer, public Singleton<PIT>
@@ -26,9 +27,7 @@ class PIT : public HardwareTimer, public Singleton<PIT>
     ErrorOr<void>      Start(TimerMode mode, Timestep interval) override;
     void               Stop() override;
 
-    u8                 GetInterruptVector();
-
-    u64                GetCurrentCount();
+    u64                CurrentCount();
 
     ErrorOr<void>      SetFrequency(usize frequency) override;
     void               SetReloadValue(u16 reloadValue);
@@ -54,16 +53,16 @@ class PIT : public HardwareTimer, public Singleton<PIT>
     };
 
   private:
-    static PIT*             s_Instance;
-    class InterruptHandler* m_Handler     = nullptr;
+    static PIT*                            s_Instance;
+    class ::Ref<class InterruptDispatcher> m_Dispatcher  = nullptr;
+
     // NOTE(v1tr10l7): When using PIC, we cannot choose irq number of PIT,
     // and it will have to be IRQ, only IoApic allows to redirect irqs
-    u8                      m_TimerVector = 0;
-    usize                   m_CurrentMode = Mode::eRate;
-    Atomic<u64>             m_Tick        = 0;
+    usize                                  m_CurrentMode = Mode::eRate;
+    Atomic<u64>                            m_Tick        = 0;
 
-    static constexpr usize  FREQUENCY     = 1000;
-    static constexpr usize  IRQ_HINT      = 0x20;
+    static constexpr usize                 FREQUENCY     = 1000;
+    static constexpr usize                 IRQ_LINE      = 0x00;
 
-    static void             Tick(struct CPUContext* ctx);
+    static IrqResult Tick(Device* device, struct CPUContext* ctx);
 }; // namespace PIT

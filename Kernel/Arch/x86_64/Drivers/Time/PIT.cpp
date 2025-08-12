@@ -5,13 +5,10 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/x86_64/Drivers/Time/PIT.hpp>
-
-#include <Arch/InterruptHandler.hpp>
-
-#include <Arch/x86_64/IDT.hpp>
 #include <Arch/x86_64/IO.hpp>
 
 #include <Scheduler/Scheduler.hpp>
+#include <System/InterruptManager.hpp>
 #include <Time/Time.hpp>
 
 PIT* PIT::s_Instance = nullptr;
@@ -25,13 +22,11 @@ PIT::PIT()
 
     LogInfo("PIT: Frequency set to {}Hz", FREQUENCY);
 
-    m_Handler = IDT::AllocateHandler(IRQ_HINT);
-    m_Handler->SetHandler(Tick);
-    m_Handler->Reserve();
-    m_Handler->eoiFirst = true;
+    m_Dispatcher = InterruptManager::AllocateHandler(IRQ_LINE, this, "cryptix");
+    m_Dispatcher->SetHandler(Tick);
 
-    m_TimerVector       = m_Handler->GetInterruptVector();
-    LogInfo("PIT: Installed on interrupt gate #{:#x}", m_TimerVector);
+    LogInfo("PIT: Installed on interrupt handler at irq line #{:#x}",
+            m_Dispatcher->IrqLine());
 }
 
 void          PIT::Initialize() { s_Instance = Instance(); }
@@ -47,19 +42,16 @@ ErrorOr<void> PIT::Start(TimerMode mode, Timestep interval)
     SetReloadValue(reloadValue);
     IO::Out<byte>(COMMAND, CHANNEL0_DATA | SEND_WORD | m_CurrentMode);
 
-    InterruptManager::Unmask(m_TimerVector);
-
+    m_Dispatcher->Unmask();
     return {};
 }
 void PIT::Stop()
 {
-    InterruptManager::Mask(m_TimerVector);
+    m_Dispatcher->Mask();
     SetReloadValue(0);
 }
 
-u8  PIT::GetInterruptVector() { return m_TimerVector; }
-
-u64 PIT::GetCurrentCount()
+u64 PIT::CurrentCount()
 {
     IO::Out<byte>(COMMAND, SELECT_CHANNEL0);
     auto lo = IO::In<byte>(CHANNEL0_DATA);
@@ -82,11 +74,13 @@ void PIT::SetReloadValue(u16 reloadValue)
     IO::Out<byte>(CHANNEL0_DATA, static_cast<byte>(reloadValue >> 8));
 }
 
-void PIT::Tick(struct CPUContext* ctx)
+IrqResult PIT::Tick(Device* device, struct CPUContext* ctx)
 {
     Instance()->m_Tick++;
 
     auto& callback = Instance()->m_OnTickCallback;
     if (callback) callback(ctx);
     Time::Tick((1'000 / FREQUENCY) * 1'000'000);
+
+    return IrqResult::eHandled;
 }

@@ -7,7 +7,14 @@
 
 all_modules = {}
 
-args = [ '-fsanitize=undefined']
+args = [ 
+  '-fsanitize=undefined', 
+  '-fmacro-backtrace-limit=0', 
+  '-I' + meson.project_source_root(),
+  # '-fno-pic',
+  # '-fno-pie',
+  '-fPIC',
+]
 
 if arch == 'aarch64'
   args += [
@@ -16,10 +23,8 @@ if arch == 'aarch64'
 ]
 endif
 
+incdirs = [include_directories('.'), incs]
 
-args += [
-  '-fpic', 
-]
 ld_args = [
   # '-nostdlib',
   # '-static',
@@ -33,7 +38,7 @@ ld_args = [
 subdir(arch)
 subdir('noarch')
 
-modules = ['serio']
+modules = ['serio', 'input']
 
 foreach name : modules
   external = false
@@ -49,8 +54,8 @@ foreach name, mod : all_modules
   if external == true
     lib = static_library(name, 
       dependencies: [inc_deps, dep],
-      link_depends: [meson.current_source_dir() / 'linker.' + arch + '.ld'],
-      include_directories: incs,
+      link_depends: [meson.current_source_dir() / 'linker.ld'],
+      include_directories: incdirs,
       c_args: args,
       cpp_args: args,
       link_args: ld_args,
@@ -61,7 +66,7 @@ foreach name, mod : all_modules
   ext_mods += custom_target(name + '.ko',
     input: lib.extract_all_objects(recursive: true),
     output: name + '.ko',
-    command: ['ld.lld', ld_args, '-T', meson.current_source_dir() / 'linker.' + arch + '.ld', '@INPUT@', '-o', '@OUTPUT@'],
+    command: ['ld.lld', ld_args, '-T', meson.current_source_dir() / 'linker.ld', '@INPUT@', '-o', '@OUTPUT@'],
     build_by_default: true,
     install: false,
     depends: lib

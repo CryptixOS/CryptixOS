@@ -21,7 +21,6 @@ class File
   public:
     File() = default;
     explicit File(class INode* inode);
-
     virtual ~File() = default;
 
     virtual class INode*   INode() const;
