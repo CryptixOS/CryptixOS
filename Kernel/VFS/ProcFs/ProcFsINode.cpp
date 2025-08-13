@@ -21,8 +21,8 @@ isize ProcFsProperty::Read(u8* outBuffer, off_t offset, usize size)
     return bytesCopied;
 }
 
-ProcFsINode::ProcFsINode(StringView name, class Filesystem* fs, mode_t mode,
-                         ProcFsProperty* property)
+ProcFsINode::ProcFsINode(StringView name, class Filesystem* fs, INodeID id,
+                         INodeMode mode, ProcFsProperty* property)
     : INode(name, fs)
     , m_Property(property)
 {
@@ -38,6 +38,11 @@ ProcFsINode::ProcFsINode(StringView name, class Filesystem* fs, mode_t mode,
     m_Metadata.Size         = 0;
     m_Metadata.BlockSize    = 512;
     m_Metadata.BlockCount   = 0;
+}
+ProcFsINode::ProcFsINode(StringView name, class Filesystem* fs, mode_t mode,
+                         ProcFsProperty* property)
+    : ProcFsINode(name, fs, fs->NextINodeIndex(), mode, property)
+{
 }
 
 const stat ProcFsINode::Stats()

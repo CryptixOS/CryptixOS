@@ -199,20 +199,19 @@ void ProcFs::AddProcess(Process* process)
     Assert(!s_Processes.Contains(process->Pid()));
     s_Processes[process->Pid()] = process;
     auto name                   = StringUtils::ToString(process->Pid());
-    auto entry                  = new DirectoryEntry(m_RootEntry, name);
+    auto entry                  = CreateRef<DirectoryEntry>(nullptr, name);
 
-    auto maybeINode             = CreateNode(m_Root, entry, 0755 | S_IFDIR);
-    if (!maybeINode) return;
+    auto inode                  = reinterpret_cast<ProcFsINode*>(
+        Try(AllocateNode(entry->Name(), S_IFDIR | 0755)));
+    inode->m_Parent = m_Root;
+
+    m_Lock.Release();
+    m_Root->InsertChild(inode, entry->Name());
+    m_Lock.Acquire();
+
+    entry->Bind(inode);
     m_RootEntry->InsertChild(entry);
-
-    // auto statusProperty = new ProcFsStatusProperty();
-    // auto statusEntry    = new DirectoryEntry(processEntry, "status");
-    // auto statusNode     = new ProcFsINode(processNode, "status", this,
-    //                                       0755 | S_IFREG, statusProperty);
-    // statusEntry->Bind(statusNode);
-
-    // processNode->InsertChild(statusNode, statusNode->Name());
-    // processEntry->InsertChild(statusEntry);
+    entry->SetParent(m_RootEntry);
 }
 void ProcFs::RemoveProcess(pid_t pid)
 {
@@ -225,12 +224,14 @@ ErrorOr<::Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
     ScopedLock guard(m_Lock);
     if (m_Root) VFS::RecursiveDelete(m_Root);
 
-    m_RootEntry    = new DirectoryEntry(nullptr, "/");
-    auto maybeRoot = CreateNode(nullptr, m_RootEntry, 0755 | S_IFDIR);
-    if (!maybeRoot) return Error(maybeRoot.Error());
+    m_RootEntry          = CreateRef<DirectoryEntry>(nullptr, "/");
+    m_Root               = TryOrRet(AllocateNode("/", 0644 | S_IFDIR));
 
-    m_Root = maybeRoot.Value();
+    auto inode           = reinterpret_cast<ProcFsINode*>(m_Root);
+    inode->m_Metadata.ID = 2;
+
     m_RootEntry->Bind(m_Root);
+    m_RootEntry->SetParent(m_RootEntry);
 
     AddChild("cmdline");
     AddChild("filesystems");
@@ -243,6 +244,14 @@ ErrorOr<::Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
 
     return m_RootEntry;
 }
+
+ErrorOr<INode*> ProcFs::AllocateNode(StringView name, INodeMode mode)
+{
+    auto inode = new ProcFsINode(name, this, NextINodeIndex(), mode);
+    if (!inode) return Error(ENOMEM);
+
+    return inode;
+}
 ErrorOr<INode*> ProcFs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
                                    mode_t mode, uid_t uid, gid_t gid)
 {
@@ -251,7 +260,20 @@ ErrorOr<INode*> ProcFs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
 
     return inode;
 }
-bool ProcFs::Populate(DirectoryEntry* dentry) { return true; }
+bool          ProcFs::Populate(DirectoryEntry* dentry) { return true; }
+ErrorOr<void> ProcFs::Stats(statfs& stats)
+{
+    constexpr usize PROC_SUPER_MAGIC = 0x9fa0;
+
+    stats.f_type                     = PROC_SUPER_MAGIC;
+    stats.f_bsize                    = PMM::PAGE_SIZE / sizeof(long);
+    stats.f_bfree                    = 0;
+    stats.f_bavail                   = 0;
+    stats.f_ffree                    = 0;
+    stats.f_namelen                  = 255;
+
+    return {};
+}
 
 void ProcFs::AddChild(StringView name)
 {

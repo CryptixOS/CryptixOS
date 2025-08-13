@@ -72,6 +72,8 @@ struct ProcFsProperty
 class ProcFsINode : public INode
 {
   public:
+    ProcFsINode(StringView name, class Filesystem* fs, INodeID id,
+                INodeMode mode, ProcFsProperty* property = nullptr);
     ProcFsINode(StringView name, class Filesystem* fs, mode_t mode,
                 ProcFsProperty* property = nullptr);
     virtual ~ProcFsINode() override
@@ -92,6 +94,8 @@ class ProcFsINode : public INode
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
+
+    friend class ProcFs;
 
   private:
     ProcFsProperty*                  m_Property = nullptr;
