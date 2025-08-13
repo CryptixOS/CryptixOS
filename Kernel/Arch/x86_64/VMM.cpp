@@ -196,8 +196,14 @@ bool PageMap::InternalMap(Pointer virt, Pointer phys, PageAttributes flags)
         flags |= PageAttributes::eLPage;
 
         for (usize i = 0; i < 1_gib; i += 2_mib)
+        {
+            auto phys = Virt2Phys(virt.Offset(i), flags);
+            if (phys) continue;
+
             if (!InternalMap(virt.Offset(i), phys.Offset(i), flags))
                 return false;
+        }
+
         return true;
     }
 
@@ -208,6 +214,15 @@ bool PageMap::InternalMap(Pointer virt, Pointer phys, PageAttributes flags)
         return false;
     }
 
+    if (pmlEntry->Address())
+    {
+        LogWarn(
+            "VMM: page at {:#x} is already mapped to {:#x}\ntried to map to => "
+            "{:#x}",
+            virt.Raw(), pmlEntry->Address().Raw(), phys.Raw());
+        Stacktrace::Print(8);
+        // for (;;) Arch::Halt();
+    }
     pmlEntry->Clear();
     pmlEntry->SetAddress(phys);
     pmlEntry->SetFlags(ToNativeFlags(flags), true);
