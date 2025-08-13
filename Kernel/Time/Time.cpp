@@ -104,6 +104,10 @@ namespace Time
 
         LogInfo("Time: Using `{}` as a timer for scheduling",
                 s_SchedulerTimer->ModelString());
+
+        for (auto timer : s_HardwareTimers)
+            if (timer != s_SchedulerTimer)
+                timer->Start(TimerMode::ePeriodic, 1000);
     }
 
     HardwareTimer* SchedulerTimer() { return s_SchedulerTimer; }
