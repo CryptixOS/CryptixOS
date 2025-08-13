@@ -68,6 +68,9 @@ def run():
         setup(build_dir, args.target_arch, args.build_type, args.compiler)
         build(build_dir)
 
+    elif args.action in ['run-bios']:
+        firmware = 'bios'
+        run_qemu(build_dir, firmware)
     elif args.action in ['run', 'run-bios', 'run-uefi', 'r']:
         firmware = 'uefi'
         if args.action != 'run':
