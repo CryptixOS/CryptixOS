@@ -157,6 +157,8 @@ namespace ELF
         m_Image->ForEachRelocationEntry(relocIt);
 
         if (status) return Error(status);
+
+        m_Image->LoadSymbols(m_Symbols);
         return {};
     }
 

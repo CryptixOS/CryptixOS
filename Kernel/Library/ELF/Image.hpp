@@ -63,11 +63,16 @@ namespace ELF
         void ForEachSymbolEntry(SymbolEntryIterator it);
         using SymbolIterator
             = Delegate<IterationResult(StringView name, Pointer value)>;
-        void           ForEachSymbol(SymbolIterator it);
+        void        ForEachSymbol(SymbolIterator it);
 
-        Pointer        LookupSymbol(StringView name) const;
-        void           DumpSymbols();
+        Pointer     LookupSymbol(StringView name) const;
+        void        DumpSymbols();
 
+        inline void LoadSymbols(RedBlackTree<StringView, u64>& symbols)
+        {
+            m_Symbols.Clear();
+            for (auto& [symbol, value] : symbols) m_Symbols[symbol] = value;
+        }
         StringView     LookupString(usize index);
 
         inline Pointer EntryPoint() const

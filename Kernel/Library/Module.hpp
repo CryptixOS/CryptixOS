@@ -60,40 +60,40 @@ struct Module : public RefCounted
 
     using List = IntrusiveRefList<Module>;
 
-    String                              Name;
-    ModuleState                         State = ModuleState::eEmpty;
+    String                                  Name;
+    ModuleState                             State = ModuleState::eEmpty;
 
-    ModuleInformation                   Info;
-    Vector<String>                      RequiredDependencies;
-    Vector<::Ref<Module>>               Dependencies;
+    ModuleInformation                       Info;
+    UnorderedMap<StringView, ::Ref<Module>> Dependencies;
 
-    Span<InitArrayEntry, DynamicExtent> InitArray;
-    Span<InitArrayEntry, DynamicExtent> FiniArray;
+    Span<InitArrayEntry, DynamicExtent>     InitArray;
+    Span<InitArrayEntry, DynamicExtent>     FiniArray;
 
-    bool                                Initialized;
-    bool                                Failed;
+    bool                                    Initialized;
+    bool                                    Failed;
 
-    IntrusiveRefListHook<Module>        Hook;
+    IntrusiveRefListHook<Module>            Hook;
 
-    ModulePreludium*                    Preludium = nullptr;
-    ::Ref<ELF::Image>                   Image     = nullptr;
+    ModulePreludium*                        Preludium = nullptr;
+    ::Ref<ELF::Image>                       Image     = nullptr;
 
-    ModuleInitProc                      Initialize;
-    ModuleTerminateProc                 Terminate;
+    ModuleInitProc                          Initialize;
+    ModuleTerminateProc                     Terminate;
 
-    void                                ParseModuleInfo();
+    void                                    ParseModuleInfo();
 
-    void                                Prepare();
-    ErrorOr<void>                       Dispatch();
-    void                                Unload();
+    void                                    Prepare();
+    ErrorOr<void>                           Dispatch();
+    void                                    Unload();
 
-    static bool                         Load();
+    static bool                             Load();
 };
 
-#define MODULE_INIT(name, init)                                                \
+#define MODULE_INIT(name_, init)                                               \
+    CTOS_MODULE_INFO_STRING(name, #name_);                                     \
     extern "C" MODULE_SECTION const ModulePreludium CtConcatenateName(         \
-        kernel_module, CtUniqueName(name))                                     \
-        = {.Name = #name, .Initialize = init, .Terminate = nullptr}
+        kernel_module, CtUniqueName(name_))                                    \
+        = {.Name = #name_, .Initialize = init, .Terminate = nullptr}
 
 #define MODULE_EXIT(name, exit)                                                \
     extern "C" CTOS_SECTION(MODULE_SECTION_NAME "." #name,                     \

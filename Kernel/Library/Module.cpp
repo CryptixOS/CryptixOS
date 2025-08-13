@@ -83,9 +83,9 @@ void Module::ParseModuleInfo()
                 auto       pre      = "pre: "_sv;
                 if (depsView.StartsWith(pre)) depsView.RemovePrefix(pre.Size());
                 if (depsView.EndsWith(":")) depsView.RemoveSuffix(1);
-                RequiredDependencies = depsView.Split(' ');
 
                 LogDebug("ModInfo[softdep] => {}, {}", value, depsView);
+                Dependencies[depsView] = nullptr;
             }
 
             pos = entryEnd + 1;
@@ -101,8 +101,9 @@ void Module::Prepare()
 }
 ErrorOr<void> Module::Dispatch()
 {
-    for (auto module : Dependencies)
+    for (auto& [name, module] : Dependencies)
     {
+        if (!module) continue;
         switch (module->State)
         {
             case ModuleState::eLoaded: module->Prepare(); CTOS_FALLTHROUGH;
