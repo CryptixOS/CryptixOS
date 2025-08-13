@@ -88,7 +88,11 @@ namespace EFI
 
             // TODO(v1tr10l7): Allocate virtual region for the efi runtime
             // services, and relocate them to it
-            if (!VMM::MapKernelRegion(virt, phys, pageCount, pageAttributes))
+            auto pageMap = VMM::GetKernelPageMap();
+
+            IgnoreUnused(pageCount);
+            IgnoreUnused(phys);
+            if (!pageMap->Protect(virt, pageAttributes))
             {
                 LogError("EFI: Failed to map '{}' region", typeString);
                 return false;
