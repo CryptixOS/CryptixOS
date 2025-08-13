@@ -91,13 +91,6 @@ namespace API::MM
                 goto free_region;
             }
 
-            sizeOr = fd->Read(virt, length);
-            if (!sizeOr)
-            {
-                errorCode = sizeOr.error();
-                goto free_region;
-            }
-
             return virt.Raw();
         }
         if (offset)

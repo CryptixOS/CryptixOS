@@ -22,7 +22,7 @@ namespace API::Process
                                sigset_t* oldSet)
     {
         auto     process     = ::Process::Current();
-        auto  thread      = Thread::Current();
+        auto     thread      = Thread::Current();
         sigset_t currentMask = thread->SignalMask();
 
         if (oldSet)
@@ -58,18 +58,23 @@ namespace API::Process
     }
     ErrorOr<isize> NanoSleep(const timespec* duration, timespec* rem)
     {
-        LogDebug("SysNanoSleep");
         auto current = Process::Current();
         if (!current->ValidateRead(duration, sizeof(timespec))
             || (rem && !current->ValidateRead(rem, sizeof(timespec))))
             return Error(EFAULT);
-        if (duration->tv_sec < 0 || duration->tv_nsec < 0
-            || (rem && (rem->tv_sec < 0 || rem->tv_nsec < 0)))
+
+        auto time = CPU::CopyFromUser(*duration);
+        auto r    = CPU::CopyFromUser(*rem);
+        if (time.tv_sec < 0 || time.tv_nsec < 0
+            || (rem && (r.tv_sec < 0 || r.tv_nsec < 0)))
             return Error(EINVAL);
 
-        auto errorOr = Time::Sleep(duration, rem);
-        if (!errorOr) return errorOr.error();
+        usize ns     = time.tv_nsec ?: time.tv_sec * 1'000'000'000;
+        auto  status = Time::NanoSleep(ns);
+        if (!status) return Error(status.Error());
 
+        r.tv_sec = r.tv_nsec = 0;
+        CPU::CopyToUser(rem, r);
         return 0;
     }
 
