@@ -36,40 +36,35 @@ namespace ELF
 
         inline Pointer Raw() const { return m_Image.Raw(); }
         inline Pointer LoadBase() const { return m_LoadBase; }
+        inline usize   LoadSize() const { return m_Size; }
 
         inline const struct Header& Header() const { return m_Header; }
         inline ObjectType           Type() const { return m_Header.Type; }
 
         usize                       ProgramHeaderCount();
-        struct ProgramHeader*       ProgramHeader(usize index);
+        const struct ProgramHeader& ProgramHeader(usize index);
         usize                       SectionHeaderCount();
-        struct SectionHeader*       SectionHeader(usize index);
+        const struct SectionHeader& SectionHeader(usize index);
 
         using ProgramHeaderIterator
-            = Delegate<IterationResult(struct ProgramHeader*)>;
-        void ForEachProgramHeader(ProgramHeaderIterator& it);
+            = Delegate<IterationResult(const struct ProgramHeader&)>;
+        void ForEachProgramHeader(ProgramHeaderIterator it);
 
         using SectionHeaderIterator
-            = Delegate<IterationResult(struct SectionHeader*)>;
+            = Delegate<IterationResult(const struct SectionHeader&)>;
         void ForEachSectionHeader(SectionHeaderIterator& it);
 
         using RelocationEntryIterator = Delegate<IterationResult(
-            struct SectionHeader&, const struct RelocationEntry&)>;
-        void ForEachRelocationEntry(RelocationEntryIterator& it);
+            const struct SectionHeader&, const struct RelocationEntry&)>;
+        void ForEachRelocationEntry(RelocationEntryIterator it);
 
         using SymbolEntryIterator
             = Delegate<IterationResult(Symbol& symbol, StringView name)>;
         void ForEachSymbolEntry(SymbolEntryIterator it);
         using SymbolIterator
             = Delegate<IterationResult(StringView name, Pointer value)>;
-        void ForEachSymbol(SymbolIterator it);
+        void           ForEachSymbol(SymbolIterator it);
 
-        using SymbolLookup = Delegate<u64(StringView name)>;
-        ErrorOr<void>  ApplyRelocations(SymbolLookup lookup);
-
-        ErrorOr<void>  ResolveSymbols(SymbolLookup lookup);
-        ErrorOr<void>  ResolveSymbols(struct SectionHeader& section,
-                                      SymbolLookup          lookup);
         Pointer        LookupSymbol(StringView name) const;
         void           DumpSymbols();
 
@@ -88,12 +83,6 @@ namespace ELF
             return m_AuxiliaryVector.ProgramHeaderEntrySize;
         }
 
-        inline Pointer InitArray() const { return m_InitArray; }
-        inline Pointer FiniArray() const { return m_FiniArray; }
-
-        inline usize   InitArraySize() const { return m_InitArraySize; }
-        inline usize   FiniArraySize() const { return m_FiniArraySize; }
-
         inline struct SectionHeader* StringSection() const
         {
             return m_StringSection;
@@ -104,14 +93,10 @@ namespace ELF
       private:
         Buffer                        m_Image;
         Pointer                       m_LoadBase = nullptr;
+        usize                         m_Size     = 0;
 
         struct Header                 m_Header;
         AuxiliaryVector               m_AuxiliaryVector;
-
-        Pointer                       m_InitArray     = nullptr;
-        Pointer                       m_FiniArray     = nullptr;
-        usize                         m_InitArraySize = 0;
-        usize                         m_FiniArraySize = 0;
 
         struct SectionHeader*         m_SymbolSection = nullptr;
         struct SectionHeader*         m_StringSection = nullptr;

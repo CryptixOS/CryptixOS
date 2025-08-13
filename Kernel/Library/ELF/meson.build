@@ -5,5 +5,6 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 srcs += files(
-  'ELF.cpp',
+  'Image.cpp',
+  'Loader.cpp',
 )

@@ -14,15 +14,15 @@ namespace System
 void Module::ParseModuleInfo()
 {
     usize       stringSectionIndex = Image->Header().SectionNamesIndex;
-    auto        stringTableSection = Image->SectionHeader(stringSectionIndex);
+    const auto& stringTableSection = Image->SectionHeader(stringSectionIndex);
     const char* sectionNames
-        = Image->Raw().Offset<const char*>(stringTableSection->Offset);
+        = Image->Raw().Offset<const char*>(stringTableSection.Offset);
 
     ELF::SectionHeader* modInfoSection = nullptr;
     for (usize i = 0; i < Image->SectionHeaderCount(); i++)
     {
-        auto&      section     = *Image->SectionHeader(i);
-        StringView sectionName = sectionNames + section.Name;
+        const auto& section     = Image->SectionHeader(i);
+        StringView  sectionName = sectionNames + section.Name;
 
         if (sectionName.StartsWith(".module_init"_sv))
         {
@@ -33,7 +33,7 @@ void Module::ParseModuleInfo()
         }
         else if (sectionName.StartsWith(".modinfo"_sv))
         {
-            modInfoSection = &section;
+            modInfoSection = const_cast<ELF::SectionHeader*>(&section);
             break;
         }
     }
@@ -56,7 +56,8 @@ void Module::ParseModuleInfo()
             StringView key   = entry.Substr(0, equalPos);
             StringView value = entry.Substr(equalPos + 1);
 
-            if (key == "author"_sv)
+            if (key == "name"_sv) Name = value;
+            else if (key == "author"_sv)
             {
                 Info.Author = value;
                 LogDebug("ModInfo[author] => {}", value);
@@ -81,9 +82,10 @@ void Module::ParseModuleInfo()
                 StringView depsView = value;
                 auto       pre      = "pre: "_sv;
                 if (depsView.StartsWith(pre)) depsView.RemovePrefix(pre.Size());
+                if (depsView.EndsWith(":")) depsView.RemoveSuffix(1);
                 RequiredDependencies = depsView.Split(' ');
 
-                LogDebug("ModInfo[softdep] => {}", value);
+                LogDebug("ModInfo[softdep] => {}, {}", value, depsView);
             }
 
             pos = entryEnd + 1;

@@ -138,31 +138,31 @@ ExecutableProgram::LoadImage(PathView path, PageMap* pageMap,
     if (!image->Load(file.Raw(), m_LoadBase)) return Error(ENOEXEC);
 
     auto forEachProgramHeader
-        = [&](ELF::ProgramHeader* header) -> IterationResult
+        = [&](const ELF::ProgramHeader& header) -> IterationResult
     {
-        if (header->Type == ELF::HeaderType::eLoad)
+        if (header.Type == ELF::HeaderType::eLoad)
         {
-            usize misalign  = header->VirtualAddress & (PMM::PAGE_SIZE - 1);
+            usize misalign  = header.VirtualAddress & (PMM::PAGE_SIZE - 1);
             usize pageCount = Math::DivRoundUp(
-                header->SegmentSizeInMemory + misalign, PMM::PAGE_SIZE);
+                header.SegmentSizeInMemory + misalign, PMM::PAGE_SIZE);
 
             Pointer phys = PMM::CallocatePages(pageCount);
             Assert(phys);
 
-            auto  virt = header->VirtualAddress + m_LoadBase;
+            auto  virt = header.VirtualAddress + m_LoadBase;
             usize size = pageCount * PMM::PAGE_SIZE;
             Assert(pageMap->MapRange(virt, phys, size,
                                      PageAttributes::eRWXU
                                          | PageAttributes::eWriteBack));
             auto region
-                = new Region(phys, header->VirtualAddress + m_LoadBase, size);
+                = new Region(phys, header.VirtualAddress + m_LoadBase, size);
             using VMM::Access;
             region->SetAccessMode(Access::eReadWriteExecute | Access::eUser);
 
             addressSpace.Insert(region->VirtualBase(), region);
             Memory::Copy(phys.Offset<Pointer>(misalign).ToHigherHalf(),
-                         image->Raw().Offset(header->Offset),
-                         header->SegmentSizeInFile);
+                         image->Raw().Offset(header.Offset),
+                         header.SegmentSizeInFile);
 
             // if (interpreter)
             //     m_InterpreterBase = std::min(m_InterpreterBase, virt);

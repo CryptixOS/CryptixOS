@@ -10,7 +10,8 @@
 #include <Firmware/ACPI/ACPI.hpp>
 #include <Firmware/ACPI/SRAT.hpp>
 
-#include <Library/ELF/ELF.hpp>
+#include <Library/ELF/Image.hpp>
+#include <Library/ELF/Loader.hpp>
 #include <Library/Locking/SpinlockProtected.hpp>
 #include <Library/Module.hpp>
 
@@ -306,33 +307,79 @@ namespace System
         LogTrace("System: Reading module metadata for '{}'", module->Name);
         module->ParseModuleInfo();
 
-        ELF::Image::SymbolLookup lookup;
+        auto& dependencies = module->Dependencies;
+        for (usize i = 0; const auto& dep : dependencies)
+            LogDebug("System: Dependency[{}] => {}", i++, dep->Name);
+
+        auto lookupSymbol = [&](StringView name) -> u64
+        {
+            auto address = LookupKernelSymbol(name);
+            if (address) return address;
+
+            auto& dependencies = module->Dependencies;
+            for (const auto& dep : dependencies)
+            {
+                address = dep->Image->LookupSymbol(name);
+                if (address) return address;
+            }
+
+            return 0;
+        };
+        IgnoreUnused(lookupSymbol);
+
+        ELF::Loader::SymbolLookup lookup;
         lookup.Bind<LookupKernelSymbol>();
-        auto status        = image->ApplyRelocations(lookup);
-        module->Initialize = image->EntryPoint();
+
+        ELF::Loader loader(image);
+        LogTrace("System: Loading segments of module: `{}`", module->Name);
+        auto status = loader.LoadSegments();
+        if (!status)
+        {
+            LogError("System: Failed to load segments of module: `{}`",
+                     module->Name);
+            return Error(status.Error());
+        }
+
+        LogTrace("System: Resolving symbols of module: `{}`", module->Name);
+        status = loader.ResolveSymbols(lookup);
+
+        if (!status)
+        {
+            LogError("System: Failed to resolve symbols of module: `{}`",
+                     module->Name);
+            return Error(status.Error());
+        }
+        else
+            LogInfo("System: Successfully resolved symbols of module `{}`",
+                    module->Name);
+
+        LogTrace("System: Applying relocations to module: `{}`", module->Name);
+        status = loader.ApplyRelocations();
+        if (!status)
+        {
+            LogError("System: Failed to apply relocations to module: `{}`",
+                     module->Name);
+            return Error(status.Error());
+        }
+
+        module->Initialize = loader.EntryPoint();
 
         LogTrace("System: Found the entry point of module `{}` at `{:#x}`",
                  module->Name, u64(module->Initialize));
         LogTrace("System: Looked up symbol => {:#x}",
-                 module->Image->LookupSymbol("ModuleInit"));
+                 loader.LookupSymbol("ModuleInit"));
 
-        if (!status)
-            LogError("System: Failed to resolve symbols of module `{}`",
-                     module->Name);
-        else
-            LogInfo("System: Successfully resolved symbols of module `{}`",
-                    module->Name);
         if (module->Initialize)
         {
             LogInfo("System: Found `{}` module's init entry point => {:#x}",
-                    module->Name, image->EntryPoint().Raw());
+                    module->Name, loader.EntryPoint().Raw());
 
             module->InitArray
-                = Span(image->InitArray().As<InitArrayEntry>(),
-                       image->InitArraySize() / sizeof(InitArrayEntry));
+                = Span(loader.InitArray().As<InitArrayEntry>(),
+                       loader.InitArraySize() / sizeof(InitArrayEntry));
             module->FiniArray
-                = Span(image->FiniArray().As<FiniArrayEntry>(),
-                       image->FiniArraySize() / sizeof(FiniArrayEntry));
+                = Span(loader.FiniArray().As<FiniArrayEntry>(),
+                       loader.FiniArraySize() / sizeof(FiniArrayEntry));
 
             module->State = ModuleState::eLoaded;
         }
@@ -360,7 +407,7 @@ namespace System
                 return IterationResult::eContinue;
             });
 
-        image->ForEachSymbol(it);
+        loader.ForEachSymbol(it);
         return {};
     }
     ErrorOr<void> LoadModule(Ref<Module> module)

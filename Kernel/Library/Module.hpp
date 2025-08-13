@@ -9,7 +9,7 @@
 
 #include <Compiler.hpp>
 
-#include <Library/ELF/ELF.hpp>
+#include <Library/ELF/Image.hpp>
 
 #include <Prism/Containers/IntrusiveRefList.hpp>
 #include <Prism/Containers/UnorderedMap.hpp>

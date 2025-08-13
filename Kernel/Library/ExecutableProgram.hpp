@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Library/ELF/ELF.hpp>
+#include <Library/ELF/Image.hpp>
 
 class ExecutableProgram
 {
