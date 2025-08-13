@@ -308,8 +308,24 @@ namespace System
         module->ParseModuleInfo();
 
         auto& dependencies = module->Dependencies;
-        for (usize i = 0; const auto& dep : dependencies)
-            LogDebug("System: Dependency[{}] => {}", i++, dep->Name);
+        for (usize i = 0; auto& [name, depModule] : dependencies)
+        {
+            LogDebug("System: Dependency[{}] => {}", i++, name);
+            if (depModule) continue;
+
+            depModule = FindModule(name);
+            if (!depModule)
+            {
+                LogError(
+                    "System: Failed to resolve dependency => `{}`, of module: "
+                    "{}",
+                    name, module->Name);
+                return Error(ENOEXEC);
+            }
+
+            for (auto& [name, nextDep] : depModule->Dependencies)
+                dependencies[name] = nextDep;
+        }
 
         auto lookupSymbol = [&](StringView name) -> u64
         {
@@ -317,18 +333,20 @@ namespace System
             if (address) return address;
 
             auto& dependencies = module->Dependencies;
-            for (const auto& dep : dependencies)
+            for (const auto& [modName, module] : dependencies)
             {
-                address = dep->Image->LookupSymbol(name);
+                if (!module) return 0;
+
+                address = module->Image->LookupSymbol(name);
                 if (address) return address;
+                IgnoreUnused(name);
+                IgnoreUnused(module);
             }
 
             return 0;
         };
-        IgnoreUnused(lookupSymbol);
-
         ELF::Loader::SymbolLookup lookup;
-        lookup.Bind<LookupKernelSymbol>();
+        lookup.BindLambda(lookupSymbol);
 
         ELF::Loader loader(image);
         LogTrace("System: Loading segments of module: `{}`", module->Name);
@@ -391,23 +409,7 @@ namespace System
         }
 
         s_Modules.With([module](auto& list) { list.PushBack(module); });
-
         ELF::Image::SymbolIterator it;
-        it.BindLambda(
-            [&](StringView name, Pointer value) -> IterationResult
-            {
-                if (name.Empty()) return IterationResult::eContinue;
-
-                // if (s_KernelSymbols.Contains(name)) return true;
-
-                // FIXME(v1tr10l7): better strategy might be to not store all of
-                // the symbols in kernel symbol table, and just use dependencies
-                // elf images
-                s_KernelSymbols[name] = value;
-                return IterationResult::eContinue;
-            });
-
-        loader.ForEachSymbol(it);
         return {};
     }
     ErrorOr<void> LoadModule(Ref<Module> module)
