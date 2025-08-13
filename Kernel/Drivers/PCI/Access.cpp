@@ -46,19 +46,30 @@ namespace PCI
 
     uintptr_t ECAM::GetAddress(const DeviceAddress& dev, u32 offset)
     {
-        u64 phys = m_Base.Raw<u64>() + ((dev.Bus - m_BusStart) << 20)
-                 | (dev.Slot << 15) | (dev.Function << 12);
+        Pointer phys = m_Base.Raw<u64>() + ((dev.Bus - m_BusStart) << 20)
+                     | (dev.Slot << 15) | (dev.Function << 12);
 
         if (m_Mappings.Contains(phys)) return m_Mappings[phys].Offset(offset);
 
-        usize size = 1 << 20;
+        usize   size    = 1 << 20;
         // FIXME(v1tr10l7): Research why it doesn't work
-        auto  virt = phys; // VMM::AllocateSpace(size, sizeof(u32));
+        Pointer virt    = phys; // VMM::AllocateSpace(size, sizeof(u32));
 
-        VMM::GetKernelPageMap()->MapRange(virt, phys, size,
-                                          PageAttributes::eRW);
+        auto    pageMap = VMM::GetKernelPageMap();
+        for (usize offset = 0; offset < size; offset += PMM::PAGE_SIZE)
+        {
+            auto pte = pageMap->Virt2Pte(
+                pageMap->TopLevel(), virt.Offset(offset), true, PMM::PAGE_SIZE);
+
+            if (!pte->Address())
+                pageMap->Map(virt.Offset(offset), phys.Offset(offset),
+                             PageAttributes::eRW);
+            else if (!(Arch::VMM::FromNativeFlags(pte->Flags())
+                       & PageAttributes::eRW))
+                pageMap->Protect(virt.Offset(offset), PageAttributes::eRW);
+        }
+
         m_Mappings[phys] = virt;
-
-        return virt + offset;
+        return virt.Offset(offset);
     }
 } // namespace PCI
