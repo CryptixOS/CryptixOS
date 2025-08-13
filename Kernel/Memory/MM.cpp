@@ -150,6 +150,27 @@ namespace MM
         s_KernelAddressSpace.Insert(virt, region);
         return region;
     }
+
+    Ref<Region> AllocateKernelRegion(const usize bytes, PageAttributes flags)
+    {
+        auto  region    = VMM::AllocateKernelRegion(bytes, flags);
+        usize pageCount = Math::DivRoundUp(bytes, PMM::PAGE_SIZE);
+        auto  phys      = PMM::CallocatePages(pageCount);
+
+        using VMM::Access;
+        Access access = Access::eUser;
+        if (flags & PageAttributes::eRead) access |= Access::eRead;
+        if (flags & PageAttributes::eWrite) access |= Access::eWrite;
+        if (flags & PageAttributes::eExecutable) access |= Access::eExecute;
+
+        region->SetPhysicalBase(phys);
+        region->SetAccessMode(access);
+
+        auto pageMap = VMM::GetKernelPageMap();
+        pageMap->MapRegion(region);
+
+        return region;
+    }
     Ref<Region> AllocateUserRegion(const usize bytes, PageAttributes flags)
     {
         auto  process      = Process::Current();

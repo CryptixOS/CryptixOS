@@ -103,6 +103,11 @@ class PageTableEntry final
         if (enabled) m_Address |= flags;
         else m_Address &= ~flags;
     }
+    inline void SetRawFlags(u64 flags)
+    {
+        m_Address &= ~Arch::VMM::GetAddressMask();
+        m_Address |= flags;
+    }
 
     inline void Clear() { m_Address = 0; }
 

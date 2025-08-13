@@ -48,10 +48,11 @@ void* PageMap::NextLevel(PageTableEntry& entry, bool allocate, uintptr_t virt)
 
 namespace VMM
 {
-    static bool s_Initialized = false;
+    static bool          s_Initialized        = false;
+    static AddressSpace* s_KernelAddressSpace = nullptr;
 
-    void        Initialize(Pointer kernelPhys, Pointer kernelVirt,
-                           usize higherHalfOffset)
+    void                 Initialize(Pointer kernelPhys, Pointer kernelVirt,
+                                    usize higherHalfOffset)
     {
         if (s_Initialized) return;
         s_Initialized      = true;
@@ -60,7 +61,8 @@ namespace VMM
         LogTrace("VMM: Initializing...");
         Arch::VMM::Initialize();
 
-        s_KernelPageMap = new PageMap();
+        s_KernelAddressSpace = new AddressSpace();
+        s_KernelPageMap      = new PageMap();
         Assert(s_KernelPageMap->TopLevel() != 0);
 
         usize baseMemorySize = 4_gib;
@@ -71,9 +73,9 @@ namespace VMM
             GetHigherHalfOffset(), 0, baseMemorySize,
             PageAttributes::eRWX | flags | PageAttributes::eWriteBack));
 
-        auto memoryMap = PMM::MemoryZones();
+        auto  memoryMap      = PMM::MemoryZones();
 
-        usize                    highestAddress = 0;
+        usize highestAddress = 0;
         for (usize index = 0; const auto& entry : memoryMap)
         {
             Pointer base   = Math::AlignDown(entry.Base(), PMM::PAGE_SIZE);
@@ -224,6 +226,11 @@ namespace VMM
             += (virt - s_VirtualAddressSpace).Offset(increment);
 
         return lowerHalf ? virt.FromHigherHalf() : virt.ToHigherHalf<>();
+    }
+    Ref<Region> AllocateKernelRegion(usize count, PageAttributes flags)
+    {
+        auto region = s_KernelAddressSpace->AllocateRegion(count, 0);
+        return region;
     }
 
     Ref<Region> AllocateDMACoherent(usize size, PageAttributes flags)

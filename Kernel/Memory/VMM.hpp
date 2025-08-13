@@ -75,6 +75,8 @@ namespace VMM
 
     Pointer     AllocateSpace(usize increment = 0, usize alignment = 0,
                               bool lowerHalf = false);
+    Ref<Region> AllocateKernelRegion(usize count, PageAttributes flags);
+
     Ref<Region> AllocateDMACoherent(usize          size,
                                     PageAttributes flags
                                     = PageAttributes::eRW

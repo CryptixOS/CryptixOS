@@ -93,7 +93,7 @@ bool PageMap::Unmap(Pointer virt, PageAttributes flags)
 bool PageMap::Remap(Pointer virtOld, Pointer virtNew, PageAttributes flags)
 {
     Pointer phys = Virt2Phys(virtOld, flags);
-    Unmap(virtOld, flags);
+    if (phys) Unmap(virtOld, flags);
 
     return Map(virtNew, phys, flags);
 }
