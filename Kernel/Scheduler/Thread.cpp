@@ -66,7 +66,7 @@ Thread::Thread(Process* parent, Vector<StringView>& argv,
 
     if (!parent->PageMap) parent->PageMap = VMM::GetKernelPageMap();
 
-    auto mapUserStack = [this]() -> std::pair<uintptr_t, uintptr_t>
+    auto mapUserStack = [this]() -> std::pair<upointer, upointer>
     {
         Pointer stackPhys
             = PMM::CallocatePages(CPU::USER_STACK_SIZE / PMM::PAGE_SIZE);
@@ -94,48 +94,12 @@ Thread::Thread(Process* parent, Vector<StringView>& argv,
 
     m_Tls.Stack
         = program.PrepareStack(stackTopWritable, stackTopVirt, argv, envp);
+
     CPU::PrepareThread(this, program.EntryPoint(), 0);
 }
 
-Thread::Thread(Process* parent, Pointer pc, bool user)
-    : m_State(ThreadState::eDequeued)
-    , m_ErrorCode(no_error)
-    , m_Parent(parent)
-    , m_IsUser(user)
-    , m_IsEnqueued(false)
-{
-    m_Tls.RunningOn = CPU::GetCurrent()->ID;
-    m_Tls.Self      = this;
-    m_Tid           = parent->m_NextTid++;
-
-    Pointer stackPhys
-        = PMM::CallocatePages<uintptr_t>(CPU::USER_STACK_SIZE / PMM::PAGE_SIZE);
-    Pointer stackVirt = parent->m_UserStackTop.Raw() - CPU::USER_STACK_SIZE;
-
-    if (!parent->PageMap) parent->PageMap = VMM::GetKernelPageMap();
-    Assert(parent->PageMap->MapRange(stackVirt, stackPhys, CPU::USER_STACK_SIZE,
-                                     PageAttributes::eRW | PageAttributes::eUser
-                                         | PageAttributes::eWriteBack));
-    parent->m_UserStackTop = stackVirt.Raw() - PMM::PAGE_SIZE;
-    m_Stacks.PushBack(
-        CreateRef<Region>(stackPhys, stackVirt, CPU::USER_STACK_SIZE));
-
-    Pointer stackTopWritable
-        = stackPhys.Offset<Pointer>(CPU::USER_STACK_SIZE).ToHigherHalf();
-
-    m_Tls.Stack = Math::AlignDown(stackTopWritable, 16);
-
-    CPU::PrepareThread(this, pc, 0);
-}
 Thread::~Thread()
 {
-    for (auto& region : m_Stacks)
-    {
-        auto  phys      = region->PhysicalBase();
-        usize pageCount = Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE);
-        PMM::FreePages(phys, pageCount);
-    }
-
     PMM::FreePages(m_Tls.FpuStorage, m_Tls.FpuStoragePageCount);
     PMM::FreePages(m_Tls.KernelStack,
                    Math::DivRoundUp(CPU::KERNEL_STACK_SIZE, PMM::PAGE_SIZE));
@@ -237,21 +201,11 @@ bool Thread::DispatchSignal(u8 signal)
 
     for (const auto& stack : m_Stacks)
     {
-        auto    stackPhys    = stack->PhysicalBase();
-        usize   stackVirt    = stack->VirtualBase();
-        usize   stackSize    = stack->Size();
+        usize stackVirt = stack->VirtualBase();
 
-        Pointer newStackPhys = PMM::CallocatePages<uintptr_t>(
-            Math::AlignUp(stackSize, PMM::PAGE_SIZE) / PMM::PAGE_SIZE);
-
-        Memory::Copy(newStackPhys.ToHigherHalf<void*>(),
-                     stackPhys.ToHigherHalf<void*>(), stackSize);
-
-        process->PageMap->MapRange(stackVirt, newStackPhys, stackSize,
-                                   PageAttributes::eRWXU
-                                       | PageAttributes::eWriteBack);
-        newThread->m_Stacks.PushBack(
-            CreateRef<Region>(newStackPhys, newStackPhys, stackSize));
+        auto  region    = process->m_AddressSpace.Find(stackVirt);
+        if (!region) continue;
+        newThread->m_Stacks.PushBack(region);
     }
 
     newThread->m_Tls.FpuStoragePageCount = m_Tls.FpuStoragePageCount;

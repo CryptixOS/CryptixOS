@@ -270,7 +270,7 @@ Process* Scheduler::CreateProcess(Process* parent, StringView name,
 
     ScopedLock guard(s_ProcessListLock);
     s_Processes[proc->Pid()] = proc;
-#if 0
+#if 1
     s_ProcFs->AddProcess(proc);
 #endif
 

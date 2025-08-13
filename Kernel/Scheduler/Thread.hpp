@@ -62,7 +62,6 @@ struct Thread : public RefCounted
     Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn = -1);
     Thread(Process* parent, Vector<StringView>& arg, Vector<StringView>& envp,
            ExecutableProgram& program, i64 runOn = -1);
-    Thread(Process* parent, Pointer pc, bool user = true);
     ~Thread();
 
     static Thread*     Current();

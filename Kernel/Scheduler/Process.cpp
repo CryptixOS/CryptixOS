@@ -7,6 +7,7 @@
 #include <API/Posix/sys/wait.h>
 #include <Arch/CPU.hpp>
 
+#include <Prism/Algorithm/Find.hpp>
 #include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
 
@@ -64,6 +65,19 @@ Process::Process(Process* parent, StringView name,
     m_FdTable.Insert(tty, 0);
     m_FdTable.Insert(tty, 1);
     m_FdTable.Insert(tty, 2);
+}
+Process::~Process()
+{
+    Arch::VMM::DestroyPageMap(PageMap);
+    delete PageMap;
+    for (auto& [virt, region] : m_AddressSpace)
+    {
+        auto  phys      = region->PhysicalBase();
+        usize size      = region->Size();
+        usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
+
+        PMM::FreePages(phys, pageCount);
+    }
 }
 
 Process* Process::GetCurrent()
@@ -126,7 +140,7 @@ Ref<Thread> Process::CreateThread(Vector<StringView>& argv,
                                   Vector<StringView>& envp,
                                   ExecutableProgram& program, i64 runOn)
 {
-    auto thread = new Thread(this, argv, envp, program, runOn);
+    auto thread = CreateRef<Thread>(this, argv, envp, program, runOn);
 
     if (m_Threads.Empty()) m_MainThread = thread;
 
@@ -325,17 +339,14 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
     delete PageMap;
 
     PageMap = new class PageMap();
-
     Vector<StringView> argvArr;
     {
         CPU::UserMemoryProtectionGuard guard;
-        // for (auto& arg : args) argvArr.EmplaceBack(arg, arg.Size());
+        for (char** arg = argv; *arg; arg++) argvArr.PushBack(*arg);
     }
 
-    static ExecutableProgram program;
-
+    ExecutableProgram program;
     if (!program.Load(path, PageMap, m_AddressSpace)) return Error(ENOEXEC);
-
     Thread* currentThread = CPU::GetCurrentThread();
     currentThread->SetState(ThreadState::eExited);
 
@@ -347,14 +358,6 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
         if (thread == currentThread) m_MainThread = currentThread;
     m_Threads.Clear();
 
-    {
-        CPU::UserMemoryProtectionGuard guard;
-        for (char** arg = argv; *arg; arg++) argvArr.PushBack(*arg);
-
-        // for (usize i = 0; auto& arg : args)
-        //     LogDebug("Process::Exec: argv[{}] = '{}'", i++, arg);
-    }
-
     Vector<StringView> envpArr;
     {
         CPU::UserMemoryProtectionGuard guard;
@@ -363,8 +366,8 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 
     auto thread
         = CreateThread(argvArr, envpArr, program, CPU::GetCurrent()->ID);
-    Scheduler::EnqueueThread(thread.Raw());
 
+    Scheduler::EnqueueThread(thread.Raw());
     Scheduler::Yield();
     return 0;
 }
@@ -384,37 +387,37 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
         if (pid < -1)
         {
             pid_t gid = -pid;
-            auto  it  = std::find_if(m_Children.begin(), m_Children.end(),
-                                     [gid](Process* proc) -> bool
-                                     {
-                                       if (proc->PGid() == gid) return true;
-                                       return false;
-                                   });
+            auto  it  = FindIf(m_Children.begin(), m_Children.end(),
+                               [gid](Process* proc) -> bool
+                               {
+                                 if (proc->PGid() == gid) return true;
+                                 return false;
+                             });
             if (it == m_Children.end()) return Error(ECHILD);
             procs.PushBack(*it);
         }
         else if (pid == -1) procs = process->m_Children;
         else if (pid == 0)
         {
-            auto it = std::find_if(m_Children.begin(), m_Children.end(),
-                                   [process](Process* proc) -> bool
-                                   {
-                                       if (proc->PGid() == process->PGid())
-                                           return true;
-                                       return false;
-                                   });
+            auto it = FindIf(m_Children.begin(), m_Children.end(),
+                             [process](Process* proc) -> bool
+                             {
+                                 if (proc->PGid() == process->PGid())
+                                     return true;
+                                 return false;
+                             });
 
             if (it == m_Children.end()) return Error(ECHILD);
             procs.PushBack(*it);
         }
         else if (pid > 0)
         {
-            auto it = std::find_if(m_Children.begin(), m_Children.end(),
-                                   [pid](Process* proc) -> bool
-                                   {
-                                       if (proc->Pid() == pid) return true;
-                                       return false;
-                                   });
+            auto it = FindIf(m_Children.begin(), m_Children.end(),
+                             [pid](Process* proc) -> bool
+                             {
+                                 if (proc->Pid() == pid) return true;
+                                 return false;
+                             });
 
             if (it == m_Children.end()) return Error(ECHILD);
             procs.PushBack(*it);
@@ -459,46 +462,12 @@ ErrorOr<Process*> Process::Fork()
     newProcess->m_Umask = m_Umask;
     m_Children.PushBack(newProcess);
 
-    newProcess->m_AddressSpace.Clear();
+    CopyMemory(newProcess);
     LogDebug("Process: Copying the address space");
-    for (const auto& [base, range] : m_AddressSpace)
-    {
-        usize pageCount
-            = Math::AlignUp(range->Size(), PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
-
-        uintptr_t physicalSpace = PMM::CallocatePages<uintptr_t>(pageCount);
-        Assert(physicalSpace);
-
-        Memory::Copy(Pointer(physicalSpace).ToHigherHalf<void*>(),
-                     range->PhysicalBase().ToHigherHalf<void*>(),
-                     range->Size());
-        pageMap->MapRange(range->VirtualBase(), physicalSpace, range->Size(),
-                          PageAttributes::eRWXU | PageAttributes::eWriteBack);
-
-        auto newRegion
-            = new Region(physicalSpace, range->VirtualBase(), range->Size());
-        newRegion->SetAccessMode(range->Access());
-        newProcess->m_AddressSpace.Insert(range->VirtualBase(), newRegion);
-        continue;
-        // auto newRegion = newProcess->m_AddressSpace.AllocateFixed(
-        //     range->VirtualBase(), range->Size());
-        // if (!newRegion)
-        //    newRegion
-        //        = newProcess->m_AddressSpace.AllocateRegion(range->Size());
-        newRegion->SetPhysicalBase(physicalSpace);
-        newRegion->SetAccessMode(range->Access());
-
-        // pageMap->MapRegion(newRegion);
-        //  TODO(v1tr10l7): Free regions;
-    }
 
     newProcess->m_NextTid.Store(m_NextTid.Load());
     LogDebug("Process: Copying fd table");
-    for (const auto& [i, fd] : m_FdTable)
-    {
-        // Ref<FileDescriptor> newFd = new FileDescriptor(fd);
-        newProcess->m_FdTable.Insert(fd, i);
-    }
+    CopyFileDescriptors(newProcess);
 
     auto thread                = currentThread->Fork(newProcess);
     thread->m_IsEnqueued       = false;
@@ -572,4 +541,25 @@ i32 Process::Exit(i32 code)
     LogDebug("Process: {} exited with exit code: {}", m_Pid, code);
     Scheduler::Yield();
     AssertNotReached();
+}
+
+void Process::CopyFileDescriptors(Process* dest)
+{
+    for (auto& [fdNum, fd] : m_FdTable) dest->m_FdTable.Insert(fd, fdNum);
+}
+void Process::CopyMemory(Process* process)
+{
+    for (auto& [virt, region] : m_AddressSpace)
+    {
+        usize size      = region->Size();
+        usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
+        auto  phys      = PMM::CallocatePages(pageCount);
+
+        Memory::Copy(Pointer(phys).ToHigherHalf<void*>(),
+                     region->PhysicalBase().ToHigherHalf<void*>(),
+                     region->Size());
+        auto newRegion = process->m_AddressSpace.AllocateFixed(virt, size);
+        newRegion->SetAccessMode(region->Access());
+        process->PageMap->MapRange(virt, phys, size, region->PageAttributes());
+    }
 }

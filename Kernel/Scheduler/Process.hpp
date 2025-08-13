@@ -57,6 +57,7 @@ class Process
   public:
     Process() = default;
     Process(Process* parent, StringView name, const Credentials& creds);
+    ~Process();
 
     static Process* GetCurrent();
     static Process* Current();
@@ -213,6 +214,9 @@ class Process
     usize               m_Quantum      = 1'000;
     Spinlock            m_Lock;
     Event               m_Event;
+
+    void                CopyFileDescriptors(Process* dest);
+    void                CopyMemory(Process* process);
 
     friend class Scheduler;
     friend struct Thread;
