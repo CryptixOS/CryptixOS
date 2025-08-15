@@ -17,4 +17,4 @@
 #mesondefine CTOS_TTY_LOG_TERMIOS
 #mesondefine CTOS_VFS_DEBUG_ECHFS
 #mesondefine CTOS_DUMP_INIT_ARRAY
-
+#mesondefine CTOS_ELF_DEBUG

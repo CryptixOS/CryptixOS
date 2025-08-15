@@ -30,7 +30,7 @@ ErrorOr<void> ExecutableProgram::Load(PathView path, PageMap* pageMap,
     auto ldPath  = m_Image->InterpreterPath();
     if (ldPath.Empty()) return {};
 
-    m_LoadBase    = 0x41000000;
+    m_LoadBase    = 0x41000000zu;
     m_Interpreter = TryOrRet(LoadImage(ldPath, pageMap, addressSpace, true));
     m_EntryPoint  = m_Interpreter->EntryPoint();
 
@@ -129,41 +129,13 @@ ExecutableProgram::LoadImage(PathView path, PageMap* pageMap,
     Ref image = CreateRef<ELF::Image>();
 
     if (!image->Load(file.Raw(), m_LoadBase)) return Error(ENOEXEC);
+    // if (image->IsExecutable() && !image->InterpreterPath().Empty())
+    //     return image;
 
-    Pointer minVirt = 0;
-    for (usize i = 0; i < image->ProgramHeaderCount(); i++)
-    {
-        auto& header = image->ProgramHeader(i);
-
-        if (header.Type == ELF::HeaderType::eLoad
-            /*&& image->InterpreterPath().Empty()*/)
-        {
-            usize misalign  = header.VirtualAddress & (PMM::PAGE_SIZE - 1);
-            usize pageCount = Math::DivRoundUp(
-                header.SegmentSizeInMemory + misalign, PMM::PAGE_SIZE);
-
-            Pointer phys = PMM::CallocatePages(pageCount);
-            Assert(phys);
-
-            auto  virt = header.VirtualAddress + m_LoadBase;
-            usize size = pageCount * PMM::PAGE_SIZE;
-            Assert(pageMap->MapRange(virt, phys, size,
-                                     PageAttributes::eRWXU
-                                         | PageAttributes::eWriteBack));
-            auto region
-                = new Region(phys, header.VirtualAddress + m_LoadBase, size);
-            using VMM::Access;
-            region->SetAccessMode(Access::eReadWriteExecute | Access::eUser);
-
-            addressSpace.Insert(region->VirtualBase(), region);
-            Memory::Copy(phys.Offset<Pointer>(misalign).ToHigherHalf(),
-                         image->Raw().Offset(header.Offset),
-                         header.SegmentSizeInFile);
-
-            minVirt = Min(minVirt.Raw(), virt);
-        }
-    }
-
+    ELF::Loader loader(image);
+    loader.LoadSegments(*pageMap, addressSpace, PageAttributes::eRWXU,
+                        m_LoadBase);
+    auto minVirt = loader.MinVirt();
     if (interpreter) m_InterpreterBase = minVirt;
     return image;
 }

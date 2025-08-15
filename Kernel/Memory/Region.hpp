@@ -84,6 +84,7 @@ namespace VMM
 
         inline void SetPhysicalBase(Pointer phys) { m_PhysicalBase = phys; }
         inline void SetAccessMode(enum Access access) { m_Access = access; }
+        void        SetAttributes(enum PageAttributes flags);
         inline void SetFileDescriptor(class FileDescriptor* fd, usize offset)
         {
             m_Fd     = fd;

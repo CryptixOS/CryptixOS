@@ -29,6 +29,10 @@ class AddressSpace : public NonCopyable<AddressSpace>
 
     bool        IsAvailable(Pointer base, usize length) const;
 
+    inline void Insert(Ref<Region> region)
+    {
+        return Insert(region->VirtualBase(), region);
+    }
     void        Insert(Pointer, Ref<Region> region);
     void        Erase(Pointer);
 

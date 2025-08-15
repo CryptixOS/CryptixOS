@@ -21,4 +21,14 @@ namespace VMM
         return flags | PageAttributes::eRead | PageAttributes::eWrite
              | PageAttributes::eExecutable;
     }
+
+    void Region::SetAttributes(enum PageAttributes flags)
+    {
+        enum Access access = Access::eNone;
+        if (flags & PageAttributes::eRead) access |= Access::eRead;
+        if (flags & PageAttributes::eWrite) access |= Access::eWrite;
+        if (flags & PageAttributes::eExecutable) access |= Access::eExecute;
+
+        m_Access = access;
+    }
 }; // namespace VMM

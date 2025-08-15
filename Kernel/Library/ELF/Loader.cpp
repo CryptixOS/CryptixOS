@@ -4,6 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+// #include <Debug/Config.hpp>
+#define CTOS_ELF_DEBUG 1
 #include <Library/ELF/Loader.hpp>
 
 #include <Memory/AddressSpace.hpp>
@@ -60,16 +62,18 @@ namespace ELF
         return {};
     }
 
-    ErrorOr<void> Loader::LoadSegments(PageMap&       pageMap,
-                                       AddressSpace&  addressSpace,
-                                       PageAttributes flags)
+    ErrorOr<void> Loader::AllocateMemory(PageMap&       pageMap,
+                                         AddressSpace&  addressSpace,
+                                         PageAttributes flags, Pointer loadBase)
     {
-        const auto& header    = m_Image->Header();
+        const auto& header = m_Image->Header();
 
-        Pointer     minVirt   = ~u64{0};
-        Pointer     maxVirt   = 0;
+        m_MinVirt          = ~u64{0};
+        m_MaxVirt          = 0;
 
-        usize       totalSize = 0;
+#if CTOS_ELF_DEBUG
+        usize totalSize = 0;
+#endif
         for (usize i = 0; i < header.ProgramEntryCount; i++)
         {
             const auto& segment = m_Image->ProgramHeader(i);
@@ -79,55 +83,131 @@ namespace ELF
 
             auto start
                 = Math::AlignDown(segment.VirtualAddress, PMM::PAGE_SIZE);
-            auto end = Math::AlignUp(segment.VirtualAddress
-                                         + segment.SegmentSizeInMemory,
-                                     alignment);
-            minVirt  = Min(minVirt.Raw(), start);
-            maxVirt  = Max(maxVirt.Raw(), end);
+            auto end  = Math::AlignUp(segment.VirtualAddress
+                                          + segment.SegmentSizeInMemory,
+                                      alignment);
+            m_MinVirt = Min(m_MinVirt.Raw(), start);
+            m_MaxVirt = Max(m_MaxVirt.Raw(), end);
 
+#if CTOS_ELF_DEBUG
             LogDebug(
                 "ELF::Loader: ProgramHeader[{}] => \n"
                 "start => {:#x}, end => {:#x}\n"
                 "end - start => {:#x}",
                 i, start, end, end - start);
             totalSize += end - start;
+#endif
         }
-        LogDebug("ELF::Loader: Total Size => {:#x}", totalSize);
 
-        m_Size           = maxVirt.Raw() - minVirt.Raw();
-        m_Size           = totalSize;
-        // m_Size *= 2;
+        m_Size                  = m_MaxVirt.Raw() - m_MinVirt.Raw();
+        m_AlignedSize           = Math::AlignUp(m_Size, PMM::PAGE_SIZE);
 
-        auto alignedSize = Math::AlignUp(m_Size, PMM::PAGE_SIZE);
-        m_LoadBase       = 0;
-        m_PageMap        = &pageMap;
-        m_AddressSpace   = &addressSpace;
+        m_LoadBase              = 0;
+        m_PageMap               = &pageMap;
+        m_AddressSpace          = &addressSpace;
 
-        if (m_Image->Type() == ObjectType::eShared)
+        Pointer virtBase        = nullptr;
+        Pointer alignedVirtBase = nullptr;
+
+        if (m_Image->Type() == ObjectType::eExecutable) loadBase = 0;
+        else m_LoadBase = loadBase ?: VMM::AllocateSpace(m_AlignedSize * 2);
+        m_Bias = m_Image->IsShared() ? m_LoadBase.Raw() - m_MinVirt.Raw() : 0;
+
+#if CTOS_ELF_DEBUG
+        LogDebug(
+            "ELF::Loader: Loading executable =>\n"
+            "minVirt => {:#x}, maxVirt => {:#x}\n"
+            "totalSize => {:#x}, size => {:#x}, alignedSize => {:#x}\n"
+            "loadBase => {:#x}, bias => {:#x}\n",
+            m_MinVirt.Raw(), m_MaxVirt.Raw(), totalSize, m_Size, m_AlignedSize,
+            m_LoadBase.Raw(), m_Bias.Raw());
+#endif
+
+        virtBase = m_Image->IsShared() ? m_LoadBase.Offset(m_MinVirt.Raw())
+                                       : m_MinVirt.Raw();
+        alignedVirtBase = Math::AlignDown(virtBase.Raw(), PMM::PAGE_SIZE);
+        m_VirtMisalign  = virtBase.Raw() - alignedVirtBase.Raw();
+
+        usize pageCount
+            = Math::DivRoundUp(m_AlignedSize + m_VirtMisalign, PMM::PAGE_SIZE);
+        m_Phys = PMM::CallocatePages(pageCount);
+        if (!m_Phys)
         {
-            m_LoadBase      = VMM::AllocateSpace(alignedSize);
-            m_Bias          = m_LoadBase.Raw() - minVirt.Raw();
-
-            usize pageCount = Math::DivRoundUp(alignedSize, PMM::PAGE_SIZE);
-            auto  phys      = PMM::CallocatePages(pageCount);
-
-            LogTrace(
-                "ELF::Loader: Mapping {:#x} bytes at {:#x} to {:#x}, mapping "
-                "end => {:#x}",
-                alignedSize, phys, m_LoadBase.Raw(),
-                m_LoadBase.Offset(alignedSize));
-            pageMap.MapRange(m_LoadBase, phys, alignedSize,
-                             PageAttributes::eRWX | flags);
-
-            auto region = CreateRef<Region>(phys, m_LoadBase, alignedSize);
-            region->SetAccessMode(VMM::Access::eRead | VMM::Access::eWrite
-                                  | VMM::Access::eExecute);
-            addressSpace.Insert(m_LoadBase, region);
+            LogError(
+                "ELF::Loader: Failed to allocate {} pages for program headers",
+                pageCount);
+            return Error(ENOMEM);
         }
 
-        Image::ProgramHeaderIterator it;
-        it.Bind<&Loader::LoadSegment>(this);
-        m_Image->ForEachProgramHeader(it);
+#if CTOS_ELF_DEBUG
+        LogTrace(
+            "ELF::Loader: Mapping {:#x} bytes at {:#x} to {:#x}, mapping "
+            "end => {:#x}",
+            m_AlignedSize, m_Phys, virtBase,
+            alignedVirtBase.Offset(m_AlignedSize + m_VirtMisalign));
+#endif
+        if (!pageMap.MapRange(alignedVirtBase, m_Phys,
+                              m_AlignedSize + m_VirtMisalign, flags))
+        {
+            PMM::FreePages(m_Phys, pageCount);
+            return Error(EFAULT);
+        }
+
+        auto region = CreateRef<Region>(m_Phys, alignedVirtBase,
+                                        m_AlignedSize + m_VirtMisalign);
+        // region->SetAttributes(flags);
+        using VMM::Access;
+        region->SetAccessMode(Access::eReadWriteExecute | Access::eUser);
+        addressSpace.Insert(region);
+        return {};
+    }
+    ErrorOr<void> Loader::LoadSegments(PageMap&       pageMap,
+                                       AddressSpace&  addressSpace,
+                                       PageAttributes flags, Pointer loadBase)
+    {
+        RetOnError(AllocateMemory(pageMap, addressSpace, flags, loadBase));
+
+        Pointer virtBase = m_Image->IsShared()
+                             ? m_LoadBase.Offset(m_MinVirt.Raw())
+                             : m_MinVirt.Raw();
+#if CTOS_ELF_DEBUG
+        // Debug: verify every page in the window maps to the expected physical
+        // page
+        for (usize offset = 0; offset < m_AlignedSize; offset += PMM::PAGE_SIZE)
+        {
+            Pointer virt         = virtBase.Offset(offset);
+            Pointer expectedPhys = m_Phys.Offset(offset + m_VirtMisalign);
+
+            Pointer physFromMap  = m_PageMap->Virt2Phys(virt);
+
+            usize   offsetInPage = virt & (PMM::PAGE_SIZE - 1);
+            Pointer actualPhys   = physFromMap & (PMM::PAGE_SIZE - 1)
+                                     ? physFromMap
+                                     : physFromMap.Offset<Pointer>(offsetInPage);
+
+            if (actualPhys.Raw() != expectedPhys.Raw())
+                LogWarn(
+                    "ELF::Loader: mapping mismatch at page off {:#x}: expected "
+                    "phys {:#x}, got {:#x}; virt {:#x}",
+                    offset, expectedPhys, actualPhys, virt);
+        }
+#endif
+
+        ErrorCode status = no_error;
+        m_Image->ForEachProgramHeader(
+            [this, &status](const ProgramHeader& segment) -> IterationResult
+            {
+                auto result = ParseSegment(segment);
+                if (!result)
+                {
+                    status = result.Error();
+                    return IterationResult::eBreak;
+                }
+
+                return IterationResult::eContinue;
+            });
+
+        if (status) return Error(status);
         return {};
     }
     ErrorOr<void> Loader::ResolveSymbols(SymbolLookup lookup)
@@ -269,75 +349,44 @@ namespace ELF
         for (const auto& [name, value] : m_Symbols)
             if (it(name, value) == IterationResult::eBreak) break;
     }
-    IterationResult Loader::LoadSegment(const ProgramHeader& segment)
+    ErrorOr<void> Loader::ParseSegment(const ProgramHeader& segment)
     {
-        if (segment.Type == HeaderType::eLoad
-            || segment.Type == HeaderType::eDynamic)
+        // TODO(v1tr10l7): correct permissions
+        // TODO(v1tr10l7): EntryPoint
+        // TODO(v1tr10l7): TLS
+        // TODO(v1tr10l7): INTERP
+        // TODO(v1tr10l7): DYNAMIC
+        // TODO(v1tr10l7): AUX
+
+        switch (segment.Type)
         {
-            const u64 segmentVirtBias = m_Bias.Offset(segment.VirtualAddress);
+            case HeaderType::eDynamic: return ParseDynamic(segment);
+            case HeaderType::eLoad: return LoadSegment(segment);
 
-            if (m_Image->Type() == ObjectType::eExecutable)
-            {
-                usize misalign  = segment.VirtualAddress & (PMM::PAGE_SIZE - 1);
-                usize pageCount = Math::DivRoundUp(
-                    segment.SegmentSizeInMemory + misalign, PMM::PAGE_SIZE);
-
-                Pointer phys = PMM::CallocatePages(pageCount);
-                Assert(phys);
-
-                auto  virt = segment.VirtualAddress + m_LoadBase.Raw();
-                usize size = pageCount * PMM::PAGE_SIZE;
-                Assert(m_PageMap->MapRange(virt, phys, size,
-                                           PageAttributes::eRWXU
-                                               | PageAttributes::eWriteBack));
-                auto region = new Region(
-                    phys, segment.VirtualAddress + m_LoadBase.Raw(), size);
-                using VMM::Access;
-                region->SetAccessMode(Access::eReadWriteExecute
-                                      | Access::eUser);
-
-                m_AddressSpace->Insert(region->VirtualBase(), region);
-                Memory::Copy(phys.Offset<Pointer>(misalign).ToHigherHalf(),
-                             m_Image->Raw().Offset(segment.Offset),
-                             segment.SegmentSizeInFile);
-            }
-            else
-            {
-                Pointer headerStart = segmentVirtBias;
-                auto headerEnd = headerStart.Offset(segment.SegmentSizeInFile);
-                Assert(headerEnd <= m_LoadBase.Offset(m_Size));
-
-                LogDebug(
-                    "ELF::Loader: Loading segment at offset {:#x} of size "
-                    "{:#x} bytes at address {:#x}",
-                    segment.Offset, segment.SegmentSizeInFile,
-                    headerStart.Raw());
-                Memory::Copy(headerStart, m_Image->Raw().Offset(segment.Offset),
-                             segment.SegmentSizeInFile);
-
-                if (segment.SegmentSizeInMemory > segment.SegmentSizeInFile)
-                    Memory::Fill(headerStart.Offset(segment.SegmentSizeInFile),
-                                 0,
-                                 segment.SegmentSizeInMemory
-                                     - segment.SegmentSizeInFile);
-            }
+            default: break;
         }
 
-        if (segment.Type != HeaderType::eDynamic)
-            return IterationResult::eContinue;
+        return {};
+    }
+    ErrorOr<void> Loader::ParseDynamic(const ProgramHeader& segment)
+    {
+        usize      sizeInFile   = segment.SegmentSizeInFile;
 
         const auto dynamicTable = reinterpret_cast<DynamicEntry*>(
             m_Image->Raw().Offset(segment.Offset));
-        for (usize i = 0; i < segment.SegmentSizeInFile / sizeof(DynamicEntry);
-             i++)
+        for (usize i = 0; i < sizeInFile / sizeof(DynamicEntry); i++)
         {
             const auto& entry = dynamicTable[i];
             switch (entry.Tag)
             {
+                case DynamicEntryType::eNull: break;
+                case DynamicEntryType::eNeeded:
+                    LogDebug("ELF::Loader: DT_NEEDED => {}",
+                             m_Image->LookupString(entry.Data.Value));
+                    break;
+                case DynamicEntryType::eStringTable: break;
+                case DynamicEntryType::eStringTableSize: break;
                 case DynamicEntryType::eInitArray:
-                    m_InitArray = m_LoadBase.Offset(
-                        entry.Data.Address
-                        + (m_Bias ? (m_Bias.Raw() - m_LoadBase.Raw()) : 0));
                     m_InitArray = reinterpret_cast<u8*>(entry.Data.Address
                                                         + m_Bias.Raw());
                     break;
@@ -356,6 +405,87 @@ namespace ELF
             };
         }
 
-        return IterationResult::eContinue;
+        return {};
+    }
+    ErrorOr<void> Loader::LoadSegment(const ProgramHeader& segment)
+    {
+        usize   sizeInFile       = segment.SegmentSizeInFile;
+        usize   sizeInMemory     = segment.SegmentSizeInMemory;
+
+        Pointer segmentStartVirt = m_Bias.Offset(segment.VirtualAddress);
+        Pointer segmentEndVirt   = segmentStartVirt.Offset(sizeInFile);
+        Pointer imageStartVirt   = m_Image->IsShared() ? m_LoadBase : m_MinVirt;
+        Assert(segmentEndVirt <= imageStartVirt.Offset(m_Size));
+
+        usize offsetInFile  = segment.Offset;
+        usize offsetInImage = segment.VirtualAddress - m_MinVirt.Raw();
+        usize offsetInPage  = segmentStartVirt.Raw()
+                           - Math::AlignDown(segmentStartVirt, PMM::PAGE_SIZE);
+        Pointer segmentPhys = m_Phys.Offset(offsetInImage + m_VirtMisalign);
+
+        // sanity: segment fits inside allocated physical block
+        usize   totalSegmentSize
+            = Math::AlignUp(offsetInPage + sizeInMemory, PMM::PAGE_SIZE);
+        if (segmentPhys.Offset(sizeInMemory)
+            > m_Phys.Offset(m_AlignedSize + m_VirtMisalign))
+        {
+            LogError(
+                "ELF::Loader: segment would overflow phys block (rel={:#x}, "
+                "needed={:#x})",
+                offsetInImage, totalSegmentSize);
+            return {};
+        }
+
+#if CTOS_ELF_DEBUG
+        LogDebug("ELF::Loader: sizeInFile => {:#x}, sizeInMemory => {:#x}",
+                 sizeInFile, sizeInMemory);
+        LogDebug(
+            "ELF::Loader: Loading segment at {:#x} offset in file, "
+            "{:#x} offset in page, and {:#x} offset in image",
+            offsetInFile, offsetInPage, offsetInImage);
+        LogDebug("ELF::Loader: segment => { .Physical: {:#x}, .Virtual: {:#x}",
+                 segmentPhys, segmentStartVirt);
+
+        LogWarn("ELF::Loader: Copy =>");
+        LogWarn("ELF::Loader: physDest.ToHigherHalf() => {:#x}",
+                segmentPhys.ToHigherHalf());
+        LogWarn("ELF::Loader: Offset => {:#x}", offsetInFile);
+        LogWarn("ELF::Loader: sizeInFile => {:#x}", sizeInFile);
+#endif
+        auto pte = m_PageMap->Virt2Pte(m_PageMap->TopLevel(), segmentStartVirt,
+                                       false, PMM::PAGE_SIZE);
+        auto attributes = Arch::VMM::FromNativeFlags(pte->Flags());
+        if (segment.Attributes & SegmentAttributes::eReadable)
+            attributes |= PageAttributes::eRead;
+        else if (segment.Attributes & SegmentAttributes::eWriteable)
+            attributes |= PageAttributes::eWrite;
+        else if (segment.Attributes & SegmentAttributes::eExecutable)
+            attributes |= PageAttributes::eExecutable;
+
+        if (!m_PageMap->ProtectRange(segmentStartVirt, sizeInMemory,
+                                     attributes))
+            LogError(
+                "ELF::Loader: Failed to set protection attributes for virtual "
+                "region at {:#x}-{:#x}",
+                segmentStartVirt, segmentEndVirt);
+        Memory::Copy(segmentPhys.ToHigherHalf(),
+                     m_Image->Raw().Offset(offsetInFile), sizeInFile);
+
+        // Zero out BSS (bytes between filesz and memsz)
+        if (sizeInMemory > sizeInFile)
+        {
+            Pointer bssStart = segmentPhys.Offset(sizeInFile);
+            usize   bssLen   = sizeInMemory - sizeInFile;
+
+#if CTOS_ELF_DEBUG
+            LogWarn("ELF::Loader: Fill =>");
+            LogWarn("ELF::Loader: zeroStart.ToHigherHalf() => {:#x}",
+                    bssStart.ToHigherHalf());
+            LogWarn("ELF::Loader: zeroLen => {:#x}", bssLen);
+#endif
+            Memory::Fill(bssStart.ToHigherHalf(), 0, bssLen);
+        }
+
+        return {};
     }
 }; // namespace ELF

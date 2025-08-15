@@ -319,6 +319,7 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
         usize pageCount = Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE);
         PMM::FreePages(phys, pageCount);
     }
+    m_AddressSpace.Clear();
 
     m_Name = path;
     Arch::VMM::DestroyPageMap(PageMap);
