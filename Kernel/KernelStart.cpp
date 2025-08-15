@@ -91,9 +91,9 @@ static void eternal()
 static bool loadInitProcess(Path initPath)
 {
     Process* kernelProcess = Scheduler::GetKernelProcess();
-    Process* userProcess   = Scheduler::CreateProcess(kernelProcess, initPath,
-                                                      Credentials::s_Root);
-    userProcess->PageMap   = VMM::GetKernelPageMap();
+    Process* userProcess
+        = Scheduler::CreateProcess(kernelProcess, initPath, s_RootCredentials);
+    userProcess->PageMap = VMM::GetKernelPageMap();
 
     Vector<StringView> argv;
     argv.PushBack(initPath);

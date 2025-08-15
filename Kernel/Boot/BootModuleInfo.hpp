@@ -8,7 +8,7 @@
 
 #include <Prism/Core/UUID.hpp>
 #include <Prism/Memory/Pointer.hpp>
-#include <Prism/Network/Ipv4Address.hpp>
+#include <Prism/Network/IPv4Address.hpp>
 #include <Prism/String/StringView.hpp>
 #include <Prism/Utility/PathView.hpp>
 

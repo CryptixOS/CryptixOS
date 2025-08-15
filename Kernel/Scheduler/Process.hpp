@@ -8,6 +8,7 @@
 
 #include <Common.hpp>
 
+#include <API/Credentials.hpp>
 #include <API/Posix/signal.h>
 
 #include <Drivers/TTY.hpp>
@@ -35,23 +36,6 @@ enum class ProcessState
 };
 
 class INode;
-struct Credentials
-{
-    UserID             UserID;
-    GroupID            GroupID;
-    ::UserID           EffectiveUserID;
-    ::GroupID          EffectiveGroupID;
-    ::UserID           FilesystemUserID;
-    ::GroupID          FilesystemGroupID;
-
-    ::UserID           SetUserID;
-    ::GroupID          SetGroupID;
-    ProcessID          SessionID;
-    ProcessID          ProcessGroupID;
-
-    static Credentials s_Root;
-};
-
 class Process
 {
   public:

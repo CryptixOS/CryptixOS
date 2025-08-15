@@ -80,7 +80,7 @@ namespace HPET
 
         // NOTE: HPET is only usable from SystemMemory
         if (table->EventTimerBlock.AddressSpaceID
-            != AddressSpace::eSystemMemory)
+            != ACPI::AddressSpace::eSystemMemory)
         {
             LogError(
                 "HPET: TimerBlock is in address space other than System "

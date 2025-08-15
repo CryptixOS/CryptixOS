@@ -20,8 +20,8 @@ namespace ACPI
         Memory::Fill(&m_IoResource, 0, sizeof(m_IoResource));
         Memory::Fill(&m_IrqResource, 0, sizeof(m_IrqResource));
 
-        m_IrqResource = Try(Bus::IrqResourceForHandle(handle));
-        m_IoResource  = Try(Bus::IoResourceForHandle(handle));
+        m_IrqResource = TryAcquire(Bus::IrqResourceForHandle(handle));
+        m_IoResource  = TryAcquire(Bus::IoResourceForHandle(handle));
 
         if (!m_IrqResource.IRQs.Empty())
         {

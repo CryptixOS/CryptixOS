@@ -28,20 +28,6 @@ inline usize AllocatePid()
     return -1;
 }
 
-Credentials Credentials::s_Root = {
-    .UserID            = 0,
-    .GroupID           = 0,
-    .EffectiveUserID   = 0,
-    .EffectiveGroupID  = 0,
-    .FilesystemUserID  = 0,
-    .FilesystemGroupID = 0,
-
-    .SetUserID         = 0,
-    .SetGroupID        = 0,
-    .SessionID         = 0,
-    .ProcessGroupID    = 0,
-};
-
 Process::Process(Process* parent, StringView name,
                  const struct Credentials& creds)
     : m_Parent(parent)
@@ -101,7 +87,7 @@ Process* Process::CreateKernelProcess()
     kernelProcess->m_Pid         = 0;
     kernelProcess->m_Name        = "TheOverlord"_s;
     kernelProcess->PageMap       = VMM::GetKernelPageMap();
-    kernelProcess->m_Credentials = Credentials::s_Root;
+    kernelProcess->m_Credentials = s_RootCredentials;
     kernelProcess->m_Ring        = PrivilegeLevel::ePrivileged;
     kernelProcess->m_NextTid     = 0;
     kernelProcess->m_Umask       = 0;
