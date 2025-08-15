@@ -54,13 +54,13 @@ namespace Syscall
                 *reinterpret_cast<upointer*>(addr) = thread->GsBase();
                 break;
 
-            default: return_err(-1, EINVAL);
+            default: return Error(EINVAL);
         }
 #else
-        CtosUnused(ARCH_SET_GS);
-        CtosUnused(ARCH_SET_FS);
-        CtosUnused(ARCH_GET_FS);
-        CtosUnused(ARCH_GET_GS);
+        IgnoreUnused(ARCH_SET_GS);
+        IgnoreUnused(ARCH_SET_FS);
+        IgnoreUnused(ARCH_GET_FS);
+        IgnoreUnused(ARCH_GET_GS);
 #endif
 
         return 0;
@@ -220,7 +220,7 @@ namespace Syscall
         {
             auto ret = s_Syscalls[static_cast<ID>(args.Index)]->Run(arr);
 
-            if (ret) args.ReturnValue = ret.value();
+            if (ret) args.ReturnValue = ret.Value();
             else if (static_cast<ID>(args.Index) != ID::eMMap)
             {
                 if (g_LogSyscalls)
@@ -231,7 +231,9 @@ namespace Syscall
 
                     SyscallError("Syscall: '{}' caused error", syscallName);
                 }
-                args.ReturnValue = -ipointer(ret.error());
+                args.ReturnValue = static_cast<usize>(ret.Error()) != MAP_FAILED
+                                     ? -ipointer(ret.Error())
+                                     : MAP_FAILED;
             }
             return;
         }

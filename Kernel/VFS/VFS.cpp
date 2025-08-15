@@ -67,8 +67,6 @@ namespace VFS
         {
             Time::NanoSleep(15'000'000'000);
             Sync();
-
-            LogDebug("filesystemSyncDaemon");
         }
     }
 

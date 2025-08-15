@@ -38,11 +38,15 @@ namespace API::MM
     {
         Process*          current   = Process::GetCurrent();
         Optional<errno_t> errorCode = NullOpt;
+        // LogDebug(
+        //     "MMap: addr: {:#x}, length: {:#x}, prot: {:#x}, flags: {:#x}, "
+        //     "fdNum: {}, offset: {:#x}",
+        //     addr.Raw(), length, prot, flags, fdNum, offset);
 
-        if (addr.Raw() & ~Arch::VMM::GetAddressMask()) return MAP_FAILED;
+        if (addr.Raw() & ~Arch::VMM::GetAddressMask()) return Error(EFAULT);
         flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
         // NOTE(v1tr10l7): Currently we don't support mapping the files
-        if (!(flags & MAP_ANONYMOUS)) return MAP_FAILED;
+        // if (!(flags & MAP_ANONYMOUS)) return Error(EFAULT);
 
         // TODO(v1tr10l7): Lazy mapping
         using VMM::Access;
@@ -82,14 +86,7 @@ namespace API::MM
             }
 
             region->SetAccessMode(access);
-
-            ErrorOr<isize> sizeOr;
-            if (offset) sizeOr = fd->Seek(SEEK_SET, offset);
-            if (!sizeOr)
-            {
-                errorCode = sizeOr.error();
-                goto free_region;
-            }
+            region->SetFileDescriptor(fd.Raw(), offset);
 
             return virt.Raw();
         }

@@ -202,7 +202,7 @@ void ProcFs::AddProcess(Process* process)
     auto entry                  = CreateRef<DirectoryEntry>(nullptr, name);
 
     auto inode                  = reinterpret_cast<ProcFsINode*>(
-        Try(AllocateNode(entry->Name(), S_IFDIR | 0755)));
+        TryAcquire(AllocateNode(entry->Name(), S_IFDIR | 0755)));
     inode->m_Parent = m_Root;
 
     m_Lock.Release();
