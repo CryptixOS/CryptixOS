@@ -25,6 +25,8 @@ class AddressSpace : public NonCopyable<AddressSpace>
     AddressSpace();
     ~AddressSpace();
 
+    void        Initialize(Pointer start, usize size);
+
     bool        IsAvailable(Pointer base, usize length) const;
 
     void        Insert(Pointer, Ref<Region> region);

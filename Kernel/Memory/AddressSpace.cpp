@@ -20,6 +20,11 @@ AddressSpace::AddressSpace()
 }
 AddressSpace::~AddressSpace() { m_RegionTree.Clear(); }
 
+void AddressSpace::Initialize(Pointer start, usize size)
+{
+    m_TotalRange = {start, start.Offset(size)};
+}
+
 bool AddressSpace::IsAvailable(Pointer base, usize length) const
 {
     auto end = base.Offset(length);

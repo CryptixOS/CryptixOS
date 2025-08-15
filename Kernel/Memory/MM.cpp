@@ -11,6 +11,7 @@
 #include <Scheduler/Process.hpp>
 
 #include <Prism/String/Formatter.hpp>
+#include <VFS/FileDescriptor.hpp>
 
 #include <icxxabi>
 #include <limine.h>
@@ -220,8 +221,12 @@ namespace MM
 
         if (region)
         {
-            usize pageCount = Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE);
+            auto  fd        = region->FileDescriptor();
+            usize size      = fd ? fd->File()->Size() : region->Size();
+
+            usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
             auto  phys      = PMM::CallocatePages(pageCount);
+            auto  virt      = region->VirtualBase();
 
             if (phys)
             {
@@ -229,6 +234,14 @@ namespace MM
 
                 auto pageMap = process->PageMap;
                 pageMap->MapRegion(region);
+
+                if (fd)
+                {
+                    LogDebug("MM: Reading mapped fd into memory");
+                    isize nread = TryAcquire(fd->Read(virt, size));
+                    if (nread != static_cast<isize>(size))
+                        LogError("MM: Failed to read the file descriptor");
+                }
                 return;
             }
 

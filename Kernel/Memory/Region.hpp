@@ -82,8 +82,13 @@ namespace VMM
         inline enum Access           Access() const { return m_Access; }
         enum PageAttributes          PageAttributes() const;
 
-        inline void    SetPhysicalBase(Pointer phys) { m_PhysicalBase = phys; }
-        inline void    SetAccessMode(enum Access access) { m_Access = access; }
+        inline void SetPhysicalBase(Pointer phys) { m_PhysicalBase = phys; }
+        inline void SetAccessMode(enum Access access) { m_Access = access; }
+        inline void SetFileDescriptor(class FileDescriptor* fd, usize offset)
+        {
+            m_Fd     = fd;
+            m_Offset = offset;
+        }
 
         constexpr bool IsReadable() const { return m_Access & Access::eRead; }
         constexpr bool IsWriteable() const { return m_Access & Access::eWrite; }
@@ -97,6 +102,7 @@ namespace VMM
         Pointer               m_PhysicalBase = nullptr;
         enum Access           m_Access       = Access::eNone;
         class FileDescriptor* m_Fd           = nullptr;
+        usize                 m_Offset       = 0;
     };
 }; // namespace VMM
 using VMM::Region;

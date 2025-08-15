@@ -159,8 +159,12 @@ namespace VMM
                                              | PageAttributes::eWriteBack));
 
         {
-            s_VirtualAddressSpace
-                = Pointer(highestAddress).Offset(1_gib); // base.Offset(4_gib);
+            s_VirtualAddressSpace = Pointer(highestAddress).Offset(1_gib);
+
+            // TODO(v1tr10l7): allocate ranges from different pools, based on
+            // the needs (e.g. nvme0 needs 32bit address for BAR)
+            s_KernelAddressSpace->Initialize(s_VirtualAddressSpace,
+                                             KERNEL_VIRTUAL_RANGE_TOP);
         }
 
         Pointer initVirt = kernel_init_start_addr;
@@ -220,12 +224,12 @@ namespace VMM
         Assert(alignment <= PMM::PAGE_SIZE);
 
         if (alignment == 0) alignment = sizeof(void*);
-        Pointer virt = Math::AlignUp(s_VirtualAddressSpace, alignment);
 
-        s_VirtualAddressSpace
-            += (virt - s_VirtualAddressSpace).Offset(increment);
+        auto region
+            = s_KernelAddressSpace->AllocateRegion(increment, alignment);
+        Pointer virt = region->VirtualBase();
 
-        return lowerHalf ? virt.FromHigherHalf() : virt.ToHigherHalf<>();
+        return lowerHalf ? virt.FromHigherHalf<Pointer>() : virt.ToHigherHalf<Pointer>();
     }
     Ref<Region> AllocateKernelRegion(usize count, PageAttributes flags)
     {
@@ -258,6 +262,11 @@ namespace VMM
     {
         Assert(s_Initialized);
         return s_KernelPageMap;
+    }
+    AddressSpace* GetKernelAddressSpace()
+    {
+        Assert(s_Initialized);
+        return s_KernelAddressSpace;
     }
 
     bool MapKernelRegion(Pointer virt, Pointer phys, usize pageCount,
