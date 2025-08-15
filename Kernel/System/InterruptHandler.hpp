@@ -16,6 +16,7 @@ enum class IrqResult
     eNone    = 0x00,
     eHandled = 0x01,
 };
+constexpr usize MAX_IRQ_COUNT = 0x40;
 
 class Device;
 using InterruptServiceRoutine = Delegate<IrqResult(Device*, CPUContext*)>;

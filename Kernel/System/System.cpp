@@ -34,7 +34,6 @@ namespace System
         RedBlackTree<StringView, u64>       s_KernelSymbols;
         Span<BootModuleInfo, DynamicExtent> s_BootModules;
 
-        static constexpr Pointer            MODULE_LOAD_BASE = nullptr;
         SpinlockProtected<Module::List>     s_Modules;
     }; // namespace
 
@@ -275,34 +274,17 @@ namespace System
 
     ErrorOr<void> LoadModule(PathView path)
     {
-        auto pathRes = TryOrRet(VFS::ResolvePath(nullptr, path));
-        auto entry   = pathRes.Entry;
+        ELF::Loader loader;
 
-        if (!entry) return Error(ENOENT);
-        Ref<ELF::Image> image  = CreateRef<ELF::Image>();
-        auto            status = image->Load(entry->INode(), MODULE_LOAD_BASE);
-
-        if (!status)
-        {
-            LogError("System: Failed to load the module located at `{}`",
-                     entry->Path());
-            return Error(status.Error());
-        }
-        else if (image->Type() != ELF::ObjectType::eShared)
-        {
-            LogError("System: The module at `{}` is not a shared image",
-                     entry->Path());
-            return Error(ENOEXEC);
-        }
-
-        return LoadModule(image);
+        loader.LoadImage(path);
+        return LoadModule(loader);
     }
-    ErrorOr<void> LoadModule(Ref<ELF::Image> image)
+    ErrorOr<void> LoadModule(ELF::Loader& loader)
     {
         Ref module          = CreateRef<Module>();
         module->Initialized = false;
         module->Failed      = false;
-        module->Image       = image;
+        module->Image       = loader.Image();
 
         LogTrace("System: Reading module metadata for '{}'", module->Name);
         module->ParseModuleInfo();
@@ -348,9 +330,10 @@ namespace System
         ELF::Loader::SymbolLookup lookup;
         lookup.BindLambda(lookupSymbol);
 
-        ELF::Loader loader(image);
         LogTrace("System: Loading segments of module: `{}`", module->Name);
-        auto status = loader.LoadSegments();
+        auto& pageMap      = *VMM::GetKernelPageMap();
+        auto& addressSpace = *VMM::GetKernelAddressSpace();
+        auto  status       = loader.LoadSegments(pageMap, addressSpace);
         if (!status)
         {
             LogError("System: Failed to load segments of module: `{}`",

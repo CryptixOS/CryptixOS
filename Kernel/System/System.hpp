@@ -27,6 +27,10 @@ class DirectoryEntry;
 struct BootModuleInfo;
 using ModuleIterator = Delegate<IterationResult(Ref<Module> module)>;
 
+namespace ELF
+{
+    class Loader;
+};
 namespace System
 {
     ErrorOr<void> LoadKernelSymbols(const BootModuleInfo& kernelExecutable);
@@ -38,7 +42,7 @@ namespace System
     ErrorOr<void>                        LoadExternalModules();
 
     ErrorOr<void>                        LoadModule(PathView path);
-    ErrorOr<void>                        LoadModule(Ref<ELF::Image> image);
+    ErrorOr<void>                        LoadModule(ELF::Loader& loader);
     ErrorOr<void>                        LoadModule(Ref<Module> module);
 
     ErrorOr<void>                        DispatchModules();
