@@ -8,7 +8,7 @@
 
 #include <Common.hpp>
 
-#include <Library/ELF/ELF_Definitions.hpp>
+#include <Library/ELF/Definitions.hpp>
 
 #include <Prism/Containers/RedBlackTree.hpp>
 #include <Prism/Core/Error.hpp>
@@ -41,7 +41,17 @@ namespace ELF
         inline const struct Header& Header() const { return m_Header; }
         inline ObjectType           Type() const { return m_Header.Type; }
 
-        usize                       ProgramHeaderCount();
+        inline bool                 IsRelocatable() const
+        {
+            return Type() == ObjectType::eRelocatable;
+        }
+        inline bool IsExecutable() const
+        {
+            return Type() == ObjectType::eExecutable;
+        }
+        inline bool IsShared() const { return Type() == ObjectType::eShared; }
+
+        usize       ProgramHeaderCount();
         const struct ProgramHeader& ProgramHeader(usize index);
         usize                       SectionHeaderCount();
         const struct SectionHeader& SectionHeader(usize index);

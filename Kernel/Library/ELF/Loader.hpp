@@ -7,19 +7,29 @@
 #pragma once
 
 #include <Library/ELF/Image.hpp>
+#include <Memory/PageTableEntry.hpp>
 
+class DirectoryEntry;
 namespace ELF
 {
     class Loader
     {
       public:
-        Loader() = default;
+        Loader();
         Loader(Ref<class Image> image)
             : m_Image(image)
         {
         }
 
-        ErrorOr<void> LoadSegments();
+        ErrorOr<void> LoadImage(PathView path);
+        ErrorOr<void> LoadImage(Ref<DirectoryEntry> dentry);
+        ErrorOr<void> LoadImage(INode* inode);
+        ErrorOr<void> LoadImage(Ref<FileDescriptor> file);
+        ErrorOr<void> LoadImage(u8* data, usize size);
+        ErrorOr<void> LoadImage(Ref<Image> image);
+
+        ErrorOr<void> LoadSegments(PageMap& pageMap, AddressSpace& addressSpace,
+                                   PageAttributes flags = PageAttributes::eRWX);
         using SymbolLookup = Delegate<u64(StringView name)>;
         ErrorOr<void>    ResolveSymbols(SymbolLookup lookup);
         ErrorOr<void>    ApplyRelocations();
@@ -42,9 +52,12 @@ namespace ELF
 
       private:
         Ref<class Image>              m_Image;
+        PageMap*                      m_PageMap      = nullptr;
+        AddressSpace*                 m_AddressSpace = nullptr;
 
-        Pointer                       m_LoadBase = nullptr;
-        usize                         m_Size     = 0;
+        Pointer                       m_LoadBase     = nullptr;
+        Pointer                       m_Bias         = 0;
+        usize                         m_Size         = 0;
 
         RedBlackTree<StringView, u64> m_Symbols;
         Pointer                       m_EntryPoint    = nullptr;

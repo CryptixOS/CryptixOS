@@ -7,6 +7,7 @@
 #pragma once
 
 #include <Library/ELF/Image.hpp>
+#include <Prism/Utility/Path.hpp>
 
 class ExecutableProgram
 {
@@ -25,11 +26,12 @@ class ExecutableProgram
 
   private:
     Ref<ELF::Image>          m_Image;
-    Ref<ELF::Image>          m_Interpreter = nullptr;
+    Ref<ELF::Image>          m_Interpreter     = nullptr;
+    Path                     m_ExecutablePath  = ""_pv;
 
-    u64                      m_EntryPoint  = 0;
-    u64                      m_LoadBase    = 0;
-    // u64                      m_InterpreterBase = 0;
+    u64                      m_EntryPoint      = 0;
+    u64                      m_LoadBase        = 0;
+    u64                      m_InterpreterBase = 0;
 
     ErrorOr<Ref<ELF::Image>> LoadImage(PathView path, PageMap* pageMap,
                                        AddressSpace& addressSpace,
