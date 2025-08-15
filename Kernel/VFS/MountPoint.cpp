@@ -11,12 +11,14 @@ MountPoint::List MountPoint::s_MountPoints = {};
 
 MountPoint::MountPoint(::Ref<DirectoryEntry>   hostEntry,
                        ::Ref<class Filesystem> mountedFs)
-    : m_Root(hostEntry)
+    : m_Host(hostEntry)
+    , m_Guest(mountedFs->RootDirectoryEntry())
     , m_Filesystem(mountedFs)
 {
 }
 
-::Ref<DirectoryEntry> MountPoint::HostEntry() const { return m_Root; }
+::Ref<DirectoryEntry> MountPoint::HostEntry() const { return m_Host; }
+::Ref<DirectoryEntry> MountPoint::GuestEntry() const { return m_Guest; }
 ::Ref<Filesystem>     MountPoint::Filesystem() const { return m_Filesystem; }
 
 void                  MountPoint::Attach(::Ref<MountPoint> mountPoint)

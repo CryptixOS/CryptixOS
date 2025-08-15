@@ -256,9 +256,11 @@ namespace ACPI
             return false;
         }
 
-        s_XsdtAvailable = s_RSDP->Revision >= 2 && s_RSDP->XsdtAddress != 0;
-        Pointer rsdtPointer
-            = s_XsdtAvailable ? s_RSDP->XsdtAddress : s_RSDP->RsdtAddress;
+        s_XsdtAvailable     = s_RSDP->Revision >= 2 && s_RSDP->XsdtAddress != 0;
+
+        bool    useXsdt     = !CommandLine::Boolean("acpi.rsdt").ValueOr(false);
+        Pointer rsdtPointer = s_XsdtAvailable && useXsdt ? s_RSDP->XsdtAddress
+                                                         : s_RSDP->RsdtAddress;
 
         if (!rsdtPointer) return false;
         s_Rsdt = rsdtPointer.ToHigherHalf<RSDT*>();

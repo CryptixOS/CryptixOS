@@ -18,9 +18,10 @@ class MountPoint : public RefCounted
     using Iterator = Delegate<bool(::Ref<MountPoint> mountPoint)>;
 
     explicit MountPoint(::Ref<DirectoryEntry> hostEntry  = nullptr,
-               ::Ref<Filesystem>     filesystem = nullptr);
+                        ::Ref<Filesystem>     filesystem = nullptr);
 
     ::Ref<DirectoryEntry>    HostEntry() const;
+    ::Ref<DirectoryEntry>    GuestEntry() const;
     ::Ref<Filesystem>        Filesystem() const;
 
     static void              Attach(::Ref<MountPoint> mountPoint);
@@ -33,7 +34,8 @@ class MountPoint : public RefCounted
     ::Ref<MountPoint>        NextMountPoint() const;
 
   private:
-    ::Ref<DirectoryEntry>   m_Root       = nullptr;
+    ::Ref<DirectoryEntry>   m_Host       = nullptr;
+    ::Ref<DirectoryEntry>   m_Guest      = nullptr;
     ::Ref<class Filesystem> m_Filesystem = nullptr;
 
     friend class IntrusiveRefList<MountPoint>;

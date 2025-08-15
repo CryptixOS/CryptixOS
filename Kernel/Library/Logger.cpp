@@ -37,8 +37,10 @@ namespace E9
 
 using namespace Prism;
 
-static usize   s_EnabledSinks = 0;
-class CoreSink final : public LogSink
+static usize    s_EnabledSinks    = 0;
+static LogLevel s_CurrentLogLevel = LogLevel::eDebug;
+
+class CoreSink  final : public LogSink
 {
   public:
     isize WriteNoLock(StringView str) override
@@ -178,6 +180,8 @@ namespace Logger
     CTOS_NO_KASAN isize Log(LogLevel logLevel, StringView string,
                             bool printNewline)
     {
+        if (logLevel < s_CurrentLogLevel) return 0;
+
         ScopedLock guard(s_Lock, true);
 
         isize      nwritten = PrintLogLevel(logLevel);
@@ -274,14 +278,14 @@ namespace Logger
         ScopedLock guard(s_Lock, true);
         PrintLogLevel(level);
 
-        isize      nwritten = 0;
-        auto       it       = fmt;
+        isize nwritten = 0;
+        auto  it       = fmt;
         while (*it)
         {
             if (*it == '%' && *(it + 1) != '%')
             {
                 PrintfFormatParser parser;
-                auto   specs = parser(it, args);
+                auto               specs = parser(it, args);
 
                 nwritten += PrintArgument(it, args, specs);
                 continue;

@@ -27,11 +27,15 @@ enum class ResolutionState
 };
 enum class PathLookupFlags
 {
-    eRegular       = 1,
-    eParent        = 2,
-    eFollowLinks   = 4,
-    eNegativeEntry = 8,
-    eMountPoint    = 16,
+    eRegular       = Bit(0),
+    // Querying directory
+    eDirectory     = Bit(1),
+    // Querying parent
+    eParent        = Bit(2),
+    eFollowLinks   = Bit(3),
+    // Querying non existent entry
+    eNegativeEntry = Bit(4),
+    eFollowMounts  = Bit(5),
 };
 constexpr PathLookupFlags operator|(PathLookupFlags lhs, PathLookupFlags rhs)
 {
@@ -56,16 +60,23 @@ class PathResolver
     explicit PathResolver(Ref<DirectoryEntry> const root, PathView path);
 
     ErrorOr<void> Initialize(Ref<DirectoryEntry> const root, PathView path);
-    ErrorOr<Ref<DirectoryEntry>>    Resolve(bool followLinks = true);
-    ErrorOr<Ref<DirectoryEntry>>    Resolve(PathLookupFlags flags);
+    ErrorOr<Ref<DirectoryEntry>> Resolve(bool followLinks = true);
+    ErrorOr<Ref<DirectoryEntry>> Resolve(PathLookupFlags flags);
+    ErrorOr<Ref<DirectoryEntry>>
+    LookupLastSegment(Ref<::DirectoryEntry> parent);
 
-    ErrorOr<void>                   Step();
-    ErrorOr<Ref<DirectoryEntry>>    FollowMounts(Ref<DirectoryEntry> dentry
-                                                 = nullptr);
-    ErrorOr<Ref<DirectoryEntry>>    FollowDown();
-    ErrorOr<Ref<DirectoryEntry>>    FollowSymlinks();
-    ErrorOr<Ref<DirectoryEntry>>    FollowSymlink();
-    Ref<DirectoryEntry>             FollowDots();
+    ErrorOr<Ref<DirectoryEntry>> FollowDown(Ref<::DirectoryEntry> dentry);
+    ErrorOr<Ref<DirectoryEntry>> FollowUp(Ref<DirectoryEntry> dentry);
+
+    Ref<DirectoryEntry>          FollowDots(Ref<DirectoryEntry> dentry);
+
+    Ref<DirectoryEntry> TryFollowMounts(Ref<DirectoryEntry> dentry = nullptr);
+    Ref<DirectoryEntry> FollowMounts(Ref<DirectoryEntry> dentry = nullptr);
+    Ref<DirectoryEntry> FollowMount(Ref<DirectoryEntry> dentry = nullptr);
+
+    ErrorOr<Ref<DirectoryEntry>>
+    TryFollowSymlinks(Ref<class DirectoryEntry> dentry);
+    ErrorOr<Ref<DirectoryEntry>>    FollowSymlink(Ref<::DirectoryEntry> dentry);
     Error                           Terminate(ErrorCode code);
 
     inline Ref<DirectoryEntry>      RootDirectoryEntry() { return m_Root; }
@@ -111,7 +122,10 @@ class PathResolver
         PathSegmentType Type   = PathSegmentType::eRegular;
     } m_CurrentSegment;
 
-    Segment                     GetNextSegment();
+    Segment GetNextSegment();
+    bool    ShouldFollowMount(Ref<class DirectoryEntry> dentry);
+    bool    ShouldFollowDots(Ref<class DirectoryEntry> dentry);
+    bool    ShouldFollowSymlink(Ref<class DirectoryEntry> dentry);
 
     class Ref<::DirectoryEntry> m_Parent         = nullptr;
     class Ref<::DirectoryEntry> m_DirectoryEntry = nullptr;

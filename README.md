@@ -137,6 +137,9 @@ To run CryptixOS in QEMU:
 ### Memory Manager 
 - ✅ Physical Bitmap Allocator
 - ⬜ Physical Buddy Allocator
+- ⬜ Swapping Pages
+- ⬜ Mapping File Descriptors
+- ⬜ NUMA domains handling
 - ✅ Virtual Memory Allocator, using Red-Black Tree
 - ✅ Heap Slab Allocator
 - ⬜ Heap Slob Allocator
@@ -171,6 +174,7 @@ To run CryptixOS in QEMU:
 - ✅ PCIe
 - ✅ Device Tree
 - ✅ ACPI
+- ⬜ I2C
 - ✅ Basic Power Management (Reboot, Shutdown)
 - ⬜ USB
 - ⬜ Embedded Controller
@@ -187,6 +191,7 @@ To run CryptixOS in QEMU:
 ## 🌐 Network Stack
 
 ### 📡 Protocols
+- ⬜ NETLINK_KOBJECT_UEVENT
 - ⬜ ARP
 - ⬜ TCP
 - ⬜ UDP

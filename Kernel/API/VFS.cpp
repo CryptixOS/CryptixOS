@@ -710,17 +710,17 @@ namespace API::VFS
 
         return {};
     }
-    ErrorOr<isize> StatFs(PathView path, statfs* out)
+    ErrorOr<isize> StatFs(const char* pathname, statfs* out)
     {
-        PathResolver resolver(nullptr,
-                              CPU::AsUser([path]() -> Path { return path; }));
-        auto entry = TryOrRet(resolver.Resolve(PathLookupFlags::eFollowLinks));
+        auto         path = CPU::CopyStringFromUser(pathname);
+        PathResolver resolver(nullptr, path);
+        auto         entry = TryOrRet(resolver.Resolve(
+            PathLookupFlags::eFollowLinks | PathLookupFlags::eFollowMounts));
 
-        auto inode = entry->INode();
+        auto         inode = entry->INode();
         if (!inode || !inode->Filesystem()) return Error(ENOENT);
 
         auto   fs = inode->Filesystem();
-
         statfs stats;
         Memory::Fill(&stats, 0, sizeof(stats));
 

@@ -82,7 +82,7 @@ namespace API::VFS
                             fd_set* exceptFds, const timeval* timeout,
                             const sigset_t* sigmask);
     ErrorOr<isize> UTime(PathView path, const utimbuf* out);
-    ErrorOr<isize> StatFs(PathView path, statfs* out);
+    ErrorOr<isize> StatFs(const char* pathname, statfs* out);
     ErrorOr<isize> FStatAt(isize dirFd, const char* path, isize flags,
                            stat* out);
     ErrorOr<isize> UnlinkAt(isize dirFdNum, const char* path, isize flags);

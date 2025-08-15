@@ -78,7 +78,6 @@ namespace VFS
 
         CreateDirectory("/dev", 0755);
         Assert(Mount(nullptr, "", "/dev", "devfs"));
-
         Scheduler::InitializeProcFs();
 
         auto colonel = Scheduler::KernelProcess();
@@ -234,9 +233,11 @@ namespace VFS
         }
 
         PathResolver resolver(parent, path);
-        Ref  directory = TryOrRet(resolver.Resolve(PathLookupFlags::eParent));
+        Ref          directory    = TryOrRet(resolver.Resolve(
+            PathLookupFlags::eParent | PathLookupFlags::eFollowMounts
+            | PathLookupFlags::eFollowLinks));
 
-        auto maybePathRes = ResolvePath(parent, path, followSymlinks);
+        auto         maybePathRes = ResolvePath(parent, path, followSymlinks);
         RetOnError(maybePathRes);
         Ref<DirectoryEntry> dentry = maybePathRes.Value().Entry;
 
@@ -314,7 +315,10 @@ namespace VFS
         PathResolution res = {nullptr, nullptr, ""_sv};
 
         PathResolver   resolver(parent, path);
-        auto           resolutionResult = resolver.Resolve(followLinks);
+
+        auto           flags = PathLookupFlags::eFollowMounts;
+        if (followLinks) flags |= PathLookupFlags::eFollowLinks;
+        auto resolutionResult = resolver.Resolve(flags);
         CtosUnused(resolutionResult);
 
         auto parentEntry = resolver.ParentEntry();
@@ -331,7 +335,9 @@ namespace VFS
                                                PathView            path)
     {
         PathResolver resolver(RootDirectoryEntry(), path);
-        auto directory = TryOrRet(resolver.Resolve(PathLookupFlags::eParent));
+        auto         directory = TryOrRet(resolver.Resolve(
+            PathLookupFlags::eParent | PathLookupFlags::eFollowMounts
+            | PathLookupFlags::eFollowLinks));
         if (directory->IsMountPoint())
             directory = directory->FollowMounts().Promote();
 
@@ -363,7 +369,8 @@ namespace VFS
 
         PathResolver targetResolver(parent, target);
         auto         targetEntry = TryOrRet(targetResolver.Resolve(
-            PathLookupFlags::eRegular | PathLookupFlags::eMountPoint));
+            PathLookupFlags::eRegular | PathLookupFlags::eFollowMounts
+            | PathLookupFlags::eFollowLinks));
 
         bool         isRoot      = targetEntry == RootDirectoryEntry();
         if (!isRoot && !targetEntry->IsDirectory())
@@ -374,8 +381,7 @@ namespace VFS
 
         if (targetEntry->IsMountPoint() || MountPoint::Lookup(targetEntry))
             return Error(EBUSY);
-        Ref<MountPoint> mountPoint = CreateRef<MountPoint>(targetEntry, fs);
-        auto            fsRoot     = TryOrRetFmt(
+        auto fsRoot = TryOrRetFmt(
             fs->Mount(sourcePath, data), Error(result.Error()),
             "VFS: Failed to mount filesystem '{}' on '/'", fsName);
 
@@ -394,6 +400,7 @@ namespace VFS
             LogTrace("VFS: Mounted  '{}' on '{}' with Filesystem '{}'",
                      sourcePath, target, fsName);
 
+        Ref<MountPoint> mountPoint = CreateRef<MountPoint>(targetEntry, fs);
         MountPoint::Attach(mountPoint);
         return mountPoint;
     }

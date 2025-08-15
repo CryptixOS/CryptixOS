@@ -4,9 +4,9 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "assert.h"
+#include <assert.h>
 
-#include "Common.hpp"
+#include <Common.hpp>
 
 extern "C"
 {
@@ -15,6 +15,7 @@ extern "C"
                                                         unsigned int line,
                                                         const char*  function)
     {
+	Stacktrace::Print(6);
         Panic("Assertion Failed({}::{}:{}): {}", file, function, line, expr);
     }
 
