@@ -38,7 +38,7 @@ namespace PCI
             if (!IsHexDigit(line[i])) return;
 
         usize nameStartPos = 4;
-        while (nameStartPos < line.Size() && !std::isalpha(line[nameStartPos]))
+        while (nameStartPos < line.Size() && !IsAlpha(line[nameStartPos]))
             ++nameStartPos;
         if (nameStartPos >= line.Size()) return;
 

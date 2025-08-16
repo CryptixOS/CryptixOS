@@ -6,8 +6,8 @@
  */
 #pragma once
 
-#include <Common.hpp>
 #include <Boot/BootMemoryInfo.hpp>
+#include <Common.hpp>
 
 #include <Prism/Containers/Span.hpp>
 #include <Prism/Memory/Pointer.hpp>
@@ -19,7 +19,7 @@ namespace PMM
     CTOS_NO_KASAN bool  Initialize(const MemoryMap& memoryMap);
     bool                IsInitialized();
 
-    Span<MemoryZone>  MemoryZones();
+    Span<MemoryZone>    MemoryZones();
 
     CTOS_NO_KASAN void* AllocatePages(usize count = 1);
     CTOS_NO_KASAN void* CallocatePages(usize count = 1);
@@ -36,7 +36,7 @@ namespace PMM
     template <PointerHolder T>
     CTOS_NO_KASAN T CallocatePages(usize count = 1)
     {
-        if constexpr (std::is_same_v<T, Pointer>) return AllocatePages(count);
+        if constexpr (IsSameV<T, Pointer>) return AllocatePages(count);
 
         return reinterpret_cast<T>(CallocatePages(count));
     }
@@ -44,7 +44,7 @@ namespace PMM
     template <PointerHolder T>
     CTOS_NO_KASAN void FreePages(T ptr, usize count)
     {
-        if constexpr (std::is_same_v<T, Pointer>)
+        if constexpr (IsSameV<T, Pointer>)
             FreePages(ptr.template FromHigherHalf<void*>(), count);
         else FreePages(reinterpret_cast<void*>(ptr), count);
     }

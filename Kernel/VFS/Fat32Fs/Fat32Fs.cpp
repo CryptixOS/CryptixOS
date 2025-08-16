@@ -6,6 +6,7 @@
  */
 #include <Memory/PMM.hpp>
 
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <VFS/DirectoryEntry.hpp>
@@ -17,9 +18,7 @@
 
 #include <Time/Time.hpp>
 
-#include <cctype>
-
-constexpr const char*          FAT32_IDENTIFIER_STRING       = "FAT32   ";
+constexpr StringView           FAT32_IDENTIFIER_STRING       = "FAT32   "_sv;
 constexpr usize                FAT32_FS_INFO_SIGNATURE       = 0x41615252;
 constexpr usize                FAT32_FS_INFO_OFFSET          = 484;
 constexpr usize                FAT32_REAL_FS_INFO_SIGNATURE  = 0x61417272;
@@ -42,8 +41,8 @@ ErrorOr<::Ref<DirectoryEntry>> Fat32Fs::Mount(StringView  sourcePath,
         return nullptr;
     }
 
-    if (std::strncmp(reinterpret_cast<char*>(m_BootRecord.IdentifierString),
-                     FAT32_IDENTIFIER_STRING, 8))
+    if (StringView(reinterpret_cast<char*>(m_BootRecord.IdentifierString), 8)
+        != FAT32_IDENTIFIER_STRING)
     {
         LogError("Fat32: '{}' -> Bad identifier string", sourceEntry->Path());
         return nullptr;
@@ -190,10 +189,10 @@ bool Fat32Fs::Populate(DirectoryEntry* dentry)
             }
         }
 
-        isLfn = false;
-        if (std::strcmp(nameBuffer.Raw(), ".") == 0
-            || std::strcmp(nameBuffer.Raw(), "..") == 0)
-            continue;
+        isLfn               = false;
+
+        StringView filename = nameBuffer.Raw();
+        if (filename == "."_sv || filename == ".."_sv) continue;
 
         u16 mode = 0644
                  | (entry->Attributes & Fat32Attribute::eDirectory ? S_IFDIR
@@ -235,7 +234,7 @@ bool Fat32Fs::Populate(DirectoryEntry* dentry)
 
         usize nameLen = 0;
         char* start   = nameBuffer.Raw();
-        while (*start && std::isalnum(*start++)) nameLen++;
+        while (*start && IsAlphanumeric(*start++)) nameLen++;
         String name;
         name.Resize(nameLen);
 

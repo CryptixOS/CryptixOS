@@ -8,6 +8,7 @@
 
 #include <API/Posix/termios.h>
 #include <Drivers/Core/CharacterDevice.hpp>
+#include <Library/Locking/UniqueGuard.hpp>
 
 #include <Prism/Containers/CircularQueue.hpp>
 #include <Prism/Containers/Deque.hpp>
@@ -52,6 +53,9 @@ class TTY : public CharacterDevice
     StringView              m_Name = "tty"_sv;
     Spinlock                m_RawLock;
     Spinlock                m_OutputLock;
+
+    Mutex                   m_RawMutex;
+    Mutex                   m_OutputMutex;
 
     Terminal*               m_Terminal = nullptr;
     termios2                m_Termios;

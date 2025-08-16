@@ -42,7 +42,7 @@ TTY::TTY(StringView name, Terminal* terminal, usize minor)
 {
     if (!s_CurrentTTY) s_CurrentTTY = this;
 
-    std::memset(&m_Termios, 0, sizeof(m_Termios));
+    Memory::Fill(&m_Termios, 0, sizeof(m_Termios));
     m_Termios.c_iflag        = TTYDEF_IFLAG;
     m_Termios.c_oflag        = TTYDEF_OFLAG;
     m_Termios.c_lflag        = TTYDEF_LFLAG;
@@ -133,19 +133,19 @@ ErrorOr<isize> TTY::Read(void* buffer, off_t offset, usize bytes)
     {
         m_OnAddLine.Await();
 
-        ScopedLock    guard(m_RawLock);
+        UniqueGuard   guard(m_RawMutex);
         const String& line  = m_LineQueue.PopFrontElement();
-        const usize   count = std::min(bytes, line.Size());
+        const usize   count = Min(bytes, line.Size());
         return line.Copy(reinterpret_cast<char*>(buffer), count);
     }
 
     char* dest = reinterpret_cast<char*>(buffer);
     if (m_RawBuffer.Size() < bytes) m_RawEvent.Await();
 
-    ScopedLock guard(m_RawLock);
-    usize      count = std::min(m_RawBuffer.Size(), bytes);
+    UniqueGuard guard(m_RawMutex);
+    usize       count = Min(m_RawBuffer.Size(), bytes);
 
-    isize      nread = 0;
+    isize       nread = 0;
     while (count--)
     {
         auto value = m_RawBuffer.Pop();
@@ -161,8 +161,8 @@ ErrorOr<isize> TTY::Read(void* buffer, off_t offset, usize bytes)
     // for (; count > 0; count--) m_RawBuffer.pop_front();
     while (count > 0 && m_RawBuffer.Size())
     {
-        ScopedLock guard(m_RawLock);
-        u8         ch = m_RawBuffer.Front();
+        UniqueGuard guard(m_RawMutex);
+        u8          ch = m_RawBuffer.Front();
         m_RawBuffer.Pop();
         *dest++ = ch;
         ++nread;
@@ -187,7 +187,9 @@ ErrorOr<isize> TTY::Write(const void* src, off_t offset, usize bytes)
         return bytes;
     }
 
-    ScopedLock guard(m_OutputLock);
+    IgnoreUnused(m_RawLock);
+    IgnoreUnused(m_OutputLock);
+    UniqueGuard guard(m_OutputMutex);
     m_Terminal->PrintString(str);
     return bytes;
 }
@@ -430,7 +432,7 @@ bool TTY::OnEscapeChar(char c) { return true; }
 
 void TTY::EnqueueChar(u64 c)
 {
-    ScopedLock guard(m_RawLock);
+    UniqueGuard guard(m_RawMutex);
 
 #define TTY_DEBUG 0
 #if TTY_DEBUG == 1
@@ -441,7 +443,7 @@ void TTY::EnqueueChar(u64 c)
 
 void TTY::FlushInput()
 {
-    ScopedLock rawGuard(m_RawLock);
+    UniqueGuard rawGuard(m_RawMutex);
 
     m_RawBuffer.Clear();
 }
@@ -459,7 +461,7 @@ void TTY::EchoRaw(u64 c) { m_Terminal->PutChar(c); }
 void TTY::EraseChar()
 {
     Assert(IsCanonicalMode());
-    ScopedLock guard(m_RawLock);
+    UniqueGuard guard(m_RawMutex);
 
     if (m_RawBuffer.Empty()) return;
     usize count = 1;

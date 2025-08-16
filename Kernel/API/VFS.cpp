@@ -777,8 +777,6 @@ namespace API::VFS
                 if (!parentEntry->IsDirectory()) return Error(ENOTDIR);
             }
             else return Error(EBADF);
-
-            parentEntry = parentEntry->FollowMounts();
         }
 
         Ref<DirectoryEntry> entry

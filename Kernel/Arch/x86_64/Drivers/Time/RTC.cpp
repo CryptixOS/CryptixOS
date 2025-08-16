@@ -16,9 +16,9 @@ namespace RTC
 {
     namespace
     {
-        std::optional<bool> s_FormatInBcd = std::nullopt;
+        Optional<bool> s_FormatInBcd = NullOpt;
 
-        inline bool         IsUpdateInProgress()
+        inline bool    IsUpdateInProgress()
         {
             return CMOS::Read(CMOS::Register::eRtcStatusA) & 0x80;
         }
@@ -80,10 +80,9 @@ namespace RTC
 
     time_t CurrentTime()
     {
-        while (IsUpdateInProgress())
-            ;
+        while (IsUpdateInProgress());
 
-        if (!s_FormatInBcd.has_value())
+        if (!s_FormatInBcd.HasValue())
             s_FormatInBcd = !(ReadRegister(CMOS::Register::eRtcStatusB) & 0x04);
         DateTime date;
         date.Year   = GetCentury() * 100 + GetYear();

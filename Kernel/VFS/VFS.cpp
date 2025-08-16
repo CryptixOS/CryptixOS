@@ -33,8 +33,9 @@ namespace VFS
 {
     static SpinlockProtected<FilesystemDriver::List> s_FilesystemDrivers;
 
-    static bool                                      s_Initialized = false;
-    static Ref<DirectoryEntry> s_RootDirectoryEntry                = nullptr;
+    static bool                                      s_Initialized    = false;
+    static Ref<DirectoryEntry>                       s_RootEntry      = nullptr;
+    static Ref<MountPoint>                           s_RootMountPoint = nullptr;
 
     template <typename T>
     static void registerFilesystem(StringView name)
@@ -189,9 +190,9 @@ namespace VFS
 
     Ref<DirectoryEntry> RootDirectoryEntry()
     {
-        auto root = s_RootDirectoryEntry;
+        auto rootMount = s_RootMountPoint;
 
-        return root->FollowMounts().Promote();
+        return rootMount ? rootMount->GuestEntry() : s_RootEntry;
     }
 
     void RecursiveDelete(INode* node)
@@ -346,16 +347,19 @@ namespace VFS
 
     ErrorOr<Ref<MountPoint>> MountRoot(StringView filesystemName)
     {
-        if (s_RootDirectoryEntry)
+        if (s_RootMountPoint)
         {
             LogError("VFS: Root already mounted!");
             return Error(EEXIST);
         }
 
-        auto root = s_RootDirectoryEntry = CreateRef<DirectoryEntry>("/");
+        auto root = CreateRef<DirectoryEntry>("/");
         if (!root) return Error(ENOMEM);
 
-        return TryOrRet(Mount(nullptr, ""_pv, "/"_pv, filesystemName));
+        s_RootEntry = root;
+        return s_RootMountPoint
+             = TryOrRet(Mount(nullptr, ""_pv, "/"_pv, filesystemName)),
+               s_RootMountPoint;
     }
 
     // TODO: flags

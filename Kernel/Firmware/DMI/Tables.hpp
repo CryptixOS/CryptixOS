@@ -29,7 +29,7 @@ namespace DMI
     };
 
     // Common header for all  structures
-    struct [[gnu::packed]] Header
+    struct CTOS_PACKED Header
     {
         HeaderType Type;
         u8         Length;
@@ -41,7 +41,7 @@ namespace DMI
         eMebiBytes = 0b00,
         eGibiBytes = 0b01,
     };
-    struct [[gnu::packed]] FirmwareCharacteristics
+    struct CTOS_PACKED FirmwareCharacteristics
     {
         union
         {
@@ -86,7 +86,7 @@ namespace DMI
 
     static_assert(sizeof(FirmwareCharacteristics) == 8);
     // Type 0 — BIOS Information
-    struct [[gnu::packed]] FirmwareInformation : Header
+    struct CTOS_PACKED FirmwareInformation : Header
     {
         StringID                Vendor;
         StringID                Version;
@@ -99,7 +99,7 @@ namespace DMI
         u8                      MinorRelease;
         u8                      EmbeddedControllerMajor;
         u8                      EmbeddedControllerMinor;
-        struct [[gnu::packed]]
+        struct CTOS_PACKED
         {
             RomSizeUnit Unit : 2;
             u16         Size : 14;
@@ -107,7 +107,7 @@ namespace DMI
     };
 
     // Type 1 — System Information
-    struct [[gnu::packed]] SystemInformation : Header
+    struct CTOS_PACKED SystemInformation : Header
     {
         u8 Name;
         u8 Version;
@@ -117,7 +117,7 @@ namespace DMI
         u8 SkuNumber;
         u8 Family;
     };
-    struct [[gnu::packed]] SystemInfo : Header
+    struct CTOS_PACKED SystemInfo : Header
     {
         u8 Manufacturer;
         u8 ProductName;
@@ -130,7 +130,7 @@ namespace DMI
     };
 
     // Type 2 — Baseboard (Module) Information
-    struct [[gnu::packed]] BaseboardInfo : Header
+    struct CTOS_PACKED BaseboardInfo : Header
     {
         u8  Manufacturer;
         u8  Product;
@@ -146,7 +146,7 @@ namespace DMI
     };
 
     // Type 3 — System Enclosure (Chassis)
-    struct [[gnu::packed]] ChassisInfo : Header
+    struct CTOS_PACKED ChassisInfo : Header
     {
         u8  Manufacturer;
         u8  Type;
@@ -166,7 +166,7 @@ namespace DMI
     };
 
     // Type 4 — Processor Information
-    struct [[gnu::packed]] ProcessorInfo : Header
+    struct CTOS_PACKED ProcessorInfo : Header
     {
         u8  SocketDesignation;
         u8  ProcessorType;
@@ -192,7 +192,7 @@ namespace DMI
     };
 
     // Type 7 — Cache Information
-    struct [[gnu::packed]] CacheInfo : Header
+    struct CTOS_PACKED CacheInfo : Header
     {
         u8  CacheSocketDesignation;
         u16 CacheConfiguration;
@@ -207,7 +207,7 @@ namespace DMI
     };
 
     // Type 8 — Port Connector Information
-    struct [[gnu::packed]] Port_connectorInfo : Header
+    struct CTOS_PACKED Port_connectorInfo : Header
     {
         u8 InternalReferenceDesignation;
         u8 InternalConnectorType;
@@ -217,7 +217,7 @@ namespace DMI
     };
 
     // Type 9 — System Slots
-    struct [[gnu::packed]] SystemSlot : Header
+    struct CTOS_PACKED SystemSlot : Header
     {
         u8  SlotDesignation;
         u8  SlotType;
@@ -233,21 +233,21 @@ namespace DMI
     };
 
     // Type 11 — OEM Strings
-    struct [[gnu::packed]] OemStrings : Header
+    struct CTOS_PACKED OemStrings : Header
     {
         u8 Count;
         // followed by count string indices
     };
 
     // Type 12 — System Configuration Options
-    struct [[gnu::packed]] System_configOptions : Header
+    struct CTOS_PACKED System_configOptions : Header
     {
         u8 Count;
         // followed by string indices
     };
 
     // Type 13 — BIOS Language Information
-    struct [[gnu::packed]] BiosLanguage : Header
+    struct CTOS_PACKED BiosLanguage : Header
     {
         u8 InstallableLanguages;
         u8 Flags;
@@ -255,7 +255,7 @@ namespace DMI
     };
 
     // Type 14 — Group Associations
-    struct [[gnu::packed]] GroupAssociations : Header
+    struct CTOS_PACKED GroupAssociations : Header
     {
         u8 GroupName;
         u8 GroupKey;
@@ -264,7 +264,7 @@ namespace DMI
     };
 
     // Type 15 — System Event Log
-    struct [[gnu::packed]] System_eventLog : Header
+    struct CTOS_PACKED System_eventLog : Header
     {
         u16 LogAreaLength;
         u32 LogHeaderStartOffset;
@@ -277,7 +277,7 @@ namespace DMI
     };
 
     // Type 16 — Physical Memory Array
-    struct [[gnu::packed]] Physical_memoryArray : Header
+    struct CTOS_PACKED Physical_memoryArray : Header
     {
         u8  Location;
         u8  Use;
@@ -288,7 +288,7 @@ namespace DMI
     };
 
     // Type 17 — Memory Device
-    struct [[gnu::packed]] MemoryDevice : Header
+    struct CTOS_PACKED MemoryDevice : Header
     {
         u16 ArrayHandle;
         u16 MemoryErrorInfoHandle;
@@ -311,7 +311,7 @@ namespace DMI
     };
 
     // Type 18 — 32-Bit Memory Error Information
-    struct [[gnu::packed]] Memory_error32 : Header
+    struct CTOS_PACKED Memory_error32 : Header
     {
         u16 ErrorType;
         u16 ErrorGranularity;
@@ -323,7 +323,7 @@ namespace DMI
     };
 
     // Type 19 — Memory Array Mapped Address
-    struct [[gnu::packed]] Memory_array_mappedAddress : Header
+    struct CTOS_PACKED Memory_array_mappedAddress : Header
     {
         u32 StartingAddress;
         u32 EndingAddress;
@@ -332,7 +332,7 @@ namespace DMI
     };
 
     // Type 20 — Memory Device Mapped Address
-    struct [[gnu::packed]] Memory_device_mappedAddress : Header
+    struct CTOS_PACKED Memory_device_mappedAddress : Header
     {
         u32 StartingAddress;
         u32 EndingAddress;
@@ -345,7 +345,7 @@ namespace DMI
     };
 
     // Type 21 — Built-in Pointing Device
-    struct [[gnu::packed]] PointingDevice : Header
+    struct CTOS_PACKED PointingDevice : Header
     {
         u8 Type;
         u8 Interface;
@@ -353,7 +353,7 @@ namespace DMI
     };
 
     // Type 22 — Portable Battery
-    struct [[gnu::packed]] PortableBattery : Header
+    struct CTOS_PACKED PortableBattery : Header
     {
         u8  Location;
         u8  Manufacturer;
@@ -372,7 +372,7 @@ namespace DMI
     };
 
     // Type 23 — System Reset
-    struct [[gnu::packed]] SystemReset : Header
+    struct CTOS_PACKED SystemReset : Header
     {
         u8 Capabilities;
     };

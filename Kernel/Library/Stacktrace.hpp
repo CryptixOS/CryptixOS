@@ -20,10 +20,10 @@ namespace Stacktrace
     };
     struct Symbol
     {
-        String                         Name;
-        uintptr_t                      Address;
+        String                   Name;
+        upointer                 Address;
 
-        constexpr std::strong_ordering operator<=>(const Symbol& rhs) const
+        constexpr StrongOrdering operator<=>(const Symbol& rhs) const
         {
             return Address <=> rhs.Address;
         }

@@ -21,9 +21,9 @@ namespace ACPI
     void       LoadNameSpace();
     void       EnumerateDevices();
 
-    SDTHeader* GetTable(const char* signature, usize index = 0);
+    SDTHeader* GetTable(StringView signature, usize index = 0);
     template <typename T>
-    inline T* GetTable(const char* signature, usize index = 0)
+    inline T* GetTable(StringView signature, usize index = 0)
     {
         return reinterpret_cast<T*>(GetTable(signature, index));
     }

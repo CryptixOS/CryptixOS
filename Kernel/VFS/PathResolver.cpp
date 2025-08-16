@@ -169,7 +169,7 @@ Ref<DirectoryEntry> PathResolver::FollowDots(Ref<::DirectoryEntry> dentry)
         m_State  = ResolutionState::eFinished;
         m_Parent = TryOrRetVal(FollowUp(dentry), nullptr);
         if (m_Flags & PathLookupFlags::eFollowMounts)
-            dentry = dentry->FollowMounts().Promote();
+            dentry = TryFollowMounts(dentry);
         m_BaseName = dentry->Name();
     }
     else if (m_Position == static_cast<isize>(m_Tokens.Size() - 1))

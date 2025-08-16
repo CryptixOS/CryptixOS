@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/CPU.hpp>
+#include <Scheduler/Thread.hpp>
 #include <System/InterruptManager.hpp>
 
 #include <mutex>

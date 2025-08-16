@@ -12,12 +12,11 @@
 
 #include <Common.hpp>
 #include <Memory/MMIO.hpp>
-
-#include <magic_enum/magic_enum.hpp>
+#include <Prism/String/StringUtils.hpp>
 
 namespace ACPI
 {
-    struct [[gnu::packed]] SDTHeader
+    struct CTOS_PACKED SDTHeader
     {
         char Signature[4];
         u32  Length;
@@ -44,7 +43,7 @@ namespace ACPI
         eGenericSerialBus             = 9,
         ePlatformCommunicationChannel = 0xa,
     };
-    struct [[gnu::packed]] GenericAddressStructure
+    struct CTOS_PACKED GenericAddressStructure
     {
         AddressSpace AddressSpaceID;
         u8           RegisterBitWidth;
@@ -93,13 +92,13 @@ namespace ACPI
                     LogWarn(
                         "GenericAddressStructure: Writing to '{}' address "
                         "space is not implemented!",
-                        magic_enum::enum_name(AddressSpaceID).data() + 1);
+                        StringUtils::ToString(AddressSpaceID));
                     break;
             }
         }
     };
 
-    struct [[gnu::packed]] X86BootArchitectureFlags
+    struct CTOS_PACKED X86BootArchitectureFlags
     {
         bool LegacyDevices     : 1  = 0;
         bool I8042Available    : 1  = 0;
@@ -185,7 +184,7 @@ namespace ACPI
         return ToUnderlying(lhs) != rhs;
     }
 
-    struct [[gnu::packed]] FADT
+    struct CTOS_PACKED FADT
     {
         SDTHeader                Header;
         u32                      FirmwareControl;

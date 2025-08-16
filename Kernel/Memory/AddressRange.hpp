@@ -45,7 +45,7 @@ class AddressRange final
         auto a = *this;
         auto b = other;
 
-        if (a.Base() > b.Base()) std::swap(a, b);
+        if (a.Base() > b.Base()) Swap(a, b);
 
         return a.Base() < b.End() && b.Base() < a.End();
     }

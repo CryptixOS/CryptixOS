@@ -4,8 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-// #include <Debug/Config.hpp>
-#define CTOS_ELF_DEBUG 1
+#include <Debug/Debug.hpp>
 #include <Library/ELF/Loader.hpp>
 
 #include <Memory/AddressSpace.hpp>

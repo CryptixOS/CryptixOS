@@ -323,9 +323,9 @@ namespace ACPI
                                        UACPI_MAX_DEPTH_ANY, UACPI_NULL);
     }
 
-    SDTHeader* GetTable(const char* signature, usize index)
+    SDTHeader* GetTable(StringView signature, usize index)
     {
-        Assert(signature != nullptr);
+        Assert(signature.Size() == 4);
         if (!s_Rsdt) return nullptr;
 
         const usize entryCount = (s_Rsdt->Header.Length - sizeof(SDTHeader))
@@ -334,11 +334,10 @@ namespace ACPI
         {
             SDTHeader* header = GetTablePointer(i).As<SDTHeader>();
 
-            if (!header || !(reinterpret_cast<char*>(header->Signature)))
-                continue;
+            if (!header) continue;
             if (!ValidateChecksum(header)) continue;
 
-            if (std::strncmp(signature, header->Signature, 4) == 0)
+            if (signature == StringView(header->Signature, 4))
             {
                 if (index == 0) return header;
                 ++index;

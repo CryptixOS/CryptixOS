@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Library/Locking/ConditionalVariable.hpp>
+#include <Scheduler/Thread.hpp>
 
 void ConditionalVariable::Wait(Mutex& mutex)
 {

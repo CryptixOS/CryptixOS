@@ -49,7 +49,7 @@ isize Fifo::Read(void* buffer, off_t offset, usize count)
         m_Lock.Acquire();
     }
 
-    count = std::min(count, m_Buffer.Used());
+    count = Min(count, m_Buffer.Used());
     nread = CPU::AsUser(
         [&]() -> isize
         { return m_Buffer.Read(reinterpret_cast<u8*>(buffer), count); });

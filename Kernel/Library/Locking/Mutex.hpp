@@ -9,8 +9,6 @@
 
 #include <Prism/Core/Types.hpp>
 #include <Scheduler/Event.hpp>
-#include <Scheduler/Scheduler.hpp>
-#include <Scheduler/Thread.hpp>
 
 class Mutex : public NonCopyable<Mutex>
 {

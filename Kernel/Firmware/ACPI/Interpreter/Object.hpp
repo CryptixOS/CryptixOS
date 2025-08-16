@@ -230,7 +230,7 @@ namespace ACPI
     {
         return new BinaryExpression(op, l, r);
     }
-    inline Expression* Call(const String& callee, std::initializer_list<Expression*> args) 
+    inline Expression* Call(const String& callee, InitializerList<Expression*> args) 
     {
         auto call = new CallExpression(callee);
         for (auto* arg : args)

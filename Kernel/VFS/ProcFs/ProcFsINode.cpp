@@ -15,7 +15,7 @@ isize ProcFsProperty::Read(u8* outBuffer, off_t offset, usize size)
     if (static_cast<usize>(offset) >= Buffer.Size()) return 0;
 
     usize bytesCopied = Buffer.Copy(reinterpret_cast<char*>(outBuffer) + offset,
-                                    std::min(size, Buffer.Size() - offset));
+                                    Min(size, Buffer.Size() - offset));
 
     if (offset + bytesCopied >= Buffer.Size()) GenerateRecord();
     return bytesCopied;
