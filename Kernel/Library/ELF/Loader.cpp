@@ -166,10 +166,11 @@ namespace ELF
     {
         RetOnError(AllocateMemory(pageMap, addressSpace, flags, loadBase));
 
+#if CTOS_ELF_DEBUG
         Pointer virtBase = m_Image->IsShared()
                              ? m_LoadBase.Offset(m_MinVirt.Raw())
                              : m_MinVirt.Raw();
-#if CTOS_ELF_DEBUG
+
         // Debug: verify every page in the window maps to the expected physical
         // page
         for (usize offset = 0; offset < m_AlignedSize; offset += PMM::PAGE_SIZE)
