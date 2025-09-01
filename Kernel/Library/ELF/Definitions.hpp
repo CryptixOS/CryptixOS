@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Prism/Core/Types.hpp>
+#include <Compiler.hpp>
 #include <Prism/Memory/Pointer.hpp>
 #include <Prism/String/StringView.hpp>
 
@@ -128,7 +128,6 @@ namespace ELF
     };
 
     constexpr usize VERSION = 1;
-
     struct CTOS_PACKED Header
     {
         u32                 Magic;

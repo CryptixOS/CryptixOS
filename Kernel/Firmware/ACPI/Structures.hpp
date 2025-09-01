@@ -10,7 +10,7 @@
     #include <Arch/x86_64/IO.hpp>
 #endif
 
-#include <Common.hpp>
+#include <Compiler.hpp>
 #include <Memory/MMIO.hpp>
 #include <Prism/String/StringUtils.hpp>
 

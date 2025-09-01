@@ -13,6 +13,7 @@
 #include <Library/Locking/Spinlock.hpp>
 
 #include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Core/Types.hpp>
 #include <Prism/String/StringView.hpp>
@@ -105,32 +106,32 @@ class Terminal
     virtual void MoveCharacter(usize newX, usize newY, usize oldX, usize oldY)
         = 0;
 
-    virtual void                    Scroll(isize count = 1)              = 0;
-    virtual void                    ScrollDown()                         = 0;
-    virtual void                    ScrollUp()                           = 0;
+    virtual void                       Scroll(isize count = 1)              = 0;
+    virtual void                       ScrollDown()                         = 0;
+    virtual void                       ScrollUp()                           = 0;
 
-    virtual void                    Refresh()                            = 0;
-    virtual void                    Flush()                              = 0;
+    virtual void                       Refresh()                            = 0;
+    virtual void                       Flush()                              = 0;
 
-    virtual void                    ShowCursor()                         = 0;
-    virtual bool                    HideCursor()                         = 0;
+    virtual void                       ShowCursor()                         = 0;
+    virtual bool                       HideCursor()                         = 0;
 
-    virtual std::pair<usize, usize> GetCursorPos()                       = 0;
-    virtual void                    SetCursorPos(usize xpos, usize ypos) = 0;
+    virtual KeyValuePair<usize, usize> GetCursorPos()                       = 0;
+    virtual void                       SetCursorPos(usize xpos, usize ypos) = 0;
 
-    virtual void                    SaveState()                          = 0;
-    virtual void                    RestoreState()                       = 0;
+    virtual void                       SaveState()                          = 0;
+    virtual void                       RestoreState()                       = 0;
 
-    virtual void                    SwapPalette()                        = 0;
+    virtual void                       SwapPalette()                        = 0;
 
-    virtual void                    SetTextForeground(AnsiColor color)   = 0;
-    virtual void                    SetTextBackground(AnsiColor color)   = 0;
+    virtual void                       SetTextForeground(AnsiColor color)   = 0;
+    virtual void                       SetTextBackground(AnsiColor color)   = 0;
 
-    virtual void                    SetTextForegroundRgb(Color color)    = 0;
-    virtual void                    SetTextBackgroundRgb(Color color)    = 0;
+    virtual void                       SetTextForegroundRgb(Color color)    = 0;
+    virtual void                       SetTextBackgroundRgb(Color color)    = 0;
 
-    void                            Reset();
-    virtual void                    Destroy() = 0;
+    void                               Reset();
+    virtual void                       Destroy() = 0;
 
   private:
     enum class State

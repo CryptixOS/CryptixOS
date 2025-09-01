@@ -433,7 +433,7 @@ void Terminal::CHA(u64 column)
     --column;
     if (column >= m_Size.ws_col) column = m_Size.ws_col - 1;
 
-    auto y = GetCursorPos().second;
+    auto y = GetCursorPos().Value;
     SetCursorPos(column, y);
 }
 void Terminal::CUP()
@@ -494,7 +494,7 @@ void Terminal::VPA(u64 row)
     --row;
     if (row >= m_Size.ws_row) row = m_Size.ws_row - 1;
 
-    auto x = GetCursorPos().first;
+    auto x = GetCursorPos().Key;
     SetCursorPos(x, row);
 }
 void Terminal::SGR(u64 parameter)

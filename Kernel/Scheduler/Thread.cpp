@@ -10,6 +10,7 @@
 
 #include <Memory/PMM.hpp>
 
+#include <Prism/Containers/KeyValuePair.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <Scheduler/Process.hpp>
@@ -66,7 +67,7 @@ Thread::Thread(Process* parent, Vector<StringView>& argv,
 
     if (!parent->PageMap) parent->PageMap = VMM::GetKernelPageMap();
 
-    auto mapUserStack = [this]() -> std::pair<upointer, upointer>
+    auto mapUserStack = [this]() -> KeyValuePair<upointer, upointer>
     {
         Pointer stackPhys
             = PMM::CallocatePages(CPU::USER_STACK_SIZE / PMM::PAGE_SIZE);

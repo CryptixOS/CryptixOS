@@ -33,7 +33,7 @@ PageAttributes PageMap::PageSizeFlags(usize pageSize) const
 
     return static_cast<PageAttributes>(0);
 }
-std::pair<usize, PageAttributes> PageMap::RequiredSize(usize size) const
+KeyValuePair<usize, PageAttributes> PageMap::RequiredSize(usize size) const
 {
     usize lPageSize  = Arch::VMM::GetPageSize(PageAttributes::eLPage);
     usize llPageSize = Arch::VMM::GetPageSize(PageAttributes::eLLPage);

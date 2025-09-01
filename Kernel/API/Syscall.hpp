@@ -238,9 +238,6 @@ namespace Syscall
     };
 
     StringView GetName(usize index);
-    void       RegisterHandler(usize                                        index,
-                               std::function<ErrorOr<upointer>(Arguments&)> handler,
-                               String                                       name);
 #define RegisterSyscall(id, handler)                                           \
     s_Syscalls[id] = new Wrapper<decltype(handler)>(#handler, handler);
 

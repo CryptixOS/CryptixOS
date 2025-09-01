@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <Compiler.hpp>
 #include <Prism/Core/Types.hpp>
 
 namespace DMI

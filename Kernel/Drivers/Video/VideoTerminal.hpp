@@ -55,7 +55,7 @@ class VideoTerminal final : public Terminal
     virtual void ShowCursor() override;
     virtual bool HideCursor() override;
 
-    virtual std::pair<usize, usize> GetCursorPos() override;
+    virtual KeyValuePair<usize, usize> GetCursorPos() override;
     virtual void SetCursorPos(usize xpos, usize ypos) override;
 
     virtual void SaveState() override;

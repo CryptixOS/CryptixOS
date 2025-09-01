@@ -12,6 +12,7 @@
 #include <Library/Logger.hpp>
 #include <Memory/VMM.hpp>
 
+#include <Prism/Core/Ranges.hpp>
 #include <System/System.hpp>
 
 #include <magic_enum/magic_enum.hpp>
@@ -243,10 +244,10 @@ void VideoTerminal::Flush()
     m_OldCursorY = m_CurrentState.CursorY;
 }
 
-void                    VideoTerminal::ShowCursor() {}
-bool                    VideoTerminal::HideCursor() { return true; }
+void                       VideoTerminal::ShowCursor() {}
+bool                       VideoTerminal::HideCursor() { return true; }
 
-std::pair<usize, usize> VideoTerminal::GetCursorPos()
+KeyValuePair<usize, usize> VideoTerminal::GetCursorPos()
 {
     usize x = m_CurrentState.CursorX >= m_Size.ws_col ? m_Size.ws_col - 1
                                                       : m_CurrentState.CursorX;
@@ -290,7 +291,7 @@ inline constexpr Color s_AnsiColors[]
 
 // 8 ansi colors(0-7) + empty entry(8) + default(9) + 8 bright ansi
 // colors(10-17)
-static_assert(std::size(s_AnsiColors) == 8 * 2 + 2);
+static_assert(Size(s_AnsiColors) == 8 * 2 + 2);
 
 void VideoTerminal::SetTextForeground(AnsiColor color)
 {

@@ -8,8 +8,6 @@
 #include <Scheduler/Thread.hpp>
 #include <System/InterruptManager.hpp>
 
-#include <mutex>
-
 #ifdef CTOS_TARGET_X86_64
     #include <Arch/x86_64/IO.hpp>
 
@@ -323,17 +321,15 @@ namespace uACPI
                 ;
         }
 
+        // TODO(v1tr10l7): use actual mutex'es, when the uacpi execution will be
+        // happening on another threads
         uacpi_handle uacpi_kernel_create_mutex(void)
         {
-            auto mutex = new std::mutex;
-            // auto mutex = new Mutex;
-
-            return reinterpret_cast<uacpi_handle>(mutex);
+            return uacpi_kernel_create_spinlock();
         }
         void uacpi_kernel_free_mutex(uacpi_handle handle)
         {
-            // delete reinterpret_cast<Mutex*>(handle);
-            delete reinterpret_cast<std::mutex*>(handle);
+            uacpi_kernel_free_spinlock(handle);
         }
 
         uacpi_handle uacpi_kernel_create_event(void)
@@ -358,21 +354,13 @@ namespace uACPI
         uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle handle,
                                                 uacpi_u16    timeout)
         {
-            auto& mutex = *reinterpret_cast<std::mutex*>(handle);
-            mutex.lock();
-
-            // auto& mutex = *reinterpret_cast<Mutex*>(handle);
-            // mutex.Lock();
-
+            // FIXME(v1tr10l7): support timeout
+            reinterpret_cast<Spinlock*>(handle)->Acquire();
             return UACPI_STATUS_OK;
         }
         void uacpi_kernel_release_mutex(uacpi_handle handle)
         {
-            auto& mutex = *reinterpret_cast<std::mutex*>(handle);
-            mutex.unlock();
-
-            // auto& mutex = *reinterpret_cast<Mutex*>(handle);
-            // mutex.Unlock();
+            reinterpret_cast<Spinlock*>(handle)->Release();
         }
 
         uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle handle, uacpi_u16)

@@ -126,23 +126,23 @@ namespace KernelHeap
 } // namespace KernelHeap
 
 void* operator new(usize size) { return KernelHeap::Callocate(size); }
-void* operator new(usize size, std::align_val_t)
+void* operator new(usize size, AlignmentType)
 {
     return KernelHeap::Callocate(size);
 }
 void* operator new[](usize size) { return KernelHeap::Callocate(size); }
-void* operator new[](usize size, std::align_val_t)
+void* operator new[](usize size, AlignmentType)
 {
     return KernelHeap::Callocate(size);
 }
 void operator delete(void* memory) noexcept { KernelHeap::Free(memory); }
-void operator delete(void* memory, std::align_val_t) noexcept
+void operator delete(void* memory, AlignmentType) noexcept
 {
     KernelHeap::Free(memory);
 }
 void operator delete(void* memory, usize) noexcept { KernelHeap::Free(memory); }
 void operator delete[](void* memory) noexcept { KernelHeap::Free(memory); }
-void operator delete[](void* memory, std::align_val_t) noexcept
+void operator delete[](void* memory, AlignmentType) noexcept
 {
     KernelHeap::Free(memory);
 }

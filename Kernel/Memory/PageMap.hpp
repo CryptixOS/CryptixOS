@@ -12,6 +12,7 @@
 #include <Memory/PageTableEntry.hpp>
 #include <Memory/Region.hpp>
 
+#include <Prism/Containers/KeyValuePair.hpp>
 #include <Prism/Core/Error.hpp>
 
 class PageMap;
@@ -27,13 +28,13 @@ class PageMap
     PageMap();
     explicit PageMap(Pointer topLevel);
 
-    void                             operator=(Pointer topLevel);
+    void                                operator=(Pointer topLevel);
 
-    [[nodiscard]] inline bool        Exists() const { return m_TopLevel; }
-    [[nodiscard]] inline PageTable*  TopLevel() const { return m_TopLevel; }
+    [[nodiscard]] inline bool           Exists() const { return m_TopLevel; }
+    [[nodiscard]] inline PageTable*     TopLevel() const { return m_TopLevel; }
 
-    inline PageAttributes            PageSizeFlags(usize pageSize) const;
-    std::pair<usize, PageAttributes> RequiredSize(usize size) const;
+    inline PageAttributes               PageSizeFlags(usize pageSize) const;
+    KeyValuePair<usize, PageAttributes> RequiredSize(usize size) const;
 
     void* NextLevel(PageTableEntry& entry, bool allocate, uintptr_t virt = -1);
 
