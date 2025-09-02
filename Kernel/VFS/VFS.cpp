@@ -234,13 +234,10 @@ namespace VFS
         }
 
         PathResolver resolver(parent, path);
-        Ref          directory    = TryOrRet(resolver.Resolve(
-            PathLookupFlags::eParent | PathLookupFlags::eFollowMounts
-            | PathLookupFlags::eFollowLinks));
-
-        auto         maybePathRes = ResolvePath(parent, path, followSymlinks);
-        RetOnError(maybePathRes);
-        Ref<DirectoryEntry> dentry = maybePathRes.Value().Entry;
+        auto         lookupFlags = PathLookupFlags::eFollowMounts;
+        if (followSymlinks) lookupFlags |= PathLookupFlags::eFollowLinks;
+        Ref dentry    = TryOrRet(resolver.Resolve(lookupFlags));
+        Ref directory = resolver.ParentEntry();
 
         if (!dentry)
         {
@@ -258,7 +255,12 @@ namespace VFS
         }
         else if (flags & O_EXCL) return Error(EEXIST);
 
-        dentry = dentry->FollowMounts()->FollowSymlinks().Promote();
+        if (dentry->IsMountPoint())
+        {
+            auto mountPoint = MountPoint::Lookup(dentry);
+            if (mountPoint) dentry = mountPoint->GuestEntry();
+        }
+        dentry = dentry->FollowSymlinks().Promote();
 
         if (dentry->IsSymlink()) return Error(ELOOP);
         if ((flags & O_DIRECTORY && !dentry->IsDirectory()))
@@ -340,7 +342,10 @@ namespace VFS
             PathLookupFlags::eParent | PathLookupFlags::eFollowMounts
             | PathLookupFlags::eFollowLinks));
         if (directory->IsMountPoint())
-            directory = directory->FollowMounts().Promote();
+        {
+            auto mountPoint = MountPoint::Lookup(directory);
+            if (mountPoint) directory = mountPoint->GuestEntry();
+        }
 
         return directory;
     }

@@ -27,6 +27,7 @@ using UserID    = uid_t;
 using GroupID   = gid_t;
 
 struct Credentials;
+class File;
 class INode
 {
   public:
@@ -102,6 +103,8 @@ class INode
     bool        ValidatePermissions(const Credentials& creds, u32 acc);
     void        UpdateATime();
 
+    virtual ErrorOr<Ref<File>> Open(class ::Ref<::DirectoryEntry> dentry,
+                                    i64 flags, u64 accMode);
     virtual ErrorOr<Ref<DirectoryEntry>> CreateNode(Ref<DirectoryEntry> entry,
                                                     mode_t mode, dev_t dev = 0);
     virtual ErrorOr<Ref<DirectoryEntry>> CreateFile(Ref<DirectoryEntry> entry,

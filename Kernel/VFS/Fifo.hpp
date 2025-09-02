@@ -23,7 +23,7 @@ class Fifo : public INode
         eWrite = 1,
     };
 
-    FileDescriptor* Open(Direction direction);
+    FileDescriptor* OpenDirection(Direction direction);
 
     virtual void    InsertChild(INode*, StringView) override
     {

@@ -14,6 +14,7 @@
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/FileDescriptor.hpp>
 #include <VFS/INode.hpp>
+#include <VFS/MountPoint.hpp>
 #include <VFS/VFS.hpp>
 
 void DirectoryEntries::Push(StringView name, loff_t offset, usize ino,
@@ -57,7 +58,7 @@ FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry, i32 flags,
     , m_DirectoryIterator(dentry->begin())
 {
     auto inode = dentry->INode();
-    if (inode) m_File = new class File(inode);
+    if (inode) m_File = CreateRef<class File>(inode);
     dentry->PopulateDirectoryEntries();
     m_DirectoryIterator = dentry->begin();
 
@@ -68,7 +69,7 @@ FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry, i32 flags,
     m_Flags      = flags & O_CLOEXEC;
 }
 FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry,
-                               class File* file, i32 flags,
+                               ::Ref<class File> file, i32 flags,
                                FileAccessMode accMode)
     : m_DirectoryEntry(dentry)
     , m_File(file)
@@ -81,7 +82,7 @@ FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry,
     m_Flags      = flags & O_CLOEXEC;
 }
 
-FileDescriptor::~FileDescriptor() { delete m_File; }
+FileDescriptor::~FileDescriptor() {}
 
 ErrorOr<isize> FileDescriptor::Read(const UserBuffer& out, usize count,
                                     isize offset)
@@ -242,7 +243,13 @@ bool FileDescriptor::GenerateDirEntries()
     DirectoryEntries& dirEntries = GetDirEntries();
     dirEntries.Clear();
 
-    auto current = DirectoryEntry()->FollowMounts()->FollowSymlinks();
+    auto current = DirectoryEntry();
+    if (current->IsMountPoint())
+    {
+        auto mountPoint = MountPoint::Lookup(current);
+        if (mountPoint) current = mountPoint->GuestEntry();
+    }
+    current = current->FollowSymlinks().Promote();
 
     if (m_DirectoryIterator == current->end())
     {

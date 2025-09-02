@@ -304,7 +304,7 @@ namespace API::VFS
             = TryOrRet(process->GetFileDescriptor(sockFdNum));
         if (!sockFd->IsSocket()) return Error(ENOTSOCK);
 
-        auto socket = reinterpret_cast<class Socket*>(sockFd->File());
+        auto socket = sockFd->File().As<class Socket>();
         auto status = socket->Bind(addr, addrlen);
 
         if (!status) return Error(status.Error());
@@ -399,16 +399,13 @@ namespace API::VFS
     {
         auto process = Process::Current();
         if (!process->ValidateRead(filename)) return Error(EFAULT);
-        Path path = CPU::AsUser([filename]() -> Path { return filename; });
-
+        Path path = CPU::CopyStringFromUser(filename);
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
         auto cwd = process->CWD();
         if (!cwd) return Error(ENOENT);
 
-        auto maybePathRes = ::VFS::ResolvePath(cwd, path);
-        RetOnError(maybePathRes);
-        auto pathRes      = maybePathRes.Value();
+        auto pathRes      = TryOrRet(::VFS::ResolvePath(cwd, path));
 
         auto newDirectory = pathRes.Entry;
         if (!newDirectory) return Error(ENOENT);
@@ -579,13 +576,7 @@ namespace API::VFS
         auto process = Process::Current();
         if (!process->ValidateRead(pathname, 255)) return Error(EFAULT);
 
-        auto path = CPU::AsUser(
-            [&pathname]() -> Path
-            {
-                if (!pathname || *pathname == 0) return "";
-
-                return pathname;
-            });
+        auto path      = CPU::CopyStringFromUser(pathname);
 
         auto pathRes   = TryOrRet(ResolveAtFd(dirFdNum, path, 0));
         auto directory = pathRes.Parent;
@@ -599,10 +590,7 @@ namespace API::VFS
         auto process = Process::Current();
         if (!process->ValidateRead(pathname, 255)) return Error(EFAULT);
 
-        auto getPath = [](const char* path) -> Path
-        { return CPU::AsUser([path]() -> Path { return path; }); };
-
-        auto path      = getPath(pathname);
+        auto path      = CPU::CopyStringFromUser(pathname);
         auto pathRes   = TryOrRet(ResolveAtFd(dirFdNum, path, 0));
         auto directory = pathRes.Parent;
         auto baseName  = pathRes.BaseName;
@@ -612,14 +600,12 @@ namespace API::VFS
     ErrorOr<isize> ReadLinkAt(isize dirFdNum, const char* pathView,
                               char* outBuffer, usize bufferSize)
     {
-        Path path
-            = CPU::AsUser([&pathView]() -> Path { return Path(pathView); });
+        Path path = CPU::CopyStringFromUser(pathView);
 
-        auto pathResOr = ResolveAtFd(dirFdNum, path, AT_SYMLINK_NOFOLLOW);
-        if (!pathResOr) return Error(pathResOr.Error());
-        auto pathRes = pathResOr.Value();
+        auto pathRes
+            = TryOrRet(ResolveAtFd(dirFdNum, path, AT_SYMLINK_NOFOLLOW));
 
-        auto entry   = pathRes.Entry;
+        auto entry = pathRes.Entry;
         if (!entry) return Error(ENOENT);
         auto inode     = entry->INode();
 
@@ -659,9 +645,9 @@ namespace API::VFS
                             fd_set* exceptFds, const timeval* timeout,
                             const sigset_t* sigmask)
     {
-        auto                   current = Process::GetCurrent();
+        auto              current = Process::GetCurrent();
 
-        [[maybe_unused]] isize i, j, max;
+        CTOS_UNUSED isize i, j, max;
         return -1;
         usize set = 0;
         for (isize i = 0; i < FD_SETSIZE; i++)
@@ -686,12 +672,10 @@ namespace API::VFS
 
     ErrorOr<isize> UTime(PathView path, const utimbuf* out)
     {
-        auto maybePathRes
-            = ::VFS::ResolvePath(::VFS::RootDirectoryEntry(), path, true);
-        RetOnError(maybePathRes);
-        auto pathRes = maybePathRes.Value();
+        auto pathRes = TryOrRet(
+            ::VFS::ResolvePath(::VFS::RootDirectoryEntry(), path, true));
 
-        auto entry   = pathRes.Entry;
+        auto entry = pathRes.Entry;
         if (!entry) return Error(ENOENT);
         auto inode = entry->INode();
         if (!inode) return Error(ENOENT);
@@ -803,11 +787,8 @@ namespace API::VFS
     ErrorOr<isize> LinkAt(isize oldDirFdNum, const char* oldPath,
                           isize newDirFdNum, const char* newPath, isize flags)
     {
-        auto getPath = [](const char* path) -> Path
-        { return CPU::AsUser([path]() -> Path { return path; }); };
-
-        auto oldPathName = getPath(oldPath);
-        auto newPathName = getPath(newPath);
+        auto oldPathName = CPU::CopyStringFromUser(oldPath);
+        auto newPathName = CPU::CopyStringFromUser(newPath);
         LogTrace("VFS::LinkAt Entry => linking `{}` to `{}`...", oldPathName,
                  newPathName);
 
@@ -831,11 +812,8 @@ namespace API::VFS
     ErrorOr<isize> SymlinkAt(const char* targetPath, isize newDirFdNum,
                              const char* linkPath)
     {
-        auto getPath = [](const char* path) -> Path
-        { return CPU::AsUser([path]() -> Path { return path; }); };
-
-        auto target    = getPath(targetPath);
-        auto link      = getPath(linkPath);
+        auto target    = CPU::CopyStringFromUser(targetPath);
+        auto link      = CPU::CopyStringFromUser(linkPath);
 
         auto pathRes   = TryOrRet(ResolveAtFd(newDirFdNum, link, 0));
         auto directory = pathRes.Parent;
@@ -938,31 +916,22 @@ namespace API::VFS
                              isize newDirFdNum, const char* newPath,
                              usize flags)
     {
-        auto getPath = [](const char* path) -> Path
-        { return CPU::AsUser([path]() -> Path { return path; }); };
+        auto oldPathRes
+            = TryOrRet(ResolveAtFd(oldDirFdNum, CPU::CopyStringFromUser(oldPath), 0));
 
-        auto oldPathResolutionOr
-            = ResolveAtFd(oldDirFdNum, getPath(oldPath), 0);
-        if (!oldPathResolutionOr) return Error(oldPathResolutionOr.Error());
-        auto oldPathResolution = oldPathResolutionOr.Value();
-
-        auto newPathResolutionOr
-            = ResolveAtFd(newDirFdNum, getPath(newPath), 0);
-        if (!newPathResolutionOr) return Error(newPathResolutionOr.Error());
-        auto newPathResolution = newPathResolutionOr.Value();
-
-        auto oldParent         = oldPathResolution.Parent->INode();
+        auto newPathRes
+            = TryOrRet(ResolveAtFd(newDirFdNum, CPU::CopyStringFromUser(newPath), 0));
+        auto oldParent         = oldPathRes.Parent->INode();
         if (!oldParent->IsDirectory()) return Error(ENOTDIR);
 
-        if (!oldPathResolution.Entry) return Error(ENOENT);
-        if (newPathResolution.Entry) return Error(EEXIST);
+        if (!oldPathRes.Entry) return Error(ENOENT);
+        if (newPathRes.Entry) return Error(EEXIST);
 
-        auto newParent = newPathResolution.Parent;
-        auto newName   = newPathResolution.BaseName.Size() > 0
-                           ? newPathResolution.BaseName
-                           : oldPathResolution.BaseName;
+        auto newParent = newPathRes.Parent;
+        auto newName   = newPathRes.BaseName.Size() > 0
+                           ? newPathRes.BaseName
+                           : oldPathRes.BaseName;
         auto success   = oldParent->Rename(newParent->INode(), newName);
-
         if (!success) return Error(success.Error());
         return 0;
     }

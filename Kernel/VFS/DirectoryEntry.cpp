@@ -56,7 +56,6 @@ void DirectoryEntry::SetParent(::WeakRef<DirectoryEntry> entry)
 void DirectoryEntry::SetMountGate(::Ref<DirectoryEntry> mountPoint)
 {
     ScopedLock guard(m_Lock);
-    m_MountGate = mountPoint;
 
     if (!(m_Flags & DirectoryEntryFlags::eEntryTypeMask))
         m_Flags |= DirectoryEntryFlags::eDirectory;
@@ -92,13 +91,6 @@ void DirectoryEntry::RemoveChild(::Ref<class DirectoryEntry> entry)
     m_Children.Erase(it);
 }
 
-::WeakRef<DirectoryEntry> DirectoryEntry::FollowMounts()
-{
-    WeakRef current = this;
-    while (current && current->m_MountGate) current = current->m_MountGate;
-
-    return current;
-}
 ::WeakRef<DirectoryEntry> DirectoryEntry::FollowSymlinks(usize cnt)
 {
     auto target = TryOrRetVal(m_INode->ReadLink(), this);
@@ -119,7 +111,7 @@ void DirectoryEntry::RemoveChild(::Ref<class DirectoryEntry> entry)
 }
 WeakRef<DirectoryEntry> DirectoryEntry::GetEffectiveParent()
 {
-    auto rootEntry  = VFS::RootDirectoryEntry()->FollowMounts();
+    auto rootEntry  = VFS::RootDirectoryEntry();
     auto mountPoint = MountPoint::Lookup(const_cast<DirectoryEntry*>(this));
 
     if (this == rootEntry.Raw() || this == VFS::RootDirectoryEntry().Raw())

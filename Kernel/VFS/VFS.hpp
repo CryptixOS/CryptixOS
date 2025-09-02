@@ -28,13 +28,11 @@ namespace VFS
 
     ErrorOr<Ref<FilesystemDriver>> FindFilesystem(StringView name);
 
-    ErrorOr<void> RegisterFilesystem(Ref<FilesystemDriver> driver);
-    ErrorOr<void> UnregisterFilesystem(Ref<FilesystemDriver> driver);
+    ErrorOr<void>       RegisterFilesystem(Ref<FilesystemDriver> driver);
+    ErrorOr<void>       UnregisterFilesystem(Ref<FilesystemDriver> driver);
 
-    Vector<std::pair<bool, StringView>>& Filesystems();
-
-    Ref<DirectoryEntry>                  RootDirectoryEntry();
-    void                                 RecursiveDelete(INode* node);
+    Ref<DirectoryEntry> RootDirectoryEntry();
+    void                RecursiveDelete(INode* node);
 
     struct PathResolution
     {

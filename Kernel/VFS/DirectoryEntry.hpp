@@ -83,7 +83,6 @@ class DirectoryEntry : public RefCounted
     void                      InsertChild(::Ref<class DirectoryEntry> entry);
     void                      RemoveChild(::Ref<class DirectoryEntry> entry);
 
-    ::WeakRef<DirectoryEntry> FollowMounts();
     ::WeakRef<DirectoryEntry> FollowSymlinks(usize cnt = 0);
 
     WeakRef<DirectoryEntry>   GetEffectiveParent();
@@ -122,6 +121,5 @@ class DirectoryEntry : public RefCounted
     usize                     m_DirOffset = 0;
 
     ::WeakRef<DirectoryEntry> m_Parent    = nullptr;
-    ::Ref<DirectoryEntry>     m_MountGate = nullptr;
     UnorderedMap<StringView, ::Ref<class DirectoryEntry>> m_Children;
 };

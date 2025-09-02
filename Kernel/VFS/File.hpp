@@ -16,7 +16,7 @@
 
 class INode;
 class DirectoryEntry;
-class File
+class File : public RefCounted
 {
   public:
     File() = default;

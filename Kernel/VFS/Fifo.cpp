@@ -17,7 +17,7 @@ Fifo::Fifo()
     m_Buffer.Reserve(FIFO_SIZE);
 }
 
-FileDescriptor* Fifo::Open(Fifo::Direction direction)
+FileDescriptor* Fifo::OpenDirection(Fifo::Direction direction)
 {
 
     auto fd = new FileDescriptor(nullptr, 0,

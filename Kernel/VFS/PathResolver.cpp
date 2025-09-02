@@ -83,6 +83,14 @@ ErrorOr<Ref<DirectoryEntry>> PathResolver::Resolve(PathLookupFlags flags)
         if (errno == no_error) errno = ENOENT;
         return Error(errno);
     }
+    else if (m_State == ResolutionState::eFinished)
+    {
+        auto dentry = m_DirectoryEntry;
+        if (dentry && dentry->IsMountPoint()
+            && m_Flags & PathLookupFlags::eFollowMounts)
+            dentry = TryFollowMounts(dentry);
+        m_DirectoryEntry = dentry;
+    }
 
     if (flags & PathLookupFlags::eNegativeEntry && m_DirectoryEntry
         && m_DirectoryEntry->Lookup(m_Path.BaseName()))

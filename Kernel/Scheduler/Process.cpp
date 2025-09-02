@@ -256,10 +256,10 @@ ErrorOr<isize> Process::InsertFd(Ref<FileDescriptor> fd)
 ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
 {
     auto fifo     = new Fifo();
-    auto readerFd = fifo->Open(Fifo::Direction::eRead);
+    auto readerFd = fifo->OpenDirection(Fifo::Direction::eRead);
     CPU::AsUser([&]() { pipeFds[0] = m_FdTable.Insert(readerFd); });
 
-    auto writerFd = fifo->Open(Fifo::Direction::eWrite);
+    auto writerFd = fifo->OpenDirection(Fifo::Direction::eWrite);
     CPU::AsUser([&]() { pipeFds[1] = m_FdTable.Insert(writerFd); });
 
     return 0;
