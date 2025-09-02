@@ -42,7 +42,7 @@ packages:
       - base-files
       - aurora
       - mlibc
-      - nasm
+      # - nasm
       - shell-apps
       - sys-apps
       - misc-apps
