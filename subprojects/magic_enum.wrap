@@ -3,6 +3,7 @@ lead_directory_missing = magic_enum
 source_url = https://github.com/Neargye/magic_enum/releases/download/v0.9.5/magic_enum-v0.9.5.tar.gz
 source_filename = magic_enum-v0.9.5.tar.gz
 source_hash = 0694e1ef160cbb6b8be2f43c7df349295911cb7daebdd4e557adaac2c18420f9
+patch_filename = magic_enum.tar
 
 [provide]
 magic_enum = magic_enum_dep
