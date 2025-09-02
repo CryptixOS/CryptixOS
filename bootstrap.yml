@@ -15,7 +15,7 @@ imports:
   - file: host-recipes/core-tools.yml
   - file: host-recipes/x11-tools.yml
 
-  - file: recipes/dev-tools.yml
+  # - file: recipes/dev-tools.yml
   - file: recipes/games.yml
   - file: recipes/gui-libs.yml
   - file: recipes/misc.yml
