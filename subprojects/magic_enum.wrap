@@ -1,7 +1,7 @@
-[wrap-git]
-url = https://github.com/Neargye/magic_enum
-revision = master
-depth = 1
+[wrap-file]
+directory = magic_enum
+source_url = https://github.com/Neargye/magic_enum/releases/download/v0.9.5/magic_enum-v0.9.5.tar.gz
+source_filename = magic_enum-v0.9.5.tar.gz
 
 [provide]
 magic_enum = magic_enum_dep
