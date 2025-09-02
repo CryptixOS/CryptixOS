@@ -80,9 +80,9 @@ To run CryptixOS in QEMU:
 - ✅ Multiple filesystems: ext2, tmpfs, procfs, fat32
 - ✅ Basic userland shell
 - ✅ Lazy Loading the pages 
+- ✅ Module support
 - ⏳ Signals, AHCI, and full networking coming soon
 - ⏳ Networking
-- ⏳ Module support
 
 ---
 
