@@ -7,13 +7,13 @@
 #pragma once
 
 #include <Drivers/Core/CharacterDevice.hpp>
-#include <Drivers/Input/Input.hpp>
+#include <Drivers/Input/InputDevice.hpp>
 
 #include <Prism/Core/Error.hpp>
 #include <Prism/Core/Types.hpp>
 #include <Prism/Memory/Ref.hpp>
 
-class SerioController : public CharacterDevice, public RefCounted
+class SerioController : public CharacterDevice
 {
   public:
     enum class DevicePort

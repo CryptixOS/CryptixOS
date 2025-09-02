@@ -10,7 +10,7 @@
 
 #include <Drivers/Core/CharacterDevice.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
-#include <Drivers/Input/Input.hpp>
+#include <Drivers/Input/InputDevice.hpp>
 
 #include <Modules/serio/SerioController.hpp>
 

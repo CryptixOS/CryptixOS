@@ -12,7 +12,7 @@
 #include <Drivers/ACPI/Bus.hpp>
 #include <Drivers/ACPI/Device.hpp>
 #include <Drivers/Core/CharacterDevice.hpp>
-#include <Drivers/Input/Input.hpp>
+#include <Drivers/Input/InputDevice.hpp>
 
 #include <Modules/serio/SerioController.hpp>
 #include <Prism/String/StringUtils.hpp>

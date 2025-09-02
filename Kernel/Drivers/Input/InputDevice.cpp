@@ -6,7 +6,7 @@
  */
 #include <API/DeviceIDs.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
-#include <Drivers/Input/Input.hpp>
+#include <Drivers/Input/InputDevice.hpp>
 
 #include <Library/Locking/SpinlockProtected.hpp>
 #include <VFS/VFS.hpp>

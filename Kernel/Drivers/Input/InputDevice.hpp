@@ -8,7 +8,7 @@
 
 #include <Drivers/Core/CharacterDevice.hpp>
 
-class InputDevice : public CharacterDevice, public RefCounted
+class InputDevice : public CharacterDevice
 {
   public:
     InputDevice(StringView name, DeviceMinor minor);

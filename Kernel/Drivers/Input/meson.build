@@ -5,6 +5,6 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 srcs += files(
-  'Input.cpp',
+  'InputDevice.cpp',
 )
 
