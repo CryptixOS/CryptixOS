@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Common.hpp>
+#include <Compiler.hpp>
 
 #include <Arch/Arch.hpp>
 
