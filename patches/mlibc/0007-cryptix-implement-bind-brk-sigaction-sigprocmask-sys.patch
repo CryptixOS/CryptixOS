@@ -1,0 +1,144 @@
+From 94e998d8ba3000fcf9b129268e467e7079bb4d27 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Thu, 4 Sep 2025 03:32:54 +0200
+Subject: [PATCH] [cryptix]: implement bind,brk,sigaction,sigprocmask syscalls
+
+---
+ meson.build                               |  2 +-
+ sysdeps/cryptix/.clang-format             | 34 +++++++++++++++++++++++
+ sysdeps/cryptix/include/cryptix/syscall.h |  5 ++++
+ sysdeps/cryptix/sysdeps/signal.cpp        | 17 ++++++------
+ sysdeps/cryptix/sysdeps/vfs.cpp           |  7 +++++
+ 5 files changed, 55 insertions(+), 10 deletions(-)
+ create mode 100755 sysdeps/cryptix/.clang-format
+
+diff --git a/meson.build b/meson.build
+index b034d527..b9a1eac9 100644
+--- a/meson.build
++++ b/meson.build
+@@ -214,7 +214,7 @@ if host_machine.system() == 'cryptix'
+ 
+ 	#internal_conf.set10('MLIBC_MAP_DSO_SEGMENTS', true)
+ 	internal_conf.set10('MLIBC_MMAP_ALLOCATE_DSO', true)
+-	#internal_conf.set10('MLIBC_MAP_FILE_WINDOWS', true)
++	internal_conf.set10('MLIBC_MAP_FILE_WINDOWS', true)
+     subdir('sysdeps/cryptix')
+ elif host_machine.system() == 'linux'
+ 	provides_bits_syscall_h = true
+diff --git a/sysdeps/cryptix/.clang-format b/sysdeps/cryptix/.clang-format
+new file mode 100755
+index 00000000..2416f544
+--- /dev/null
++++ b/sysdeps/cryptix/.clang-format
+@@ -0,0 +1,34 @@
++AlignConsecutiveAssignments: AcrossEmptyLinesAndComments
++AlignConsecutiveBitFields: AcrossEmptyLinesAndComments
++AlignConsecutiveDeclarations: AcrossEmptyLinesAndComments
++AlignConsecutiveMacros: AcrossEmptyLinesAndComments
++AlignEscapedNewlines: Right
++AlignOperands: AlignAfterOperator
++AlignTrailingComments: true
++AllowAllArgumentsOnNextLine: true
++AllowAllParametersOfDeclarationOnNextLine: true
++AllowShortBlocksOnASingleLine: Always
++AllowShortCaseLabelsOnASingleLine: true
++AllowShortEnumsOnASingleLine: true
++AllowShortFunctionsOnASingleLine: All
++AllowShortIfStatementsOnASingleLine: AllIfsAndElse
++AllowShortLambdasOnASingleLine: All
++AllowShortLoopsOnASingleLine: true
++AlwaysBreakBeforeMultilineStrings: true
++AlwaysBreakTemplateDeclarations: Yes
++AccessModifierOffset: -2
++BinPackArguments: true
++BinPackParameters: true
++BitFieldColonSpacing: Both
++BreakBeforeBinaryOperators: All
++BreakBeforeBraces: Allman
++BreakBeforeTernaryOperators: true
++BreakConstructorInitializers: BeforeComma
++BreakStringLiterals: true
++IndentAccessModifiers: false
++IndentCaseLabels: true
++IndentPPDirectives: BeforeHash
++IndentWidth: 4
++NamespaceIndentation: All
++PointerAlignment: Left
++#AttributeBreakingStyle: Always
+diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
+index 353c6b97..6d298523 100644
+--- a/sysdeps/cryptix/include/cryptix/syscall.h
++++ b/sysdeps/cryptix/include/cryptix/syscall.h
+@@ -30,6 +30,10 @@ constexpr size_t SYS_LSEEK = 8;
+ constexpr size_t SYS_MMAP = 9;
+ constexpr size_t SYS_MPROTECT = 10;
+ constexpr size_t SYS_MUNMAP = 11;
++constexpr size_t SYS_BRK = 12;
++constexpr size_t SYS_SIGACTION = 13;
++constexpr size_t SYS_SIGPROCMASK = 14;
++constexpr size_t SYS_SIGRETURN = 15;
+ constexpr size_t SYS_IOCTL = 16;
+ constexpr size_t SYS_PREAD64 = 17;
+ constexpr size_t SYS_PWRITE64 = 18;
+@@ -40,6 +44,7 @@ constexpr size_t SYS_DUP2 = 33;
+ constexpr size_t SYS_NANOSLEEP = 35;
+ constexpr size_t SYS_GETPID = 39;
+ constexpr size_t SYS_SOCKET = 41;
++constexpr size_t SYS_BIND = 49;
+ constexpr size_t SYS_FORK = 57;
+ constexpr size_t SYS_EXECVE = 59;
+ constexpr size_t SYS_EXIT = 60;
+diff --git a/sysdeps/cryptix/sysdeps/signal.cpp b/sysdeps/cryptix/sysdeps/signal.cpp
+index f272ba62..b2e664c0 100644
+--- a/sysdeps/cryptix/sysdeps/signal.cpp
++++ b/sysdeps/cryptix/sysdeps/signal.cpp
+@@ -5,20 +5,19 @@
+ 
+ namespace mlibc
+ {
+-    int sys_sigaction([[maybe_unused]] int signum,
+-                      [[maybe_unused]] const struct sigaction* __restrict act,
+-                      [[maybe_unused]] struct sigaction* __restrict oldact)
++    int sys_sigaction(int signum, const struct sigaction* __restrict act,
++                      struct sigaction* __restrict oldact)
+     {
+-        // TODO(v1tr10l7): implement sys_sigaction;
++        auto ret = Syscall(SYS_SIGACTION, signum, act, oldact);
++        if (auto e = syscall_error(ret); e) return e;
++
+         return 0;
+     }
+-
+-    int sys_sigprocmask([[maybe_unused]] int             how,
+-                        [[maybe_unused]] const sigset_t* set,
+-                        [[maybe_unused]] sigset_t*       retrieve)
++    int sys_sigprocmask(int how, const sigset_t* set, sigset_t* retrieve)
+     {
++        auto ret = Syscall(SYS_SIGPROCMASK, how, set, retrieve);
++        if (auto e = syscall_error(ret); e) return e;
+ 
+-        // TODO(v1tr10l7): implement sys_sigprocmask;
+         return 0;
+     }
+ }; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/vfs.cpp b/sysdeps/cryptix/sysdeps/vfs.cpp
+index cce2cfa0..9fa62591 100644
+--- a/sysdeps/cryptix/sysdeps/vfs.cpp
++++ b/sysdeps/cryptix/sysdeps/vfs.cpp
+@@ -166,6 +166,13 @@ int sys_socket(int family, int type, int protocol, int *fd) {
+ 	*fd = ret;
+ 	return 0;
+ }
++int sys_bind(int fd, const struct sockaddr *addr_ptr, socklen_t addr_length) {
++	auto ret = Syscall(SYS_BIND, fd, addr_ptr, addr_length);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
+ 
+ int sys_uname(struct utsname *out) {
+ 	auto ret = Syscall(SYS_UNAME, out);
+-- 
+2.51.0
+

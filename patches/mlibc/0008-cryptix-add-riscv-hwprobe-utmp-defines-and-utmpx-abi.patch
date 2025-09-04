@@ -1,0 +1,64 @@
+From 694df98fe1b53567acc70f4e23a4e8350c546e26 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Thu, 4 Sep 2025 03:39:44 +0200
+Subject: [PATCH] [cryptix]: add riscv-hwprobe,utmp-defines and utmpx abi-bits
+ headers
+
+---
+ sysdeps/cryptix/include/abi-bits/riscv-hwprobe.h | 1 +
+ sysdeps/cryptix/include/abi-bits/utmp-defines.h  | 1 +
+ sysdeps/cryptix/include/abi-bits/utmpx.h         | 1 +
+ sysdeps/cryptix/meson.build                      | 3 +++
+ 4 files changed, 6 insertions(+)
+ create mode 120000 sysdeps/cryptix/include/abi-bits/riscv-hwprobe.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/utmp-defines.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/utmpx.h
+
+diff --git a/sysdeps/cryptix/include/abi-bits/riscv-hwprobe.h b/sysdeps/cryptix/include/abi-bits/riscv-hwprobe.h
+new file mode 120000
+index 0000000..e651325
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/riscv-hwprobe.h
+@@ -0,0 +1 @@
++../../../../abis/linux/riscv-hwprobe.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/utmp-defines.h b/sysdeps/cryptix/include/abi-bits/utmp-defines.h
+new file mode 120000
+index 0000000..8617643
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/utmp-defines.h
+@@ -0,0 +1 @@
++../../../../abis/linux/utmp-defines.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/utmpx.h b/sysdeps/cryptix/include/abi-bits/utmpx.h
+new file mode 120000
+index 0000000..c6a2677
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/utmpx.h
+@@ -0,0 +1 @@
++../../../../abis/linux/utmpx.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
+index 074e2b7..9e5fbe6 100644
+--- a/sysdeps/cryptix/meson.build
++++ b/sysdeps/cryptix/meson.build
+@@ -57,6 +57,7 @@ if not no_headers
+     'include/abi-bits/ptrace.h',
+     'include/abi-bits/random.h',
+     'include/abi-bits/reboot.h',
++    'include/abi-bits/riscv-hwprobe.h',
+     'include/abi-bits/resource.h',
+     'include/abi-bits/rlim_t.h',
+     'include/abi-bits/seek-whence.h',
+@@ -74,6 +75,8 @@ if not no_headers
+     'include/abi-bits/termios.h',
+     'include/abi-bits/time.h',
+     'include/abi-bits/uid_t.h',
++    'include/abi-bits/utmpx.h',
++    'include/abi-bits/utmp-defines.h',
+     'include/abi-bits/utsname.h',
+     'include/abi-bits/vm-flags.h',
+     'include/abi-bits/vt.h',
+-- 
+2.51.0
+

@@ -41,6 +41,49 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
 
+  - name: gmp
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: Library for arbitrary-precision arithmetic on different type of numbers
+      description: The GMP package contains math libraries. These have useful functions for arbitrary precision arithmetic.
+      spdx: 'LGPL-3.0-or-later'
+      website: 'https://gmplib.org/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['dev-libs']
+    source:
+      subdir: 'sources'
+      # We switched to a tarball as the GMP repos are currently returning 403 forbidden (2024-12-31)
+      url: 'https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz'
+      format: 'tar.xz'
+      checksum: 'blake2b:a865129e2b3f634ec5bad7f97ed89532e43f5662ac47a7d8ab7f0df8c9f8d0886bd984651422e2573c2163bca69c0547c248147ec90880accbd53db97dc0ddee'
+      extract_path: 'gmp-6.3.0'
+      version: '6.3.0'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+      regenerate:
+        - args: ['autoreconf', '-fvi']
+        - args: ['cp', '@THIS_SOURCE_DIR@/configfsf.guess', '@THIS_SOURCE_DIR@/config.guess']
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+    revision: 1
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--disable-static'
+        - '--docdir=/usr/share/doc/gmp-6.3.0'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+
   - name: libiconv
     architecture: '@OPTION:arch@'
     metadata:
@@ -118,6 +161,7 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
         quiet: true
+
   - name: libintl
     architecture: '@OPTION:arch@'
     source:
@@ -292,7 +336,7 @@ packages:
         - '-Ddefault_library=both'
         #- '-Ddebug_allocator=true'
         - '-Dlibgcc_dependency=true'
-        - '-Dbuild_tests=true'
+        - '-Dbuild_tests=false'
         - '-Dposix_option=enabled'
         - '-Dlinux_option=enabled'
         - '-Dglibc_option=enabled'
@@ -308,6 +352,127 @@ packages:
       - args: ['ln', '-sf', 'crt0.o', '@THIS_COLLECT_DIR@/usr/lib/crt1.o']
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/lib/@OPTION:arch-triple@']
       - args: ['ln', '-sf', '../ld.so', '@THIS_COLLECT_DIR@/usr/lib/@OPTION:arch-triple@/ld.so']
+
+  - name: mpc
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: A library for multiprecision complex arithmetic with exact rounding
+      description: The MPC package contains a library for the arithmetic of complex numbers with arbitrarily high precision and correct rounding of the result.
+      spdx: 'LGPL-3.0-or-later'
+      website: 'https://www.multiprecision.org/mpc/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['dev-libs']
+    source:
+      subdir: sources
+      git: 'https://gitlab.inria.fr/mpc/mpc.git'
+      tag: '1.3.1'
+      version: '1.3.1'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+      regenerate:
+        - args: ['autoreconf', '-f', '-i']
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - gmp
+      - mpfr
+    revision: 5
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--disable-static'
+        - '--docdir=/usr/share/doc/mpc-1.3.1'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+  - name: mpfr
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: Library for multiple-precision floating-point computations with exact rounding
+      description: The MPFR package contains functions for multiple precision math.
+      spdx: 'LGPL-3.0-or-later'
+      website: 'https://www.mpfr.org/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['dev-libs']
+    source:
+      subdir: 'sources'
+      url: 'https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz'
+      format: 'tar.xz'
+      checksum: blake2b:6bbf5658e70fbb673a3b65246a6bac708d1571aa6943c6742efd92f468ac71e6f0fe351b757f7133440ea312d9a5fc3549acd89d54f4d975c58bdc204d7b21ec
+      extract_path: 'mpfr-4.2.2'
+      version: '4.2.2'
+      tools_required:
+        - host-autoconf-archive
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+      regenerate:
+        - args: ['autoreconf', '-v', '-f', '-i', '--warnings=all,error']
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - gmp
+    revision: 1
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--enable-static=no'
+        - '--enable-shared=yes'
+        - '--docdir=/usr/share/doc/mpfr-4.2.2'
+        - '--with-pic'
+        environ:
+          # MPFR's configuration script misdetects cross-compilations. Hence,
+          # set one of its internal variables to force it into the cross compilation path.
+          'user_redefine_cc': 'yes'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+
+  - name: neon 
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/CryptixOS/Neon.git'
+      branch: 'main'
+    tools_required:
+      - system-gcc
+      - host-pkg-config
+      - virtual: pkgconfig-for-target
+        triple: "@OPTION:arch-triple@"
+    pkgs_required:
+      - base-files
+      - mlibc
+      - prism
+    configure: 
+      - args:
+        - 'meson'
+        - 'setup'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/@OPTION:arch-triple@-target.cross-file'
+        - '--prefix=/usr'
+        - '--libdir=/lib'
+        - '--buildtype=debugoptimized'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: false
 
   - name: ncurses
     architecture: '@OPTION:arch@'
