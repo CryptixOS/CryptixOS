@@ -15,9 +15,7 @@ imports:
   - file: host-recipes/core-tools.yml
   - file: host-recipes/x11-tools.yml
 
-  - file: recipes/dev-tools.yml
-  - file: recipes/games.yml
-  - file: recipes/gui-libs.yml
+  #- file: recipes/games.yml
   - file: recipes/misc.yml
   - file: recipes/misc-apps.yml
   #- file: recipes/net-utils.yml
@@ -40,9 +38,8 @@ packages:
       version: '1.0'
     pkgs_required:
       - base-files
-      - aurora
+      - init
       - mlibc
-      - nasm
       - shell-apps
       - sys-apps
       - misc-apps
