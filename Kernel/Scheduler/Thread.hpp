@@ -122,8 +122,6 @@ struct Thread : public RefCounted
         return m_SignalMask & signal;
     }
 
-    // FIXME(v1tr10l7): implement this once we have signals
-    inline bool   DuringSignal() const { return m_DuringSignal.Load(); }
     inline bool   ExecutingSyscall() const { return m_ExecutingSyscall.Load(); }
     inline bool   WasInterrupted() const { return false; }
 
@@ -198,7 +196,6 @@ struct Thread : public RefCounted
     usize m_PendingSignals = 0;
 #endif
     AtomicBool m_ExecutingSyscall = false;
-    AtomicBool m_DuringSignal     = false;
 
   public:
     ThreadTLS m_Tls;

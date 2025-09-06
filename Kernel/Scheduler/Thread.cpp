@@ -103,11 +103,10 @@ bool Thread::DispatchAnyPendingSignal()
 {
     // FIXME(v1tr10l7): aarch64 implementation
     if (m_ExecutingSyscall || Context.cs == GDT::KERNEL_CODE_SELECTOR
-        || Context.ds == GDT::KERNEL_DATA_SELECTOR || DuringSignal())
+        || Context.ds == GDT::KERNEL_DATA_SELECTOR)
         return false;
 
     Assert(!CPU::GetInterruptFlag());
-    if (m_DuringSignal) return false;
     u32 pendingSignals = m_PendingSignals & ~m_SignalMask;
 
     u8  signal         = 0;
@@ -136,8 +135,6 @@ bool           Thread::DispatchSignal(u8 signal)
     auto& action = m_Parent->SignalAction(SignalID::eHangup);
     if (action.VirtualAddress)
     {
-        m_DuringSignal       = true;
-
         auto    rsp          = Context.rsp;
         Pointer phys         = nullptr;
         Pointer stackTopVirt = nullptr;
@@ -168,7 +165,6 @@ bool           Thread::DispatchSignal(u8 signal)
 
             builder.Write(m_Tls.FpuStorage, fpuStorageSize);
 
-            // FIXME(v1tr10l7): Red Zone
             for (usize i = 0; i < 128 / 8; i++) builder.Write(0);
             builder.Align(16);
             builder.Write(trampolineVirt);
@@ -179,12 +175,6 @@ bool           Thread::DispatchSignal(u8 signal)
         Context.rsp = rsp;
         Context.rip = action.VirtualAddress;
         Context.rdi = signal;
-
-        // FIXME(v1tr10l7): save the cpu context on
-        // the stack to restore it later, instead of
-        // using Thread local variable,
-        //  so we can support many signals happening
-        //  concurrently per thread
         return true;
     }
 
@@ -239,9 +229,6 @@ bool           Thread::DispatchSignal(u8 signal)
 }
 ErrorOr<void> Thread::SignalReturn()
 {
-    // Assert(DuringSignal());
-    // m_DuringSignal = false;
-
     Pointer rsp = Context.rsp;
     {
         CPU::UserMemoryProtectionGuard guard;
