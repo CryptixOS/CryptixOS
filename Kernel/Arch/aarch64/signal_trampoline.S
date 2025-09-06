@@ -7,8 +7,8 @@
 .section .text
 .global sigret_trampoline_start
 sigret_trampoline_start:
-    // mov SYS_SIGRETURN number to x0 (on ARM, syscall numbers are passed in x0)
-    mov x0, #15
+    // mov SYS_SIGRETURN number to x8 (on ARM, syscall numbers are passed in x8)
+    mov x8, #15
     // svc 0 is used to make a system call in ARM (equivalent to syscall in x86)
     svc #0
 sigret_trampoline_end:
