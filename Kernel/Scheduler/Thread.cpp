@@ -133,6 +133,7 @@ bool           Thread::DispatchSignal(u8 signal)
     m_PendingSignals &= ~Bit(signal);
 
     LogDebug("Thread: Context => \n{}", Context);
+#if CTOS_TARGET_X86_64
     Assert(Context.ss == (GDT::USERLAND_DATA_SELECTOR | 0x03));
 
     auto& action = m_Parent->SignalAction(SignalID::eHangup);
@@ -227,11 +228,13 @@ bool           Thread::DispatchSignal(u8 signal)
 
         default: AssertNotReached(); break;
     }
-    // TODO(v1tr10l7): Dispatch signals
+        // TODO(v1tr10l7): Dispatch signals
+#endif
     return false;
 }
 ErrorOr<void> Thread::SignalReturn()
 {
+#if CTOS_TARGET_X86_64
     Pointer rsp = Context.rsp;
     {
         CPU::UserMemoryProtectionGuard guard;
@@ -245,12 +248,14 @@ ErrorOr<void> Thread::SignalReturn()
         return {};
     }
 
+#endif
     for (;;) Arch::Halt();
     return Error(ENOSYS);
 }
 
 ::Ref<Thread> Thread::Fork(Process* process)
 {
+#if CTOS_TARGET_X86_64
     auto newThread
         = process->CreateThread(Context.rip, m_IsUser, CPU::GetCurrent()->ID);
     newThread->m_Tls.Self  = newThread.Raw();
@@ -291,13 +296,14 @@ ErrorOr<void> Thread::SignalReturn()
     newThread->Context.rdx = 0;
 
     newThread->m_IsUser    = m_IsUser;
-#ifdef CTOS_TARGET_X86_64
-    newThread->m_GsBase = m_GsBase;
-    newThread->m_FsBase = m_FsBase;
-#endif
+    newThread->m_GsBase    = m_GsBase;
+    newThread->m_FsBase    = m_FsBase;
 
-    newThread->m_State = ThreadState::eDequeued;
+    newThread->m_State     = ThreadState::eDequeued;
     return newThread;
+#else
+    return nullptr;
+#endif
 }
 
 KeyValuePair<upointer, upointer> Thread::AllocateUserStack()

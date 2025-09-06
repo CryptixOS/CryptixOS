@@ -395,10 +395,14 @@ namespace uACPI
         uacpi_handle            s_Contexts[255]{};
         IrqResult               OnInterrupt(Device*, CPUContext* ctx)
         {
+#if CTOS_TARGET_X86_64
             auto handler = s_Handlers[ctx->interruptVector];
             if (handler) handler(s_Contexts[ctx->interruptVector]);
 
             return IrqResult::eHandled;
+#else
+            return IrqResult::eNone;
+#endif
         }
 
         uacpi_status uacpi_kernel_install_interrupt_handler(

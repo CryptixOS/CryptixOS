@@ -34,10 +34,12 @@ namespace InterruptManager
         //         result = it->Value->Handle(ctx);
         //     });
 
-        auto      it     = s_IrqMap.Find(ctx->interruptVector);
+#if CTOS_TARGET_X86_64
+        auto it = s_IrqMap.Find(ctx->interruptVector);
         if (it == s_IrqMap.end()) return result;
 
         result = it->Value->Handle(ctx);
+#endif
         return result;
     }
 

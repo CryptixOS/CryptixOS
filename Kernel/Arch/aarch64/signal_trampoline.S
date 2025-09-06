@@ -11,5 +11,6 @@ sigret_trampoline_start:
     mov x8, #15
     // svc 0 is used to make a system call in ARM (equivalent to syscall in x86)
     svc #0
+.global sigret_trampoline_end
 sigret_trampoline_end:
 
