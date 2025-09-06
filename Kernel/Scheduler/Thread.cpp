@@ -102,9 +102,12 @@ void Thread::SendSignal(u8 signal)
 bool Thread::DispatchAnyPendingSignal()
 {
     // FIXME(v1tr10l7): aarch64 implementation
-    if (m_ExecutingSyscall || Context.cs == GDT::KERNEL_CODE_SELECTOR
+    if (m_ExecutingSyscall) return false;
+#if CTOS_TARGET_X86_64
+    if (Context.cs == GDT::KERNEL_CODE_SELECTOR
         || Context.ds == GDT::KERNEL_DATA_SELECTOR)
         return false;
+#endif
 
     Assert(!CPU::GetInterruptFlag());
     u32 pendingSignals = m_PendingSignals & ~m_SignalMask;
