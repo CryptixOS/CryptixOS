@@ -1,0 +1,215 @@
+From 0dea03356faadf2b9537c91c88a46236b3544cdd Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Sat, 6 Sep 2025 18:06:35 +0200
+Subject: [PATCH] [cryptix]: implement POSIX signals
+
+---
+ sysdeps/cryptix/include/cryptix/syscall.h |  6 ++
+ sysdeps/cryptix/sysdeps/internal.cpp      | 90 ++++++++++++-----------
+ sysdeps/cryptix/sysdeps/process.cpp       |  7 ++
+ sysdeps/cryptix/sysdeps/signal.cpp        | 41 +++++++----
+ 4 files changed, 87 insertions(+), 57 deletions(-)
+
+diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
+index 353c6b9..a6ee0c8 100644
+--- a/sysdeps/cryptix/include/cryptix/syscall.h
++++ b/sysdeps/cryptix/include/cryptix/syscall.h
+@@ -30,6 +30,9 @@ constexpr size_t SYS_LSEEK = 8;
+ constexpr size_t SYS_MMAP = 9;
+ constexpr size_t SYS_MPROTECT = 10;
+ constexpr size_t SYS_MUNMAP = 11;
++constexpr size_t SYS_SIGACTION = 13;
++constexpr size_t SYS_SIGPROCMASK = 14;
++constexpr size_t SYS_SIGRETURN = 15;
+ constexpr size_t SYS_IOCTL = 16;
+ constexpr size_t SYS_PREAD64 = 17;
+ constexpr size_t SYS_PWRITE64 = 18;
+@@ -44,6 +47,7 @@ constexpr size_t SYS_FORK = 57;
+ constexpr size_t SYS_EXECVE = 59;
+ constexpr size_t SYS_EXIT = 60;
+ constexpr size_t SYS_WAIT4 = 61;
++constexpr size_t SYS_KILL = 62;
+ constexpr size_t SYS_UNAME = 63;
+ constexpr size_t SYS_FCNTL = 72;
+ constexpr size_t SYS_GETCWD = 79;
+@@ -102,6 +106,8 @@ constexpr size_t SYS_READLINKAT = 267;
+ constexpr size_t SYS_FCHMODAT = 268;
+ constexpr size_t SYS_UTIMENSAT = 280;
+ constexpr size_t SYS_SYNCFS = 306;
++constexpr size_t SYS_FUTEX_WAKE = 454;
++constexpr size_t SYS_FUTEX_WAIT = 455;
+ 
+ #pragma endregion
+ 
+diff --git a/sysdeps/cryptix/sysdeps/internal.cpp b/sysdeps/cryptix/sysdeps/internal.cpp
+index 0515571..82a03fa 100644
+--- a/sysdeps/cryptix/sysdeps/internal.cpp
++++ b/sysdeps/cryptix/sysdeps/internal.cpp
+@@ -10,45 +10,53 @@
+ 
+ #include <sys/mman.h>
+ 
+-namespace mlibc
+-{
+-    void sys_libc_log(const char* message)
+-    {
+-        static constexpr char MLIBC_SIG[] = "[mlibc]: ";
+-
+-        size_t                len         = strlen(message) + 1;
+-        char*                 messageEOL
+-            = reinterpret_cast<char*>(alloca(len + sizeof(MLIBC_SIG)));
+-
+-        memcpy(messageEOL, MLIBC_SIG, sizeof(MLIBC_SIG) - 1);
+-        memcpy(messageEOL + sizeof(MLIBC_SIG) - 1, message, len);
+-        len += sizeof(MLIBC_SIG) - 1;
+-
+-        messageEOL[len - 1] = '\n';
+-        Syscall(SYS_WRITE, 1, messageEOL, len);
+-    }
+-    [[noreturn]] void sys_libc_panic()
+-    {
+-        Syscall(SYS_PANIC, "mlibc crashed");
+-
+-        __builtin_unreachable();
+-    }
+-
+-    STUB_RET(int sys_clone([[maybe_unused]] void*  tcb,
+-                           [[maybe_unused]] pid_t* pid_out,
+-                           [[maybe_unused]] void*  stack));
+-    STUB_RET(int sys_kill([[maybe_unused]] pid_t, [[maybe_unused]] int));
+-
+-    //////
+-    int sys_tcb_set(void* pointer)
+-    {
+-        auto ret = Syscall(SYS_ARCH_PRCTL, 0x1002, pointer);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return ret;
+-    }
+-
+-    STUB_RET(int sys_futex_wait(int* pointer, int expected,
+-                                const struct timespec* time));
+-    STUB_RET(int sys_futex_wake([[maybe_unused]] int* pointer));
++namespace mlibc {
++void sys_libc_log(const char *message) {
++	static constexpr char MLIBC_SIG[] = "[mlibc]: ";
++
++	size_t len = strlen(message) + 1;
++	char *messageEOL = reinterpret_cast<char *>(alloca(len + sizeof(MLIBC_SIG)));
++
++	memcpy(messageEOL, MLIBC_SIG, sizeof(MLIBC_SIG) - 1);
++	memcpy(messageEOL + sizeof(MLIBC_SIG) - 1, message, len);
++	len += sizeof(MLIBC_SIG) - 1;
++
++	messageEOL[len - 1] = '\n';
++	Syscall(SYS_WRITE, 1, messageEOL, len);
++}
++[[noreturn]] void sys_libc_panic() {
++	Syscall(SYS_PANIC, "mlibc crashed");
++
++	__builtin_unreachable();
++}
++
++STUB_RET(
++    int sys_clone(
++        [[maybe_unused]] void *tcb, [[maybe_unused]] pid_t *pid_out, [[maybe_unused]] void *stack
++    )
++);
++
++//////
++int sys_tcb_set(void *pointer) {
++	auto ret = Syscall(SYS_ARCH_PRCTL, 0x1002, pointer);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return ret;
++}
++
++int sys_futex_wait(int *pointer, int expected, const struct timespec *time) {
++	auto ret = Syscall(SYS_FUTEX_WAIT, pointer, expected, time);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_futex_wake(int *pointer) {
++	auto ret = Syscall(SYS_FUTEX_WAKE, pointer);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
+ } // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/process.cpp b/sysdeps/cryptix/sysdeps/process.cpp
+index fdab72a..b167bcc 100644
+--- a/sysdeps/cryptix/sysdeps/process.cpp
++++ b/sysdeps/cryptix/sysdeps/process.cpp
+@@ -19,6 +19,13 @@ int sys_waitpid(pid_t pid, int *status, int flags, struct rusage *ru, pid_t *ret
+ 	*ret_pid = static_cast<pid_t>(ret);
+ 	return 0;
+ }
++int sys_kill(int pid, int sig) {
++	auto ret = Syscall(SYS_KILL, pid, sig);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
+ 
+ uid_t sys_getuid() {
+ 	auto ret = Syscall(SYS_GETUID);
+diff --git a/sysdeps/cryptix/sysdeps/signal.cpp b/sysdeps/cryptix/sysdeps/signal.cpp
+index f272ba6..7f64d2d 100644
+--- a/sysdeps/cryptix/sysdeps/signal.cpp
++++ b/sysdeps/cryptix/sysdeps/signal.cpp
+@@ -3,22 +3,31 @@
+ 
+ #include <cryptix/syscall.h>
+ 
+-namespace mlibc
+-{
+-    int sys_sigaction([[maybe_unused]] int signum,
+-                      [[maybe_unused]] const struct sigaction* __restrict act,
+-                      [[maybe_unused]] struct sigaction* __restrict oldact)
+-    {
+-        // TODO(v1tr10l7): implement sys_sigaction;
+-        return 0;
+-    }
++namespace mlibc {
++int sys_sigaction(
++    int signum, const struct sigaction *__restrict act, struct sigaction *__restrict oldact
++) {
++	auto ret = Syscall(SYS_SIGACTION, signum, act, oldact);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
+ 
+-    int sys_sigprocmask([[maybe_unused]] int             how,
+-                        [[maybe_unused]] const sigset_t* set,
+-                        [[maybe_unused]] sigset_t*       retrieve)
+-    {
++int sys_sigprocmask(int how, const sigset_t *set, sigset_t *retrieve) {
++	auto ret = Syscall(SYS_SIGPROCMASK, how, set, retrieve);
++	if (auto e = syscall_error(ret); e)
++		return e;
+ 
+-        // TODO(v1tr10l7): implement sys_sigprocmask;
+-        return 0;
+-    }
++	return 0;
++}
++void sys_sigreturn() {
++	Syscall(SYS_SIGRETURN);
++	__builtin_unreachable();
++}
+ }; // namespace mlibc
++
++extern "C" void sigreturn()
++{
++    sigreturn();   
++}
+-- 
+2.51.0
+
