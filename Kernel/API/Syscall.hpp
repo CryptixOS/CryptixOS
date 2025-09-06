@@ -147,7 +147,10 @@ namespace Syscall
         eMMap             = 9,
         eMProtect         = 10,
         eMUnMap           = 11,
+        eBrk              = 12,
+        eSigAction        = 13,
         eSigProcMask      = 14,
+        eSigReturn        = 15,
         eIoCtl            = 16,
         ePRead64          = 17,
         ePWrite64         = 18,
@@ -215,6 +218,7 @@ namespace Syscall
         eReboot           = 169,
         eInitModule       = 175,
         eGetTid           = 186,
+        eFutex            = 202,
         eGetDents64       = 217,
         eClockGetTime     = 228,
         eClockNanoSleep   = 230,
@@ -235,6 +239,10 @@ namespace Syscall
         eSyncFs           = 306,
         eFinitModule      = 313,
         eRenameAt2        = 316,
+        eFutexWakeV       = 449,
+        eFutexWake        = 454,
+        eFutexWait        = 455,
+        eFutexRequeue     = 456,
     };
 
     StringView GetName(usize index);

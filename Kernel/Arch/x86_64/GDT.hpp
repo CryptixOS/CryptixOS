@@ -10,13 +10,21 @@
 
 struct [[gnu::packed]] TaskStateSegment
 {
-    u32 reserved1;
-    u64 rsp[3];
-    u64 reserved2;
-    u64 ist[7];
-    u64 reserved3;
-    u16 reserved4;
-    u16 ioMapBase;
+    u32 Reserved1;
+    u64 RSP0;
+    u64 RSP1;
+    u64 RSP2;
+    u64 Reserved2;
+    u64 IST1;
+    u64 IST2;
+    u64 IST3;
+    u64 IST4;
+    u64 IST5;
+    u64 IST6;
+    u64 IST7;
+    u64 Reserved3;
+    u16 Reserved4;
+    u16 IoMapBase;
 };
 
 namespace GDT

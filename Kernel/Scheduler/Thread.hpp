@@ -22,6 +22,7 @@
 
 #include <Prism/Containers/Deque.hpp>
 #include <Prism/Containers/IntrusiveList.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
 #include <Scheduler/Event.hpp>
 
 namespace CPU
@@ -104,23 +105,35 @@ struct Thread : public RefCounted
     {
         return m_State == ThreadState::eBlocked;
     }
-    constexpr bool  ReadyForCleanup() { return IsDead(); }
+    constexpr bool ReadyForCleanup() { return IsDead(); }
 
-    ::Ref<Thread>   Fork(Process* parent);
+    ::Ref<Thread>  Fork(Process* parent);
 
+#if 0
     inline sigset_t SignalMask() const { return m_SignalMask; }
     inline void     SetSignalMask(sigset_t mask) { m_SignalMask = mask; }
+#else
+    inline usize SignalMask() const { return m_SignalMask; }
+    inline void  SetSignalMask(usize mask) { m_SignalMask = mask; }
+#endif
 
-    inline bool     ShouldIgnoreSignal(u8 signal) const
+    inline bool ShouldIgnoreSignal(u8 signal) const
     {
         return m_SignalMask & signal;
     }
 
     // FIXME(v1tr10l7): implement this once we have signals
-    inline bool WasInterrupted() const { return false; }
-    void        SendSignal(u8 signal);
-    bool        DispatchAnyPendingSignal();
-    bool        DispatchSignal(u8 signal);
+    inline bool   DuringSignal() const { return m_DuringSignal.Load(); }
+    inline bool   ExecutingSyscall() const { return m_ExecutingSyscall.Load(); }
+    inline bool   WasInterrupted() const { return false; }
+
+    void          OnSyscallEnter();
+    void          OnSyscallLeave();
+
+    void          SendSignal(u8 signal);
+    bool          DispatchAnyPendingSignal();
+    bool          DispatchSignal(u8 signal);
+    ErrorOr<void> SignalReturn();
 
 #ifdef CTOS_TARGET_X86_64
     inline Pointer FsBase() const { return m_FsBase; }
@@ -176,9 +189,16 @@ struct Thread : public RefCounted
     Pointer m_El0Base;
 #endif
 
-    bool     m_IsEnqueued     = false;
+    bool m_IsEnqueued = false;
+#if 0
     sigset_t m_SignalMask     = 0;
     sigset_t m_PendingSignals = 0;
+#else
+    usize m_SignalMask     = 0;
+    usize m_PendingSignals = 0;
+#endif
+    AtomicBool m_ExecutingSyscall = false;
+    AtomicBool m_DuringSignal     = false;
 
   public:
     ThreadTLS m_Tls;
@@ -196,4 +216,6 @@ struct Thread : public RefCounted
 
     friend class Process;
     friend class Scheduler;
+
+    KeyValuePair<upointer, upointer> AllocateUserStack();
 };

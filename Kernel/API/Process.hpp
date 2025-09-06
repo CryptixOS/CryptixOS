@@ -14,8 +14,11 @@ struct timespec;
 struct rusage;
 namespace API::Process
 {
+    ErrorOr<isize>  SigAction(isize signal, const struct sigaction* action,
+                              sigaction* oldAction);
     ErrorOr<isize>  SigProcMask(i32 how, const sigset_t* newSet,
                                 sigset_t* oldSet);
+    ErrorOr<isize>  SigReturn();
     ErrorOr<isize>  SchedYield();
     ErrorOr<isize>  NanoSleep(const timespec* duration, timespec* rem);
 
@@ -50,4 +53,15 @@ namespace API::Process
 
     ErrorOr<pid_t>  GetPGid(pid_t pid);
     ErrorOr<pid_t>  GetSid(pid_t pid);
+
+    ErrorOr<isize>  Futex(u32* uaddr, isize op, u32 expected,
+                          const struct timespec* utime, u32* uaddr2, u32 value2);
+    ErrorOr<isize>  FutexWaitV(struct futex_waitv* waiters, usize futexCount,
+                               usize flags, struct timespec* timeout,
+                               clockid_t clockid);
+    ErrorOr<usize> FutexWake(void* uaddr, usize mask, isize count, usize flags);
+    ErrorOr<usize> FutexWait(void* uaddr, usize value, usize mask, usize flags,
+                             struct timespec* timeout, clockid_t clockid);
+    ErrorOr<isize> FutexRequeue(struct futex_waitv* waiters, usize flags,
+                                isize wakeCount, isize requeueCount);
 } // namespace API::Process

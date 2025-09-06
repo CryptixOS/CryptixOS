@@ -312,6 +312,9 @@ namespace System
         auto lookupSymbol = [&](StringView name) -> u64
         {
             auto address = LookupKernelSymbol(name);
+            if (StringView(name).Contains("printStuff"_sv))
+                LogTrace("ELF::Loader: {} => {:#x}", name, address);
+
             if (address) return address;
 
             auto& dependencies = module->Dependencies;

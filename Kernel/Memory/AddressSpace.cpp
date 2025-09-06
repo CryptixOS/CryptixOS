@@ -57,6 +57,7 @@ void AddressSpace::Erase(Pointer base)
 
 Ref<Region> AddressSpace::AllocateRegion(usize length, usize alignment)
 {
+    if (!alignment) alignment = PMM::PAGE_SIZE;
     Pointer current = Math::AlignUp(m_TotalRange.Base(), alignment);
 
     for (auto it = m_RegionTree.begin(); it != m_RegionTree.end(); ++it)

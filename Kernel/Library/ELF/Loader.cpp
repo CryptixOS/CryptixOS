@@ -11,6 +11,8 @@
 #include <Memory/VMM.hpp>
 #include <VFS/VFS.hpp>
 
+extern KeyValuePair<Pointer, usize> SignalTrampoline();
+
 namespace ELF
 {
     Loader::Loader()
@@ -73,6 +75,7 @@ namespace ELF
 #if CTOS_ELF_DEBUG
         usize totalSize = 0;
 #endif
+
         for (usize i = 0; i < header.ProgramEntryCount; i++)
         {
             const auto& segment = m_Image->ProgramHeader(i);
@@ -97,6 +100,9 @@ namespace ELF
             totalSize += end - start;
 #endif
         }
+
+        auto [trampolinePhys, trampolineSize] = SignalTrampoline();
+        trampolineSize          = Math::AlignUp(trampolineSize, PMM::PAGE_SIZE);
 
         m_Size                  = m_MaxVirt.Raw() - m_MinVirt.Raw();
         m_AlignedSize           = Math::AlignUp(m_Size, PMM::PAGE_SIZE);
@@ -145,19 +151,37 @@ namespace ELF
             m_AlignedSize, m_Phys, virtBase,
             alignedVirtBase.Offset(m_AlignedSize + m_VirtMisalign));
 #endif
-        if (!pageMap.MapRange(alignedVirtBase, m_Phys,
-                              m_AlignedSize + m_VirtMisalign, flags))
+
+        usize totalSize = m_AlignedSize + m_VirtMisalign;
+        if (!pageMap.MapRange(alignedVirtBase, m_Phys, totalSize, flags))
         {
             PMM::FreePages(m_Phys, pageCount);
             return Error(EFAULT);
         }
 
-        auto region = CreateRef<Region>(m_Phys, alignedVirtBase,
-                                        m_AlignedSize + m_VirtMisalign);
-        // region->SetAttributes(flags);
+        m_TrampolineVirt = alignedVirtBase.Offset(totalSize);
+        auto region      = CreateRef<Region>(m_Phys, alignedVirtBase,
+                                             m_AlignedSize + m_VirtMisalign);
+        region->SetAttributes(flags);
         using VMM::Access;
         region->SetAccessMode(Access::eReadWriteExecute | Access::eUser);
         addressSpace.Insert(region);
+
+        auto trampolineFlags = PageAttributes::eRWXU;
+
+        if (&addressSpace != VMM::GetKernelAddressSpace())
+        {
+            m_TrampolineVirt = Math::AlignUp(
+                m_TrampolineVirt.Offset(PMM::PAGE_SIZE) * 32, PMM::PAGE_SIZE);
+            auto trampolineRegion = CreateRef<Region>(
+                trampolinePhys, m_TrampolineVirt, trampolineSize);
+            trampolineRegion->SetAccessMode(Access::eReadWriteExecute
+                                            | Access::eUser);
+            // addressSpace.Insert(trampolineRegion);
+            Assert(pageMap.MapRange(m_TrampolineVirt, trampolinePhys,
+                                    trampolineSize, trampolineFlags));
+        }
+
         return {};
     }
     ErrorOr<void> Loader::LoadSegments(PageMap&       pageMap,
@@ -462,10 +486,16 @@ namespace ELF
         else if (segment.Attributes & SegmentAttributes::eExecutable)
             attributes |= PageAttributes::eExecutable;
 
+        if (segmentStartVirt.Raw() == 0x6ffffbff000
+            || AddressRange(segmentStartVirt.Raw(), sizeInMemory)
+                   .Contains(0x6ffffbff000ull))
+            LogError("ELF::Loader: found");
+
         if (!m_PageMap->ProtectRange(segmentStartVirt, sizeInMemory,
                                      attributes))
             LogError(
-                "ELF::Loader: Failed to set protection attributes for virtual "
+                "ELF::Loader: Failed to set protection attributes for "
+                "virtual "
                 "region at {:#x}-{:#x}",
                 segmentStartVirt, segmentEndVirt);
         Memory::Copy(segmentPhys.ToHigherHalf(),

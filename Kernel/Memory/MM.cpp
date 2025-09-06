@@ -209,45 +209,6 @@ namespace MM
         auto message = Format("Page Fault occurred at '{:#x}'\nCaused by:\n",
                               info.VirtualAddress().Raw());
         auto reason  = info.Reason();
-
-        auto process = Process::Current();
-        Ref<Region> region = nullptr;
-
-        if (process)
-        {
-            auto& addressSpace = process->AddressSpace();
-            region             = addressSpace.Find(info.VirtualAddress());
-        }
-
-        if (region)
-        {
-            auto  fd        = region->FileDescriptor();
-            usize size      = fd ? fd->File()->Size() : region->Size();
-
-            usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
-            auto  phys      = PMM::CallocatePages(pageCount);
-            auto  virt      = region->VirtualBase();
-
-            if (phys)
-            {
-                region->SetPhysicalBase(phys);
-
-                auto pageMap = process->PageMap;
-                pageMap->MapRegion(region);
-
-                if (fd)
-                {
-                    LogDebug("MM: Reading mapped fd into memory");
-                    isize nread = TryAcquire(fd->Read(virt, size));
-                    if (nread != static_cast<isize>(size))
-                        LogError("MM: Failed to read the file descriptor");
-                }
-                return;
-            }
-
-            errno = ENOMEM;
-        }
-
         if (reason & PageFaultReason::eNotPresent)
             message += "\t- Non-present page\n";
         if (reason & PageFaultReason::eWrite)
@@ -265,6 +226,41 @@ namespace MM
 
         bool kernelFault = !(reason & PageFaultReason::eUser);
         message += Format("In {} space", kernelFault ? "User" : "Kernel");
+
+        auto        process = Process::Current();
+        Ref<Region> region  = nullptr;
+
+        if (process)
+        {
+            auto& addressSpace = process->AddressSpace();
+            region             = addressSpace.Find(info.VirtualAddress());
+        }
+
+        if (region)
+        {
+            auto    fd        = region->FileDescriptor();
+            usize   size      = fd ? fd->File()->Size() : region->Size();
+
+            usize   pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
+            Pointer phys      = PMM::CallocatePages(pageCount);
+            auto    virt      = region->VirtualBase();
+
+            auto    pageMap   = process->PageMap;
+            if (phys)
+            {
+                region->SetPhysicalBase(phys);
+                pageMap->MapRegion(region);
+
+                if (fd)
+                {
+                    isize nread = TryAcquire(fd->Read(virt, size));
+                    if (nread != static_cast<isize>(size))
+                        LogError("MM: Failed to read the file descriptor");
+                }
+                return;
+            }
+            errno = ENOMEM;
+        }
 
         if (CPU::DuringSyscall())
         {

@@ -38,3 +38,27 @@ struct [[gnu::packed]] CPUContext
     u64 rsp;
     u64 ss;
 };
+
+template <>
+struct fmt::formatter<CPUContext> : fmt::formatter<std::string>
+{
+    template <typename FormatContext>
+    auto format(const CPUContext& frame, FormatContext& ctx) const
+    {
+        return fmt::formatter<std::string>::format(
+            fmt::format(
+                "ds: {:#x}, es: {:#x}\n"
+                "rax: {:#x}, rbx: {:#x}, rcx: {:#x}, rdx: {:#x}\n"
+                "rdi: {:#x}, rsi: {:#x}, rbp: {:#x}\n"
+                "r8: {:#x}, r9: {:#x}, r10: {:#x}, r11: {:#x}\n"
+                "r12: {:#x}, r13: {:#x}, r14: {:#x}, r15: {:#x}\n"
+                "interruptVector: {:#x}, errorCode: {:#x}\n"
+                "rip: {:#x}, cs: {:#x}, rflags: {:#x}, rsp: {:#x}, ss: {:#x}",
+                frame.ds, frame.es, frame.rax, frame.rbx, frame.rcx, frame.rdx,
+                frame.rdi, frame.rsi, frame.rbp, frame.r8, frame.r9, frame.r10,
+                frame.r11, frame.r12, frame.r13, frame.r14, frame.r15,
+                frame.interruptVector, frame.errorCode, frame.rip, frame.cs,
+                frame.rflags, frame.rsp, frame.ss),
+            ctx);
+    }
+};

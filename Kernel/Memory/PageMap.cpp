@@ -65,13 +65,14 @@ ErrorOr<Pointer> PageMap::MapIoRegion(Pointer phys, usize length,
 
 bool PageMap::Map(Pointer virt, Pointer phys, PageAttributes flags)
 {
-    u64 pte = Virt2Phys(virt);
-    if (pte != static_cast<u64>(-1))
+    u64 mappedPhys = Virt2Phys(virt);
+
+    if (mappedPhys != static_cast<u64>(-1))
     {
         auto errorMessage = fmt::format(
             "VMM: Trying to map address {:#x} to {:#x}, but it is already "
             "mapped => {:#x}",
-            virt.Raw(), phys.Raw(), pte);
+            virt.Raw(), phys.Raw(), mappedPhys);
 
         Assert(errorMessage.data());
     }

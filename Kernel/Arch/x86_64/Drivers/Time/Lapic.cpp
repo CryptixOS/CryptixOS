@@ -107,6 +107,8 @@ void Lapic::Initialize()
         m_Dispatcher = InterruptManager::AllocateHandler(0x30, this, "cryptix");
         LogInfo("LAPIC: Allocated interrupt handler at irq line => {:#x}",
                 m_Dispatcher->IrqLine());
+
+        IDT::SetIST(m_Dispatcher->IrqLine() + 0x20, 1);
         m_Dispatcher->SetHandler(Tick);
     }
     LogInfo("LAPIC: Initialized");

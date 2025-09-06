@@ -50,6 +50,7 @@ namespace ELF
 
         inline Pointer MinVirt() const { return m_MinVirt; }
         inline Pointer MaxVirt() const { return m_MaxVirt; }
+        inline Pointer TrampolineVirt() const { return m_TrampolineVirt; }
 
         inline usize   AlignedSize() const { return m_AlignedSize; }
 
@@ -68,19 +69,20 @@ namespace ELF
 
       private:
         Ref<class Image>              m_Image;
-        PageMap*                      m_PageMap      = nullptr;
-        AddressSpace*                 m_AddressSpace = nullptr;
+        PageMap*                      m_PageMap        = nullptr;
+        AddressSpace*                 m_AddressSpace   = nullptr;
 
-        Pointer                       m_LoadBase     = nullptr;
-        Pointer                       m_Phys         = nullptr;
-        Pointer                       m_Bias         = 0;
+        Pointer                       m_LoadBase       = nullptr;
+        Pointer                       m_Phys           = nullptr;
+        Pointer                       m_Bias           = 0;
 
-        Pointer                       m_MinVirt      = 0;
-        Pointer                       m_MaxVirt      = 0;
+        Pointer                       m_MinVirt        = 0;
+        Pointer                       m_MaxVirt        = 0;
+        Pointer                       m_TrampolineVirt = 0;
 
-        usize                         m_Size         = 0;
-        usize                         m_AlignedSize  = 0;
-        usize                         m_VirtMisalign = 0;
+        usize                         m_Size           = 0;
+        usize                         m_AlignedSize    = 0;
+        usize                         m_VirtMisalign   = 0;
 
         RedBlackTree<StringView, u64> m_Symbols;
         Pointer                       m_EntryPoint      = nullptr;

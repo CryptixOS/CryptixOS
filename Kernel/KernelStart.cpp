@@ -76,7 +76,6 @@ static void eternal()
 {
     for (;;)
     {
-        LogTrace("Kernel thread");
         auto status = Time::NanoSleep(5'000'000'000zu);
         if (!status)
         {

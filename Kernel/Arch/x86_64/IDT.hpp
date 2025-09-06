@@ -13,9 +13,10 @@ constexpr usize DPL_RING3 = 0x03;
 
 namespace IDT
 {
-    void              Initialize();
-    void              Load();
+    void Initialize();
+    void Load();
 
-    void              SetIST(u8 vector, u32 value);
-    void              SetDPL(u8 vector, u8 dpl = 3);
+    u32  GetIST(u8 vector);
+    void SetIST(u8 vector, u32 value);
+    void SetDPL(u8 vector, u8 dpl = 3);
 }; // namespace IDT

@@ -28,6 +28,7 @@ namespace VMM
         if (flags & PageAttributes::eRead) access |= Access::eRead;
         if (flags & PageAttributes::eWrite) access |= Access::eWrite;
         if (flags & PageAttributes::eExecutable) access |= Access::eExecute;
+        if (flags & PageAttributes::eUser) access |= Access::eUser;
 
         m_Access = access;
     }

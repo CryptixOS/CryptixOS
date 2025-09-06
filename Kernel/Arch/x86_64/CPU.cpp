@@ -162,10 +162,10 @@ namespace CPU
             GDT::Initialize();
             GDT::Load(current->ID);
 
-            current->TSS.rsp[0] = Pointer(PMM::CallocatePages(KERNEL_STACK_SIZE
-                                                              / PMM::PAGE_SIZE))
-                                      .ToHigherHalf<Pointer>()
-                                      .Offset<uintptr_t>(KERNEL_STACK_SIZE);
+            current->TSS.RSP0 = Pointer(PMM::CallocatePages(KERNEL_STACK_SIZE
+                                                            / PMM::PAGE_SIZE))
+                                    .ToHigherHalf<Pointer>()
+                                    .Offset<uintptr_t>(KERNEL_STACK_SIZE);
             GDT::LoadTSS((&current->TSS));
             IDT::Load();
 
@@ -198,11 +198,12 @@ namespace CPU
 
         Lapic::Instance()->Initialize();
 
-        GetCurrent()->TSS.ist[0]
+        GetCurrent()->TSS.IST1
             = ToHigherHalfAddress<uintptr_t>(PMM::AllocatePages<uintptr_t>(
                   KERNEL_STACK_SIZE / PMM::PAGE_SIZE))
             + KERNEL_STACK_SIZE;
         IDT::SetIST(14, 2);
+        GDT::LoadTSS(&GetCurrent()->TSS);
 
         if (s_KvmClock && !s_KvmClock->Enable())
             LogError("CPU[{}]: Failed to initialize kvm clock", Current()->ID);
@@ -243,10 +244,10 @@ namespace CPU
             GDT::Initialize();
             GDT::Load(current->LapicID);
 
-            current->TSS.rsp[0] = Pointer(PMM::CallocatePages(KERNEL_STACK_SIZE
-                                                              / PMM::PAGE_SIZE))
-                                      .ToHigherHalf<Pointer>()
-                                      .Offset<uintptr_t>(KERNEL_STACK_SIZE);
+            current->TSS.RSP0 = Pointer(PMM::CallocatePages(KERNEL_STACK_SIZE
+                                                            / PMM::PAGE_SIZE))
+                                    .ToHigherHalf<Pointer>()
+                                    .Offset<uintptr_t>(KERNEL_STACK_SIZE);
             GDT::LoadTSS(&current->TSS);
 
             IDT::Initialize();
@@ -261,12 +262,7 @@ namespace CPU
             current->IsOnline = true;
         }
 
-        if (auto timer = CommandLine::String("scheduler.timer");
-            timer.Empty() || timer == "lapic"_sv)
-            IDT::SetIST(Lapic::Instance()->InterruptVector(), 1);
-        else IDT::SetIST(PIT::Instance()->InterruptVector(), 1);
         LogInfo("BSP: Initialized");
-
         Identify();
     }
     KERNEL_INIT_CODE
@@ -538,7 +534,8 @@ namespace CPU
     {
         thread->SetRunningOn(GetCurrent()->ID);
 
-        GetCurrent()->TSS.ist[1] = thread->PageFaultStack();
+        GetCurrent()->TSS.IST2 = thread->PageFaultStack();
+        GDT::LoadTSS(&GetCurrent()->TSS);
         GetCurrent()->FpuRestore(thread->FpuStorage());
 
         thread->Parent()->PageMap->Load();

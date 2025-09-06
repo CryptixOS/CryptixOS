@@ -69,7 +69,6 @@ void earlyPanic(const char* format, ...)
     va_end(args);
 
     EarlyLogFatal("CPU[%d]: Halted", CPU::GetCurrentID());
-
     s_HaltedCPUs++;
     CPU::HaltAll();
     for (;;) Arch::Halt();

@@ -373,7 +373,6 @@ Thread* Scheduler::PickReadyThread()
     Thread* currentThread = Thread::Current();
     if (!newThread) return currentThread ? currentThread : CPU::Current()->Idle;
 
-    newThread->DispatchAnyPendingSignal();
     return newThread;
 }
 void Scheduler::SwitchContext(Thread* newThread, CPUContext* oldContext)
@@ -391,6 +390,7 @@ void Scheduler::SwitchContext(Thread* newThread, CPUContext* oldContext)
         CPU::SaveThread(currentThread, oldContext);
     }
 
+    newThread->DispatchAnyPendingSignal();
     CPU::LoadThread(newThread, oldContext);
 
     if (currentThread && currentThread->IsDead()

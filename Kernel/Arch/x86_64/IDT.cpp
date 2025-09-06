@@ -122,7 +122,7 @@ static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
     entry->IsrHigh    = (handler & 0xffffffff00000000) >> 32;
 }
 
-[[noreturn]] static void raiseException(CPUContext* ctx)
+CTOS_NORETURN static void raiseException(CPUContext* ctx)
 {
     u64 cpuID = CPU::GetCurrentID();
     using Stacktrace::StackFrame;
@@ -130,13 +130,22 @@ static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
     frame.Base               = Pointer(ctx->rbp).As<StackFrame>();
     frame.InstructionPointer = ctx->rip;
     Stacktrace::Print(&frame, 6);
-
+#if 0
+    auto registerDump = fmt::format("{}", *ctx);
     EarlyPanic(
         "Captured exception[%#x] on cpu %zu: '%s'\n\rError Code: "
         "%#b\n\rrip: "
-        "%#p",
+        "%#p\nRegister Dump => \n%s",
         ctx->interruptVector, cpuID, s_ExceptionNames[ctx->interruptVector],
-        ctx->errorCode, ctx->rip);
+        ctx->errorCode, ctx->rip, registerDump.data());
+#else
+    Panic(
+        "Captured exception[{:#x}] on cpu {}: '{}'\n\rError Code: "
+        "{:#b}\n\rrip: "
+        "{:#x}\nRegister Dump => \n{}",
+        ctx->interruptVector, cpuID, s_ExceptionNames[ctx->interruptVector],
+        ctx->errorCode, ctx->rip, *ctx);
+#endif
 
     Arch::Halt();
 }
@@ -184,7 +193,7 @@ static void pageFault(CPUContext* ctx)
     MM::HandlePageFault(faultInfo);
 }
 
-[[noreturn]] static void unhandledInterrupt(CPUContext* context)
+CTOS_NORETURN static void unhandledInterrupt(CPUContext* context)
 {
     EarlyLogError("\nAn unhandled interrupt %#x occurred",
                   context->interruptVector);
@@ -239,6 +248,7 @@ namespace IDT
         __asm__ volatile("lidt %0" : : "m"(idtr));
     }
 
+    u32  GetIST(u8 vector) { return s_IdtEntries[vector].IST; }
     void SetIST(u8 vector, u32 value) { s_IdtEntries[vector].IST = value; }
     void SetDPL(u8 vector, u8 dpl) { s_IdtEntries[vector].DPL = dpl; }
 } // namespace IDT

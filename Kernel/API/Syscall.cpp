@@ -81,7 +81,9 @@ namespace Syscall
         RegisterSyscall(ID::eMMap, API::MM::MMap);
         RegisterSyscall(ID::eMProtect, API::MM::MProtect);
         RegisterSyscall(ID::eMUnMap, API::MM::MUnMap);
+        RegisterSyscall(ID::eSigAction, API::Process::SigAction);
         RegisterSyscall(ID::eSigProcMask, API::Process::SigProcMask);
+        RegisterSyscall(ID::eSigReturn, API::Process::SigReturn);
         RegisterSyscall(ID::eIoCtl, API::VFS::IoCtl);
         RegisterSyscall(ID::ePRead64, API::VFS::PRead);
         RegisterSyscall(ID::ePWrite64, API::VFS::PWrite);
@@ -163,12 +165,17 @@ namespace Syscall
         RegisterSyscall(ID::eDup3, API::VFS::Dup3);
         RegisterSyscall(ID::eSyncFs, API::VFS::SyncFs);
         RegisterSyscall(ID::eRenameAt2, API::VFS::RenameAt2);
+        RegisterSyscall(ID::eFutexWake, API::Process::FutexWake);
+        RegisterSyscall(ID::eFutexWait, API::Process::FutexWait);
     }
     void Handle(Arguments& args)
     {
         CPU::OnSyscallEnter(args.Index == ToUnderlying(ID::ePanic)
                                 ? CPU::GetCurrent()->LastSyscallID
                                 : args.Index);
+        auto thread = Thread::Current();
+        thread->OnSyscallEnter();
+
 #define LOG_SYSCALLS false
         // #if LOG_SYSCALLS == true || true
         static isize previousSyscall = -1;
@@ -203,6 +210,8 @@ namespace Syscall
                 args.Get<u64>(2), args.Get<u64>(3), args.Get<u64>(4),
                 args.Get<u64>(5));
 
+            thread->OnSyscallLeave();
+            CPU::OnSyscallLeave();
             return;
         }
 
@@ -235,9 +244,13 @@ namespace Syscall
                                      ? -ipointer(ret.Error())
                                      : MAP_FAILED;
             }
+
+            thread->OnSyscallLeave();
+            CPU::OnSyscallLeave();
             return;
         }
 
+        thread->OnSyscallLeave();
         CPU::OnSyscallLeave();
     }
 } // namespace Syscall

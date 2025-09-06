@@ -18,32 +18,81 @@ namespace API::Process
 {
     using ::Process;
 
-    ErrorOr<isize> SigProcMask(i32 how, const sigset_t* newSet,
-                               sigset_t* oldSet)
+    ErrorOr<isize> SigAction(isize signal, const struct sigaction* action,
+                             sigaction* oldAction)
     {
-        auto     process     = ::Process::Current();
-        auto     thread      = Thread::Current();
-        sigset_t currentMask = thread->SignalMask();
+        auto process = Process::Current();
+        auto thread  = Thread::Current();
+
+        if (signal < 1 || signal > _NSIG
+            || (action && (signal == SIGKILL || signal == SIGSTOP)))
+            return Error(EINVAL);
+        if ((action && !process->ValidateRead(action))
+            || (oldAction && !process->ValidateWrite(oldAction)))
+            return Error(EFAULT);
+
+        if (oldAction)
+        {
+            const SignalAction& oldSignalAction
+                = process->SignalAction(static_cast<SignalID>(signal));
+
+            struct sigaction old{};
+            old.sa_handler  = oldSignalAction.VirtualAddress;
+            old.sa_flags    = oldSignalAction.Flags;
+            old.sa_restorer = nullptr;
+            *reinterpret_cast<usize*>(&old.sa_mask) = oldSignalAction.Mask;
+            CPU::CopyToUser(oldAction, old);
+        }
+
+        if (!action) return 0;
+        SignalAction newAction{};
+        {
+            CPU::UserMemoryProtectionGuard guard;
+            newAction.VirtualAddress = action->sa_handler;
+            newAction.Flags          = action->sa_flags;
+            newAction.Mask = *reinterpret_cast<const u32*>(&action->sa_mask);
+        }
+
+        process->SetSignalAction(static_cast<SignalID>(signal), newAction);
+        auto mask
+            = thread->SignalMask() & ~(Bit(SIGKILL - 1) | Bit(SIGSTOP - 1));
+        thread->SetSignalMask(mask);
+
+        // if (sigact.sa_handler == SIG_IGN
+        //     || (sigact.sa_handler == SIG_DFL
+        //         && (signal == SIGCONT || signal == SIGCHLD || signal ==
+        //         SIGURG
+        //             || signal == SIGWINCH)))
+        // TODO(v1tr10l7): remove signal from the queue, and recalc pending
+        // signals
+        ;
+
+        return 0;
+    }
+    ErrorOr<isize> SigProcMask(i32 how, const sigset_t* set, sigset_t* oldSet)
+    {
+        auto process     = ::Process::Current();
+        auto thread      = Thread::Current();
+        auto currentMask = thread->SignalMask();
+        return Error(ENOSYS);
 
         if (oldSet)
         {
             if (!process->ValidateWrite(oldSet, sizeof(sigset_t)))
                 return Error(EFAULT);
 
-            CPU::UserMemoryProtectionGuard guard;
-            *oldSet = currentMask;
+            CPU::CopyToUser(reinterpret_cast<usize*>(oldSet), currentMask);
         }
 
-        if (!newSet) return 0;
-        if (!process->ValidateRead(newSet, sizeof(sigset_t)))
-            return Error(EFAULT);
+        if (!set) return 0;
+        if (!process->ValidateRead(set, sizeof(sigset_t))) return Error(EFAULT);
 
-        CPU::UserMemoryProtectionGuard guard;
+        auto newSet = CPU::CopyFromUser(*reinterpret_cast<const usize*>(set));
         switch (how)
         {
-            case SIG_BLOCK: currentMask &= ~(*newSet); break;
-            case SIG_UNBLOCK: currentMask |= *newSet; break;
-            case SIG_SETMASK: currentMask = *newSet; break;
+            case SIG_BLOCK: currentMask &= ~newSet; break;
+            case SIG_UNBLOCK: currentMask |= newSet; break;
+            case SIG_SETMASK: currentMask = newSet; break;
 
             default: return Error(EINVAL);
         }
@@ -51,6 +100,16 @@ namespace API::Process
         thread->SetSignalMask(currentMask);
         return 0;
     }
+    ErrorOr<isize> SigReturn()
+    {
+        auto thread  = Thread::Current();
+        auto success = thread->SignalReturn();
+        if (!success) return Error(success.Error());
+
+        Scheduler::Yield();
+        return 0;
+    }
+
     ErrorOr<isize> SchedYield()
     {
         Scheduler::Yield();
@@ -93,7 +152,6 @@ namespace API::Process
         auto newProcess = TryOrRet(process->Fork());
         Assert(newProcess);
 
-        LogDebug("API: process forked");
         return newProcess->Pid();
     }
     ErrorOr<isize> Execve(char* pathname, char** argv, char** envp)
@@ -125,6 +183,7 @@ namespace API::Process
     {
         class Process* current = ::Process::Current();
         class Process* target  = nullptr;
+
         if (pid == 0) target = current;
         else if (pid > 0) target = Scheduler::GetProcess(pid);
         else if (pid == -1)
@@ -139,10 +198,10 @@ namespace API::Process
             target = Scheduler::GetProcess(-pid);
         }
 
-        IgnoreUnused(target);
-        IgnoreUnused(signal);
-
-        return Error(ENOSYS);
+        LogTrace("API: Sending signal {} to process with pid => {}", signal,
+                 pid);
+        target->SendSignal(signal);
+        return 0;
     }
 
     ErrorOr<mode_t> Umask(mode_t mask)
@@ -270,5 +329,15 @@ namespace API::Process
 
         if (current->Sid() != process->Sid()) return Error(EPERM);
         return process->Sid();
+    }
+
+    ErrorOr<usize> FutexWake(void* uaddr, usize mask, isize count, usize flags)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<usize> FutexWait(void* uaddr, usize value, usize mask, usize flags,
+                             struct timespec* timeout, clockid_t clockid)
+    {
+        return Error(ENOSYS);
     }
 } // namespace API::Process

@@ -1,4 +1,3 @@
-
 /*
  * Created by v1tr10l7 on 17.11.2024.
  * Copyright (c) 2024-2024, Szymon Zemke <v1tr10l7@proton.me>
@@ -8,14 +7,15 @@
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptGuard.hpp>
 
+#include <Library/StackBuilder.hpp>
 #include <Memory/PMM.hpp>
 
-#include <Prism/Containers/KeyValuePair.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 
+extern KeyValuePair<Pointer, usize> SignalTrampoline();
 Thread::Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn)
     : m_State(ThreadState::eDequeued)
     , m_ErrorCode(no_error)
@@ -67,34 +67,15 @@ Thread::Thread(Process* parent, Vector<StringView>& argv,
 
     if (!parent->PageMap) parent->PageMap = VMM::GetKernelPageMap();
 
-    auto mapUserStack = [this]() -> KeyValuePair<upointer, upointer>
-    {
-        Pointer stackPhys
-            = PMM::CallocatePages(CPU::USER_STACK_SIZE / PMM::PAGE_SIZE);
-        Pointer stackVirt
-            = m_Parent->m_UserStackTop.Raw() - CPU::USER_STACK_SIZE;
-
-        Assert(m_Parent->PageMap->MapRange(
-            stackVirt, stackPhys, CPU::USER_STACK_SIZE,
-            PageAttributes::eRWXU | PageAttributes::eWriteBack));
-
-        using VMM::Access;
-        auto stackRegion
-            = new Region(stackPhys, stackVirt, CPU::USER_STACK_SIZE);
-        stackRegion->SetAccessMode(Access::eReadWriteExecute | Access::eUser);
-        m_Stacks.PushBack(stackRegion);
-        m_Parent->m_AddressSpace.Insert(stackVirt, stackRegion);
-
-        m_StackVirt              = stackVirt;
-        m_Parent->m_UserStackTop = stackVirt.Raw() - PMM::PAGE_SIZE;
-        return {stackPhys.ToHigherHalf<Pointer>().Offset(CPU::USER_STACK_SIZE),
-                stackVirt.Offset(CPU::USER_STACK_SIZE)};
-    };
-
-    auto [stackTopWritable, stackTopVirt] = mapUserStack();
-
+    auto [stackTopWritable, stackTopVirt] = AllocateUserStack();
     m_Tls.Stack
         = program.PrepareStack(stackTopWritable, stackTopVirt, argv, envp);
+    m_Parent->m_SignalTrampolineVirt = program.SignalTrampoline();
+
+    // if (m_Parent->m_Pid > 0 && m_Tid == m_Parent->m_Pid)
+    // {
+    //     LogTrace("Thread: Setting up the signal for the main thread...");
+    // }
 
     CPU::PrepareThread(this, program.EntryPoint(), 0);
 }
@@ -108,29 +89,105 @@ Thread::~Thread()
                    Math::DivRoundUp(CPU::KERNEL_STACK_SIZE, PMM::PAGE_SIZE));
 }
 
+void Thread::OnSyscallEnter() { m_ExecutingSyscall = true; }
+void Thread::OnSyscallLeave() { m_ExecutingSyscall = false; }
+
 void Thread::SendSignal(u8 signal)
 {
     InterruptGuard guard(false);
+
     if (ShouldIgnoreSignal(signal)) return;
-    m_PendingSignals |= 1 << signal;
+    m_PendingSignals |= Bit(signal);
 }
 bool Thread::DispatchAnyPendingSignal()
 {
+    // FIXME(v1tr10l7): aarch64 implementation
+    if (m_ExecutingSyscall || Context.cs == GDT::KERNEL_CODE_SELECTOR
+        || Context.ds == GDT::KERNEL_DATA_SELECTOR || DuringSignal())
+        return false;
+
     Assert(!CPU::GetInterruptFlag());
+    if (m_DuringSignal) return false;
     u32 pendingSignals = m_PendingSignals & ~m_SignalMask;
 
     u8  signal         = 0;
-    for (; signal < 32; ++signal)
-        if (pendingSignals & Bit(signal)) return DispatchSignal(signal);
+    while (signal < 32 && !(pendingSignals & Bit(signal))) ++signal;
+    if (signal == 32) return false;
 
-    return false;
+    return DispatchSignal(signal);
 }
-bool Thread::DispatchSignal(u8 signal)
+
+struct SignalFrame
+{
+    u64        ReturnAddress;
+    CPUContext Saved;
+};
+
+extern Pointer g_SignalTrampoline;
+bool           Thread::DispatchSignal(u8 signal)
 {
     Assert(!CPU::GetInterruptFlag());
     Assert(signal < 32);
-
     m_PendingSignals &= ~Bit(signal);
+
+    LogDebug("Thread: Context => \n{}", Context);
+    Assert(Context.ss == (GDT::USERLAND_DATA_SELECTOR | 0x03));
+
+    auto& action = m_Parent->SignalAction(SignalID::eHangup);
+    if (action.VirtualAddress)
+    {
+        m_DuringSignal       = true;
+
+        auto    rsp          = Context.rsp;
+        Pointer phys         = nullptr;
+        Pointer stackTopVirt = nullptr;
+
+        for (auto [virt, region] : m_Parent->m_AddressSpace)
+        {
+            if (!region->Contains(rsp - 1)) continue;
+            phys         = region->PhysicalBase();
+            stackTopVirt = virt.Offset(CPU::USER_STACK_SIZE);
+        }
+
+        usize   stackOffset = CPU::USER_STACK_SIZE - (stackTopVirt.Raw() - rsp);
+        Pointer rspWritable = phys.ToHigherHalf().Offset(stackOffset);
+        StackBuilder builder(rspWritable);
+
+        upointer     trampolineVirt = m_Parent->m_SignalTrampolineVirt;
+        {
+            CPU::UserMemoryProtectionGuard guard;
+
+            auto actualPhys = Pointer(rspWritable).FromHigherHalf();
+            LogDebug("Thread: Phys => {:#x}, ActualPhys => {:#x}", phys,
+                     actualPhys);
+
+            usize fpuStorageSize = m_Tls.FpuStoragePageCount * PMM::PAGE_SIZE;
+            upointer contextAddress = builder.Write(&Context, sizeof(Context));
+            LogDebug("Thread: Saved the thread's context to => {:#x}",
+                     contextAddress);
+
+            builder.Write(m_Tls.FpuStorage, fpuStorageSize);
+
+            // FIXME(v1tr10l7): Red Zone
+            for (usize i = 0; i < 128 / 8; i++) builder.Write(0);
+            builder.Align(16);
+            builder.Write(trampolineVirt);
+
+            rsp -= (builder.Top() - builder.Current()).Raw();
+        }
+
+        Context.rsp = rsp;
+        Context.rip = action.VirtualAddress;
+        Context.rdi = signal;
+
+        // FIXME(v1tr10l7): save the cpu context on
+        // the stack to restore it later, instead of
+        // using Thread local variable,
+        //  so we can support many signals happening
+        //  concurrently per thread
+        return true;
+    }
+
     switch (signal)
     {
         case SIGHUP:
@@ -179,6 +236,27 @@ bool Thread::DispatchSignal(u8 signal)
     }
     // TODO(v1tr10l7): Dispatch signals
     return false;
+}
+ErrorOr<void> Thread::SignalReturn()
+{
+    // Assert(DuringSignal());
+    // m_DuringSignal = false;
+
+    Pointer rsp = Context.rsp;
+    {
+        CPU::UserMemoryProtectionGuard guard;
+
+        usize fpuStorageSize = m_Tls.FpuStoragePageCount * PMM::PAGE_SIZE;
+        Memory::Copy(m_Tls.FpuStorage, rsp.Offset(16 + 128), fpuStorageSize);
+
+        CPUContext* saved = rsp.Offset<CPUContext*>(16 + 128 + fpuStorageSize);
+        LogWarn("SigReturn: Saved stack frame dump =>\n{}", *saved);
+        Context = *saved;
+        return {};
+    }
+
+    for (;;) Arch::Halt();
+    return Error(ENOSYS);
 }
 
 ::Ref<Thread> Thread::Fork(Process* process)
@@ -231,3 +309,29 @@ bool Thread::DispatchSignal(u8 signal)
     newThread->m_State = ThreadState::eDequeued;
     return newThread;
 }
+
+KeyValuePair<upointer, upointer> Thread::AllocateUserStack()
+{
+    usize   pageCount = CPU::USER_STACK_SIZE / PMM::PAGE_SIZE + 1;
+    Pointer stackPhys = PMM::CallocatePages(pageCount);
+
+    Pointer guardVirt
+        = m_Parent->m_UserStackTop.Offset(-pageCount * PMM::PAGE_SIZE);
+    Pointer stackVirt = guardVirt.Offset(PMM::PAGE_SIZE);
+    // m_Parent->m_UserStackTop.Raw() - CPU::USER_STACK_SIZE;
+
+    Assert(m_Parent->PageMap->MapRange(
+        stackVirt, stackPhys, CPU::USER_STACK_SIZE,
+        PageAttributes::eRWXU | PageAttributes::eWriteBack));
+
+    using VMM::Access;
+    auto stackRegion = new Region(stackPhys, stackVirt, CPU::USER_STACK_SIZE);
+    stackRegion->SetAccessMode(Access::eReadWriteExecute | Access::eUser);
+    m_Stacks.PushBack(stackRegion);
+    m_Parent->m_AddressSpace.Insert(stackVirt, stackRegion);
+
+    m_StackVirt              = stackVirt;
+    m_Parent->m_UserStackTop = guardVirt.Raw() - PMM::PAGE_SIZE;
+    return {stackPhys.ToHigherHalf<Pointer>().Offset(CPU::USER_STACK_SIZE),
+            stackVirt.Offset(CPU::USER_STACK_SIZE)};
+};

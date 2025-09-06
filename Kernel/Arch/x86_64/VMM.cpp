@@ -221,8 +221,12 @@ bool PageMap::InternalMap(Pointer virt, Pointer phys, PageAttributes flags)
             "{:#x}",
             virt.Raw(), pmlEntry->Address().Raw(), phys.Raw());
         Stacktrace::Print(8);
-        // for (;;) Arch::Halt();
+#define CTOS_HALT_ON_COLLISION 1
+#if CTOS_HALT_ON_COLLISION
+        for (;;) Arch::Halt();
+#endif
     }
+
     pmlEntry->Clear();
     pmlEntry->SetAddress(phys);
     pmlEntry->SetFlags(ToNativeFlags(flags), true);

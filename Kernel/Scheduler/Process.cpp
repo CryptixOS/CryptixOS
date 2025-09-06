@@ -19,6 +19,33 @@
 #include <VFS/FileDescriptor.hpp>
 #include <VFS/VFS.hpp>
 
+extern "C" char sigret_trampoline_start[];
+extern "C" char sigret_trampoline_end[];
+
+Pointer         g_SignalTrampoline = nullptr;
+usize g_SignalTrampolineSize = sigret_trampoline_end - sigret_trampoline_start;
+
+KeyValuePair<Pointer, usize> SignalTrampoline()
+{
+    static KeyValuePair signalTrampoline = []() -> KeyValuePair<Pointer, usize>
+    {
+        usize pageCount
+            = Math::DivRoundUp(g_SignalTrampolineSize, PMM::PAGE_SIZE);
+
+        LogTrace(
+            "Process: Allocating the global signal trampoline => size: {:#x}, "
+            "pageRoundedSize => {:#x}",
+            g_SignalTrampolineSize, pageCount * PMM::PAGE_SIZE);
+        g_SignalTrampoline = PMM::CallocatePages(pageCount);
+        Memory::Copy(g_SignalTrampoline.ToHigherHalf(), sigret_trampoline_start,
+                     g_SignalTrampolineSize);
+
+        return {g_SignalTrampoline, g_SignalTrampolineSize};
+    }();
+
+    return signalTrampoline;
+}
+
 inline usize AllocatePid()
 {
     static Spinlock lock;
@@ -58,6 +85,11 @@ Process::~Process()
     delete PageMap;
     for (auto& [virt, region] : m_AddressSpace)
     {
+        if (region->VirtualBase() == m_SignalTrampolineVirt)
+        {
+            LogDebug("~Process: Hit signal trampoline region, omitting...");
+            continue;
+        }
         auto  phys      = region->PhysicalBase();
         usize size      = region->Size();
         usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
@@ -118,7 +150,6 @@ Ref<Thread> Process::CreateThread(Pointer rip, bool isUser, i64 runOn)
     thread->m_IsUser = isUser;
 
     if (m_Threads.Empty()) m_MainThread = thread;
-
     m_Threads.PushBack(thread);
     return thread;
 }
@@ -129,7 +160,6 @@ Ref<Thread> Process::CreateThread(Vector<StringView>& argv,
     auto thread = CreateRef<Thread>(this, argv, envp, program, runOn);
 
     if (m_Threads.Empty()) m_MainThread = thread;
-
     m_Threads.PushBack(thread);
     return thread;
 }
@@ -195,6 +225,24 @@ mode_t Process::Umask(mode_t mask)
     m_Umask         = mask;
 
     return previous;
+}
+
+const struct SignalAction& Process::SignalAction(SignalID signal) const
+{
+    Assert(signal < SignalID::eLastRealTime);
+
+    const struct SignalAction* action;
+    m_SignalActions.With([&action, signal](auto& actions)
+                         { action = &actions[ToUnderlying(signal)]; });
+    return *action;
+}
+void Process::SetSignalAction(SignalID                   signal,
+                              const struct SignalAction& action)
+{
+    Assert(signal < SignalID::eLastRealTime);
+
+    m_SignalActions.With([&action, signal](auto& actions)
+                         { actions[ToUnderlying(signal)] = action; });
 }
 
 void Process::SendGroupSignal(pid_t pgid, i32 signal)
@@ -315,6 +363,8 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 
     for (const auto& [virt, region] : m_AddressSpace)
     {
+        if (region->VirtualBase() == m_SignalTrampolineVirt) continue;
+
         auto  phys      = region->PhysicalBase();
         usize pageCount = Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE);
         PMM::FreePages(phys, pageCount);
@@ -439,7 +489,6 @@ ErrorOr<Process*> Process::Fork()
     Process* newProcess = Scheduler::CreateProcess(this, m_Name, m_Credentials);
     Assert(newProcess);
 
-    LogTrace("Process: new process created!");
     // TODO(v1tr10l7): implement PageMap::Fork;
     class PageMap* pageMap = new class PageMap();
     if (!pageMap) return Error(ENOMEM);
@@ -450,17 +499,13 @@ ErrorOr<Process*> Process::Fork()
     m_Children.PushBack(newProcess);
 
     CopyMemory(newProcess);
-    LogDebug("Process: Copying the address space");
-
     newProcess->m_NextTid.Store(m_NextTid.Load());
-    LogDebug("Process: Copying fd table");
     CopyFileDescriptors(newProcess);
 
     auto thread                = currentThread->Fork(newProcess);
     thread->m_IsEnqueued       = false;
     newProcess->m_UserStackTop = m_UserStackTop;
 
-    LogDebug("Process: enqueuing thread");
     Scheduler::EnqueueThread(thread.Raw());
 
     LogDebug("Process: Spawned {}", newProcess->m_Pid);
@@ -469,7 +514,6 @@ ErrorOr<Process*> Process::Fork()
 
 i32 Process::Exit(i32 code)
 {
-    LogDebug("Process: Exiting {} with exit code => {}", m_Pid, code);
     AssertMsg(this != Scheduler::GetKernelProcess(),
               "Process::Exit(): The process with pid 1 tries to exit!");
     Assert(m_Pid != 1 && "Process: init process tries to exit");
@@ -530,6 +574,39 @@ i32 Process::Exit(i32 code)
     AssertNotReached();
 }
 
+ErrorOr<void> Process::WaitForFutex(i32* vaddr, i32 expected)
+{
+    {
+        CPU::UserMemoryProtectionGuard guard;
+        if (*vaddr != expected) return Error(EAGAIN);
+    }
+
+    auto it = m_FutexEvents.Find(reinterpret_cast<upointer>(vaddr));
+    if (it == m_FutexEvents.end())
+        m_FutexEvents[reinterpret_cast<upointer>(vaddr)] = new Event;
+    auto event = m_FutexEvents[reinterpret_cast<upointer>(vaddr)] = new Event;
+
+    bool interrupted = !event->Await(true);
+    if (interrupted) return Error(EINTR);
+
+    return {};
+}
+ErrorOr<void> Process::WakeFutex(i32* vaddr)
+{
+    {
+        CPU::UserMemoryProtectionGuard guard;
+        *(volatile int*)vaddr;
+    }
+
+    auto it = m_FutexEvents.Find(reinterpret_cast<upointer>(vaddr));
+    if (it == m_FutexEvents.end())
+        m_FutexEvents[reinterpret_cast<upointer>(vaddr)] = new Event;
+    auto event = m_FutexEvents[reinterpret_cast<upointer>(vaddr)] = new Event;
+
+    event->Trigger(false);
+    return {};
+}
+
 void Process::CopyFileDescriptors(Process* dest)
 {
     for (auto& [fdNum, fd] : m_FdTable) dest->m_FdTable.Insert(fd, fdNum);
@@ -538,6 +615,7 @@ void Process::CopyMemory(Process* process)
 {
     for (auto& [virt, region] : m_AddressSpace)
     {
+        if (region->VirtualBase() == m_SignalTrampolineVirt) continue;
         usize size      = region->Size();
         usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
         auto  phys      = PMM::CallocatePages(pageCount);
@@ -549,4 +627,36 @@ void Process::CopyMemory(Process* process)
         newRegion->SetAccessMode(region->Access());
         process->PageMap->MapRange(virt, phys, size, region->PageAttributes());
     }
+}
+
+void Process::SetupSignalTrampoline()
+{
+    if (m_Ring == PrivilegeLevel::ePrivileged) return;
+
+    auto [phys, trampolineSize]                   = SignalTrampoline();
+
+    static constexpr usize SIGNAL_TRAMPOLINE_VIRT = 0x4000'000'000'000;
+    auto foundRegion = m_AddressSpace.Find(SIGNAL_TRAMPOLINE_VIRT);
+    if (foundRegion
+        && foundRegion->PageAttributes()
+               & (PageAttributes::eRead | PageAttributes::eExecutable
+                  | PageAttributes::eUser))
+        return;
+    return;
+
+    auto trampolineRegion
+        = m_AddressSpace.AllocateFixed(SIGNAL_TRAMPOLINE_VIRT, trampolineSize);
+    trampolineRegion->SetPhysicalBase(phys);
+    using Access = VMM::Access;
+    trampolineRegion->SetAccessMode(Access::eRead | Access::eExecute
+                                    | Access::eUser);
+    auto virt = trampolineRegion->VirtualBase();
+
+    LogTrace(
+        "Process: Mapping the signal trampoline at {:#x} for the process[{}],"
+        " to the address => {:#x}",
+        phys, m_Pid, virt);
+    auto pageMap = m_Parent->PageMap;
+    pageMap->MapRegion(trampolineRegion);
+    m_SignalTrampolineVirt = virt;
 }

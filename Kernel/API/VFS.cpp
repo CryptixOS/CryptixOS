@@ -558,8 +558,6 @@ namespace API::VFS
             return Error(EFAULT);
 
         Ref<FileDescriptor> fd = TryOrRet(current->GetFileDescriptor(fdNum));
-        LogDebug("SysGetDents64: {{ Path: {} }}", fd->DirectoryEntry()->Path());
-
         CPU::UserMemoryProtectionGuard guard;
         return fd->GetDirEntries(outBuffer, count);
     }
@@ -916,21 +914,20 @@ namespace API::VFS
                              isize newDirFdNum, const char* newPath,
                              usize flags)
     {
-        auto oldPathRes
-            = TryOrRet(ResolveAtFd(oldDirFdNum, CPU::CopyStringFromUser(oldPath), 0));
+        auto oldPathRes = TryOrRet(
+            ResolveAtFd(oldDirFdNum, CPU::CopyStringFromUser(oldPath), 0));
 
-        auto newPathRes
-            = TryOrRet(ResolveAtFd(newDirFdNum, CPU::CopyStringFromUser(newPath), 0));
-        auto oldParent         = oldPathRes.Parent->INode();
+        auto newPathRes = TryOrRet(
+            ResolveAtFd(newDirFdNum, CPU::CopyStringFromUser(newPath), 0));
+        auto oldParent = oldPathRes.Parent->INode();
         if (!oldParent->IsDirectory()) return Error(ENOTDIR);
 
         if (!oldPathRes.Entry) return Error(ENOENT);
         if (newPathRes.Entry) return Error(EEXIST);
 
         auto newParent = newPathRes.Parent;
-        auto newName   = newPathRes.BaseName.Size() > 0
-                           ? newPathRes.BaseName
-                           : oldPathRes.BaseName;
+        auto newName   = newPathRes.BaseName.Size() > 0 ? newPathRes.BaseName
+                                                        : oldPathRes.BaseName;
         auto success   = oldParent->Rename(newParent->INode(), newName);
         if (!success) return Error(success.Error());
         return 0;

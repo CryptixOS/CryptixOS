@@ -14,11 +14,13 @@ srcs += files(
   'VMM.cpp',
   'idt.S',
   'memory.S',
+  'signal_trampoline.S',
   'syscall.S',
 )
 asm_sources = files(
   'idt.S',
   'memory.S',
+  'signal_trampoline.S',
   'syscall.S',
 )
 

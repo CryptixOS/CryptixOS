@@ -23,15 +23,17 @@ class ExecutableProgram
 
     Pointer     EntryPoint() const { return m_EntryPoint; }
     Pointer     LoadBase() const { return m_LoadBase; }
+    Pointer     SignalTrampoline() { return m_SignalTrampoline; }
 
   private:
     Ref<ELF::Image>          m_Image;
-    Ref<ELF::Image>          m_Interpreter     = nullptr;
-    Path                     m_ExecutablePath  = ""_pv;
+    Ref<ELF::Image>          m_Interpreter      = nullptr;
+    Path                     m_ExecutablePath   = ""_pv;
 
-    u64                      m_EntryPoint      = 0;
-    u64                      m_LoadBase        = 0;
-    u64                      m_InterpreterBase = 0;
+    u64                      m_EntryPoint       = 0;
+    u64                      m_LoadBase         = 0;
+    u64                      m_InterpreterBase  = 0;
+    Pointer                  m_SignalTrampoline = nullptr;
 
     ErrorOr<Ref<ELF::Image>> LoadImage(PathView path, PageMap* pageMap,
                                        AddressSpace& addressSpace,

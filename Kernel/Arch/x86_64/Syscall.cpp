@@ -17,8 +17,8 @@ namespace Syscall
     extern "C" void handleSyscall(CPUContext*);
     void            Initialize()
     {
-        //TODO(v1tr10l7): fix the 0x80 syscall gate
-        
+        // TODO(v1tr10l7): fix the 0x80 syscall gate
+
         // auto handler
         //     = InterruptManager::AllocateHandler(0x80, nullptr, "cryptix");
         // handler->SetHandler(handleSyscall);

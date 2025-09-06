@@ -9,8 +9,6 @@
 #include <Common.hpp>
 
 #include <API/Credentials.hpp>
-#include <API/Posix/signal.h>
-
 #include <Drivers/TTY.hpp>
 
 #include <Memory/AddressSpace.hpp>
@@ -18,6 +16,7 @@
 #include <Memory/VMM.hpp>
 
 #include <Library/ExecutableProgram.hpp>
+#include <Library/Locking/SpinlockProtected.hpp>
 #include <Prism/String/String.hpp>
 
 #include <Scheduler/Thread.hpp>
@@ -142,9 +141,11 @@ class Process
     mode_t                     Umask(mode_t mask);
 
     inline Timestep            Quantum() const { return m_Quantum; }
+    const struct SignalAction& SignalAction(SignalID signal) const;
+    void SetSignalAction(SignalID signal, const struct SignalAction& action);
 
-    static void                SendGroupSignal(ProcessID pgid, i32 signal);
-    void                       SendSignal(i32 signal);
+    static void    SendGroupSignal(ProcessID pgid, i32 signal);
+    void           SendSignal(i32 signal);
 
     ErrorOr<isize> OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
     ErrorOr<isize> DupFd(isize oldFdNum, isize newFdNum, isize flags);
@@ -164,6 +165,9 @@ class Process
     ErrorOr<Process*>  Fork();
     ErrorOr<i32>       Exec(String path, char** argv, char** envp);
     i32                Exit(i32 code);
+
+    ErrorOr<void>      WaitForFutex(i32* vaddr, i32 expected);
+    ErrorOr<void>      WakeFutex(i32* vaddr);
 
     friend struct Thread;
 
@@ -199,8 +203,17 @@ class Process
     Spinlock            m_Lock;
     Event               m_Event;
 
-    void                CopyFileDescriptors(Process* dest);
-    void                CopyMemory(Process* process);
+    SpinlockProtected<
+        Array<struct SignalAction, ToUnderlying(SignalID::eCount)>>
+                                   m_SignalActions;
+    Pointer                        m_SignalTrampolineVirt = nullptr;
+
+    UnorderedMap<upointer, Event*> m_FutexEvents{};
+
+    void                           CopyFileDescriptors(Process* dest);
+    void                           CopyMemory(Process* process);
+
+    void                           SetupSignalTrampoline();
 
     friend class Scheduler;
     friend struct Thread;

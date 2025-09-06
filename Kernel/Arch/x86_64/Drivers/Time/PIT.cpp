@@ -23,6 +23,8 @@ PIT::PIT()
     LogInfo("PIT: Frequency set to {}Hz", FREQUENCY);
 
     m_Dispatcher = InterruptManager::AllocateHandler(IRQ_LINE, this, "cryptix");
+
+    // TODO(v1tr10l7): IDT::SetIST(m_Dispatcher->IrqLine() + 0x20, 1);
     m_Dispatcher->SetHandler(Tick);
 
     LogInfo("PIT: Installed on interrupt handler at irq line #{:#x}",
