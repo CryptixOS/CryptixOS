@@ -81,7 +81,7 @@ To run CryptixOS in QEMU:
 - ✅ Basic userland shell
 - ✅ Lazy Loading the pages 
 - ✅ Module support
-- ⏳ Signals, AHCI, and full networking coming soon
+- ✅ Signals
 - ⏳ Networking
 
 ---
@@ -227,7 +227,7 @@ To run CryptixOS in QEMU:
 
 ## 🧠 Syscall & Core
 
-- ⬜ Signals
+- ✅ Signals
 - ⬜ Thread API
 - ✅ VFS
 - ✅ Session Management
