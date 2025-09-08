@@ -15,6 +15,12 @@
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 
+struct CTOS_PACKED SignalFrame
+{
+    CPUContext Registers;
+    upointer   SignalTrampoline;
+};
+
 extern KeyValuePair<Pointer, usize> SignalTrampoline();
 Thread::Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn)
     : m_State(ThreadState::eDequeued)
@@ -24,7 +30,7 @@ Thread::Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn)
     , m_IsEnqueued(false)
 
 {
-    m_Tid = parent->m_NextTid++;
+    m_ID = parent->m_NextTid++;
     CPU::PrepareThread(this, pc, arg);
     m_Tls.Self      = this;
     m_Tls.RunningOn = runOn;
@@ -63,7 +69,7 @@ Thread::Thread(Process* parent, Vector<StringView>& argv,
 {
     m_Tls.RunningOn = CPU::Current()->ID;
     m_Tls.Self      = this;
-    m_Tid           = parent->m_NextTid++;
+    m_ID            = parent->m_NextTid++;
 
     if (!parent->PageMap) parent->PageMap = VMM::GetKernelPageMap();
 
@@ -72,7 +78,7 @@ Thread::Thread(Process* parent, Vector<StringView>& argv,
         = program.PrepareStack(stackTopWritable, stackTopVirt, argv, envp);
     m_Parent->m_SignalTrampolineVirt = program.SignalTrampoline();
 
-    // if (m_Parent->m_Pid > 0 && m_Tid == m_Parent->m_Pid)
+    // if (m_Parent->m_Pid > 0 && m_ID == m_Parent->m_Pid)
     // {
     //     LogTrace("Thread: Setting up the signal for the main thread...");
     // }

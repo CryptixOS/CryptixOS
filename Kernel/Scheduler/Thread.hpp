@@ -83,7 +83,8 @@ struct Thread : public RefCounted
 
     void               SetFpuStorage(Pointer fpuStorage, usize pageCount);
 
-    inline tid_t       Tid() const { return m_Tid; }
+    inline ThreadID    ID() const { return m_ID; }
+    inline tid_t       Tid() const { return m_ID; }
     inline ThreadState State() const { return m_State; }
     inline void        SetState(ThreadState state)
     {
@@ -163,7 +164,7 @@ struct Thread : public RefCounted
     ///// ^^^^^^^^^^ /////
 
     Spinlock       m_Lock;
-    tid_t          m_Tid;
+    ThreadID       m_ID;
     ThreadState    m_State     = ThreadState::eIdle;
     errno_t        m_ErrorCode = no_error;
     Process*       m_Parent;
