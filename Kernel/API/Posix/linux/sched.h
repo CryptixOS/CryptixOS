@@ -9,67 +9,72 @@
 #include <Prism/Core/Types.hpp>
 
 /* signal mask to be sent at exit */
-constexpr usize CSIGNAL              = 0x000000ff;
+constexpr usize CSIGNAL              = 0x0000'00ff;
 /* set if VM shared between processes */
-constexpr usize CLONE_VM             = 0x00000100;
+constexpr usize CLONE_VM             = 0x0000'0100;
 /* set if fs info shared between processes */
-constexpr usize CLONE_FS             = 0x00000200;
+constexpr usize CLONE_FS             = 0x0000'0200;
 /* set if open files shared between processes   */
-constexpr usize CLONE_FILES          = 0x00000400;
+constexpr usize CLONE_FILES          = 0x0000'0400;
 
 /* set if signal handlers and blocked signals shared */
-constexpr usize CLONE_SIGHAND        = 0x00000800;
+constexpr usize CLONE_SIGHAND        = 0x0000'0800;
 /* set if a pidfd should be placed in parent */
-constexpr usize CLONE_PIDFD          = 0x00001000;
+constexpr usize CLONE_PIDFD          = 0x0000'1000;
 /* set if we want to let tracing continue on the child too */
-constexpr usize CLONE_PTRACE         = 0x00002000;
+constexpr usize CLONE_PTRACE         = 0x0000'2000;
 /* set if the parent wants the child to wake it up on mm_release */
-constexpr usize CLONE_VFORK          = 0x00004000;
+constexpr usize CLONE_VFORK          = 0x0000'4000;
 /* set if we want to have the same parent as the cloner */
-constexpr usize CLONE_PARENT         = 0x00008000;
+constexpr usize CLONE_PARENT         = 0x0000'8000;
 /* Same thread group? */
-constexpr usize CLONE_THREAD         = 0x00010000;
+constexpr usize CLONE_THREAD         = 0x0001'0000;
 /* New mount namespace group */
-constexpr usize CLONE_NEWNS          = 0x00020000;
+constexpr usize CLONE_NEWNS          = 0x0002'0000;
 /* share system V SEM_UNDO semantics */
-constexpr usize CLONE_SYSVSEM        = 0x00040000;
+constexpr usize CLONE_SYSVSEM        = 0x0004'0000;
 /* create a new TLS for the child */
-constexpr usize CLONE_SETTLS         = 0x00080000;
+constexpr usize CLONE_SETTLS         = 0x0008'0000;
 /* set the TID in the parent */
-constexpr usize CLONE_PARENT_SETTID  = 0x00100000;
+constexpr usize CLONE_PARENT_SETTID  = 0x0010'0000;
 /* clear the TID in the child */
-constexpr usize CLONE_CHILD_CLEARTID = 0x00200000;
+constexpr usize CLONE_CHILD_CLEARTID = 0x0020'0000;
 /* Unused, ignored */
-constexpr usize CLONE_DETACHED       = 0x00400000;
+constexpr usize CLONE_DETACHED       = 0x0040'0000;
 /* set if the tracing process can't force CLONE_PTRACE on this clone */
-constexpr usize CLONE_UNTRACED       = 0x00800000;
+constexpr usize CLONE_UNTRACED       = 0x0080'0000;
 /* set the TID in the child */
-constexpr usize CLONE_CHILD_SETTID   = 0x01000000;
+constexpr usize CLONE_CHILD_SETTID   = 0x0100'0000;
 /* New cgroup namespace */
-constexpr usize CLONE_NEWCGROUP      = 0x02000000;
+constexpr usize CLONE_NEWCGROUP      = 0x0200'0000;
 /* New utsname namespace */
-constexpr usize CLONE_NEWUTS         = 0x04000000;
+constexpr usize CLONE_NEWUTS         = 0x0400'0000;
 /* New ipc namespace */
-constexpr usize CLONE_NEWIPC         = 0x08000000;
+constexpr usize CLONE_NEWIPC         = 0x0800'0000;
 /* New user namespace */
-constexpr usize CLONE_NEWUSER        = 0x10000000;
+constexpr usize CLONE_NEWUSER        = 0x1000'0000;
 /* New pid namespace */
-constexpr usize CLONE_NEWPID         = 0x20000000;
+constexpr usize CLONE_NEWPID         = 0x2000'0000;
 /* New network namespace */
-constexpr usize CLONE_NEWNET         = 0x40000000;
+constexpr usize CLONE_NEWNET         = 0x4000'0000;
 /* Clone io context */
-constexpr usize CLONE_IO             = 0x80000000;
+constexpr usize CLONE_IO             = 0x8000'0000;
 
 /* Clear any signal handler and reset to SIG_DFL. */
-constexpr usize CLONE_CLEAR_SIGHAND  = 0x100000000ULL;
+constexpr usize CLONE_CLEAR_SIGHAND  = 0x1'0000'0000ull;
 /* Clone into a specific cgroup given the right permissions. */
-constexpr usize CLONE_INTO_CGROUP    = 0x200000000ULL;
+constexpr usize CLONE_INTO_CGROUP    = 0x2'0000'0000ull;
 /*
  * cloning flags intersect with CSIGNAL so can be used with unshare and clone3
  * syscalls only:
  */
 /* New time namespace */
-constexpr usize CLONE_NEWTIME        = 0x00000080;
+constexpr usize CLONE_NEWTIME        = 0x0000'0080;
+
+constexpr usize CLONE_LEGACY_FLAGS   = 0xffff'ffffull;
+// valid  clone flags mask
+constexpr usize CLONE_VALID_FLAGS_MASK
+    = CLONE_LEGACY_FLAGS | CLONE_CLEAR_SIGHAND | CLONE_INTO_CGROUP;
 
 /**
  * struct clone_args - arguments for the clone3 syscall
