@@ -362,7 +362,11 @@ void TTY::Initialize()
         if (!registered) delete tty;
     }
     if (!s_TTYs.Empty())
+    {
         VFS::CreateNode("/dev/tty"_sv, 0644 | S_IFCHR, s_TTYs.Front()->ID());
+        VFS::CreateNode("/dev/console"_sv, 0644 | S_IFCHR,
+                        s_TTYs.Front()->ID());
+    }
 
     LogInfo("TTY: Initialized");
 }

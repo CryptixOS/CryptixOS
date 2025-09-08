@@ -10,6 +10,14 @@
 #include <Memory/PMM.hpp>
 #include <Memory/VMM.hpp>
 
+static constexpr u8 MAXIMUM_NUMBER_OF_TDS
+    = 128; // Upper pool limit. This consumes the second page we have allocated
+CTOS_UNUSED static constexpr u8  MAXIMUM_NUMBER_OF_QHS          = 64;
+CTOS_UNUSED static constexpr u8  RETRY_COUNTER_RELOAD           = 3;
+
+CTOS_UNUSED static constexpr u8  UHCI_NUMBER_OF_ISOCHRONOUS_TDS = 128;
+CTOS_UNUSED static constexpr u16 UHCI_NUMBER_OF_FRAMES          = 1024;
+
 namespace USB::UHCI
 {
     ErrorOr<void> Controller::Initialize()
@@ -21,7 +29,7 @@ namespace USB::UHCI
             LogError("UHCI: Failed to enable the device");
             return Error(status.error());
         }
-    
+
         LogTrace("UHCI: Acquiring PCI Bar4...");
         m_Bar = GetBar(4);
 
@@ -100,6 +108,103 @@ namespace USB::UHCI
         // TODO(v1tr10l7): Create Root Hub
 
         EnableInterrupts();
+        m_QhPool = PMM::CallocatePages(2);
+        m_QhPool = m_QhPool.ToHigherHalf();
+
+        m_FreeQhPool.Resize(MAXIMUM_NUMBER_OF_TDS);
+        for (usize i = 0; i < m_FreeQhPool.Size(); i++)
+        {
+            auto placement = m_QhPool.Offset<void*>(i * sizeof(QueueHead));
+            auto phys      = m_QhPool.FromHigherHalf<Pointer>().Offset<u32>(
+                (i * sizeof(QueueHead)));
+            m_FreeQhPool[i] = new (placement) QueueHead(phys);
+        }
+
+        // Create the Full Speed, Low Speed Control and Bulk Queue Heads
+        m_InterruptTransferQueue = AllocateQueueHead();
+        m_LowSpeedControlQh      = AllocateQueueHead();
+        m_FullSpeedControlQh     = AllocateQueueHead();
+        m_BulkQh                 = AllocateQueueHead();
+        m_DummyQh                = AllocateQueueHead();
+
+        Pointer tdPool           = PMM::CallocatePages(2);
+        m_TdPool                 = tdPool.ToHigherHalf();
+
+        // Set up the Isochronous Transfer Descriptor list
+        m_IsoTdList.Resize(UHCI_NUMBER_OF_ISOCHRONOUS_TDS);
+        for (usize i = 0; i < m_IsoTdList.Size(); i++)
+        {
+            auto placement
+                = m_TdPool.Offset<void*>((i * sizeof(TransferDescriptor)));
+            auto phys = m_TdPool.FromHigherHalf<Pointer>().Offset<u32>(
+                (i * sizeof(TransferDescriptor)));
+
+            // Place a new Transfer Descriptor with a 1:1 in our region
+            // The pointer returned by `new()` lines up exactly with the value
+            // that we store in `paddr`, meaning our member functions directly
+            // access the raw descriptor (that we later send to the controller)
+            m_IsoTdList[i]          = new (placement) TransferDescriptor(phys);
+            auto transferDescriptor = m_IsoTdList[i];
+            transferDescriptor->SetInUse(
+                true); // Isochronous transfers are ALWAYS marked as in use
+            //     (in
+            // case we somehow get allocated one...)
+            transferDescriptor->SetIsochronous();
+            transferDescriptor->LinkQueueHead(m_InterruptTransferQueue->Phys());
+        }
+
+        m_FreeTdPool.Resize(MAXIMUM_NUMBER_OF_TDS);
+        for (usize i = 0; i < m_FreeTdPool.Size(); i++)
+        {
+            auto placement
+                = m_TdPool.Offset<Pointer>(PMM::PAGE_SIZE)
+                      .Offset<void*>((i * sizeof(TransferDescriptor)));
+            auto phys = m_TdPool.FromHigherHalf<Pointer>().Offset<u32>(
+                i * sizeof(TransferDescriptor));
+
+            // Place a new Transfer Descriptor with a 1:1 in our region
+            // The pointer returned by `new()` lines up exactly with the value
+            // that we store in `paddr`, meaning our member functions directly
+            // access the raw descriptor (that we later send to the controller)
+            m_FreeTdPool[i] = new (placement) TransferDescriptor(phys);
+        }
+
+        m_InterruptTransferQueue->LinkNextQueueHead(m_LowSpeedControlQh);
+        m_InterruptTransferQueue->TerminateElementLink();
+
+        m_LowSpeedControlQh->LinkNextQueueHead(m_FullSpeedControlQh);
+        m_LowSpeedControlQh->TerminateElementLink();
+
+        m_FullSpeedControlQh->LinkNextQueueHead(m_BulkQh);
+        m_FullSpeedControlQh->TerminateElementLink();
+
+        m_BulkQh->LinkNextQueueHead(m_DummyQh);
+        m_BulkQh->TerminateElementLink();
+
+        auto piix4_td_hack = AllocateTransferDescriptor();
+        piix4_td_hack->Terminate();
+        piix4_td_hack->SetMaxLen(0x7ff); // Null data packet
+        piix4_td_hack->SetDeviceAddress(0x7f);
+        piix4_td_hack->SetPacketID(PacketID::IN);
+        m_DummyQh->TerminateWithStrayDescriptor(piix4_td_hack);
+        m_DummyQh->TerminateElementLink();
+
+        u32* framelist = reinterpret_cast<u32*>(m_FrameList);
+        for (int frame = 0; frame < UHCI_NUMBER_OF_FRAMES; frame++)
+        {
+            // Each frame pointer points to iso_td % NUM_ISO_TDS
+            framelist[frame]
+                = m_IsoTdList.At(frame % UHCI_NUMBER_OF_ISOCHRONOUS_TDS)
+                      ->Phys();
+        }
+
+        Write(Register::eStartOfFrameModify, 64);
+
+        Write(Register::eFrameListBaseAddress, framelistPhys);
+        Write(Register::eFrameNumber, 0);
+
+        Write(Register::eInterruptEnable, false);
+
         return {};
     };
 
@@ -194,7 +299,34 @@ namespace USB::UHCI
         return Error(ENOSYS);
     }
 
-    i32  Controller::IoCtl(usize request, uintptr_t argp) { return -1; }
+    i32        Controller::IoCtl(usize request, uintptr_t argp) { return -1; }
+
+    QueueHead* Controller::AllocateQueueHead()
+    {
+        for (QueueHead* queueHead : m_FreeQhPool)
+        {
+            if (!queueHead->InUse())
+            {
+                queueHead->SetInUse(true);
+                return queueHead;
+            }
+        }
+
+        return nullptr; // Huh!? We're outta queue heads!
+    }
+    TransferDescriptor* Controller::AllocateTransferDescriptor() const
+    {
+        for (TransferDescriptor* transferDescriptor : m_FreeTdPool)
+        {
+            if (!transferDescriptor->InUse())
+            {
+                transferDescriptor->SetInUse(true);
+                return transferDescriptor;
+            }
+        }
+
+        return nullptr; // Huh?! We're outta TDs!!
+    }
 
     void Controller::HandleInterrupt()
     {

@@ -14,6 +14,7 @@
 #include <Drivers/PCI/Device.hpp>
 #include <Drivers/USB/HostController.hpp>
 #include <Drivers/USB/UHCI/Definitions.hpp>
+#include <Drivers/USB/UHCI/UHCiDescriptorPool.hpp>
 
 #include <Memory/IORegion.hpp>
 #include <Prism/Core/TypeTraits.hpp>
@@ -56,6 +57,33 @@ namespace USB::UHCI
         Pointer                m_FrameListPhys = 0;
         struct FrameListEntry* m_FrameList;
         IoRegion               m_IoRegisters;
+        // DescriptorPool<QueueHead>          m_QueueHeadPool;
+
+        CTOS_UNUSED Vector<QueueHead*> m_FreeQhPool;
+        CTOS_UNUSED Vector<TransferDescriptor*> m_FreeTdPool;
+        CTOS_UNUSED Vector<TransferDescriptor*> m_IsoTdList;
+
+        CTOS_UNUSED QueueHead* m_InterruptTransferQueue = nullptr;
+        CTOS_UNUSED QueueHead* m_LowSpeedControlQh      = nullptr;
+        CTOS_UNUSED QueueHead* m_FullSpeedControlQh     = nullptr;
+        CTOS_UNUSED QueueHead* m_BulkQh                 = nullptr;
+        CTOS_UNUSED QueueHead* m_DummyQh                = nullptr;
+
+        CTOS_UNUSED Pointer    m_QhPool                 = nullptr;
+        CTOS_UNUSED Pointer    m_TdPool                 = nullptr;
+
+        QueueHead*             AllocateQueueHead();
+        TransferDescriptor*    AllocateTransferDescriptor() const;
+
+        //
+        // QueueHead*                         m_ScheduleBeginAnchor;
+        // QueueHead*                         m_InterruptQhAnchor;
+        // QueueHead*                         m_LsControlQhAnchor;
+        // QueueHead*                         m_FsControlQhAnchor;
+        // QueueHead*                         m_BulkQhAnchor;
+        //
+        // DescriptorPool<TransferDescriptor> m_TransferPool;
+        // DescriptorPool<TransferDescriptor> m_IsochronousTransferPool;
 
         enum class Register : u16
         {
