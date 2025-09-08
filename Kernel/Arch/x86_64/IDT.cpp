@@ -104,9 +104,10 @@ struct CTOS_PACKED IDTEntry
     u32 Reserved;
 };
 
-CTOS_UNUSED alignas(0x10) static IDTEntry s_IdtEntries[256] = {};
+constexpr usize IDT_ENTRY_COUNT                                         = 256;
+CTOS_UNUSED alignas(0x10) static IDTEntry s_IdtEntries[IDT_ENTRY_COUNT] = {};
 extern "C" void* interrupt_handlers[];
-static void (*exceptionHandlers[32])(CPUContext*);
+static void (*s_InterruptHandlers[IDT_ENTRY_COUNT])(CPUContext*);
 
 static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
 {
@@ -202,8 +203,8 @@ CTOS_NORETURN static void unhandledInterrupt(CPUContext* context)
 }
 extern "C" void raiseInterrupt(CPUContext* ctx)
 {
-    if (ctx->interruptVector < 0x20)
-        return exceptionHandlers[ctx->interruptVector](ctx);
+    auto handler = s_InterruptHandlers[ctx->interruptVector];
+    if (handler) return handler(ctx);
     else if (InterruptManager::Handle(ctx) == IrqResult::eHandled)
     {
         InterruptManager::SendEOI(ctx->interruptVector);
@@ -227,11 +228,11 @@ namespace IDT
             idtWriteEntry(i, reinterpret_cast<uintptr_t>(interrupt_handlers[i]),
                           IDT_ENTRY_PRESENT | gateType);
 
-            if (i < 32) exceptionHandlers[i] = raiseException;
+            if (i < 32) s_InterruptHandlers[i] = raiseException;
         }
 
-        exceptionHandlers[Exception::BREAKPOINT] = breakpoint;
-        exceptionHandlers[Exception::PAGE_FAULT] = pageFault;
+        s_InterruptHandlers[Exception::BREAKPOINT] = breakpoint;
+        s_InterruptHandlers[Exception::PAGE_FAULT] = pageFault;
 
         SetDPL(Exception::BREAKPOINT, 3);
         LogInfo("IDT: Initialized!");
