@@ -11,6 +11,7 @@
 #include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/Memory/Endian.hpp>
 #include <Prism/String/String.hpp>
+#include <Prism/Utility/Optional.hpp>
 
 namespace DeviceTree
 {
@@ -63,6 +64,8 @@ namespace DeviceTree
         {
             m_Children[name] = node;
         }
+
+        void AddProperty(StringView name, u8* data, usize length);
         void InsertProperty(StringView name, Property* property);
 
         void Print(u32 depth = 0);
@@ -70,6 +73,8 @@ namespace DeviceTree
       private:
         Node*                               m_Parent = nullptr;
         String                              m_Name;
+        Optional<usize>                     m_ID = NullOpt;
+        Vector<String>                      m_CompatibleDrivers;
 
         UnorderedMap<StringView, Node*>     m_Children;
         UnorderedMap<StringView, Property*> m_Properties;

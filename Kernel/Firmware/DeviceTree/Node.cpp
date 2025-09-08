@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Debug/Assertions.hpp>
 #include <Firmware/DeviceTree/Node.hpp>
 
 namespace DeviceTree
@@ -39,6 +40,25 @@ namespace DeviceTree
         Logger::Print("\n");
     }
 
+    void Node::AddProperty(StringView name, u8* data, usize length)
+    {
+        Property* property = new Property(this, name, data, length);
+        InsertProperty(name, property);
+
+        if (name == "phandle"_sv)
+        {
+            Assert(length == 4);
+            m_ID = *reinterpret_cast<u32*>(data);
+            LogDebug("ID => {:#x}", m_ID.Value());
+        }
+        else if (name == "compatible"_sv)
+        {
+            m_CompatibleDrivers = name.Split(',');
+            LogDebug("Compatible drivers =>");
+            for (const auto& name : m_CompatibleDrivers)
+                LogMessage("\t{}\n", name);
+        }
+    }
     void Node::InsertProperty(StringView name, Property* property)
     {
         m_Properties[name] = property;

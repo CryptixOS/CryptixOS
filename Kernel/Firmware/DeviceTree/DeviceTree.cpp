@@ -68,12 +68,8 @@ namespace DeviceTree
                     offset = Math::AlignUp(offset, 4);
 
                     if (current)
-                    {
-                        Property* property
-                            = new Property(current, propertyName, propertyData,
-                                           propertyDataSize);
-                        current->InsertProperty(propertyName, property);
-                    }
+                        current->AddProperty(propertyName, propertyData,
+                                             propertyDataSize);
                     break;
                 }
                 case FDT_TokenType::eNop:
@@ -114,7 +110,7 @@ namespace DeviceTree
         auto success = ParseFDT(header);
         if (!success) return false;
 
-#if CTOS_DUMP_DEVICE_TREE
+#if 1
         s_RootNode->Print();
 #endif
 
