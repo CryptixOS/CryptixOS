@@ -9,7 +9,7 @@
 #include <Compiler.hpp>
 #include <Prism/Core/Types.hpp>
 
-struct CTOS_PACKED /ExecutionContext
+struct CTOS_PACKED ExecutionContext
 {
     u64 X0;
     u64 X1;
@@ -48,10 +48,10 @@ struct CTOS_PACKED /ExecutionContext
 };
 
 template <>
-struct fmt::formatter</ExecutionContext> : fmt::formatter<std::string>
+struct fmt::formatter</ ExecutionContext> : fmt::formatter<std::string>
 {
     template <typename FormatContext>
-    auto format(const /ExecutionContext& frame, FormatContext& ctx) const
+    auto format(const / ExecutionContext & frame, FormatContext& ctx) const
     {
         return fmt::formatter<std::string>::format(
             fmt::format(
