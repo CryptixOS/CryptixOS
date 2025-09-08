@@ -1,0 +1,50 @@
+# Arch Linux base image
+FROM archlinux:latest
+
+# Set environment variables for non-interactive installs
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install required dependencies and Python pipx
+RUN pacman -Syu --noconfirm \
+    meson \
+    ninja \
+    clang \
+    lld \
+    llvm \
+    git \
+    cmake \
+    python \
+    base-devel \
+    qemu \
+    parted \
+    udev \
+    bison \
+    flex \
+    gmp \
+    mpc \
+    mpfr \
+    texinfo \
+    isl \
+    gperf \
+    gettext \
+    autopoint \
+    readline \
+    groff \
+    zsh \
+    xorriso \
+    bochs \
+    qpdf \
+    fasm \
+    && pacman -Scc --noconfirm  # Clean up cache to reduce image size
+
+# Install pipx via pip
+RUN python -m pip install --upgrade pip \
+    && pip install pipx
+
+# Set up work directory and copy necessary files
+WORKDIR /workspace
+COPY . /workspace
+
+# Default command (you can override it during container run)
+CMD ["/bin/bash"]
+
