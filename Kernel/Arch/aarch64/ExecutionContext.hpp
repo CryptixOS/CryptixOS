@@ -48,10 +48,10 @@ struct CTOS_PACKED ExecutionContext
 };
 
 template <>
-struct fmt::formatter</ ExecutionContext> : fmt::formatter<std::string>
+struct fmt::formatter<ExecutionContext> : fmt::formatter<std::string>
 {
     template <typename FormatContext>
-    auto format(const / ExecutionContext & frame, FormatContext& ctx) const
+    auto format(const ExecutionContext& frame, FormatContext& ctx) const
     {
         return fmt::formatter<std::string>::format(
             fmt::format(
