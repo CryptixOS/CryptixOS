@@ -74,6 +74,17 @@ namespace CPU
 
         return value;
     }
+    template <typename T>
+        requires(!SameAs<T, void>)
+    inline decltype(auto) CopyFromUser(const T& value, usize size)
+    {
+        T                         copied = {};
+        UserMemoryProtectionGuard guard;
+        Memory::Copy(&copied, &value, size);
+
+        return copied;
+    }
+
     inline Path CopyStringFromUser(const char* string)
     {
         return AsUser([string]() -> Path { return string; });
