@@ -44,12 +44,12 @@ namespace Virtio
 
             ConfigurationType configType   = static_cast<ConfigurationType>(
                 ReadAt(capabilityPointer + 0x03, 1));
-            if (configType == ConfigurationType::ePCICapabiltiesAccess)
+            if (configType == ConfigurationType::ePCICapabilitiesAccess)
                 continue;
             else if (ToUnderlying(configType)
                          < ToUnderlying(ConfigurationType::eCommon)
                      || ToUnderlying(configType) > ToUnderlying(
-                            ConfigurationType::ePCICapabiltiesAccess))
+                            ConfigurationType::ePCICapabilitiesAccess))
             {
                 LogError("Virtio: Unknown capability configuration type => {}",
                          configType);

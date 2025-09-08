@@ -6,7 +6,8 @@
  */
 #pragma once
 
-#include <Common.hpp>
+#include <Compiler.hpp>
+#include <Prism/Core/Core.hpp>
 
 namespace PCI
 {
@@ -91,7 +92,7 @@ namespace PCI
         eCardBusBridge = 0x02,
     };
 
-    struct [[gnu::packed]] DeviceHeader
+    struct CTOS_PACKED DeviceHeader
     {
         u16             DeviceID;
         enum VendorID   VendorID;

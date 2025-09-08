@@ -17,7 +17,7 @@ namespace Virtio
         eNotify               = 2,
         eISR                  = 3,
         eDevice               = 4,
-        ePCICapabiltiesAccess = 5,
+        ePCICapabilitiesAccess = 5,
     };
     struct [[gnu::packed]] Configuration
     {
