@@ -125,12 +125,6 @@ bool Thread::DispatchAnyPendingSignal()
     return DispatchSignal(signal);
 }
 
-struct SignalFrame
-{
-    u64        ReturnAddress;
-    CPUContext Saved;
-};
-
 extern Pointer g_SignalTrampoline;
 bool           Thread::DispatchSignal(u8 signal)
 {
