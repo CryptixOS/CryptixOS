@@ -26,7 +26,7 @@ c = meson.get_compiler('c')
 cxx = meson.get_compiler('cpp')
 ld = cxx.get_linker_id()
 arch = host_machine.cpu_family()
-qemulog = meson.project_source_root() / 'qemu.log'
+qemulog = 'qemu.log'
 
 srcs = []
 initrd_dir = meson.project_source_root() / 'build-sysroot/system-root'
@@ -63,6 +63,7 @@ macros = [
     '-DMAGIC_ENUM_RANGE_MAX=0x8a00',
     '-DPRISM_BUILD_DEBUG=1',
     '-DPRISM_LOG_ENABLE=1',
+    '-DPRISM_TARGET_CRYPTIX_KERNEL=1',
     '-DPRISM_TARGET_CRYPTIX=1',
     '-DUACPI_FORMATTED_LOGGING',
     '-DFMT_BUILTIN_TYPES=0',
@@ -166,9 +167,9 @@ qemu_args = [
   '-d', 'int,guest_errors',
 
   # don't reboot nor shutdown on triple fault
-  '-no-shutdown', '-no-reboot',
+  #'-no-shutdown', '-no-reboot',
   # output qemu logs to > qemu.log
-  '-D', meson.project_source_root() / 'qemu.log',
+  '-D', 'qemu.log',
   # enable boot menu
   '-boot', 'order=d,menu=on,splash-time=100',
 
@@ -204,7 +205,6 @@ qemu_args = [
   # virtio drive
   # '-device', 'virtio-blk-pci,drive=drive2,id=virtio0,bus=pcie2,addr=0x6',
 
-
   #'-device', 'virtio-serial-pci,max_ports=2',
   #'-device', 'virtconsole,chardev=vcon,name=vcon0',
   #'-chardev', 'socket,id=vcon,ipv4=on,host=localhost,port=443,server,telnet=on,wait=off',
@@ -212,8 +212,11 @@ qemu_args = [
   #'-device', 'virtio-keyboard',
   #'-device', 'virtio-tablet',
   '-vga', 'std',
+
+  # '-object', 'filter-dump,id=hue,netdev=breh,file=e100.pcap', 
+  # '-netdev', 'tap,ifname=tap0,id=br0', '-device', 'e1000,netdev=br0',
   #'-device', 'virtio-serial,max_ports=2',
-  #'-netdev', 'tap,id=mynet0,ifname=tap0,script=no,downscript=no',
+  # '-netdev', 'tap,id=mynet0,ifname=tap0,script=no,downscript=no',
   #'-device', 'rtl8139,netdev=mynet0',
   #'-nic', 'bridge,model=rtl8139',
   #'-netdev', 'user,id=net0', '-device', 'rtl8139,netdev=net0',
@@ -228,13 +231,16 @@ if arch == 'x86_64'
     # output port 0xe9 to the stdio
     '-debugcon', 'stdio',
     # output serial to > debug.log
-    '-serial', 'file:' + meson.project_source_root() / 'debug.log',
+    '-serial', 'file:debug.log',
     # enable kvm acceleration
     '-enable-kvm',
     # enable pcspeaker
     '-machine', 'pcspk-audiodev=audio',
     # use host cpu
     '-cpu', 'host',
+
+    # loopback i2c device
+    '-device', 'i2c-echo',
   ]
   ovmf_id = 'X64'
   xorriso_args = [
@@ -250,12 +256,18 @@ if arch == 'x86_64'
 
 elif arch == 'aarch64'
   qemu_args += [
+    # use virt board
     '-M', 'virt', 
     '-cpu', 'cortex-a72',
+    # define framebuffer device
     '-device', 'ramfb',
+    # define usb xhci controller
     '-device', 'qemu-xhci',
+    # define usb keyboard
     '-device', 'usb-kbd',
+    # define usb mouse
     '-device', 'usb-mouse',
+    # output serial to stdio
     '-serial', 'stdio',
   ]
   ovmf_id = 'AA64'
