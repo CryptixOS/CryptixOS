@@ -302,7 +302,7 @@ tools:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
         - '--prefix=@PREFIX@'
-        - 'CFLAGS=-Wno-implicit-function-declaration'
+        - 'CFLAGS=-Wno-implicit-function-declaration -Wno-attributes -Wno-int-conversion -Wno-error'
     compile:
       - args: 'make'
     install:
