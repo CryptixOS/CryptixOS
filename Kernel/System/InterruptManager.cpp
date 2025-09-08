@@ -22,20 +22,20 @@ namespace InterruptManager
         Bitmap                                        s_AllocatedIrqs;
     } // namespace
 
-    IrqResult Handle(CPUContext* ctx)
+    IrqResult Handle(ExecutionContext* ctx)
     {
         IrqResult result = IrqResult::eNone;
         // s_IrqMap.With(
         //     [ctx, &result](auto& list)
         //     {
-        //         auto it = list.Find(ctx->interruptVector);
+        //         auto it = list.Find(ctx->InterruptVector);
         //         if (it == list.end()) return;
         //
         //         result = it->Value->Handle(ctx);
         //     });
 
 #if CTOS_TARGET_X86_64
-        auto it = s_IrqMap.Find(ctx->interruptVector);
+        auto it = s_IrqMap.Find(ctx->InterruptVector);
         if (it == s_IrqMap.end()) return result;
 
         result = it->Value->Handle(ctx);

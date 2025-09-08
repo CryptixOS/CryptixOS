@@ -17,8 +17,8 @@
 
 struct CTOS_PACKED SignalFrame
 {
-    CPUContext Registers;
-    upointer   SignalTrampoline;
+    upointer         SignalTrampoline;
+    ExecutionContext Context;
 };
 
 extern KeyValuePair<Pointer, usize> SignalTrampoline();
@@ -78,7 +78,7 @@ Thread::Thread(Process* parent, Vector<StringView>& argv,
         = program.PrepareStack(stackTopWritable, stackTopVirt, argv, envp);
     m_Parent->m_SignalTrampolineVirt = program.SignalTrampoline();
 
-    // if (m_Parent->m_Pid > 0 && m_ID == m_Parent->m_Pid)
+    // if (m_Parent->ID() > 0 && ID() == m_Parent->ID())
     // {
     //     LogTrace("Thread: Setting up the signal for the main thread...");
     // }
@@ -110,8 +110,8 @@ bool Thread::DispatchAnyPendingSignal()
     // FIXME(v1tr10l7): aarch64 implementation
     if (m_ExecutingSyscall) return false;
 #if CTOS_TARGET_X86_64
-    if (Context.cs == GDT::KERNEL_CODE_SELECTOR
-        || Context.ds == GDT::KERNEL_DATA_SELECTOR)
+    if (Context.CS == GDT::KERNEL_CODE_SELECTOR
+        || Context.DS == GDT::KERNEL_DATA_SELECTOR)
         return false;
 #endif
 
@@ -134,12 +134,12 @@ bool           Thread::DispatchSignal(u8 signal)
 
     LogDebug("Thread: Context => \n{}", Context);
 #if CTOS_TARGET_X86_64
-    Assert(Context.ss == (GDT::USERLAND_DATA_SELECTOR | 0x03));
+    Assert(Context.SS == (GDT::USERLAND_DATA_SELECTOR | 0x03));
 
     auto& action = m_Parent->SignalAction(SignalID::eHangup);
     if (action.VirtualAddress)
     {
-        auto    rsp          = Context.rsp;
+        auto    rsp          = Context.RSP;
         Pointer phys         = nullptr;
         Pointer stackTopVirt = nullptr;
 
@@ -176,9 +176,9 @@ bool           Thread::DispatchSignal(u8 signal)
             rsp -= (builder.Top() - builder.Current()).Raw();
         }
 
-        Context.rsp = rsp;
-        Context.rip = action.VirtualAddress;
-        Context.rdi = signal;
+        Context.RSP = rsp;
+        Context.RIP = action.VirtualAddress;
+        Context.RDI = signal;
         return true;
     }
 
@@ -197,7 +197,7 @@ bool           Thread::DispatchSignal(u8 signal)
         case SIGPROF:
         case SIGTERM:
             // TODO(v1tr10l7): Terminate
-            if (m_Parent->m_Pid != m_Parent->m_Credentials.ProcessGroupID)
+            if (m_Parent->ID() != m_Parent->m_Credentials.ProcessGroupID)
                 m_Parent->Exit(0);
             break;
         case SIGCHLD:
@@ -235,14 +235,15 @@ bool           Thread::DispatchSignal(u8 signal)
 ErrorOr<void> Thread::SignalReturn()
 {
 #if CTOS_TARGET_X86_64
-    Pointer rsp = Context.rsp;
+    Pointer rsp = Context.RSP;
     {
         CPU::UserMemoryProtectionGuard guard;
 
         usize fpuStorageSize = m_Tls.FpuStoragePageCount * PMM::PAGE_SIZE;
         Memory::Copy(m_Tls.FpuStorage, rsp.Offset(16 + 128), fpuStorageSize);
 
-        CPUContext* saved = rsp.Offset<CPUContext*>(16 + 128 + fpuStorageSize);
+        ExecutionContext* saved
+            = rsp.Offset<ExecutionContext*>(16 + 128 + fpuStorageSize);
         LogWarn("SigReturn: Saved stack frame dump =>\n{}", *saved);
         Context = *saved;
         return {};
@@ -257,7 +258,7 @@ ErrorOr<void> Thread::SignalReturn()
 {
 #if CTOS_TARGET_X86_64
     auto newThread
-        = process->CreateThread(Context.rip, m_IsUser, CPU::GetCurrent()->ID);
+        = process->CreateThread(Context.RIP, m_IsUser, CPU::GetCurrent()->ID);
     newThread->m_Tls.Self  = newThread.Raw();
     newThread->m_Tls.Stack = m_Tls.Stack;
 
@@ -292,8 +293,8 @@ ErrorOr<void> Thread::SignalReturn()
 
     newThread->m_Parent    = process;
     newThread->Context     = SavedContext;
-    newThread->Context.rax = 0;
-    newThread->Context.rdx = 0;
+    newThread->Context.RAX = 0;
+    newThread->Context.RDX = 0;
 
     newThread->m_IsUser    = m_IsUser;
     newThread->m_GsBase    = m_GsBase;

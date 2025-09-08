@@ -259,7 +259,7 @@ namespace PCI
         Ref<InterruptDispatcher> handler
             = InterruptManager::AllocateHandler(0x50, nullptr, "cryptix");
         handler->SetHandler(
-            [this](::Device*, CPUContext*) -> IrqResult
+            [this](::Device*, ExecutionContext*) -> IrqResult
             {
                 if (m_OnIrq) m_OnIrq.Invoke();
                 return IrqResult::eHandled;

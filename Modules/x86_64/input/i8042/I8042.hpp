@@ -37,7 +37,7 @@ enum class Ps2DeviceType
     eNcdSunKeyboard
 };
 
-struct CPUContext;
+struct ExecutionContext;
 class I8042 : public ACPI::Device, public SerioController
 {
   public:
@@ -184,7 +184,7 @@ class I8042 : public ACPI::Device, public SerioController
     bool                       m_Port2Available = false;
 
     static bool                QuerySupport();
-    static IrqResult HandleInterrupt(::Device* device, CPUContext* context);
+    static IrqResult HandleInterrupt(::Device* device, ExecutionContext* context);
 
     ErrorOr<void>    DisableDevices();
 

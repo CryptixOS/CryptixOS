@@ -82,5 +82,5 @@ class Lapic : public HardwareTimer, public Singleton<Lapic>
     void CalibrateTimer();
     void SetNmi(u8 vector, u8 currentCPUID, u8 cpuID, u16 flags, u8 lint);
 
-    static IrqResult Tick(Device* device, CPUContext* context);
+    static IrqResult Tick(Device* device, ExecutionContext* context);
 };

@@ -14,9 +14,10 @@ CTOS_MODULE_DESCRIPTION("serio controller driver interface");
 CTOS_MODULE_LICENSE("GPL-3");
 CTOS_MODULE_VERSION("0.2");
 
-static Ref<SerioController> s_Serio = nullptr;
+static Ref<SerioController>      s_Serio = nullptr;
+CTOS_EXPORT CTOS_FORCE_EMIT void printStuff() { LogTrace("Stuff"); }
 
-CTOS_EXPORT CTOS_FORCE_EMIT ErrorOr<void>
+CTOS_EXPORT CTOS_FORCE_EMIT      ErrorOr<void>
 SerioController::Register(::Ref<SerioController> ctrl)
 {
     if (s_Serio) return Error(EEXIST);

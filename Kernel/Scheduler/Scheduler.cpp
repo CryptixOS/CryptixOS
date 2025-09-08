@@ -269,7 +269,7 @@ Process* Scheduler::CreateProcess(Process* parent, StringView name,
     auto       proc = new Process(parent, name, creds);
 
     ScopedLock guard(s_ProcessListLock);
-    s_Processes[proc->Pid()] = proc;
+    s_Processes[proc->ID()] = proc;
 #if 1
     s_ProcFs->AddProcess(proc);
 #endif
@@ -375,7 +375,7 @@ Thread* Scheduler::PickReadyThread()
 
     return newThread;
 }
-void Scheduler::SwitchContext(Thread* newThread, CPUContext* oldContext)
+void Scheduler::SwitchContext(Thread* newThread, ExecutionContext* oldContext)
 {
     auto currentThread = CPU::GetCurrentThread();
     if (currentThread) currentThread->YieldAwaitLock.Release();
@@ -399,7 +399,7 @@ void Scheduler::SwitchContext(Thread* newThread, CPUContext* oldContext)
         delete currentThread->Parent();
 }
 
-void Scheduler::Tick(CPUContext* ctx)
+void Scheduler::Tick(ExecutionContext* ctx)
 {
     Thread* newThread = nullptr;
     if (!IsPreemptionEnabled()) goto reschedule;

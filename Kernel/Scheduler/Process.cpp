@@ -58,11 +58,11 @@ inline usize AllocatePid()
 Process::Process(Process* parent, StringView name,
                  const struct Credentials& creds)
     : m_Parent(parent)
-    , m_Pid(AllocatePid())
+    , m_ID(AllocatePid())
     , m_Name(name)
     , m_Credentials(creds)
     , m_Ring(PrivilegeLevel::eUnprivileged)
-    , m_NextTid(m_Pid)
+    , m_NextTid(m_ID)
     , m_CWD(VFS::RootDirectoryEntry())
 
 {
@@ -116,7 +116,7 @@ Process* Process::CreateKernelProcess()
     if (kernelProcess) goto ret;
 
     kernelProcess                = new Process;
-    kernelProcess->m_Pid         = 0;
+    kernelProcess->m_ID          = 0;
     kernelProcess->m_Name        = "TheOverlord"_s;
     kernelProcess->PageMap       = VMM::GetKernelPageMap();
     kernelProcess->m_Credentials = s_RootCredentials;
@@ -135,7 +135,7 @@ Process* Process::CreateIdleProcess()
 
     Process*             idle = new Process;
 
-    idle->m_Pid               = idlePids--;
+    idle->m_ID                = idlePids--;
     idle->m_Name              = "Idle Process for CPU: "_s;
     idle->m_Name += StringUtils::ToString(CPU::GetCurrentID());
 
@@ -184,8 +184,8 @@ bool Process::ValidateAddress(Pointer address, i32 accessMode, usize size)
 
 pid_t Process::SetSid()
 {
-    m_Credentials.SessionID = m_Credentials.ProcessGroupID = m_Pid;
-    return m_Pid;
+    m_Credentials.SessionID = m_Credentials.ProcessGroupID = m_ID;
+    return m_ID;
 }
 
 ErrorOr<isize> Process::SetReUID(UserID ruid, UserID euid)
@@ -452,7 +452,7 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
             auto it = FindIf(m_Children.begin(), m_Children.end(),
                              [pid](Process* proc) -> bool
                              {
-                                 if (proc->Pid() == pid) return true;
+                                 if (proc->ID() == pid) return true;
                                  return false;
                              });
 
@@ -476,13 +476,13 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
                 [wstatus, &which]()
                 { *wstatus = W_EXITCODE(which->Status().ValueOr(0), 0); });
 
-        return which->Pid();
+        return which->ID();
     }
 }
 
-ErrorOr<Process*> Process::Fork()
+ErrorOr<Process*> Process::Clone(usize flags)
 {
-    LogDebug("Process: Forking {}...", m_Pid);
+    LogDebug("Process: Forking {}...", m_ID);
     Thread* currentThread = CPU::GetCurrentThread();
     Assert(currentThread && currentThread->m_Parent == this);
 
@@ -508,7 +508,7 @@ ErrorOr<Process*> Process::Fork()
 
     Scheduler::EnqueueThread(thread.Raw());
 
-    LogDebug("Process: Spawned {}", newProcess->m_Pid);
+    LogDebug("Process: Spawned {}", newProcess->m_ID);
     return newProcess;
 }
 
@@ -516,7 +516,7 @@ i32 Process::Exit(i32 code)
 {
     AssertMsg(this != Scheduler::GetKernelProcess(),
               "Process::Exit(): The process with pid 1 tries to exit!");
-    Assert(m_Pid != 1 && "Process: init process tries to exit");
+    Assert(m_ID != 1 && "Process: init process tries to exit");
     CPU::SetInterruptFlag(false);
     ScopedLock guard(m_Lock);
 
@@ -527,7 +527,7 @@ i32 Process::Exit(i32 code)
     currentThread->m_Parent = Scheduler::GetKernelProcess();
 
     Process* subreaper      = Scheduler::GetProcess(1);
-    if (m_Pid > 1)
+    if (m_ID > 1)
     {
         for (auto& child : m_Children)
         {
@@ -564,12 +564,12 @@ i32 Process::Exit(i32 code)
     currentThread->SetState(ThreadState::eExited);
     m_State = ProcessState::eDead;
 
-    Scheduler::RemoveProcess(m_Pid);
+    Scheduler::RemoveProcess(m_ID);
     VMM::LoadPageMap(*VMM::GetKernelPageMap(), false);
 
     Event::Trigger(&m_Event, false);
 
-    LogDebug("Process: {} exited with exit code: {}", m_Pid, code);
+    LogDebug("Process: {} exited with exit code: {}", m_ID, code);
     Scheduler::Yield();
     AssertNotReached();
 }
@@ -655,7 +655,7 @@ void Process::SetupSignalTrampoline()
     LogTrace(
         "Process: Mapping the signal trampoline at {:#x} for the process[{}],"
         " to the address => {:#x}",
-        phys, m_Pid, virt);
+        phys, m_ID, virt);
     auto pageMap = m_Parent->PageMap;
     pageMap->MapRegion(trampolineRegion);
     m_SignalTrampolineVirt = virt;

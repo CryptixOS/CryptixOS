@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Posix/linux/sched.h>
 #include <API/Posix/sys/mman.h>
 #include <API/Posix/sys/wait.h>
 #include <API/Process.hpp>
@@ -137,10 +138,10 @@ namespace API::Process
         return 0;
     }
 
-    ErrorOr<pid_t> Pid()
+    ErrorOr<ProcessID> Pid()
     {
         auto process = ::Process::Current();
-        return process->Pid();
+        return process->ID();
     }
 
     ErrorOr<ProcessID> Clone(usize flags, usize newSp, i32* parentTid,
@@ -148,16 +149,18 @@ namespace API::Process
     {
         return Error(ENOSYS);
     }
-    ErrorOr<pid_t> Fork()
+    ErrorOr<ProcessID> Fork()
     {
         class Process* process = ::Process::Current();
         Assert(process);
 
+        usize flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND
+                    | CLONE_SYSVSEM | CLONE_SETTLS | CLONE_PARENT_SETTID;
         CPU::SetInterruptFlag(false);
-        auto newProcess = TryOrRet(process->Fork());
+        auto newProcess = TryOrRet(process->Clone(flags));
         Assert(newProcess);
 
-        return newProcess->Pid();
+        return newProcess->ID();
     }
     ErrorOr<isize> Execve(char* pathname, char** argv, char** envp)
     {
@@ -272,14 +275,14 @@ namespace API::Process
             return 0;
         }
 
-        process->SetPGid(process->Pid());
+        process->SetPGid(process->ID());
         return 0;
     }
 
     ErrorOr<pid_t> GetPPid()
     {
         auto process = ::Process::Current();
-        return process->ParentPid();
+        return process->ParentID();
     }
     ErrorOr<pid_t> GetPGrp(pid_t pid) { return GetPGid(pid); }
     ErrorOr<pid_t> SetSid()

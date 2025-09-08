@@ -32,14 +32,14 @@ namespace CPU
 {
     namespace
     {
-        inline void XSave(uintptr_t ctx)
+        inline void XSave(upointer ctx)
         {
             __asm__ volatile("xsave (%0)"
                              :
                              : "r"(ctx), "a"(0xffffffff), "d"(0xffffffff)
                              : "memory");
         }
-        inline void XRestore(uintptr_t ctx)
+        inline void XRestore(upointer ctx)
         {
             __asm__ volatile("xrstor (%0)"
                              :
@@ -47,11 +47,11 @@ namespace CPU
                              : "memory");
         }
 
-        inline void FXSave(uintptr_t ctx)
+        inline void FXSave(upointer ctx)
         {
             __asm__ volatile("fxsave (%0)" : : "r"(ctx) : "memory");
         }
-        inline void FXRestore(uintptr_t ctx)
+        inline void FXRestore(upointer ctx)
         {
             __asm__ volatile("fxrstor (%0)" : : "r"(ctx) : "memory");
         }
@@ -165,7 +165,7 @@ namespace CPU
             current->TSS.RSP0 = Pointer(PMM::CallocatePages(KERNEL_STACK_SIZE
                                                             / PMM::PAGE_SIZE))
                                     .ToHigherHalf<Pointer>()
-                                    .Offset<uintptr_t>(KERNEL_STACK_SIZE);
+                                    .Offset<upointer>(KERNEL_STACK_SIZE);
             GDT::LoadTSS((&current->TSS));
             IDT::Load();
 
@@ -193,13 +193,13 @@ namespace CPU
                    << 32));
 
         // Syscall EntryPoint
-        WriteMSR(MSR::LSTAR, reinterpret_cast<uintptr_t>(syscall_entry));
+        WriteMSR(MSR::LSTAR, reinterpret_cast<upointer>(syscall_entry));
         WriteMSR(MSR::SFMASK, ~u32(2));
 
         Lapic::Instance()->Initialize();
 
         GetCurrent()->TSS.IST1
-            = ToHigherHalfAddress<uintptr_t>(PMM::AllocatePages<uintptr_t>(
+            = ToHigherHalfAddress<upointer>(PMM::AllocatePages<upointer>(
                   KERNEL_STACK_SIZE / PMM::PAGE_SIZE))
             + KERNEL_STACK_SIZE;
         IDT::SetIST(14, 2);
@@ -247,7 +247,7 @@ namespace CPU
             current->TSS.RSP0 = Pointer(PMM::CallocatePages(KERNEL_STACK_SIZE
                                                             / PMM::PAGE_SIZE))
                                     .ToHigherHalf<Pointer>()
-                                    .Offset<uintptr_t>(KERNEL_STACK_SIZE);
+                                    .Offset<upointer>(KERNEL_STACK_SIZE);
             GDT::LoadTSS(&current->TSS);
 
             IDT::Initialize();
@@ -335,20 +335,6 @@ namespace CPU
         return true;
     }
 
-    void DumpRegisters(CPUContext* ctx)
-    {
-        LogInfo("RAX: {:#x}, RBX: {:#x}, RCX: {:#x}, RDX: {:#x}", ctx->rax,
-                ctx->rbx, ctx->rcx, ctx->rdx);
-        LogInfo("RSI: {:#x}, RDI: {:#x}, RBP: {:#x}, RSP: {:#x}", ctx->rsi,
-                ctx->rdi, ctx->rbp, ctx->rsp);
-        LogInfo("R8: {:#x}, R9: {:#x}, R10: {:#x}, R11: {:#x}", ctx->r8,
-                ctx->r9, ctx->r10, ctx->r11);
-        LogInfo("R12: {:#x}, R13: {:#x}, R14: {:#x}, R15: {:#x}", ctx->r12,
-                ctx->r13, ctx->r14, ctx->r15);
-        LogInfo("CS: {:#x}, SS: {:#x}, DS: {:#x}, ES: {:#x}", ctx->cs, ctx->ss,
-                ctx->ds, ctx->es);
-        LogInfo("RIP: {:#x}, RFLAGS: {:#b}", ctx->rip, ctx->rflags);
-    }
     bool GetInterruptFlag()
     {
         u64 rflags;
@@ -471,20 +457,20 @@ namespace CPU
 
     void PrepareThread(Thread* thread, Pointer pc, Pointer arg)
     {
-        CPU* current           = GetCurrent();
-        thread->Context.rflags = 0x202;
-        thread->Context.rip    = pc;
-        thread->Context.rdi    = arg;
+        CPU* current          = GetCurrent();
+        thread->Context.Flags = 0x202;
+        thread->Context.RIP   = pc;
+        thread->Context.RDI   = arg;
 
         Pointer kernelStack
-            = PMM::AllocatePages<uintptr_t>(KERNEL_STACK_SIZE / PMM::PAGE_SIZE);
+            = PMM::AllocatePages<upointer>(KERNEL_STACK_SIZE / PMM::PAGE_SIZE);
 
         current->KernelStack
             = kernelStack.Offset<Pointer>(KERNEL_STACK_SIZE).ToHigherHalf();
         thread->SetKernelStack(current->KernelStack);
 
         Pointer pfStack
-            = PMM::AllocatePages<uintptr_t>(KERNEL_STACK_SIZE / PMM::PAGE_SIZE);
+            = PMM::AllocatePages<upointer>(KERNEL_STACK_SIZE / PMM::PAGE_SIZE);
         thread->SetPageFaultStack(
             pfStack.Offset<Pointer>(KERNEL_STACK_SIZE).ToHigherHalf());
 
@@ -497,11 +483,11 @@ namespace CPU
         thread->SetGsBase(thread);
         if (thread->IsUser())
         {
-            thread->Context.cs = GDT::USERLAND_CODE_SELECTOR | 0x03;
-            thread->Context.ss = GDT::USERLAND_DATA_SELECTOR | 0x03;
-            thread->Context.ds = thread->Context.es = thread->Context.ss;
+            thread->Context.CS = GDT::USERLAND_CODE_SELECTOR | 0x03;
+            thread->Context.SS = GDT::USERLAND_DATA_SELECTOR | 0x03;
+            thread->Context.DS = thread->Context.ES = thread->Context.SS;
 
-            thread->Context.rsp                     = thread->GetStack();
+            thread->Context.RSP                     = thread->GetStack();
             current->FpuRestore(thread->FpuStorage());
 
             u16 defaultFcw = 0b1100111111;
@@ -513,15 +499,15 @@ namespace CPU
         }
         else
         {
-            thread->Context.cs = GDT::KERNEL_CODE_SELECTOR;
-            thread->Context.ss = GDT::KERNEL_DATA_SELECTOR;
-            thread->Context.ds = thread->Context.es = thread->Context.ss;
+            thread->Context.CS = GDT::KERNEL_CODE_SELECTOR;
+            thread->Context.SS = GDT::KERNEL_DATA_SELECTOR;
+            thread->Context.DS = thread->Context.ES = thread->Context.SS;
 
-            thread->Context.rsp                     = thread->KernelStack();
+            thread->Context.RSP                     = thread->KernelStack();
             thread->SetStack(thread->KernelStack());
         }
     }
-    void SaveThread(Thread* thread, CPUContext* ctx)
+    void SaveThread(Thread* thread, ExecutionContext* ctx)
     {
         thread->Context = *ctx;
 
@@ -530,7 +516,7 @@ namespace CPU
 
         GetCurrent()->FpuSave(thread->FpuStorage());
     }
-    void LoadThread(Thread* thread, CPUContext* ctx)
+    void LoadThread(Thread* thread, ExecutionContext* ctx)
     {
         thread->SetRunningOn(GetCurrent()->ID);
 

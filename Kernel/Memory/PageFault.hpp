@@ -38,19 +38,19 @@ class PageFaultInfo
 {
   public:
     inline constexpr PageFaultInfo(Pointer virt, PageFaultReason reason,
-                                   struct CPUContext* context)
+                                   struct ExecutionContext* context)
         : m_VirtualAddress(virt)
         , m_Reason(reason)
-        , m_CPUContext(context)
+        , m_ExecutionContext(context)
     {
     }
 
     inline constexpr Pointer VirtualAddress() const { return m_VirtualAddress; }
     inline constexpr PageFaultReason Reason() const { return m_Reason; }
-    inline constexpr CPUContext*     CPUContext() const { return m_CPUContext; }
+    inline constexpr ExecutionContext*     ExecutionContext() const { return m_ExecutionContext; }
 
   private:
     Pointer            m_VirtualAddress = nullptr;
     PageFaultReason    m_Reason;
-    struct CPUContext* m_CPUContext = nullptr;
+    struct ExecutionContext* m_ExecutionContext = nullptr;
 };

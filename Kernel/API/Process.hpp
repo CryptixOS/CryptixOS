@@ -12,6 +12,7 @@
 
 struct timespec;
 struct rusage;
+struct clone_args;
 namespace API::Process
 {
     ErrorOr<isize>     SigAction(isize signal, const struct sigaction* action,
@@ -59,7 +60,7 @@ namespace API::Process
 
     ErrorOr<isize>     Futex(u32* uaddr, isize op, u32 expected,
                              const struct timespec* utime, u32* uaddr2, u32 value2);
-    ErrorOr<isize>     Clone3(struct clone_args* uargs, usize size);
+    ErrorOr<isize>     Clone3(clone_args* uargs, usize size);
     ErrorOr<isize>     FutexWaitV(struct futex_waitv* waiters, usize futexCount,
                                   usize flags, struct timespec* timeout,
                                   clockid_t clockid);

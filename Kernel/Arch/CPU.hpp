@@ -21,13 +21,12 @@
 
 class ClockSource;
 struct Thread;
-struct CPUContext;
+struct ExecutionContext;
 namespace CPU
 {
     constexpr usize KERNEL_STACK_SIZE = 64_kib;
     constexpr usize USER_STACK_SIZE   = 2_mib;
 
-    void            DumpRegisters(CPUContext* ctx);
     bool            GetInterruptFlag();
     void            SetInterruptFlag(bool enabled);
     bool            SwapInterruptFlag(bool enabled);
@@ -44,8 +43,8 @@ namespace CPU
 
     void         PrepareThread(Thread* thread, Pointer pc, Pointer arg = 0);
 
-    void         SaveThread(Thread* thread, CPUContext* ctx);
-    void         LoadThread(Thread* thread, CPUContext* ctx);
+    void         SaveThread(Thread* thread, ExecutionContext* ctx);
+    void         LoadThread(Thread* thread, ExecutionContext* ctx);
 
     void         Reschedule(Timestep us);
 

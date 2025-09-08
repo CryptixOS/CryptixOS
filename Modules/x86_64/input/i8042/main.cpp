@@ -358,7 +358,7 @@ bool I8042::QuerySupport()
     return true;
 }
 
-IrqResult I8042::HandleInterrupt(::Device* device, CPUContext* context)
+IrqResult I8042::HandleInterrupt(::Device* device, ExecutionContext* context)
 {
     while (Instance() && !Instance()->IsOutputEmpty())
     {

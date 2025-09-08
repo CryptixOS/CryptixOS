@@ -12,7 +12,7 @@ enum class IrqResult;
 
 class Device;
 [[noreturn]]
-IrqResult HaltAndCatchFire(class Device*, struct CPUContext* context);
+IrqResult HaltAndCatchFire(class Device*, struct ExecutionContext* context);
 
 [[noreturn]]
 void panic(StringView message);

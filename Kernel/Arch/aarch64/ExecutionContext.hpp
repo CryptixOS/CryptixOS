@@ -9,7 +9,7 @@
 #include <Compiler.hpp>
 #include <Prism/Core/Types.hpp>
 
-struct CTOS_PACKED CPUContext
+struct CTOS_PACKED /ExecutionContext
 {
     u64 X0;
     u64 X1;
@@ -40,38 +40,36 @@ struct CTOS_PACKED CPUContext
     u64 X26;
     u64 X27;
     u64 X28;
-    u64 X29; // FP
-    u64 X30; // LR
+    CtAliasedField(u64, X29, FramePointer);
+    CtAliasedField(u64, X30, Link);
 
-    u64 Sp;
-    u64 Pc;
-    u64 Pstate;
+    CtAliasedField(u64, SP, StackPointer);
+    CtAliasedField(u64, PC, ProgramCounter);
 };
 
 template <>
-struct fmt::formatter<CPUContext> : fmt::formatter<std::string>
+struct fmt::formatter</ExecutionContext> : fmt::formatter<std::string>
 {
     template <typename FormatContext>
-    auto format(const CPUContext& frame, FormatContext& ctx) const
+    auto format(const /ExecutionContext& frame, FormatContext& ctx) const
     {
         return fmt::formatter<std::string>::format(
             fmt::format(
-                "x0: {:#x}, x1: {:#x}, x2: {:#x}, x3: {:#x}\n"
-                "x4: {:#x}, x5: {:#x}, x6: {:#x}, x7: {:#x}\n"
-                "x8: {:#x}, x9: {:#x}, x10: {:#x}, x11: {:#x}\n"
-                "x12: {:#x}, x13: {:#x}, x14: {:#x}, x15: {:#x}\n"
-                "x16: {:#x}, x17: {:#x}, x18: {:#x}\n"
-                "x19: {:#x}, x20: {:#x}, x21: {:#x}, x22: {:#x}\n"
-                "x23: {:#x}, x24: {:#x}, x25: {:#x}, x26: {:#x}\n"
-                "x27: {:#x}, x28: {:#x}, x29(fp): {:#x}, x30(lr): {:#x}\n"
-                "sp: {:#x}, pc: {:#x}, pstate: {:#x}",
+                "X0: {:#x}, X1: {:#x}, X2: {:#x}, X3: {:#x}\n"
+                "X4: {:#x}, X5: {:#x}, X6: {:#x}, X7: {:#x}\n"
+                "X8: {:#x}, X9: {:#x}, X10: {:#x}, X11: {:#x}\n"
+                "X12: {:#x}, X13: {:#x}, X14: {:#x}, X15: {:#x}\n"
+                "X16: {:#x}, X17: {:#x}, X18: {:#x}\n"
+                "X19: {:#x}, X20: {:#x}, X21: {:#x}, X22: {:#x}\n"
+                "X23: {:#x}, X24: {:#x}, X25: {:#x}, X26: {:#x}\n"
+                "X27: {:#x}, X28: {:#x}, X29(fp): {:#x}, X30(lr): {:#x}\n"
+                "sp: {:#x}, pc: {:#x}",
                 frame.X0, frame.X1, frame.X2, frame.X3, frame.X4, frame.X5,
                 frame.X6, frame.X7, frame.X8, frame.X9, frame.X10, frame.X11,
                 frame.X12, frame.X13, frame.X14, frame.X15, frame.X16,
                 frame.X17, frame.X18, frame.X19, frame.X20, frame.X21,
                 frame.X22, frame.X23, frame.X24, frame.X25, frame.X26,
-                frame.X27, frame.X28, frame.X29, frame.X30, frame.Sp, frame.Pc,
-                frame.Pstate),
+                frame.X27, frame.X28, frame.X29, frame.X30, frame.SP, frame.PC),
             ctx);
     }
 };

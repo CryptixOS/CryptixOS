@@ -64,5 +64,5 @@ class PIT : public HardwareTimer, public Singleton<PIT>
     static constexpr usize                 FREQUENCY     = 1000;
     static constexpr usize                 IRQ_LINE      = 0x00;
 
-    static IrqResult Tick(Device* device, struct CPUContext* ctx);
+    static IrqResult Tick(Device* device, struct ExecutionContext* ctx);
 }; // namespace PIT

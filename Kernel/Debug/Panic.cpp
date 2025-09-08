@@ -32,7 +32,7 @@ inline static void enterPanicMode()
 
 static Atomic<u64> s_HaltedCPUs = 0;
 [[noreturn]]
-IrqResult HaltAndCatchFire(Device*, CPUContext* context)
+IrqResult HaltAndCatchFire(Device*, ExecutionContext* context)
 {
     EarlyLogFatal("CPU[%d]: Halted", CPU::GetCurrentID());
 

@@ -74,15 +74,15 @@ class Process
         return ValidateWrite(address, sizeof(T));
     }
 
-    inline ProcessID ParentPid() const
+    inline ProcessID ParentID() const
     {
-        if (m_Parent) return m_Parent->m_Pid;
+        if (m_Parent) return m_Parent->ID();
 
         // TODO(v1tr10l7): What should we return, if there is no parent??
         return 0;
     }
     inline Process*     Parent() const { return m_Parent; }
-    inline ProcessID    Pid() const { return m_Pid; }
+    inline ProcessID    ID() const { return m_ID; }
     inline StringView   Name() const { return m_Name; }
     inline ProcessState State() const { return m_State; }
     inline bool    IsDead() const { return m_State == ProcessState::eDead; }
@@ -120,11 +120,11 @@ class Process
 
     inline bool                       IsSessionLeader() const
     {
-        return m_Pid == m_Credentials.SessionID;
+        return m_ID == m_Credentials.SessionID;
     }
     inline bool IsGroupLeader() const
     {
-        return m_Pid == m_Credentials.ProcessGroupID;
+        return m_ID == m_Credentials.ProcessGroupID;
     }
     inline bool IsChild(Process* process) const
     {
@@ -162,7 +162,7 @@ class Process
     ErrorOr<ProcessID> WaitPid(ProcessID pid, i32* wstatus, i32 flags,
                                struct rusage* rusage);
 
-    ErrorOr<Process*>  Fork();
+    ErrorOr<Process*>  Clone(usize cloneFlags);
     ErrorOr<i32>       Exec(String path, char** argv, char** envp);
     i32                Exit(i32 code);
 
@@ -175,7 +175,7 @@ class Process
 
   private:
     Process*            m_Parent      = nullptr;
-    ProcessID           m_Pid         = -1;
+    ProcessID           m_ID          = -1;
     String              m_Name        = "?";
     ProcessState        m_State       = ProcessState::eRunning;
 
@@ -186,7 +186,7 @@ class Process
     bool                m_Exited     = false;
 
     Ref<Thread>         m_MainThread = nullptr;
-    Atomic<ThreadID>    m_NextTid    = m_Pid;
+    Atomic<ThreadID>    m_NextTid    = m_ID;
     Vector<Process*>    m_Children;
     Vector<Process*>    m_Zombies;
     Vector<Ref<Thread>> m_Threads;

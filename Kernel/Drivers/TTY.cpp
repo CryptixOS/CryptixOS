@@ -285,7 +285,7 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         case TIOCSETD: m_Termios.c_line = *reinterpret_cast<u32*>(argp); break;
         // Make the TTY the controlling terminal of the calling process
         case TIOCSCTTY:
-            if (current->Sid() != current->Pid() || current->TTY())
+            if (current->Sid() != current->ID() || current->TTY())
                 return_err(-1, EINVAL);
             if (m_ControlSid && current->Credentials().UserID != 0)
                 return_err(-1, EPERM);

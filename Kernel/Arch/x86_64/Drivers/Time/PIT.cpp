@@ -76,7 +76,7 @@ void PIT::SetReloadValue(u16 reloadValue)
     IO::Out<byte>(CHANNEL0_DATA, static_cast<byte>(reloadValue >> 8));
 }
 
-IrqResult PIT::Tick(Device* device, struct CPUContext* ctx)
+IrqResult PIT::Tick(Device* device, struct ExecutionContext* ctx)
 {
     Instance()->m_Tick++;
 

@@ -15,12 +15,15 @@
 
 namespace ACPI::Interpreter
 {
-    static NameSpace*        s_RootNameSpace = nullptr;
-    static Vector<CodeBlock> s_ScopesToParse;
-    static ExecutionContext  s_Context;
-    static CodeBlock         s_CurrentBlock;
+    namespace
+    {
+        NameSpace*        s_RootNameSpace = nullptr;
+        Vector<CodeBlock> s_ScopesToParse;
+        ExecutionContext  s_Context;
+        CodeBlock         s_CurrentBlock;
+    }; // namespace
 
-    inline u8                PeekNextByte()
+    inline u8 PeekNextByte()
     {
         auto& stream = s_Context.Stream;
 

@@ -10,7 +10,7 @@
 #include <Library/Module.hpp>
 #include <Prism/Utility/Delegate.hpp>
 
-struct CPUContext;
+struct ExecutionContext;
 enum class IrqResult
 {
     eNone    = 0x00,
@@ -19,7 +19,7 @@ enum class IrqResult
 constexpr usize MAX_IRQ_COUNT = 0x40;
 
 class Device;
-using InterruptServiceRoutine = Delegate<IrqResult(Device*, CPUContext*)>;
+using InterruptServiceRoutine = Delegate<IrqResult(Device*, ExecutionContext*)>;
 class InterruptDispatcher : public RefCounted
 {
   public:
@@ -42,14 +42,14 @@ class InterruptDispatcher : public RefCounted
     template <typename F>
     inline void SetHandler(F f)
     {
-        m_Handler.BindLambda([f](::Device* device, CPUContext* ctx) -> IrqResult
+        m_Handler.BindLambda([f](::Device* device, ExecutionContext* ctx) -> IrqResult
                              { return f(device, ctx); });
     }
 
     inline void       Mask() { m_IrqChip->Mask(m_Irq); }
     inline void       Unmask() { m_IrqChip->Unmask(m_Irq); }
 
-    virtual IrqResult Handle(CPUContext* ctx)
+    virtual IrqResult Handle(ExecutionContext* ctx)
     {
         return m_Handler(m_Device, ctx);
     }

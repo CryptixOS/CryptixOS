@@ -55,7 +55,7 @@ class Scheduler
 
     static Thread* GetNextThread(usize cpuID);
     static Thread* PickReadyThread();
-    static void    SwitchContext(Thread* newThread, struct CPUContext* context);
+    static void    SwitchContext(Thread* newThread, struct ExecutionContext* context);
 
-    static void    Tick(struct CPUContext*);
+    static void    Tick(struct ExecutionContext*);
 }; // namespace Scheduler

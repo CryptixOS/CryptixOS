@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/x86_64/CPU.hpp>
-#include <Arch/x86_64/CPUContext.hpp>
+#include <Arch/x86_64//ExecutionContext.hpp>
 #include <Arch/x86_64/GDT.hpp>
 #include <Arch/x86_64/IDT.hpp>
 
@@ -19,7 +19,7 @@
 namespace InterruptManager
 {
     void      SendEOI(u32 irq);
-    IrqResult Handle(CPUContext* ctx);
+    IrqResult Handle(ExecutionContext* ctx);
 }; // namespace InterruptManager
 namespace Stacktrace
 {
@@ -107,7 +107,7 @@ struct CTOS_PACKED IDTEntry
 constexpr usize IDT_ENTRY_COUNT                                         = 256;
 CTOS_UNUSED alignas(0x10) static IDTEntry s_IdtEntries[IDT_ENTRY_COUNT] = {};
 extern "C" void* interrupt_handlers[];
-static void (*s_InterruptHandlers[IDT_ENTRY_COUNT])(CPUContext*);
+static void (*s_InterruptHandlers[IDT_ENTRY_COUNT])(ExecutionContext*);
 
 static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
 {
@@ -123,36 +123,26 @@ static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
     entry->IsrHigh    = (handler & 0xffffffff00000000) >> 32;
 }
 
-CTOS_NORETURN static void raiseException(CPUContext* ctx)
+CTOS_NORETURN static void raiseException(ExecutionContext* ctx)
 {
     u64 cpuID = CPU::GetCurrentID();
     using Stacktrace::StackFrame;
     StackFrame frame;
-    frame.Base               = Pointer(ctx->rbp).As<StackFrame>();
-    frame.InstructionPointer = ctx->rip;
+    frame.Base               = Pointer(ctx->RBP).As<StackFrame>();
+    frame.InstructionPointer = ctx->RIP;
     Stacktrace::Print(&frame, 6);
-#if 0
-    auto registerDump = fmt::format("{}", *ctx);
-    EarlyPanic(
-        "Captured exception[%#x] on cpu %zu: '%s'\n\rError Code: "
-        "%#b\n\rrip: "
-        "%#p\nRegister Dump => \n%s",
-        ctx->interruptVector, cpuID, s_ExceptionNames[ctx->interruptVector],
-        ctx->errorCode, ctx->rip, registerDump.data());
-#else
     Panic(
         "Captured exception[{:#x}] on cpu {}: '{}'\n\rError Code: "
         "{:#b}\n\rrip: "
         "{:#x}\nRegister Dump => \n{}",
-        ctx->interruptVector, cpuID, s_ExceptionNames[ctx->interruptVector],
-        ctx->errorCode, ctx->rip, *ctx);
-#endif
+        ctx->InterruptVector, cpuID, s_ExceptionNames[ctx->InterruptVector],
+        ctx->ErrorCode, ctx->RIP, *ctx);
 
     Arch::Halt();
 }
 
 // TODO(v1tr10l7): properly handle breakpoints
-static void            breakpoint(CPUContext* ctx) { EarlyPanic("Breakpoint"); }
+static void            breakpoint(ExecutionContext* ctx) { EarlyPanic("Breakpoint"); }
 
 constexpr usize        PAGE_FAULT_PRESENT           = Bit(0);
 constexpr usize        PAGE_FAULT_WRITE             = Bit(1);
@@ -184,30 +174,30 @@ inline PageFaultReason pageFaultReason(u64 errorCode)
     return reason;
 }
 
-static void pageFault(CPUContext* ctx)
+static void pageFault(ExecutionContext* ctx)
 {
     Pointer       faultAddress = CPU::ReadCR2();
-    auto          errorCode    = ctx->errorCode;
+    auto          errorCode    = ctx->ErrorCode;
     auto          faultReason  = pageFaultReason(errorCode);
 
     PageFaultInfo faultInfo(faultAddress, faultReason, ctx);
     MM::HandlePageFault(faultInfo);
 }
 
-CTOS_NORETURN static void unhandledInterrupt(CPUContext* context)
+CTOS_NORETURN static void unhandledInterrupt(ExecutionContext* context)
 {
     EarlyLogError("\nAn unhandled interrupt %#x occurred",
-                  context->interruptVector);
+                  context->InterruptVector);
 
     for (;;) __asm__ volatile("cli; hlt");
 }
-extern "C" void raiseInterrupt(CPUContext* ctx)
+extern "C" void raiseInterrupt(ExecutionContext* ctx)
 {
-    auto handler = s_InterruptHandlers[ctx->interruptVector];
+    auto handler = s_InterruptHandlers[ctx->InterruptVector];
     if (handler) return handler(ctx);
     else if (InterruptManager::Handle(ctx) == IrqResult::eHandled)
     {
-        InterruptManager::SendEOI(ctx->interruptVector);
+        InterruptManager::SendEOI(ctx->InterruptVector);
         return;
     }
 

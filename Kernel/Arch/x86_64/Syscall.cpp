@@ -14,7 +14,7 @@ namespace Syscall
 {
     constexpr usize SYSCALL_VECTOR = 0x80;
 
-    extern "C" void handleSyscall(CPUContext*);
+    extern "C" void handleSyscall(ExecutionContext*);
     void            Initialize()
     {
         // TODO(v1tr10l7): fix the 0x80 syscall gate
@@ -25,22 +25,22 @@ namespace Syscall
         //
         IDT::SetDPL(SYSCALL_VECTOR, DPL_RING3);
     }
-    extern "C" void handleSyscall(CPUContext* ctx)
+    extern "C" void handleSyscall(ExecutionContext* ctx)
     {
         Arguments args{};
 
-        args.Index            = ctx->rax;
-        args.Args[0]          = ctx->rdi;
-        args.Args[1]          = ctx->rsi;
-        args.Args[2]          = ctx->rdx;
-        args.Args[3]          = ctx->r10;
-        args.Args[4]          = ctx->r8;
-        args.Args[5]          = ctx->r9;
+        args.Index            = ctx->RAX;
+        args.Args[0]          = ctx->RDI;
+        args.Args[1]          = ctx->RSI;
+        args.Args[2]          = ctx->RDX;
+        args.Args[3]          = ctx->R10;
+        args.Args[4]          = ctx->R8;
+        args.Args[5]          = ctx->R9;
 
         auto current          = CPU::GetCurrentThread();
         current->SavedContext = *ctx;
 
         Handle(args);
-        ctx->rax = args.ReturnValue;
+        ctx->RAX = args.ReturnValue;
     }
 } // namespace Syscall

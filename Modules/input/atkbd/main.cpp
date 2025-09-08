@@ -202,6 +202,7 @@ CTOS_MODULE_LICENSE("GPL-3");
 CTOS_MODULE_VERSION("0.2");
 CTOS_MODULE_SOFTDEP("pre: i8042");
 
+extern void                 printStuff();
 extern "C" CTOS_EXPORT bool ModuleInit()
 {
     LogInfo("Hello, World from Kernel Module");

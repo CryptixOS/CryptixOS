@@ -35,9 +35,9 @@ class HardwareTimer : public CharacterDevice
     virtual usize      InterruptVector() const { return usize(-1); };
     virtual bool       IsCPULocal() const { return false; }
 
-    using OnTickCallback = Delegate<void(struct CPUContext*)>;
+    using OnTickCallback = Delegate<void(struct ExecutionContext*)>;
 
-    template <void (*Callback)(CPUContext*)>
+    template <void (*Callback)(ExecutionContext*)>
     inline void SetCallback()
     {
         m_OnTickCallback.Bind<Callback>();

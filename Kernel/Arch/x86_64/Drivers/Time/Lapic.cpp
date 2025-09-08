@@ -199,7 +199,7 @@ void Lapic::SetNmi(u8 vector, u8 currentCPUID, u8 cpuID, u16 flags, u8 lint)
     else if (lint == 1) Write(LAPIC_LINT1_REGISTER, nmi);
 }
 
-IrqResult Lapic::Tick(Device* device, CPUContext* context)
+IrqResult Lapic::Tick(Device* device, ExecutionContext* context)
 {
     auto lapic = reinterpret_cast<Lapic*>(device);
 

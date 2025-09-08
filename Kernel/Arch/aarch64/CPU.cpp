@@ -39,12 +39,12 @@ namespace CPU
         (void)pc;
     }
 
-    void SaveThread(Thread* thread, CPUContext* ctx)
+    void SaveThread(Thread* thread, ExecutionContext* ctx)
     {
         (void)thread;
         (void)ctx;
     }
-    void LoadThread(Thread* thread, CPUContext* ctx)
+    void LoadThread(Thread* thread, ExecutionContext* ctx)
     {
         (void)thread;
         (void)ctx;

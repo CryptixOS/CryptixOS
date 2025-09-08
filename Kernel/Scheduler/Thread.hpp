@@ -12,9 +12,9 @@
 #include <API/UnixTypes.hpp>
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
-    #include <Arch/x86_64/CPUContext.hpp>
+    #include <Arch/x86_64//ExecutionContext.hpp>
 #elif CTOS_ARCH == CTOS_ARCH_AARCH64
-    #include <Arch/aarch64/CPUContext.hpp>
+    #include <Arch/aarch64//ExecutionContext.hpp>
 #endif
 
 #include <Library/ExecutableProgram.hpp>
@@ -173,8 +173,8 @@ struct Thread : public RefCounted
     friend Thread* CPU::GetCurrentThread();
 
   public:
-    CPUContext Context;
-    CPUContext SavedContext;
+    ExecutionContext Context;
+    ExecutionContext SavedContext;
     Spinlock   YieldAwaitLock;
 
   private:
