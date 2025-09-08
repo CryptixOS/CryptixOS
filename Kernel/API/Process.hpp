@@ -64,8 +64,8 @@ namespace API::Process
     ErrorOr<isize>     FutexWaitV(struct futex_waitv* waiters, usize futexCount,
                                   usize flags, struct timespec* timeout,
                                   clockid_t clockid);
-    ErrorOr<usize> FutexWake(void* uaddr, usize mask, isize count, usize flags);
-    ErrorOr<usize> FutexWait(void* uaddr, usize value, usize mask, usize flags,
+    ErrorOr<usize> FutexWake(i32* uaddr, usize mask, isize count, usize flags);
+    ErrorOr<usize> FutexWait(i32* uaddr, usize value, usize mask, usize flags,
                              struct timespec* timeout, clockid_t clockid);
     ErrorOr<isize> FutexRequeue(struct futex_waitv* waiters, usize flags,
                                 isize wakeCount, isize requeueCount);

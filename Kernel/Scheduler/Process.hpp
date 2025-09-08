@@ -9,6 +9,7 @@
 #include <Common.hpp>
 
 #include <API/Credentials.hpp>
+#include <API/Signals.hpp>
 #include <Drivers/TTY.hpp>
 
 #include <Memory/AddressSpace.hpp>
@@ -206,6 +207,7 @@ class Process
     SpinlockProtected<
         Array<struct SignalAction, ToUnderlying(SignalID::eCount)>>
                                    m_SignalActions;
+    SignalFlags                    m_SignalFlags          = SignalFlags::eNone;
     Pointer                        m_SignalTrampolineVirt = nullptr;
 
     UnorderedMap<upointer, Event*> m_FutexEvents{};

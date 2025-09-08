@@ -76,6 +76,7 @@ config.set('USER_VIRTUAL_RANGE_BASE', '0x0000\'0000\'0010\'0000zu')
 config.set('USER_VIRTUAL_RANGE_TOP', '0x0000\'7fff\'ffff\'ffffzu')
 
 config.set('CTOS_ACPI_DISABLE', '0')
+config.set('CTOS_DEVICE_TREE_DISABLE', '0')
 
 configure_file(
   input: 'Config.hpp.in',

@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Posix/linux/sched.h>
 #include <API/Posix/sys/wait.h>
 #include <Arch/CPU.hpp>
 
@@ -50,7 +51,7 @@ inline usize AllocatePid()
 {
     static Spinlock lock;
     ScopedLock      guard(lock);
-    for (pid_t i = 1; i < std::numeric_limits<pid_t>::max(); i++)
+    for (ProcessID i = 1; i < std::numeric_limits<ProcessID>::max(); i++)
         if (!Scheduler::ValidatePid(i)) return i;
     return -1;
 }
@@ -131,12 +132,12 @@ ret:
 }
 Process* Process::CreateIdleProcess()
 {
-    static Atomic<pid_t> idlePids(-1);
+    static Atomic<ProcessID> idlePids(-1);
 
-    Process*             idle = new Process;
+    Process*                 idle = new Process;
 
-    idle->m_ID                = idlePids--;
-    idle->m_Name              = "Idle Process for CPU: "_s;
+    idle->m_ID                    = idlePids--;
+    idle->m_Name                  = "Idle Process for CPU: "_s;
     idle->m_Name += StringUtils::ToString(CPU::GetCurrentID());
 
     idle->PageMap = VMM::GetKernelPageMap();
@@ -182,7 +183,7 @@ bool Process::ValidateAddress(Pointer address, i32 accessMode, usize size)
     return false;
 }
 
-pid_t Process::SetSid()
+ProcessID Process::SetSid()
 {
     m_Credentials.SessionID = m_Credentials.ProcessGroupID = m_ID;
     return m_ID;
@@ -190,39 +191,39 @@ pid_t Process::SetSid()
 
 ErrorOr<isize> Process::SetReUID(UserID ruid, UserID euid)
 {
-    m_Credentials.UserID          = ruid;
-    m_Credentials.EffectiveUserID = euid;
+    if (ruid != static_cast<UserID>(-1)) m_Credentials.UserID = ruid;
+    if (euid != static_cast<UserID>(-1)) m_Credentials.EffectiveUserID = euid;
 
     return {};
 }
 ErrorOr<isize> Process::SetReGID(GroupID rgid, GroupID egid)
 {
-    m_Credentials.GroupID          = rgid;
-    m_Credentials.EffectiveGroupID = egid;
+    if (rgid != static_cast<GroupID>(-1)) m_Credentials.GroupID = rgid;
+    if (egid != static_cast<GroupID>(-1)) m_Credentials.EffectiveGroupID = egid;
 
     return {};
 }
 ErrorOr<isize> Process::SetResUID(UserID ruid, UserID euid, UserID suid)
 {
-    m_Credentials.UserID          = ruid;
-    m_Credentials.EffectiveUserID = euid;
-    m_Credentials.SetUserID       = suid;
+    if (ruid != static_cast<UserID>(-1)) m_Credentials.UserID = ruid;
+    if (euid != static_cast<UserID>(-1)) m_Credentials.EffectiveUserID = euid;
+    if (suid != static_cast<UserID>(-1)) m_Credentials.SetUserID = suid;
 
     return {};
 }
 ErrorOr<isize> Process::SetResGID(GroupID rgid, GroupID egid, GroupID sgid)
 {
-    m_Credentials.GroupID          = rgid;
-    m_Credentials.EffectiveGroupID = egid;
-    m_Credentials.SetGroupID       = sgid;
+    if (rgid != static_cast<GroupID>(-1)) m_Credentials.GroupID = rgid;
+    if (egid != static_cast<GroupID>(-1)) m_Credentials.EffectiveGroupID = egid;
+    if (sgid != static_cast<GroupID>(-1)) m_Credentials.SetGroupID = sgid;
 
     return {};
 }
 
-mode_t Process::Umask(mode_t mask)
+INodeMode Process::Umask(INodeMode mask)
 {
-    mode_t previous = m_Umask;
-    m_Umask         = mask;
+    INodeMode previous = m_Umask;
+    m_Umask            = mask;
 
     return previous;
 }
@@ -245,7 +246,7 @@ void Process::SetSignalAction(SignalID                   signal,
                          { actions[ToUnderlying(signal)] = action; });
 }
 
-void Process::SendGroupSignal(pid_t pgid, i32 signal)
+void Process::SendGroupSignal(ProcessID pgid, i32 signal)
 {
     auto& processMap = Scheduler::GetProcessMap();
     for (auto [pid, process] : processMap)
@@ -254,7 +255,8 @@ void Process::SendGroupSignal(pid_t pgid, i32 signal)
 }
 void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
-ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
+ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags,
+                               INodeMode mode)
 {
     Ref parent = CWD();
     if (CPU::AsUser([path]() -> bool { return path.Absolute(); }))
@@ -408,8 +410,8 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
     Scheduler::Yield();
     return 0;
 }
-ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
-                                rusage* rusage)
+ErrorOr<ProcessID> Process::WaitPid(ProcessID pid, i32* wstatus, i32 flags,
+                                    rusage* rusage)
 {
     bool           block = !(flags & WNOHANG);
     Vector<Event*> events;
@@ -423,10 +425,10 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
 
         if (pid < -1)
         {
-            pid_t gid = -pid;
-            auto  it  = FindIf(m_Children.begin(), m_Children.end(),
-                               [gid](Process* proc) -> bool
-                               {
+            ProcessID gid = -pid;
+            auto      it  = FindIf(m_Children.begin(), m_Children.end(),
+                                   [gid](Process* proc) -> bool
+                                   {
                                  if (proc->PGid() == gid) return true;
                                  return false;
                              });
@@ -483,9 +485,23 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
 ErrorOr<Process*> Process::Clone(usize flags)
 {
     LogDebug("Process: Forking {}...", m_ID);
+
+    if ((flags & (CLONE_NEWNS | CLONE_FS)) == (CLONE_NEWNS | CLONE_FS))
+        return Error(EINVAL);
+    if ((flags & (CLONE_NEWUSER | CLONE_FS)) == (CLONE_NEWUSER | CLONE_FS))
+        return Error(EINVAL);
+
+    if ((flags & CLONE_THREAD) && !(flags & CLONE_SIGHAND))
+        return Error(EINVAL);
+    if ((flags & CLONE_SIGHAND) && !(flags & CLONE_VM)) return Error(EINVAL);
+    if ((flags & CLONE_PARENT) && m_SignalFlags & SignalFlags::eUnkillable)
+        return Error(EINVAL);
+    if (flags & (CLONE_PIDFD | CLONE_DETACHED)) return Error(EINVAL);
+
     Thread* currentThread = CPU::GetCurrentThread();
     Assert(currentThread && currentThread->m_Parent == this);
 
+    CPU::DisableInterrupts();
     Process* newProcess = Scheduler::CreateProcess(this, m_Name, m_Credentials);
     Assert(newProcess);
 
@@ -498,9 +514,9 @@ ErrorOr<Process*> Process::Clone(usize flags)
     newProcess->m_Umask = m_Umask;
     m_Children.PushBack(newProcess);
 
-    CopyMemory(newProcess);
+    if (flags & CLONE_VM) CopyMemory(newProcess);
     newProcess->m_NextTid.Store(m_NextTid.Load());
-    CopyFileDescriptors(newProcess);
+    if (flags & CLONE_FILES) CopyFileDescriptors(newProcess);
 
     auto thread                = currentThread->Fork(newProcess);
     thread->m_IsEnqueued       = false;

@@ -78,11 +78,6 @@ Thread::Thread(Process* parent, Vector<StringView>& argv,
         = program.PrepareStack(stackTopWritable, stackTopVirt, argv, envp);
     m_Parent->m_SignalTrampolineVirt = program.SignalTrampoline();
 
-    // if (m_Parent->ID() > 0 && ID() == m_Parent->ID())
-    // {
-    //     LogTrace("Thread: Setting up the signal for the main thread...");
-    // }
-
     CPU::PrepareThread(this, program.EntryPoint(), 0);
 }
 
