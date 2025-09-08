@@ -49,15 +49,17 @@ namespace DeviceTree
         {
             Assert(length == 4);
             m_ID = *reinterpret_cast<u32*>(data);
-            LogDebug("ID => {:#x}", m_ID.Value());
         }
         else if (name == "compatible"_sv)
         {
-            m_CompatibleDrivers = name.Split(',');
-            LogDebug("Compatible drivers =>");
-            for (const auto& name : m_CompatibleDrivers)
-                LogMessage("\t{}\n", name);
+            StringView compatible(reinterpret_cast<char*>(data));
+
+            m_CompatibleDrivers = compatible.Split(',');
         }
+        else if (name == "#size-cells"_sv)
+            m_SizeCellCount = *reinterpret_cast<u32*>(data);
+        else if (name == "#address-cells"_sv)
+            m_AddressCellCount = *reinterpret_cast<u32*>(data);
     }
     void Node::InsertProperty(StringView name, Property* property)
     {

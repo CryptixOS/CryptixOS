@@ -110,7 +110,7 @@ namespace DeviceTree
         auto success = ParseFDT(header);
         if (!success) return false;
 
-#if 1
+#if CTOS_DEVICE_TREE_DUMP != 0
         s_RootNode->Print();
 #endif
 

@@ -17,6 +17,7 @@ debugConfig.set('CTOS_EFI_DUMP_MEMMAP', '0')
 debugConfig.set('CTOS_TTY_LOG_TERMIOS', '0')
 debugConfig.set('CTOS_DUMP_INIT_ARRAY', '1')
 debugConfig.set('CTOS_ELF_DEBUG', '0')
+debugConfig.set('CTOS_DEVICE_TREE_DUMP', '0')
 
 configure_file(
   input: 'Debug.hpp.in', 

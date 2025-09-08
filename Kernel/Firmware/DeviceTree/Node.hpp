@@ -75,6 +75,8 @@ namespace DeviceTree
         String                              m_Name;
         Optional<usize>                     m_ID = NullOpt;
         Vector<String>                      m_CompatibleDrivers;
+        BigEndian<u32>                      m_AddressCellCount = 0;
+        BigEndian<u32>                      m_SizeCellCount    = 0;
 
         UnorderedMap<StringView, Node*>     m_Children;
         UnorderedMap<StringView, Property*> m_Properties;
