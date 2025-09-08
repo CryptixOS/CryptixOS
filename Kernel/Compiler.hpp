@@ -43,12 +43,19 @@
 #define CTOS_SECTION_FORCE_EMIT(name, ...)                                     \
     CTOS_SECTION(name, CTOS_ATTR_PREFIX::used __VA_OPT__(, ) __VA_ARGS__)
 
-#define CTOS_CDECL               CTOS_ATTRIBUTE(cdecl)
-#define CTOS_FASTCALL            CTOS_ATTRIBUTE(rastcall)
-#define CTOS_SYSVABI             CTOS_ATTRIBUTE(sysv_abi)
-#define CTOS_NAKED               CTOS_ATTRIBUTE(naked)
+#define CTOS_CDECL    CTOS_ATTRIBUTE(cdecl)
+#define CTOS_FASTCALL CTOS_ATTRIBUTE(rastcall)
+#define CTOS_SYSVABI  CTOS_ATTRIBUTE(sysv_abi)
+#define CTOS_NAKED    CTOS_ATTRIBUTE(naked)
 
-#define CTOS_EXPORT              __attribute__((visibility("default")))
+#define CTOS_EXPORT   __attribute__((visibility("default")))
+
+#define CtAliasedField(type, name, alias)                                      \
+    union                                                                      \
+    {                                                                          \
+        type name;                                                             \
+        type alias;                                                            \
+    }
 
 #define CtStringifyInner(x...)   #x
 #define CtStringify(x...)        CtStringifyInner(x)
@@ -58,22 +65,34 @@
 #define CtUniqueName(name)                                                     \
     CtConcatenateName(_##name##__, CtConcatenateName(__COUNTER__, __LINE__))
 
+#define CtUniqueID(prefix)                                                     \
+    CtConcatenateName(CtConcatenateName(__UNIQUE_ID_, prefix), __COUNTER__)
+#define CtDefineSymbolAttr(symbol, attributes)                                 \
+    static void* CTOS_FORCE_EMIT attributes CtUniqueID(                        \
+        CtConcatenateName(__addressable_, symbol))                             \
+        = reinterpret_cast<void*>(upointer) & symbol;
+
+#define CtDefineSymbol(symbol)                                                 \
+    CtDefineSymbolAttr(symbol, CTOS_SECTION_FORCE_EMIT(".discard."             \
+                                                       "addressable"))
+#define CtExportSymbol(sym)      _EXPORT_SYMBOL(sym, "")
+
 //--------------------------------------------------------------------------
 // Sections
 //--------------------------------------------------------------------------
 
-#define KERNEL_INIT_SECTION_NAME     ".kernel_init"
-#define KERNEL_INIT_SECTION          CTOS_SECTION_FORCE_EMIT(KERNEL_INIT_SECTION_NAME)
+#define KERNEL_INIT_SECTION_NAME ".kernel_init"
+#define KERNEL_INIT_SECTION      CTOS_SECTION_FORCE_EMIT(KERNEL_INIT_SECTION_NAME)
 
-#define MODULE_SECTION_NAME          ".module_init"
-#define MODULE_SECTION               CTOS_SECTION_FORCE_EMIT(MODULE_SECTION_NAME)
+#define MODULE_SECTION_NAME      ".module_init"
+#define MODULE_SECTION           CTOS_SECTION_FORCE_EMIT(MODULE_SECTION_NAME)
 
-#define MODULE_DATA_SECTION_NAME     ".module_init.data"
+#define MODULE_DATA_SECTION_NAME ".module_init.data"
 
 //--------------------------------------------------------------------------
 // Compiler builtins
 //--------------------------------------------------------------------------
 
 // NOTE(v1tr10l7): index must be a value between 0 - 63
-#define CtFrameAddress(index)        __builtin_frame_address(index)
-#define CtCurrentFrameAddress()      CtFrameAddress(0)
+#define CtFrameAddress(index)    __builtin_frame_address(index)
+#define CtCurrentFrameAddress()  CtFrameAddress(0)
