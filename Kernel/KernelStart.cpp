@@ -233,7 +233,9 @@ kernelStart(const BootInformation& info)
     System::PrepareBootModules(info.KernelModules);
 
     Device::Initialize();
+#if CTOS_DEVICE_TREE_DISABLE == 0
     DeviceTree::Initialize(info.DeviceTreeBlob);
+#endif
 
 #if CTOS_ACPI_DISABLE == 0
     if (CommandLine::GetBoolean("acpi.enable").ValueOr(true) && info.RSDP)
