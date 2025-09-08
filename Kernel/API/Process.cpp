@@ -143,6 +143,11 @@ namespace API::Process
         return process->Pid();
     }
 
+    ErrorOr<ProcessID> Clone(usize flags, usize newSp, i32* parentTid,
+                             i32* childTid, usize tls)
+    {
+        return Error(ENOSYS);
+    }
     ErrorOr<pid_t> Fork()
     {
         class Process* process = ::Process::Current();
@@ -330,7 +335,17 @@ namespace API::Process
         if (current->Sid() != process->Sid()) return Error(EPERM);
         return process->Sid();
     }
+    ErrorOr<ThreadID> GetTid()
+    {
+        auto thread = Thread::Current();
 
+        return thread->ID();
+    }
+
+    ErrorOr<isize> Clone3(struct clone_args* uargs, usize size)
+    {
+        return Error(ENOSYS);
+    }
     ErrorOr<usize> FutexWake(void* uaddr, usize mask, isize count, usize flags)
     {
         return Error(ENOSYS);

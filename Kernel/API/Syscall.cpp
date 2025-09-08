@@ -96,6 +96,7 @@ namespace Syscall
         RegisterSyscall(ID::ePid, API::Process::Pid);
         RegisterSyscall(ID::eSocket, API::VFS::Socket);
         RegisterSyscall(ID::eBind, API::VFS::Bind);
+        RegisterSyscall(ID::eClone, API::Process::Clone);
         RegisterSyscall(ID::eFork, API::Process::Fork);
         RegisterSyscall(ID::eExecve, API::Process::Execve);
         RegisterSyscall(ID::eExit, API::Process::Exit);
@@ -146,7 +147,7 @@ namespace Syscall
         RegisterSyscall(ID::eMount, API::VFS::Mount);
         RegisterSyscall(ID::eReboot, API::System::Reboot);
         RegisterSyscall(ID::eInitModule, API::System::InitModule);
-        // RegisterSyscall(ID::eGetTid, Process::SysGetTid);
+        RegisterSyscall(ID::eGetTid, API::Process::GetTid);
         RegisterSyscall(ID::eGetDents64, API::VFS::GetDEnts64);
         RegisterSyscall(ID::eClockGetTime, API::Time::ClockGetTime);
         RegisterSyscall(ID::ePanic, API::System::SysPanic);
@@ -165,6 +166,7 @@ namespace Syscall
         RegisterSyscall(ID::eDup3, API::VFS::Dup3);
         RegisterSyscall(ID::eSyncFs, API::VFS::SyncFs);
         RegisterSyscall(ID::eRenameAt2, API::VFS::RenameAt2);
+        RegisterSyscall(ID::eClone3, API::Process::Clone3);
         RegisterSyscall(ID::eFutexWake, API::Process::FutexWake);
         RegisterSyscall(ID::eFutexWait, API::Process::FutexWait);
     }
