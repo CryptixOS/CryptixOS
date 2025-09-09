@@ -6,26 +6,26 @@
  */
 #pragma once
 
-#include <Common.hpp>
+#include <Arch/aarch64/CPUIntrinsics.hpp>
 
 struct Thread;
 namespace CPU
 {
     struct CPU
     {
-        usize     ID;
-        void*     Empty;
+        usize    ID;
+        void*    Empty;
 
         upointer ThreadStack;
         upointer KernelStack;
 
-        usize     HardwareID;
-        bool      IsOnline = false;
+        usize    HardwareID;
+        bool     IsOnline = false;
 
-        Thread*   Idle;
-        Thread*   CurrentThread;
+        Thread*  Idle;
+        Thread*  CurrentThread;
 
-        bool      DuringSyscall = false;
-        usize     LastSyscallID = usize(-1);
+        bool     DuringSyscall = false;
+        usize    LastSyscallID = usize(-1);
     };
 }; // namespace CPU
