@@ -119,6 +119,7 @@ ErrorOr<isize> FileDescriptor::Write(const UserBuffer& in, usize count,
 
     if (!m_File) return Error(ENOENT);
     if (offset < 0) offset = m_Offset;
+    // if (m_Flags & O_APPEND) offset = m_File->Size();
 
     isize bytesWritten = m_File->Write(in.Raw(), offset, count).ValueOr(0);
     offset += bytesWritten;

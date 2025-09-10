@@ -111,12 +111,23 @@ void DirectoryEntry::RemoveChild(::Ref<class DirectoryEntry> entry)
 }
 WeakRef<DirectoryEntry> DirectoryEntry::GetEffectiveParent()
 {
-    auto rootEntry  = VFS::RootDirectoryEntry();
-    auto mountPoint = MountPoint::Lookup(const_cast<DirectoryEntry*>(this));
+    auto                  rootEntry   = VFS::RootDirectoryEntry();
+    ::Ref<DirectoryEntry> parentEntry = nullptr;
 
+    MountPoint::Iterate(
+        [this, &parentEntry](::Ref<MountPoint> mountPoint) -> IterationResult
+        {
+            if (mountPoint->GuestEntry() == this)
+            {
+                parentEntry = mountPoint->HostEntry();
+                return IterationResult::eBreak;
+            }
+
+            return IterationResult::eContinue;
+        });
     if (this == rootEntry.Raw() || this == VFS::RootDirectoryEntry().Raw())
         return const_cast<DirectoryEntry*>(this);
-    else if (mountPoint) return mountPoint->HostEntry()->Parent();
+    else if (parentEntry) return parentEntry;
 
     return Parent();
 }

@@ -40,7 +40,7 @@ void              MountPoint::Iterate(Iterator iterator)
 {
     auto current = Head();
     for (; current; current = current->NextMountPoint())
-        if (iterator(current)) break;
+        if (iterator(current) == IterationResult::eBreak) break;
 }
 
 ::Ref<MountPoint> MountPoint::NextMountPoint() const { return Hook.Next; }

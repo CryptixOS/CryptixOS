@@ -200,18 +200,20 @@ void ProcFs::AddProcess(Process* process)
     s_Processes[process->ID()] = process;
     auto name                  = StringUtils::ToString(process->ID());
     auto entry                 = CreateRef<DirectoryEntry>(nullptr, name);
-
     auto inode                 = reinterpret_cast<ProcFsINode*>(
         TryAcquire(AllocateNode(entry->Name(), S_IFDIR | 0755)));
-    inode->m_Parent = m_Root;
-
-    m_Lock.Release();
-    m_Root->InsertChild(inode, entry->Name());
-    m_Lock.Acquire();
 
     entry->Bind(inode);
-    m_RootEntry->InsertChild(entry);
+    if (inode)
+    {
+        m_Lock.Release();
+        m_Root->InsertChild(inode, name);
+        m_Lock.Acquire();
+        m_RootEntry->InsertChild(entry);
+    }
+
     entry->SetParent(m_RootEntry);
+    m_RootEntry->InsertChild(entry);
 }
 void ProcFs::RemoveProcess(pid_t pid)
 {
@@ -288,5 +290,4 @@ void ProcFs::AddChild(StringView name)
     }
 
     entry->SetParent(m_RootEntry);
-    m_RootEntry->InsertChild(entry);
 }

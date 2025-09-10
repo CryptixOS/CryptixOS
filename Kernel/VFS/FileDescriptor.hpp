@@ -64,6 +64,14 @@ struct DirectoryEntries
     auto        end() { return Entries.end(); }
 };
 
+enum class FileMode : u64
+{
+    eNone   = 0,
+    eAppend = O_APPEND,
+    eAsync  = O_ASYNC,
+    eDirect = O_DIRECT,
+    ePath   = O_PATH,
+};
 class FileDescriptor : public RefCounted
 {
   public:

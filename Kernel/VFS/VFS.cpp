@@ -209,7 +209,7 @@ namespace VFS
 
     ErrorOr<Ref<DirectoryEntry>> OpenDirectoryEntry(Ref<DirectoryEntry> parent,
                                                     PathView path, isize flags,
-                                                    mode_t mode)
+                                                    INodeMode mode)
     {
         Process* current        = Process::GetCurrent();
         bool     followSymlinks = !(flags & O_NOFOLLOW);
@@ -253,7 +253,7 @@ namespace VFS
 
             if (!dentry) return Error(ENOENT);
         }
-        else if (flags & O_EXCL) return Error(EEXIST);
+        else if (flags & O_EXCL && dentry->INode()) return Error(EEXIST);
 
         if (dentry->IsMountPoint())
         {
@@ -274,7 +274,7 @@ namespace VFS
         return dentry;
     }
     ErrorOr<Ref<FileDescriptor>> Open(Ref<DirectoryEntry> parent, PathView path,
-                                      isize flags, mode_t mode)
+                                      isize flags, INodeMode mode)
     {
         auto dentry = TryOrRet(OpenDirectoryEntry(parent, path, flags, mode));
 
@@ -423,22 +423,20 @@ namespace VFS
 
     ErrorOr<void> Sync()
     {
-        MountPoint::Iterator iterator;
-        iterator.BindLambda(
-            [](Ref<MountPoint> mount) -> bool
+        MountPoint::Iterate(
+            [](Ref<MountPoint> mount) -> IterationResult
             {
                 auto fs = mount->Filesystem();
                 fs->Sync();
 
-                return true;
+                return IterationResult::eContinue;
             });
 
-        MountPoint::Iterate(iterator);
         return {};
     }
 
     ErrorOr<Ref<DirectoryEntry>> CreateNode(Ref<DirectoryEntry> directory,
-                                            StringView name, mode_t mode,
+                                            StringView name, INodeMode mode,
                                             dev_t dev, PathView target)
     {
         Assert(directory);
@@ -471,7 +469,7 @@ namespace VFS
         entry->SetParent(directory);
         return entry;
     }
-    ErrorOr<Ref<DirectoryEntry>> CreateNode(PathView path, mode_t mode,
+    ErrorOr<Ref<DirectoryEntry>> CreateNode(PathView path, INodeMode mode,
                                             dev_t dev)
     {
         return CreateNode(TryOrRet(ResolveParent(RootDirectoryEntry(), path)),
@@ -479,28 +477,29 @@ namespace VFS
     }
 
     ErrorOr<Ref<DirectoryEntry>> CreateFile(Ref<DirectoryEntry> directory,
-                                            StringView name, mode_t mode)
+                                            StringView name, INodeMode mode)
     {
         mode &= ~S_IFMT;
         mode |= S_IFREG;
 
         return CreateNode(directory, name, mode, 0);
     }
-    ErrorOr<Ref<DirectoryEntry>> CreateFile(PathView path, mode_t mode)
+    ErrorOr<Ref<DirectoryEntry>> CreateFile(PathView path, INodeMode mode)
     {
         return CreateFile(TryOrRet(ResolveParent(RootDirectoryEntry(), path)),
                           path.BaseName(), mode);
     }
 
     ErrorOr<Ref<DirectoryEntry>> CreateDirectory(Ref<DirectoryEntry> directory,
-                                                 StringView name, mode_t mode)
+                                                 StringView          name,
+                                                 INodeMode           mode)
     {
         mode &= ~S_IFMT;
         mode |= S_IFDIR;
 
         return CreateNode(directory, name, mode, 0);
     }
-    ErrorOr<Ref<DirectoryEntry>> CreateDirectory(PathView path, mode_t mode)
+    ErrorOr<Ref<DirectoryEntry>> CreateDirectory(PathView path, INodeMode mode)
     {
         return CreateDirectory(
             TryOrRet(ResolveParent(RootDirectoryEntry(), path)),
@@ -510,7 +509,7 @@ namespace VFS
     ErrorOr<Ref<DirectoryEntry>> Symlink(Ref<DirectoryEntry> directory,
                                          StringView name, PathView targetPath)
     {
-        mode_t mode = 0777 | S_IFLNK;
+        INodeMode mode = 0777 | S_IFLNK;
 
         return CreateNode(directory, name, mode, 0, targetPath);
     }

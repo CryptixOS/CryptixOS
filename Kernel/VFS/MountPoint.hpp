@@ -15,7 +15,7 @@ class Filesystem;
 class MountPoint : public RefCounted
 {
   public:
-    using Iterator = Delegate<bool(::Ref<MountPoint> mountPoint)>;
+    using Iterator = Delegate<IterationResult(::Ref<MountPoint> mountPoint)>;
 
     explicit MountPoint(::Ref<DirectoryEntry> hostEntry  = nullptr,
                         ::Ref<Filesystem>     filesystem = nullptr);
