@@ -14,6 +14,7 @@
 #include <Drivers/Terminal.hpp>
 #include <Drivers/Video/VideoTerminal.hpp>
 
+#include <Library/Unicode.hpp>
 #include <Memory/PMM.hpp>
 #include <Prism/String/StringUtils.hpp>
 using namespace StringUtils;

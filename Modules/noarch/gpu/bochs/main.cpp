@@ -53,12 +53,12 @@ class BochsAdapter : public PCI::Device
 
     inline static u16    Read(VbeRegister index)
     {
-        IO::Out<word>(VBE_DISPI_IOPORT_INDEX, std::to_underlying(index));
+        IO::Out<word>(VBE_DISPI_IOPORT_INDEX, ToUnderlying(index));
         return IO::In<word>(VBE_DISPI_IOPORT_DATA);
     }
     inline static void Write(VbeRegister index, u16 value)
     {
-        IO::Out<word>(VBE_DISPI_IOPORT_INDEX, std::to_underlying(index));
+        IO::Out<word>(VBE_DISPI_IOPORT_INDEX, ToUnderlying(index));
         IO::Out<word>(VBE_DISPI_IOPORT_DATA, value);
     }
 };
@@ -71,7 +71,7 @@ static Array       s_BochsIdTable = ToArray({
 });
 static PCI::Driver s_BochsDriver  = {
      .Name     = "bxvga",
-     .MatchIDs = std::span(s_BochsIdTable.begin(), s_BochsIdTable.end()),
+     .MatchIDs = Span(s_BochsIdTable.begin(), s_BochsIdTable.Size()),
      .Probe    = BochsAdapter::Probe,
      .Remove   = nullptr,
 };

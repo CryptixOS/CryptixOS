@@ -15,10 +15,11 @@
 #include <Boot/CommandLine.hpp>
 #include <Drivers/TTY.hpp>
 
+#include <Prism/Core/Ranges.hpp>
 #include <Prism/String/StringUtils.hpp>
 using namespace Prism;
 
-constexpr usize   SCANCODE_MAX               = std::size(PS2_Set1_Keys);
+constexpr usize   SCANCODE_MAX               = Size(PS2_Set1_Keys);
 constexpr usize   SCANCODE_CTRL_PRESS        = 0x1d;
 constexpr usize   SCANCODE_CTRL_REL          = 0x9d;
 constexpr usize   SCANCODE_SHIFT_RIGHT_PRESS = 0x36;

@@ -7,6 +7,7 @@
 #pragma once
 
 #include <Prism/Containers/Array.hpp>
+#include <Prism/Core/Ranges.hpp>
 #include <Prism/Core/Types.hpp>
 
 namespace Unicode
@@ -190,7 +191,7 @@ namespace Unicode
 
     constexpr bool IsInCombining(u32 ucs, const auto& table)
     {
-        auto it = std::lower_bound(table.begin(), table.end(), ucs);
+        auto it = LowerBound(table.begin(), table.end(), ucs);
         if (it == table.end()) return false;
 
         return ucs >= it->First && ucs <= it->Last;
