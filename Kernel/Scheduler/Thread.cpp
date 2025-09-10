@@ -257,16 +257,16 @@ ErrorOr<void> Thread::SignalReturn()
     newThread->m_Tls.Self  = newThread.Raw();
     newThread->m_Tls.Stack = m_Tls.Stack;
 
-    Pointer kstack = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
-                                                    / PMM::PAGE_SIZE);
+    Pointer kstack = PMM::CallocatePages<upointer>(CPU::KERNEL_STACK_SIZE
+                                                   / PMM::PAGE_SIZE);
     newThread->m_Tls.KernelStack
-        = kstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
+        = kstack.ToHigherHalf<Pointer>().Offset<upointer>(
             CPU::KERNEL_STACK_SIZE);
 
-    Pointer pfstack = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
-                                                     / PMM::PAGE_SIZE);
+    Pointer pfstack = PMM::CallocatePages<upointer>(CPU::KERNEL_STACK_SIZE
+                                                    / PMM::PAGE_SIZE);
     newThread->m_Tls.PageFaultStack
-        = pfstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
+        = pfstack.ToHigherHalf<Pointer>().Offset<upointer>(
             CPU::KERNEL_STACK_SIZE);
 
     for (const auto& stack : m_Stacks)
@@ -280,8 +280,8 @@ ErrorOr<void> Thread::SignalReturn()
 
     newThread->m_Tls.FpuStoragePageCount = m_Tls.FpuStoragePageCount;
     newThread->m_Tls.FpuStorage
-        = Pointer(PMM::CallocatePages<uintptr_t>(m_Tls.FpuStoragePageCount))
-              .ToHigherHalf<uintptr_t>();
+        = Pointer(PMM::CallocatePages<upointer>(m_Tls.FpuStoragePageCount))
+              .ToHigherHalf<upointer>();
 
     Memory::Copy(newThread->m_Tls.FpuStorage, m_Tls.FpuStorage,
                  m_Tls.FpuStoragePageCount * PMM::PAGE_SIZE);

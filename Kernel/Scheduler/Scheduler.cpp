@@ -240,9 +240,9 @@ void Scheduler::Yield(bool saveCtx)
     {
 #ifdef CTOS_TARGET_X86_64
         CPU::SetGSBase(
-            reinterpret_cast<uintptr_t>(&CPU::Current()->Idle->m_Tls));
+            reinterpret_cast<upointer>(&CPU::Current()->Idle->m_Tls));
         CPU::SetKernelGSBase(
-            reinterpret_cast<uintptr_t>(&CPU::Current()->Idle->m_Tls));
+            reinterpret_cast<upointer>(&CPU::Current()->Idle->m_Tls));
 #endif
     }
 
@@ -274,7 +274,7 @@ Process* Scheduler::CreateProcess(Process* parent, StringView name,
 
     return proc;
 }
-void Scheduler::RemoveProcess(pid_t pid)
+void Scheduler::RemoveProcess(ProcessID pid)
 {
     ScopedLock guard(s_ProcessListLock);
     s_ProcFs->RemoveProcess(pid);
@@ -285,7 +285,7 @@ void Scheduler::RemoveProcess(pid_t pid)
     if (found) found->Hook.Unlink(found);
 }
 
-bool Scheduler::ValidatePid(pid_t pid)
+bool Scheduler::ValidatePid(ProcessID pid)
 {
     ScopedLock guard(s_ProcessListLock);
 
@@ -293,7 +293,7 @@ bool Scheduler::ValidatePid(pid_t pid)
         if (process.ID() == pid) return true;
     return false;
 }
-Process* Scheduler::GetProcess(pid_t pid)
+Process* Scheduler::GetProcess(ProcessID pid)
 {
     ScopedLock guard(s_ProcessListLock);
     for (auto& process : s_ProcessList)

@@ -142,8 +142,8 @@ class Process
     inline Ref<DirectoryEntry> RootNode() const { return m_RootDirectoryEntry; }
     inline Ref<DirectoryEntry> CWD() const { return m_CWD; }
     inline void                SetCWD(Ref<DirectoryEntry> cwd) { m_CWD = cwd; }
-    inline mode_t              Umask() const { return m_Umask; }
-    mode_t                     Umask(mode_t mask);
+    inline INodeMode           Umask() const { return m_Umask; }
+    INodeMode                  Umask(INodeMode mask);
 
     inline Timestep            Quantum() const { return m_Quantum; }
     const struct SignalAction& SignalAction(SignalID signal) const;
@@ -152,7 +152,8 @@ class Process
     static void    SendGroupSignal(ProcessID pgid, i32 signal);
     void           SendSignal(i32 signal);
 
-    ErrorOr<isize> OpenAt(i32 dirFdNum, PathView path, i32 flags, mode_t mode);
+    ErrorOr<isize> OpenAt(i32 dirFdNum, PathView path, i32 flags,
+                          INodeMode mode);
     ErrorOr<isize> DupFd(isize oldFdNum, isize newFdNum, isize flags);
     i32            CloseFd(i32 fd);
     ErrorOr<isize> InsertFd(Ref<FileDescriptor> fd);
@@ -199,7 +200,7 @@ class Process
 
     Ref<DirectoryEntry> m_RootDirectoryEntry = nullptr;
     Ref<DirectoryEntry> m_CWD                = nullptr;
-    mode_t              m_Umask              = 0;
+    INodeMode           m_Umask              = 0;
 
     FileDescriptorTable m_FdTable;
     class AddressSpace  m_AddressSpace;

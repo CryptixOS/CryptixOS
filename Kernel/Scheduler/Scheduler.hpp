@@ -38,10 +38,10 @@ class Scheduler
 
     static Process* CreateProcess(Process* parent, StringView name,
                                   const Credentials& creds);
-    static void     RemoveProcess(pid_t pid);
+    static void     RemoveProcess(ProcessID pid);
 
-    static bool     ValidatePid(pid_t pid);
-    static Process* GetProcess(pid_t pid);
+    static bool     ValidatePid(ProcessID pid);
+    static Process* GetProcess(ProcessID pid);
 
     static void     EnqueueThread(Thread* thread);
     static void     EnqueueNotReady(Thread* thread);

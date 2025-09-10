@@ -85,7 +85,6 @@ struct Thread : public RefCounted
     void               SetFpuStorage(Pointer fpuStorage, usize pageCount);
 
     inline ThreadID    ID() const { return m_ID; }
-    inline tid_t       Tid() const { return m_ID; }
     inline ThreadState State() const { return m_State; }
     inline void        SetState(ThreadState state)
     {
@@ -147,22 +146,10 @@ struct Thread : public RefCounted
     using List = IntrusiveList<Thread>;
 
   private:
-    ///// DON'T MOVE /////
-    // isize          m_RunningOn = -1;
-    // Thread*        m_Self      = this;
-    // Pointer        m_Stack;
-    //
-    // Pointer        m_KernelStack;
-    // Pointer        m_PageFaultStack;
-    //
-    // usize          m_FpuStoragePageCount;
-    // Pointer        m_FpuStorage;
-    ///// ^^^^^^^^^^ /////
-
     Spinlock       m_Lock;
     ThreadID       m_ID;
     ThreadState    m_State     = ThreadState::eIdle;
-    errno_t        m_ErrorCode = no_error;
+    ::ErrorCode    m_ErrorCode = no_error;
     Process*       m_Parent;
     Pointer        m_StackVirt;
 
