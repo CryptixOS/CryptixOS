@@ -50,12 +50,13 @@ class Scheduler
   private:
     Scheduler() = default;
 
-    static UnorderedMap<pid_t, Process*>& GetProcessMap();
+    static Process::List& ProcessList();
     friend class Process;
 
     static Thread* GetNextThread(usize cpuID);
     static Thread* PickReadyThread();
-    static void    SwitchContext(Thread* newThread, struct ExecutionContext* context);
+    static void    SwitchContext(Thread*                  newThread,
+                                 struct ExecutionContext* context);
 
     static void    Tick(struct ExecutionContext*);
 }; // namespace Scheduler

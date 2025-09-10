@@ -98,8 +98,11 @@ namespace API::Process
         }
 
         process->SetSignalAction(static_cast<SignalID>(signal), newAction);
-        auto mask
-            = thread->SignalMask() & ~(Bit(SIGKILL - 1) | Bit(SIGSTOP - 1));
+        auto mask = thread->SignalMask();
+        mask.Remove(SIGKILL);
+        mask.Remove(SIGSTOP);
+        // & ~(Bit(SIGKILL - 1) | Bit(SIGSTOP - 1));
+
         thread->SetSignalMask(mask);
 
         // if (sigact.sa_handler == SIG_IGN
@@ -118,24 +121,26 @@ namespace API::Process
         auto process     = Process::Current();
         auto thread      = Thread::Current();
         auto currentMask = thread->SignalMask();
-        return Error(ENOSYS);
+        return Error(EINVAL);
 
         if (oldSet)
         {
             if (!process->ValidateWrite(oldSet, sizeof(sigset_t)))
                 return Error(EFAULT);
 
-            CPU::CopyToUser(reinterpret_cast<usize*>(oldSet), currentMask);
+            // CPU::CopyToUser(reinterpret_cast<SignalSet*>(oldSet),
+            // currentMask);
         }
 
         if (!set) return 0;
         if (!process->ValidateRead(set, sizeof(sigset_t))) return Error(EFAULT);
 
-        auto newSet = CPU::CopyFromUser(*reinterpret_cast<const usize*>(set));
+        auto newSet
+            = CPU::CopyFromUser(*reinterpret_cast<const SignalSet*>(set));
         switch (how)
         {
-            case SIG_BLOCK: currentMask &= ~newSet; break;
-            case SIG_UNBLOCK: currentMask |= newSet; break;
+            case SIG_BLOCK: currentMask |= newSet; break;
+            case SIG_UNBLOCK: currentMask &= ~newSet; break;
             case SIG_SETMASK: currentMask = newSet; break;
 
             default: return Error(EINVAL);
@@ -277,24 +282,46 @@ namespace API::Process
     }
     ErrorOr<isize> Kill(ProcessID pid, isize signal)
     {
-        class Process* current = Process::Current();
-        class Process* target  = nullptr;
+        auto current = Process::Current();
 
-        if (pid == 0) target = current;
-        else if (pid > 0) target = Scheduler::GetProcess(pid);
-        else if (pid == -1)
+        if (signal < 1 || signal > _NSIG) return Error(EINVAL);
+        if (pid > 0)
         {
-            ToDoWarn();
-            // Send to everyone
-        }
-        else if (pid < -1)
-        {
-            // Send to everyone in group
-            ToDoWarn();
-            target = Scheduler::GetProcess(-pid);
+            auto target = Scheduler::GetProcess(pid);
+            if (!target) return Error(ESRCH);
+
+            // TODO(v1tr10l7): perm check
+            target->SendSignal(signal);
+            return 0;
         }
 
-        target->SendSignal(signal);
+        Vector<class Process*> targets;
+        auto appendProcess = [&targets](auto process) -> IterationResult
+        {
+            targets.PushBack(process);
+            return IterationResult::eContinue;
+        };
+
+        // Send to everyone you are permitted to, except 1
+        if (pid == -1) Process::ForEach(appendProcess);
+        else
+        {
+            GroupID targetGroup
+                = pid == 0 ? current->Credentials().GroupID : -pid;
+            Process::ForEachInGroup(targetGroup, appendProcess);
+        }
+
+        if (targets.Empty()) return Error(ESRCH);
+
+        usize signalsDelivered = 0;
+        for (auto target : targets)
+        {
+            // FIXME(v1tr10l7): perm check
+            target->SendSignal(signal);
+            ++signalsDelivered;
+        }
+
+        if (!signalsDelivered) return Error(EPERM);
         return 0;
     }
 

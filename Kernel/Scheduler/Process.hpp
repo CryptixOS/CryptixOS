@@ -48,6 +48,10 @@ class Process
     static Process* CreateKernelProcess();
     static Process* CreateIdleProcess();
 
+    using Iterator = Delegate<IterationResult(Process*)>;
+    static void ForEach(Iterator it);
+    static void ForEachInGroup(ProcessID pgid, Iterator it);
+
     Ref<Thread> CreateThread(Pointer rip, bool isUser = true, i64 runOn = -1);
     Ref<Thread> CreateThread(Vector<StringView>& argv, Vector<StringView>& envp,
                              ExecutableProgram& program, i64 runOn = -1);
@@ -171,6 +175,7 @@ class Process
     ErrorOr<void>      WakeFutex(i32* vaddr);
 
     friend struct Thread;
+    using List       = IntrusiveList<Process>;
 
     PageMap* PageMap = nullptr;
 
@@ -219,4 +224,9 @@ class Process
 
     friend class Scheduler;
     friend struct Thread;
+
+    friend class IntrusiveList<Process>;
+    friend struct IntrusiveListHook<Process>;
+
+    IntrusiveListHook<Process> Hook;
 };

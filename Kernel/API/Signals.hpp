@@ -89,3 +89,104 @@ constexpr SignalFlags& operator&=(SignalFlags& lhs, SignalFlags rhs)
 
     return lhs  = static_cast<SignalFlags>(result), lhs;
 }
+
+struct SignalSet
+{
+    static constexpr usize BitCount     = 1024;
+    static constexpr usize WordBitCount = sizeof(unsigned long) * 8;
+    static constexpr usize WordCount    = BitCount / WordBitCount;
+    unsigned long          Signals[WordCount];
+
+    constexpr auto SignalIndex(isize signal) const { return signal - 1; }
+    constexpr auto WordIndex(isize signal) const
+    {
+        return SignalIndex(signal) / WordBitCount;
+    }
+
+    constexpr auto BitMask(isize signal) const
+    {
+        return 1ul << (SignalIndex(signal) % WordBitCount);
+    }
+
+    inline constexpr bool operator[](usize i) const { return Contains(i); }
+
+    inline constexpr void Clear()
+    {
+        for (auto& signal : Signals) signal = 0;
+    }
+    inline constexpr void Fill()
+    {
+        for (auto& signal : Signals) signal = ~0ull;
+    }
+
+    constexpr void Add(isize signal)
+    {
+        if (signal <= 0 || signal > static_cast<isize>(BitCount)) return;
+        Signals[WordIndex(signal)] |= 1ul
+                                   << (SignalIndex(signal) % WordBitCount);
+    }
+
+    constexpr void Remove(isize signal)
+    {
+        if (signal <= 0 || signal > static_cast<isize>(BitCount)) return;
+        Signals[WordIndex(signal)]
+            &= ~(1ul << (SignalIndex(signal) % WordBitCount));
+    }
+
+    constexpr bool Contains(isize signal) const
+    {
+        if (signal <= 0 || signal > static_cast<isize>(BitCount)) return false;
+        usize         word = WordIndex(signal);
+        unsigned long mask = 1ul << (SignalIndex(signal) % WordBitCount);
+        return (Signals[word] & mask) != 0;
+    }
+
+    friend constexpr bool operator==(const SignalSet& lhs, const SignalSet& rhs)
+    {
+        for (usize i = 0; i < WordCount; ++i)
+            if (lhs.Signals[i] != rhs.Signals[i]) return false;
+        return true;
+    }
+    friend constexpr bool operator!=(const SignalSet& lhs, const SignalSet& rhs)
+    {
+        return !(lhs == rhs);
+    }
+
+    friend constexpr SignalSet operator~(const SignalSet& set)
+    {
+        SignalSet result;
+        for (usize i = 0; i < WordCount; ++i)
+            result.Signals[i] = ~set.Signals[i];
+        return result;
+    }
+    friend constexpr SignalSet operator&(const SignalSet& lhs,
+                                         const SignalSet& rhs)
+    {
+        SignalSet result;
+        for (usize i = 0; i < WordCount; ++i)
+            result.Signals[i] = lhs.Signals[i] & rhs.Signals[i];
+        return result;
+    }
+
+    friend constexpr SignalSet operator|(const SignalSet& lhs,
+                                         const SignalSet& rhs)
+    {
+        SignalSet result;
+        for (usize i = 0; i < WordCount; ++i)
+            result.Signals[i] = lhs.Signals[i] | rhs.Signals[i];
+        return result;
+    }
+
+    // Compound assignment
+    constexpr SignalSet& operator&=(const SignalSet& rhs)
+    {
+        for (usize i = 0; i < WordCount; ++i) Signals[i] &= rhs.Signals[i];
+        return *this;
+    }
+
+    constexpr SignalSet& operator|=(const SignalSet& rhs)
+    {
+        for (usize i = 0; i < WordCount; ++i) Signals[i] |= rhs.Signals[i];
+        return *this;
+    }
+};

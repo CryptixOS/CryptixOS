@@ -67,10 +67,6 @@ Process::Process(Process* parent, StringView name,
     , m_CWD(VFS::RootDirectoryEntry())
 
 {
-    // OpenAt(AT_FDCWD, "/dev/tty", O_RDWR, 0);
-    // OpenAt(AT_FDCWD, "/dev/tty", O_RDWR, 0);
-    // OpenAt(AT_FDCWD, "/dev/tty", O_RDWR, 0);
-
     Ref ttyNode
         = VFS::ResolvePath(VFS::RootDirectoryEntry(), "/dev/tty").Value().Entry;
 
@@ -139,10 +135,24 @@ Process* Process::CreateIdleProcess()
     idle->m_ID                    = idlePids--;
     idle->m_Name                  = "Idle Process for CPU: "_s;
     idle->m_Name += StringUtils::ToString(CPU::GetCurrentID());
-
     idle->PageMap = VMM::GetKernelPageMap();
 
     return idle;
+}
+
+void Process::ForEach(Iterator it)
+{
+    for (auto& process : Scheduler::ProcessList())
+        if (it(&process) == IterationResult::eBreak) break;
+}
+void Process::ForEachInGroup(ProcessID pgid, Iterator it)
+{
+    for (auto& process : Scheduler::ProcessList())
+    {
+        if (process.Credentials().ProcessGroupID != pgid) continue;
+
+        if (it(&process) == IterationResult::eBreak) break;
+    }
 }
 
 Ref<Thread> Process::CreateThread(Pointer rip, bool isUser, i64 runOn)
@@ -248,19 +258,35 @@ void Process::SetSignalAction(SignalID                   signal,
 
 void Process::SendGroupSignal(ProcessID pgid, i32 signal)
 {
-    auto& processMap = Scheduler::GetProcessMap();
-    for (auto [pid, process] : processMap)
-        if (process->Credentials().ProcessGroupID == pgid)
-            process->SendSignal(signal);
+    for (auto& process : Scheduler::ProcessList())
+        if (process.Credentials().ProcessGroupID == pgid)
+            process.SendSignal(signal);
 }
 void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
 ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags,
                                INodeMode mode)
 {
+    String enabledFlags = "Process::OpenAt: Flags =>\n"_s;
+    bool   print        = flags
+               & (O_APPEND | O_ASYNC | O_DIRECT | O_DSYNC | O_LARGEFILE
+                  | O_NOATIME | O_NOCTTY | O_SYNC | O_TMPFILE | O_TRUNC);
+    if (flags & O_APPEND) enabledFlags += "O_APPEND, "_sv;
+    if (flags & O_ASYNC) enabledFlags += "O_ASYNC, "_sv;
+    if (flags & O_DIRECT) enabledFlags += "O_DIRECT, "_sv;
+    if (flags & O_DSYNC) enabledFlags += "O_DSYNC, "_sv;
+    if (flags & O_LARGEFILE) enabledFlags += "O_LARGEFILE, "_sv;
+    if (flags & O_NOATIME) enabledFlags += "O_NOATIME, "_sv;
+    if (flags & O_NOCTTY) enabledFlags += "O_NOCTTY, "_sv;
+    if (flags & O_SYNC) enabledFlags += "O_SYNC, "_sv;
+    if (flags & O_TMPFILE) enabledFlags += "O_TMPFILE, "_sv;
+    if (flags & O_TRUNC) enabledFlags += "O_TRUNC, "_sv;
+    StringView flagsString = enabledFlags;
+    if (flagsString.EndsWith(", ")) flagsString.RemoveSuffix(2);
+    if (print) LogDebug("{}", flagsString);
+
     Ref parent = CWD();
-    if (CPU::AsUser([path]() -> bool { return path.Absolute(); }))
-        parent = VFS::RootDirectoryEntry();
+    if (path.Absolute()) parent = VFS::RootDirectoryEntry();
     else if (dirFd != AT_FDCWD)
     {
         Ref<FileDescriptor> descriptor = GetFileHandle(dirFd);
@@ -270,12 +296,8 @@ ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags,
         parent     = entry;
     }
 
-    auto descriptor
-        = CPU::AsUser([&]() -> ErrorOr<Ref<FileDescriptor>>
-                      { return VFS::Open(parent, path, flags, mode); });
-    if (!descriptor) return Error(descriptor.Error());
-
-    return m_FdTable.Insert(descriptor.Value());
+    auto descriptor = TryOrRet(VFS::Open(parent, path, flags, mode));
+    return m_FdTable.Insert(descriptor);
 }
 ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
 {

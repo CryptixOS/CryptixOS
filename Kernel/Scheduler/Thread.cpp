@@ -98,7 +98,7 @@ void Thread::SendSignal(u8 signal)
     InterruptGuard guard(false);
 
     if (ShouldIgnoreSignal(signal)) return;
-    m_PendingSignals |= Bit(signal);
+    m_PendingSignals.Add(signal);
 }
 bool Thread::DispatchAnyPendingSignal()
 {
@@ -111,10 +111,10 @@ bool Thread::DispatchAnyPendingSignal()
 #endif
 
     Assert(!CPU::GetInterruptFlag());
-    u32 pendingSignals = m_PendingSignals & ~m_SignalMask;
+    auto pendingSignals = m_PendingSignals & ~m_SignalMask;
 
-    u8  signal         = 0;
-    while (signal < 32 && !(pendingSignals & Bit(signal))) ++signal;
+    u8   signal         = 0;
+    while (signal < 32 && !(pendingSignals.Contains(signal))) ++signal;
     if (signal == 32) return false;
 
     return DispatchSignal(signal);
@@ -125,13 +125,13 @@ bool           Thread::DispatchSignal(u8 signal)
 {
     Assert(!CPU::GetInterruptFlag());
     Assert(signal < 32);
-    m_PendingSignals &= ~Bit(signal);
+    m_PendingSignals.Remove(signal);
 
     LogDebug("Thread: Context => \n{}", Context);
 #if CTOS_TARGET_X86_64
     Assert(Context.SS == (GDT::USERLAND_DATA_SELECTOR | 0x03));
 
-    auto& action = m_Parent->SignalAction(SignalID::eHangup);
+    auto& action = m_Parent->SignalAction(static_cast<SignalID>(signal));
     if (action.VirtualAddress)
     {
         auto    rsp          = Context.RSP;
@@ -300,6 +300,14 @@ ErrorOr<void> Thread::SignalReturn()
 #else
     return nullptr;
 #endif
+}
+
+void Thread::SetSignalMask(SignalSet mask)
+{
+    if (m_SignalMask == mask) return;
+
+    ScopedLock guard(m_SignalMaskLock, true);
+    m_SignalMask = mask;
 }
 
 KeyValuePair<upointer, upointer> Thread::AllocateUserStack()

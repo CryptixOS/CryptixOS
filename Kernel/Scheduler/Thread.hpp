@@ -9,12 +9,13 @@
 #include <Common.hpp>
 
 #include <API/Posix/signal.h>
+#include <API/Signals.hpp>
 #include <API/UnixTypes.hpp>
 
 #if CTOS_ARCH == CTOS_ARCH_X86_64
-    #include <Arch/x86_64//ExecutionContext.hpp>
+    #include <Arch/x86_64/ExecutionContext.hpp>
 #elif CTOS_ARCH == CTOS_ARCH_AARCH64
-    #include <Arch/aarch64//ExecutionContext.hpp>
+    #include <Arch/aarch64/ExecutionContext.hpp>
 #endif
 
 #include <Library/ExecutableProgram.hpp>
@@ -106,21 +107,16 @@ struct Thread : public RefCounted
     {
         return m_State == ThreadState::eBlocked;
     }
-    constexpr bool ReadyForCleanup() { return IsDead(); }
+    constexpr bool   ReadyForCleanup() { return IsDead(); }
 
-    ::Ref<Thread>  Fork(Process* parent);
+    ::Ref<Thread>    Fork(Process* parent);
 
-#if 0
-    inline sigset_t SignalMask() const { return m_SignalMask; }
-    inline void     SetSignalMask(sigset_t mask) { m_SignalMask = mask; }
-#else
-    inline usize SignalMask() const { return m_SignalMask; }
-    inline void  SetSignalMask(usize mask) { m_SignalMask = mask; }
-#endif
+    inline SignalSet SignalMask() const { return m_SignalMask; }
+    void             SetSignalMask(SignalSet mask);
 
-    inline bool ShouldIgnoreSignal(u8 signal) const
+    inline bool      ShouldIgnoreSignal(u8 signal) const
     {
-        return m_SignalMask & signal;
+        return m_SignalMask.Contains(signal);
     }
 
     inline bool   ExecutingSyscall() const { return m_ExecutingSyscall.Load(); }
@@ -175,7 +171,7 @@ struct Thread : public RefCounted
   public:
     ExecutionContext Context;
     ExecutionContext SavedContext;
-    Spinlock   YieldAwaitLock;
+    Spinlock         YieldAwaitLock;
 
   private:
     Vector<::Ref<Region>> m_Stacks;
@@ -188,14 +184,11 @@ struct Thread : public RefCounted
     Pointer m_El0Base;
 #endif
 
-    bool m_IsEnqueued = false;
-#if 0
-    sigset_t m_SignalMask     = 0;
-    sigset_t m_PendingSignals = 0;
-#else
-    usize m_SignalMask     = 0;
-    usize m_PendingSignals = 0;
-#endif
+    bool       m_IsEnqueued = false;
+
+    Spinlock   m_SignalMaskLock;
+    SignalSet  m_SignalMask       = {};
+    SignalSet  m_PendingSignals   = {};
     AtomicBool m_ExecutingSyscall = false;
 
   public:

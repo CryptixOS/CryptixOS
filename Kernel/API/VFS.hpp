@@ -21,7 +21,7 @@ namespace API::VFS
 {
     ErrorOr<isize> Read(isize fdNum, u8* out, usize bytes);
     ErrorOr<isize> Write(isize fdNum, const u8* in, usize bytes);
-    ErrorOr<isize> Open(PathView path, isize flags, mode_t mode);
+    ErrorOr<isize> Open(const char* pathname, isize flags, INodeMode mode);
     ErrorOr<isize> Close(isize fdNum);
 
     ErrorOr<isize> Stat(const char* path, stat* out);
@@ -34,7 +34,7 @@ namespace API::VFS
     ErrorOr<isize> PRead(isize fdNum, void* out, usize count, off_t offset);
     ErrorOr<isize> PWrite(isize fdNum, const void* in, usize count,
                           off_t offset);
-    ErrorOr<isize> Access(const char* filename, mode_t mode);
+    ErrorOr<isize> Access(const char* filename, INodeMode mode);
 
     ErrorOr<isize> Dup(isize oldFdNum);
     ErrorOr<isize> Dup2(isize oldFdNum, isize newFdNum);
@@ -51,15 +51,15 @@ namespace API::VFS
     ErrorOr<isize> FChDir(isize fdNum);
 
     ErrorOr<isize> Rename(const char* oldPath, const char* newPath);
-    ErrorOr<isize> MkDir(const char* pathname, mode_t mode);
+    ErrorOr<isize> MkDir(const char* pathname, INodeMode mode);
     ErrorOr<isize> RmDir(const char* pathname);
-    ErrorOr<isize> Creat(const char* pathname, mode_t mode);
+    ErrorOr<isize> Creat(const char* pathname, INodeMode mode);
     ErrorOr<isize> Link(const char* oldPath, const char* newPath);
     ErrorOr<isize> Unlink(const char* path);
     ErrorOr<isize> Symlink(const char* target, const char* linkPath);
     ErrorOr<isize> ReadLink(PathView path, char* out, usize size);
-    ErrorOr<isize> ChMod(const char* path, mode_t mode);
-    ErrorOr<isize> FChMod(isize fdNum, mode_t mode);
+    ErrorOr<isize> ChMod(const char* path, INodeMode mode);
+    ErrorOr<isize> FChMod(isize fdNum, INodeMode mode);
 
     ErrorOr<isize> SyncFilesystems();
     ErrorOr<isize> Mount(const char* path, const char* target,
@@ -70,13 +70,13 @@ namespace API::VFS
     ErrorOr<isize> GetDEnts64(isize dirFdNum, dirent* const outBuffer,
                               usize count);
     ErrorOr<isize> OpenAt(isize dirFdNum, const char* path, isize flags,
-                          mode_t mode);
-    ErrorOr<isize> MkDirAt(isize dirFdNum, const char* path, mode_t mode);
-    ErrorOr<isize> MkNodAt(isize dirFdNum, const char* path, mode_t mode,
+                          INodeMode mode);
+    ErrorOr<isize> MkDirAt(isize dirFdNum, const char* path, INodeMode mode);
+    ErrorOr<isize> MkNodAt(isize dirFdNum, const char* path, INodeMode mode,
                            dev_t dev);
     ErrorOr<isize> ReadLinkAt(isize dirFdNum, const char* path, char* out,
                               usize bufferSize);
-    ErrorOr<isize> FChModAt(isize dirFdNum, const char* path, mode_t mode,
+    ErrorOr<isize> FChModAt(isize dirFdNum, const char* path, INodeMode mode,
                             isize flags);
     ErrorOr<isize> PSelect6(isize fdCount, fd_set* readFds, fd_set* writeFds,
                             fd_set* exceptFds, const timeval* timeout,

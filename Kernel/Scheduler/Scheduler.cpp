@@ -27,12 +27,12 @@ namespace
     {
         Atomic<bool> PreemptionEnabled;
     };
-    CPULocalData*                 s_CPULocalData;
+    CPULocalData* s_CPULocalData;
 
-    Process*                      s_KernelProcess = nullptr;
-    Spinlock                      s_ProcessListLock;
-    UnorderedMap<pid_t, Process*> s_Processes;
-    Ref<ProcFs>                   s_ProcFs = nullptr;
+    Process*      s_KernelProcess = nullptr;
+    Spinlock      s_ProcessListLock;
+    Process::List s_ProcessList;
+    Ref<ProcFs>   s_ProcFs = nullptr;
 } // namespace
 
 struct ThreadQueue
@@ -269,31 +269,37 @@ Process* Scheduler::CreateProcess(Process* parent, StringView name,
     auto       proc = new Process(parent, name, creds);
 
     ScopedLock guard(s_ProcessListLock);
-    s_Processes[proc->ID()] = proc;
-#if 1
+    s_ProcessList.PushBack(proc);
     s_ProcFs->AddProcess(proc);
-#endif
 
     return proc;
 }
 void Scheduler::RemoveProcess(pid_t pid)
 {
     ScopedLock guard(s_ProcessListLock);
-    s_Processes.Erase(pid);
     s_ProcFs->RemoveProcess(pid);
+
+    s_ProcessListLock.Release();
+    auto found = GetProcess(pid);
+    s_ProcessListLock.Acquire();
+    if (found) found->Hook.Unlink(found);
 }
 
 bool Scheduler::ValidatePid(pid_t pid)
 {
     ScopedLock guard(s_ProcessListLock);
-    return s_Processes.Contains(pid);
+
+    for (auto& process : s_ProcessList)
+        if (process.ID() == pid) return true;
+    return false;
 }
 Process* Scheduler::GetProcess(pid_t pid)
 {
     ScopedLock guard(s_ProcessListLock);
-    auto       it = s_Processes.Find(pid);
+    for (auto& process : s_ProcessList)
+        if (process.ID() == pid) return &process;
 
-    return it != s_Processes.end() ? s_Processes[pid] : nullptr;
+    return nullptr;
 }
 
 void Scheduler::EnqueueThread(Thread* thread)
@@ -331,12 +337,9 @@ void Scheduler::DequeueThread(Thread* thread)
     thread->Hook.Unlink(thread);
 }
 
-UnorderedMap<pid_t, Process*>& Scheduler::GetProcessMap()
-{
-    return s_Processes;
-}
+Process::List& Scheduler::ProcessList() { return s_ProcessList; }
 
-Thread* Scheduler::GetNextThread(usize cpuID)
+Thread*        Scheduler::GetNextThread(usize cpuID)
 {
     if (ExecutionQueue(CPU::GetCurrentID()).IsEmpty()) return nullptr;
 

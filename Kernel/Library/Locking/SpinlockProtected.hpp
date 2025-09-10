@@ -24,6 +24,8 @@ class SpinlockProtected : public NonCopyable<SpinlockProtected<T>>,
     {
     }
 
+    inline constexpr operator T() const { return m_Value; }
+
     template <typename Callback>
     decltype(auto) With(Callback callback) const
     {
