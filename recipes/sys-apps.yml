@@ -39,7 +39,9 @@ packages:
     architecture: '@OPTION:arch@'
     source:
       subdir: 'sources'
-      version: '1.0'
+      git: 'https://github.com/CryptixOS/Cryptix-Utils.git'
+      branch: 'main'
+      version: '0.1'
     tools_required:
       - system-gcc
       - host-pkg-config
@@ -66,10 +68,6 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
         quiet: true
-      # - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CryptixUtils/reboot.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/reboot']
-      #- args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CryptixUtils/vi.cpp', '-lncurses',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/vi']
-      # - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/CryptixUtils/shutdown.cpp',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/shutdown']
-      # - args: ['@OPTION:arch-triple@-g++', '-z', 'noexecstack', '@SOURCE_ROOT@/Userland/AwesomeShell/src/main.cpp', '-lncurses',  '-o', '@THIS_COLLECT_DIR@/usr/sbin/awsh']
 
   - name: coreutils
     architecture: '@OPTION:arch@'
@@ -415,7 +413,7 @@ packages:
       subdir: 'sources'
       version: '0.1'
     pkgs_required:
-      # - cryptix-utils
+      - cryptix-utils
       - coreutils
       - file 
       - less
