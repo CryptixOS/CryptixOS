@@ -346,7 +346,7 @@ namespace uACPI
         uacpi_thread_id uacpi_kernel_get_thread_id(void)
         {
             auto thread = Thread::Current();
-            if (thread) return reinterpret_cast<uacpi_thread_id>(thread->Tid());
+            if (thread) return reinterpret_cast<uacpi_thread_id>(thread->ID());
 
             return UACPI_THREAD_ID_NONE;
         }
