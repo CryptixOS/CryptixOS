@@ -52,9 +52,13 @@ namespace DeviceTree
         }
         else if (name == "compatible"_sv)
         {
-            StringView compatible(reinterpret_cast<char*>(data));
-
-            m_CompatibleDrivers = compatible.Split(',');
+            char* current = reinterpret_cast<char*>(data);
+            char* end     = current + length;
+            while (current < end)
+            {
+                auto string = m_CompatibleDrivers.EmplaceBack(current);
+                current += string.Size() + 1;
+            }
         }
         else if (name == "#size-cells"_sv)
             m_SizeCellCount

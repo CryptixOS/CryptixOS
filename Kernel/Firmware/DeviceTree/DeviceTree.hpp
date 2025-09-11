@@ -8,6 +8,7 @@
 
 #include <Firmware/DeviceTree/Node.hpp>
 
+#include <Prism/Core/Error.hpp>
 #include <Prism/Memory/Endian.hpp>
 #include <Prism/Memory/Pointer.hpp>
 
@@ -42,5 +43,16 @@ namespace DeviceTree
     static_assert(sizeof(FDT_Header) == 40,
                   "FDT header's size doesn't match the specification!");
 
+    struct Driver
+    {
+        String     Name;
+        StringView Compatible;
+
+        using ProbeFn = ErrorOr<void> (*)(Node& node);
+
+        ProbeFn Probe;
+    };
     bool Initialize(Pointer deviceTreeBlob);
+
+    bool RegisterDriver(const Driver& driver);
 }; // namespace DeviceTree

@@ -111,11 +111,26 @@ namespace DeviceTree
         auto success = ParseFDT(header);
         if (!success) return false;
 
+#undef CTOS_DEVICE_TREE_DUMP
+#define CTOS_DEVICE_TREE_DUMP 1
 #if CTOS_DEVICE_TREE_DUMP != 0
         s_RootNode->Print();
 #endif
 
         LogInfo("DeviceTree: FDT parsed successfully");
         return success;
+    }
+
+    bool EnumerateNode(const Driver& driver, Node& node)
+    {
+        if (node.IsCompatible(driver.Compatible)) return true;
+        for (auto& [name, child] : node)
+            if (EnumerateNode(driver, *child)) return true;
+        return false;
+    }
+    bool RegisterDriver(const Driver& driver)
+    {
+        if (EnumerateNode(driver, *s_RootNode)) return true;
+        return false;
     }
 } // namespace DeviceTree

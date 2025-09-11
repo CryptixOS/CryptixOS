@@ -81,8 +81,15 @@ namespace DeviceTree
                 if (compatible == name) return true;
             return false;
         }
+        inline const Vector<Register>& Registers() const { return m_Registers; }
 
-        void InsertNode(StringView name, Node* node)
+        inline auto                    begin() { return m_Children.begin(); }
+        inline auto begin() const { return m_Children.begin(); }
+
+        inline auto end() { return m_Children.end(); }
+        inline auto end() const { return m_Children.end(); }
+
+        void        InsertNode(StringView name, Node* node)
         {
             m_Children[name] = node;
         }
