@@ -12,7 +12,7 @@
 #include <Drivers/Serial.hpp>
 #include <Drivers/TTY.hpp>
 #include <Drivers/Terminal.hpp>
-#include <Drivers/Video/VideoTerminal.hpp>
+#include <Drivers/Video/FramebufferConsole.hpp>
 
 #include <Library/Unicode.hpp>
 #include <Memory/PMM.hpp>
@@ -170,7 +170,7 @@ const Vector<Terminal*>& Terminal::EnumerateTerminals()
 
         for (usize j = 0; j < terminalCount; j++)
         {
-            auto terminal = VideoTerminal::Create(fb);
+            auto terminal = FramebufferConsole::Create(fb);
             s_Terminals.PushBack(terminal);
         }
 

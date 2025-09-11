@@ -6,7 +6,7 @@
  */
 #include <Boot/BootModuleInfo.hpp>
 
-#include <Drivers/Video/VideoTerminal.hpp>
+#include <Drivers/Video/FramebufferConsole.hpp>
 #include <Embed/Font.hpp>
 
 #include <Library/Logger.hpp>
@@ -17,18 +17,18 @@
 
 #include <magic_enum/magic_enum.hpp>
 
-constexpr usize MAX_FONT_GLYPHS     = 256;
-constexpr Color DEFAULT_BACKGROUND  = Color(0xa0'00'00'00);
-constexpr Color DEFAULT_BACKDROP    = Color(0x00'00'00'00);
+constexpr usize     MAX_FONT_GLYPHS     = 256;
+constexpr Color     DEFAULT_BACKGROUND  = Color(0xa0'00'00'00);
+constexpr Color     DEFAULT_BACKDROP    = Color(0x00'00'00'00);
 
-constexpr usize BUILTIN_FONT_WIDTH  = 8;
-constexpr usize BUILTIN_FONT_HEIGHT = 16;
+constexpr usize     BUILTIN_FONT_WIDTH  = 8;
+constexpr usize     BUILTIN_FONT_HEIGHT = 16;
 
-VideoTerminal*  VideoTerminal::Create(Framebuffer& framebuffer)
+FramebufferConsole* FramebufferConsole::Create(Framebuffer& framebuffer)
 {
-    return new VideoTerminal(framebuffer);
+    return new FramebufferConsole(framebuffer);
 }
-bool VideoTerminal::Initialize(const ::Framebuffer& framebuffer)
+bool FramebufferConsole::Initialize(const ::Framebuffer& framebuffer)
 {
     if (!framebuffer.Address) return false;
     else if (m_Initialized) return true;
@@ -89,7 +89,7 @@ bool VideoTerminal::Initialize(const ::Framebuffer& framebuffer)
     return (m_Initialized = true);
 }
 
-void VideoTerminal::Clear(u32 color, bool move)
+void FramebufferConsole::Clear(u32 color, bool move)
 {
     Character empty;
     empty.CodePoint  = ' ';
@@ -106,7 +106,7 @@ void VideoTerminal::Clear(u32 color, bool move)
     }
 }
 
-void VideoTerminal::RawPutChar(u8 c)
+void FramebufferConsole::RawPutChar(u8 c)
 {
     if (m_CurrentState.CursorX >= m_Size.ws_col)
     {
@@ -127,8 +127,8 @@ void VideoTerminal::RawPutChar(u8 c)
     ch.Background = m_CurrentState.TextBackground;
     EnqueueChar(&ch, m_CurrentState.CursorX++, m_CurrentState.CursorY);
 }
-void VideoTerminal::MoveCharacter(usize newX, usize newY, usize oldX,
-                                  usize oldY)
+void FramebufferConsole::MoveCharacter(usize newX, usize newY, usize oldX,
+                                       usize oldY)
 {
     if (oldX >= m_Size.ws_col || oldY >= m_Size.ws_row || newX >= m_Size.ws_col
         || newY >= m_Size.ws_row)
@@ -142,7 +142,7 @@ void VideoTerminal::MoveCharacter(usize newX, usize newY, usize oldX,
     EnqueueChar(c, newX, newY);
 }
 
-void VideoTerminal::Scroll(isize count)
+void FramebufferConsole::Scroll(isize count)
 {
     bool revScroll = false;
     if (count < 0)
@@ -154,7 +154,7 @@ void VideoTerminal::Scroll(isize count)
     for (isize i = 0; i < count; i++) revScroll ? ScrollUp() : ScrollDown();
 }
 
-void VideoTerminal::ScrollDown()
+void FramebufferConsole::ScrollDown()
 {
     for (usize i = (m_ScrollTopMargin + 1) * m_Size.ws_col;
          i < m_ScrollBottomMargin * m_Size.ws_col; i++)
@@ -172,7 +172,7 @@ void VideoTerminal::ScrollDown()
     for (usize i = 0; i < m_Size.ws_col; i++)
         EnqueueChar(&empty, i, m_ScrollBottomMargin - 1);
 }
-void VideoTerminal::ScrollUp()
+void FramebufferConsole::ScrollUp()
 {
     for (usize i = (m_ScrollBottomMargin - 1) * m_Size.ws_col - 1;
          i >= m_ScrollTopMargin * m_Size.ws_col; i--)
@@ -192,7 +192,7 @@ void VideoTerminal::ScrollUp()
         EnqueueChar(&empty, i, m_ScrollTopMargin);
 }
 
-void VideoTerminal::Refresh()
+void FramebufferConsole::Refresh()
 {
     auto bgColor = m_CurrentState.TextBackground;
     for (usize y = 0; y < m_Framebuffer.Height; y++)
@@ -217,7 +217,7 @@ void VideoTerminal::Refresh()
 
     DrawCursor();
 }
-void VideoTerminal::Flush()
+void FramebufferConsole::Flush()
 {
     DrawCursor();
     while (!m_Queue.Empty())
@@ -244,10 +244,10 @@ void VideoTerminal::Flush()
     m_OldCursorY = m_CurrentState.CursorY;
 }
 
-void                       VideoTerminal::ShowCursor() {}
-bool                       VideoTerminal::HideCursor() { return true; }
+void                       FramebufferConsole::ShowCursor() {}
+bool                       FramebufferConsole::HideCursor() { return true; }
 
-KeyValuePair<usize, usize> VideoTerminal::GetCursorPos()
+KeyValuePair<usize, usize> FramebufferConsole::GetCursorPos()
 {
     usize x = m_CurrentState.CursorX >= m_Size.ws_col ? m_Size.ws_col - 1
                                                       : m_CurrentState.CursorX;
@@ -256,7 +256,7 @@ KeyValuePair<usize, usize> VideoTerminal::GetCursorPos()
 
     return {x, y};
 }
-void VideoTerminal::SetCursorPos(usize xpos, usize ypos)
+void FramebufferConsole::SetCursorPos(usize xpos, usize ypos)
 {
     if (xpos >= m_Size.ws_col)
         xpos = static_cast<i32>(xpos) < 0 ? 0 : m_Size.ws_col - 1;
@@ -267,10 +267,10 @@ void VideoTerminal::SetCursorPos(usize xpos, usize ypos)
     m_CurrentState.CursorY = ypos;
 }
 
-void VideoTerminal::SaveState() { m_SavedState = m_CurrentState; }
-void VideoTerminal::RestoreState() { m_CurrentState = m_SavedState; }
+void FramebufferConsole::SaveState() { m_SavedState = m_CurrentState; }
+void FramebufferConsole::RestoreState() { m_CurrentState = m_SavedState; }
 
-void VideoTerminal::SwapPalette()
+void FramebufferConsole::SwapPalette()
 {
     Swap(m_CurrentState.TextForeground, m_CurrentState.TextBackground);
 }
@@ -293,7 +293,7 @@ inline constexpr Color s_AnsiColors[]
 // colors(10-17)
 static_assert(Size(s_AnsiColors) == 8 * 2 + 2);
 
-void VideoTerminal::SetTextForeground(AnsiColor color)
+void FramebufferConsole::SetTextForeground(AnsiColor color)
 {
     if (color == AnsiColor::eDefault)
         return SetTextForegroundRgb(DEFAULT_TEXT_FOREGROUND);
@@ -307,7 +307,7 @@ void VideoTerminal::SetTextForeground(AnsiColor color)
 
     SetTextForegroundRgb(s_AnsiColors[ToUnderlying(color)]);
 }
-void VideoTerminal::SetTextBackground(AnsiColor color)
+void FramebufferConsole::SetTextBackground(AnsiColor color)
 {
     if (color == AnsiColor::eDefault)
         return SetTextBackgroundRgb(DEFAULT_TEXT_BACKGROUND);
@@ -322,21 +322,21 @@ void VideoTerminal::SetTextBackground(AnsiColor color)
     SetTextBackgroundRgb(s_AnsiColors[ToUnderlying(color)]);
 }
 
-void VideoTerminal::SetTextForegroundRgb(Color rgb)
+void FramebufferConsole::SetTextForegroundRgb(Color rgb)
 {
     m_CurrentState.TextForeground = rgb;
 }
-void VideoTerminal::SetTextBackgroundRgb(Color rgb)
+void FramebufferConsole::SetTextBackgroundRgb(Color rgb)
 {
     m_CurrentState.TextBackground = rgb;
 }
 
-void VideoTerminal::Destroy()
+void FramebufferConsole::Destroy()
 {
     if (m_Canvas.Address) delete[] m_Canvas.Address.As<u8>();
 }
 
-void VideoTerminal::PlotChar(Character* c, usize xpos, usize ypos)
+void FramebufferConsole::PlotChar(Character* c, usize xpos, usize ypos)
 {
     if (!VerifyBounds(xpos, ypos)) return;
     Color defaultBg  = DEFAULT_TEXT_BACKGROUND;
@@ -371,7 +371,7 @@ void VideoTerminal::PlotChar(Character* c, usize xpos, usize ypos)
     }
 }
 
-void VideoTerminal::EnqueueChar(Character* c, usize x, usize y)
+void FramebufferConsole::EnqueueChar(Character* c, usize x, usize y)
 {
     if (x >= m_Size.ws_col || y >= m_Size.ws_row) return;
     usize      i = y * m_Size.ws_col + x;
@@ -389,7 +389,7 @@ void VideoTerminal::EnqueueChar(Character* c, usize x, usize y)
     q->Character = *c;
 }
 
-void VideoTerminal::DrawCursor()
+void FramebufferConsole::DrawCursor()
 {
     if (!VerifyBounds(m_CurrentState.CursorX, m_CurrentState.CursorY)) return;
     usize i = m_CurrentState.CursorX + m_CurrentState.CursorY * m_Size.ws_col;
@@ -408,7 +408,7 @@ void VideoTerminal::DrawCursor()
     }
 }
 
-void VideoTerminal::SetFont(const Font& font)
+void FramebufferConsole::SetFont(const Font& font)
 {
     m_Font = font;
 
@@ -457,7 +457,7 @@ void VideoTerminal::SetFont(const Font& font)
     m_Size.ws_xpixel = m_Framebuffer.Width;
     m_Size.ws_ypixel = m_Framebuffer.Height;
 }
-void VideoTerminal::SetCanvas(u8* image, usize size)
+void FramebufferConsole::SetCanvas(u8* image, usize size)
 {
     if (!image || !m_Image.LoadFromMemory(image, size))
     {
@@ -489,7 +489,7 @@ void VideoTerminal::SetCanvas(u8* image, usize size)
 
     GenerateGradient();
 }
-void VideoTerminal::GenerateGradient()
+void FramebufferConsole::GenerateGradient()
 {
     Pointer     pixels        = m_Image.Pixels();
     const usize imagePitch    = m_Image.Pitch();
@@ -523,7 +523,7 @@ void VideoTerminal::GenerateGradient()
     }
 }
 
-Color VideoTerminal::BlendMargin(usize x, usize y, Color backgroundPixel)
+Color FramebufferConsole::BlendMargin(usize x, usize y, Color backgroundPixel)
 {
     usize gradientStopX = m_Framebuffer.Width - m_Margin;
     usize gradientStopY = m_Framebuffer.Height - m_Margin;

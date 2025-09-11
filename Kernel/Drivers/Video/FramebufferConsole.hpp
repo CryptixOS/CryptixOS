@@ -25,15 +25,15 @@ struct Rectangle
     }
 };
 
-class VideoTerminal final : public Terminal
+class FramebufferConsole final : public Terminal
 {
   public:
-    static VideoTerminal* Create(Framebuffer& framebuffer);
-    bool                  Initialize(const Framebuffer& framebuffer) override;
+    static FramebufferConsole* Create(Framebuffer& framebuffer);
+    bool Initialize(const Framebuffer& framebuffer) override;
 
   protected:
-    VideoTerminal() = default;
-    explicit VideoTerminal(const Framebuffer& framebuffer)
+    FramebufferConsole() = default;
+    explicit FramebufferConsole(const Framebuffer& framebuffer)
     {
         Initialize(framebuffer);
     }

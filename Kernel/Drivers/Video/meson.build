@@ -6,6 +6,6 @@
 #*/
 srcs += files(
   'FramebufferDevice.cpp',
-  'VideoTerminal.cpp',
+  'FramebufferConsole.cpp',
 )
 
