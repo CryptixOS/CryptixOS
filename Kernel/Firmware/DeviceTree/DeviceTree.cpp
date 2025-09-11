@@ -50,6 +50,7 @@ namespace DeviceTree
                     break;
                 }
                 case FDT_TokenType::eEndNode:
+                    current->Parse();
                     current = (current && current->Parent()) ? current->Parent()
                                                              : root;
                     break;

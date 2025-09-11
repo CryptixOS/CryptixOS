@@ -72,27 +72,11 @@ namespace EFI
 };
 bool        g_LogTmpFs = false;
 
-static void eternal()
-{
-    for (;;)
-    {
-        auto status = Time::NanoSleep(5'000'000'000zu);
-        if (!status)
-        {
-            LogError("Sleeping failed");
-            Process::Current()->Exit(-1);
-        }
-
-        Arch::Pause();
-    }
-}
-
 static bool loadInitProcess(Path initPath)
 {
-    Process* kernelProcess = Scheduler::GetKernelProcess();
-    Process* userProcess
-        = Scheduler::CreateProcess(kernelProcess, initPath, s_RootCredentials);
-    userProcess->PageMap = VMM::GetKernelPageMap();
+    Process* initProcess
+        = Scheduler::CreateProcess(nullptr, initPath, s_RootCredentials);
+    initProcess->PageMap = VMM::GetKernelPageMap();
 
     Vector<StringView> argv;
     argv.PushBack(initPath);
@@ -101,21 +85,16 @@ static bool loadInitProcess(Path initPath)
 
     static ExecutableProgram program;
     PageMap*                 pageMap = new PageMap();
-    if (!program.Load(initPath, pageMap, userProcess->AddressSpace()))
+    if (!program.Load(initPath, pageMap, initProcess->AddressSpace()))
         return false;
 
-    userProcess->PageMap = pageMap;
+    initProcess->PageMap = pageMap;
     Logger::DisableSink(LOG_SINK_TERMINAL);
-    auto userThread
-        = userProcess->CreateThread(argv, envp, program, CPU::GetCurrent()->ID);
+    auto initThread
+        = initProcess->CreateThread(argv, envp, program, CPU::GetCurrent()->ID);
     VMM::UnmapKernelInitCode();
 
-    (void)eternal;
-    auto colonel   = Scheduler::KernelProcess();
-    auto newThread = colonel->CreateThread(reinterpret_cast<uintptr_t>(eternal),
-                                           false, CPU::Current()->ID);
-    Scheduler::EnqueueThread(newThread.Raw());
-    Scheduler::EnqueueThread(userThread.Raw());
+    Scheduler::EnqueueThread(initThread.Raw());
 
     return true;
 }
@@ -234,7 +213,8 @@ kernelStart(const BootInformation& info)
 
     Device::Initialize();
 #if CTOS_DEVICE_TREE_DISABLE == 0
-    DeviceTree::Initialize(info.DeviceTreeBlob);
+    if (CommandLine::GetBoolean("dtb.enable").ValueOr(true))
+        DeviceTree::Initialize(info.DeviceTreeBlob);
 #endif
 
 #if CTOS_ACPI_DISABLE == 0
@@ -252,7 +232,7 @@ kernelStart(const BootInformation& info)
 
     Time::Initialize(info.DateAtBoot);
     Scheduler::Initialize();
-    auto process = Scheduler::GetKernelProcess();
+    auto process = Scheduler::KernelProcess();
     auto thread
         = process->CreateThread(kernelThread, false, CPU::GetCurrent()->ID);
 

@@ -23,6 +23,12 @@ namespace DeviceTree
     };
 
     class Node;
+    struct Register
+    {
+        Pointer Base   = nullptr;
+        usize   Length = 0;
+    };
+
     class Property
     {
       public:
@@ -38,6 +44,8 @@ namespace DeviceTree
         String m_Name     = "";
         u8*    m_Data     = nullptr;
         usize  m_DataSize = 0;
+
+        friend class Node;
     };
 
     class Node
@@ -52,14 +60,28 @@ namespace DeviceTree
             eEnd       = 9,
         };
 
-        Node*      Parent() { return m_Parent; }
-        StringView Name() { return m_Name; }
-
         Node(Node* parent, StringView name)
             : m_Parent(parent)
             , m_Name(name)
         {
         }
+
+        inline Node*           Parent() const { return m_Parent; }
+        inline StringView      Name() const { return m_Name; }
+
+        inline Optional<usize> ID() const { return m_ID; }
+        inline StringView      Model() const { return m_Model; }
+
+        inline usize AddressCellCount() const { return m_AddressCellCount; }
+        inline usize SizeCellCount() const { return m_SizeCellCount; }
+
+        inline bool  IsCompatible(StringView name) const
+        {
+            for (StringView compatible : m_CompatibleDrivers)
+                if (compatible == name) return true;
+            return false;
+        }
+
         void InsertNode(StringView name, Node* node)
         {
             m_Children[name] = node;
@@ -68,17 +90,34 @@ namespace DeviceTree
         void AddProperty(StringView name, u8* data, usize length);
         void InsertProperty(StringView name, Property* property);
 
+        void Parse();
         void Print(u32 depth = 0);
 
       private:
-        Node*                               m_Parent = nullptr;
-        String                              m_Name;
-        Optional<usize>                     m_ID = NullOpt;
+        Node*                               m_Parent           = nullptr;
+        String                              m_Name             = ""_sv;
+
+        Optional<usize>                     m_ID               = NullOpt;
+        String                              m_Model            = ""_sv;
+
+        usize                               m_AddressCellCount = 2;
+        usize                               m_SizeCellCount    = 1;
+
         Vector<String>                      m_CompatibleDrivers;
-        BigEndian<u32>                      m_AddressCellCount = 0;
-        BigEndian<u32>                      m_SizeCellCount    = 0;
+        Vector<Register>                    m_Registers;
 
         UnorderedMap<StringView, Node*>     m_Children;
         UnorderedMap<StringView, Property*> m_Properties;
     };
 }; // namespace DeviceTree
+
+template <>
+struct fmt::formatter<DeviceTree::Register> : fmt::formatter<std::string>
+{
+    template <typename FormatContext>
+    auto format(const DeviceTree::Register& reg, FormatContext& ctx) const
+    {
+        return fmt::formatter<std::string>::format(
+            fmt::format("{:#x}:{:#x}", reg.Base, reg.Length), ctx);
+    }
+};
