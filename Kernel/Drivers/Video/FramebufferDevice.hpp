@@ -28,11 +28,11 @@ class FramebufferDevice : public CharacterDevice
     virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
                                  isize offset = -1) override;
 
-    virtual i32            IoCtl(usize request, uintptr_t argp) override;
+    virtual ErrorOr<isize> IoCtl(usize request, upointer argp) override;
 
   private:
-    Framebuffer       m_Framebuffer;
-;
+    Framebuffer m_Framebuffer;
+    ;
     fb_var_screeninfo m_VariableScreenInfo;
     fb_fix_screeninfo m_FixedScreenInfo;
 };

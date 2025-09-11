@@ -71,6 +71,9 @@ class Terminal
     static Terminal*                GetPrimary();
     static const Vector<Terminal*>& EnumerateTerminals();
 
+    static Terminal*                Active();
+    static void                     SwitchTo(usize index);
+
   protected:
     bool     m_Initialized = false;
     winsize  m_Size;

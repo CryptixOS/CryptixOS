@@ -38,5 +38,8 @@ class NullDevice final : public CharacterDevice
         return count;
     }
 
-    virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
+    virtual ErrorOr<isize> IoCtl(usize request, upointer argp) override
+    {
+        return 0;
+    }
 };

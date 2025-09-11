@@ -43,7 +43,7 @@ class PCSpeakerDevice : public CharacterDevice
     virtual ErrorOr<isize> Write(const void* src, off_t offset,
                                  usize bytes) override
     {
-        if (!src || bytes < sizeof(u32)) return_err(-1, EINVAL);
+        if (!src || bytes < sizeof(u32)) return Error(EINVAL);
 
         struct Command
         {
@@ -55,7 +55,7 @@ class PCSpeakerDevice : public CharacterDevice
 
         if (command.Tone < 20 || command.Tone > 20'000
             || command.Milliseconds == 0)
-            return_err(-1, EINVAL);
+            return Error(EINVAL);
 
         PCSpeaker::ToneOn(command.Tone);
         IO::Delay(command.Milliseconds);
@@ -75,9 +75,9 @@ class PCSpeakerDevice : public CharacterDevice
         return Write(in.Raw(), offset, count);
     }
 
-    virtual i32 IoCtl(usize request, uintptr_t argp) override
+    virtual ErrorOr<isize> IoCtl(usize request, upointer argp) override
     {
-        return_err(-1, ENOSYS);
+        return Error(ENOSYS);
     }
 };
 

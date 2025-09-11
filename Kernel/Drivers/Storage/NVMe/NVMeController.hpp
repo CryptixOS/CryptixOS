@@ -200,7 +200,10 @@ namespace NVMe
             return 0;
         }
 
-        virtual i32 IoCtl(usize request, uintptr_t argp) override { return 0; }
+        virtual ErrorOr<isize> IoCtl(usize request, upointer argp) override
+        {
+            return Error(ENOSYS);
+        }
 
       private:
         String m_Name                                    = "nvme"_s;

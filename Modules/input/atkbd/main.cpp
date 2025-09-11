@@ -14,6 +14,7 @@
 #include <Arch/PowerManager.hpp>
 #include <Boot/CommandLine.hpp>
 #include <Drivers/TTY.hpp>
+#include <Drivers/Terminal.hpp>
 
 #include <Prism/Core/Ranges.hpp>
 #include <Prism/String/StringUtils.hpp>
@@ -175,10 +176,16 @@ void AtKeyboard::HandleScanCodeSet1Key(u8 raw)
     if (m_Modifiers & KeyModifier::eControl) c = StringUtils::ToUpper(c) - 0x40;
 
     if (!pressed) return;
-
-    if (m_Modifiers & KeyModifier::eShift && m_Modifiers & KeyModifier::eAlt
-        && c == '\r')
-        PowerManager::Reboot();
+    if (m_Modifiers & KeyModifier::eShift && m_Modifiers & KeyModifier::eAlt)
+    {
+        if (c == '\r') PowerManager::Reboot();
+        else if (c >= '!' && c <= '(')
+        {
+            isize index = c - '!' + 1;
+            Assert(index >= 0);
+            Terminal::SwitchTo(index - 1);
+        }
+    }
     else if (m_Modifiers & KeyModifier::eShift
              && m_Modifiers & KeyModifier::eAlt)
         g_LogSyscalls = !g_LogSyscalls;

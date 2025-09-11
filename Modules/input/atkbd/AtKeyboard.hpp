@@ -95,10 +95,10 @@ class AtKeyboard : public SerioDevice
         return -1;
     }
 
-    virtual i32 IoCtl(usize request, uintptr_t argp) override
+    virtual ErrorOr<isize> IoCtl(usize request, upointer argp) override
     {
         // TODO(v1tr10l7): AtKeyboard::IoCtl
-        return -1;
+        return Error(ENOSYS);
     }
 
     virtual void OnByteReceived(u8 byte) override;

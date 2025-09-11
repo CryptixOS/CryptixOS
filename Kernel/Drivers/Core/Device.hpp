@@ -20,26 +20,26 @@
 using DeviceMajor = u32;
 using DeviceMinor = u32;
 
-constexpr dev_t MakeDevice(DeviceMajor major, DeviceMinor minor)
+constexpr DeviceID MakeDevice(DeviceMajor major, DeviceMinor minor)
 {
-    dev_t dev = dev_t(major & 0x00000fffu) << 8;
-    dev |= dev_t(major & 0xfffff000u) << 32;
-    dev |= dev_t(minor & 0x000000ffu);
-    dev |= dev_t(minor & 0xffffff00u) << 12;
+    DeviceID dev = DeviceID(major & 0x00000fffu) << 8;
+    dev |= DeviceID(major & 0xfffff000u) << 32;
+    dev |= DeviceID(minor & 0x000000ffu);
+    dev |= DeviceID(minor & 0xffffff00u) << 12;
 
     return dev;
 }
-constexpr DeviceMajor GetDeviceMajor(dev_t dev)
+constexpr DeviceMajor GetDeviceMajor(DeviceID dev)
 {
-    u32 major = (dev & static_cast<dev_t>(0x0000'0000'000f'ff00u)) >> 8;
-    major |= (dev & static_cast<dev_t>(0xffff'f000'0000'0000u)) >> 32;
+    u32 major = (dev & static_cast<DeviceID>(0x0000'0000'000f'ff00u)) >> 8;
+    major |= (dev & static_cast<DeviceID>(0xffff'f000'0000'0000u)) >> 32;
 
     return major;
 }
-constexpr DeviceMinor GetDeviceMinor(dev_t dev)
+constexpr DeviceMinor GetDeviceMinor(DeviceID dev)
 {
-    u32 minor = dev & static_cast<dev_t>(0x0000'0000'0000'00ffu);
-    minor |= (dev & static_cast<dev_t>(0x0000'0fff'fff0'0000u)) >> 12;
+    u32 minor = dev & static_cast<DeviceID>(0x0000'0000'0000'00ffu);
+    minor |= (dev & static_cast<DeviceID>(0x0000'0fff'fff0'0000u)) >> 12;
 
     return minor;
 }
@@ -47,7 +47,7 @@ constexpr DeviceMinor GetDeviceMinor(dev_t dev)
 class Device : public File
 {
   public:
-    constexpr Device(StringView name, dev_t id)
+    constexpr Device(StringView name, DeviceID id)
         : m_Name(name)
         , m_ID(id)
     {
@@ -64,23 +64,26 @@ class Device : public File
 
     virtual ~Device() = default;
 
-    constexpr inline dev_t ID() const noexcept { return m_ID; }
-    virtual StringView     Name() const noexcept { return m_Name; };
+    constexpr inline DeviceID ID() const noexcept { return m_ID; }
+    virtual StringView        Name() const noexcept { return m_Name; };
 
-    virtual const stat&    Stats() { return m_Stats; }
+    virtual const stat&       Stats() { return m_Stats; }
 
-    virtual i32            IoCtl(usize request, uintptr_t argp) { return -1; };
+    virtual ErrorOr<isize>    IoCtl(usize request, upointer argp)
+    {
+        return Error(ENOSYS);
+    };
 
-    static void            Initialize();
+    static void Initialize();
 
-    Device*                Next() const { return Hook.Next; }
+    Device*     Next() const { return Hook.Next; }
 
     using HookType = IntrusiveRefListHook<Device, Device*>;
     using List     = IntrusiveRefList<Device, HookType>;
 
   protected:
     StringView m_Name = ""_sv;
-    dev_t      m_ID;
+    DeviceID   m_ID;
     stat       m_Stats;
 
   private:

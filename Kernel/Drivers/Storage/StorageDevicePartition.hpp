@@ -40,7 +40,7 @@ class StorageDevicePartition : public BlockDevice
         return Write(in.Raw(), offset, count);
     }
 
-    virtual i32 IoCtl(usize request, uintptr_t argp) override
+    virtual ErrorOr<isize> IoCtl(usize request, upointer argp) override
     {
         return m_Device.IoCtl(request, argp);
     }

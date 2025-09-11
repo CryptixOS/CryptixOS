@@ -299,7 +299,10 @@ namespace USB::UHCI
         return Error(ENOSYS);
     }
 
-    i32        Controller::IoCtl(usize request, uintptr_t argp) { return -1; }
+    ErrorOr<isize> Controller::IoCtl(usize request, upointer argp)
+    {
+        return Error(ENOSYS);
+    }
 
     QueueHead* Controller::AllocateQueueHead()
     {

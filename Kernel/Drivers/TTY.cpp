@@ -26,9 +26,6 @@
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/VFS.hpp>
 
-#include <algorithm>
-#include <magic_enum/magic_enum.hpp>
-
 Vector<TTY*> TTY::s_TTYs{};
 TTY*         TTY::s_CurrentTTY = nullptr;
 
@@ -69,7 +66,10 @@ TTY::TTY(StringView name, Terminal* terminal, usize minor)
     m_Termios.c_cc[VEOL2]    = CEOL2;
 }
 
-bool TTY::GetCursorKeyMode() const { return m_Terminal->GetCursorKeyMode(); }
+bool TTY::GetCursorKeyMode() const
+{
+    return Terminal::Active()->GetCursorKeyMode();
+}
 void TTY::SendBuffer(const char* string, usize bytes)
 {
     if (string[0] == '\e') m_State = State::eEscapeSequence;
@@ -116,7 +116,7 @@ void TTY::SendBuffer(const char* string, usize bytes)
 }
 
 StringView TTY::Name() const noexcept { return m_Name; }
-winsize    TTY::GetSize() const { return m_Terminal->GetSize(); }
+winsize    TTY::GetSize() const { return Terminal::Active()->GetSize(); }
 
 void       TTY::SetTermios(const termios2& termios)
 {
@@ -190,7 +190,7 @@ ErrorOr<isize> TTY::Write(const void* src, off_t offset, usize bytes)
     IgnoreUnused(m_RawLock);
     IgnoreUnused(m_OutputLock);
     UniqueGuard guard(m_OutputMutex);
-    m_Terminal->PrintString(str);
+    Terminal::Active()->PrintString(str);
     return bytes;
 }
 
@@ -203,9 +203,9 @@ ErrorOr<isize> TTY::Write(const UserBuffer& in, usize count, isize offset)
     return Write(in.Raw(), offset, count);
 }
 
-i32 TTY::IoCtl(usize request, uintptr_t argp)
+ErrorOr<isize> TTY::IoCtl(usize request, upointer argp)
 {
-    if (!argp) return_err(-1, EFAULT);
+    if (!argp) return Error(EFAULT);
     Process* current = Process::Current();
 
     switch (request)
@@ -213,25 +213,25 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         case TCGETS:
         {
             if (!current->ValidateWrite(argp, sizeof(termios2)))
-                return_err(-1, EFAULT);
+                return Error(EFAULT);
             Memory::Copy(argp, &m_Termios, sizeof(m_Termios));
             break;
         }
         case TCSETS:
             if (!current->ValidateRead(argp, sizeof(termios2)))
-                return_err(-1, EFAULT);
+                return Error(EFAULT);
             SetTermios(*reinterpret_cast<termios2*>(argp));
             break;
         case TCSETSW:
             // TODO(v1tr10l7): Drain the output buffer
             if (!current->ValidateRead(argp, sizeof(termios2)))
-                return_err(-1, EFAULT);
+                return Error(EFAULT);
             SetTermios(*reinterpret_cast<termios2*>(argp));
             break;
         case TCSETSF:
             // TODO(v1tr10l7): Allow current output buffer to drain
             if (!current->ValidateRead(argp, sizeof(termios2)))
-                return_err(-1, EFAULT);
+                return Error(EFAULT);
             SetTermios(*reinterpret_cast<termios2*>(argp));
             FlushInput();
             break;
@@ -239,14 +239,14 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         case TCGETS2:
         {
             if (!current->ValidateWrite(argp, sizeof(termios2)))
-                return_err(-1, EFAULT);
+                return Error(EFAULT);
             Memory::Copy(argp, &m_Termios, sizeof(termios2));
             break;
         }
         case TCSETS2:
         {
             if (!current->ValidateRead(argp, sizeof(termios2)))
-                return_err(-1, EFAULT);
+                return Error(EFAULT);
             Memory::Copy(&m_Termios, argp, sizeof(termios2));
             break;
         }
@@ -254,7 +254,7 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         {
             // TODO(v1tr10l7): Drain the output buffer
             if (!current->ValidateRead(argp, sizeof(termios2)))
-                return_err(-1, EFAULT);
+                return Error(EFAULT);
             Memory::Copy(&m_Termios, argp, sizeof(termios2));
             break;
         }
@@ -263,21 +263,21 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
             // TODO(v1tr10l7): Allow current output buffer to drain,
             //  and discard the input buffer
             if (!current->ValidateRead(argp, sizeof(termios2)))
-                return_err(-1, EFAULT);
+                return Error(EFAULT);
             Memory::Copy(&m_Termios, argp, sizeof(termios2));
             break;
         }
 
-        case TCGETA: return_err(-1, ENOSYS); break;
-        case TCSETA: return_err(-1, ENOSYS); break;
-        case TCSETAW: return_err(-1, ENOSYS); break;
-        case TCSETAF: return_err(-1, ENOSYS); break;
+        case TCGETA: return Error(ENOSYS); break;
+        case TCSETA: return Error(ENOSYS); break;
+        case TCSETAW: return Error(ENOSYS); break;
+        case TCSETAF: return Error(ENOSYS); break;
 
-        case TIOCGLCKTRMIOS: return_err(-1, ENOSYS); break;
-        case TIOCSLCKTRMIOS: return_err(-1, ENOSYS); break;
+        case TIOCGLCKTRMIOS: return Error(ENOSYS); break;
+        case TIOCSLCKTRMIOS: return Error(ENOSYS); break;
 
         case TIOCGWINSZ: *reinterpret_cast<winsize*>(argp) = GetSize(); break;
-        case TIOCSWINSZ: return_err(-1, ENOSYS); break;
+        case TIOCSWINSZ: return Error(ENOSYS); break;
 
         case TIOCINQ: *reinterpret_cast<u32*>(argp) = m_RawBuffer.Size(); break;
 
@@ -286,16 +286,16 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         // Make the TTY the controlling terminal of the calling process
         case TIOCSCTTY:
             if (current->Sid() != current->ID() || current->TTY())
-                return_err(-1, EINVAL);
+                return Error(EINVAL);
             if (m_ControlSid && current->Credentials().UserID != 0)
-                return_err(-1, EPERM);
+                return Error(EPERM);
             current->SetTTY(this);
             m_ControlSid = current->Credentials().SessionID;
             break;
         case TIOCNOTTY:
             if (current->TTY() != this
                 || m_ControlSid != current->Credentials().SessionID)
-                return_err(-1, EINVAL);
+                return Error(EINVAL);
 
             current->SetTTY(nullptr);
             m_ControlSid = -1;
@@ -315,7 +315,7 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         case TIOCSPGRP:
         {
             auto pgid = *reinterpret_cast<i32*>(argp);
-            if (pgid < 0) return_err(-1, EINVAL);
+            if (pgid < 0) return Error(EINVAL);
             m_Pgid = pgid;
             break;
         }
@@ -325,7 +325,7 @@ i32 TTY::IoCtl(usize request, uintptr_t argp)
         default:
             LogWarn("TTY: Request not implemented: {:#x}, argp: {}", request,
                     argp);
-            return_err(-1, EINVAL);
+            return Error(EINVAL);
     }
 
     return 0;
@@ -460,7 +460,7 @@ void TTY::Echo(u64 c)
 
     EchoRaw(c);
 }
-void TTY::EchoRaw(u64 c) { m_Terminal->PutChar(c); }
+void TTY::EchoRaw(u64 c) { Terminal::Active()->PutChar(c); }
 
 void TTY::EraseChar()
 {

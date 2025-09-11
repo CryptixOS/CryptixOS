@@ -133,7 +133,7 @@ ErrorOr<isize> FramebufferDevice::Write(const UserBuffer& in, usize count,
     return Write(in.Raw(), offset, count);
 }
 
-i32 FramebufferDevice::IoCtl(usize request, uintptr_t argp)
+ErrorOr<isize> FramebufferDevice::IoCtl(usize request, upointer argp)
 {
     switch (request)
     {
@@ -153,6 +153,5 @@ i32 FramebufferDevice::IoCtl(usize request, uintptr_t argp)
         case FBIOBLANK: return 0;
     }
 
-    errno = ENOSYS;
-    return -1;
+    return Error(ENOSYS);
 }

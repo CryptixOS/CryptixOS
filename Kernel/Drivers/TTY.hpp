@@ -42,7 +42,7 @@ class TTY : public CharacterDevice
     virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
                                  isize offset = -1) override;
 
-    virtual i32            IoCtl(usize request, uintptr_t argp) override;
+    virtual ErrorOr<isize> IoCtl(usize request, upointer argp) override;
 
     static void            Initialize();
 

@@ -21,6 +21,7 @@ using namespace StringUtils;
 
 Vector<Terminal*>                Terminal::s_Terminals = {};
 Span<Framebuffer, DynamicExtent> s_Framebuffers;
+static Terminal*                 s_ActiveTerminal = nullptr;
 
 Terminal::Terminal()
 {
@@ -141,6 +142,15 @@ Terminal*         Terminal::GetPrimary()
 {
     return !s_Terminals.Empty() ? s_Terminals[0] : nullptr;
 }
+
+Terminal* Terminal::Active() { return s_ActiveTerminal; }
+void      Terminal::SwitchTo(usize index)
+{
+    Assert(index < s_Terminals.Size());
+
+    s_ActiveTerminal = s_Terminals[index];
+    s_ActiveTerminal->Refresh();
+}
 const Vector<Terminal*>& Terminal::EnumerateTerminals()
 {
     if (s_Framebuffers.Empty())
@@ -152,15 +162,23 @@ const Vector<Terminal*>& Terminal::EnumerateTerminals()
 
     LogTrace("Terminal: Initializing terminals for {} framebuffers...",
              s_Framebuffers.Size());
-    for (auto& framebuffer : s_Framebuffers)
+
+    for (usize i = 0; i < s_Framebuffers.Size(); i++)
     {
-        auto terminal = VideoTerminal::Create(framebuffer);
-        s_Terminals.PushBack(terminal);
+        auto& fb            = s_Framebuffers[i];
+        usize terminalCount = i == 0 ? 8 : 1;
+
+        for (usize j = 0; j < terminalCount; j++)
+        {
+            auto terminal = VideoTerminal::Create(fb);
+            s_Terminals.PushBack(terminal);
+        }
 
         LogTrace("Terminal: Instantiated a terminal");
     }
 
     LogInfo("Terminal: Initialized {} terminals", s_Terminals.Size());
+    if (!s_Terminals.Empty()) s_ActiveTerminal = s_Terminals[0];
     return s_Terminals;
 }
 
