@@ -79,10 +79,9 @@ void Lapic::Initialize()
                                      PageAttributes::eRW
                                          | PageAttributes::eUncacheableStrong);
     }
-
-    m_BaseAddress = ToHigherHalfAddress<upointer>(base & ~(0xfff));
-    m_ID          = m_X2Apic ? Read(LAPIC_ID_REGISTER)
-                             : (Read(LAPIC_ID_REGISTER) >> 24) & 0xff;
+    else m_BaseAddress = ToHigherHalfAddress<upointer>(base & ~(0xfff));
+    m_ID = m_X2Apic ? Read(LAPIC_ID_REGISTER)
+                    : (Read(LAPIC_ID_REGISTER) >> 24) & 0xff;
 
     Write(LAPIC_TASK_PRIORITY_REGISTER, 0x00);
     Write(LAPIC_SPURIOUS_REGISTER, 0xff | Bit(8));
@@ -116,18 +115,30 @@ void Lapic::Initialize()
 
 usize Lapic::InterruptVector() const { return m_Dispatcher->IrqLine() + 0x20; }
 
-void  Lapic::SendIpi(u32 flags, u32 m_ID)
+void  Lapic::SendIpi(u32 vector, u32 destApicId)
 {
+    // Fixed delivery mode, physical dest, edge trigger, level=assert
+    constexpr u32 DELIVERY_FIXED = 0x000;
+    constexpr u32 DESTMODE_PHYS  = 0x000;
+    constexpr u32 LEVEL_ASSERT   = (1u << 14);
+    constexpr u32 TRIGGER_EDGE   = 0x000;
+    constexpr u32 SHORTHAND_NONE = 0x000;
+
+    u32 icrLow = vector | DELIVERY_FIXED | DESTMODE_PHYS | LEVEL_ASSERT
+               | TRIGGER_EDGE | SHORTHAND_NONE;
+
     if (!m_X2Apic)
     {
-        Write(LAPIC_ICR_HIGH_REGISTER, m_ID << 24);
-        Write(LAPIC_ICR_LOW_REGISTER, flags);
-        return;
+        Write(LAPIC_ICR_HIGH_REGISTER, destApicId << 24);
+        Write(LAPIC_ICR_LOW_REGISTER, icrLow);
     }
-
-    Write(LAPIC_ICR_LOW_REGISTER,
-          (static_cast<u64>(m_ID) << 32) | Bit(14) | flags);
+    else
+    {
+        u64 icr = (static_cast<u64>(destApicId) << 32) | icrLow;
+        CPU::WriteMSR(0x830, icr); // IA32_X2APIC_ICR MSR
+    }
 }
+
 void          Lapic::SendEOI() { Write(LAPIC_EOI_REGISTER, LAPIC_EOI_ACK); }
 
 ErrorOr<void> Lapic::Start(TimerMode tm, Timestep interval)
@@ -162,7 +173,7 @@ u32 Lapic::Read(u32 reg)
 {
     if (m_X2Apic) return CPU::ReadMSR((reg >> 4) + 0x800);
 
-    volatile auto ptr = reinterpret_cast<volatile u32*>(m_BaseAddress);
+    volatile auto ptr = reinterpret_cast<volatile u32*>(m_BaseAddress + reg);
     return *ptr;
 }
 

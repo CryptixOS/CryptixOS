@@ -74,7 +74,7 @@ class ProcFsINode : public INode
   public:
     ProcFsINode(StringView name, class Filesystem* fs, INodeID id,
                 INodeMode mode, ProcFsProperty* property = nullptr);
-    ProcFsINode(StringView name, class Filesystem* fs, mode_t mode,
+    ProcFsINode(StringView name, class Filesystem* fs, INodeMode mode,
                 ProcFsProperty* property = nullptr);
     virtual ~ProcFsINode() override
     {
@@ -85,6 +85,8 @@ class ProcFsINode : public INode
     virtual ErrorOr<void>
     TraverseDirectories(Ref<class DirectoryEntry> parent,
                         DirectoryIterator         iterator) override;
+    virtual ErrorOr<Ref<DirectoryEntry>>
+    Lookup(Ref<DirectoryEntry> dentry) override;
 
     virtual const UnorderedMap<StringView, INode*>& Children() const
     {
@@ -100,4 +102,12 @@ class ProcFsINode : public INode
   private:
     ProcFsProperty*                  m_Property = nullptr;
     UnorderedMap<StringView, INode*> m_Children;
+};
+
+class Process;
+class ProcFsProcessINode : public ProcFsINode
+{
+  public:
+    ProcFsProcessINode(StringView name, class Filesystem* fs, INodeID id,
+                       INodeMode mode, Process* process);
 };

@@ -79,7 +79,9 @@ namespace VFS
 
         CreateDirectory("/dev", 0755);
         Assert(Mount(nullptr, "", "/dev", "devfs"));
-        Scheduler::InitializeProcFs();
+
+        CreateDirectory("/proc", 0755);
+        Assert(Mount(nullptr, "", "/proc", "proc"));
 
         auto colonel = Scheduler::KernelProcess();
         auto syncd   = colonel->CreateThread(filesystemSyncDaemon, 0);

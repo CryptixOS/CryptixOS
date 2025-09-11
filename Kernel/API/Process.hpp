@@ -18,7 +18,7 @@ namespace API::Process
     ErrorOr<isize>     SigAction(isize signal, const struct sigaction* action,
                                  sigaction* oldAction);
     ErrorOr<isize>     SigProcMask(i32 how, const sigset_t* newSet,
-                                   sigset_t* oldSet);
+                                   sigset_t* oldSet, usize sigSetSize);
     ErrorOr<isize>     SigReturn();
     ErrorOr<isize>     SchedYield();
     ErrorOr<isize>     NanoSleep(const timespec* duration, timespec* rem);

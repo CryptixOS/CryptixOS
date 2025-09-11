@@ -11,6 +11,7 @@
 #include <API/Process.hpp>
 #include <Arch/InterruptGuard.hpp>
 
+#include <Prism/String/StringUtils.hpp>
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
@@ -116,27 +117,32 @@ namespace API::Process
 
         return 0;
     }
-    ErrorOr<isize> SigProcMask(i32 how, const sigset_t* set, sigset_t* oldSet)
+    ErrorOr<isize> SigProcMask(i32 how, const sigset_t* set, sigset_t* oldSet,
+                               usize sigSetSize)
     {
-        auto process     = Process::Current();
+        auto process = Process::Current();
+        if (sigSetSize != sizeof(SignalSet)) return Error(EINVAL);
+
         auto thread      = Thread::Current();
         auto currentMask = thread->SignalMask();
-        return Error(EINVAL);
 
         if (oldSet)
         {
-            if (!process->ValidateWrite(oldSet, sizeof(sigset_t)))
+            if (!process->ValidateWrite(oldSet, sizeof(SignalSet)))
                 return Error(EFAULT);
 
-            // CPU::CopyToUser(reinterpret_cast<SignalSet*>(oldSet),
-            // currentMask);
+            CPU::CopyToUser(reinterpret_cast<SignalSet*>(oldSet), currentMask);
         }
 
         if (!set) return 0;
-        if (!process->ValidateRead(set, sizeof(sigset_t))) return Error(EFAULT);
+        if (!process->ValidateRead(set, sizeof(SignalSet)))
+            return Error(EFAULT);
 
         auto newSet
             = CPU::CopyFromUser(*reinterpret_cast<const SignalSet*>(set));
+        newSet.Remove(SIGKILL);
+        newSet.Remove(SIGSTOP);
+
         switch (how)
         {
             case SIG_BLOCK: currentMask |= newSet; break;
@@ -283,6 +289,8 @@ namespace API::Process
     ErrorOr<isize> Kill(ProcessID pid, isize signal)
     {
         auto current = Process::Current();
+        LogDebug("API::Kill: Sending signal #{}({}) to process {}", signal,
+                 StringUtils::ToString(static_cast<SignalID>(signal)), pid);
 
         if (signal < 1 || signal > _NSIG) return Error(EINVAL);
         if (pid > 0)

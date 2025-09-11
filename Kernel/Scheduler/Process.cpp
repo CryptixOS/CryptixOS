@@ -267,24 +267,6 @@ void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags,
                                INodeMode mode)
 {
-    String enabledFlags = "Process::OpenAt: Flags =>\n"_s;
-    bool   print        = flags
-               & (O_APPEND | O_ASYNC | O_DIRECT | O_DSYNC | O_LARGEFILE
-                  | O_NOATIME | O_NOCTTY | O_SYNC | O_TMPFILE | O_TRUNC);
-    if (flags & O_APPEND) enabledFlags += "O_APPEND, "_sv;
-    if (flags & O_ASYNC) enabledFlags += "O_ASYNC, "_sv;
-    if (flags & O_DIRECT) enabledFlags += "O_DIRECT, "_sv;
-    if (flags & O_DSYNC) enabledFlags += "O_DSYNC, "_sv;
-    if (flags & O_LARGEFILE) enabledFlags += "O_LARGEFILE, "_sv;
-    if (flags & O_NOATIME) enabledFlags += "O_NOATIME, "_sv;
-    if (flags & O_NOCTTY) enabledFlags += "O_NOCTTY, "_sv;
-    if (flags & O_SYNC) enabledFlags += "O_SYNC, "_sv;
-    if (flags & O_TMPFILE) enabledFlags += "O_TMPFILE, "_sv;
-    if (flags & O_TRUNC) enabledFlags += "O_TRUNC, "_sv;
-    StringView flagsString = enabledFlags;
-    if (flagsString.EndsWith(", ")) flagsString.RemoveSuffix(2);
-    if (print) LogDebug("{}", flagsString);
-
     Ref parent = CWD();
     if (path.Absolute()) parent = VFS::RootDirectoryEntry();
     else if (dirFd != AT_FDCWD)
@@ -496,9 +478,7 @@ ErrorOr<ProcessID> Process::WaitPid(ProcessID pid, i32* wstatus, i32 flags,
             continue;
 
         if (wstatus)
-            CPU::AsUser(
-                [wstatus, &which]()
-                { *wstatus = W_EXITCODE(which->Status().ValueOr(0), 0); });
+            CPU::CopyToUser(wstatus, W_EXITCODE(which->Status().ValueOr(0), 0));
 
         return which->ID();
     }

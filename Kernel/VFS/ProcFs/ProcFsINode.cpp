@@ -6,6 +6,8 @@
  */
 #include <API/Posix/dirent.h>
 #include <Memory/PMM.hpp>
+#include <Prism/String/StringUtils.hpp>
+#include <Scheduler/Scheduler.hpp>
 
 #include <VFS/Filesystem.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
@@ -39,7 +41,7 @@ ProcFsINode::ProcFsINode(StringView name, class Filesystem* fs, INodeID id,
     m_Metadata.BlockSize    = 512;
     m_Metadata.BlockCount   = 0;
 }
-ProcFsINode::ProcFsINode(StringView name, class Filesystem* fs, mode_t mode,
+ProcFsINode::ProcFsINode(StringView name, class Filesystem* fs, INodeMode mode,
                          ProcFsProperty* property)
     : ProcFsINode(name, fs, fs->NextINodeIndex(), mode, property)
 {
@@ -72,18 +74,45 @@ const stat ProcFsINode::Stats()
 ErrorOr<void> ProcFsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
                                                DirectoryIterator iterator)
 {
+    Process::ForEach(
+        [this](auto* process) -> IterationResult
+        {
+            String    pidString = StringUtils::ToString(process->ID());
+            INodeID   id        = 0;
+            INodeMode mode      = 0;
+
+            if (!Children().Contains(pidString))
+                m_Children[pidString] = new ProcFsProcessINode(
+                    pidString, m_Filesystem, id, mode, process);
+
+            return IterationResult::eContinue;
+        });
+
     usize offset = 0;
     for (const auto [name, inode] : Children())
     {
-        usize  ino  = inode->Stats().st_ino;
-        mode_t mode = inode->Stats().st_mode;
-        auto   type = IF2DT(mode);
+        INodeID   ino  = inode->Stats().st_ino;
+        INodeMode mode = inode->Stats().st_mode;
+        auto      type = IF2DT(mode);
 
-        if (iterator(name, offset, ino, type)) break;
+        if (!iterator(name, offset, ino, type)) break;
         ++offset;
     }
 
     return {};
+}
+ErrorOr<Ref<DirectoryEntry>> ProcFsINode::Lookup(Ref<DirectoryEntry> entry)
+{
+    ScopedLock guard(m_Lock);
+
+    auto       child = Children().Find(entry->Name());
+    if (child != Children().end())
+    {
+        entry->Bind(child->Value);
+        return entry;
+    }
+
+    return Error(ENOENT);
 }
 
 void ProcFsINode::InsertChild(INode* node, StringView name)
@@ -102,3 +131,10 @@ isize ProcFsINode::Write(const void* buffer, off_t offset, usize bytes)
     return -1;
 }
 ErrorOr<isize> ProcFsINode::Truncate(usize size) { return Error(EROFS); }
+
+ProcFsProcessINode::ProcFsProcessINode(StringView name, class Filesystem* fs,
+                                       INodeID id, INodeMode mode,
+                                       Process* process)
+    : ProcFsINode(name, fs, id, mode)
+{
+}

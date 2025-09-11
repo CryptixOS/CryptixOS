@@ -10,6 +10,7 @@
 #include <Library/StackBuilder.hpp>
 #include <Memory/PMM.hpp>
 
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
 
 #include <Scheduler/Process.hpp>
@@ -96,14 +97,20 @@ void Thread::OnSyscallLeave() { m_ExecutingSyscall = false; }
 void Thread::SendSignal(u8 signal)
 {
     InterruptGuard guard(false);
+    LogDebug(
+        "Thread::SendSignal: Sending signal #{}({}) to process {}\nIgnored: {}",
+        signal, StringUtils::ToString(static_cast<SignalID>(signal)),
+        m_Parent->ID(), ShouldIgnoreSignal(signal));
 
     if (ShouldIgnoreSignal(signal)) return;
     m_PendingSignals.Add(signal);
+    if (m_State == ThreadState::eBlocked)
+        ;
 }
 bool Thread::DispatchAnyPendingSignal()
 {
     // FIXME(v1tr10l7): aarch64 implementation
-    if (m_ExecutingSyscall) return false;
+    // if (m_ExecutingSyscall) return false;
 #if CTOS_TARGET_X86_64
     if (Context.CS == GDT::KERNEL_CODE_SELECTOR
         || Context.DS == GDT::KERNEL_DATA_SELECTOR)
@@ -111,9 +118,16 @@ bool Thread::DispatchAnyPendingSignal()
 #endif
 
     Assert(!CPU::GetInterruptFlag());
-    auto pendingSignals = m_PendingSignals & ~m_SignalMask;
 
-    u8   signal         = 0;
+    usize i = 0;
+    for (i = 0; i < 32; i++)
+        if (m_PendingSignals.Contains(i))
+            LogDebug(
+                "Thread::DispatchAnyPendingSignal: Found pending signal => {}",
+                i);
+    auto pendingSignals = m_PendingSignals & ~m_SignalMask;
+    if (i != 32) LogDebug("Still pending => {}", pendingSignals.Contains(i));
+    u8 signal = 0;
     while (signal < 32 && !(pendingSignals.Contains(signal))) ++signal;
     if (signal == 32) return false;
 

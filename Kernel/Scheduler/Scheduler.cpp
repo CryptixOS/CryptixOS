@@ -5,6 +5,9 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/CPU.hpp>
+#ifdef CTOS_TARGET_X86_64
+    #include <Arch/x86_64/Drivers/Time/Lapic.hpp>
+#endif
 
 #include <Library/Locking/Spinlock.hpp>
 #include <Memory/PMM.hpp>
@@ -15,7 +18,6 @@
 #include <Time/Time.hpp>
 
 #include <VFS/MountPoint.hpp>
-#include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/VFS.hpp>
 
 namespace
@@ -32,7 +34,6 @@ namespace
     Process*      s_KernelProcess = nullptr;
     Spinlock      s_ProcessListLock;
     Process::List s_ProcessList;
-    Ref<ProcFs>   s_ProcFs = nullptr;
 } // namespace
 
 struct ThreadQueue
@@ -152,15 +153,6 @@ void Scheduler::Initialize()
     LogInfo("Scheduler: Kernel process created");
     LogInfo("Scheduler: Initialized");
 }
-KERNEL_INIT_CODE
-void Scheduler::InitializeProcFs()
-{
-    VFS::CreateDirectory("/proc", 0755);
-    Assert(VFS::Mount(nullptr, "", "/proc", "proc"));
-
-    s_ProcFs = MountPoint::Head()->Filesystem().As<ProcFs>();
-    s_ProcFs->AddProcess(s_KernelProcess);
-}
 void Scheduler::PrepareAP(bool start)
 {
     Process* process = Process::CreateIdleProcess();
@@ -246,9 +238,7 @@ void Scheduler::Yield(bool saveCtx)
 #endif
     }
 
-    Time::SchedulerTimer()->Start(TimerMode::eOneShot,
-                                  Process::Current()->Quantum());
-
+    Time::SchedulerTimer()->Start(TimerMode::eOneShot, 0);
     CPU::SetInterruptFlag(true);
 
     if (saveCtx)
@@ -270,14 +260,12 @@ Process* Scheduler::CreateProcess(Process* parent, StringView name,
 
     ScopedLock guard(s_ProcessListLock);
     s_ProcessList.PushBack(proc);
-    s_ProcFs->AddProcess(proc);
 
     return proc;
 }
 void Scheduler::RemoveProcess(ProcessID pid)
 {
     ScopedLock guard(s_ProcessListLock);
-    s_ProcFs->RemoveProcess(pid);
 
     s_ProcessListLock.Release();
     auto found = GetProcess(pid);
@@ -393,9 +381,7 @@ void Scheduler::SwitchContext(Thread* newThread, ExecutionContext* oldContext)
         CPU::SaveThread(currentThread, oldContext);
     }
 
-    newThread->DispatchAnyPendingSignal();
     CPU::LoadThread(newThread, oldContext);
-
     if (currentThread && currentThread->IsDead()
         && currentThread->Parent()->IsDead()
         && currentThread != CPU::Current()->Idle)
@@ -410,6 +396,7 @@ void Scheduler::Tick(ExecutionContext* ctx)
     newThread = PickReadyThread();
     Assert(newThread);
     SwitchContext(newThread, ctx);
+    if (newThread->DispatchAnyPendingSignal()) *ctx = newThread->Context;
 
     if (newThread != CPU::Current()->Idle)
         newThread->SetState(ThreadState::eRunning);

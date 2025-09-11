@@ -20,10 +20,6 @@ class ProcFs : public Filesystem
     {
     }
 
-    static Process*    GetProcess(pid_t pid);
-    void               AddProcess(Process* process);
-    void               RemoveProcess(pid_t pid);
-
     virtual StringView MountFlagsString() const override
     {
         return "rw,nosuid,nodev,noexec,relatime";
@@ -41,8 +37,6 @@ class ProcFs : public Filesystem
     virtual ErrorOr<void> Stats(statfs& stats) override;
 
   private:
-    static UnorderedMap<pid_t, Process*>      s_Processes;
-
     UnorderedMap<StringView, ProcFsProperty*> m_Properties;
 
     void                                      AddChild(StringView name);

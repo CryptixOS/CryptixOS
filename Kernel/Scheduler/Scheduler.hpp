@@ -18,9 +18,7 @@ class Scheduler
 {
   public:
     KERNEL_INIT_CODE
-    static void Initialize();
-    KERNEL_INIT_CODE
-    static void     InitializeProcFs();
+    static void     Initialize();
     static void     PrepareAP(bool start = false);
 
     static bool     IsPreemptionEnabled();

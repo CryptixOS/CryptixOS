@@ -11,6 +11,7 @@
 #include <Drivers/Core/DeviceManager.hpp>
 #include <Prism/String/StringUtils.hpp>
 
+#include <Scheduler/Scheduler.hpp>
 #include <System/System.hpp>
 #include <Time/Time.hpp>
 
@@ -19,8 +20,6 @@
 
 #include <VFS/ProcFs/ProcFs.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
-
-UnorderedMap<pid_t, Process*> ProcFs::s_Processes;
 
 struct ProcFsCmdLineProperty : public ProcFsProperty
 {
@@ -149,13 +148,14 @@ struct ProcFsMemoryRegionsProperty : public ProcFsProperty
         Write("======================================================\n");
     }
 };
+
 struct ProcFsStatusProperty : public ProcFsProperty
 {
     virtual void GenerateRecord() override
     {
         StringView pidString = m_Parent->Name();
         pid_t      pid       = StringUtils::ToNumber<pid_t>(pidString, 10);
-        auto       process   = ProcFs::GetProcess(pid);
+        auto       process   = Scheduler::GetProcess(pid);
         if (!process) return;
 
         Write("Name: {}\n", process->Name());
@@ -186,40 +186,6 @@ static ProcFsINode* CreateProcFsNode(INode* parent, StringView name,
     return node;
 }
 
-Process* ProcFs::GetProcess(pid_t pid)
-{
-    auto it = s_Processes.Find(pid);
-    if (it == s_Processes.end()) return nullptr;
-
-    return it->Value;
-}
-void ProcFs::AddProcess(Process* process)
-{
-    ScopedLock guard(m_Lock);
-    Assert(!s_Processes.Contains(process->ID()));
-    s_Processes[process->ID()] = process;
-    auto name                  = StringUtils::ToString(process->ID());
-    auto entry                 = CreateRef<DirectoryEntry>(nullptr, name);
-    auto inode                 = reinterpret_cast<ProcFsINode*>(
-        TryAcquire(AllocateNode(entry->Name(), S_IFDIR | 0755)));
-
-    entry->Bind(inode);
-    if (inode)
-    {
-        m_Lock.Release();
-        m_Root->InsertChild(inode, name);
-        m_Lock.Acquire();
-        m_RootEntry->InsertChild(entry);
-    }
-
-    entry->SetParent(m_RootEntry);
-    m_RootEntry->InsertChild(entry);
-}
-void ProcFs::RemoveProcess(pid_t pid)
-{
-    ScopedLock guard(m_Lock);
-    s_Processes.Erase(pid);
-}
 ErrorOr<::Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
                                              const void* data)
 {
