@@ -82,6 +82,7 @@ To run CryptixOS in QEMU:
 - ✅ Lazy Loading the pages 
 - ✅ Module support
 - ✅ Signals
+- ✅ Thread API
 - ⏳ Networking
 
 ---
@@ -191,7 +192,7 @@ To run CryptixOS in QEMU:
 ## 🌐 Network Stack
 
 ### 📡 Protocols
-- ⬜ NETLINK_KOBJECT_UEVENT
+- ⬜ NetLink Kernel Object UEvent
 - ⬜ ARP
 - ⬜ TCP
 - ⬜ UDP
@@ -228,7 +229,7 @@ To run CryptixOS in QEMU:
 ## 🧠 Syscall & Core
 
 - ✅ Signals
-- ⬜ Thread API
+- ✅ Thread API
 - ✅ VFS
 - ✅ Session Management
 - ⬜ Networking

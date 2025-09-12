@@ -28,44 +28,6 @@ namespace Syscall
         return StringUtils::ToString(id);
     }
 
-    constexpr usize          ARCH_SET_GS = 0x1001;
-    constexpr usize          ARCH_SET_FS = 0x1002;
-    constexpr usize          ARCH_GET_FS = 0x1003;
-    constexpr usize          ARCH_GET_GS = 0x1004;
-    static ErrorOr<upointer> ArchPrCtl(isize opcode, upointer addr)
-    {
-#ifdef CTOS_TARGET_X86_64
-        auto                           thread = CPU::GetCurrentThread();
-        CPU::UserMemoryProtectionGuard guard;
-        switch (opcode)
-        {
-            case ARCH_SET_GS:
-                thread->SetGsBase(addr);
-                CPU::SetKernelGSBase(thread->GsBase());
-                break;
-            case ARCH_SET_FS:
-                thread->SetFsBase(addr);
-                CPU::SetFSBase(thread->FsBase());
-                break;
-            case ARCH_GET_FS:
-                *reinterpret_cast<upointer*>(addr) = thread->FsBase();
-                break;
-            case ARCH_GET_GS:
-                *reinterpret_cast<upointer*>(addr) = thread->GsBase();
-                break;
-
-            default: return Error(EINVAL);
-        }
-#else
-        IgnoreUnused(ARCH_SET_GS);
-        IgnoreUnused(ARCH_SET_FS);
-        IgnoreUnused(ARCH_GET_FS);
-        IgnoreUnused(ARCH_GET_GS);
-#endif
-
-        return 0;
-    }
-
     void InstallAll()
     {
         Initialize();
@@ -92,7 +54,7 @@ namespace Syscall
         RegisterSyscall(ID::eSchedYield, API::Process::SchedYield);
         RegisterSyscall(ID::eDup, API::VFS::Dup);
         RegisterSyscall(ID::eDup2, API::VFS::Dup2);
-        RegisterSyscall(ID::eNanoSleep, API::Process::NanoSleep);
+        RegisterSyscall(ID::eNanoSleep, API::Time::NanoSleep);
         RegisterSyscall(ID::ePid, API::Process::Pid);
         RegisterSyscall(ID::eSocket, API::VFS::Socket);
         RegisterSyscall(ID::eBind, API::VFS::Bind);
@@ -141,7 +103,8 @@ namespace Syscall
         RegisterSyscall(ID::eSid, API::Process::GetSid);
         RegisterSyscall(ID::eUTime, API::VFS::UTime);
         RegisterSyscall(ID::eStatFs, API::VFS::StatFs);
-        RegisterSyscall(ID::eArchPrCtl, ArchPrCtl);
+        RegisterSyscall(ID::ePrCtl, API::System::PrCtl);
+        RegisterSyscall(ID::eArchPrCtl, API::System::ArchPrCtl);
         RegisterSyscall(ID::eSetTimeOfDay, API::Time::SetTimeOfDay);
         RegisterSyscall(ID::eSync, API::VFS::SyncFilesystems);
         RegisterSyscall(ID::eMount, API::VFS::Mount);
@@ -169,6 +132,7 @@ namespace Syscall
         RegisterSyscall(ID::eClone3, API::Process::Clone3);
         RegisterSyscall(ID::eFutexWake, API::Process::FutexWake);
         RegisterSyscall(ID::eFutexWait, API::Process::FutexWait);
+        RegisterSyscall(ID::eDebugLog, API::System::DebugLog);
     }
     void Handle(Arguments& args)
     {
@@ -179,7 +143,7 @@ namespace Syscall
         thread->OnSyscallEnter();
 
 #define LOG_SYSCALLS false
-        // #if LOG_SYSCALLS == true || true
+        // #if LOG_SYSCALLS == true
         static isize previousSyscall = -1;
         g_LogSyscalls                = false;
 
@@ -198,10 +162,8 @@ namespace Syscall
         }
 
         previousSyscall = args.Index;
-        // #endif
 
-        if (args.Index >= 512
-            || (!s_Syscalls.Contains(static_cast<ID>(args.Index))))
+        if (!s_Syscalls.Contains(static_cast<ID>(args.Index)))
         {
             args.ReturnValue = -1;
             errno            = ENOSYS;

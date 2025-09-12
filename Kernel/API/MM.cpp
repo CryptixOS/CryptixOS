@@ -122,6 +122,7 @@ namespace API::MM
     }
     ErrorOr<isize> MProtect(Pointer virt, usize length, i32 prot)
     {
+        return 0;
         if (virt & ~PMM::PAGE_SIZE) return Error(EINVAL);
         length = Math::AlignUp(length, PMM::PAGE_SIZE);
         if (length == 0) return Error(EINVAL);
@@ -139,7 +140,7 @@ namespace API::MM
         auto accessFlags = Prot2AccessFlags(prot);
         region->SetAccessMode(accessFlags);
 
-        process->PageMap->RemapRegion(region);
+        process->PageMap->ProtectRange(virt, length, region->PageAttributes());
         return 0;
     }
     ErrorOr<isize> MUnMap(Pointer virt, usize length)

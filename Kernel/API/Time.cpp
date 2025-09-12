@@ -13,6 +13,36 @@
 
 namespace API::Time
 {
+    using namespace ::Time;
+    ErrorOr<isize> NanoSleep(const struct timespec* duration, timespec* rem)
+    {
+        auto current = Process::Current();
+        if ((duration && !current->ValidateRead(duration, sizeof(timespec)))
+            || (rem && !current->ValidateRead(rem, sizeof(timespec))))
+            return Error(EFAULT);
+
+        usize ns = 0;
+        {
+            CPU::UserMemoryProtectionGuard guard;
+            timespec                       sleepDuration = {};
+            if (duration)
+                sleepDuration = *duration; // CPU::CopyFromUser(*duration);
+            if (sleepDuration.tv_sec < 0 || sleepDuration.tv_nsec < 0)
+                return Error(EINVAL);
+
+            ns = sleepDuration.tv_nsec ?: sleepDuration.tv_sec * 1'000'000'000;
+        }
+        auto status = ::Time::NanoSleep(ns);
+        if (!status) return Error(status.Error());
+
+        {
+            CPU::UserMemoryProtectionGuard guard;
+            timespec                       reminder{};
+            if (rem) *rem = reminder;
+        }
+        return 0;
+    }
+
     ErrorOr<isize> GetTimeOfDay(struct timeval* tv, struct timezone* tz)
     {
         Process* current = Process::GetCurrent();
@@ -80,11 +110,11 @@ namespace API::Time
         switch (clockID)
         {
             case CLOCK_REALTIME:
-            case CLOCK_REALTIME_COARSE: ts = ::Time::GetReal(); break;
+            case CLOCK_REALTIME_COARSE: ts = Time::GetReal(); break;
             case CLOCK_MONOTONIC:
             case CLOCK_MONOTONIC_RAW:
             case CLOCK_MONOTONIC_COARSE:
-            case CLOCK_BOOTTIME: ts = ::Time::GetMonotonic(); break;
+            case CLOCK_BOOTTIME: ts = Time::GetMonotonic(); break;
             case CLOCK_PROCESS_CPUTIME_ID:
             case CLOCK_THREAD_CPUTIME_ID:
                 ts = {.tv_sec = 0, .tv_nsec = 0};

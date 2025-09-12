@@ -7,10 +7,10 @@
 #pragma once
 
 #include <API/Syscall.hpp>
-#include <API/UnixTypes.hpp>
 
 namespace API::Time
 {
+    ErrorOr<isize> NanoSleep(const struct timespec* duration, timespec* rem);
     ErrorOr<isize> GetTimeOfDay(struct timeval* restrict tv,
                                 struct timezone* tz);
     ErrorOr<isize> SetTimeOfDay(const struct timeval* restrict tv,

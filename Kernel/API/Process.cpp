@@ -20,12 +20,13 @@
 namespace API::Process
 {
     using ::Process;
-    static ErrorOr<Process*> DoClone3(struct clone_args& args)
+    static ErrorOr<Thread*> DoClone3(struct clone_args& args)
     {
-        auto  current = Process::Current();
+        auto  current       = Process::Current();
+        auto  currentThread = Thread::Current();
 
-        usize flags   = args.flags;
-        u64   newSp   = args.stack;
+        usize flags         = args.flags;
+        u64   newSp         = args.stack;
 
         if (flags & ~CLONE_VALID_FLAGS_MASK) return Error(EINVAL);
         if (flags & (CLONE_DETACHED | (CSIGNAL & ~CLONE_NEWTIME)))
@@ -59,8 +60,11 @@ namespace API::Process
             IgnoreUnused(trace);
         }
 
-        auto cloned = TryOrRet(current->Clone(flags & ~CLONE_PARENT_SETTID));
-        return cloned;
+        Pointer tls    = args.tls;
+        auto    cloned = TryOrRet(currentThread->Clone(
+            flags & ~CLONE_PARENT_SETTID, newSp, args.stack_size, tls));
+        Scheduler::EnqueueThread(cloned.Raw());
+        return cloned.Raw();
     }
 
     ErrorOr<isize> SigAction(isize signal, const struct sigaction* action,
@@ -170,27 +174,6 @@ namespace API::Process
         Scheduler::Yield();
         return 0;
     }
-    ErrorOr<isize> NanoSleep(const timespec* duration, timespec* rem)
-    {
-        auto current = Process::Current();
-        if (!current->ValidateRead(duration, sizeof(timespec))
-            || (rem && !current->ValidateRead(rem, sizeof(timespec))))
-            return Error(EFAULT);
-
-        auto time = CPU::CopyFromUser(*duration);
-        auto r    = CPU::CopyFromUser(*rem);
-        if (time.tv_sec < 0 || time.tv_nsec < 0
-            || (rem && (r.tv_sec < 0 || r.tv_nsec < 0)))
-            return Error(EINVAL);
-
-        usize ns     = time.tv_nsec ?: time.tv_sec * 1'000'000'000;
-        auto  status = Time::NanoSleep(ns);
-        if (!status) return Error(status.Error());
-
-        r.tv_sec = r.tv_nsec = 0;
-        CPU::CopyToUser(rem, r);
-        return 0;
-    }
 
     ErrorOr<ProcessID> Pid()
     {
@@ -210,42 +193,49 @@ namespace API::Process
 
         clone_args      args;
         Memory::Fill(&args, 0, sizeof(args));
-        args.flags       = lowerFlags & ~CSIGNAL;
-        args.pidfd       = outParentTid;
-        args.child_tid   = outChildTid;
-        args.parent_tid  = outParentTid;
-        args.exit_signal = lowerFlags & CSIGNAL;
-        ;
-        args.stack          = newSp;
-        args.stack_size     = stackSize;
-        args.tls            = tls;
-        args.set_tid        = 0;
-        args.set_tid_size   = 0;
-        args.cgroup         = 0;
+        args.flags            = lowerFlags & ~CSIGNAL;
+        args.pidfd            = outParentTid;
+        args.child_tid        = outChildTid;
+        args.parent_tid       = outParentTid;
+        args.exit_signal      = lowerFlags & CSIGNAL;
+        args.stack            = newSp;
+        args.stack_size       = stackSize;
+        args.tls              = tls;
+        args.set_tid          = 0;
+        args.set_tid_size     = 0;
+        args.cgroup           = 0;
 
-        auto     cloned     = TryOrRet(DoClone3(args));
-        auto     mainThread = cloned->MainThread();
-        ThreadID tid        = mainThread->ID();
+        auto     clonedThread = TryOrRet(DoClone3(args));
+        ThreadID tid          = clonedThread->ID();
 
+        if (flags & CLONE_CHILD_SETTID)
+        {
+            if (!childTid) return Error(EINVAL);
+            if (!current->ValidateWrite(childTid, sizeof(i32)))
+                return Error(EFAULT);
+
+            CPU::CopyToUser(childTid, tid);
+        }
         if (flags & CLONE_PARENT_SETTID)
         {
             if (!parentTid) return Error(EINVAL);
             if (!current->ValidateWrite(parentTid, sizeof(i32)))
                 return Error(EFAULT);
 
-            CPU::CopyToUser(parentTid, tid);
+            CPU::CopyToUser(parentTid, current->ID());
         }
 
-        return tid;
+        return clonedThread->Parent()->ID();
     }
     ErrorOr<ProcessID> Fork()
     {
         class Process* process = Process::Current();
         Assert(process);
 
-        clone_args args = {};
-        args.flags      = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND
-                   | CLONE_SYSVSEM | CLONE_SETTLS | CLONE_PARENT_SETTID;
+        clone_args args   = {};
+        args.flags        = 0 & ~CSIGNAL;
+        // args.flags      = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND
+        //            | CLONE_SYSVSEM | CLONE_SETTLS | CLONE_PARENT_SETTID;
         args.pidfd        = 0;
         args.child_tid    = 0;
         args.parent_tid   = 0;
@@ -257,8 +247,9 @@ namespace API::Process
         args.set_tid_size = 0;
         args.cgroup       = 0;
 
-        auto cloned       = TryOrRet(DoClone3(args));
-        return cloned->ID();
+        auto clonedThread = TryOrRet(DoClone3(args));
+        auto newProcess   = clonedThread->Parent();
+        return newProcess->ID();
     }
     ErrorOr<isize> Execve(char* pathname, char** argv, char** envp)
     {
@@ -471,14 +462,12 @@ namespace API::Process
         if (!uargs) return Error(EINVAL);
         if (!current->ValidateRead(uargs)) return Error(EFAULT);
 
-        clone_args args       = CPU::CopyFromUser(*uargs, size);
-        auto       flags      = args.flags;
-        i32*       parentTid  = reinterpret_cast<i32*>(args.parent_tid);
+        clone_args args         = CPU::CopyFromUser(*uargs, size);
+        auto       flags        = args.flags;
+        i32*       parentTid    = reinterpret_cast<i32*>(args.parent_tid);
 
-        auto       cloned     = TryOrRet(DoClone3(args));
-
-        auto       mainThread = cloned->MainThread();
-        ThreadID   tid        = mainThread->ID();
+        auto       clonedThread = TryOrRet(DoClone3(args));
+        ThreadID   tid          = clonedThread->ID();
 
         if (flags & CLONE_PARENT_SETTID)
         {

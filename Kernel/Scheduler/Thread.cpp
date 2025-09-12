@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <API/Posix/linux/sched.h>
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptGuard.hpp>
 
@@ -23,11 +24,11 @@ struct CTOS_PACKED SignalFrame
 };
 
 extern KeyValuePair<Pointer, usize> SignalTrampoline();
-Thread::Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn)
+Thread::Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn, bool user)
     : m_State(ThreadState::eDequeued)
     , m_ErrorCode(no_error)
     , m_Parent(parent)
-    , m_IsUser(false)
+    , m_IsUser(user)
     , m_IsEnqueued(false)
 
 {
@@ -263,57 +264,70 @@ ErrorOr<void> Thread::SignalReturn()
     return Error(ENOSYS);
 }
 
-::Ref<Thread> Thread::Fork(Process* process)
+ErrorOr<::Ref<Thread>> Thread::Clone(usize flags, Pointer stack,
+                                     CTOS_UNUSED usize stackSize, Pointer tls)
 {
-#if CTOS_TARGET_X86_64
-    auto newThread
-        = process->CreateThread(Context.RIP, m_IsUser, CPU::GetCurrent()->ID);
-    newThread->m_Tls.Self  = newThread.Raw();
-    newThread->m_Tls.Stack = m_Tls.Stack;
 
-    Pointer kstack = PMM::CallocatePages<upointer>(CPU::KERNEL_STACK_SIZE
-                                                   / PMM::PAGE_SIZE);
-    newThread->m_Tls.KernelStack
-        = kstack.ToHigherHalf<Pointer>().Offset<upointer>(
-            CPU::KERNEL_STACK_SIZE);
+    if ((flags & (CLONE_NEWNS | CLONE_FS)) == (CLONE_NEWNS | CLONE_FS))
+        return Error(EINVAL);
+    if ((flags & (CLONE_NEWUSER | CLONE_FS)) == (CLONE_NEWUSER | CLONE_FS))
+        return Error(EINVAL);
 
-    Pointer pfstack = PMM::CallocatePages<upointer>(CPU::KERNEL_STACK_SIZE
-                                                    / PMM::PAGE_SIZE);
-    newThread->m_Tls.PageFaultStack
-        = pfstack.ToHigherHalf<Pointer>().Offset<upointer>(
-            CPU::KERNEL_STACK_SIZE);
+    if ((flags & CLONE_THREAD) && !(flags & CLONE_SIGHAND))
+        return Error(EINVAL);
+    if ((flags & CLONE_SIGHAND) && !(flags & CLONE_VM)) return Error(EINVAL);
+    if (flags & (CLONE_PIDFD | CLONE_DETACHED)) return Error(EINVAL);
 
-    for (const auto& stack : m_Stacks)
+    auto parent = m_Parent;
+    if (!(flags & CLONE_THREAD))
     {
-        usize stackVirt = stack->VirtualBase();
-
-        auto  region    = process->m_AddressSpace.Find(stackVirt);
-        if (!region) continue;
-        newThread->m_Stacks.PushBack(region);
+        auto newProcess = TryOrRet(parent->Clone(flags));
+        parent          = newProcess;
     }
 
-    newThread->m_Tls.FpuStoragePageCount = m_Tls.FpuStoragePageCount;
-    newThread->m_Tls.FpuStorage
-        = Pointer(PMM::CallocatePages<upointer>(m_Tls.FpuStoragePageCount))
-              .ToHigherHalf<upointer>();
+    auto newThread = parent->CreateThread(Context.ProgramCounter, m_IsUser,
+                                          CPU::GetCurrent()->ID);
+    newThread->m_Tls.Self = newThread.Raw();
+    if (!(flags & CLONE_VM))
+    {
+        stack     = m_Tls.Stack;
+        stackSize = CPU::USER_STACK_SIZE;
+    }
+
+    newThread->m_Tls.Stack = stack;
+
+    if (!(flags & CLONE_THREAD))
+    {
+        for (const auto& stack : m_Stacks)
+        {
+            usize stackVirt = stack->VirtualBase();
+
+            auto  region    = parent->m_AddressSpace.Find(stackVirt);
+            if (!region) continue;
+            newThread->m_Stacks.PushBack(region);
+        }
+    }
 
     Memory::Copy(newThread->m_Tls.FpuStorage, m_Tls.FpuStorage,
                  m_Tls.FpuStoragePageCount * PMM::PAGE_SIZE);
 
-    newThread->m_Parent    = process;
-    newThread->Context     = SavedContext;
-    newThread->Context.RAX = 0;
-    newThread->Context.RDX = 0;
+    newThread->m_Parent     = parent;
+    newThread->Context      = SavedContext;
+    newThread->m_IsEnqueued = false;
+#if CTOS_TARGET_X86_64
+    newThread->Context.RAX    = 0;
+    newThread->Context.RFlags = 0x202;
+    newThread->Context.RDX    = 0;
+    if (flags & CLONE_VM) newThread->Context.RSP = stack;
 
-    newThread->m_IsUser    = m_IsUser;
-    newThread->m_GsBase    = m_GsBase;
-    newThread->m_FsBase    = m_FsBase;
+    newThread->m_GsBase = m_GsBase;
+    newThread->m_FsBase = m_FsBase;
 
-    newThread->m_State     = ThreadState::eDequeued;
-    return newThread;
-#else
-    return nullptr;
+    if (flags & CLONE_SETTLS) newThread->m_FsBase = tls;
 #endif
+
+    newThread->m_State = ThreadState::eDequeued;
+    return newThread;
 }
 
 void Thread::SetSignalMask(SignalSet mask)

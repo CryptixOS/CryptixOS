@@ -157,8 +157,7 @@ void Process::ForEachInGroup(ProcessID pgid, Iterator it)
 
 Ref<Thread> Process::CreateThread(Pointer rip, bool isUser, i64 runOn)
 {
-    auto thread      = new Thread(this, rip, 0, runOn);
-    thread->m_IsUser = isUser;
+    auto thread = new Thread(this, rip, 0, runOn, isUser);
 
     if (m_Threads.Empty()) m_MainThread = thread;
     m_Threads.PushBack(thread);
@@ -487,21 +486,7 @@ ErrorOr<ProcessID> Process::WaitPid(ProcessID pid, i32* wstatus, i32 flags,
 ErrorOr<Process*> Process::Clone(usize flags)
 {
     LogDebug("Process: Forking {}...", m_ID);
-
-    if ((flags & (CLONE_NEWNS | CLONE_FS)) == (CLONE_NEWNS | CLONE_FS))
-        return Error(EINVAL);
-    if ((flags & (CLONE_NEWUSER | CLONE_FS)) == (CLONE_NEWUSER | CLONE_FS))
-        return Error(EINVAL);
-
-    if ((flags & CLONE_THREAD) && !(flags & CLONE_SIGHAND))
-        return Error(EINVAL);
-    if ((flags & CLONE_SIGHAND) && !(flags & CLONE_VM)) return Error(EINVAL);
-    if ((flags & CLONE_PARENT) && m_SignalFlags & SignalFlags::eUnkillable)
-        return Error(EINVAL);
-    if (flags & (CLONE_PIDFD | CLONE_DETACHED)) return Error(EINVAL);
-
-    Thread* currentThread = CPU::GetCurrentThread();
-    Assert(currentThread && currentThread->m_Parent == this);
+    Assert(Thread::Current() && Thread::Current()->m_Parent == this);
 
     CPU::DisableInterrupts();
     Process* newProcess = Scheduler::CreateProcess(this, m_Name, m_Credentials);
@@ -512,19 +497,19 @@ ErrorOr<Process*> Process::Clone(usize flags)
     if (!pageMap) return Error(ENOMEM);
 
     newProcess->PageMap = pageMap;
-    newProcess->m_CWD   = m_CWD;
-    newProcess->m_Umask = m_Umask;
-    m_Children.PushBack(newProcess);
+    newProcess->m_Parent->m_Children.PushBack(newProcess);
 
-    if (flags & CLONE_VM) CopyMemory(newProcess);
+    // if (flags & CLONE_VM)
+    CopyMemory(newProcess);
     newProcess->m_NextTid.Store(m_NextTid.Load());
-    if (flags & CLONE_FILES) CopyFileDescriptors(newProcess);
 
-    auto thread                = currentThread->Fork(newProcess);
-    thread->m_IsEnqueued       = false;
+    // if (flags & CLONE_FS)
+    CopyFs(newProcess);
+    // if (flags & CLONE_FILES)
+    CopyFileDescriptors(newProcess);
+    if (flags & CLONE_PARENT) newProcess->m_Parent = m_Parent;
+
     newProcess->m_UserStackTop = m_UserStackTop;
-
-    Scheduler::EnqueueThread(thread.Raw());
 
     LogDebug("Process: Spawned {}", newProcess->m_ID);
     return newProcess;
@@ -625,6 +610,12 @@ ErrorOr<void> Process::WakeFutex(i32* vaddr)
     return {};
 }
 
+void Process::CopyFs(Process* dest)
+{
+    dest->m_RootDirectoryEntry = m_RootDirectoryEntry;
+    dest->m_CWD                = m_CWD;
+    dest->m_Umask              = m_Umask;
+}
 void Process::CopyFileDescriptors(Process* dest)
 {
     for (auto& [fdNum, fd] : m_FdTable) dest->m_FdTable.Insert(fd, fdNum);

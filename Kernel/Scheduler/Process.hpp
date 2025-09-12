@@ -149,16 +149,17 @@ class Process
     const struct SignalAction& SignalAction(SignalID signal) const;
     void SetSignalAction(SignalID signal, const struct SignalAction& action);
 
-    static void    SendGroupSignal(ProcessID pgid, i32 signal);
-    void           SendSignal(i32 signal);
+    static void          SendGroupSignal(ProcessID pgid, i32 signal);
+    void                 SendSignal(i32 signal);
 
-    ErrorOr<isize> OpenAt(i32 dirFdNum, PathView path, i32 flags,
-                          INodeMode mode);
-    ErrorOr<isize> DupFd(isize oldFdNum, isize newFdNum, isize flags);
-    i32            CloseFd(i32 fd);
-    ErrorOr<isize> InsertFd(Ref<FileDescriptor> fd);
-    ErrorOr<isize> OpenPipe(i32* pipeFds);
-    inline bool    IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
+    FileDescriptorTable& FdTable() { return m_FdTable; }
+    ErrorOr<isize>       OpenAt(i32 dirFdNum, PathView path, i32 flags,
+                                INodeMode mode);
+    ErrorOr<isize>       DupFd(isize oldFdNum, isize newFdNum, isize flags);
+    i32                  CloseFd(i32 fd);
+    ErrorOr<isize>       InsertFd(Ref<FileDescriptor> fd);
+    ErrorOr<isize>       OpenPipe(i32* pipeFds);
+    inline bool IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
     ErrorOr<Ref<FileDescriptor>> GetFileDescriptor(isize fdNum);
     inline Ref<FileDescriptor>   GetFileHandle(i32 fd)
     {
@@ -218,6 +219,7 @@ class Process
 
     UnorderedMap<upointer, Event*> m_FutexEvents{};
 
+    void                           CopyFs(Process* dest);
     void                           CopyFileDescriptors(Process* dest);
     void                           CopyMemory(Process* process);
 

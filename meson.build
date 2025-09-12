@@ -153,10 +153,10 @@ qemu_args = [
   '-smp', '4',
 
   # setup NUMA nodes
-  # '-object', 'memory-backend-ram,id=ram0,size=2048M',
-  # '-object', 'memory-backend-ram,id=ram1,size=2048M',
-  # '-numa', 'node,cpus=0-1,memdev=ram0',
-  # '-numa', 'node,cpus=2-3,memdev=ram1',
+  '-object', 'memory-backend-ram,id=ram0,size=2048M',
+  '-object', 'memory-backend-ram,id=ram1,size=1024M',
+  '-numa', 'node,cpus=0-1,memdev=ram0',
+  '-numa', 'node,cpus=2-3,memdev=ram1',
 
   # use 3G of memory
   '-m', '3G',

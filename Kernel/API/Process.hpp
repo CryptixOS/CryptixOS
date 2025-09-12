@@ -21,7 +21,6 @@ namespace API::Process
                                    sigset_t* oldSet, usize sigSetSize);
     ErrorOr<isize>     SigReturn();
     ErrorOr<isize>     SchedYield();
-    ErrorOr<isize>     NanoSleep(const timespec* duration, timespec* rem);
 
     ErrorOr<pid_t>     Pid();
     ErrorOr<ProcessID> Clone(usize flags, usize newSp, i32* parentTid,

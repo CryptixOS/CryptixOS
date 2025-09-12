@@ -61,7 +61,8 @@ class Process;
 struct Thread : public RefCounted
 {
     Thread() = default;
-    Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn = -1);
+    Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn = -1,
+           bool user = false);
     Thread(Process* parent, Vector<StringView>& arg, Vector<StringView>& envp,
            ExecutableProgram& program, i64 runOn = -1);
     ~Thread();
@@ -106,14 +107,15 @@ struct Thread : public RefCounted
     {
         return m_State == ThreadState::eBlocked;
     }
-    constexpr bool   ReadyForCleanup() { return IsDead(); }
+    constexpr bool         ReadyForCleanup() { return IsDead(); }
 
-    ::Ref<Thread>    Fork(Process* parent);
+    ErrorOr<::Ref<Thread>> Clone(usize flags, Pointer stack, usize stackSize,
+                                 Pointer tls);
 
-    inline SignalSet SignalMask() const { return m_SignalMask; }
-    void             SetSignalMask(SignalSet mask);
+    inline SignalSet       SignalMask() const { return m_SignalMask; }
+    void                   SetSignalMask(SignalSet mask);
 
-    inline bool      ShouldIgnoreSignal(u8 signal) const
+    inline bool            ShouldIgnoreSignal(u8 signal) const
     {
         return m_SignalMask.Contains(signal);
     }

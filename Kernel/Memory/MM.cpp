@@ -238,12 +238,13 @@ namespace MM
 
         if (region)
         {
-            auto    fd        = region->FileDescriptor();
-            usize   size      = fd ? fd->File()->Size() : region->Size();
+            // auto    fd        = region->FileDescriptor();
+            // usize   size      = fd ? fd->File()->Size() : region->Size();
+            usize   size      = region->Size();
 
             usize   pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
             Pointer phys      = PMM::CallocatePages(pageCount);
-            auto    virt      = region->VirtualBase();
+            // auto    virt      = region->VirtualBase();
 
             auto    pageMap   = process->PageMap;
             if (phys)
@@ -251,12 +252,12 @@ namespace MM
                 region->SetPhysicalBase(phys);
                 pageMap->MapRegion(region);
 
-                if (fd)
-                {
-                    isize nread = TryAcquire(fd->Read(virt, size));
-                    if (nread != static_cast<isize>(size))
-                        LogError("MM: Failed to read the file descriptor");
-                }
+                // if (fd)
+                // {
+                //     isize nread = TryAcquire(fd->Read(virt, size));
+                //     if (nread != static_cast<isize>(size))
+                //         LogError("MM: Failed to read the file descriptor");
+                // }
                 return;
             }
             errno = ENOMEM;

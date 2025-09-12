@@ -6,6 +6,8 @@
  */
 #include <Version.hpp>
 
+#include <API/Posix/asm/prctl.h>
+#include <API/Posix/linux/prctl.h>
 #include <API/System.hpp>
 
 #include <Arch/Arch.hpp>
@@ -90,6 +92,44 @@ namespace API::System
         return Error(ENOSYS);
     }
 
+    ErrorOr<isize> PrCtl(isize opcode, upointer arg1, upointer arg2,
+                         upointer arg3, upointer arg4)
+    {
+        LogDebug("API::System: PrCtl => opcode: {:#x}", opcode);
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> ArchPrCtl(isize opcode, upointer arg1)
+    {
+#ifdef CTOS_TARGET_X86_64
+        auto thread = CPU::GetCurrentThread();
+        switch (opcode)
+        {
+            case ARCH_SET_GS:
+                thread->SetGsBase(arg1);
+                CPU::SetKernelGSBase(thread->GsBase());
+                break;
+            case ARCH_SET_FS:
+                thread->SetFsBase(arg1);
+                CPU::SetFSBase(thread->FsBase());
+                break;
+            case ARCH_GET_FS:
+                CPU::CopyToUser(reinterpret_cast<upointer*>(arg1),
+                                thread->FsBase().Raw());
+                break;
+            case ARCH_GET_GS:
+                CPU::CopyToUser(reinterpret_cast<upointer*>(arg1),
+                                thread->GsBase().Raw());
+                break;
+
+            default: return Error(EINVAL);
+        }
+
+        return 0;
+#else
+        return Error(ENOSYS);
+#endif
+    }
+
     ErrorOr<isize> Reboot(RebootCommand cmd)
     {
         switch (cmd)
@@ -157,5 +197,11 @@ namespace API::System
                   .data());
 
         return -1;
+    }
+    ErrorOr<isize> DebugLog(const char* message)
+    {
+        auto string = CPU::CopyStringFromUser(message);
+        LogDebug("{}", string);
+        return 0;
     }
 } // namespace API::System

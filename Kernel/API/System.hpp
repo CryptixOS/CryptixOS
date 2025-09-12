@@ -23,13 +23,18 @@ namespace API::System
         eUndefined = -1,
     };
 
-    ErrorOr<isize>     Uname(utsname* out);
-    ErrorOr<isize>     GetResourceLimit(isize resource, rlimit* rlimit);
-    ErrorOr<isize>     GetResourceUsage(isize who, rusage* usage);
+    ErrorOr<isize>    Uname(utsname* out);
+    ErrorOr<isize>    GetResourceLimit(isize resource, rlimit* rlimit);
+    ErrorOr<isize>    GetResourceUsage(isize who, rusage* usage);
 
-    ErrorOr<isize>     Reboot(RebootCommand cmd);
-    ErrorOr<isize>     InitModule(upointer image, usize size,
-                                  const char** parameters);
+    ErrorOr<isize>    PrCtl(isize opcode, upointer arg1, upointer arg2,
+                            upointer arg3, upointer arg4);
+    ErrorOr<isize>    ArchPrCtl(isize opcode, upointer arg1);
 
-    ErrorOr<uintptr_t> SysPanic(const char* errorMessage);
+    ErrorOr<isize>    Reboot(RebootCommand cmd);
+    ErrorOr<isize>    InitModule(upointer image, usize size,
+                                 const char** parameters);
+
+    ErrorOr<upointer> SysPanic(const char* errorMessage);
+    ErrorOr<isize>    DebugLog(const char* message, usize length);
 } // namespace API::System

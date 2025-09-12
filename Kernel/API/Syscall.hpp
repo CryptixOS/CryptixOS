@@ -211,6 +211,7 @@ namespace Syscall
         eSid              = 124,
         eUTime            = 132,
         eStatFs           = 137,
+        ePrCtl            = 157,
         eArchPrCtl        = 158,
         eSync             = 162,
         eSetTimeOfDay     = 164,
@@ -245,6 +246,7 @@ namespace Syscall
         eFutexWake        = 454,
         eFutexWait        = 455,
         eFutexRequeue     = 456,
+        eDebugLog         = 1024,
     };
 
     StringView GetName(usize index);
