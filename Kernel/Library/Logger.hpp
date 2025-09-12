@@ -41,44 +41,33 @@ class Terminal;
 using Prism::LogLevel;
 namespace Logger
 {
-    CTOS_NO_KASAN void  EnableSink(usize sink);
-    CTOS_NO_KASAN void  DisableSink(usize sink);
+    CTOS_NO_KASAN void EnableSink(usize sink);
+    CTOS_NO_KASAN void DisableSink(usize sink);
 
-    void                LogChar(u64 c);
-    CTOS_NO_KASAN isize Print(StringView string);
-    CTOS_NO_KASAN isize Printv(const char* format, va_list* args);
-
-    CTOS_NO_KASAN isize Log(LogLevel logLevel, StringView str,
-                            bool printNewline = true);
-    CTOS_NO_KASAN isize Logf(LogLevel logLevel, const char* format, ...);
-    CTOS_NO_KASAN isize Logv(LogLevel logLevel, const char* format,
-                             va_list& args, bool printNewline = true);
-
-    Terminal&           GetTerminal();
-    void                Unlock();
+    Terminal&          GetTerminal();
+    void               Unlock();
 } // namespace Logger
 
 #define CTOS_BUILD_DEBUG
 #ifdef CTOS_BUILD_DEBUG
     #define LogDebug(...)                                                      \
-        Logger::Log(LogLevel::eDebug, fmt::format(__VA_ARGS__).data())
-    #define EarlyLogDebug(...) Logger::Logf(LogLevel::eDebug, __VA_ARGS__)
+        Prism::Log::Log(LogLevel::eDebug, fmt::format(__VA_ARGS__).data())
+    #define EarlyLogDebug(...) Prism::Log::Logf(LogLevel::eDebug, __VA_ARGS__)
 #else
     #define LogDebug(...)
     #define EarlyLogDebug(...)
 #endif
 
-#define LogMessage(...)                                                        \
-    Logger::Log(LogLevel::eNone, fmt::format(__VA_ARGS__).data())
-#define EarlyLogMessage(...) Logger::Logf(LogLevel::eNone, __VA_ARGS__)
+#define LogMessage(...)      Prism::Log::Message(__VA_ARGS__)
+#define EarlyLogMessage(...) Prism::Log::Logf(LogLevel::eNone, __VA_ARGS__)
 
 #define ENABLE_LOGGING       true
 #if ENABLE_LOGGING == true
-    #define EarlyLogTrace(...) Logger::Logf(LogLevel::eTrace, __VA_ARGS__)
-    #define EarlyLogInfo(...)  Logger::Logf(LogLevel::eInfo, __VA_ARGS__)
-    #define EarlyLogWarn(...)  Logger::Logf(LogLevel::eWarn, __VA_ARGS__)
-    #define EarlyLogError(...) Logger::Logf(LogLevel::eError, __VA_ARGS__)
-    #define EarlyLogFatal(...) Logger::Logf(LogLevel::eFatal, __VA_ARGS__)
+    #define EarlyLogTrace(...) Prism::Log::Logf(LogLevel::eTrace, __VA_ARGS__)
+    #define EarlyLogInfo(...)  Prism::Log::Logf(LogLevel::eInfo, __VA_ARGS__)
+    #define EarlyLogWarn(...)  Prism::Log::Logf(LogLevel::eWarn, __VA_ARGS__)
+    #define EarlyLogError(...) Prism::Log::Logf(LogLevel::eError, __VA_ARGS__)
+    #define EarlyLogFatal(...) Prism::Log::Logf(LogLevel::eFatal, __VA_ARGS__)
 
     #define LogTrace(...)      Prism::Log::Trace(__VA_ARGS__)
     #define LogInfo(...)       Prism::Log::Info(__VA_ARGS__)

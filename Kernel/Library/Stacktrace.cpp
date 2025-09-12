@@ -4,7 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Common.hpp>
+#include <API/Syscall.hpp>
+#include <Arch/CPU.hpp>
 
 #include <Boot/BootModuleInfo.hpp>
 #include <Debug/Debug.hpp>
@@ -120,6 +121,10 @@ namespace Stacktrace
     }
     void Print(StackFrame* stackFrame, usize maxFrames)
     {
+        auto syscallID
+            = static_cast<Syscall::ID>(CPU::Current()->LastSyscallID);
+        LogDebug("Last failed syscall => {:#x}({})", ToUnderlying(syscallID),
+                 ToString(syscallID));
         for (usize i = 0; stackFrame && i < maxFrames; i++)
         {
             auto rip = stackFrame->InstructionPointer;
@@ -132,8 +137,8 @@ namespace Stacktrace
 
             auto          demangledName
                 = symbol ? llvm::demangle(symbol->Name.Raw()) : "??";
-            LogMessage("[\u001b[33mStacktrace\u001b[0m]: {}. {} <{:#x}>\n",
-                       i + 1, demangledName, rip.Raw());
+            LogWarn("[\u001b[33mStacktrace\u001b[0m]: {}. {} <{:#x}>\n", i + 1,
+                    demangledName, rip.Raw());
 
             if (symbol->Name.StartsWith("interrupt_handler")) break;
         }

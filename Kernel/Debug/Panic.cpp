@@ -31,7 +31,7 @@ inline static void enterPanicMode()
 }
 
 static Atomic<u64> s_HaltedCPUs = 0;
-[[noreturn]]
+CTOS_NORETURN
 IrqResult HaltAndCatchFire(Device*, ExecutionContext* context)
 {
     EarlyLogFatal("CPU[%d]: Halted", CPU::GetCurrentID());
@@ -44,8 +44,7 @@ IrqResult HaltAndCatchFire(Device*, ExecutionContext* context)
     AssertNotReached();
 }
 
-CTOS_NO_KASAN [[noreturn]]
-void panic(StringView msg)
+CTOS_NO_KASAN CTOS_NORETURN void panic(StringView msg)
 {
     enterPanicMode();
     EarlyLogError("Error Message: %s\n", msg.Raw());
@@ -57,15 +56,14 @@ void panic(StringView msg)
     CPU::HaltAll();
     for (;;) Arch::Halt();
 }
-CTOS_NO_KASAN [[noreturn]]
-void earlyPanic(const char* format, ...)
+CTOS_NO_KASAN CTOS_NORETURN void earlyPanic(const char* format, ...)
 {
     enterPanicMode();
     Stacktrace::Print(32);
 
     va_list args;
     va_start(args, format);
-    Logger::Logv(LogLevel::eError, format, args);
+    Log::Logv(LogLevel::eError, format, args);
     va_end(args);
 
     EarlyLogFatal("CPU[%d]: Halted", CPU::GetCurrentID());

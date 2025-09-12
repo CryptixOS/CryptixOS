@@ -80,3 +80,13 @@ class ScopedLock final : public NonCopyable<ScopedLock>
     Spinlock& m_Lock;
     bool      m_RestoreInterrupts = false;
 };
+
+class SpinLockPolicy
+{
+  public:
+    void                      Init() {}
+    CTOS_NODISCARD ScopedLock Lock() { return ScopedLock(m_Lock); }
+
+  private:
+    Spinlock m_Lock;
+};

@@ -207,6 +207,7 @@ kernelStart(const BootInformation& info)
 
     MM::Initialize();
     Serial::Initialize();
+    Logger::EnableSink(LOG_SINK_SERIAL);
     // DONT MOVE END
     // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     System::PrepareBootModules(info.KernelModules);

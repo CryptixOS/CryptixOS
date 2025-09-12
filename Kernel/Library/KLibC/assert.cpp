@@ -15,7 +15,7 @@ extern "C"
                                                         unsigned int line,
                                                         const char*  function)
     {
-	Stacktrace::Print(6);
+        Stacktrace::Print(6);
         Panic("Assertion Failed({}::{}:{}): {}", file, function, line, expr);
     }
 

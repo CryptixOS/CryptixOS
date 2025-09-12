@@ -36,5 +36,5 @@ namespace API::System
                                  const char** parameters);
 
     ErrorOr<upointer> SysPanic(const char* errorMessage);
-    ErrorOr<isize>    DebugLog(const char* message, usize length);
+    ErrorOr<isize>    DebugLog(const char* message);
 } // namespace API::System

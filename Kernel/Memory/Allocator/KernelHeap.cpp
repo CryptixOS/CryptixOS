@@ -30,16 +30,6 @@ namespace KernelHeap
             PMM::FreePages(memory.FromHigherHalf(), pageCount);
         }
     };
-    class SpinLockPolicy
-    {
-      public:
-        void                     Init() {}
-        [[nodiscard]] ScopedLock Lock() { return ScopedLock(m_Lock); }
-
-      private:
-        Spinlock m_Lock;
-    };
-
     namespace
     {
         constexpr usize BUCKET_COUNT         = 8;

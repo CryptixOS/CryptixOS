@@ -20,7 +20,7 @@ namespace DeviceTree
 
     void Property::Print(usize depth)
     {
-        for (usize i = 0; i < depth; i++) Logger::LogChar(' ');
+        for (usize i = 0; i < depth; i++) Log::LogChar(' ');
         LogMessage("- {} ", m_Name);
 
         if (m_DataSize == 4)
@@ -35,9 +35,9 @@ namespace DeviceTree
         {
             LogMessage(" Value (raw): \n");
             for (u32 i = 0; i < m_DataSize; i++)
-                Logger::Print(fmt::format("{:02x}", m_Data[i]).data());
+                Log::Print(fmt::format("{:02x}", m_Data[i]).data());
         }
-        Logger::Print("\n");
+        Log::Print("\n");
     }
 
     void Node::AddProperty(StringView name, u8* data, usize length)
@@ -122,35 +122,35 @@ namespace DeviceTree
         for (auto& [name, property] : m_Properties)
         {
             if (name == "phandle"_sv)
-                Logger::Print(
+                Log::Print(
                     fmt::format("{}- phandle: {:#08x}\n", spaces, m_ID.Value())
                         .data());
             else if (name == "model"_sv)
-                Logger::Print(
+                Log::Print(
                     fmt::format("{}- model: {}\n", spaces, m_Model).data());
             else if (name == "#address-cells"_sv)
-                Logger::Print(fmt::format("{}- #address-cells: {}\n", spaces,
-                                          m_AddressCellCount)
-                                  .data());
+                Log::Print(fmt::format("{}- #address-cells: {}\n", spaces,
+                                       m_AddressCellCount)
+                               .data());
             else if (name == "#size-cells"_sv)
-                Logger::Print(fmt::format("{}- #size-cells: {}\n", spaces,
-                                          m_SizeCellCount)
-                                  .data());
+                Log::Print(fmt::format("{}- #size-cells: {}\n", spaces,
+                                       m_SizeCellCount)
+                               .data());
             else if (name == "compatible"_sv)
             {
-                Logger::Print(fmt::format("{}- compatible: ", spaces).data());
+                Log::Print(fmt::format("{}- compatible: ", spaces).data());
                 for (StringView compatible : m_CompatibleDrivers)
-                    Logger::Print(fmt::format("{} ", compatible).data());
-                Logger::LogChar('\n');
+                    Log::Print(fmt::format("{} ", compatible).data());
+                Log::LogChar('\n');
             }
             else if (name == "reg"_sv)
             {
-                Logger::Print(fmt::format("{}- reg: ", spaces).data());
+                Log::Print(fmt::format("{}- reg: ", spaces).data());
                 for (auto& reg : m_Registers)
-                    Logger::Print(
+                    Log::Print(
                         fmt::format("{:#08x}:{:#08x} | ", reg.Base, reg.Length)
                             .data());
-                Logger::LogChar('\n');
+                Log::LogChar('\n');
             }
             else property->Print(depth);
         }

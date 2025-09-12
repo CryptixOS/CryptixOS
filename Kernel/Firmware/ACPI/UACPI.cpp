@@ -295,7 +295,7 @@ namespace uACPI
 
             va_list  args;
             va_start(args, format);
-            Logger::Logv(pLevel, format, args, false);
+            Log::Logv(pLevel, format, args, false);
             va_end(args);
         }
 
