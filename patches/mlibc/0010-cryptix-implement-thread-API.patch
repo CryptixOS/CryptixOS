@@ -1,0 +1,535 @@
+From fddd8fb9e503206bbbf2f8a0b622566205372ba9 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Thu, 11 Sep 2025 21:53:55 +0200
+Subject: [PATCH] [cryptix]: implement thread-API
+
+---
+ meson.build                                   |   6 -
+ sysdeps/cryptix/arch/meson.build              |   1 +
+ sysdeps/cryptix/{ => arch}/x86_64/crt0.S      |   0
+ sysdeps/cryptix/{ => arch}/x86_64/crti.S      |   0
+ sysdeps/cryptix/{ => arch}/x86_64/crtn.S      |   0
+ sysdeps/cryptix/arch/x86_64/meson.build       |  37 +++++
+ .../cryptix/{ => arch}/x86_64/thread_entry.S  |   1 -
+ sysdeps/cryptix/entry/meson.build             |   4 +
+ sysdeps/cryptix/entry/thread.cpp              |  23 +++-
+ sysdeps/cryptix/include/cryptix/syscall.h     |   4 +-
+ sysdeps/cryptix/include/meson.build           |  72 ++++++++++
+ sysdeps/cryptix/meson.build                   | 130 +-----------------
+ sysdeps/cryptix/sysdeps/memory.cpp            |   4 +-
+ sysdeps/cryptix/sysdeps/meson.build           |  12 ++
+ sysdeps/cryptix/sysdeps/process.cpp           |  25 +++-
+ sysdeps/cryptix/sysdeps/time.cpp              |   1 -
+ sysdeps/cryptix/sysdeps/vfs.cpp               |   9 +-
+ 17 files changed, 181 insertions(+), 148 deletions(-)
+ create mode 100644 sysdeps/cryptix/arch/meson.build
+ rename sysdeps/cryptix/{ => arch}/x86_64/crt0.S (100%)
+ rename sysdeps/cryptix/{ => arch}/x86_64/crti.S (100%)
+ rename sysdeps/cryptix/{ => arch}/x86_64/crtn.S (100%)
+ create mode 100644 sysdeps/cryptix/arch/x86_64/meson.build
+ rename sysdeps/cryptix/{ => arch}/x86_64/thread_entry.S (99%)
+ create mode 100644 sysdeps/cryptix/entry/meson.build
+ create mode 100644 sysdeps/cryptix/include/meson.build
+ create mode 100644 sysdeps/cryptix/sysdeps/meson.build
+
+diff --git a/meson.build b/meson.build
+index 703cee7..553d945 100644
+--- a/meson.build
++++ b/meson.build
+@@ -203,12 +203,6 @@ libc_include_dirs += include_directories('sysdeps/generic-helpers/include')
+ provides_bits_syscall_h = false
+ 
+ if host_machine.system() == 'cryptix'
+-    posix_option = true
+-    linux_option = true
+-    glibc_option = true
+-    bsd_option = true
+-    libgcc_dependency = true
+-    #debug_allocator = true
+     rtld_include_dirs += include_directories('sysdeps/cryptix/include')
+     libc_include_dirs += include_directories('sysdeps/cryptix/include')
+ 
+diff --git a/sysdeps/cryptix/arch/meson.build b/sysdeps/cryptix/arch/meson.build
+new file mode 100644
+index 0000000..620db1c
+--- /dev/null
++++ b/sysdeps/cryptix/arch/meson.build
+@@ -0,0 +1 @@
++subdir(host_machine.cpu_family())
+diff --git a/sysdeps/cryptix/x86_64/crt0.S b/sysdeps/cryptix/arch/x86_64/crt0.S
+similarity index 100%
+rename from sysdeps/cryptix/x86_64/crt0.S
+rename to sysdeps/cryptix/arch/x86_64/crt0.S
+diff --git a/sysdeps/cryptix/x86_64/crti.S b/sysdeps/cryptix/arch/x86_64/crti.S
+similarity index 100%
+rename from sysdeps/cryptix/x86_64/crti.S
+rename to sysdeps/cryptix/arch/x86_64/crti.S
+diff --git a/sysdeps/cryptix/x86_64/crtn.S b/sysdeps/cryptix/arch/x86_64/crtn.S
+similarity index 100%
+rename from sysdeps/cryptix/x86_64/crtn.S
+rename to sysdeps/cryptix/arch/x86_64/crtn.S
+diff --git a/sysdeps/cryptix/arch/x86_64/meson.build b/sysdeps/cryptix/arch/x86_64/meson.build
+new file mode 100644
+index 0000000..f3ef3dd
+--- /dev/null
++++ b/sysdeps/cryptix/arch/x86_64/meson.build
+@@ -0,0 +1,37 @@
++if get_option('posix_option').allowed()
++	libc_sources += files(
++		'thread_entry.S'
++    )
++endif
++
++if not headers_only
++  crt = custom_target(
++    'crt0',
++    build_by_default: true,
++    command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
++    input: 'crt0.S',
++    output: 'crt0.o',
++    install: true,
++    install_dir: get_option('libdir'),
++  )
++
++  custom_target(
++    'crti',
++    build_by_default: true,
++    command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
++    input: 'crti.S',
++    output: 'crti.o',
++    install: true,
++    install_dir: get_option('libdir'),
++  )
++
++  custom_target(
++    'crtn',
++    build_by_default: true,
++    command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
++    input: 'crtn.S',
++    output: 'crtn.o',
++    install: true,
++    install_dir: get_option('libdir'),
++  )
++endif
+diff --git a/sysdeps/cryptix/x86_64/thread_entry.S b/sysdeps/cryptix/arch/x86_64/thread_entry.S
+similarity index 99%
+rename from sysdeps/cryptix/x86_64/thread_entry.S
+rename to sysdeps/cryptix/arch/x86_64/thread_entry.S
+index cea1b17..540e721 100644
+--- a/sysdeps/cryptix/x86_64/thread_entry.S
++++ b/sysdeps/cryptix/arch/x86_64/thread_entry.S
+@@ -1,4 +1,3 @@
+-
+ .section .text
+ .global __mlibc_spawn_thread
+ .type __mlibc_spawn_thread, "function"
+diff --git a/sysdeps/cryptix/entry/meson.build b/sysdeps/cryptix/entry/meson.build
+new file mode 100644
+index 0000000..af9f0f7
+--- /dev/null
++++ b/sysdeps/cryptix/entry/meson.build
+@@ -0,0 +1,4 @@
++libc_sources += files(
++  'entry.cpp',
++  'thread.cpp',
++)
+diff --git a/sysdeps/cryptix/entry/thread.cpp b/sysdeps/cryptix/entry/thread.cpp
+index 8a01eb9..e8b4a47 100644
+--- a/sysdeps/cryptix/entry/thread.cpp
++++ b/sysdeps/cryptix/entry/thread.cpp
+@@ -8,9 +8,20 @@
+ 
+ namespace mlibc
+ {
++    extern "C" void __mlibc_enter_thread(void* entry, void* user_arg)
++    {
++        auto tcb = mlibc::get_current_tcb();
+ 
+-    static constexpr size_t default_stacksize = 0x200000; // 2 mib
++        while (!__atomic_load_n(&tcb->tid, __ATOMIC_RELAXED))
++            mlibc::sys_futex_wait(&tcb->tid, 0, nullptr);
++        tcb->invokeThreadFunc(entry, user_arg);
+ 
++        __atomic_store_n(&tcb->didExit, 1, __ATOMIC_RELEASE);
++        mlibc::sys_futex_wake(&tcb->didExit);
++        mlibc::sys_thread_exit();
++    }
++
++    static constexpr size_t default_stacksize = 0x200000; // 2 mib
+     int sys_prepare_stack(void** stack, void* entry, void* user_arg, void* tcb,
+                           size_t* stack_size, size_t* guard_size,
+                           void** stack_base)
+@@ -26,12 +37,12 @@ namespace mlibc
+         }
+         else
+         {
+-            map = reinterpret_cast<uintptr_t>(
+-                mmap(nullptr, *stack_size + *guard_size, PROT_NONE,
+-                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
++            sys_vm_map(nullptr, *stack_size + *guard_size, PROT_NONE,
++                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0,
++                       reinterpret_cast<void**>(&map));
+             if (reinterpret_cast<void*>(map) == MAP_FAILED) return EAGAIN;
+-            int ret = mprotect(reinterpret_cast<void*>(map + *guard_size),
+-                               *stack_size, PROT_READ | PROT_WRITE);
++            int ret = sys_vm_protect(reinterpret_cast<void*>(map + *guard_size),
++                                     *stack_size, PROT_READ | PROT_WRITE);
+             if (ret) return EAGAIN;
+         }
+ 
+diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
+index b3bbcd9..6c2b748 100644
+--- a/sysdeps/cryptix/include/cryptix/syscall.h
++++ b/sysdeps/cryptix/include/cryptix/syscall.h
+@@ -1,5 +1,5 @@
+-#include <cstddef>
+-#include <cstdint>
++#include <stddef.h>
++#include <stdint.h>
+ 
+ #define SyscallInvoker "syscall"
+ 
+diff --git a/sysdeps/cryptix/include/meson.build b/sysdeps/cryptix/include/meson.build
+new file mode 100644
+index 0000000..ce24f3b
+--- /dev/null
++++ b/sysdeps/cryptix/include/meson.build
+@@ -0,0 +1,72 @@
++if not no_headers
++  install_headers(
++    'abi-bits/access.h',
++    'abi-bits/auxv.h',
++    'abi-bits/blkcnt_t.h',
++    'abi-bits/blksize_t.h',
++    'abi-bits/clockid_t.h',
++    'abi-bits/dev_t.h',
++    'abi-bits/epoll.h',
++    'abi-bits/errno.h',
++    'abi-bits/fcntl.h',
++    'abi-bits/fsblkcnt_t.h',
++    'abi-bits/fsfilcnt_t.h',
++    'abi-bits/gid_t.h',
++    'abi-bits/in.h',
++    'abi-bits/inotify.h',
++    'abi-bits/ino_t.h',
++    'abi-bits/ioctls.h',
++    'abi-bits/ipc.h',
++    'abi-bits/limits.h',
++    'abi-bits/mode_t.h',
++    'abi-bits/msg.h',
++    'abi-bits/mqueue.h',
++    'abi-bits/nlink_t.h',
++    'abi-bits/packet.h',
++    'abi-bits/pid_t.h',
++    'abi-bits/poll.h',
++    'abi-bits/ptrace.h',
++    'abi-bits/random.h',
++    'abi-bits/reboot.h',
++    'abi-bits/riscv-hwprobe.h',
++    'abi-bits/resource.h',
++    'abi-bits/rlim_t.h',
++    'abi-bits/seek-whence.h',
++    'abi-bits/shm.h',
++    'abi-bits/sigevent.h',
++    'abi-bits/signal.h',
++    'abi-bits/sigval.h',
++    'abi-bits/socket.h',
++    'abi-bits/socklen_t.h',
++    'abi-bits/stat.h',
++    'abi-bits/statfs.h',
++    'abi-bits/statvfs.h',
++    'abi-bits/statx.h',
++    'abi-bits/suseconds_t.h',
++    'abi-bits/termios.h',
++    'abi-bits/time.h',
++    'abi-bits/uid_t.h',
++    'abi-bits/utmpx.h',
++    'abi-bits/utmp-defines.h',
++    'abi-bits/utsname.h',
++    'abi-bits/vm-flags.h',
++    'abi-bits/vt.h',
++    'abi-bits/wait.h',
++    'abi-bits/xattr.h',
++    subdir: 'abi-bits',
++    follow_symlinks: true,
++  )
++  install_headers('cryptix/syscall.h', 'cryptix/reboot.hpp', subdir: 'cryptix')
++
++  install_headers(
++    'sys/reboot.h',
++	'sys/mount.h',
++	'sys/sysmacros.h',
++    'sys/statfs.h',
++    'sys/vfs.h',
++    subdir: 'sys')
++
++  install_headers(
++	'mntent.h',
++  )
++endif
+diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
+index 9e5fbe6..44794d1 100644
+--- a/sysdeps/cryptix/meson.build
++++ b/sysdeps/cryptix/meson.build
+@@ -6,129 +6,7 @@ sysdep_supported_options = {
+   'ansi': true,
+ }
+ 
+-common_sources = files(
+-  'sysdeps/internal.cpp',
+-  'sysdeps/memory.cpp',
+-  'sysdeps/process.cpp',
+-  'sysdeps/signal.cpp',
+-  'sysdeps/system.cpp',
+-  'sysdeps/time.cpp',
+-  'sysdeps/vfs.cpp',
+-)
+-
+-rtld_dso_sources += common_sources
+-libc_sources += files(
+-  'entry/entry.cpp',
+-
+-  #'generic/mntent.cpp',
+-  #'generic/mount.cpp',
+-  #'generic/reboot.cpp',
+-)
+-libc_sources += common_sources
+-
+-
+-if not no_headers
+-  install_headers(
+-    'include/abi-bits/access.h',
+-    'include/abi-bits/auxv.h',
+-    'include/abi-bits/blkcnt_t.h',
+-    'include/abi-bits/blksize_t.h',
+-    'include/abi-bits/clockid_t.h',
+-    'include/abi-bits/dev_t.h',
+-    'include/abi-bits/epoll.h',
+-    'include/abi-bits/errno.h',
+-    'include/abi-bits/fcntl.h',
+-    'include/abi-bits/fsblkcnt_t.h',
+-    'include/abi-bits/fsfilcnt_t.h',
+-    'include/abi-bits/gid_t.h',
+-    'include/abi-bits/in.h',
+-    'include/abi-bits/inotify.h',
+-    'include/abi-bits/ino_t.h',
+-    'include/abi-bits/ioctls.h',
+-    'include/abi-bits/ipc.h',
+-    'include/abi-bits/limits.h',
+-    'include/abi-bits/mode_t.h',
+-    'include/abi-bits/msg.h',
+-    'include/abi-bits/mqueue.h',
+-    'include/abi-bits/nlink_t.h',
+-    'include/abi-bits/packet.h',
+-    'include/abi-bits/pid_t.h',
+-    'include/abi-bits/poll.h',
+-    'include/abi-bits/ptrace.h',
+-    'include/abi-bits/random.h',
+-    'include/abi-bits/reboot.h',
+-    'include/abi-bits/riscv-hwprobe.h',
+-    'include/abi-bits/resource.h',
+-    'include/abi-bits/rlim_t.h',
+-    'include/abi-bits/seek-whence.h',
+-    'include/abi-bits/shm.h',
+-    'include/abi-bits/sigevent.h',
+-    'include/abi-bits/signal.h',
+-    'include/abi-bits/sigval.h',
+-    'include/abi-bits/socket.h',
+-    'include/abi-bits/socklen_t.h',
+-    'include/abi-bits/stat.h',
+-    'include/abi-bits/statfs.h',
+-    'include/abi-bits/statvfs.h',
+-    'include/abi-bits/statx.h',
+-    'include/abi-bits/suseconds_t.h',
+-    'include/abi-bits/termios.h',
+-    'include/abi-bits/time.h',
+-    'include/abi-bits/uid_t.h',
+-    'include/abi-bits/utmpx.h',
+-    'include/abi-bits/utmp-defines.h',
+-    'include/abi-bits/utsname.h',
+-    'include/abi-bits/vm-flags.h',
+-    'include/abi-bits/vt.h',
+-    'include/abi-bits/wait.h',
+-    'include/abi-bits/xattr.h',
+-    subdir: 'abi-bits',
+-    follow_symlinks: true,
+-  )
+-  install_headers('include/cryptix/syscall.h', 'include/cryptix/reboot.hpp', subdir: 'cryptix')
+-
+-  install_headers(
+-    'include/sys/reboot.h',
+-	'include/sys/mount.h',
+-	'include/sys/sysmacros.h',
+-    'include/sys/statfs.h',
+-    'include/sys/vfs.h',
+-    subdir: 'sys')
+-
+-  install_headers(
+-	'include/mntent.h',
+-  )
+-    
+-endif
+-
+-if not headers_only
+-  crt = custom_target(
+-    'crt0',
+-    build_by_default: true,
+-    command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
+-    input: host_machine.cpu_family() / 'crt0.S',
+-    output: 'crt0.o',
+-    install: true,
+-    install_dir: get_option('libdir'),
+-  )
+-
+-  custom_target(
+-    'crti',
+-    build_by_default: true,
+-    command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
+-    input: host_machine.cpu_family() / 'crti.S',
+-    output: 'crti.o',
+-    install: true,
+-    install_dir: get_option('libdir'),
+-  )
+-
+-  custom_target(
+-    'crtn',
+-    build_by_default: true,
+-    command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
+-    input: host_machine.cpu_family() / 'crtn.S',
+-    output: 'crtn.o',
+-    install: true,
+-    install_dir: get_option('libdir'),
+-  )
+-endif
++subdir('arch')
++subdir('entry')
++subdir('include')
++subdir('sysdeps')
+diff --git a/sysdeps/cryptix/sysdeps/memory.cpp b/sysdeps/cryptix/sysdeps/memory.cpp
+index c9257ba..92e491f 100644
+--- a/sysdeps/cryptix/sysdeps/memory.cpp
++++ b/sysdeps/cryptix/sysdeps/memory.cpp
+@@ -46,8 +46,8 @@ namespace mlibc
+     }
+     int sys_vm_protect(void* pointer, size_t size, int prot)
+     {
+-        // auto ret = Syscall(SYS_MPROTECT, pointer, size, prot);
+-        // if (auto e = syscall_error(ret); e) return e;
++        auto ret = Syscall(SYS_MPROTECT, pointer, size, prot);
++        if (auto e = syscall_error(ret); e) return e;
+ 
+         return 0;
+     }
+diff --git a/sysdeps/cryptix/sysdeps/meson.build b/sysdeps/cryptix/sysdeps/meson.build
+new file mode 100644
+index 0000000..8ec939b
+--- /dev/null
++++ b/sysdeps/cryptix/sysdeps/meson.build
+@@ -0,0 +1,12 @@
++common_sources = files(
++  'internal.cpp',
++  'memory.cpp',
++  'process.cpp',
++  'signal.cpp',
++  'system.cpp',
++  'time.cpp',
++  'vfs.cpp',
++)
++
++rtld_dso_sources += common_sources
++libc_sources += common_sources
+diff --git a/sysdeps/cryptix/sysdeps/process.cpp b/sysdeps/cryptix/sysdeps/process.cpp
+index 5d070b3..eb46796 100644
+--- a/sysdeps/cryptix/sysdeps/process.cpp
++++ b/sysdeps/cryptix/sysdeps/process.cpp
+@@ -1,9 +1,20 @@
+ #include <mlibc/debug.hpp>
+ #include <mlibc/posix-sysdeps.hpp>
++#include <mlibc/tcb.hpp>
+ 
+ #include <algorithm>
+ #include <cryptix/syscall.h>
+ 
++#ifndef MLIBC_BUILDING_RTLD
++    #include <errno.h>
++    #include <pthread.h>
++    #include <stdio.h>
++#endif
++
++extern "C" int  __mlibc_spawn_thread(int flags, void* stack, void* pid_out,
++                                     void* child_tid, void* tcb);
++extern "C" void __mlibc_enter_thread(void* entry, void* user_arg);
++
+ namespace mlibc
+ {
+     pid_t sys_getpid() { return Syscall(SYS_GETPID); }
+@@ -139,17 +150,19 @@ namespace mlibc
+         return 0;
+     }
+ 
++#ifndef MLIBC_BUILDING_RTLD
+     int sys_clone(void* tcb, pid_t* pid_out, void* stack)
+     {
+         unsigned long flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND
+                             | CLONE_THREAD | CLONE_SYSVSEM | CLONE_SETTLS
+                             | CLONE_PARENT_SETTID;
+ 
+-        auto ret = Syscall(SYS_CLONE, flags, stack, pid_out, nullptr, tcb);
+-        if (auto e = syscall_error(ret); e) return e;
++        auto ret = __mlibc_spawn_thread(flags, stack, pid_out, nullptr, tcb);
++        if (ret < 0) return ret;
+ 
+         return 0;
+     }
++#endif
+     int sys_fork(pid_t* child)
+     {
+         auto ret = Syscall(SYS_FORK);
+@@ -203,4 +216,12 @@ namespace mlibc
+         memcpy(buffer, data.nodename, std::min(bufsize, hostname_size));
+         return 0;
+     }
++
++#ifndef MLIBC_BUILDING_RTLD
++    [[noreturn]] void sys_thread_exit()
++    {
++        sys_exit(0);
++        __builtin_trap();
++    }
++#endif
+ }; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/time.cpp b/sysdeps/cryptix/sysdeps/time.cpp
+index d1e270d..04e9721 100644
+--- a/sysdeps/cryptix/sysdeps/time.cpp
++++ b/sysdeps/cryptix/sysdeps/time.cpp
+@@ -1,7 +1,6 @@
+ #include <cryptix/syscall.h>
+ 
+ #include <execinfo.h>
+-#include <mlibc/debug.hpp>
+ #include <mlibc/posix-sysdeps.hpp>
+ 
+ #include <sys/mman.h>
+diff --git a/sysdeps/cryptix/sysdeps/vfs.cpp b/sysdeps/cryptix/sysdeps/vfs.cpp
+index 28ac885..08d473c 100644
+--- a/sysdeps/cryptix/sysdeps/vfs.cpp
++++ b/sysdeps/cryptix/sysdeps/vfs.cpp
+@@ -392,8 +392,13 @@ namespace mlibc
+     }
+     int sys_ttyname(int fd, char* buf, size_t size)
+     {
+-        buf[0] = 'T';
+-        buf[1] = 0;
++        ssize_t out_size = size;
++        for (size_t i = 0; i < size; i++)
++            buf[i] = 'a';
++
++        sys_libc_log("readlink\n");
++        sys_readlink("/proc/1/fd/0", buf, size, &out_size);
++
+         return 0;
+     }
+ 
+-- 
+2.51.0
+

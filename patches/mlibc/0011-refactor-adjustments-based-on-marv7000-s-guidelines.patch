@@ -1,0 +1,3042 @@
+From ac1bd8a9b11ca73e9bbca6e980405553a1feabb4 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Thu, 11 Sep 2025 23:05:42 +0200
+Subject: [PATCH] [refactor]: adjustments based on marv7000's guidelines -
+ follow mlibc formatting - meson.build: move if cryptix condition at the end -
+ remove alloca from libc_log - remove linux headers
+
+---
+ meson.build                                |  18 +-
+ sysdeps/cryptix/.clang-format              |  34 -
+ sysdeps/cryptix/entry/thread.cpp           |  94 ++-
+ sysdeps/cryptix/generic/mntent.cpp         |  94 ---
+ sysdeps/cryptix/generic/mount.cpp          |  18 -
+ sysdeps/cryptix/generic/reboot.cpp         |  49 +-
+ sysdeps/cryptix/include/asm/ioctl.h        | 105 ---
+ sysdeps/cryptix/include/asm/ioctls.h       | 121 ---
+ sysdeps/cryptix/include/cryptix/reboot.hpp |  22 +-
+ sysdeps/cryptix/include/cryptix/syscall.h  | 381 +++++----
+ sysdeps/cryptix/include/meson.build        |   6 -
+ sysdeps/cryptix/include/mntent.h           |  50 --
+ sysdeps/cryptix/include/sys/mount.h        |  54 --
+ sysdeps/cryptix/include/sys/reboot.h       |  20 -
+ sysdeps/cryptix/include/sys/sysmacros.h    |  14 +-
+ sysdeps/cryptix/meson.build                |   1 -
+ sysdeps/cryptix/sysdeps/internal.cpp       |  39 +-
+ sysdeps/cryptix/sysdeps/memory.cpp         |  79 +-
+ sysdeps/cryptix/sysdeps/process.cpp        | 410 +++++-----
+ sysdeps/cryptix/sysdeps/signal.cpp         | 108 +--
+ sysdeps/cryptix/sysdeps/system.cpp         |  98 +--
+ sysdeps/cryptix/sysdeps/time.cpp           |  37 +-
+ sysdeps/cryptix/sysdeps/vfs.cpp            | 880 ++++++++++-----------
+ 23 files changed, 1099 insertions(+), 1633 deletions(-)
+ delete mode 100755 sysdeps/cryptix/.clang-format
+ delete mode 100644 sysdeps/cryptix/generic/mntent.cpp
+ delete mode 100644 sysdeps/cryptix/generic/mount.cpp
+ delete mode 100644 sysdeps/cryptix/include/asm/ioctl.h
+ delete mode 100644 sysdeps/cryptix/include/asm/ioctls.h
+ delete mode 100644 sysdeps/cryptix/include/mntent.h
+ delete mode 100644 sysdeps/cryptix/include/sys/mount.h
+ delete mode 100644 sysdeps/cryptix/include/sys/reboot.h
+
+diff --git a/meson.build b/meson.build
+index 553d945..a939655 100644
+--- a/meson.build
++++ b/meson.build
+@@ -202,15 +202,7 @@ libc_include_dirs += include_directories('sysdeps/generic-helpers/include')
+ # Process sysdeps first, as sysdeps might want to disable unsupported options.
+ provides_bits_syscall_h = false
+ 
+-if host_machine.system() == 'cryptix'
+-    rtld_include_dirs += include_directories('sysdeps/cryptix/include')
+-    libc_include_dirs += include_directories('sysdeps/cryptix/include')
+-
+-	#internal_conf.set10('MLIBC_MAP_DSO_SEGMENTS', true)
+-	internal_conf.set10('MLIBC_MMAP_ALLOCATE_DSO', true)
+-	internal_conf.set10('MLIBC_MAP_FILE_WINDOWS', true)
+-    subdir('sysdeps/cryptix')
+-elif host_machine.system() == 'linux'
++if host_machine.system() == 'linux'
+ 	provides_bits_syscall_h = true
+ 	rtld_include_dirs += include_directories('sysdeps/linux/include')
+ 	libc_include_dirs += include_directories('sysdeps/linux/include')
+@@ -282,6 +274,14 @@ elif host_machine.system() == 'nyaux'
+ 	rtld_include_dirs += include_directories('sysdeps/nyaux/include')
+ 	libc_include_dirs += include_directories('sysdeps/nyaux/include')
+ 	subdir('sysdeps/nyaux')
++elif host_machine.system() == 'cryptix'
++    rtld_include_dirs += include_directories('sysdeps/cryptix/include')
++    libc_include_dirs += include_directories('sysdeps/cryptix/include')
++
++	#internal_conf.set10('MLIBC_MAP_DSO_SEGMENTS', true)
++	internal_conf.set10('MLIBC_MMAP_ALLOCATE_DSO', true)
++	internal_conf.set10('MLIBC_MAP_FILE_WINDOWS', true)
++    subdir('sysdeps/cryptix')
+ else
+ 	error('No sysdeps defined for OS: ' + host_machine.system())
+ endif
+diff --git a/sysdeps/cryptix/.clang-format b/sysdeps/cryptix/.clang-format
+deleted file mode 100755
+index 2416f54..0000000
+--- a/sysdeps/cryptix/.clang-format
++++ /dev/null
+@@ -1,34 +0,0 @@
+-AlignConsecutiveAssignments: AcrossEmptyLinesAndComments
+-AlignConsecutiveBitFields: AcrossEmptyLinesAndComments
+-AlignConsecutiveDeclarations: AcrossEmptyLinesAndComments
+-AlignConsecutiveMacros: AcrossEmptyLinesAndComments
+-AlignEscapedNewlines: Right
+-AlignOperands: AlignAfterOperator
+-AlignTrailingComments: true
+-AllowAllArgumentsOnNextLine: true
+-AllowAllParametersOfDeclarationOnNextLine: true
+-AllowShortBlocksOnASingleLine: Always
+-AllowShortCaseLabelsOnASingleLine: true
+-AllowShortEnumsOnASingleLine: true
+-AllowShortFunctionsOnASingleLine: All
+-AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+-AllowShortLambdasOnASingleLine: All
+-AllowShortLoopsOnASingleLine: true
+-AlwaysBreakBeforeMultilineStrings: true
+-AlwaysBreakTemplateDeclarations: Yes
+-AccessModifierOffset: -2
+-BinPackArguments: true
+-BinPackParameters: true
+-BitFieldColonSpacing: Both
+-BreakBeforeBinaryOperators: All
+-BreakBeforeBraces: Allman
+-BreakBeforeTernaryOperators: true
+-BreakConstructorInitializers: BeforeComma
+-BreakStringLiterals: true
+-IndentAccessModifiers: false
+-IndentCaseLabels: true
+-IndentPPDirectives: BeforeHash
+-IndentWidth: 4
+-NamespaceIndentation: All
+-PointerAlignment: Left
+-#AttributeBreakingStyle: Always
+diff --git a/sysdeps/cryptix/entry/thread.cpp b/sysdeps/cryptix/entry/thread.cpp
+index e8b4a47..e38c30e 100644
+--- a/sysdeps/cryptix/entry/thread.cpp
++++ b/sysdeps/cryptix/entry/thread.cpp
+@@ -6,51 +6,61 @@
+ #include <stdint.h>
+ #include <sys/mman.h>
+ 
+-namespace mlibc
+-{
+-    extern "C" void __mlibc_enter_thread(void* entry, void* user_arg)
+-    {
+-        auto tcb = mlibc::get_current_tcb();
++namespace mlibc {
++extern "C" void __mlibc_enter_thread(void *entry, void *user_arg) {
++	auto tcb = mlibc::get_current_tcb();
+ 
+-        while (!__atomic_load_n(&tcb->tid, __ATOMIC_RELAXED))
+-            mlibc::sys_futex_wait(&tcb->tid, 0, nullptr);
+-        tcb->invokeThreadFunc(entry, user_arg);
++	while (!__atomic_load_n(&tcb->tid, __ATOMIC_RELAXED))
++		mlibc::sys_futex_wait(&tcb->tid, 0, nullptr);
++	tcb->invokeThreadFunc(entry, user_arg);
+ 
+-        __atomic_store_n(&tcb->didExit, 1, __ATOMIC_RELEASE);
+-        mlibc::sys_futex_wake(&tcb->didExit);
+-        mlibc::sys_thread_exit();
+-    }
++	__atomic_store_n(&tcb->didExit, 1, __ATOMIC_RELEASE);
++	mlibc::sys_futex_wake(&tcb->didExit);
++	mlibc::sys_thread_exit();
++}
+ 
+-    static constexpr size_t default_stacksize = 0x200000; // 2 mib
+-    int sys_prepare_stack(void** stack, void* entry, void* user_arg, void* tcb,
+-                          size_t* stack_size, size_t* guard_size,
+-                          void** stack_base)
+-    {
+-        (void)tcb;
+-        if (!*stack_size) *stack_size = default_stacksize;
++static constexpr size_t default_stacksize = 0x200000; // 2 mib
++int sys_prepare_stack(
++    void **stack,
++    void *entry,
++    void *user_arg,
++    void *tcb,
++    size_t *stack_size,
++    size_t *guard_size,
++    void **stack_base
++) {
++	(void)tcb;
++	if (!*stack_size)
++		*stack_size = default_stacksize;
+ 
+-        uintptr_t map;
+-        if (*stack)
+-        {
+-            map         = reinterpret_cast<uintptr_t>(*stack);
+-            *guard_size = 0;
+-        }
+-        else
+-        {
+-            sys_vm_map(nullptr, *stack_size + *guard_size, PROT_NONE,
+-                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0,
+-                       reinterpret_cast<void**>(&map));
+-            if (reinterpret_cast<void*>(map) == MAP_FAILED) return EAGAIN;
+-            int ret = sys_vm_protect(reinterpret_cast<void*>(map + *guard_size),
+-                                     *stack_size, PROT_READ | PROT_WRITE);
+-            if (ret) return EAGAIN;
+-        }
++	uintptr_t map;
++	if (*stack) {
++		map = reinterpret_cast<uintptr_t>(*stack);
++		*guard_size = 0;
++	} else {
++		sys_vm_map(
++		    nullptr,
++		    *stack_size + *guard_size,
++		    PROT_NONE,
++		    MAP_PRIVATE | MAP_ANONYMOUS,
++		    -1,
++		    0,
++		    reinterpret_cast<void **>(&map)
++		);
++		if (reinterpret_cast<void *>(map) == MAP_FAILED)
++			return EAGAIN;
++		int ret = sys_vm_protect(
++		    reinterpret_cast<void *>(map + *guard_size), *stack_size, PROT_READ | PROT_WRITE
++		);
++		if (ret)
++			return EAGAIN;
++	}
+ 
+-        *stack_base = reinterpret_cast<void*>(map);
+-        auto sp = reinterpret_cast<uintptr_t*>(map + *guard_size + *stack_size);
+-        *--sp   = reinterpret_cast<uintptr_t>(user_arg);
+-        *--sp   = reinterpret_cast<uintptr_t>(entry);
+-        *stack  = reinterpret_cast<void*>(sp);
+-        return 0;
+-    }
++	*stack_base = reinterpret_cast<void *>(map);
++	auto sp = reinterpret_cast<uintptr_t *>(map + *guard_size + *stack_size);
++	*--sp = reinterpret_cast<uintptr_t>(user_arg);
++	*--sp = reinterpret_cast<uintptr_t>(entry);
++	*stack = reinterpret_cast<void *>(sp);
++	return 0;
++}
+ } // namespace mlibc
+diff --git a/sysdeps/cryptix/generic/mntent.cpp b/sysdeps/cryptix/generic/mntent.cpp
+deleted file mode 100644
+index 51bdceb..0000000
+--- a/sysdeps/cryptix/generic/mntent.cpp
++++ /dev/null
+@@ -1,94 +0,0 @@
+-#include <bits/ensure.h>
+-#include <errno.h>
+-#include <limits.h>
+-#include <mntent.h>
+-#include <stdio.h>
+-#include <string.h>
+-
+-namespace
+-{
+-    char*  internal_buf;
+-    size_t internal_bufsize;
+-} // namespace
+-
+-#define SENTINEL (char*)&internal_buf
+-
+-FILE* setmntent(const char* name, const char* mode)
+-{
+-    return fopen(name, mode);
+-}
+-
+-struct mntent* getmntent(FILE* f)
+-{
+-    static struct mntent mnt;
+-    return getmntent_r(f, &mnt, SENTINEL, 0);
+-}
+-
+-int addmntent(FILE* f, const struct mntent* mnt)
+-{
+-    if (fseek(f, 0, SEEK_END)) { return 1; }
+-    return fprintf(f, "%s\t%s\t%s\t%s\t%d\t%d\n", mnt->mnt_fsname, mnt->mnt_dir,
+-                   mnt->mnt_type, mnt->mnt_opts, mnt->mnt_freq, mnt->mnt_passno)
+-         < 0;
+-}
+-
+-int endmntent(FILE* f)
+-{
+-    if (f) { fclose(f); }
+-    return 1;
+-}
+-
+-char* hasmntopt(const struct mntent* mnt, const char* opt)
+-{
+-    return strstr(mnt->mnt_opts, opt);
+-}
+-
+-/* Adapted from musl */
+-struct mntent* getmntent_r(FILE* f, struct mntent* mnt, char* linebuf,
+-                           int buflen)
+-{
+-    int    n[8];
+-    bool   use_internal = (linebuf == SENTINEL);
+-    int    len;
+-    size_t i;
+-
+-    mnt->mnt_freq   = 0;
+-    mnt->mnt_passno = 0;
+-
+-    do {
+-        if (use_internal)
+-        {
+-            getline(&internal_buf, &internal_bufsize, f);
+-            linebuf = internal_buf;
+-        }
+-        else { fgets(linebuf, buflen, f); }
+-        if (feof(f) || ferror(f)) { return 0; }
+-        if (!strchr(linebuf, '\n'))
+-        {
+-            fscanf(f, "%*[^\n]%*[\n]");
+-            errno = ERANGE;
+-            return 0;
+-        }
+-
+-        len = strlen(linebuf);
+-        if (len > INT_MAX) { continue; }
+-
+-        for (i = 0; i < sizeof n / sizeof *n; i++) { n[i] = len; }
+-
+-        sscanf(linebuf, " %n%*s%n %n%*s%n %n%*s%n %n%*s%n %d %d", n, n + 1,
+-               n + 2, n + 3, n + 4, n + 5, n + 6, n + 7, &mnt->mnt_freq,
+-               &mnt->mnt_passno);
+-    } while (linebuf[n[0]] == '#' || n[1] == len);
+-
+-    linebuf[n[1]]   = 0;
+-    linebuf[n[3]]   = 0;
+-    linebuf[n[5]]   = 0;
+-    linebuf[n[7]]   = 0;
+-
+-    mnt->mnt_fsname = linebuf + n[0];
+-    mnt->mnt_dir    = linebuf + n[2];
+-    mnt->mnt_type   = linebuf + n[4];
+-    mnt->mnt_opts   = linebuf + n[6];
+-
+-    return mnt;
+-}
+diff --git a/sysdeps/cryptix/generic/mount.cpp b/sysdeps/cryptix/generic/mount.cpp
+deleted file mode 100644
+index b17de66..0000000
+--- a/sysdeps/cryptix/generic/mount.cpp
++++ /dev/null
+@@ -1,18 +0,0 @@
+-#include <bits/ensure.h>
+-#include <errno.h>
+-#include <sys/mount.h>
+-
+-int mount(const char* source, const char* target, const char* fstype,
+-          unsigned long flags, const void* data)
+-{
+-    return 0;
+-}
+-
+-int umount(const char* target) { return umount2(target, 0); }
+-
+-int umount2(const char* target, int flags) { return 0; }
+-
+-extern "C"
+-{
+-    int statfs(const char* path, struct statfs* buf) { return 0; }
+-}
+diff --git a/sysdeps/cryptix/generic/reboot.cpp b/sysdeps/cryptix/generic/reboot.cpp
+index c4ceb44..d72a937 100644
+--- a/sysdeps/cryptix/generic/reboot.cpp
++++ b/sysdeps/cryptix/generic/reboot.cpp
+@@ -6,33 +6,36 @@
+ 
+ using namespace cryptix;
+ 
+-RebootCmd cryptix_reboot_cmd(unsigned int what)
+-{
+-    switch (what)
+-    {
+-        case 0x01234567: return RebootCmd::eRestart;
+-        case 0xCDEF0123: return RebootCmd::eHalt;
+-        case 0x4321FEDC: return RebootCmd::ePowerOff;
+-        case 0xA1B2C3D4: return RebootCmd::eRestart2;
+-        case 0xD000FCE2: return RebootCmd::eSuspend;
+-        case 0x45584543: return RebootCmd::eKexec;
++RebootCmd cryptix_reboot_cmd(unsigned int what) {
++	switch (what) {
++		case 0x01234567:
++			return RebootCmd::eRestart;
++		case 0xCDEF0123:
++			return RebootCmd::eHalt;
++		case 0x4321FEDC:
++			return RebootCmd::ePowerOff;
++		case 0xA1B2C3D4:
++			return RebootCmd::eRestart2;
++		case 0xD000FCE2:
++			return RebootCmd::eSuspend;
++		case 0x45584543:
++			return RebootCmd::eKexec;
+ 
+-        default: break;
+-    }
++		default:
++			break;
++	}
+ 
+-    return RebootCmd::eUndefined;
++	return RebootCmd::eUndefined;
+ }
+ 
+-int reboot(int what)
+-{
+-    auto cmd = cryptix_reboot_cmd(what);
++int reboot(int what) {
++	auto cmd = cryptix_reboot_cmd(what);
+ 
+-    auto ret = Syscall(SYS_REBOOT, cmd);
+-    if (auto e = syscall_error(ret); e)
+-    {
+-        errno = e;
+-        return -1;
+-    }
++	auto ret = Syscall(SYS_REBOOT, cmd);
++	if (auto e = syscall_error(ret); e) {
++		errno = e;
++		return -1;
++	}
+ 
+-    return 0;
++	return 0;
+ }
+diff --git a/sysdeps/cryptix/include/asm/ioctl.h b/sysdeps/cryptix/include/asm/ioctl.h
+deleted file mode 100644
+index 8cbb364..0000000
+--- a/sysdeps/cryptix/include/asm/ioctl.h
++++ /dev/null
+@@ -1,105 +0,0 @@
+-/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
+-#ifndef _ASM_GENERIC_IOCTL_H
+-#define _ASM_GENERIC_IOCTL_H
+-
+-/* ioctl command encoding: 32 bits total, command in lower 16 bits,
+- * size of the parameter structure in the lower 14 bits of the
+- * upper 16 bits.
+- * Encoding the size of the parameter structure in the ioctl request
+- * is useful for catching programs compiled with old versions
+- * and to avoid overwriting user space outside the user buffer area.
+- * The highest 2 bits are reserved for indicating the ``access mode''.
+- * NOTE: This limits the max parameter size to 16kB -1 !
+- */
+-
+-/*
+- * The following is for compatibility across the various Linux
+- * platforms.  The generic ioctl numbering scheme doesn't really enforce
+- * a type field.  De facto, however, the top 8 bits of the lower 16
+- * bits are indeed used as a type field, so we might just as well make
+- * this explicit here.  Please be sure to use the decoding macros
+- * below from now on.
+- */
+-#define _IOC_NRBITS	8
+-#define _IOC_TYPEBITS	8
+-
+-/*
+- * Let any architecture override either of the following before
+- * including this file.
+- */
+-
+-#ifndef _IOC_SIZEBITS
+-# define _IOC_SIZEBITS	14
+-#endif
+-
+-#ifndef _IOC_DIRBITS
+-# define _IOC_DIRBITS	2
+-#endif
+-
+-#define _IOC_NRMASK	((1 << _IOC_NRBITS)-1)
+-#define _IOC_TYPEMASK	((1 << _IOC_TYPEBITS)-1)
+-#define _IOC_SIZEMASK	((1 << _IOC_SIZEBITS)-1)
+-#define _IOC_DIRMASK	((1 << _IOC_DIRBITS)-1)
+-
+-#define _IOC_NRSHIFT	0
+-#define _IOC_TYPESHIFT	(_IOC_NRSHIFT+_IOC_NRBITS)
+-#define _IOC_SIZESHIFT	(_IOC_TYPESHIFT+_IOC_TYPEBITS)
+-#define _IOC_DIRSHIFT	(_IOC_SIZESHIFT+_IOC_SIZEBITS)
+-
+-/*
+- * Direction bits, which any architecture can choose to override
+- * before including this file.
+- *
+- * NOTE: _IOC_WRITE means userland is writing and kernel is
+- * reading. _IOC_READ means userland is reading and kernel is writing.
+- */
+-
+-#ifndef _IOC_NONE
+-# define _IOC_NONE	0U
+-#endif
+-
+-#ifndef _IOC_WRITE
+-# define _IOC_WRITE	1U
+-#endif
+-
+-#ifndef _IOC_READ
+-# define _IOC_READ	2U
+-#endif
+-
+-#define _IOC(dir,type,nr,size) \
+-	(((dir)  << _IOC_DIRSHIFT) | \
+-	 ((type) << _IOC_TYPESHIFT) | \
+-	 ((nr)   << _IOC_NRSHIFT) | \
+-	 ((size) << _IOC_SIZESHIFT))
+-
+-#define _IOC_TYPECHECK(t) (sizeof(t))
+-
+-/*
+- * Used to create numbers.
+- *
+- * NOTE: _IOW means userland is writing and kernel is reading. _IOR
+- * means userland is reading and kernel is writing.
+- */
+-#define _IO(type,nr)		_IOC(_IOC_NONE,(type),(nr),0)
+-#define _IOR(type,nr,size)	_IOC(_IOC_READ,(type),(nr),(_IOC_TYPECHECK(size)))
+-#define _IOW(type,nr,size)	_IOC(_IOC_WRITE,(type),(nr),(_IOC_TYPECHECK(size)))
+-#define _IOWR(type,nr,size)	_IOC(_IOC_READ|_IOC_WRITE,(type),(nr),(_IOC_TYPECHECK(size)))
+-#define _IOR_BAD(type,nr,size)	_IOC(_IOC_READ,(type),(nr),sizeof(size))
+-#define _IOW_BAD(type,nr,size)	_IOC(_IOC_WRITE,(type),(nr),sizeof(size))
+-#define _IOWR_BAD(type,nr,size)	_IOC(_IOC_READ|_IOC_WRITE,(type),(nr),sizeof(size))
+-
+-/* used to decode ioctl numbers.. */
+-#define _IOC_DIR(nr)		(((nr) >> _IOC_DIRSHIFT) & _IOC_DIRMASK)
+-#define _IOC_TYPE(nr)		(((nr) >> _IOC_TYPESHIFT) & _IOC_TYPEMASK)
+-#define _IOC_NR(nr)		(((nr) >> _IOC_NRSHIFT) & _IOC_NRMASK)
+-#define _IOC_SIZE(nr)		(((nr) >> _IOC_SIZESHIFT) & _IOC_SIZEMASK)
+-
+-/* ...and for the drivers/sound files... */
+-
+-#define IOC_IN		(_IOC_WRITE << _IOC_DIRSHIFT)
+-#define IOC_OUT		(_IOC_READ << _IOC_DIRSHIFT)
+-#define IOC_INOUT	((_IOC_WRITE|_IOC_READ) << _IOC_DIRSHIFT)
+-#define IOCSIZE_MASK	(_IOC_SIZEMASK << _IOC_SIZESHIFT)
+-#define IOCSIZE_SHIFT	(_IOC_SIZESHIFT)
+-
+-#endif /* _ASM_GENERIC_IOCTL_H */
+diff --git a/sysdeps/cryptix/include/asm/ioctls.h b/sysdeps/cryptix/include/asm/ioctls.h
+deleted file mode 100644
+index bdbba9b..0000000
+--- a/sysdeps/cryptix/include/asm/ioctls.h
++++ /dev/null
+@@ -1,121 +0,0 @@
+-/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
+-#ifndef __ASM_GENERIC_IOCTLS_H
+-#define __ASM_GENERIC_IOCTLS_H
+-
+-#include <asm/ioctl.h>
+-
+-/*
+- * These are the most common definitions for tty ioctl numbers.
+- * Most of them do not use the recommended _IOC(), but there is
+- * probably some source code out there hardcoding the number,
+- * so we might as well use them for all new platforms.
+- *
+- * The architectures that use different values here typically
+- * try to be compatible with some Unix variants for the same
+- * architecture.
+- */
+-
+-/* 0x54 is just a magic number to make these relatively unique ('T') */
+-
+-#define TCGETS		0x5401
+-#define TCSETS		0x5402
+-#define TCSETSW		0x5403
+-#define TCSETSF		0x5404
+-#define TCGETA		0x5405
+-#define TCSETA		0x5406
+-#define TCSETAW		0x5407
+-#define TCSETAF		0x5408
+-#define TCSBRK		0x5409
+-#define TCXONC		0x540A
+-#define TCFLSH		0x540B
+-#define TIOCEXCL	0x540C
+-#define TIOCNXCL	0x540D
+-#define TIOCSCTTY	0x540E
+-#define TIOCGPGRP	0x540F
+-#define TIOCSPGRP	0x5410
+-#define TIOCOUTQ	0x5411
+-#define TIOCSTI		0x5412
+-#define TIOCGWINSZ	0x5413
+-#define TIOCSWINSZ	0x5414
+-#define TIOCMGET	0x5415
+-#define TIOCMBIS	0x5416
+-#define TIOCMBIC	0x5417
+-#define TIOCMSET	0x5418
+-#define TIOCGSOFTCAR	0x5419
+-#define TIOCSSOFTCAR	0x541A
+-#define FIONREAD	0x541B
+-#define TIOCINQ		FIONREAD
+-#define TIOCLINUX	0x541C
+-#define TIOCCONS	0x541D
+-#define TIOCGSERIAL	0x541E
+-#define TIOCSSERIAL	0x541F
+-#define TIOCPKT		0x5420
+-#define FIONBIO		0x5421
+-#define TIOCNOTTY	0x5422
+-#define TIOCSETD	0x5423
+-#define TIOCGETD	0x5424
+-#define TCSBRKP		0x5425	/* Needed for POSIX tcsendbreak() */
+-#define TIOCSBRK	0x5427  /* BSD compatibility */
+-#define TIOCCBRK	0x5428  /* BSD compatibility */
+-#define TIOCGSID	0x5429  /* Return the session ID of FD */
+-#define TCGETS2		_IOR('T', 0x2A, struct termios2)
+-#define TCSETS2		_IOW('T', 0x2B, struct termios2)
+-#define TCSETSW2	_IOW('T', 0x2C, struct termios2)
+-#define TCSETSF2	_IOW('T', 0x2D, struct termios2)
+-#define TIOCGRS485	0x542E
+-#ifndef TIOCSRS485
+-#define TIOCSRS485	0x542F
+-#endif
+-#define TIOCGPTN	_IOR('T', 0x30, unsigned int) /* Get Pty Number (of pty-mux device) */
+-#define TIOCSPTLCK	_IOW('T', 0x31, int)  /* Lock/unlock Pty */
+-#define TIOCGDEV	_IOR('T', 0x32, unsigned int) /* Get primary device node of /dev/console */
+-#define TCGETX		0x5432 /* SYS5 TCGETX compatibility */
+-#define TCSETX		0x5433
+-#define TCSETXF		0x5434
+-#define TCSETXW		0x5435
+-#define TIOCSIG		_IOW('T', 0x36, int)  /* pty: generate signal */
+-#define TIOCVHANGUP	0x5437
+-#define TIOCGPKT	_IOR('T', 0x38, int) /* Get packet mode state */
+-#define TIOCGPTLCK	_IOR('T', 0x39, int) /* Get Pty lock state */
+-#define TIOCGEXCL	_IOR('T', 0x40, int) /* Get exclusive mode state */
+-#define TIOCGPTPEER	_IO('T', 0x41) /* Safely open the slave */
+-#define TIOCGISO7816	_IOR('T', 0x42, struct serial_iso7816)
+-#define TIOCSISO7816	_IOWR('T', 0x43, struct serial_iso7816)
+-
+-#define FIONCLEX	0x5450
+-#define FIOCLEX		0x5451
+-#define FIOASYNC	0x5452
+-#define TIOCSERCONFIG	0x5453
+-#define TIOCSERGWILD	0x5454
+-#define TIOCSERSWILD	0x5455
+-#define TIOCGLCKTRMIOS	0x5456
+-#define TIOCSLCKTRMIOS	0x5457
+-#define TIOCSERGSTRUCT	0x5458 /* For debugging only */
+-#define TIOCSERGETLSR   0x5459 /* Get line status register */
+-#define TIOCSERGETMULTI 0x545A /* Get multiport config  */
+-#define TIOCSERSETMULTI 0x545B /* Set multiport config */
+-
+-#define TIOCMIWAIT	0x545C	/* wait for a change on serial input line(s) */
+-#define TIOCGICOUNT	0x545D	/* read serial port __inline__ interrupt counts */
+-
+-/*
+- * Some arches already define FIOQSIZE due to a historical
+- * conflict with a Hayes modem-specific ioctl value.
+- */
+-#ifndef FIOQSIZE
+-# define FIOQSIZE	0x5460
+-#endif
+-
+-/* Used for packet mode */
+-#define TIOCPKT_DATA		 0
+-#define TIOCPKT_FLUSHREAD	 1
+-#define TIOCPKT_FLUSHWRITE	 2
+-#define TIOCPKT_STOP		 4
+-#define TIOCPKT_START		 8
+-#define TIOCPKT_NOSTOP		16
+-#define TIOCPKT_DOSTOP		32
+-#define TIOCPKT_IOCTL		64
+-
+-#define TIOCSER_TEMT	0x01	/* Transmitter physically empty */
+-
+-#endif /* __ASM_GENERIC_IOCTLS_H */
+diff --git a/sysdeps/cryptix/include/cryptix/reboot.hpp b/sysdeps/cryptix/include/cryptix/reboot.hpp
+index 6eb9738..35b08b8 100644
+--- a/sysdeps/cryptix/include/cryptix/reboot.hpp
++++ b/sysdeps/cryptix/include/cryptix/reboot.hpp
+@@ -1,15 +1,13 @@
+ #pragma once
+ 
+-namespace cryptix
+-{
+-    enum class RebootCmd
+-    {
+-        eRestart   = 0,
+-        eHalt      = 1,
+-        ePowerOff  = 2,
+-        eRestart2  = 3,
+-        eSuspend   = 4,
+-        eKexec     = 5,
+-        eUndefined = -1,
+-    };
++namespace cryptix {
++enum class RebootCmd {
++	eRestart = 0,
++	eHalt = 1,
++	ePowerOff = 2,
++	eRestart2 = 3,
++	eSuspend = 4,
++	eKexec = 5,
++	eUndefined = -1,
++};
+ };
+diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
+index 6c2b748..9fbdf9f 100644
+--- a/sysdeps/cryptix/include/cryptix/syscall.h
++++ b/sysdeps/cryptix/include/cryptix/syscall.h
+@@ -3,239 +3,214 @@
+ 
+ #define SyscallInvoker "syscall"
+ 
+-#define STUB(signature)                                                        \
+-    signature { sys_libc_log(#signature "is a stub!"); }
+-#define STUB_RET(signature)                                                    \
+-    signature                                                                  \
+-    {                                                                          \
+-        sys_libc_log(#signature " is a stub!");                                \
+-        return 0;                                                              \
+-    }
++#define STUB(signature)                                                                            \
++	signature { sys_libc_log(#signature "is a stub!"); }
++#define STUB_RET(signature)                                                                        \
++	signature {                                                                                    \
++		sys_libc_log(#signature " is a stub!");                                                    \
++		return 0;                                                                                  \
++	}
+ 
+-inline int syscall_error(intptr_t ret)
+-{
+-    auto v = static_cast<intptr_t>(ret);
+-    if (static_cast<uintptr_t>(v) > -4096ul) return -v;
+-    return 0;
++inline int syscall_error(intptr_t ret) {
++	auto v = static_cast<intptr_t>(ret);
++	if (static_cast<uintptr_t>(v) > -4096ul)
++		return -v;
++	return 0;
+ }
+ 
+ #pragma region
+-constexpr size_t SYS_READ          = 0;
+-constexpr size_t SYS_WRITE         = 1;
+-constexpr size_t SYS_OPEN          = 2;
+-constexpr size_t SYS_CLOSE         = 3;
+-constexpr size_t SYS_STAT          = 4;
+-constexpr size_t SYS_FSTAT         = 5;
+-constexpr size_t SYS_LSTAT         = 6;
+-constexpr size_t SYS_LSEEK         = 8;
+-constexpr size_t SYS_MMAP          = 9;
+-constexpr size_t SYS_MPROTECT      = 10;
+-constexpr size_t SYS_MUNMAP        = 11;
+-constexpr size_t SYS_BRK           = 12;
+-constexpr size_t SYS_SIGACTION     = 13;
+-constexpr size_t SYS_SIGPROCMASK   = 14;
+-constexpr size_t SYS_SIGRETURN     = 15;
+-constexpr size_t SYS_IOCTL         = 16;
+-constexpr size_t SYS_PREAD64       = 17;
+-constexpr size_t SYS_PWRITE64      = 18;
+-constexpr size_t SYS_ACCESS        = 21;
+-constexpr size_t SYS_PIPE          = 22;
+-constexpr size_t SYS_DUP           = 32;
+-constexpr size_t SYS_DUP2          = 33;
+-constexpr size_t SYS_NANOSLEEP     = 35;
+-constexpr size_t SYS_GETPID        = 39;
+-constexpr size_t SYS_SOCKET        = 41;
+-constexpr size_t SYS_BIND          = 49;
+-constexpr size_t SYS_CLONE         = 56;
+-constexpr size_t SYS_FORK          = 57;
+-constexpr size_t SYS_EXECVE        = 59;
+-constexpr size_t SYS_EXIT          = 60;
+-constexpr size_t SYS_WAIT4         = 61;
+-constexpr size_t SYS_KILL          = 62;
+-constexpr size_t SYS_UNAME         = 63;
+-constexpr size_t SYS_FCNTL         = 72;
+-constexpr size_t SYS_GETCWD        = 79;
+-constexpr size_t SYS_CHDIR         = 80;
+-constexpr size_t SYS_FCHDIR        = 81;
+-constexpr size_t SYS_RENAME        = 82;
+-constexpr size_t SYS_MKDIR         = 83;
+-constexpr size_t SYS_RMDIR         = 84;
+-constexpr size_t SYS_CREAT         = 85;
+-constexpr size_t SYS_LINK          = 86;
+-constexpr size_t SYS_UNLINK        = 87;
+-constexpr size_t SYS_SYMLINK       = 88;
+-constexpr size_t SYS_READLINK      = 89;
+-constexpr size_t SYS_CHMOD         = 90;
+-constexpr size_t SYS_FCHMOD        = 91;
+-constexpr size_t SYS_CHOWN         = 92;
+-constexpr size_t SYS_FCHOWN        = 93;
+-constexpr size_t SYS_LCHOWN        = 94;
+-constexpr size_t SYS_UMASK         = 95;
+-constexpr size_t SYS_GETRLIMIT     = 97;
+-constexpr size_t SYS_GETRUSAGE     = 98;
+-constexpr size_t SYS_GETUID        = 102;
+-constexpr size_t SYS_GETGID        = 104;
+-constexpr size_t SYS_SETUID        = 105;
+-constexpr size_t SYS_SETGID        = 106;
+-constexpr size_t SYS_GETEUID       = 107;
+-constexpr size_t SYS_GETEGID       = 108;
+-constexpr size_t SYS_SETPGID       = 109;
+-constexpr size_t SYS_GETPPID       = 110;
+-constexpr size_t SYS_SETSID        = 112;
+-constexpr size_t SYS_SETREUID      = 113;
+-constexpr size_t SYS_SETREGID      = 114;
+-constexpr size_t SYS_SETRESUID     = 117;
+-constexpr size_t SYS_SETRESGID     = 119;
+-constexpr size_t SYS_GETPGID       = 121;
+-constexpr size_t SYS_GETSID        = 124;
+-constexpr size_t SYS_SIGPENDING    = 127;
+-constexpr size_t SYS_SIGTIMEDWAIT  = 128;
+-constexpr size_t SYS_SIGSUSPEND    = 130;
+-constexpr size_t SYS_SIGALTSTACK   = 131;
+-constexpr size_t SYS_STATFS        = 137;
+-constexpr size_t SYS_ARCH_PRCTL    = 158;
+-constexpr size_t SYS_SYNC          = 162;
+-constexpr size_t SYS_MOUNT         = 165;
+-constexpr size_t SYS_UMOUNT        = 166;
+-constexpr size_t SYS_REBOOT        = 169;
+-constexpr size_t SYS_INIT_MODULE   = 175;
+-constexpr size_t SYS_GETTID        = 186;
+-constexpr size_t SYS_GETDENTS64    = 217;
++constexpr size_t SYS_READ = 0;
++constexpr size_t SYS_WRITE = 1;
++constexpr size_t SYS_OPEN = 2;
++constexpr size_t SYS_CLOSE = 3;
++constexpr size_t SYS_STAT = 4;
++constexpr size_t SYS_FSTAT = 5;
++constexpr size_t SYS_LSTAT = 6;
++constexpr size_t SYS_LSEEK = 8;
++constexpr size_t SYS_MMAP = 9;
++constexpr size_t SYS_MPROTECT = 10;
++constexpr size_t SYS_MUNMAP = 11;
++constexpr size_t SYS_BRK = 12;
++constexpr size_t SYS_SIGACTION = 13;
++constexpr size_t SYS_SIGPROCMASK = 14;
++constexpr size_t SYS_SIGRETURN = 15;
++constexpr size_t SYS_IOCTL = 16;
++constexpr size_t SYS_PREAD64 = 17;
++constexpr size_t SYS_PWRITE64 = 18;
++constexpr size_t SYS_ACCESS = 21;
++constexpr size_t SYS_PIPE = 22;
++constexpr size_t SYS_DUP = 32;
++constexpr size_t SYS_DUP2 = 33;
++constexpr size_t SYS_NANOSLEEP = 35;
++constexpr size_t SYS_GETPID = 39;
++constexpr size_t SYS_SOCKET = 41;
++constexpr size_t SYS_BIND = 49;
++constexpr size_t SYS_CLONE = 56;
++constexpr size_t SYS_FORK = 57;
++constexpr size_t SYS_EXECVE = 59;
++constexpr size_t SYS_EXIT = 60;
++constexpr size_t SYS_WAIT4 = 61;
++constexpr size_t SYS_KILL = 62;
++constexpr size_t SYS_UNAME = 63;
++constexpr size_t SYS_FCNTL = 72;
++constexpr size_t SYS_GETCWD = 79;
++constexpr size_t SYS_CHDIR = 80;
++constexpr size_t SYS_FCHDIR = 81;
++constexpr size_t SYS_RENAME = 82;
++constexpr size_t SYS_MKDIR = 83;
++constexpr size_t SYS_RMDIR = 84;
++constexpr size_t SYS_CREAT = 85;
++constexpr size_t SYS_LINK = 86;
++constexpr size_t SYS_UNLINK = 87;
++constexpr size_t SYS_SYMLINK = 88;
++constexpr size_t SYS_READLINK = 89;
++constexpr size_t SYS_CHMOD = 90;
++constexpr size_t SYS_FCHMOD = 91;
++constexpr size_t SYS_CHOWN = 92;
++constexpr size_t SYS_FCHOWN = 93;
++constexpr size_t SYS_LCHOWN = 94;
++constexpr size_t SYS_UMASK = 95;
++constexpr size_t SYS_GETRLIMIT = 97;
++constexpr size_t SYS_GETRUSAGE = 98;
++constexpr size_t SYS_GETUID = 102;
++constexpr size_t SYS_GETGID = 104;
++constexpr size_t SYS_SETUID = 105;
++constexpr size_t SYS_SETGID = 106;
++constexpr size_t SYS_GETEUID = 107;
++constexpr size_t SYS_GETEGID = 108;
++constexpr size_t SYS_SETPGID = 109;
++constexpr size_t SYS_GETPPID = 110;
++constexpr size_t SYS_SETSID = 112;
++constexpr size_t SYS_SETREUID = 113;
++constexpr size_t SYS_SETREGID = 114;
++constexpr size_t SYS_SETRESUID = 117;
++constexpr size_t SYS_SETRESGID = 119;
++constexpr size_t SYS_GETPGID = 121;
++constexpr size_t SYS_GETSID = 124;
++constexpr size_t SYS_SIGPENDING = 127;
++constexpr size_t SYS_SIGTIMEDWAIT = 128;
++constexpr size_t SYS_SIGSUSPEND = 130;
++constexpr size_t SYS_SIGALTSTACK = 131;
++constexpr size_t SYS_STATFS = 137;
++constexpr size_t SYS_ARCH_PRCTL = 158;
++constexpr size_t SYS_SYNC = 162;
++constexpr size_t SYS_MOUNT = 165;
++constexpr size_t SYS_UMOUNT = 166;
++constexpr size_t SYS_REBOOT = 169;
++constexpr size_t SYS_INIT_MODULE = 175;
++constexpr size_t SYS_GETTID = 186;
++constexpr size_t SYS_GETDENTS64 = 217;
+ constexpr size_t SYS_CLOCK_GETTIME = 228;
+-constexpr size_t SYS_PANIC         = 255;
+-constexpr size_t SYS_OPENAT        = 257;
+-constexpr size_t SYS_MKDIRAT       = 258;
+-constexpr size_t SYS_MKNODAT       = 259;
+-constexpr size_t SYS_FSTATAT       = 262;
+-constexpr size_t SYS_UNLINKAT      = 263;
+-constexpr size_t SYS_RENAMEAT      = 264;
+-constexpr size_t SYS_LINKAT        = 265;
+-constexpr size_t SYS_SYMLINKAT     = 266;
+-constexpr size_t SYS_READLINKAT    = 267;
+-constexpr size_t SYS_FCHMODAT      = 268;
+-constexpr size_t SYS_UTIMENSAT     = 280;
+-constexpr size_t SYS_SYNCFS        = 306;
+-constexpr size_t SYS_FUTEX_WAKE    = 454;
+-constexpr size_t SYS_FUTEX_WAIT    = 455;
++constexpr size_t SYS_PANIC = 255;
++constexpr size_t SYS_OPENAT = 257;
++constexpr size_t SYS_MKDIRAT = 258;
++constexpr size_t SYS_MKNODAT = 259;
++constexpr size_t SYS_FSTATAT = 262;
++constexpr size_t SYS_UNLINKAT = 263;
++constexpr size_t SYS_RENAMEAT = 264;
++constexpr size_t SYS_LINKAT = 265;
++constexpr size_t SYS_SYMLINKAT = 266;
++constexpr size_t SYS_READLINKAT = 267;
++constexpr size_t SYS_FCHMODAT = 268;
++constexpr size_t SYS_UTIMENSAT = 280;
++constexpr size_t SYS_SYNCFS = 306;
++constexpr size_t SYS_FUTEX_WAKE = 454;
++constexpr size_t SYS_FUTEX_WAIT = 455;
+ #pragma endregion
+ 
+-static inline uintptr_t SyscallAsm0(uintptr_t n)
+-{
++static inline uintptr_t SyscallAsm0(uintptr_t n) {
+ 
+-    uintptr_t ret;
+-    asm volatile(SyscallInvoker : "=a"(ret) : "a"(n) : "rcx", "r11", "memory");
+-    return ret;
++	uintptr_t ret;
++	asm volatile(SyscallInvoker : "=a"(ret) : "a"(n) : "rcx", "r11", "memory");
++	return ret;
+ }
+ 
+-static inline uintptr_t SyscallAsm1(uintptr_t n, uintptr_t a1)
+-{
+-    uintptr_t ret;
+-    asm volatile(SyscallInvoker
+-                 : "=a"(ret)
+-                 : "a"(n), "D"(a1)
+-                 : "rcx", "r11", "memory");
+-    return ret;
++static inline uintptr_t SyscallAsm1(uintptr_t n, uintptr_t a1) {
++	uintptr_t ret;
++	asm volatile(SyscallInvoker : "=a"(ret) : "a"(n), "D"(a1) : "rcx", "r11", "memory");
++	return ret;
+ }
+ 
+-static inline uintptr_t SyscallAsm2(uintptr_t n, uintptr_t a1, uintptr_t a2)
+-{
+-    uintptr_t ret;
+-    asm volatile(SyscallInvoker
+-                 : "=a"(ret)
+-                 : "a"(n), "D"(a1), "S"(a2)
+-                 : "rcx", "r11", "memory");
+-    return ret;
++static inline uintptr_t SyscallAsm2(uintptr_t n, uintptr_t a1, uintptr_t a2) {
++	uintptr_t ret;
++	asm volatile(SyscallInvoker : "=a"(ret) : "a"(n), "D"(a1), "S"(a2) : "rcx", "r11", "memory");
++	return ret;
+ }
+ 
+-static inline uintptr_t SyscallAsm3(uintptr_t n, uintptr_t a1, uintptr_t a2,
+-                                    uintptr_t a3)
+-{
+-    uintptr_t ret;
+-    asm volatile(SyscallInvoker
+-                 : "=a"(ret)
+-                 : "a"(n), "D"(a1), "S"(a2), "d"(a3)
+-                 : "rcx", "r11", "memory");
+-    return ret;
++static inline uintptr_t SyscallAsm3(uintptr_t n, uintptr_t a1, uintptr_t a2, uintptr_t a3) {
++	uintptr_t ret;
++	asm volatile(SyscallInvoker
++	             : "=a"(ret)
++	             : "a"(n), "D"(a1), "S"(a2), "d"(a3)
++	             : "rcx", "r11", "memory");
++	return ret;
+ }
+ 
+-static inline uintptr_t SyscallAsm4(uintptr_t n, uintptr_t a1, uintptr_t a2,
+-                                    uintptr_t a3, uintptr_t a4)
+-{
+-    uintptr_t          ret;
+-    register uintptr_t r10 asm("r10") = a4;
+-    asm volatile(SyscallInvoker
+-                 : "=a"(ret)
+-                 : "a"(n), "D"(a1), "S"(a2), "d"(a3), "r"(r10)
+-                 : "rcx", "r11", "memory");
+-    return ret;
++static inline uintptr_t
++SyscallAsm4(uintptr_t n, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4) {
++	uintptr_t ret;
++	register uintptr_t r10 asm("r10") = a4;
++	asm volatile(SyscallInvoker
++	             : "=a"(ret)
++	             : "a"(n), "D"(a1), "S"(a2), "d"(a3), "r"(r10)
++	             : "rcx", "r11", "memory");
++	return ret;
+ }
+ 
+-static inline uintptr_t SyscallAsm5(uintptr_t n, uintptr_t a1, uintptr_t a2,
+-                                    uintptr_t a3, uintptr_t a4, uintptr_t a5)
+-{
+-    uintptr_t          ret;
+-    register uintptr_t r10 asm("r10") = a4;
+-    register uintptr_t r8 asm("r8")   = a5;
+-    asm volatile(SyscallInvoker
+-                 : "=a"(ret)
+-                 : "a"(n), "D"(a1), "S"(a2), "d"(a3), "r"(r10), "r"(r8)
+-                 : "rcx", "r11", "memory");
+-    return ret;
++static inline uintptr_t
++SyscallAsm5(uintptr_t n, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5) {
++	uintptr_t ret;
++	register uintptr_t r10 asm("r10") = a4;
++	register uintptr_t r8 asm("r8") = a5;
++	asm volatile(SyscallInvoker
++	             : "=a"(ret)
++	             : "a"(n), "D"(a1), "S"(a2), "d"(a3), "r"(r10), "r"(r8)
++	             : "rcx", "r11", "memory");
++	return ret;
+ }
+ 
+-static inline uintptr_t SyscallAsm6(uintptr_t n, uintptr_t a1, uintptr_t a2,
+-                                    uintptr_t a3, uintptr_t a4, uintptr_t a5,
+-                                    uintptr_t a6)
+-{
+-    uintptr_t          ret;
+-    register uintptr_t r10 asm("r10") = a4;
+-    register uintptr_t r8 asm("r8")   = a5;
+-    register uintptr_t r9 asm("r9")   = a6;
+-    asm volatile(SyscallInvoker
+-                 : "=a"(ret)
+-                 : "a"(n), "D"(a1), "S"(a2), "d"(a3), "r"(r10), "r"(r8), "r"(r9)
+-                 : "rcx", "r11", "memory");
+-    return ret;
++static inline uintptr_t SyscallAsm6(
++    uintptr_t n, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5, uintptr_t a6
++) {
++	uintptr_t ret;
++	register uintptr_t r10 asm("r10") = a4;
++	register uintptr_t r8 asm("r8") = a5;
++	register uintptr_t r9 asm("r9") = a6;
++	asm volatile(SyscallInvoker
++	             : "=a"(ret)
++	             : "a"(n), "D"(a1), "S"(a2), "d"(a3), "r"(r10), "r"(r8), "r"(r9)
++	             : "rcx", "r11", "memory");
++	return ret;
+ }
+ 
+ #define GetMacro(_1, _2, _3, _4, _5, _6, _7, NAME, ...) NAME
+-#define InvokeSyscall(...)                                                     \
+-    GetMacro(__VA_ARGS__, SyscallAsm6, SyscallAsm5, SyscallAsm4, SyscallAsm3,  \
+-             SyscallAsm2, SyscallAsm1, SyscallAsm0)(__VA_ARGS__)
++#define InvokeSyscall(...)                                                                                            \
++	GetMacro(__VA_ARGS__, SyscallAsm6, SyscallAsm5, SyscallAsm4, SyscallAsm3, SyscallAsm2, SyscallAsm1, SyscallAsm0)( \
++	    __VA_ARGS__                                                                                                   \
++	)
+ 
+-inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1, uintptr_t a2,
+-                           uintptr_t a3, uintptr_t a4, uintptr_t a5,
+-                           uintptr_t a6)
+-{
+-    return InvokeSyscall(n, a1, a2, a3, a4, a5, a6);
++inline uintptr_t DoSyscall(
++    uintptr_t n, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5, uintptr_t a6
++) {
++	return InvokeSyscall(n, a1, a2, a3, a4, a5, a6);
+ }
+-inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1, uintptr_t a2,
+-                           uintptr_t a3, uintptr_t a4, uintptr_t a5)
+-{
+-    return InvokeSyscall(n, a1, a2, a3, a4, a5);
++inline uintptr_t
++DoSyscall(uintptr_t n, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5) {
++	return InvokeSyscall(n, a1, a2, a3, a4, a5);
+ }
+-inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1, uintptr_t a2,
+-                           uintptr_t a3, uintptr_t a4)
+-{
+-    return InvokeSyscall(n, a1, a2, a3, a4);
++inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4) {
++	return InvokeSyscall(n, a1, a2, a3, a4);
+ }
+-inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1, uintptr_t a2,
+-                           uintptr_t a3)
+-{
+-    return InvokeSyscall(n, a1, a2, a3);
++inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1, uintptr_t a2, uintptr_t a3) {
++	return InvokeSyscall(n, a1, a2, a3);
+ }
+-inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1, uintptr_t a2)
+-{
+-    return InvokeSyscall(n, a1, a2);
+-}
+-inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1)
+-{
+-    return InvokeSyscall(n, a1);
++inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1, uintptr_t a2) {
++	return InvokeSyscall(n, a1, a2);
+ }
++inline uintptr_t DoSyscall(uintptr_t n, uintptr_t a1) { return InvokeSyscall(n, a1); }
+ inline uintptr_t DoSyscall(uintptr_t n) { return InvokeSyscall(n); }
+ 
+ template <typename... Args>
+-inline uintptr_t Syscall(Args&&... args)
+-{
+-    return DoSyscall(uintptr_t(args)...);
++inline uintptr_t Syscall(Args &&...args) {
++	return DoSyscall(uintptr_t(args)...);
+ }
+diff --git a/sysdeps/cryptix/include/meson.build b/sysdeps/cryptix/include/meson.build
+index ce24f3b..813bd42 100644
+--- a/sysdeps/cryptix/include/meson.build
++++ b/sysdeps/cryptix/include/meson.build
+@@ -59,14 +59,8 @@ if not no_headers
+   install_headers('cryptix/syscall.h', 'cryptix/reboot.hpp', subdir: 'cryptix')
+ 
+   install_headers(
+-    'sys/reboot.h',
+-	'sys/mount.h',
+ 	'sys/sysmacros.h',
+     'sys/statfs.h',
+     'sys/vfs.h',
+     subdir: 'sys')
+-
+-  install_headers(
+-	'mntent.h',
+-  )
+ endif
+diff --git a/sysdeps/cryptix/include/mntent.h b/sysdeps/cryptix/include/mntent.h
+deleted file mode 100644
+index bafd289..0000000
+--- a/sysdeps/cryptix/include/mntent.h
++++ /dev/null
+@@ -1,50 +0,0 @@
+-#ifndef _MNTENT_H
+-#define _MNTENT_H
+-
+-#include <stdio.h>
+-
+-// TODO: Refer to _PATH_MOUNTED
+-#define MOUNTED "/etc/mtab"
+-
+-/* Generic mount options */
+-#define MNTOPT_DEFAULTS "defaults"		/* Use all default options. */
+-#define MNTOPT_RO       "ro"			/* Read only. */
+-#define MNTOPT_RW       "rw"			/* Read/write. */
+-#define MNTOPT_SUID     "suid"			/* Set uid allowed. */
+-#define MNTOPT_NOSUID   "nosuid"		/* No set uid allowed. */
+-#define MNTOPT_NOAUTO   "noauto"		/* Do not auto mount. */
+-
+-#ifdef __cplusplus
+-extern "C" {
+-#endif
+-
+-struct mntent {
+-	char *mnt_fsname;
+-	char *mnt_dir;
+-	char *mnt_type;
+-	char *mnt_opts;
+-	int mnt_freq;
+-	int mnt_passno;
+-};
+-
+-#ifndef __MLIBC_ABI_ONLY
+-
+-FILE *setmntent(const char *, const char *);
+-
+-struct mntent *getmntent(FILE *);
+-
+-int addmntent(FILE *, const struct mntent *);
+-
+-int endmntent(FILE *);
+-
+-char *hasmntopt(const struct mntent *, const char *);
+-
+-struct mntent *getmntent_r(FILE *, struct mntent *,  char *, int);
+-
+-#endif /* !__MLIBC_ABI_ONLY */
+-
+-#ifdef __cplusplus
+-}
+-#endif
+-
+-#endif // _MNTENT_H
+diff --git a/sysdeps/cryptix/include/sys/mount.h b/sysdeps/cryptix/include/sys/mount.h
+deleted file mode 100644
+index b19f3d7..0000000
+--- a/sysdeps/cryptix/include/sys/mount.h
++++ /dev/null
+@@ -1,54 +0,0 @@
+-#ifndef _SYS_MOUNT_H
+-#define _SYS_MOUNT_H
+-
+-#ifdef __cplusplus
+-extern "C" {
+-#endif
+-
+-#define MS_RDONLY 1
+-#define MS_NOSUID 2
+-#define MS_NODEV 4
+-#define MS_NOEXEC 8
+-#define MS_SYNCHRONOUS 16
+-#define MS_REMOUNT 32
+-#define MS_MANDLOCK 64
+-#define MS_DIRSYNC 128
+-#define MS_NOSYMFOLLOW 256
+-#define MS_NOATIME 1024
+-#define MS_NODIRATIME 2048
+-#define MS_BIND 4096
+-#define MS_MOVE 8192
+-#define MS_REC 16384
+-#define MS_SILENT 32768
+-#define MS_POSIXACL (1 << 16)
+-#define MS_UNBINDABLE (1 << 17)
+-#define MS_PRIVATE (1 << 18)
+-#define MS_SLAVE (1 << 19)
+-#define MS_SHARED (1 << 20)
+-#define MS_RELATIME (1 << 21)
+-#define MS_KERNMOUNT (1 << 22)
+-#define MS_I_VERSION (1 << 23)
+-#define MS_STRICTATIME (1 << 24)
+-#define MS_LAZYTIME (1 << 25)
+-#define MS_NOREMOTELOCK (1 << 27)
+-#define MS_NOSEC (1 << 28)
+-#define MS_BORN (1 << 29)
+-#define MS_ACTIVE (1 << 30)
+-#define MS_NOUSER (1 << 31)
+-
+-#define MNT_FORCE 1
+-
+-#ifndef __MLIBC_ABI_ONLY
+-
+-int mount(const char *source, const char *target,
+-		const char *fstype, unsigned long flags, const void *data);
+-int umount(const char *target);
+-int umount2(const char *target, int flags);
+-
+-#endif /* !__MLIBC_ABI_ONLY */
+-
+-#ifdef __cplusplus
+-}
+-#endif
+-
+-#endif // _SYS_MOUNT_H
+diff --git a/sysdeps/cryptix/include/sys/reboot.h b/sysdeps/cryptix/include/sys/reboot.h
+deleted file mode 100644
+index 6c4e495..0000000
+--- a/sysdeps/cryptix/include/sys/reboot.h
++++ /dev/null
+@@ -1,20 +0,0 @@
+-#ifndef MLIBC_SYS_REBOOT_H
+-#define MLIBC_SYS_REBOOT_H
+-
+-#include <abi-bits/reboot.h>
+-
+-#ifdef __cplusplus
+-extern "C" {
+-#endif
+-
+-#ifndef __MLIBC_ABI_ONLY
+-
+-int reboot(int arg);
+-
+-#endif /* !__MLIBC_ABI_ONLY */
+-
+-#ifdef __cplusplus
+-}
+-#endif
+-
+-#endif // MLIBC_SYS_REBOOT_H
+diff --git a/sysdeps/cryptix/include/sys/sysmacros.h b/sysdeps/cryptix/include/sys/sysmacros.h
+index 1d81ef5..944e5bc 100644
+--- a/sysdeps/cryptix/include/sys/sysmacros.h
++++ b/sysdeps/cryptix/include/sys/sysmacros.h
+@@ -2,19 +2,17 @@
+ #define _SYS_SYSMACROS_H
+ 
+ #ifdef __cplusplus
+-extern "C"
+-{
++extern "C" {
+ #endif
+ 
+-    unsigned int           __mlibc_dev_major(unsigned long long int __dev);
++unsigned int __mlibc_dev_major(unsigned long long int __dev);
+ 
+-    unsigned int           __mlibc_dev_minor(unsigned long long int __dev);
++unsigned int __mlibc_dev_minor(unsigned long long int __dev);
+ 
+-    unsigned long long int __mlibc_dev_makedev(unsigned int __major,
+-                                               unsigned int __minor);
++unsigned long long int __mlibc_dev_makedev(unsigned int __major, unsigned int __minor);
+ 
+-#define major(dev)            __mlibc_dev_major(dev)
+-#define minor(dev)            __mlibc_dev_minor(dev)
++#define major(dev) __mlibc_dev_major(dev)
++#define minor(dev) __mlibc_dev_minor(dev)
+ #define makedev(major, minor) __mlibc_dev_makedev(major, minor)
+ 
+ #ifdef __cplusplus
+diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
+index 44794d1..4213312 100644
+--- a/sysdeps/cryptix/meson.build
++++ b/sysdeps/cryptix/meson.build
+@@ -3,7 +3,6 @@ sysdep_supported_options = {
+   'linux': true,
+   'glibc': true,
+   'bsd': true,
+-  'ansi': true,
+ }
+ 
+ subdir('arch')
+diff --git a/sysdeps/cryptix/sysdeps/internal.cpp b/sysdeps/cryptix/sysdeps/internal.cpp
+index 51acb31..a3ee90c 100644
+--- a/sysdeps/cryptix/sysdeps/internal.cpp
++++ b/sysdeps/cryptix/sysdeps/internal.cpp
+@@ -10,27 +10,20 @@
+ 
+ #include <sys/mman.h>
+ 
+-namespace mlibc
+-{
+-    void sys_libc_log(const char* message)
+-    {
+-        static constexpr char MLIBC_SIG[] = "[mlibc]: ";
+-
+-        size_t                len         = strlen(message) + 1;
+-        char*                 messageEOL
+-            = reinterpret_cast<char*>(alloca(len + sizeof(MLIBC_SIG)));
+-
+-        memcpy(messageEOL, MLIBC_SIG, sizeof(MLIBC_SIG) - 1);
+-        memcpy(messageEOL + sizeof(MLIBC_SIG) - 1, message, len);
+-        len += sizeof(MLIBC_SIG) - 1;
+-
+-        messageEOL[len - 1] = '\n';
+-        Syscall(SYS_WRITE, 1, messageEOL, len);
+-    }
+-    [[noreturn]] void sys_libc_panic()
+-    {
+-        Syscall(SYS_PANIC, "mlibc crashed");
+-
+-        __builtin_unreachable();
+-    }
++namespace mlibc {
++void sys_libc_log(const char *message) {
++	static constexpr char MLIBC_SIG[] = "[mlibc]: ";
++
++	size_t len = strlen(message);
++
++	long nwritten = 0;
++	sys_write(1, MLIBC_SIG, sizeof(MLIBC_SIG), &nwritten);
++	sys_write(1, message, len, &nwritten);
++	sys_write(1, "\n", 1, &nwritten);
++}
++[[noreturn]] void sys_libc_panic() {
++	Syscall(SYS_PANIC, "mlibc crashed");
++
++	__builtin_unreachable();
++}
+ } // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/memory.cpp b/sysdeps/cryptix/sysdeps/memory.cpp
+index 92e491f..5fc4c23 100644
+--- a/sysdeps/cryptix/sysdeps/memory.cpp
++++ b/sysdeps/cryptix/sysdeps/memory.cpp
+@@ -10,45 +10,42 @@
+ 
+ #include <sys/mman.h>
+ 
+-namespace mlibc
+-{
+-    int sys_anon_allocate(size_t size, void** pointer)
+-    {
+-        auto ret = sys_vm_map(nullptr, size, PROT_READ | PROT_WRITE, 0x20, -1,
+-                              0, pointer);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_anon_free(void* pointer, size_t size)
+-    {
+-        auto ret = sys_vm_unmap(pointer, size);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-
+-    int sys_vm_map(void* hint, size_t size, int prot, int flags, int fd,
+-                   off_t offset, void** window)
+-    {
+-        auto ret = Syscall(SYS_MMAP, hint, size, prot, flags, fd, offset);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *window = reinterpret_cast<void*>(ret);
+-        return 0;
+-    }
+-    int sys_vm_unmap(void* pointer, size_t size)
+-    {
+-        auto ret = Syscall(SYS_MUNMAP, pointer, size);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_vm_protect(void* pointer, size_t size, int prot)
+-    {
+-        auto ret = Syscall(SYS_MPROTECT, pointer, size, prot);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
++namespace mlibc {
++int sys_anon_allocate(size_t size, void **pointer) {
++	auto ret = sys_vm_map(nullptr, size, PROT_READ | PROT_WRITE, 0x20, -1, 0, pointer);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_anon_free(void *pointer, size_t size) {
++	auto ret = sys_vm_unmap(pointer, size);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++
++int sys_vm_map(void *hint, size_t size, int prot, int flags, int fd, off_t offset, void **window) {
++	auto ret = Syscall(SYS_MMAP, hint, size, prot, flags, fd, offset);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*window = reinterpret_cast<void *>(ret);
++	return 0;
++}
++int sys_vm_unmap(void *pointer, size_t size) {
++	auto ret = Syscall(SYS_MUNMAP, pointer, size);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_vm_protect(void *pointer, size_t size, int prot) {
++	auto ret = Syscall(SYS_MPROTECT, pointer, size, prot);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
+ } // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/process.cpp b/sysdeps/cryptix/sysdeps/process.cpp
+index eb46796..f104d78 100644
+--- a/sysdeps/cryptix/sysdeps/process.cpp
++++ b/sysdeps/cryptix/sysdeps/process.cpp
+@@ -6,222 +6,216 @@
+ #include <cryptix/syscall.h>
+ 
+ #ifndef MLIBC_BUILDING_RTLD
+-    #include <errno.h>
+-    #include <pthread.h>
+-    #include <stdio.h>
++#include <errno.h>
++#include <pthread.h>
++#include <stdio.h>
+ #endif
+ 
+-extern "C" int  __mlibc_spawn_thread(int flags, void* stack, void* pid_out,
+-                                     void* child_tid, void* tcb);
+-extern "C" void __mlibc_enter_thread(void* entry, void* user_arg);
+-
+-namespace mlibc
+-{
+-    pid_t sys_getpid() { return Syscall(SYS_GETPID); }
+-    void  sys_exit(int code)
+-    {
+-        Syscall(SYS_EXIT, code);
+-
+-        __builtin_unreachable();
+-    }
+-    int sys_waitpid(pid_t pid, int* status, int flags, struct rusage* ru,
+-                    pid_t* ret_pid)
+-    {
+-        auto ret = Syscall(SYS_WAIT4, pid, status, flags, ru);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *ret_pid = static_cast<pid_t>(ret);
+-        return 0;
+-    }
+-    int sys_kill(int pid, int sig)
+-    {
+-        auto ret = Syscall(SYS_KILL, pid, sig);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-
+-    uid_t sys_getuid()
+-    {
+-        auto ret = Syscall(SYS_GETUID);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return static_cast<pid_t>(ret);
+-    }
+-    gid_t sys_getgid()
+-    {
+-        auto ret = Syscall(SYS_GETGID);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return static_cast<pid_t>(ret);
+-    }
+-    int sys_setuid(uid_t uid)
+-    {
+-        auto ret = Syscall(SYS_SETUID, uid);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_setgid(gid_t gid)
+-    {
+-        auto ret = Syscall(SYS_SETGID, gid);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    uid_t sys_geteuid()
+-    {
+-        auto ret = Syscall(SYS_GETEUID);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return ret;
+-    }
+-    gid_t sys_getegid()
+-    {
+-        auto ret = Syscall(SYS_GETEGID);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return ret;
+-    }
+-    int sys_setpgid(pid_t pid, pid_t pgid)
+-    {
+-        auto ret = Syscall(SYS_SETPGID, pid, pgid);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    pid_t sys_getppid()
+-    {
+-        auto ret = Syscall(SYS_GETPPID);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return static_cast<pid_t>(ret);
+-    }
+-    pid_t sys_setsid(pid_t* out)
+-    {
+-        auto ret = Syscall(SYS_SETSID);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *out = static_cast<pid_t>(ret);
+-        return 0;
+-    }
+-    int sys_setreuid(uid_t ruid, uid_t euid)
+-    {
+-        auto ret = Syscall(SYS_SETREUID, ruid, euid);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_setregid(gid_t rgid, gid_t egid)
+-    {
+-        auto ret = Syscall(SYS_SETREGID, rgid, egid);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
+-    {
+-        auto ret = Syscall(SYS_SETRESUID, ruid, euid, suid);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
+-    {
+-        auto ret = Syscall(SYS_SETRESGID, rgid, egid, sgid);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    pid_t sys_getpgid(pid_t pid, pid_t* out)
+-    {
+-        auto ret = Syscall(SYS_GETPGID, pid);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *out = ret;
+-        return 0;
+-    }
+-    pid_t sys_getsid(pid_t pid, pid_t* out)
+-    {
+-        auto ret = Syscall(SYS_GETSID, pid);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *out = ret;
+-        return 0;
+-    }
++extern "C" int
++__mlibc_spawn_thread(int flags, void *stack, void *pid_out, void *child_tid, void *tcb);
++extern "C" void __mlibc_enter_thread(void *entry, void *user_arg);
++
++namespace mlibc {
++pid_t sys_getpid() { return Syscall(SYS_GETPID); }
++void sys_exit(int code) {
++	Syscall(SYS_EXIT, code);
++
++	__builtin_unreachable();
++}
++int sys_waitpid(pid_t pid, int *status, int flags, struct rusage *ru, pid_t *ret_pid) {
++	auto ret = Syscall(SYS_WAIT4, pid, status, flags, ru);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*ret_pid = static_cast<pid_t>(ret);
++	return 0;
++}
++int sys_kill(int pid, int sig) {
++	auto ret = Syscall(SYS_KILL, pid, sig);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++
++uid_t sys_getuid() {
++	auto ret = Syscall(SYS_GETUID);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return static_cast<pid_t>(ret);
++}
++gid_t sys_getgid() {
++	auto ret = Syscall(SYS_GETGID);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return static_cast<pid_t>(ret);
++}
++int sys_setuid(uid_t uid) {
++	auto ret = Syscall(SYS_SETUID, uid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_setgid(gid_t gid) {
++	auto ret = Syscall(SYS_SETGID, gid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++uid_t sys_geteuid() {
++	auto ret = Syscall(SYS_GETEUID);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return ret;
++}
++gid_t sys_getegid() {
++	auto ret = Syscall(SYS_GETEGID);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return ret;
++}
++int sys_setpgid(pid_t pid, pid_t pgid) {
++	auto ret = Syscall(SYS_SETPGID, pid, pgid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++pid_t sys_getppid() {
++	auto ret = Syscall(SYS_GETPPID);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return static_cast<pid_t>(ret);
++}
++pid_t sys_setsid(pid_t *out) {
++	auto ret = Syscall(SYS_SETSID);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*out = static_cast<pid_t>(ret);
++	return 0;
++}
++int sys_setreuid(uid_t ruid, uid_t euid) {
++	auto ret = Syscall(SYS_SETREUID, ruid, euid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_setregid(gid_t rgid, gid_t egid) {
++	auto ret = Syscall(SYS_SETREGID, rgid, egid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_setresuid(uid_t ruid, uid_t euid, uid_t suid) {
++	auto ret = Syscall(SYS_SETRESUID, ruid, euid, suid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid) {
++	auto ret = Syscall(SYS_SETRESGID, rgid, egid, sgid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++pid_t sys_getpgid(pid_t pid, pid_t *out) {
++	auto ret = Syscall(SYS_GETPGID, pid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*out = ret;
++	return 0;
++}
++pid_t sys_getsid(pid_t pid, pid_t *out) {
++	auto ret = Syscall(SYS_GETSID, pid);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*out = ret;
++	return 0;
++}
+ 
+ #ifndef MLIBC_BUILDING_RTLD
+-    int sys_clone(void* tcb, pid_t* pid_out, void* stack)
+-    {
+-        unsigned long flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND
+-                            | CLONE_THREAD | CLONE_SYSVSEM | CLONE_SETTLS
+-                            | CLONE_PARENT_SETTID;
++int sys_clone(void *tcb, pid_t *pid_out, void *stack) {
++	unsigned long flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD
++	                      | CLONE_SYSVSEM | CLONE_SETTLS | CLONE_PARENT_SETTID;
+ 
+-        auto ret = __mlibc_spawn_thread(flags, stack, pid_out, nullptr, tcb);
+-        if (ret < 0) return ret;
++	auto ret = __mlibc_spawn_thread(flags, stack, pid_out, nullptr, tcb);
++	if (ret < 0)
++		return ret;
+ 
+-        return 0;
+-    }
++	return 0;
++}
+ #endif
+-    int sys_fork(pid_t* child)
+-    {
+-        auto ret = Syscall(SYS_FORK);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *child = static_cast<pid_t>(ret);
+-        return 0;
+-    }
+-    int sys_execve(const char* path, char* const argv[], char* const envp[])
+-    {
+-        return Syscall(SYS_EXECVE, path, argv, envp);
+-    }
+-
+-    int sys_tcb_set(void* pointer)
+-    {
+-        auto ret = Syscall(SYS_ARCH_PRCTL, 0x1002, pointer);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return ret;
+-    }
+-    int sys_gettid()
+-    {
+-        auto ret = Syscall(SYS_GETTID);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_futex_tid() { return sys_gettid(); }
+-    int sys_futex_wait(int* pointer, int expected, const struct timespec* time)
+-    {
+-        auto ret = Syscall(SYS_FUTEX_WAIT, pointer, expected, time);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_futex_wake(int* pointer)
+-    {
+-        auto ret = Syscall(SYS_FUTEX_WAKE, pointer);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-
+-    int sys_gethostname(char* buffer, size_t bufsize)
+-    {
+-        utsname data{};
+-        auto    e = sys_uname(&data);
+-        if (e) return e;
+-
+-        size_t hostname_size = strlen(data.nodename);
+-        memcpy(buffer, data.nodename, std::min(bufsize, hostname_size));
+-        return 0;
+-    }
++int sys_fork(pid_t *child) {
++	auto ret = Syscall(SYS_FORK);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*child = static_cast<pid_t>(ret);
++	return 0;
++}
++int sys_execve(const char *path, char *const argv[], char *const envp[]) {
++	return Syscall(SYS_EXECVE, path, argv, envp);
++}
++
++int sys_tcb_set(void *pointer) {
++	auto ret = Syscall(SYS_ARCH_PRCTL, 0x1002, pointer);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return ret;
++}
++int sys_gettid() {
++	auto ret = Syscall(SYS_GETTID);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_futex_tid() { return sys_gettid(); }
++int sys_futex_wait(int *pointer, int expected, const struct timespec *time) {
++	auto ret = Syscall(SYS_FUTEX_WAIT, pointer, expected, time);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_futex_wake(int *pointer) {
++	auto ret = Syscall(SYS_FUTEX_WAKE, pointer);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++
++int sys_gethostname(char *buffer, size_t bufsize) {
++	utsname data{};
++	auto e = sys_uname(&data);
++	if (e)
++		return e;
++
++	size_t hostname_size = strlen(data.nodename);
++	memcpy(buffer, data.nodename, std::min(bufsize, hostname_size));
++	return 0;
++}
+ 
+ #ifndef MLIBC_BUILDING_RTLD
+-    [[noreturn]] void sys_thread_exit()
+-    {
+-        sys_exit(0);
+-        __builtin_trap();
+-    }
++[[noreturn]] void sys_thread_exit() {
++	sys_exit(0);
++	__builtin_trap();
++}
+ #endif
+ }; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/signal.cpp b/sysdeps/cryptix/sysdeps/signal.cpp
+index 2c847f6..98f6ec9 100644
+--- a/sysdeps/cryptix/sysdeps/signal.cpp
++++ b/sysdeps/cryptix/sysdeps/signal.cpp
+@@ -3,58 +3,58 @@
+ 
+ #include <cryptix/syscall.h>
+ 
+-namespace mlibc
+-{
+-    int sys_sigaction(int signum, const struct sigaction* __restrict act,
+-                      struct sigaction* __restrict oldact)
+-    {
+-        auto ret = Syscall(SYS_SIGACTION, signum, act, oldact);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_sigprocmask(int how, const sigset_t* set, sigset_t* retrieve)
+-    {
+-        auto ret = Syscall(SYS_SIGPROCMASK, how, set, retrieve, NSIG / 8);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    void sys_sigreturn()
+-    {
+-        Syscall(SYS_SIGRETURN);
+-        __builtin_unreachable();
+-    }
+-
+-    int sys_sigpending(sigset_t* set)
+-    {
+-        auto ret = Syscall(SYS_SIGPENDING, set);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-
+-    int sys_sigtimedwait(const sigset_t* set, siginfo_t* info,
+-                         const struct timespec* timeout, int* out_signal)
+-    {
+-        auto ret = Syscall(SYS_SIGTIMEDWAIT, set, info, timeout);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *out_signal = ret;
+-        return 0;
+-    }
+-    int sys_sigsupend(const sigset_t* set)
+-    {
+-        auto ret = Syscall(SYS_SIGSUSPEND, set);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_sigaltstack(const stack_t* ss, stack_t* oss)
+-    {
+-        auto ret = Syscall(SYS_SIGALTSTACK, ss, oss);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
++namespace mlibc {
++int sys_sigaction(
++    int signum, const struct sigaction *__restrict act, struct sigaction *__restrict oldact
++) {
++	auto ret = Syscall(SYS_SIGACTION, signum, act, oldact);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_sigprocmask(int how, const sigset_t *set, sigset_t *retrieve) {
++	auto ret = Syscall(SYS_SIGPROCMASK, how, set, retrieve, NSIG / 8);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++void sys_sigreturn() {
++	Syscall(SYS_SIGRETURN);
++	__builtin_unreachable();
++}
++
++int sys_sigpending(sigset_t *set) {
++	auto ret = Syscall(SYS_SIGPENDING, set);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++
++int sys_sigtimedwait(
++    const sigset_t *set, siginfo_t *info, const struct timespec *timeout, int *out_signal
++) {
++	auto ret = Syscall(SYS_SIGTIMEDWAIT, set, info, timeout);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*out_signal = ret;
++	return 0;
++}
++int sys_sigsupend(const sigset_t *set) {
++	auto ret = Syscall(SYS_SIGSUSPEND, set);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_sigaltstack(const stack_t *ss, stack_t *oss) {
++	auto ret = Syscall(SYS_SIGALTSTACK, ss, oss);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
+ }; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/system.cpp b/sysdeps/cryptix/sysdeps/system.cpp
+index 3ea63e4..9657bf4 100644
+--- a/sysdeps/cryptix/sysdeps/system.cpp
++++ b/sysdeps/cryptix/sysdeps/system.cpp
+@@ -9,53 +9,57 @@
+ 
+ using namespace cryptix;
+ 
+-RebootCmd cryptix_reboot_cmd(unsigned int what)
+-{
+-    switch (what)
+-    {
+-        case 0x01234567: return RebootCmd::eRestart;
+-        case 0xCDEF0123: return RebootCmd::eHalt;
+-        case 0x4321FEDC: return RebootCmd::ePowerOff;
+-        case 0xA1B2C3D4: return RebootCmd::eRestart2;
+-        case 0xD000FCE2: return RebootCmd::eSuspend;
+-        case 0x45584543: return RebootCmd::eKexec;
+-
+-        default: break;
+-    }
+-
+-    return RebootCmd::eUndefined;
++RebootCmd cryptix_reboot_cmd(unsigned int what) {
++	switch (what) {
++		case 0x01234567:
++			return RebootCmd::eRestart;
++		case 0xCDEF0123:
++			return RebootCmd::eHalt;
++		case 0x4321FEDC:
++			return RebootCmd::ePowerOff;
++		case 0xA1B2C3D4:
++			return RebootCmd::eRestart2;
++		case 0xD000FCE2:
++			return RebootCmd::eSuspend;
++		case 0x45584543:
++			return RebootCmd::eKexec;
++
++		default:
++			break;
++	}
++
++	return RebootCmd::eUndefined;
++}
++
++namespace mlibc {
++int sys_getrlimit(int resource, struct rlimit *rlim) {
++	auto ret = Syscall(SYS_GETRLIMIT, resource, rlim);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
+ }
++int sys_getrusage(int who, struct rusage *usage) {
++	auto ret = Syscall(SYS_GETRUSAGE, who, usage);
++	if (auto e = syscall_error(ret); e)
++		return e;
+ 
+-namespace mlibc
+-{
+-    int sys_getrlimit(int resource, struct rlimit* rlim)
+-    {
+-        auto ret = Syscall(SYS_GETRLIMIT, resource, rlim);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_getrusage(int who, struct rusage* usage)
+-    {
+-        auto ret = Syscall(SYS_GETRUSAGE, who, usage);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_reboot(int what)
+-    {
+-        auto cmd = cryptix_reboot_cmd(what);
+-
+-        auto ret = Syscall(SYS_REBOOT, cmd);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_init_module(void* module, unsigned long length, const char* args)
+-    {
+-        auto ret = Syscall(SYS_INIT_MODULE, module, length, args);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
++	return 0;
++}
++int sys_reboot(int what) {
++	auto cmd = cryptix_reboot_cmd(what);
++
++	auto ret = Syscall(SYS_REBOOT, cmd);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_init_module(void *module, unsigned long length, const char *args) {
++	auto ret = Syscall(SYS_INIT_MODULE, module, length, args);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
+ }; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/time.cpp b/sysdeps/cryptix/sysdeps/time.cpp
+index 04e9721..ef9577d 100644
+--- a/sysdeps/cryptix/sysdeps/time.cpp
++++ b/sysdeps/cryptix/sysdeps/time.cpp
+@@ -5,26 +5,25 @@
+ 
+ #include <sys/mman.h>
+ 
+-namespace mlibc
+-{
+-    int sys_sleep(time_t* secs, long* nanos)
+-    {
+-        timespec duration = {.tv_sec = *secs, .tv_nsec = nanos ? *nanos : 0};
+-        timespec remaining;
+-        auto     ret = Syscall(SYS_NANOSLEEP, &duration, &remaining);
++namespace mlibc {
++int sys_sleep(time_t *secs, long *nanos) {
++	timespec duration = {.tv_sec = *secs, .tv_nsec = nanos ? *nanos : 0};
++	timespec remaining;
++	auto ret = Syscall(SYS_NANOSLEEP, &duration, &remaining);
+ 
+-        if (auto e = syscall_error(ret); e) return e;
++	if (auto e = syscall_error(ret); e)
++		return e;
+ 
+-        return 0;
+-    }
+-    int sys_clock_get(int clockid, time_t* secs, long* nanos)
+-    {
+-        timespec ts;
+-        auto     ret = Syscall(SYS_CLOCK_GETTIME, clockid, &ts);
+-        if (auto e = syscall_error(ret); e) return e;
++	return 0;
++}
++int sys_clock_get(int clockid, time_t *secs, long *nanos) {
++	timespec ts;
++	auto ret = Syscall(SYS_CLOCK_GETTIME, clockid, &ts);
++	if (auto e = syscall_error(ret); e)
++		return e;
+ 
+-        *secs  = ts.tv_sec;
+-        *nanos = ts.tv_nsec;
+-        return 0;
+-    }
++	*secs = ts.tv_sec;
++	*nanos = ts.tv_nsec;
++	return 0;
++}
+ }; // namespace mlibc
+diff --git a/sysdeps/cryptix/sysdeps/vfs.cpp b/sysdeps/cryptix/sysdeps/vfs.cpp
+index 08d473c..972bb21 100644
+--- a/sysdeps/cryptix/sysdeps/vfs.cpp
++++ b/sysdeps/cryptix/sysdeps/vfs.cpp
+@@ -18,449 +18,447 @@
+ 
+ #include <cryptix/syscall.h>
+ 
+-namespace mlibc
+-{
+-    int sys_sysconf(int num, long* ret)
+-    {
+-        switch (num)
+-        {
+-            case _SC_OPEN_MAX:
+-            case _SC_CHILD_MAX:
+-            case _SC_LINE_MAX:
+-            case _SC_PHYS_PAGES: *ret = INT32_MAX; break;
+-
+-            default: return EINVAL;
+-        }
+-
+-        return 0;
+-    }
+-
+-    int sys_read(int fd, void* buffer, size_t count, ssize_t* bytesRead)
+-    {
+-        auto ret = Syscall(SYS_READ, fd, buffer, count);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *bytesRead = ssize_t(ret);
+-        return 0;
+-    }
+-    int sys_write(int fd, void const* buffer, unsigned long bytes,
+-                  long* bytesWritten)
+-    {
+-
+-        auto ret = Syscall(SYS_WRITE, fd, buffer, bytes);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *bytesWritten = ret;
+-        return 0;
+-    }
+-    int sys_open(const char* path, int flags, mode_t mode, int* fd)
+-    {
+-        auto ret = Syscall(SYS_OPENAT, AT_FDCWD, path, flags, mode);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *fd = ret;
+-        return 0;
+-    }
+-    int sys_close(int fd)
+-    {
+-        auto ret = Syscall(SYS_CLOSE, fd);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-
+-    int sys_stat(fsfd_target fsfdt, int fd, const char* path, int flags,
+-                 struct stat* statbuf)
+-    {
+-        int ret = -1;
+-        switch (fsfdt)
+-        {
+-            case fsfd_target::fd:
+-                ret = Syscall(SYS_FSTATAT, fd, "", flags | AT_EMPTY_PATH,
+-                              statbuf);
+-                break;
+-            case fsfd_target::path:
+-                ret = Syscall(SYS_FSTATAT, AT_FDCWD, path, flags, statbuf);
+-                break;
+-            case fsfd_target::fd_path:
+-                ret = Syscall(SYS_FSTATAT, fd, path, flags, statbuf);
+-                break;
+-
+-            default:
+-                __ensure(!"sys_stat: invalid fsfdt");
+-                __builtin_unreachable();
+-        }
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_seek(int fd, off_t offset, int whence, off_t* newOffset)
+-    {
+-        auto ret = Syscall(SYS_LSEEK, fd, offset, whence);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *newOffset = off_t(ret);
+-        return 0;
+-    }
+-    int sys_ioctl(int fd, unsigned long request, void* arg, int* result)
+-    {
+-        int ret = Syscall(SYS_IOCTL, fd, request, arg);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *result = ret;
+-        return 0;
+-    }
+-    int sys_pread(int fd, void* buf, size_t n, off_t off, ssize_t* bytes_read)
+-    {
+-        int ret = Syscall(SYS_PREAD64, fd, buf, n, off);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *bytes_read = ret;
+-        return 0;
+-    }
+-    int sys_pwrite(int fd, const void* buf, size_t n, off_t off,
+-                   ssize_t* bytes_written)
+-    {
+-        int ret = Syscall(SYS_PWRITE64, fd, buf, n, off);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *bytes_written = ret;
+-        return 0;
+-    }
+-
+-    int sys_access(const char* path, int mode)
+-    {
+-        int ret = Syscall(SYS_ACCESS, path, mode);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_pipe(int* fds, int flags)
+-    {
+-        int ret = Syscall(SYS_PIPE, fds);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_dup(int fd, int flags, int* newfd)
+-    {
+-        // TODO(v1tr10l7): implement flags;
+-        (void)flags;
+-        auto ret = Syscall(SYS_DUP, fd);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *newfd = ret;
+-        return 0;
+-    }
+-    int sys_dup2(int fd, int flags, int newfd)
+-    {
+-        // TODO(v1tr10l7): implement flags;
+-        (void)flags;
+-        auto ret = Syscall(SYS_DUP2, fd, newfd);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_socket(int family, int type, int protocol, int* fd)
+-    {
+-        auto ret = Syscall(SYS_SOCKET, family, type, protocol);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *fd = ret;
+-        return 0;
+-    }
+-    int sys_bind(int fd, const struct sockaddr* addr_ptr, socklen_t addr_length)
+-    {
+-        auto ret = Syscall(SYS_BIND, fd, addr_ptr, addr_length);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-
+-    int sys_uname(struct utsname* out)
+-    {
+-        auto ret = Syscall(SYS_UNAME, out);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_fcntl(int fd, int request, va_list args, int* result)
+-    {
+-        auto ret = Syscall(SYS_FCNTL, fd, request, args);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *result = ret;
+-        return 0;
+-    }
+-
+-    int sys_getcwd(char* buffer, size_t size)
+-    {
+-        auto ret = Syscall(SYS_GETCWD, buffer, size);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_chdir(const char* path)
+-    {
+-        auto ret = Syscall(SYS_CHDIR, path);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_fchdir(int fd)
+-    {
+-        auto ret = Syscall(SYS_FCHDIR, fd);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_rename(const char* old_path, const char* new_path)
+-    {
+-        auto ret = Syscall(SYS_RENAME, old_path, new_path);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_mkdir(const char* path, mode_t mode)
+-    {
+-        auto ret = Syscall(SYS_MKDIR, path, mode);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_rmdir(const char* path)
+-    {
+-        auto ret = Syscall(SYS_RMDIR, path);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_link(const char* old_path, const char* new_path)
+-    {
+-        auto ret = Syscall(SYS_LINK, old_path, new_path);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_symlink(const char* target_path, const char* link_path)
+-    {
+-        auto ret = Syscall(SYS_SYMLINK, target_path, link_path);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_readlink(const char* path, void* buffer, size_t maxSize,
+-                     ssize_t* length)
+-    {
+-        auto ret = Syscall(SYS_READLINK, path, buffer, maxSize);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *length = ret;
+-        return 0;
+-    }
+-    int sys_chmod(const char* pathname, mode_t mode)
+-    {
+-        auto ret = Syscall(SYS_CHMOD, pathname, mode);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_fchmod(int fd, mode_t mode)
+-    {
+-        auto ret = Syscall(SYS_FCHMOD, fd, mode);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_umask(mode_t mode, mode_t* old_mode)
+-    {
+-        auto ret = Syscall(SYS_UMASK, mode);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *old_mode = ret;
+-        return 0;
+-    }
+-
+-    int sys_statfs(const char* path, struct statfs* out)
+-    {
+-        auto ret = Syscall(SYS_STATFS, path, out);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    void sys_sync() { Syscall(SYS_SYNC); }
+-    int  sys_mount(const char* source, const char* target, const char* fs_name,
+-                   unsigned long flags, const void* data)
+-    {
+-        auto ret = Syscall(SYS_MOUNT, source, target, fs_name, flags, data);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return ret;
+-    }
+-
+-    int sys_read_entries(int fdnum, void* buffer, size_t max_size,
+-                         size_t* bytes_read)
+-    {
+-        auto ret = Syscall(SYS_GETDENTS64, fdnum, buffer, max_size);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *bytes_read = ret;
+-        return 0;
+-    }
+-    int sys_openat(int dirfd, const char* path, int flags, mode_t mode, int* fd)
+-    {
+-        auto ret = Syscall(SYS_OPENAT, dirfd, path, flags, mode);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *fd = ret;
+-        return 0;
+-    }
+-    int sys_open_dir(const char* path, int* fd)
+-    {
+-        return sys_openat(AT_FDCWD, path, O_DIRECTORY, 0, fd);
+-    }
+-    int sys_mkdirat(int dirfd, const char* path, mode_t mode)
+-    {
+-        auto ret = Syscall(SYS_MKDIRAT, dirfd, path, mode);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_mknodat(int dirfd, const char* path, int mode, int dev)
+-    {
+-        auto ret = Syscall(SYS_MKNODAT, dirfd, path, mode, dev);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_unlinkat(int dirfd, const char* path, int flags)
+-    {
+-        auto ret = Syscall(SYS_UNLINKAT, dirfd, path, flags);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_renameat(int olddirfd, const char* old_path, int newdirfd,
+-                     const char* new_path)
+-    {
+-        auto ret
+-            = Syscall(SYS_RENAMEAT, olddirfd, old_path, newdirfd, new_path);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_linkat(int olddirfd, const char* old_path, int newdirfd,
+-                   const char* new_path, int flags)
+-    {
+-        auto ret = Syscall(SYS_LINKAT, olddirfd, old_path, newdirfd, new_path,
+-                           flags);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_symlinkat(const char* target_path, int dirfd, const char* link_path)
+-    {
+-        auto ret = Syscall(SYS_SYMLINKAT, target_path, dirfd, link_path);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_readlinkat(int dirfd, const char* path, char* buf, size_t bufsz,
+-                       ssize_t* length)
+-    {
+-        auto ret = Syscall(SYS_READLINKAT, dirfd, path, buf, bufsz);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        *length = ret;
+-        return 0;
+-    }
+-    int sys_fchmodat(int fd, const char* pathname, mode_t mode, int flags)
+-    {
+-        auto ret = Syscall(SYS_FCHMODAT, fd, pathname, mode, flags);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-
+-    int sys_isatty(int fd)
+-    {
+-        winsize ws;
+-        int     ret;
+-        if (!sys_ioctl(fd, TIOCGWINSZ, &ws, &ret)) return 0;
+-
+-        return ENOTTY;
+-    }
+-    int sys_ttyname(int fd, char* buf, size_t size)
+-    {
+-        ssize_t out_size = size;
+-        for (size_t i = 0; i < size; i++)
+-            buf[i] = 'a';
+-
+-        sys_libc_log("readlink\n");
+-        sys_readlink("/proc/1/fd/0", buf, size, &out_size);
+-
+-        return 0;
+-    }
++namespace mlibc {
++int sys_sysconf(int num, long *ret) {
++	switch (num) {
++		case _SC_OPEN_MAX:
++		case _SC_CHILD_MAX:
++		case _SC_LINE_MAX:
++		case _SC_PHYS_PAGES:
++			*ret = INT32_MAX;
++			break;
++
++		default:
++			return EINVAL;
++	}
++
++	return 0;
++}
++
++int sys_read(int fd, void *buffer, size_t count, ssize_t *bytesRead) {
++	auto ret = Syscall(SYS_READ, fd, buffer, count);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*bytesRead = ssize_t(ret);
++	return 0;
++}
++int sys_write(int fd, void const *buffer, unsigned long bytes, long *bytesWritten) {
++
++	auto ret = Syscall(SYS_WRITE, fd, buffer, bytes);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*bytesWritten = ret;
++	return 0;
++}
++int sys_open(const char *path, int flags, mode_t mode, int *fd) {
++	auto ret = Syscall(SYS_OPENAT, AT_FDCWD, path, flags, mode);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*fd = ret;
++	return 0;
++}
++int sys_close(int fd) {
++	auto ret = Syscall(SYS_CLOSE, fd);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++
++int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags, struct stat *statbuf) {
++	int ret = -1;
++	switch (fsfdt) {
++		case fsfd_target::fd:
++			ret = Syscall(SYS_FSTATAT, fd, "", flags | AT_EMPTY_PATH, statbuf);
++			break;
++		case fsfd_target::path:
++			ret = Syscall(SYS_FSTATAT, AT_FDCWD, path, flags, statbuf);
++			break;
++		case fsfd_target::fd_path:
++			ret = Syscall(SYS_FSTATAT, fd, path, flags, statbuf);
++			break;
++
++		default:
++			__ensure(!"sys_stat: invalid fsfdt");
++			__builtin_unreachable();
++	}
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_seek(int fd, off_t offset, int whence, off_t *newOffset) {
++	auto ret = Syscall(SYS_LSEEK, fd, offset, whence);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*newOffset = off_t(ret);
++	return 0;
++}
++int sys_ioctl(int fd, unsigned long request, void *arg, int *result) {
++	int ret = Syscall(SYS_IOCTL, fd, request, arg);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*result = ret;
++	return 0;
++}
++int sys_pread(int fd, void *buf, size_t n, off_t off, ssize_t *bytes_read) {
++	int ret = Syscall(SYS_PREAD64, fd, buf, n, off);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*bytes_read = ret;
++	return 0;
++}
++int sys_pwrite(int fd, const void *buf, size_t n, off_t off, ssize_t *bytes_written) {
++	int ret = Syscall(SYS_PWRITE64, fd, buf, n, off);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*bytes_written = ret;
++	return 0;
++}
++
++int sys_access(const char *path, int mode) {
++	int ret = Syscall(SYS_ACCESS, path, mode);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_pipe(int *fds, int flags) {
++	int ret = Syscall(SYS_PIPE, fds);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_dup(int fd, int flags, int *newfd) {
++	// TODO(v1tr10l7): implement flags;
++	(void)flags;
++	auto ret = Syscall(SYS_DUP, fd);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*newfd = ret;
++	return 0;
++}
++int sys_dup2(int fd, int flags, int newfd) {
++	// TODO(v1tr10l7): implement flags;
++	(void)flags;
++	auto ret = Syscall(SYS_DUP2, fd, newfd);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_socket(int family, int type, int protocol, int *fd) {
++	auto ret = Syscall(SYS_SOCKET, family, type, protocol);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*fd = ret;
++	return 0;
++}
++int sys_bind(int fd, const struct sockaddr *addr_ptr, socklen_t addr_length) {
++	auto ret = Syscall(SYS_BIND, fd, addr_ptr, addr_length);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++
++int sys_uname(struct utsname *out) {
++	auto ret = Syscall(SYS_UNAME, out);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_fcntl(int fd, int request, va_list args, int *result) {
++	auto ret = Syscall(SYS_FCNTL, fd, request, args);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*result = ret;
++	return 0;
++}
++
++int sys_getcwd(char *buffer, size_t size) {
++	auto ret = Syscall(SYS_GETCWD, buffer, size);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_chdir(const char *path) {
++	auto ret = Syscall(SYS_CHDIR, path);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_fchdir(int fd) {
++	auto ret = Syscall(SYS_FCHDIR, fd);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_rename(const char *old_path, const char *new_path) {
++	auto ret = Syscall(SYS_RENAME, old_path, new_path);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_mkdir(const char *path, mode_t mode) {
++	auto ret = Syscall(SYS_MKDIR, path, mode);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_rmdir(const char *path) {
++	auto ret = Syscall(SYS_RMDIR, path);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_link(const char *old_path, const char *new_path) {
++	auto ret = Syscall(SYS_LINK, old_path, new_path);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_symlink(const char *target_path, const char *link_path) {
++	auto ret = Syscall(SYS_SYMLINK, target_path, link_path);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_readlink(const char *path, void *buffer, size_t maxSize, ssize_t *length) {
++	auto ret = Syscall(SYS_READLINK, path, buffer, maxSize);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*length = ret;
++	return 0;
++}
++int sys_chmod(const char *pathname, mode_t mode) {
++	auto ret = Syscall(SYS_CHMOD, pathname, mode);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_fchmod(int fd, mode_t mode) {
++	auto ret = Syscall(SYS_FCHMOD, fd, mode);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_umask(mode_t mode, mode_t *old_mode) {
++	auto ret = Syscall(SYS_UMASK, mode);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*old_mode = ret;
++	return 0;
++}
++
++int sys_statfs(const char *path, struct statfs *out) {
++	auto ret = Syscall(SYS_STATFS, path, out);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++void sys_sync() { Syscall(SYS_SYNC); }
++int sys_mount(
++    const char *source,
++    const char *target,
++    const char *fs_name,
++    unsigned long flags,
++    const void *data
++) {
++	auto ret = Syscall(SYS_MOUNT, source, target, fs_name, flags, data);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return ret;
++}
++
++int sys_read_entries(int fdnum, void *buffer, size_t max_size, size_t *bytes_read) {
++	auto ret = Syscall(SYS_GETDENTS64, fdnum, buffer, max_size);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*bytes_read = ret;
++	return 0;
++}
++int sys_openat(int dirfd, const char *path, int flags, mode_t mode, int *fd) {
++	auto ret = Syscall(SYS_OPENAT, dirfd, path, flags, mode);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*fd = ret;
++	return 0;
++}
++int sys_open_dir(const char *path, int *fd) {
++	return sys_openat(AT_FDCWD, path, O_DIRECTORY, 0, fd);
++}
++int sys_mkdirat(int dirfd, const char *path, mode_t mode) {
++	auto ret = Syscall(SYS_MKDIRAT, dirfd, path, mode);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_mknodat(int dirfd, const char *path, int mode, int dev) {
++	auto ret = Syscall(SYS_MKNODAT, dirfd, path, mode, dev);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_unlinkat(int dirfd, const char *path, int flags) {
++	auto ret = Syscall(SYS_UNLINKAT, dirfd, path, flags);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_renameat(int olddirfd, const char *old_path, int newdirfd, const char *new_path) {
++	auto ret = Syscall(SYS_RENAMEAT, olddirfd, old_path, newdirfd, new_path);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_linkat(int olddirfd, const char *old_path, int newdirfd, const char *new_path, int flags) {
++	auto ret = Syscall(SYS_LINKAT, olddirfd, old_path, newdirfd, new_path, flags);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_symlinkat(const char *target_path, int dirfd, const char *link_path) {
++	auto ret = Syscall(SYS_SYMLINKAT, target_path, dirfd, link_path);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_readlinkat(int dirfd, const char *path, char *buf, size_t bufsz, ssize_t *length) {
++	auto ret = Syscall(SYS_READLINKAT, dirfd, path, buf, bufsz);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	*length = ret;
++	return 0;
++}
++int sys_fchmodat(int fd, const char *pathname, mode_t mode, int flags) {
++	auto ret = Syscall(SYS_FCHMODAT, fd, pathname, mode, flags);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++
++int sys_isatty(int fd) {
++	winsize ws;
++	int ret;
++	if (!sys_ioctl(fd, TIOCGWINSZ, &ws, &ret))
++		return 0;
++
++	return ENOTTY;
++}
++int sys_ttyname(int fd, char *buf, size_t size) {
++	ssize_t out_size = size;
++	for (size_t i = 0; i < size; i++)
++		buf[i] = 'a';
++
++	sys_libc_log("readlink\n");
++	sys_readlink("/proc/1/fd/0", buf, size, &out_size);
++
++	return 0;
++}
+ 
+ #ifndef TCGETS
+-    constexpr size_t TCGETS  = 0x5401;
+-    constexpr size_t TCSETS  = 0x5402;
+-    constexpr size_t TCSETSW = 0x5403;
+-    constexpr size_t TCSETSF = 0x5404;
++constexpr size_t TCGETS = 0x5401;
++constexpr size_t TCSETS = 0x5402;
++constexpr size_t TCSETSW = 0x5403;
++constexpr size_t TCSETSF = 0x5404;
+ #endif
+ 
+-    int sys_tcgetattr(int fd, struct termios* attr)
+-    {
+-        int ret;
+-        if (int r = sys_ioctl(fd, TCGETS, attr, &ret) != 0) return r;
+-
+-        return 0;
+-    }
+-
+-    int sys_tcsetattr(int fd, int optional_action, const struct termios* attr)
+-    {
+-        int ret;
+-        switch (optional_action)
+-        {
+-            case TCSANOW: optional_action = TCSETS; break;
+-            case TCSADRAIN: optional_action = TCSETSW; break;
+-            case TCSAFLUSH: optional_action = TCSETSF; break;
+-            default: __ensure(!"Unsupported tcsetattr");
+-        }
+-
+-        if (int r = sys_ioctl(fd, optional_action, (void*)attr, &ret) != 0)
+-            return r;
+-
+-        return 0;
+-    }
+-    STUB_RET(int sys_pselect([[maybe_unused]] int                    nfds,
+-                             [[maybe_unused]] fd_set*                readfds,
+-                             [[maybe_unused]] fd_set*                writefds,
+-                             [[maybe_unused]] fd_set*                exceptfds,
+-                             [[maybe_unused]] const struct timespec* timeout,
+-                             [[maybe_unused]] const sigset_t*        sigmask,
+-                             [[maybe_unused]] int* num_events));
+-    int sys_utimensat(int dirfd, const char* pathname,
+-                      const struct timespec times[2], int flags)
+-    {
+-        auto ret = Syscall(SYS_UTIMENSAT, dirfd, pathname, times, flags);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-    int sys_syncfs(int fd)
+-    {
+-        auto ret = Syscall(SYS_SYNCFS, fd);
+-        if (auto e = syscall_error(ret); e) return e;
+-
+-        return 0;
+-    }
+-
+-    int sys_unlockpt(int fd)
+-    {
+-        int unlock = 0;
+-        int result = 0;
+-
+-        return sys_ioctl(fd, TIOCSPTLCK, &unlock, &result);
+-    }
++int sys_tcgetattr(int fd, struct termios *attr) {
++	int ret;
++	if (int r = sys_ioctl(fd, TCGETS, attr, &ret) != 0)
++		return r;
++
++	return 0;
++}
++
++int sys_tcsetattr(int fd, int optional_action, const struct termios *attr) {
++	int ret;
++	switch (optional_action) {
++		case TCSANOW:
++			optional_action = TCSETS;
++			break;
++		case TCSADRAIN:
++			optional_action = TCSETSW;
++			break;
++		case TCSAFLUSH:
++			optional_action = TCSETSF;
++			break;
++		default:
++			__ensure(!"Unsupported tcsetattr");
++	}
++
++	if (int r = sys_ioctl(fd, optional_action, (void *)attr, &ret) != 0)
++		return r;
++
++	return 0;
++}
++STUB_RET(
++    int sys_pselect(
++        [[maybe_unused]] int nfds,
++        [[maybe_unused]] fd_set *readfds,
++        [[maybe_unused]] fd_set *writefds,
++        [[maybe_unused]] fd_set *exceptfds,
++        [[maybe_unused]] const struct timespec *timeout,
++        [[maybe_unused]] const sigset_t *sigmask,
++        [[maybe_unused]] int *num_events
++    )
++);
++int sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags) {
++	auto ret = Syscall(SYS_UTIMENSAT, dirfd, pathname, times, flags);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++int sys_syncfs(int fd) {
++	auto ret = Syscall(SYS_SYNCFS, fd);
++	if (auto e = syscall_error(ret); e)
++		return e;
++
++	return 0;
++}
++
++int sys_unlockpt(int fd) {
++	int unlock = 0;
++	int result = 0;
++
++	return sys_ioctl(fd, TIOCSPTLCK, &unlock, &result);
++}
+ } // namespace mlibc
+-- 
+2.51.0
+
