@@ -26,13 +26,12 @@ namespace CPU
 } // namespace CPU
 
 #include <Prism/Core/NonCopyable.hpp>
-#include <Prism/Core/Platform.hpp>
-#include <Prism/Core/Types.hpp>
+#include <Prism/Core/NonMovable.hpp>
 #include <Prism/Debug/Assertions.hpp>
 
 #include <Prism/Utility/Atomic.hpp>
 
-class Spinlock : public NonCopyable<Spinlock>
+class Spinlock : public NonCopyable<Spinlock>, public NonMovable<Spinlock>
 {
     enum class LockState : u32
     {
@@ -43,14 +42,14 @@ class Spinlock : public NonCopyable<Spinlock>
   public:
     CTOS_ALWAYS_INLINE bool Test()
     {
-        return m_Lock.Load(MemoryOrder::eAtomicRelaxed) == LockState::eUnlocked;
+        return m_Lock.Load(MemoryOrder::eRelaxed) == LockState::eUnlocked;
     }
     CTOS_ALWAYS_INLINE bool TestAndAcquire()
     {
         LockState expected = LockState::eUnlocked;
         return m_Lock.CompareExchange(expected, LockState::eLocked, false,
-                                      MemoryOrder::eAtomicAcquire,
-                                      MemoryOrder::eAtomicRelaxed);
+                                      MemoryOrder::eAcquire,
+                                      MemoryOrder::eRelaxed);
     }
 
     void Acquire(bool disableInterrupts = false);

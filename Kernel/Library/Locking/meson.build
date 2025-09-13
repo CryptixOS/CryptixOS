@@ -9,5 +9,6 @@ srcs += files(
   'Mutex.cpp',
   'RecursiveMutex.cpp',
   'Semaphore.cpp',
+  'SequenceLock.cpp',
   'Spinlock.cpp',
 )

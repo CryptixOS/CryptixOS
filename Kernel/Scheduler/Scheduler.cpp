@@ -178,8 +178,7 @@ bool Scheduler::IsPreemptionEnabled()
     if (!s_SchedulerEnabled) return false;
 
     u64 cpuID = CPU::GetCurrentID();
-    return s_CPULocalData[cpuID].PreemptionEnabled.Load(
-        MemoryOrder::eAtomicRelaxed);
+    return s_CPULocalData[cpuID].PreemptionEnabled.Load(MemoryOrder::eRelaxed);
 }
 
 void Scheduler::EnablePreemption()
@@ -187,16 +186,14 @@ void Scheduler::EnablePreemption()
     if (!s_SchedulerEnabled) return;
 
     u64 cpuID = CPU::GetCurrentID();
-    s_CPULocalData[cpuID].PreemptionEnabled.Store(true,
-                                                  MemoryOrder::eAtomicRelease);
+    s_CPULocalData[cpuID].PreemptionEnabled.Store(true, MemoryOrder::eRelease);
 }
 void Scheduler::DisablePreemption()
 {
     if (!s_SchedulerEnabled) return;
 
     u64 cpuID = CPU::GetCurrentID();
-    s_CPULocalData[cpuID].PreemptionEnabled.Store(false,
-                                                  MemoryOrder::eAtomicAcquire);
+    s_CPULocalData[cpuID].PreemptionEnabled.Store(false, MemoryOrder::eAcquire);
 }
 
 void Scheduler::Block(Thread* thread)
