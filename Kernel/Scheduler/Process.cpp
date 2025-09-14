@@ -64,17 +64,15 @@ Process::Process(Process* parent, StringView name,
     , m_Credentials(creds)
     , m_Ring(PrivilegeLevel::eUnprivileged)
     , m_NextTid(m_ID)
-    , m_CWD(VFS::RootDirectoryEntry())
 
 {
-    Ref ttyNode
-        = VFS::ResolvePath(VFS::RootDirectoryEntry(), "/dev/tty").Value().Entry;
+    if (m_ID == 1) m_FsView = CreateRef<FilesystemView>();
+    Ref ttyNode = VFS::ResolvePath(VFS::RootDirectoryEntry(), "/dev/console")
+                      .Value()
+                      .Entry;
 
-    auto tty
-        = VFS::Open(VFS::RootDirectoryEntry(), "/dev/tty", O_RDWR, 0).Value();
-    m_FdTable.Insert(tty, 0);
-    m_FdTable.Insert(tty, 1);
-    m_FdTable.Insert(tty, 2);
+    auto tty = VFS::Open(VFS::RootDirectoryEntry(), "/dev/console", O_RDWR, 0)
+                   .Value();
 }
 Process::~Process()
 {
@@ -110,7 +108,7 @@ Process* Process::Current()
 Process* Process::CreateKernelProcess()
 {
     Process* kernelProcess = Scheduler::GetKernelProcess();
-    if (kernelProcess) goto ret;
+    if (kernelProcess) return kernelProcess;
 
     kernelProcess                = new Process;
     kernelProcess->m_ID          = 0;
@@ -119,11 +117,9 @@ Process* Process::CreateKernelProcess()
     kernelProcess->m_Credentials = s_RootCredentials;
     kernelProcess->m_Ring        = PrivilegeLevel::ePrivileged;
     kernelProcess->m_NextTid     = 0;
-    kernelProcess->m_Umask       = 0;
+    kernelProcess->m_FsView      = CreateRef<FilesystemView>();
 
     // FIXME(v1tr10l7): What about m_AddressSpace?
-
-ret:
     return kernelProcess;
 }
 Process* Process::CreateIdleProcess()
@@ -231,8 +227,8 @@ ErrorOr<isize> Process::SetResGID(GroupID rgid, GroupID egid, GroupID sgid)
 
 INodeMode Process::Umask(INodeMode mask)
 {
-    INodeMode previous = m_Umask;
-    m_Umask            = mask;
+    INodeMode previous = m_FsView->FileCreationMask();
+    m_FsView->SetFileCreationMask(mask);
 
     return previous;
 }
@@ -280,6 +276,13 @@ ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags,
     auto descriptor = TryOrRet(VFS::Open(parent, path, flags, mode));
     return m_FdTable.Insert(descriptor);
 }
+isize Process::FirstFreeFdIndex()
+{
+    isize fdNum = 0;
+    while (m_FdTable.IsValid(fdNum)) ++fdNum;
+
+    return fdNum;
+}
 ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
 {
     if (oldFdNum == newFdNum) return Error(EINVAL);
@@ -287,12 +290,8 @@ ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
     Ref<FileDescriptor> oldFd = GetFileHandle(oldFdNum);
     if (!oldFd) return Error(EBADF);
 
-    while (newFdNum < 0 || m_FdTable.IsValid(newFdNum)) ++newFdNum;
     Ref<FileDescriptor> newFd = GetFileHandle(newFdNum);
     if (newFd) CloseFd(newFdNum);
-
-    // newFd = CreateRef<FileDescriptor>(oldFd, flags);
-    // if (!newFd) return Error(ENOMEM);
 
     newFd    = oldFd;
     newFdNum = m_FdTable.Insert(newFd, newFdNum);
@@ -360,8 +359,8 @@ Vector<String> SplitArguments(const String& str)
 ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 {
     m_FdTable.Clear();
-    auto tty
-        = VFS::Open(VFS::RootDirectoryEntry(), "/dev/tty", O_RDWR, 0).Value();
+    auto tty = VFS::Open(VFS::RootDirectoryEntry(), "/dev/console", O_RDWR, 0)
+                   .Value();
     m_FdTable.Insert(tty, 0);
     m_FdTable.Insert(tty, 1);
     m_FdTable.Insert(tty, 2);
@@ -503,8 +502,8 @@ ErrorOr<Process*> Process::Clone(usize flags)
     CopyMemory(newProcess);
     newProcess->m_NextTid.Store(m_NextTid.Load());
 
-    // if (flags & CLONE_FS)
-    CopyFs(newProcess);
+    newProcess->m_FsView = m_FsView;
+    if (flags & CLONE_FS) CopyFs(newProcess);
     // if (flags & CLONE_FILES)
     CopyFileDescriptors(newProcess);
     if (flags & CLONE_PARENT) newProcess->m_Parent = m_Parent;
@@ -610,11 +609,13 @@ ErrorOr<void> Process::WakeFutex(i32* vaddr)
     return {};
 }
 
-void Process::CopyFs(Process* dest)
+void Process::CopyFs(Process* process)
 {
-    dest->m_RootDirectoryEntry = m_RootDirectoryEntry;
-    dest->m_CWD                = m_CWD;
-    dest->m_Umask              = m_Umask;
+    process->m_FsView = CreateRef<FilesystemView>(*m_FsView);
+
+    m_FsView->SetRoot(m_FsView->Root());
+    m_FsView->ChangeDirectory(m_FsView->WorkingDirectory());
+    m_FsView->SetFileCreationMask(m_FsView->FileCreationMask());
 }
 void Process::CopyFileDescriptors(Process* dest)
 {
@@ -636,36 +637,4 @@ void Process::CopyMemory(Process* process)
         newRegion->SetAccessMode(region->Access());
         process->PageMap->MapRange(virt, phys, size, region->PageAttributes());
     }
-}
-
-void Process::SetupSignalTrampoline()
-{
-    if (m_Ring == PrivilegeLevel::ePrivileged) return;
-
-    auto [phys, trampolineSize]                   = SignalTrampoline();
-
-    static constexpr usize SIGNAL_TRAMPOLINE_VIRT = 0x4000'000'000'000;
-    auto foundRegion = m_AddressSpace.Find(SIGNAL_TRAMPOLINE_VIRT);
-    if (foundRegion
-        && foundRegion->PageAttributes()
-               & (PageAttributes::eRead | PageAttributes::eExecutable
-                  | PageAttributes::eUser))
-        return;
-    return;
-
-    auto trampolineRegion
-        = m_AddressSpace.AllocateFixed(SIGNAL_TRAMPOLINE_VIRT, trampolineSize);
-    trampolineRegion->SetPhysicalBase(phys);
-    using Access = VMM::Access;
-    trampolineRegion->SetAccessMode(Access::eRead | Access::eExecute
-                                    | Access::eUser);
-    auto virt = trampolineRegion->VirtualBase();
-
-    LogTrace(
-        "Process: Mapping the signal trampoline at {:#x} for the process[{}],"
-        " to the address => {:#x}",
-        phys, m_ID, virt);
-    auto pageMap = m_Parent->PageMap;
-    pageMap->MapRegion(trampolineRegion);
-    m_SignalTrampolineVirt = virt;
 }

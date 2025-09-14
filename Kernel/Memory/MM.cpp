@@ -238,26 +238,31 @@ namespace MM
 
         if (region)
         {
-            // auto    fd        = region->FileDescriptor();
-            // usize   size      = fd ? fd->File()->Size() : region->Size();
-            usize   size      = region->Size();
+            auto  fd   = region->FileDescriptor();
+            usize size = fd && fd->File() ? fd->File()->Size() : region->Size();
 
-            usize   pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
-            Pointer phys      = PMM::CallocatePages(pageCount);
-            // auto    virt      = region->VirtualBase();
+            usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
+            Pointer phys    = PMM::CallocatePages(pageCount);
+            auto    virt    = region->VirtualBase();
+            Assert(virt);
 
-            auto    pageMap   = process->PageMap;
+            auto pageMap = process->PageMap;
             if (phys)
             {
+                auto flags = PageAttributes::eRW | PageAttributes::eUser
+                           | PageAttributes::eWriteBack;
                 region->SetPhysicalBase(phys);
+                region->SetAttributes(flags);
                 pageMap->MapRegion(region);
 
-                // if (fd)
-                // {
-                //     isize nread = TryAcquire(fd->Read(virt, size));
-                //     if (nread != static_cast<isize>(size))
-                //         LogError("MM: Failed to read the file descriptor");
-                // }
+                if (fd)
+                {
+                    LogDebug("MM: Mapping fd");
+                    isize nread = TryAcquire(fd->Read(virt, size));
+                    LogDebug("MM: Read fd");
+                    if (nread != static_cast<isize>(size))
+                        LogError("MM: Failed to read the file descriptor");
+                }
                 return;
             }
             errno = ENOMEM;

@@ -273,7 +273,7 @@ namespace API::VFS
     {
         Process* process = Process::Current();
 
-        return process->DupFd(oldFdNum, -1, 0);
+        return process->DupFd(oldFdNum, process->FirstFreeFdIndex(), 0);
     }
     ErrorOr<isize> Dup2(isize oldFdNum, isize newFdNum)
     {
@@ -614,17 +614,12 @@ namespace API::VFS
 
         auto entry = pathRes.Entry;
         if (!entry) return Error(ENOENT);
-        auto inode     = entry->INode();
+        auto  inode     = entry->INode();
 
-        auto linkValue = TryOrRet(inode->ReadLink());
-        CPU::AsUser(
-            [&]()
-            {
-                Memory::Copy(outBuffer, linkValue.Raw(),
-                             Min(linkValue.Size(), bufferSize));
-            });
-
-        return 0;
+        auto  linkValue = TryOrRet(inode->ReadLink());
+        usize count     = Min(linkValue.Size(), bufferSize);
+        CPU::CopyStringToUser(linkValue.StrView(), outBuffer, count);
+        return count;
     }
     ErrorOr<isize> FChModAt(isize dirFdNum, const char* pathView,
                             INodeMode mode, isize flags)
@@ -655,7 +650,7 @@ namespace API::VFS
         auto              current = Process::Current();
 
         CTOS_UNUSED isize i, j, max;
-        return -1;
+        return 0;
         usize set = 0;
         for (isize i = 0; i < FD_SETSIZE; i++)
         {

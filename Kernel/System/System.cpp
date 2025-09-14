@@ -40,7 +40,6 @@ namespace System
     ErrorOr<void> LoadKernelSymbols(const BootModuleInfo& kernelExecutable)
     {
         LogTrace("System: Loading kernel symbols...");
-
         s_KernelExecutable    = kernelExecutable;
         Pointer kernelAddress = kernelExecutable.LoadAddress;
         usize   kernelSize    = kernelExecutable.Size;
@@ -54,7 +53,6 @@ namespace System
         LogTrace(
             "System: Loaded the kernel executable with size `{}`KiB at `{:#x}`",
             kernelSize / 1024, kernelAddress.Raw());
-
         auto status = s_KernelImage.LoadFromMemory(kernelAddress, kernelSize);
         if (!status)
         {
@@ -62,8 +60,7 @@ namespace System
             return Error(ENOEXEC);
         }
 
-        ELF::Image::SymbolIterator it;
-        it.BindLambda(
+        s_KernelImage.ForEachSymbol(
             [&](StringView name, Pointer value) -> IterationResult
             {
                 if (name.Empty()) return IterationResult::eContinue;
@@ -71,8 +68,6 @@ namespace System
                 s_KernelSymbols[name] = value;
                 return IterationResult::eContinue;
             });
-
-        s_KernelImage.ForEachSymbol(it);
         LogTrace("System: Successfully loaded the kernel symbols");
 
         Stacktrace::Initialize();
@@ -114,13 +109,17 @@ namespace System
         LogTrace("System: Retrieving numa domains information from SRAT table");
         auto srat = ACPI::GetTable<SRAT>("SRAT");
         if (!srat) return;
-        usize   length    = srat->Header.Length;
+        usize   length  = srat->Header.Length;
 
-        Pointer start     = srat;
-        Pointer end       = start.Offset(length);
-        Pointer current   = start.Offset(sizeof(SRAT));
+        Pointer start   = srat;
+        Pointer end     = start.Offset(length);
+        Pointer current = start.Offset(sizeof(SRAT));
 
-        usize   nodeIndex = 0;
+#ifndef CTOS_TARGET_X86_64
+        return;
+#endif
+
+        usize nodeIndex = 0;
         while (current < end)
         {
             auto entry = current.As<EntryHeader>();
@@ -170,6 +169,7 @@ namespace System
                 case EntryType::eGiccAffinity:
                 {
                     auto gicc = current.As<ACPI::SRAT::GiccAffinity>();
+
                     LogMessage("\t\tProximity Domain: {}\n",
                                gicc->ProximityDomain);
                     LogMessage("\t\tProcessor UID: {}\n", gicc->ProcessorUID);
@@ -222,7 +222,6 @@ namespace System
 
     ErrorOr<void> LoadBuiltinModules()
     {
-
         auto modulesStart = module_init_start_addr;
         auto modulesEnd   = module_init_end_addr;
         for (ModulePreludium* moduleHeader = modulesStart;
@@ -250,24 +249,6 @@ namespace System
         LoadModule("/usr/lib/modules/e1000e.ko");
         LoadModule("/usr/lib/modules/i8042.ko");
         LoadModule("/usr/lib/modules/atkbd.ko");
-        return {};
-
-        auto pathRes = TryOrRet(
-            VFS::ResolvePath(VFS::RootDirectoryEntry(), "/lib/modules/"));
-        auto         moduleDirectory = pathRes.Entry;
-
-        Vector<Path> modulesToLoad;
-        if (moduleDirectory)
-        {
-            for (const auto& [name, child] : moduleDirectory->Children())
-            {
-                auto modPath = fmt::format("/lib/modules/{}", name);
-                modulesToLoad.PushBack(modPath.data());
-            }
-        }
-        for (isize i = static_cast<isize>(modulesToLoad.Size()) - 1; i >= 0;
-             i--)
-            LoadModule(modulesToLoad[i]);
 
         return {};
     }
@@ -324,8 +305,6 @@ namespace System
 
                 address = module->Image->LookupSymbol(name);
                 if (address) return address;
-                IgnoreUnused(name);
-                IgnoreUnused(module);
             }
 
             return 0;

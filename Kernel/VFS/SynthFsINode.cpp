@@ -45,11 +45,11 @@ SynthFsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
 {
     ScopedLock guard(m_Lock);
     usize      offset = 0;
-    for (const auto [name, inode] : Children())
+    for (const auto& [name, inode] : Children())
     {
-        usize  ino  = inode->ID();
-        mode_t mode = inode->Mode();
-        auto   type = IF2DT(mode);
+        usize     ino  = inode->ID();
+        INodeMode mode = inode->Mode();
+        auto      type = IF2DT(mode);
 
         if (!iterator(name, offset, ino, type)) break;
         ++offset;
@@ -72,7 +72,7 @@ ErrorOr<Ref<DirectoryEntry>> SynthFsINode::Lookup(Ref<DirectoryEntry> entry)
 }
 
 ErrorOr<Ref<DirectoryEntry>> SynthFsINode::CreateNode(Ref<DirectoryEntry> entry,
-                                                      mode_t mode, dev_t dev)
+                                                      INodeMode mode, dev_t dev)
 {
     ScopedLock guard(m_Lock);
     if (m_Children.Contains(entry->Name())) return Error(EEXIST);
@@ -108,12 +108,12 @@ ErrorOr<Ref<DirectoryEntry>> SynthFsINode::CreateNode(Ref<DirectoryEntry> entry,
     return entry;
 }
 ErrorOr<Ref<DirectoryEntry>> SynthFsINode::CreateFile(Ref<DirectoryEntry> entry,
-                                                      mode_t              mode)
+                                                      INodeMode           mode)
 {
     return CreateNode(entry, (mode & ~S_IFMT) | S_IFREG, 0);
 }
 ErrorOr<Ref<DirectoryEntry>>
-SynthFsINode::CreateDirectory(Ref<DirectoryEntry> entry, mode_t mode)
+SynthFsINode::CreateDirectory(Ref<DirectoryEntry> entry, INodeMode mode)
 {
 
     TryOrRet(CreateNode(entry, (mode & ~S_IFMT) | S_IFDIR, 0));

@@ -9,35 +9,34 @@
 #include <Prism/Containers/UnorderedMap.hpp>
 #include <VFS/FileDescriptor.hpp>
 
-class FileDescriptorTable
+class FileDescriptorTable : public RefCounted
 {
-    using TableType = UnorderedMap<isize, Ref<FileDescriptor>>;
+    using TableType = UnorderedMap<isize, ::Ref<FileDescriptor>>;
 
   public:
     FileDescriptorTable() = default;
 
-    i32         Insert(Ref<FileDescriptor> descriptor, i32 desired = -1);
-    i32         Erase(i32 fdNum);
+    isize       Insert(::Ref<FileDescriptor> descriptor, isize desired = -1);
+    isize       Erase(isize fdNum);
 
-    void        OpenStdioStreams();
     void        Clear();
 
-    inline bool IsValid(i32 fd) const { return m_Table.Contains(fd); }
-    inline Ref<FileDescriptor> GetFd(i32 fd) const
+    inline bool IsValid(isize fd) const { return m_Table.Contains(fd); }
+    inline ::Ref<FileDescriptor> GetFd(isize fd) const
     {
         if (!IsValid(fd)) return nullptr;
 
         return m_Table.At(fd);
     }
 
-    auto                    begin() { return m_Table.begin(); }
-    auto                    end() { return m_Table.end(); }
+    auto                          begin() { return m_Table.begin(); }
+    auto                          end() { return m_Table.end(); }
 
-    inline Ref<FileDescriptor>& operator[](usize i) { return m_Table[i]; }
+    inline ::Ref<FileDescriptor>& operator[](usize i) { return m_Table[i]; }
 
   private:
-    Spinlock    m_Lock;
-    TableType   m_Table;
+    Spinlock      m_Lock;
+    TableType     m_Table;
 
-    Atomic<i32> m_NextIndex = 3;
+    Atomic<isize> m_NextIndex = 0;
 };

@@ -26,7 +26,7 @@ class SynthFsINode : public INode
 
     inline static constexpr usize GetDefaultSize() { return 0x1000; }
 
-    virtual const UnorderedMap<StringView, INode*>& Children() const
+    virtual const UnorderedMap<String, INode*>& Children() const
     {
         return m_Children;
     }
@@ -60,11 +60,11 @@ class SynthFsINode : public INode
     }
 
   protected:
-    inline static constexpr usize    DIRECTORY_ENTRY_SIZE = 20;
+    inline static constexpr usize DIRECTORY_ENTRY_SIZE = 20;
 
-    Buffer                           m_Buffer;
-    UnorderedMap<StringView, INode*> m_Children;
-    String                           m_Target = ""_s;
+    Buffer                        m_Buffer;
+    UnorderedMap<String, INode*>  m_Children;
+    String                        m_Target = ""_s;
 
-    ErrorOr<void>                    ResizeBuffer(usize newSize);
+    ErrorOr<void>                 ResizeBuffer(usize newSize);
 };

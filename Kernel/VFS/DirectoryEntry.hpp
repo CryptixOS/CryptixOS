@@ -75,7 +75,7 @@ class DirectoryEntry : public RefCounted
     inline ::WeakRef<DirectoryEntry> Parent() { return m_Parent; }
 
     Path                             Path();
-    const UnorderedMap<StringView, ::Ref<DirectoryEntry>>& Children() const;
+    const UnorderedMap<String, ::Ref<DirectoryEntry>>& Children() const;
 
     void                      SetParent(::WeakRef<DirectoryEntry> entry);
     void                      SetMountGate(::Ref<DirectoryEntry> mountGate);
@@ -88,9 +88,9 @@ class DirectoryEntry : public RefCounted
     WeakRef<DirectoryEntry>   GetEffectiveParent();
 
     using Iterator
-        = UnorderedMap<StringView, ::Ref<class DirectoryEntry>>::Iterator<>;
+        = UnorderedMap<String, ::Ref<class DirectoryEntry>>::Iterator<>;
     using ConstIterator
-        = UnorderedMap<StringView, ::Ref<class DirectoryEntry>>::ConstIterator;
+        = UnorderedMap<String, ::Ref<class DirectoryEntry>>::ConstIterator;
     Iterator      begin() { return m_Children.begin(); }
     ConstIterator begin() const { return m_Children.begin(); }
     Iterator      end() { return m_Children.end(); }
@@ -114,12 +114,12 @@ class DirectoryEntry : public RefCounted
 
     Spinlock                  m_Lock;
 
-    String                    m_Name      = "";
+    String                    m_Name      = ""_s;
     DirectoryEntryFlags       m_Flags     = DirectoryEntryFlags::eNegative;
     class INode*              m_INode     = nullptr;
     bool                      m_Populated = false;
     usize                     m_DirOffset = 0;
 
     ::WeakRef<DirectoryEntry> m_Parent    = nullptr;
-    UnorderedMap<StringView, ::Ref<class DirectoryEntry>> m_Children;
+    UnorderedMap<String, ::Ref<class DirectoryEntry>> m_Children;
 };

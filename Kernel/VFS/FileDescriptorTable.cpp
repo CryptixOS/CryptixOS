@@ -7,10 +7,10 @@
 #include <VFS/FileDescriptorTable.hpp>
 #include <VFS/VFS.hpp>
 
-i32 FileDescriptorTable::Insert(Ref<FileDescriptor> fd, i32 desired)
+isize FileDescriptorTable::Insert(::Ref<FileDescriptor> fd, isize desired)
 {
     ScopedLock guard(m_Lock);
-    i32        fdNum = m_NextIndex;
+    isize      fdNum = m_NextIndex;
 
     auto       found = m_Table.Find(desired);
     if (desired >= 0 && found == m_Table.end()) fdNum = desired;
@@ -19,30 +19,18 @@ i32 FileDescriptorTable::Insert(Ref<FileDescriptor> fd, i32 desired)
     ++m_NextIndex;
     return fdNum;
 }
-i32 FileDescriptorTable::Erase(i32 fdNum)
+isize FileDescriptorTable::Erase(isize fdNum)
 {
-    ScopedLock          guard(m_Lock);
-    Ref<FileDescriptor> fd = GetFd(fdNum);
+    ScopedLock            guard(m_Lock);
+    ::Ref<FileDescriptor> fd = GetFd(fdNum);
     if (!fd) return_err(-1, EBADF);
 
     m_Table.Erase(fdNum);
     return 0;
 }
 
-void FileDescriptorTable::OpenStdioStreams()
-{
-    // FIXME(v1tr10l7): Should we verify whether stdio fds are already open?
-    // Ref ttyNode
-    //     = VFS::ResolvePath(VFS::RootDirectoryEntry(), "/dev/tty")
-    //           .Value()
-    //           .Entry;
-
-    // Insert(CreateRef<FileDescriptor>(ttyNode, 0, FileAccessMode::eRead), 0);
-    // Insert(CreateRef<FileDescriptor>(ttyNode, 0, FileAccessMode::eWrite), 1);
-    // Insert(CreateRef<FileDescriptor>(ttyNode, 0, FileAccessMode::eWrite), 2);
-}
 void FileDescriptorTable::Clear()
 {
     m_Table.Clear();
-    m_NextIndex = 3;
+    m_NextIndex = 0;
 }

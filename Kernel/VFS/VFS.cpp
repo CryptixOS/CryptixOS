@@ -364,9 +364,9 @@ namespace VFS
         if (!root) return Error(ENOMEM);
 
         s_RootEntry = root;
-        return s_RootMountPoint
-             = TryOrRet(Mount(nullptr, ""_pv, "/"_pv, filesystemName)),
-               s_RootMountPoint;
+        s_RootMountPoint
+            = TryOrRet(Mount(nullptr, ""_pv, "/"_pv, filesystemName));
+        return s_RootMountPoint;
     }
 
     // TODO: flags
@@ -402,7 +402,7 @@ namespace VFS
             return Error(ENODEV);
         }
 
-        fsRoot->SetParent(targetEntry);
+        fsRoot->SetParent(fsRoot);
         targetEntry->SetMountGate(fsRoot);
 
         if (sourcePath.Empty())

@@ -22,6 +22,7 @@
 
 #include <Scheduler/Thread.hpp>
 #include <VFS/FileDescriptorTable.hpp>
+#include <VFS/FilesystemView.hpp>
 
 enum class PrivilegeLevel
 {
@@ -139,13 +140,19 @@ class Process
         return false;
     }
 
-    inline Ref<DirectoryEntry> RootNode() const { return m_RootDirectoryEntry; }
-    inline Ref<DirectoryEntry> CWD() const { return m_CWD; }
-    inline void                SetCWD(Ref<DirectoryEntry> cwd) { m_CWD = cwd; }
-    inline INodeMode           Umask() const { return m_Umask; }
-    INodeMode                  Umask(INodeMode mask);
+    inline Ref<DirectoryEntry> RootNode() const { return m_FsView->Root(); }
+    inline Ref<DirectoryEntry> CWD() const
+    {
+        return m_FsView->WorkingDirectory();
+    }
+    inline void SetCWD(Ref<DirectoryEntry> cwd)
+    {
+        m_FsView->ChangeDirectory(cwd);
+    }
+    inline INodeMode Umask() const { return m_FsView->FileCreationMask(); }
+    INodeMode        Umask(INodeMode mask);
 
-    inline Timestep            Quantum() const { return m_Quantum; }
+    inline Timestep  Quantum() const { return m_Quantum; }
     const struct SignalAction& SignalAction(SignalID signal) const;
     void SetSignalAction(SignalID signal, const struct SignalAction& action);
 
@@ -155,6 +162,7 @@ class Process
     FileDescriptorTable& FdTable() { return m_FdTable; }
     ErrorOr<isize>       OpenAt(i32 dirFdNum, PathView path, i32 flags,
                                 INodeMode mode);
+    isize                FirstFreeFdIndex();
     ErrorOr<isize>       DupFd(isize oldFdNum, isize newFdNum, isize flags);
     i32                  CloseFd(i32 fd);
     ErrorOr<isize>       InsertFd(Ref<FileDescriptor> fd);
@@ -199,10 +207,7 @@ class Process
     Vector<Process*>    m_Zombies;
     Vector<Ref<Thread>> m_Threads;
 
-    Ref<DirectoryEntry> m_RootDirectoryEntry = nullptr;
-    Ref<DirectoryEntry> m_CWD                = nullptr;
-    INodeMode           m_Umask              = 0;
-
+    Ref<FilesystemView> m_FsView = nullptr;
     FileDescriptorTable m_FdTable;
     class AddressSpace  m_AddressSpace;
 
@@ -222,8 +227,6 @@ class Process
     void                           CopyFs(Process* dest);
     void                           CopyFileDescriptors(Process* dest);
     void                           CopyMemory(Process* process);
-
-    void                           SetupSignalTrampoline();
 
     friend class Scheduler;
     friend struct Thread;

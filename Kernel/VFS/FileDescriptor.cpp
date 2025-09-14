@@ -103,7 +103,6 @@ ErrorOr<isize> FileDescriptor::Read(const UserBuffer& out, usize count,
     // }
 
     if (offset < 0) offset = m_Offset;
-
     isize bytesRead = m_File->Read(out.Raw(), offset, count).ValueOr(0);
     offset += bytesRead;
 

@@ -30,20 +30,20 @@ Path DirectoryEntry::Path()
 
     WeakRef       current   = this;
     auto          rootEntry = VFS::RootDirectoryEntry();
+    auto          rootINode = rootEntry->INode();
 
-    while (current && current != rootEntry)
+    while (current && current->INode() != rootINode)
     {
         auto segment = "/"_s;
         segment += current->m_Name;
 
         if (current->m_Name != "/"_sv) pathBuilder.Insert(segment);
-
         current = current->GetEffectiveParent().Raw();
     }
 
     return pathBuilder.Empty() ? "/"_s : pathBuilder.ToString();
 }
-const UnorderedMap<StringView, ::Ref<DirectoryEntry>>&
+const UnorderedMap<String, ::Ref<DirectoryEntry>>&
 DirectoryEntry::Children() const
 {
     return m_Children;

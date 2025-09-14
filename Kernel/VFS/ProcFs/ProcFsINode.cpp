@@ -6,9 +6,11 @@
  */
 #include <API/Posix/dirent.h>
 #include <Memory/PMM.hpp>
+#include <Prism/String/StringBuilder.hpp>
 #include <Prism/String/StringUtils.hpp>
 #include <Scheduler/Scheduler.hpp>
 
+#include <Time/Time.hpp>
 #include <VFS/Filesystem.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
 
@@ -30,16 +32,24 @@ ProcFsINode::ProcFsINode(StringView name, class Filesystem* fs, INodeID id,
 {
     Assert(!S_ISDIR(mode) || !m_Property);
 
-    m_Metadata.DeviceID     = m_Filesystem->BackingDeviceID();
-    m_Metadata.ID           = m_Filesystem->NextINodeIndex();
-    m_Metadata.LinkCount    = 1;
-    m_Metadata.Mode         = mode;
-    m_Metadata.UID          = 0;
-    m_Metadata.GID          = 0;
-    m_Metadata.RootDeviceID = m_Metadata.DeviceID;
-    m_Metadata.Size         = 0;
-    m_Metadata.BlockSize    = 512;
-    m_Metadata.BlockCount   = 0;
+    m_Metadata.ID               = m_Filesystem->NextINodeIndex();
+    m_Metadata.Mode             = mode;
+
+    m_Metadata.Size             = IsDirectory() ?: 20 * 2;
+    m_Metadata.LinkCount        = 1 + IsDirectory();
+
+    m_Metadata.BlockSize        = PMM::PAGE_SIZE;
+    m_Metadata.BlockCount       = 0;
+
+    m_Metadata.RootDeviceID     = m_Filesystem->BackingDeviceID();
+    m_Metadata.DeviceID         = 0;
+
+    m_Metadata.UID              = 0;
+    m_Metadata.GID              = 0;
+
+    m_Metadata.AccessTime       = Time::GetReal();
+    m_Metadata.ModificationTime = Time::GetReal();
+    m_Metadata.ChangeTime       = Time::GetReal();
 }
 ProcFsINode::ProcFsINode(StringView name, class Filesystem* fs, INodeMode mode,
                          ProcFsProperty* property)
@@ -47,52 +57,16 @@ ProcFsINode::ProcFsINode(StringView name, class Filesystem* fs, INodeMode mode,
 {
 }
 
-const stat ProcFsINode::Stats()
-{
-    if (m_Property)
-    {
-        m_Property->GenerateRecord();
-        m_Metadata.Size = m_Property->Buffer.Size();
-    }
-
-    stat stats{};
-    stats.st_dev     = m_Metadata.DeviceID;
-    stats.st_ino     = m_Metadata.ID;
-    stats.st_nlink   = m_Metadata.LinkCount;
-    stats.st_mode    = m_Metadata.Mode;
-    stats.st_uid     = m_Metadata.UID;
-    stats.st_gid     = m_Metadata.GID;
-    stats.st_rdev    = m_Metadata.RootDeviceID;
-    stats.st_size    = m_Metadata.Size;
-    stats.st_blksize = m_Metadata.BlockSize;
-    stats.st_blocks  = m_Metadata.BlockCount;
-    stats.st_atim    = m_Metadata.AccessTime;
-    stats.st_mtim    = m_Metadata.ModificationTime;
-    stats.st_ctim    = m_Metadata.ChangeTime;
-    return stats;
-}
 ErrorOr<void> ProcFsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
                                                DirectoryIterator iterator)
 {
-    Process::ForEach(
-        [this](auto* process) -> IterationResult
-        {
-            String    pidString = StringUtils::ToString(process->ID());
-            INodeID   id        = 0;
-            INodeMode mode      = 0;
-
-            if (!Children().Contains(pidString))
-                m_Children[pidString] = new ProcFsProcessINode(
-                    pidString, m_Filesystem, id, mode, process);
-
-            return IterationResult::eContinue;
-        });
+    if (!m_Populated) m_Populated = Populate();
 
     usize offset = 0;
-    for (const auto [name, inode] : Children())
+    for (const auto& [name, inode] : m_Children)
     {
-        INodeID   ino  = inode->Stats().st_ino;
-        INodeMode mode = inode->Stats().st_mode;
+        INodeID   ino  = inode->ID();
+        INodeMode mode = inode->Mode();
         auto      type = IF2DT(mode);
 
         if (!iterator(name, offset, ino, type)) break;
@@ -103,10 +77,11 @@ ErrorOr<void> ProcFsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
 }
 ErrorOr<Ref<DirectoryEntry>> ProcFsINode::Lookup(Ref<DirectoryEntry> entry)
 {
+    if (!m_Populated) m_Populated = Populate();
     ScopedLock guard(m_Lock);
 
-    auto       child = Children().Find(entry->Name());
-    if (child != Children().end())
+    auto       child = m_Children.Find(entry->Name());
+    if (child != m_Children.end())
     {
         entry->Bind(child->Value);
         return entry;
@@ -132,9 +107,93 @@ isize ProcFsINode::Write(const void* buffer, off_t offset, usize bytes)
 }
 ErrorOr<isize> ProcFsINode::Truncate(usize size) { return Error(EROFS); }
 
-ProcFsProcessINode::ProcFsProcessINode(StringView name, class Filesystem* fs,
-                                       INodeID id, INodeMode mode,
-                                       Process* process)
-    : ProcFsINode(name, fs, id, mode)
+ProcFsRootINode::ProcFsRootINode(StringView name, class Filesystem* fs)
+    : ProcFsINode(name, fs, 2, 0755 | S_IFDIR)
 {
 }
+bool ProcFsRootINode::Populate()
+{
+    Process::ForEach(
+        [this](auto* process) -> IterationResult
+        {
+            auto      pid       = process->ID();
+            String    pidString = StringUtils::ToString(pid);
+
+            INodeID   id        = pid << 10;
+            INodeMode mode      = S_IFDIR | 0755;
+
+            if (!m_Children.Contains(pidString))
+                InsertChild(new ProcFsProcessINode(pidString, m_Filesystem, id,
+                                                   mode, pid),
+                            pidString);
+
+            return IterationResult::eContinue;
+        });
+    if (!m_Children.Contains("self"_sv))
+    {
+        auto selfLink = new ProcFsSelfLinkINode("self"_sv, m_Filesystem);
+        InsertChild(selfLink, "self"_sv);
+    }
+
+    return true;
+}
+ProcFsSelfLinkINode::ProcFsSelfLinkINode(StringView name, class Filesystem* fs)
+    : ProcFsINode(name, fs, fs->NextINodeIndex(), S_IFLNK | 0755)
+{
+}
+ErrorOr<Path> ProcFsSelfLinkINode::ReadLink()
+{
+    auto          selfID = Process::Current()->ID();
+    StringBuilder builder;
+    builder << "/proc/"_s;
+    builder << ToString(selfID);
+    builder << "/"_s;
+
+    return String(builder);
+}
+
+ProcFsProcessINode::ProcFsProcessINode(StringView name, class Filesystem* fs,
+                                       INodeID id, INodeMode mode,
+                                       ProcessID pid)
+    : ProcFsINode(name, fs, id, mode)
+    , m_ProcessID(pid)
+{
+    auto fdinfo = new ProcFsFdINode("fd", m_Filesystem, m_ProcessID);
+    InsertChild(fdinfo, "fd");
+}
+bool ProcFsProcessINode::Populate() { return true; }
+
+ProcFsFdINode::ProcFsFdINode(StringView name, class Filesystem* fs,
+                             ProcessID pid)
+    : ProcFsINode(name, fs, 2, 0755 | S_IFDIR)
+    , m_ProcessID(pid)
+{
+}
+bool ProcFsFdINode::Populate()
+{
+    auto process = Scheduler::GetProcess(m_ProcessID);
+    if (!process) return false;
+    for (auto [num, fd] : process->FdTable())
+    {
+        auto dentry = fd->DirectoryEntry();
+        auto path   = dentry->Path();
+
+        auto name   = StringUtils::ToString(num);
+        if (m_Children.Contains(name)) continue;
+
+        auto symlink
+            = new ProcFsSymlinkINode(name, m_Filesystem, S_IFLNK | 0755, path);
+        InsertChild(symlink, name);
+    }
+
+    return true;
+}
+
+ProcFsSymlinkINode::ProcFsSymlinkINode(StringView name, class Filesystem* fs,
+                                       INodeMode mode, PathView target)
+    : ProcFsINode(name, fs, mode)
+    , m_Target(target)
+{
+}
+
+ErrorOr<Path> ProcFsSymlinkINode::ReadLink() { return m_Target; }

@@ -22,7 +22,7 @@ class Ext2FsINode : public INode
     virtual ErrorOr<Ref<DirectoryEntry>>
     Lookup(Ref<DirectoryEntry> dentry) override;
 
-    virtual const UnorderedMap<StringView, INode*>& Children() const
+    virtual const UnorderedMap<String, INode*>& Children() const
     {
         return m_Children;
     }
@@ -37,11 +37,11 @@ class Ext2FsINode : public INode
     friend class Ext2Fs;
 
   private:
-    Ext2Fs*                          m_Fs;
-    Ext2FsINodeMeta                  m_Meta;
-    UnorderedMap<StringView, INode*> m_Children;
-    usize                            m_DirectoryOffset = 0;
+    Ext2Fs*                      m_Fs;
+    Ext2FsINodeMeta              m_Meta;
+    UnorderedMap<String, INode*> m_Children;
+    usize                        m_DirectoryOffset = 0;
 
-    void          Initialize(ino_t index, mode_t mode, u16 type);
+    void                         Initialize(ino_t index, mode_t mode, u16 type);
     ErrorOr<void> AddDirectoryEntry(Ext2FsDirectoryEntry& dentry);
 };

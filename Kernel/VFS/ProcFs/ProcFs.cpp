@@ -190,10 +190,11 @@ ErrorOr<::Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
                                              const void* data)
 {
     ScopedLock guard(m_Lock);
-    if (m_Root) VFS::RecursiveDelete(m_Root);
+    if (m_Root) return Error(EEXIST);
 
     m_RootEntry          = CreateRef<DirectoryEntry>(nullptr, "/");
-    m_Root               = TryOrRet(AllocateNode("/", 0644 | S_IFDIR));
+    // m_Root               = TryOrRet(AllocateNode("/", 0644 | S_IFDIR));
+    m_Root               = new ProcFsRootINode("/", this);
 
     auto inode           = reinterpret_cast<ProcFsINode*>(m_Root);
     inode->m_Metadata.ID = 2;
@@ -221,7 +222,7 @@ ErrorOr<INode*> ProcFs::AllocateNode(StringView name, INodeMode mode)
     return inode;
 }
 ErrorOr<INode*> ProcFs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
-                                   mode_t mode, uid_t uid, gid_t gid)
+                                   INodeMode mode, uid_t uid, gid_t gid)
 {
     auto inode = new ProcFsINode(entry->Name(), this, mode, nullptr);
     entry->Bind(inode);
@@ -234,7 +235,7 @@ ErrorOr<void> ProcFs::Stats(statfs& stats)
     constexpr usize PROC_SUPER_MAGIC = 0x9fa0;
 
     stats.f_type                     = PROC_SUPER_MAGIC;
-    stats.f_bsize                    = PMM::PAGE_SIZE / sizeof(long);
+    stats.f_bsize                    = PMM::PAGE_SIZE;
     stats.f_bfree                    = 0;
     stats.f_bavail                   = 0;
     stats.f_ffree                    = 0;

@@ -81,17 +81,12 @@ class ProcFsINode : public INode
         if (m_Property) delete m_Property;
     }
 
-    virtual const stat Stats() override;
     virtual ErrorOr<void>
     TraverseDirectories(Ref<class DirectoryEntry> parent,
                         DirectoryIterator         iterator) override;
     virtual ErrorOr<Ref<DirectoryEntry>>
-    Lookup(Ref<DirectoryEntry> dentry) override;
+                  Lookup(Ref<DirectoryEntry> dentry) override;
 
-    virtual const UnorderedMap<StringView, INode*>& Children() const
-    {
-        return m_Children;
-    }
     virtual void  InsertChild(INode* node, StringView name) override;
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
@@ -99,15 +94,57 @@ class ProcFsINode : public INode
 
     friend class ProcFs;
 
-  private:
-    ProcFsProperty*                  m_Property = nullptr;
-    UnorderedMap<StringView, INode*> m_Children;
-};
+    virtual bool Populate() { return false; }
 
+  protected:
+    ProcFsProperty*              m_Property = nullptr;
+    UnorderedMap<String, INode*> m_Children;
+    bool                         m_Populated = false;
+};
 class Process;
+class ProcFsRootINode : public ProcFsINode
+{
+  public:
+    ProcFsRootINode(StringView name, class Filesystem* fs);
+
+    virtual bool Populate() override;
+};
+class ProcFsSelfLinkINode : public ProcFsINode
+{
+  public:
+    ProcFsSelfLinkINode(StringView name, class Filesystem* fs);
+    virtual ErrorOr<Path> ReadLink() override;
+};
 class ProcFsProcessINode : public ProcFsINode
 {
   public:
     ProcFsProcessINode(StringView name, class Filesystem* fs, INodeID id,
-                       INodeMode mode, Process* process);
+                       INodeMode mode, ProcessID pid);
+
+    virtual bool Populate() override;
+
+  private:
+    ProcessID m_ProcessID = -1;
+};
+class ProcFsFdINode : public ProcFsINode
+{
+  public:
+    ProcFsFdINode(StringView name, class Filesystem* fs, ProcessID pid);
+
+    virtual bool Populate() override;
+
+  private:
+    ProcessID m_ProcessID = -1;
+};
+
+class ProcFsSymlinkINode : public ProcFsINode
+{
+  public:
+    ProcFsSymlinkINode(StringView name, class Filesystem* fs, INodeMode mode,
+                       PathView target);
+
+    virtual ErrorOr<Path> ReadLink() override;
+
+  private:
+    Path m_Target = ""_sv;
 };
