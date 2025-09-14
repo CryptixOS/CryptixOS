@@ -4,63 +4,108 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Prism/Core/Types.hpp>
+#include <Arch/aarch64/Drivers/GIC.hpp>
+#include <Memory/VMM.hpp>
 
-namespace GIC
+DeviceTree::Driver GIC::s_Driver = {
+    .Name       = "gic-v1"_sv,
+    .Compatible = "arm,cortex-a15-gic"_sv,
+    .Probe      = Probe,
+};
+Ref<GIC> s_GIC = nullptr;
+
+GIC::GIC(DeviceTree::Node& node)
 {
-    constexpr usize DISTRIBUTOR_BASE   = 0x8000000;
-    constexpr usize REDISTRIBUTOR_BASE = 0x8010000;
+    const auto& registers   = node.Registers();
+    m_DistributorRegister   = registers[0];
+    m_RedistributorRegister = registers[1];
+}
 
-#define GICD_BASE          0x8000000 // Distributor
-#define GICR_BASE          0x8010000 // Redistributor
+bool GIC::Register() { return DeviceTree::RegisterDriver(GIC::s_Driver); }
 
-#define GICD_CTLR          (*(volatile uint32_t*)(GICD_BASE + 0x000))
-#define GICD_ISENABLER(n)  (*(volatile uint32_t*)(GICD_BASE + 0x100 + (n) * 4))
-#define GICD_ICENABLER(n)  (*(volatile uint32_t*)(GICD_BASE + 0x180 + (n) * 4))
-#define GICD_IPRIORITYR(n) (*(volatile uint32_t*)(GICD_BASE + 0x400 + (n) * 4))
+static constexpr Pointer ExplodeByte(u8 b)
+{
+    Pointer value = b;
+    if constexpr (sizeof(Pointer) == 4) return value.Raw() * 0x01010101;
+    else if constexpr (sizeof(Pointer) == 8)
+        return value.Raw() * 0x01010101'01010101;
+}
+ErrorOr<void> GIC::Initialize()
+{
+    auto version
+        = (m_CPUInterface->ID >> CPU_InterfaceRegisters::ID_VERSION_OFFSET)
+        & CPU_InterfaceRegisters::ID_VERSION_MASK;
+    if (version != 2) return Error(ENOTSUP);
+    m_Distributor->Control &= ~DistributorRegisters::IRQ_CONTROL_ENABLE;
 
-#define GICR_CTLR          (*(volatile uint32_t*)(GICR_BASE + 0x000))
-#define GICR_ISENABLER0    (*(volatile uint32_t*)(GICR_BASE + 0x100))
+    auto irqLineCount
+        = (m_Distributor->Type >> DistributorRegisters::IRQ_COUNT_OFFSET)
+        & DistributorRegisters::IRQ_COUNT_MASK;
+    u32 const maxIrqCount = 32 * (irqLineCount + 1);
 
-    void Initialize(void)
+    for (usize i = 0; i < maxIrqCount / 32; i++)
     {
-        // Enable GIC Distributor
-        GICD_CTLR = 1; // Enable Distributor
-
-        // Enable GIC Redistributor (for current CPU)
-        GICR_CTLR = 1;
-
-        // Enable CPU interface (System Register Interface)
-        asm volatile(
-            "msr ICC_IGRPEN1_EL1, %0\n" // Enable Group 1 interrupts
-            "msr ICC_BPR1_EL1, %1\n"    // Set binary point (no preemption)
-            "msr ICC_PMR_EL1, %2\n"     // Set priority mask to lowest priority
-            "msr ICC_CTLR_EL1, %3\n"    // Enable EL1 interrupt control
-            "isb"
-            :
-            : "r"(1), "r"(0), "r"(0xFF), "r"(1));
+        m_Distributor->InterruptClearEnable[i]  = 0xffff'ffff;
+        m_Distributor->InterruptClearPending[i] = 0xffff'ffff;
+        m_Distributor->InterruptClearActive[i]  = 0xffff'ffff;
     }
 
-#define GICC_BASE 0x8020000 // Example address from FDT
-#define GICC_CTLR (*(volatile uint32_t*)(GICC_BASE + 0x000))
-#define GICC_PMR  (*(volatile uint32_t*)(GICC_BASE + 0x004))
-
-    void gic_v2_init(void)
+    for (usize i = 0; i < maxIrqCount / 4; i++)
     {
-        // Enable GIC Distributor
-        *reinterpret_cast<volatile u32*>(GICD_CTLR) = 1;
-
-        // Enable CPU Interface
-        GICC_PMR  = 0xFF; // Allow all priority levels
-        GICC_CTLR = 1;    // Enable CPU Interface
+        m_Distributor->InterruptPriority[i] = 0;
+        m_Distributor->InterruptProcessorTargets[i]
+            = ExplodeByte(0xff).Raw<u32>();
     }
 
-    void gic_enable_irq(int irq)
-    {
-        u64 reg              = irq / 32;
-        u64 bit              = irq % 32;
+    m_CPUInterface->InterruptPriorityMask = 0xff;
+    m_CPUInterface->Control |= CPU_InterfaceRegisters::IRQ_CONTROL_ENABLE;
+    m_Distributor->Control |= DistributorRegisters::IRQ_CONTROL_ENABLE;
 
-        GICD_ISENABLER(reg)  = (1 << bit); // Enable the IRQ
-        GICD_IPRIORITYR(irq) = 0x80;       // Set priority (medium)
-    }
-}; // namespace GIC
+    LogInfo("GIC: Successfully initialized");
+    return {};
+}
+ErrorOr<void> GIC::Shutdown() { return Error(ENOSYS); }
+
+ErrorOr<void> GIC::Mask(u32 irq)
+{
+    m_Distributor->InterruptClearEnable[irq / 32] = Bit(irq % 32);
+    return {};
+}
+ErrorOr<void> GIC::Unmask(u32 irq)
+{
+    m_Distributor->InterruptSetEnable[irq / 32] = Bit(irq % 32);
+    return {};
+}
+
+ErrorOr<void> GIC::SendEOI(u32 irq)
+{
+    m_CPUInterface->EndOfInterrupt = irq;
+    return {};
+}
+
+ErrorOr<void> GIC::Probe(DeviceTree::Node& node)
+{
+    const auto& registers = node.Registers();
+    if (registers.Size() < 2) return Error(ENOSYS);
+
+    auto distributorRegister   = registers[0];
+    auto redistributorRegister = registers[1];
+
+    LogTrace(
+        "GIC: Found generic interrupt controller, register bases =>\n"
+        "distributor: {:#x}:{:#x}\n"
+        "redistributor: {:#x}:{:#x}\n",
+        distributorRegister.Base, distributorRegister.Length,
+        redistributorRegister.Base, redistributorRegister.Length);
+
+    auto pageMap = VMM::GetKernelPageMap();
+    auto flags   = PageAttributes::eRW | PageAttributes::eWriteThrough;
+    pageMap->MapRange(distributorRegister.Base, distributorRegister.Base,
+                      distributorRegister.Length, flags);
+    pageMap->MapRange(redistributorRegister.Base, redistributorRegister.Base,
+                      redistributorRegister.Length, flags);
+    s_GIC = CreateRef<GIC>(node);
+    if (!s_GIC) return Error(ENOMEM);
+
+    return {};
+}

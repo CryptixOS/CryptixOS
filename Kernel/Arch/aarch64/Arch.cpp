@@ -5,10 +5,11 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/Arch.hpp>
+#include <Arch/aarch64/Drivers/GIC.hpp>
 
 namespace Arch
 {
-    void                           Initialize() {}
+    void                           Initialize() { Assert(GIC::Register()); }
 
     __attribute__((noreturn)) void Halt()
     {

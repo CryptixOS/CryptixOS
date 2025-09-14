@@ -12,9 +12,9 @@ srcs += files(
   'VMM.cpp',
   'interrupts.S',
   'signal_trampoline.S',
-
-  'Drivers/Serial.cpp'
 )
+
+subdir('Drivers')
 
 #ld_args += ['-Wl,-maarch64elf']
 args += [

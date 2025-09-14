@@ -35,10 +35,10 @@ namespace ACPI::SRAT
         eReserved            = 8,
     };
 
-    struct [[gnu::packed]] EntryHeader 
+    struct [[gnu::packed]] EntryHeader
     {
         enum Type Type;
-        u8 Length;
+        u8        Length;
     };
 
     /* 0: Processor Local APIC/SAPIC Affinity */
@@ -46,12 +46,12 @@ namespace ACPI::SRAT
     struct CPU_Affinity
     {
         EntryHeader Header;
-        u8        ProximityDomainLow;
-        u8        ApicID;
-        u32       Flags;
-        u8        LocalSapicEID;
-        u8        ProximityDomainHigh[3];
-        u32       ClockDomain;
+        u8          ProximityDomainLow;
+        u8          ApicID;
+        u32         Flags;
+        u8          LocalSapicEID;
+        u8          ProximityDomainHigh[3];
+        u32         ClockDomain;
     };
     /* 1: Memory Affinity */
     constexpr usize MEMORY_AFFINITY_ENABLED       = Bit(0);
@@ -60,24 +60,24 @@ namespace ACPI::SRAT
     struct MemoryAffinity
     {
         EntryHeader Header;
-        u32       ProximityDomain;
-        u16       Reserved;
-        u64       BaseAddress;
-        u64       Length;
-        u32       Reserved1;
-        u32       Flags;
-        u64       Reserved2;
+        u32         ProximityDomain;
+        u16         Reserved;
+        u64         BaseAddress;
+        u64         Length;
+        u32         Reserved1;
+        u32         Flags;
+        u64         Reserved2;
     };
     /* 2: Processor Local X2_APIC Affinity (ACPI 4.0) */
     struct X2ApicAffinity
     {
         EntryHeader Header;
-        u16       Reserved;
-        u32       ProximityDomain;
-        u32       ApicID;
-        u32       Flags;
-        u32       ClockDomain;
-        u32       Reserved2;
+        u16         Reserved;
+        u32         ProximityDomain;
+        u32         ApicID;
+        u32         Flags;
+        u32         ClockDomain;
+        u32         Reserved2;
     };
 
     /* 3: GICC Affinity (ACPI 5.1) */
@@ -85,19 +85,19 @@ namespace ACPI::SRAT
     struct GiccAffinity
     {
         EntryHeader Header;
-        u32       ProximityDomain;
-        u32       ProcessorUID;
-        u32       Flags;
-        u32       ClockDomain;
+        u32         ProximityDomain;
+        u32         ProcessorUID;
+        u32         Flags;
+        u32         ClockDomain;
     };
 
     /* 4: GIC ITS Affinity (ACPI 6.2) */
     struct GicItsAffinity
     {
         EntryHeader Header;
-        u32       ProximityDomain;
-        u16       Reserved;
-        u32       ItsID;
+        u32         ProximityDomain;
+        u16         Reserved;
+        u32         ItsID;
     };
 
     constexpr usize DEVICE_HANDLE_SIZE        = 16;
@@ -106,22 +106,22 @@ namespace ACPI::SRAT
     struct GenericAffinity
     {
         EntryHeader Header;
-        u8        Reserved;
-        u8        DeviceHandleType;
-        u32       ProximityDomain;
-        u8        DeviceHandle[DEVICE_HANDLE_SIZE];
-        u32       Flags;
-        u32       Reserved1;
+        u8          Reserved;
+        u8          DeviceHandleType;
+        u32         ProximityDomain;
+        u8          DeviceHandle[DEVICE_HANDLE_SIZE];
+        u32         Flags;
+        u32         Reserved1;
     };
 
     /* 7: RINTC Affinity Structure(ACPI 6.6) */
     struct RintcAffinity
     {
         EntryHeader Header;
-        u16       Reserved;
-        u32       ProximityDomain;
-        u32       ProcessorUID;
-        u32       Flags;
-        u32       ClockDomain;
+        u16         Reserved;
+        u32         ProximityDomain;
+        u32         ProcessorUID;
+        u32         Flags;
+        u32         ClockDomain;
     };
 }; // namespace ACPI::SRAT

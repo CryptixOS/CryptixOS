@@ -121,16 +121,27 @@ namespace DeviceTree
         return success;
     }
 
-    bool EnumerateNode(const Driver& driver, Node& node)
+    static Node* FindCompatibleNode(const Driver& driver, Node& node)
     {
-        if (node.IsCompatible(driver.Compatible)) return true;
+        if (node.IsCompatible(driver.Compatible)) return &node;
+
         for (auto& [name, child] : node)
-            if (EnumerateNode(driver, *child)) return true;
-        return false;
+        {
+            auto found = FindCompatibleNode(driver, *child);
+            if (found) return found;
+        }
+
+        return nullptr;
     }
     bool RegisterDriver(const Driver& driver)
     {
-        if (EnumerateNode(driver, *s_RootNode)) return true;
-        return false;
+        auto found = FindCompatibleNode(driver, *s_RootNode);
+        if (!found) return false;
+
+        if (!driver.Probe) return false;
+        auto success = driver.Probe(*found);
+
+        if (!success) return false;
+        return true;
     }
 } // namespace DeviceTree

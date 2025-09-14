@@ -12,10 +12,12 @@ namespace Serial
     constexpr const Pointer UART_BASE  = 0x9'000'000zu;
     static Pointer          s_UartVirt = UART_BASE;
 
-    bool                      Initialize()
+    bool                    Initialize()
     {
         s_UartVirt = VMM::MapIoRegion(UART_BASE, PMM::PAGE_SIZE, true, 0);
 
+        const char* string = "Serial: Initialized\n";
+        for (const char* c = string; *c; c++) Write(*c);
         return true;
     }
 
