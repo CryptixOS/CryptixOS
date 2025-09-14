@@ -9,6 +9,7 @@
 #include <Library/Locking/Spinlock.hpp>
 #include <Prism/Core/NonCopyable.hpp>
 #include <Prism/Core/NonMovable.hpp>
+#include <Prism/Core/TypeTraits.hpp>
 
 class SequenceLock
 {

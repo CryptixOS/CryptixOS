@@ -122,7 +122,9 @@ namespace Stacktrace
     void Print(StackFrame* stackFrame, usize maxFrames)
     {
         auto syscallID
-            = static_cast<Syscall::ID>(CPU::Current()->LastSyscallID);
+            = CPU::Current()
+                ? static_cast<Syscall::ID>(CPU::Current()->LastSyscallID)
+                : static_cast<Syscall::ID>(0);
         LogDebug("Last failed syscall => {:#x}({})", ToUnderlying(syscallID),
                  ToString(syscallID));
         for (usize i = 0; stackFrame && i < maxFrames; i++)
@@ -137,8 +139,8 @@ namespace Stacktrace
 
             auto          demangledName
                 = symbol ? llvm::demangle(symbol->Name.Raw()) : "??";
-            LogWarn("[\u001b[33mStacktrace\u001b[0m]: {}. {} <{:#x}>\n", i + 1,
-                    demangledName, rip.Raw());
+            LogMessage("[\u001b[33mStacktrace\u001b[0m]: {}. {} <{:#x}>\n",
+                       i + 1, demangledName, rip.Raw());
 
             if (symbol->Name.StartsWith("interrupt_handler")) break;
         }
