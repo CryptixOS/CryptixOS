@@ -95,6 +95,7 @@ namespace API::VFS
     ErrorOr<isize> UtimensAt(i64 dirFdNum, const char* path,
                              const timespec times[2], i64 flags);
     ErrorOr<isize> Dup3(isize oldFdNum, isize newFdNum, isize flags);
+    ErrorOr<isize> Pipe2(i32* pipeFds, isize flags);
 
     ErrorOr<isize> SyncFs(isize fdNum);
     ErrorOr<isize> RenameAt2(isize oldDirFdNum, const char* oldPath,

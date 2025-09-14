@@ -66,13 +66,20 @@ Process::Process(Process* parent, StringView name,
     , m_NextTid(m_ID)
 
 {
-    if (m_ID == 1) m_FsView = CreateRef<FilesystemView>();
+    if (m_ID == 1)
+    {
+        m_AddressSpace = CreateRef<class AddressSpace>();
+        m_FsView       = CreateRef<FilesystemView>();
+        m_FdTable      = CreateRef<class FileDescriptorTable>();
+    }
 }
 Process::~Process()
 {
     Arch::VMM::DestroyPageMap(PageMap);
     delete PageMap;
-    for (auto& [virt, region] : m_AddressSpace)
+    if (!m_AddressSpace) return;
+
+    for (auto& [virt, region] : *m_AddressSpace)
     {
         if (region->VirtualBase() == m_SignalTrampolineVirt)
         {
@@ -104,14 +111,16 @@ Process* Process::CreateKernelProcess()
     Process* kernelProcess = Scheduler::GetKernelProcess();
     if (kernelProcess) return kernelProcess;
 
-    kernelProcess                = new Process;
-    kernelProcess->m_ID          = 0;
-    kernelProcess->m_Name        = "TheOverlord"_s;
-    kernelProcess->PageMap       = VMM::GetKernelPageMap();
-    kernelProcess->m_Credentials = s_RootCredentials;
-    kernelProcess->m_Ring        = PrivilegeLevel::ePrivileged;
-    kernelProcess->m_NextTid     = 0;
-    kernelProcess->m_FsView      = CreateRef<FilesystemView>();
+    kernelProcess                 = new Process;
+    kernelProcess->m_ID           = 0;
+    kernelProcess->m_Name         = "TheOverlord"_s;
+    kernelProcess->PageMap        = VMM::GetKernelPageMap();
+    kernelProcess->m_Credentials  = s_RootCredentials;
+    kernelProcess->m_Ring         = PrivilegeLevel::ePrivileged;
+    kernelProcess->m_NextTid      = 0;
+    kernelProcess->m_FsView       = CreateRef<FilesystemView>();
+    kernelProcess->m_FdTable      = CreateRef<class FileDescriptorTable>();
+    kernelProcess->m_AddressSpace = CreateRef<class AddressSpace>();
 
     // FIXME(v1tr10l7): What about m_AddressSpace?
     return kernelProcess;
@@ -147,7 +156,7 @@ void Process::ForEachInGroup(ProcessID pgid, Iterator it)
 
 Ref<Thread> Process::CreateThread(Pointer rip, bool isUser, i64 runOn)
 {
-    auto thread = new Thread(this, rip, 0, runOn, isUser);
+    auto thread = CreateRef<Thread>(this, rip, nullptr, runOn, isUser);
 
     if (m_Threads.Empty()) m_MainThread = thread;
     m_Threads.PushBack(thread);
@@ -167,7 +176,8 @@ Ref<Thread> Process::CreateThread(Vector<StringView>& argv,
 bool Process::ValidateAddress(Pointer address, i32 accessMode, usize size)
 {
     // TODO(v1tr10l7): Validate access mode
-    for (const auto& [base, region] : m_AddressSpace)
+    if (!m_AddressSpace) return false;
+    for (const auto& [base, region] : *m_AddressSpace)
     {
         if (region->Contains(address)) return true;
         if (!region->Contains(address)
@@ -229,7 +239,7 @@ INodeMode Process::Umask(INodeMode mask)
 
 const struct SignalAction& Process::SignalAction(SignalID signal) const
 {
-    Assert(signal < SignalID::eLastRealTime);
+    Assert(signal <= SignalID::eLastRealTime);
 
     const struct SignalAction* action;
     m_SignalActions.With([&action, signal](auto& actions)
@@ -239,7 +249,7 @@ const struct SignalAction& Process::SignalAction(SignalID signal) const
 void Process::SetSignalAction(SignalID                   signal,
                               const struct SignalAction& action)
 {
-    Assert(signal < SignalID::eLastRealTime);
+    Assert(signal <= SignalID::eLastRealTime);
 
     m_SignalActions.With([&action, signal](auto& actions)
                          { actions[ToUnderlying(signal)] = action; });
@@ -268,12 +278,12 @@ ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags,
     }
 
     auto descriptor = TryOrRet(VFS::Open(parent, path, flags, mode));
-    return m_FdTable.Insert(descriptor);
+    return m_FdTable->Insert(descriptor);
 }
 isize Process::FirstFreeFdIndex()
 {
     isize fdNum = 0;
-    while (m_FdTable.IsValid(fdNum)) ++fdNum;
+    while (m_FdTable->IsValid(fdNum)) ++fdNum;
 
     return fdNum;
 }
@@ -288,31 +298,31 @@ ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
     if (newFd) CloseFd(newFdNum);
 
     newFd    = oldFd;
-    newFdNum = m_FdTable.Insert(newFd, newFdNum);
+    newFdNum = m_FdTable->Insert(newFd, newFdNum);
     if (newFdNum < 0) return Error(EBADF);
 
     return newFdNum;
 }
-i32            Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
+i32            Process::CloseFd(i32 fd) { return m_FdTable->Erase(fd); }
 ErrorOr<isize> Process::InsertFd(Ref<FileDescriptor> fd)
 {
-    return m_FdTable.Insert(fd);
+    return m_FdTable->Insert(fd);
 }
 
 ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
 {
     auto fifo     = new Fifo();
     auto readerFd = fifo->OpenDirection(Fifo::Direction::eRead);
-    CPU::AsUser([&]() { pipeFds[0] = m_FdTable.Insert(readerFd); });
+    CPU::AsUser([&]() { pipeFds[0] = m_FdTable->Insert(readerFd); });
 
     auto writerFd = fifo->OpenDirection(Fifo::Direction::eWrite);
-    CPU::AsUser([&]() { pipeFds[1] = m_FdTable.Insert(writerFd); });
+    CPU::AsUser([&]() { pipeFds[1] = m_FdTable->Insert(writerFd); });
 
     return 0;
 }
 ErrorOr<Ref<FileDescriptor>> Process::GetFileDescriptor(isize fdNum)
 {
-    auto fd = m_FdTable.GetFd(fdNum);
+    auto fd = m_FdTable->GetFd(fdNum);
     if (!fd) return Error(EBADF);
 
     return fd;
@@ -352,24 +362,30 @@ Vector<String> SplitArguments(const String& str)
 
 ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 {
-    m_FdTable.Clear();
-    auto tty = VFS::Open(VFS::RootDirectoryEntry(), "/dev/console", O_RDWR, 0)
+    if (m_FdTable) m_FdTable->Clear();
+    m_FdTable = CreateRef<class FileDescriptorTable>();
+
+    auto tty  = VFS::Open(VFS::RootDirectoryEntry(), "/dev/console", O_RDWR, 0)
                    .Value();
-    m_FdTable.Insert(tty, 0);
-    m_FdTable.Insert(tty, 1);
-    m_FdTable.Insert(tty, 2);
+    m_FdTable->Insert(tty, 0);
+    m_FdTable->Insert(tty, 1);
+    m_FdTable->Insert(tty, 2);
 
-    for (const auto& [virt, region] : m_AddressSpace)
+    if (m_AddressSpace)
     {
-        if (region->VirtualBase() == m_SignalTrampolineVirt) continue;
+        for (const auto& [virt, region] : *m_AddressSpace)
+        {
+            if (region->VirtualBase() == m_SignalTrampolineVirt) continue;
 
-        auto  phys      = region->PhysicalBase();
-        usize pageCount = Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE);
-        PMM::FreePages(phys, pageCount);
+            auto  phys      = region->PhysicalBase();
+            usize pageCount = Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE);
+            PMM::FreePages(phys, pageCount);
+        }
+        m_AddressSpace->Clear();
     }
-    m_AddressSpace.Clear();
+    m_AddressSpace = CreateRef<class AddressSpace>();
 
-    m_Name = path;
+    m_Name         = path;
     Arch::VMM::DestroyPageMap(PageMap);
     delete PageMap;
 
@@ -381,7 +397,7 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
     }
 
     ExecutableProgram program;
-    if (!program.Load(path, PageMap, m_AddressSpace)) return Error(ENOEXEC);
+    if (!program.Load(path, PageMap, *m_AddressSpace)) return Error(ENOEXEC);
     Thread* currentThread = CPU::GetCurrentThread();
     currentThread->SetState(ThreadState::eExited);
 
@@ -486,24 +502,24 @@ ErrorOr<Process*> Process::Clone(usize flags)
     Assert(newProcess);
 
     // TODO(v1tr10l7): implement PageMap::Fork;
-    class PageMap* pageMap = new class PageMap();
-    if (!pageMap) return Error(ENOMEM);
+    newProcess->PageMap        = PageMap;
+    newProcess->m_AddressSpace = m_AddressSpace;
 
-    newProcess->PageMap = pageMap;
+    if (!(flags & CLONE_VM))
+    {
+        auto status = CopyMemory(newProcess);
+        if (!status) return Error(status.Error());
+    }
     newProcess->m_Parent->m_Children.PushBack(newProcess);
-
-    // if (flags & CLONE_VM)
-    CopyMemory(newProcess);
     newProcess->m_NextTid.Store(m_NextTid.Load());
-
     newProcess->m_FsView = m_FsView;
-    if (flags & CLONE_FS) CopyFs(newProcess);
-    // if (flags & CLONE_FILES)
-    CopyFileDescriptors(newProcess);
+    if (!(flags & CLONE_FS)) CopyFs(newProcess);
+
+    newProcess->m_FdTable = m_FdTable;
+    if (!(flags & CLONE_FILES)) CopyFileDescriptors(newProcess);
     if (flags & CLONE_PARENT) newProcess->m_Parent = m_Parent;
 
     newProcess->m_UserStackTop = m_UserStackTop;
-
     LogDebug("Process: Spawned {}", newProcess->m_ID);
     return newProcess;
 }
@@ -517,7 +533,7 @@ i32 Process::Exit(i32 code)
     ScopedLock guard(m_Lock);
 
     // FIXME(v1tr10l7): Do proper cleanup of all resources
-    m_FdTable.Clear();
+    m_FdTable->Clear();
 
     Thread* currentThread   = Thread::Current();
     currentThread->m_Parent = Scheduler::GetKernelProcess();
@@ -611,13 +627,20 @@ void Process::CopyFs(Process* process)
     m_FsView->ChangeDirectory(m_FsView->WorkingDirectory());
     m_FsView->SetFileCreationMask(m_FsView->FileCreationMask());
 }
-void Process::CopyFileDescriptors(Process* dest)
+void Process::CopyFileDescriptors(Process* process)
 {
-    for (auto& [fdNum, fd] : m_FdTable) dest->m_FdTable.Insert(fd, fdNum);
+    process->m_FdTable = CreateRef<class FileDescriptorTable>();
+    for (auto& [fdNum, fd] : *m_FdTable) process->m_FdTable->Insert(fd, fdNum);
 }
-void Process::CopyMemory(Process* process)
+ErrorOr<void> Process::CopyMemory(Process* process)
 {
-    for (auto& [virt, region] : m_AddressSpace)
+    class PageMap* pageMap = new class PageMap();
+    if (!pageMap) return Error(ENOMEM);
+
+    process->PageMap        = pageMap;
+    process->m_AddressSpace = CreateRef<class AddressSpace>();
+
+    for (auto& [virt, region] : *m_AddressSpace)
     {
         if (region->VirtualBase() == m_SignalTrampolineVirt) continue;
         usize size      = region->Size();
@@ -627,8 +650,10 @@ void Process::CopyMemory(Process* process)
         Memory::Copy(Pointer(phys).ToHigherHalf<void*>(),
                      region->PhysicalBase().ToHigherHalf<void*>(),
                      region->Size());
-        auto newRegion = process->m_AddressSpace.AllocateFixed(virt, size);
+        auto newRegion = process->m_AddressSpace->AllocateFixed(virt, size);
         newRegion->SetAccessMode(region->Access());
         process->PageMap->MapRange(virt, phys, size, region->PageAttributes());
     }
+
+    return {};
 }

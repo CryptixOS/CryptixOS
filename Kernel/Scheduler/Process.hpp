@@ -21,6 +21,8 @@
 #include <Prism/String/String.hpp>
 
 #include <Scheduler/Thread.hpp>
+#include <Time/Timer.hpp>
+
 #include <VFS/FileDescriptorTable.hpp>
 #include <VFS/FilesystemView.hpp>
 
@@ -98,15 +100,20 @@ class Process
         return m_Credentials.EffectiveUserID == 0;
     }
     inline const Credentials& Credentials() const { return m_Credentials; }
-    inline Optional<i32>      Status() const { return m_Status; }
+    inline constexpr bool     IsCapable(Capability capability) const
+    {
+        return m_Credentials.Capable(capability);
+    }
 
-    inline Ref<Thread>        MainThread() { return m_MainThread; }
-    inline AddressSpace&      AddressSpace() { return m_AddressSpace; }
+    inline Optional<i32> Status() const { return m_Status; }
 
-    inline ProcessID          Sid() const { return m_Credentials.SessionID; }
-    inline ProcessID PGid() const { return m_Credentials.ProcessGroupID; }
+    inline Ref<Thread>   MainThread() { return m_MainThread; }
+    inline AddressSpace& AddressSpace() { return *m_AddressSpace; }
 
-    inline void      SetUID(UserID uid) { m_Credentials.EffectiveUserID = uid; }
+    inline ProcessID     Sid() const { return m_Credentials.SessionID; }
+    inline ProcessID     PGid() const { return m_Credentials.ProcessGroupID; }
+
+    inline void    SetUID(UserID uid) { m_Credentials.EffectiveUserID = uid; }
     inline void    SetGID(GroupID gid) { m_Credentials.EffectiveGroupID = gid; }
 
     ErrorOr<isize> SetReUID(UserID ruid, UserID euid);
@@ -149,17 +156,19 @@ class Process
     {
         m_FsView->ChangeDirectory(cwd);
     }
-    inline INodeMode Umask() const { return m_FsView->FileCreationMask(); }
-    INodeMode        Umask(INodeMode mask);
+    inline INodeMode     Umask() const { return m_FsView->FileCreationMask(); }
+    INodeMode            Umask(INodeMode mask);
 
-    inline Timestep  Quantum() const { return m_Quantum; }
+    inline Timestep      Quantum() const { return m_Quantum; }
+    inline struct Timer& Timer(usize index) { return m_Timers[index]; }
+
     const struct SignalAction& SignalAction(SignalID signal) const;
     void SetSignalAction(SignalID signal, const struct SignalAction& action);
 
     static void          SendGroupSignal(ProcessID pgid, i32 signal);
     void                 SendSignal(i32 signal);
 
-    FileDescriptorTable& FdTable() { return m_FdTable; }
+    FileDescriptorTable& FdTable() { return *m_FdTable; }
     ErrorOr<isize>       OpenAt(i32 dirFdNum, PathView path, i32 flags,
                                 INodeMode mode);
     isize                FirstFreeFdIndex();
@@ -167,11 +176,11 @@ class Process
     i32                  CloseFd(i32 fd);
     ErrorOr<isize>       InsertFd(Ref<FileDescriptor> fd);
     ErrorOr<isize>       OpenPipe(i32* pipeFds);
-    inline bool IsFdValid(i32 fd) const { return m_FdTable.IsValid(fd); }
+    inline bool IsFdValid(i32 fd) const { return m_FdTable->IsValid(fd); }
     ErrorOr<Ref<FileDescriptor>> GetFileDescriptor(isize fdNum);
     inline Ref<FileDescriptor>   GetFileHandle(i32 fd)
     {
-        return m_FdTable.GetFd(fd);
+        return m_FdTable->GetFd(fd);
     }
 
     ErrorOr<ProcessID> WaitPid(ProcessID pid, i32* wstatus, i32 flags,
@@ -190,31 +199,32 @@ class Process
     PageMap* PageMap = nullptr;
 
   private:
-    Process*            m_Parent      = nullptr;
-    ProcessID           m_ID          = -1;
-    String              m_Name        = "?";
-    ProcessState        m_State       = ProcessState::eRunning;
+    Process*                         m_Parent      = nullptr;
+    ProcessID                        m_ID          = -1;
+    String                           m_Name        = "?";
+    ProcessState                     m_State       = ProcessState::eRunning;
 
-    struct Credentials  m_Credentials = {};
-    class TTY*          m_TTY         = nullptr;
-    PrivilegeLevel      m_Ring        = PrivilegeLevel::eUnprivileged;
-    Optional<i32>       m_Status;
-    bool                m_Exited     = false;
+    struct Credentials               m_Credentials = {};
+    class TTY*                       m_TTY         = nullptr;
+    PrivilegeLevel                   m_Ring = PrivilegeLevel::eUnprivileged;
+    Optional<i32>                    m_Status;
+    bool                             m_Exited     = false;
 
-    Ref<Thread>         m_MainThread = nullptr;
-    Atomic<ThreadID>    m_NextTid    = m_ID;
-    Vector<Process*>    m_Children;
-    Vector<Process*>    m_Zombies;
-    Vector<Ref<Thread>> m_Threads;
+    Ref<Thread>                      m_MainThread = nullptr;
+    Atomic<ThreadID>                 m_NextTid    = m_ID;
+    Vector<Process*>                 m_Children;
+    Vector<Process*>                 m_Zombies;
+    Vector<Ref<Thread>>              m_Threads;
+    Array<struct Timer, 64>          m_Timers;
 
-    Ref<FilesystemView> m_FsView = nullptr;
-    FileDescriptorTable m_FdTable;
-    class AddressSpace  m_AddressSpace;
+    ::Ref<FilesystemView>            m_FsView       = nullptr;
+    ::Ref<class FileDescriptorTable> m_FdTable      = nullptr;
+    ::Ref<class AddressSpace>        m_AddressSpace = nullptr;
 
-    Pointer             m_UserStackTop = 0x70000000000u;
-    usize               m_Quantum      = 1'000;
-    Spinlock            m_Lock;
-    Event               m_Event;
+    Pointer                          m_UserStackTop = 0x70000000000u;
+    usize                            m_Quantum      = 1'000;
+    Spinlock                         m_Lock;
+    Event                            m_Event;
 
     SpinlockProtected<
         Array<struct SignalAction, ToUnderlying(SignalID::eCount)>>
@@ -226,7 +236,7 @@ class Process
 
     void                           CopyFs(Process* dest);
     void                           CopyFileDescriptors(Process* dest);
-    void                           CopyMemory(Process* process);
+    ErrorOr<void>                  CopyMemory(Process* process);
 
     friend class Scheduler;
     friend struct Thread;

@@ -285,10 +285,10 @@ ErrorOr<isize> TTY::IoCtl(usize request, upointer argp)
         case TIOCSETD: m_Termios.c_line = *reinterpret_cast<u32*>(argp); break;
         // Make the TTY the controlling terminal of the calling process
         case TIOCSCTTY:
-            if (current->Sid() != current->ID() || current->TTY())
-                return Error(EINVAL);
-            if (m_ControlSid && current->Credentials().UserID != 0)
-                return Error(EPERM);
+            // if (current->Sid() != current->ID() || current->TTY())
+            //     return Error(EINVAL);
+            // if (m_ControlSid && current->Credentials().UserID != 0)
+            //     return Error(EPERM);
             current->SetTTY(this);
             m_ControlSid = current->Credentials().SessionID;
             break;

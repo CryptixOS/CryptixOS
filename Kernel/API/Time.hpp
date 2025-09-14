@@ -11,6 +11,9 @@
 namespace API::Time
 {
     ErrorOr<isize> NanoSleep(const struct timespec* duration, timespec* rem);
+    ErrorOr<isize> GetITimer(isize which, struct itimerval* currentValue);
+    ErrorOr<isize> SetITimer(isize which, const struct itimerval* value,
+                             struct itimerval* oldValue);
     ErrorOr<isize> GetTimeOfDay(struct timeval* restrict tv,
                                 struct timezone* tz);
     ErrorOr<isize> SetTimeOfDay(const struct timeval* restrict tv,

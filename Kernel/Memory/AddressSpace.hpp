@@ -19,7 +19,7 @@
 #include <Prism/Memory/Ref.hpp>
 #include <Prism/Memory/WeakRef.hpp>
 
-class AddressSpace : public NonCopyable<AddressSpace>
+class AddressSpace : public NonCopyable<AddressSpace>, public RefCounted
 {
   public:
     AddressSpace();
@@ -29,28 +29,28 @@ class AddressSpace : public NonCopyable<AddressSpace>
 
     bool        IsAvailable(Pointer base, usize length) const;
 
-    inline void Insert(Ref<Region> region)
+    inline void Insert(::Ref<Region> region)
     {
         return Insert(region->VirtualBase(), region);
     }
-    void        Insert(Pointer, Ref<Region> region);
-    void        Erase(Pointer);
+    void          Insert(Pointer, ::Ref<Region> region);
+    void          Erase(Pointer);
 
-    Ref<Region> AllocateRegion(usize size, usize alignment = 0);
-    Ref<Region> AllocateFixed(Pointer requestedAddress, usize size);
+    ::Ref<Region> AllocateRegion(usize size, usize alignment = 0);
+    ::Ref<Region> AllocateFixed(Pointer requestedAddress, usize size);
 
-    Ref<Region> Find(Pointer virt) const;
-    bool        Contains(Pointer virt) const { return Find(virt) != nullptr; }
+    ::Ref<Region> Find(Pointer virt) const;
+    bool          Contains(Pointer virt) const { return Find(virt) != nullptr; }
 
-    inline Ref<Region> operator[](Pointer virt) { return m_RegionTree[virt]; }
-    void               Clear();
+    inline ::Ref<Region> operator[](Pointer virt) { return m_RegionTree[virt]; }
+    void                 Clear();
 
-    auto               begin() { return m_RegionTree.begin(); }
-    auto               end() { return m_RegionTree.end(); }
+    auto                 begin() { return m_RegionTree.begin(); }
+    auto                 end() { return m_RegionTree.end(); }
 
-    RedBlackTree<Pointer, Ref<Region>> m_RegionTree;
+    RedBlackTree<Pointer, ::Ref<Region>> m_RegionTree;
 
-    void                               Dump();
+    void                                 Dump();
 
   private:
     Spinlock     m_Lock;

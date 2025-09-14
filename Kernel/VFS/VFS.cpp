@@ -19,6 +19,7 @@
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/EchFs/EchFs.hpp>
+#include <VFS/EchFs/EchFsINode.hpp>
 #include <VFS/Ext2Fs/Ext2Fs.hpp>
 #include <VFS/Fat32Fs/Fat32Fs.hpp>
 #include <VFS/INode.hpp>
@@ -305,8 +306,8 @@ namespace VFS
                 DeviceMinor minor = GetDeviceMinor(id);
 
                 LogTrace("VFS: Opening device with id: {}.{}", major, minor);
-                // return CreateRef<FileDescriptor>(
-                //     dentry, reinterpret_cast<File*>(device), flags, accMode);
+                return CreateRef<FileDescriptor>(
+                    dentry, reinterpret_cast<File*>(device), flags, accMode);
             }
         }
 

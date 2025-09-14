@@ -59,13 +59,6 @@
 #include <VFS/MountPoint.hpp>
 #include <VFS/VFS.hpp>
 
-#include <VFS/DevTmpFs/DevTmpFs.hpp>
-#include <VFS/EchFs/EchFs.hpp>
-#include <VFS/Ext2Fs/Ext2Fs.hpp>
-#include <VFS/Fat32Fs/Fat32Fs.hpp>
-#include <VFS/ProcFs/ProcFs.hpp>
-#include <VFS/TmpFs/TmpFs.hpp>
-
 namespace EFI
 {
     bool Initialize(Pointer systemTable, const EfiMemoryMap& memoryMap);
@@ -95,7 +88,6 @@ static bool loadInitProcess(Path initPath)
     VMM::UnmapKernelInitCode();
 
     Scheduler::EnqueueThread(initThread.Raw());
-
     return true;
 }
 
@@ -238,7 +230,6 @@ kernelStart(const BootInformation& info)
         = process->CreateThread(kernelThread, false, CPU::GetCurrent()->ID);
 
     Scheduler::EnqueueThread(thread.Raw());
-
     Syscall::InstallAll();
     Scheduler::PrepareAP(true);
 

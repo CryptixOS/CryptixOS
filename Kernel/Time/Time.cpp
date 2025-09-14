@@ -16,30 +16,12 @@
 
 #include <Prism/Algorithm/Find.hpp>
 #include <Prism/Containers/Deque.hpp>
-#include <Prism/Utility/Time.hpp>
 
-#include <Scheduler/Event.hpp>
 #include <Time/Time.hpp>
+#include <Time/Timer.hpp>
 
 namespace Time
 {
-    struct Timer
-    {
-        explicit Timer(Timestep when)
-            : When(when)
-        {
-            Arm();
-        }
-
-        Optional<usize> Index = NullOpt;
-        bool            Fired = false;
-        Timestep        When{0};
-        Event           Event;
-
-        void            Arm();
-        void            Disarm();
-    };
-
     namespace
     {
         HardwareTimer::List s_HardwareTimers;

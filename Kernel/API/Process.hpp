@@ -55,6 +55,9 @@ namespace API::Process
 
     ErrorOr<pid_t>     GetPGid(pid_t pid);
     ErrorOr<pid_t>     GetSid(pid_t pid);
+
+    ErrorOr<isize>     SigAltStack(const struct sigaltstack* ss,
+                                   sigaltstack*              oldSs);
     ErrorOr<ThreadID>  GetTid();
 
     ErrorOr<isize>     Futex(u32* uaddr, isize op, u32 expected,

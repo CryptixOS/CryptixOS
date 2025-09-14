@@ -32,30 +32,6 @@ namespace CPU
 {
     namespace
     {
-        inline void XSave(upointer ctx)
-        {
-            __asm__ volatile("xsave (%0)"
-                             :
-                             : "r"(ctx), "a"(0xffffffff), "d"(0xffffffff)
-                             : "memory");
-        }
-        inline void XRestore(upointer ctx)
-        {
-            __asm__ volatile("xrstor (%0)"
-                             :
-                             : "r"(ctx), "a"(0xffffffff), "d"(0xffffffff)
-                             : "memory");
-        }
-
-        inline void FXSave(upointer ctx)
-        {
-            __asm__ volatile("fxsave (%0)" : : "r"(ctx) : "memory");
-        }
-        inline void FXRestore(upointer ctx)
-        {
-            __asm__ volatile("fxrstor (%0)" : : "r"(ctx) : "memory");
-        }
-
         CPU*        s_BSP        = nullptr;
         u64         s_BspLapicId = 0;
         CPU::List   s_CPUs;
@@ -314,37 +290,20 @@ namespace CPU
         dispatcher->SetHandler(HaltAndCatchFire);
     }
 
-    ID::ID(u64 leaf, u64 subleaf)
-    {
-        __asm__ volatile("cpuid"
-                         : "=a"(rax), "=b"(rbx), "=c"(rcx), "=d"(rdx)
-                         : "a"(leaf), "c"(subleaf));
-    }
+    ID::ID(u64 leaf, u64 subleaf) { CPUID(leaf, subleaf, rax, rbx, rcx, rdx); }
     bool ID::operator()(u64 leaf, u64 subleaf)
     {
         u32 cpuidMax;
-        __asm__ volatile("cpuid"
-                         : "=a"(cpuidMax)
-                         : "a"(leaf & 0x80000000)
-                         : "rbx", "rcx", "rdx");
+        Asm("cpuid" : "=a"(cpuidMax) : "a"(leaf & 0x80000000) : "rbx", "rcx",
+            "rdx");
         if (leaf > cpuidMax) return false;
 
-        __asm__ volatile("cpuid"
-                         : "=a"(rax), "=b"(rbx), "=c"(rcx), "=d"(rdx)
-                         : "a"(leaf), "c"(subleaf));
+        Asm("cpuid" : "=a"(rax), "=b"(rbx), "=c"(rcx), "=d"(rdx) : "a"(leaf),
+            "c"(subleaf));
         return true;
     }
 
-    bool GetInterruptFlag()
-    {
-        u64 rflags;
-        __asm__ volatile(
-            "pushf\n"
-            "pop %0"
-            : "=m"(rflags));
-
-        return rflags & Bit(9);
-    }
+    bool GetInterruptFlag() { return InterruptsEnabled(); }
     void SetInterruptFlag(bool enabled)
     {
         if (enabled) __asm__ volatile("sti");
@@ -399,11 +358,11 @@ namespace CPU
 
     void Stac()
     {
-        if (ReadCR4() & Bit(21)) __asm__ volatile("stac" ::: "cc");
+        if (ReadCR4() & Bit(21)) EnableUserAccess();
     }
     void Clac()
     {
-        if (ReadCR4() & Bit(21)) __asm__ volatile("clac" ::: "cc");
+        if (ReadCR4() & Bit(21)) DisableUserAccess();
     }
 
     Pointer GetFSBase() { return ReadMSR(MSR::FS_BASE); }

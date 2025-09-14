@@ -42,6 +42,28 @@ namespace API::Time
         }
         return 0;
     }
+    ErrorOr<isize> GetITimer(isize which, struct itimerval* currentValue)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> SetITimer(isize which, const struct itimerval* value,
+                             struct itimerval* oldValue)
+    {
+        auto      process  = Process::Current();
+        itimerval newValue = {};
+
+        if (value)
+        {
+            if (!process->ValidateRead(value, sizeof(itimerval)))
+                return Error(EFAULT);
+            newValue = CPU::CopyFromUser(*value);
+        }
+
+        auto& timer = process->Timer(which);
+        IgnoreUnused(timer);
+        // TODO(v1tr10l7): return the old value
+        return Error(ENOSYS);
+    }
 
     ErrorOr<isize> GetTimeOfDay(struct timeval* tv, struct timezone* tz)
     {

@@ -69,6 +69,14 @@ struct sigaction
     sigset_t       sa_mask;
 };
 
+struct sigaltstack
+{
+    void* ss_sp;
+    int   ss_flags;
+    usize ss_size;
+};
+using stack_t                 = sigaltstack;
+
 /* Error return.  */
 inline __sighandler_t SIG_ERR = reinterpret_cast<__sighandler_t>(-1);
 /* Default action.  */

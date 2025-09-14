@@ -6,4 +6,5 @@
 #*/
 srcs += files(
   'Time.cpp',
+  'Timer.cpp',
 )

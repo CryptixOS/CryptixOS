@@ -616,9 +616,9 @@ namespace API::VFS
         if (!entry) return Error(ENOENT);
         auto  inode     = entry->INode();
 
-        auto  linkValue = TryOrRet(inode->ReadLink());
+        auto  linkValue = TryOrRet(inode->ReadLink()).StrView();
         usize count     = Min(linkValue.Size(), bufferSize);
-        CPU::CopyStringToUser(linkValue.StrView(), outBuffer, count);
+        CPU::CopyStringToUser(linkValue, outBuffer, count);
         return count;
     }
     ErrorOr<isize> FChModAt(isize dirFdNum, const char* pathView,
@@ -854,8 +854,8 @@ namespace API::VFS
         if (mtime.tv_nsec == UTIME_NOW) mtime = Time::GetReal();
         else if (mtime.tv_nsec == UTIME_OMIT) mtime = {};
 
-        auto   path      = CPU::AsUser([&]() -> PathView { return pathname; });
-        auto   pathResOr = ResolveAtFd(dirFdNum, path, flags);
+        auto       path = CPU::AsUser([&]() -> PathView { return pathname; });
+        auto       pathResOr = ResolveAtFd(dirFdNum, path, flags);
 
         Ref<INode> inode     = nullptr;
         if (!pathResOr)
@@ -892,6 +892,7 @@ namespace API::VFS
         auto* process = Process::Current();
         return process->DupFd(oldFdNum, newFdNum, flags);
     }
+    ErrorOr<isize> Pipe2(i32* pipeFds, isize flags) { return Error(ENOSYS); }
 
     ErrorOr<isize> SyncFs(isize fdNum)
     {

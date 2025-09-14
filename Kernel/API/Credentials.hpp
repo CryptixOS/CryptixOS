@@ -6,22 +6,25 @@
  */
 #pragma once
 
+#include <API/Capability.hpp>
 #include <API/UnixTypes.hpp>
 #include <Compiler.hpp>
 
 struct Credentials
 {
-    UserID    UserID;
-    GroupID   GroupID;
-    ::UserID  EffectiveUserID;
-    ::GroupID EffectiveGroupID;
-    ::UserID  FilesystemUserID;
-    ::GroupID FilesystemGroupID;
+    UserID     UserID;
+    GroupID    GroupID;
+    ::UserID   EffectiveUserID;
+    ::GroupID  EffectiveGroupID;
+    ::UserID   FilesystemUserID;
+    ::GroupID  FilesystemGroupID;
 
-    ::UserID  SetUserID;
-    ::GroupID SetGroupID;
-    ProcessID SessionID;
-    ProcessID ProcessGroupID;
+    ::UserID   SetUserID;
+    ::GroupID  SetGroupID;
+    ProcessID  SessionID;
+    ProcessID  ProcessGroupID;
+
+    Capability EffectiveCapabilities{};
 
     CTOS_ALWAYS_INLINE constexpr Credentials()
         : UserID(0)
@@ -34,7 +37,13 @@ struct Credentials
         , SetGroupID(0)
         , SessionID(0)
         , ProcessGroupID(0)
+        , EffectiveCapabilities(Capability::eNone)
     {
+    }
+
+    inline constexpr bool Capable(Capability capability) const
+    {
+        return EffectiveCapabilities & capability;
     }
 };
 

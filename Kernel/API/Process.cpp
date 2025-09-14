@@ -448,6 +448,11 @@ namespace API::Process
         if (current->Sid() != process->Sid()) return Error(EPERM);
         return process->Sid();
     }
+
+    ErrorOr<isize> SigAltStack(const struct sigaltstack* ss, sigaltstack* oldSs)
+    {
+        return Error(ENOSYS);
+    }
     ErrorOr<ThreadID> GetTid()
     {
         auto thread = Thread::Current();

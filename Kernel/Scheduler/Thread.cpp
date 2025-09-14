@@ -153,7 +153,7 @@ bool           Thread::DispatchSignal(u8 signal)
         Pointer phys         = nullptr;
         Pointer stackTopVirt = nullptr;
 
-        for (auto [virt, region] : m_Parent->m_AddressSpace)
+        for (auto [virt, region] : *m_Parent->m_AddressSpace)
         {
             if (!region->Contains(rsp - 1)) continue;
             phys         = region->PhysicalBase();
@@ -302,7 +302,7 @@ ErrorOr<::Ref<Thread>> Thread::Clone(usize flags, Pointer stack,
         {
             usize stackVirt = stack->VirtualBase();
 
-            auto  region    = parent->m_AddressSpace.Find(stackVirt);
+            auto  region    = parent->m_AddressSpace->Find(stackVirt);
             if (!region) continue;
             newThread->m_Stacks.PushBack(region);
         }
@@ -356,7 +356,7 @@ KeyValuePair<upointer, upointer> Thread::AllocateUserStack()
     auto stackRegion = new Region(stackPhys, stackVirt, CPU::USER_STACK_SIZE);
     stackRegion->SetAccessMode(Access::eReadWriteExecute | Access::eUser);
     m_Stacks.PushBack(stackRegion);
-    m_Parent->m_AddressSpace.Insert(stackVirt, stackRegion);
+    m_Parent->m_AddressSpace->Insert(stackVirt, stackRegion);
 
     m_StackVirt              = stackVirt;
     m_Parent->m_UserStackTop = guardVirt.Raw() - PMM::PAGE_SIZE;

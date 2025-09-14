@@ -49,7 +49,7 @@ enum class SignalID
 
     eFirstRealTime         = SIGRTMIN,
     eLastRealTime          = SIGRTMAX,
-    eCount                 = _NSIG,
+    eCount                 = _NSIG + 1,
 };
 struct SignalAction
 {

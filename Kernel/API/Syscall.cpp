@@ -55,6 +55,8 @@ namespace Syscall
         RegisterSyscall(ID::eDup, API::VFS::Dup);
         RegisterSyscall(ID::eDup2, API::VFS::Dup2);
         RegisterSyscall(ID::eNanoSleep, API::Time::NanoSleep);
+        RegisterSyscall(ID::eGetITimer, API::Time::GetITimer);
+        RegisterSyscall(ID::eSetITimer, API::Time::SetITimer);
         RegisterSyscall(ID::ePid, API::Process::Pid);
         RegisterSyscall(ID::eSocket, API::VFS::Socket);
         RegisterSyscall(ID::eBind, API::VFS::Bind);
@@ -101,6 +103,7 @@ namespace Syscall
         RegisterSyscall(ID::eSetResGid, API::Process::SetResGid);
         RegisterSyscall(ID::eGet_pGid, API::Process::GetPGid);
         RegisterSyscall(ID::eSid, API::Process::GetSid);
+        RegisterSyscall(ID::eSigAltStack, API::Process::SigAltStack);
         RegisterSyscall(ID::eUTime, API::VFS::UTime);
         RegisterSyscall(ID::eStatFs, API::VFS::StatFs);
         RegisterSyscall(ID::ePrCtl, API::System::PrCtl);
@@ -127,6 +130,7 @@ namespace Syscall
         RegisterSyscall(ID::ePSelect6, API::VFS::PSelect6);
         RegisterSyscall(ID::eUtimensAt, API::VFS::UtimensAt);
         RegisterSyscall(ID::eDup3, API::VFS::Dup3);
+        RegisterSyscall(ID::ePipe2, API::VFS::Pipe2);
         RegisterSyscall(ID::eSyncFs, API::VFS::SyncFs);
         RegisterSyscall(ID::eRenameAt2, API::VFS::RenameAt2);
         RegisterSyscall(ID::eClone3, API::Process::Clone3);
