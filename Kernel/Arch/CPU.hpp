@@ -98,11 +98,12 @@ namespace CPU
 
         *userBuffer = value;
     }
-    inline void CopyStringToUser(StringView source, char* dest)
+    inline void CopyStringToUser(StringView source, char* dest, isize count)
     {
         UserMemoryProtectionGuard guard;
 
-        source.Copy(dest, source.Size());
+        if (count < 0) count = source.Size();
+        source.Copy(dest, count);
     }
 
     template <typename F, typename... Args>

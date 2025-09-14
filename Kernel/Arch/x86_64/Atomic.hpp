@@ -6,9 +6,8 @@
  */
 #pragma once
 
-#include <Compiler.hpp>
-
 #include <Arch/x86_64/Types.hpp>
+#include <Compiler.hpp>
 
 template <typename T>
 CTOS_ALWAYS_INLINE bool CompareExchange(volatile T* ptr, T oldValue, T newValue)
@@ -23,4 +22,17 @@ CTOS_ALWAYS_INLINE bool CompareExchange(volatile T* ptr, T oldValue, T newValue)
                      : "memory");
 
     return static_cast<T>(result) == oldValue;
+}
+
+CTOS_ALWAYS_INLINE void MemoryBarrier()
+{
+    __asm__ volatile("mfence" ::: "memory");
+}
+CTOS_ALWAYS_INLINE void ReadMemoryBarrier()
+{
+    __asm__ volatile("lfence" ::: "memory");
+}
+CTOS_ALWAYS_INLINE void WriteMemoryBarrier()
+{
+    __asm__ volatile("sfence" ::: "memory");
 }
