@@ -17,16 +17,16 @@ class Ext2FsINode : public INode
     virtual ~Ext2FsINode() {}
 
     virtual ErrorOr<void>
-    TraverseDirectories(Ref<class DirectoryEntry> parent,
-                        DirectoryIterator         iterator) override;
-    virtual ErrorOr<Ref<DirectoryEntry>>
-    Lookup(Ref<DirectoryEntry> dentry) override;
+    TraverseDirectories(::Ref<class DirectoryEntry> parent,
+                        DirectoryIterator           iterator) override;
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    Lookup(::Ref<DirectoryEntry> dentry) override;
 
-    virtual const UnorderedMap<String, INode*>& Children() const
+    virtual const UnorderedMap<String, ::Ref<INode>>& Children() const
     {
         return m_Children;
     }
-    virtual void  InsertChild(INode* node, StringView name) override;
+    virtual void  InsertChild(::Ref<INode> node, StringView name) override;
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override
     {
@@ -37,11 +37,11 @@ class Ext2FsINode : public INode
     friend class Ext2Fs;
 
   private:
-    Ext2Fs*                      m_Fs;
-    Ext2FsINodeMeta              m_Meta;
-    UnorderedMap<String, INode*> m_Children;
-    usize                        m_DirectoryOffset = 0;
+    Ext2Fs*                            m_Fs;
+    Ext2FsINodeMeta                    m_Meta;
+    UnorderedMap<String, ::Ref<INode>> m_Children;
+    usize                              m_DirectoryOffset = 0;
 
-    void                         Initialize(ino_t index, mode_t mode, u16 type);
+    void          Initialize(ino_t index, mode_t mode, u16 type);
     ErrorOr<void> AddDirectoryEntry(Ext2FsDirectoryEntry& dentry);
 };

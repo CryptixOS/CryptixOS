@@ -83,12 +83,12 @@ ErrorOr<::Ref<DirectoryEntry>> Fat32Fs::Mount(StringView  sourcePath,
 
     UpdateFsInfo();
 
-    m_RootEntry = new DirectoryEntry(nullptr, "/");
+    m_RootEntry = CreateRef<DirectoryEntry>(nullptr, "/");
     auto rootOr = CreateNode(nullptr, m_RootEntry, 0644 | S_IFDIR);
     if (!rootOr) return Error(rootOr.Error());
 
     m_Root     = rootOr.Value();
-    m_RootNode = reinterpret_cast<Fat32FsINode*>(m_Root);
+    m_RootNode = m_Root.As<Fat32FsINode>();
 
     m_RootEntry->Bind(m_Root);
     m_RootNode->m_Metadata.BlockCount
@@ -100,12 +100,13 @@ ErrorOr<::Ref<DirectoryEntry>> Fat32Fs::Mount(StringView  sourcePath,
 
     m_RootNode->m_Cluster            = m_BootRecord.RootDirectoryCluster;
 
-    m_Root                           = m_RootNode;
+    m_Root                           = m_RootNode.As<INode>();
     return m_RootEntry;
 }
 
-ErrorOr<INode*> Fat32Fs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
-                                    mode_t mode, uid_t uid, gid_t gid)
+ErrorOr<::Ref<INode>> Fat32Fs::CreateNode(::Ref<INode>          parent,
+                                          ::Ref<DirectoryEntry> entry,
+                                          mode_t mode, uid_t uid, gid_t gid)
 {
     StringView name = entry->Name();
 
@@ -132,7 +133,7 @@ bool Fat32Fs::Populate(DirectoryEntry* dentry)
     usize directoryEntryCount
         = node->Stats().st_size / sizeof(Fat32DirectoryEntry);
 
-    Fat32FsINode* f32node = reinterpret_cast<Fat32FsINode*>(node);
+    ::Ref<Fat32FsINode> f32node = node.As<Fat32FsINode>();
     if (ReadWriteClusters(reinterpret_cast<u8*>(directoryEntries),
                           f32node->m_Cluster, f32node->m_Metadata.BlockCount,
                           nullptr, false)
@@ -210,7 +211,7 @@ bool Fat32Fs::Populate(DirectoryEntry* dentry)
             return false;
         }
 
-        auto newNode = reinterpret_cast<Fat32FsINode*>(newNodeOr.Value());
+        auto newNode = newNodeOr.Value().As<Fat32FsINode>();
         dentry->Bind(newNode);
         if (!newNode)
         {

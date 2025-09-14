@@ -25,14 +25,14 @@ class Fifo : public INode
 
     FileDescriptor* OpenDirection(Direction direction);
 
-    virtual void    InsertChild(INode*, StringView) override
+    virtual void    InsertChild(::Ref<INode>, StringView) override
     {
         AssertNotReached();
     }
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
 
-    virtual const stat Stats() override { return {}; }
+    virtual const stat Stats() const override { return {}; }
 
   private:
     Atomic<usize> m_ReaderCount = 0;

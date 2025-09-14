@@ -6,6 +6,8 @@
  */
 #pragma once
 
+#include <Compiler.hpp>
+
 #include <Prism/Core/Types.hpp>
 #include <Prism/Memory/Endian.hpp>
 
@@ -18,7 +20,7 @@
 namespace PNG
 {
     constexpr const char SIGNATURE[] = "\x89PNG\r\n\x1a\n";
-    struct [[gnu::packed]] Header
+    struct CTOS_PACKED Header
     {
         u32 Width;
         u32 Height;
@@ -65,7 +67,7 @@ namespace PNG
         eCount = 2,
     };
 
-    struct [[gnu::packed]] PaletteEntry
+    struct CTOS_PACKED PaletteEntry
     {
         u8 Red;
         u8 Green;

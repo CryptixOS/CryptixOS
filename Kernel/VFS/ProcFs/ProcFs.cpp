@@ -176,8 +176,8 @@ static constexpr ProcFsProperty* CreateProcFsProperty(StringView name)
     return nullptr;
 }
 
-static ProcFsINode* CreateProcFsNode(INode* parent, StringView name,
-                                     Filesystem* filesystem)
+static ::Ref<ProcFsINode> CreateProcFsNode(::Ref<INode> parent, StringView name,
+                                           Filesystem* filesystem)
 {
     ProcFsProperty* property = CreateProcFsProperty(name);
     auto node = new ProcFsINode(name, filesystem, 0755 | S_IFREG, property);
@@ -196,7 +196,7 @@ ErrorOr<::Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
     // m_Root               = TryOrRet(AllocateNode("/", 0644 | S_IFDIR));
     m_Root               = new ProcFsRootINode("/", this);
 
-    auto inode           = reinterpret_cast<ProcFsINode*>(m_Root);
+    auto inode           = m_Root.As<ProcFsINode>();
     inode->m_Metadata.ID = 2;
 
     m_RootEntry->Bind(m_Root);
@@ -214,17 +214,18 @@ ErrorOr<::Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
     return m_RootEntry;
 }
 
-ErrorOr<INode*> ProcFs::AllocateNode(StringView name, INodeMode mode)
+ErrorOr<::Ref<INode>> ProcFs::AllocateNode(StringView name, INodeMode mode)
 {
     auto inode = new ProcFsINode(name, this, NextINodeIndex(), mode);
     if (!inode) return Error(ENOMEM);
 
     return inode;
 }
-ErrorOr<INode*> ProcFs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
-                                   INodeMode mode, uid_t uid, gid_t gid)
+ErrorOr<::Ref<INode>> ProcFs::CreateNode(::Ref<INode>          parent,
+                                         ::Ref<DirectoryEntry> entry,
+                                         INodeMode mode, uid_t uid, gid_t gid)
 {
-    auto inode = new ProcFsINode(entry->Name(), this, mode, nullptr);
+    auto inode = CreateRef<ProcFsINode>(entry->Name(), this, mode, nullptr);
     entry->Bind(inode);
 
     return inode;

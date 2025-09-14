@@ -46,9 +46,9 @@ namespace ELF
         if (!inode) return Error(ENOENT);
         return Load(inode, loadBase);
     }
-    ErrorOr<void> Image::Load(INode* inode, Pointer loadBase)
+    ErrorOr<void> Image::Load(::Ref<INode> inode, Pointer loadBase)
     {
-        isize fileSize = inode->Stats().st_size;
+        isize fileSize = inode->Size();
         m_Image.Resize(fileSize + 100);
 
         m_LoadBase = loadBase;

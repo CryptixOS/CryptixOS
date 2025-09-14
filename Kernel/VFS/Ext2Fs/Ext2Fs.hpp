@@ -24,14 +24,15 @@ class Ext2Fs : public Filesystem
 
     virtual ErrorOr<::Ref<DirectoryEntry>>
     Mount(StringView sourcePath, const void* data = nullptr) override;
-    ErrorOr<INode*> CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
-                               mode_t mode, uid_t uid = 0, gid_t gid = 0);
-    virtual bool    Populate(DirectoryEntry* dentry) override;
+    ErrorOr<::Ref<INode>>    CreateNode(::Ref<INode>          parent,
+                                        ::Ref<DirectoryEntry> entry, mode_t mode,
+                                        uid_t uid = 0, gid_t gid = 0);
+    virtual bool             Populate(DirectoryEntry* dentry) override;
 
     inline Ext2FsSuperBlock* GetSuperBlock() const { return m_SuperBlock; }
     inline usize             GetBlockSize() const { return m_BlockSize; }
 
-    ErrorOr<void>            FreeINode(INode* inode) override;
+    ErrorOr<void>            FreeINode(::Ref<INode> inode) override;
 
     isize SetINodeBlock(Ext2FsINodeMeta& meta, u32 inode, u32 iblock,
                         u32 dblock);

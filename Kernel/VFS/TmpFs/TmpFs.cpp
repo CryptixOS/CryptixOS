@@ -42,7 +42,7 @@ ErrorOr<::Ref<DirectoryEntry>> TmpFs::Mount(StringView  sourcePath,
     m_RootEntry          = CreateRef<DirectoryEntry>(nullptr, "/");
     m_Root               = TryOrRet(AllocateNode("/", 0644 | S_IFDIR));
 
-    auto inode           = reinterpret_cast<TmpFsINode*>(m_Root);
+    auto inode           = m_Root.As<TmpFsINode>();
     inode->m_Metadata.ID = 2;
 
     m_RootEntry->Bind(m_Root);
@@ -51,7 +51,7 @@ ErrorOr<::Ref<DirectoryEntry>> TmpFs::Mount(StringView  sourcePath,
     return m_RootEntry;
 }
 
-ErrorOr<INode*> TmpFs::AllocateNode(StringView name, mode_t mode)
+ErrorOr<::Ref<INode>> TmpFs::AllocateNode(StringView name, mode_t mode)
 {
     if (m_NextINodeIndex >= m_MaxINodeCount) return Error(ENOSPC);
     else if (FreeINodeCount() == 0) return Error(ENOSPC);
@@ -62,11 +62,11 @@ ErrorOr<INode*> TmpFs::AllocateNode(StringView name, mode_t mode)
     --m_FreeINodeCount;
     return inode;
 }
-ErrorOr<void> TmpFs::FreeINode(INode* inode)
+ErrorOr<void> TmpFs::FreeINode(::Ref<INode> inode)
 {
     if (!inode) return Error(EFAULT);
 
-    delete inode;
+    inode.Reset();
     ++m_FreeINodeCount;
 
     return {};

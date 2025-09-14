@@ -67,12 +67,6 @@ Process::Process(Process* parent, StringView name,
 
 {
     if (m_ID == 1) m_FsView = CreateRef<FilesystemView>();
-    Ref ttyNode = VFS::ResolvePath(VFS::RootDirectoryEntry(), "/dev/console")
-                      .Value()
-                      .Entry;
-
-    auto tty = VFS::Open(VFS::RootDirectoryEntry(), "/dev/console", O_RDWR, 0)
-                   .Value();
 }
 Process::~Process()
 {

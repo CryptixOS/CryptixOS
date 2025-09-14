@@ -57,8 +57,9 @@ ProcFsINode::ProcFsINode(StringView name, class Filesystem* fs, INodeMode mode,
 {
 }
 
-ErrorOr<void> ProcFsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
-                                               DirectoryIterator iterator)
+ErrorOr<void>
+ProcFsINode::TraverseDirectories(::Ref<class DirectoryEntry> parent,
+                                 DirectoryIterator           iterator)
 {
     if (!m_Populated) m_Populated = Populate();
 
@@ -75,7 +76,7 @@ ErrorOr<void> ProcFsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
 
     return {};
 }
-ErrorOr<Ref<DirectoryEntry>> ProcFsINode::Lookup(Ref<DirectoryEntry> entry)
+ErrorOr<::Ref<DirectoryEntry>> ProcFsINode::Lookup(::Ref<DirectoryEntry> entry)
 {
     if (!m_Populated) m_Populated = Populate();
     ScopedLock guard(m_Lock);
@@ -90,7 +91,7 @@ ErrorOr<Ref<DirectoryEntry>> ProcFsINode::Lookup(Ref<DirectoryEntry> entry)
     return Error(ENOENT);
 }
 
-void ProcFsINode::InsertChild(INode* node, StringView name)
+void ProcFsINode::InsertChild(::Ref<INode> node, StringView name)
 {
     ScopedLock guard(m_Lock);
     m_Children[name] = node;

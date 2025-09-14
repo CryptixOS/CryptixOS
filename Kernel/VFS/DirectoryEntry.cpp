@@ -22,9 +22,15 @@ DirectoryEntry::DirectoryEntry(::WeakRef<DirectoryEntry> parent,
     , m_Parent(parent)
 {
 }
+DirectoryEntry::DirectoryEntry(const DirectoryEntry& other)
+    : m_INode(other.m_INode)
+{
+}
 DirectoryEntry::~DirectoryEntry() {}
 
-Path DirectoryEntry::Path()
+::Ref<INode> DirectoryEntry::INode() const { return m_INode; }
+
+Path         DirectoryEntry::Path()
 {
     StringBuilder pathBuilder;
 
@@ -61,7 +67,7 @@ void DirectoryEntry::SetMountGate(::Ref<DirectoryEntry> mountPoint)
         m_Flags |= DirectoryEntryFlags::eDirectory;
     m_Flags |= DirectoryEntryFlags::eMountPoint;
 }
-void DirectoryEntry::Bind(class INode* inode)
+void DirectoryEntry::Bind(::Ref<class INode> inode)
 {
     Assert(inode);
 
@@ -139,7 +145,7 @@ DirectoryEntry::TraverseDirectories(::Ref<class DirectoryEntry> parent,
     PopulateDirectoryEntries();
 
     usize index = 0;
-    for (const auto& [name, entry] : m_Children)
+    for (auto& [name, entry] : m_Children)
     {
         auto inode = entry->INode();
         if (!inode)

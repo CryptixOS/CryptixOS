@@ -28,13 +28,14 @@ class ProcFs : public Filesystem
     virtual ErrorOr<::Ref<DirectoryEntry>>
     Mount(StringView sourcePath, const void* data = nullptr) override;
 
-    virtual ErrorOr<INode*> AllocateNode(StringView name,
-                                         INodeMode  mode) override;
-    ErrorOr<INode*>       CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
-                                     mode_t mode, uid_t uid = 0, gid_t gid = 0);
-    virtual bool          Populate(DirectoryEntry* dentry) override;
+    virtual ErrorOr<::Ref<INode>> AllocateNode(StringView name,
+                                               INodeMode  mode) override;
+    ErrorOr<::Ref<INode>>         CreateNode(::Ref<INode>          parent,
+                                             ::Ref<DirectoryEntry> entry, mode_t mode,
+                                             uid_t uid = 0, gid_t gid = 0);
+    virtual bool                  Populate(DirectoryEntry* dentry) override;
 
-    virtual ErrorOr<void> Stats(statfs& stats) override;
+    virtual ErrorOr<void>         Stats(statfs& stats) override;
 
   private:
     UnorderedMap<StringView, ProcFsProperty*> m_Properties;

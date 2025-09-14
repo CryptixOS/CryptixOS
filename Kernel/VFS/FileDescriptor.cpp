@@ -181,18 +181,15 @@ ErrorOr<isize> FileDescriptor::Truncate(off_t size)
     return m_File->Truncate(size);
 }
 
-bool FileDescriptor::IsCharDevice() const
+bool FileDescriptor::IsCharDevice()
 {
     return INode() && INode()->IsCharDevice();
 }
-bool FileDescriptor::IsFifo() const { return INode() && INode()->IsFifo(); }
-bool FileDescriptor::IsDirectory() const
-{
-    return DirectoryEntry()->IsDirectory();
-}
-bool FileDescriptor::IsRegular() const { return DirectoryEntry()->IsRegular(); }
-bool FileDescriptor::IsSymlink() const { return DirectoryEntry()->IsSymlink(); }
-bool FileDescriptor::IsSocket() const { return INode() && INode()->IsSocket(); }
+bool FileDescriptor::IsFifo() { return INode() && INode()->IsFifo(); }
+bool FileDescriptor::IsDirectory() { return DirectoryEntry()->IsDirectory(); }
+bool FileDescriptor::IsRegular() { return DirectoryEntry()->IsRegular(); }
+bool FileDescriptor::IsSymlink() { return DirectoryEntry()->IsSymlink(); }
+bool FileDescriptor::IsSocket() { return INode() && INode()->IsSocket(); }
 
 [[clang::no_sanitize("alignment")]] ErrorOr<isize>
 FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)

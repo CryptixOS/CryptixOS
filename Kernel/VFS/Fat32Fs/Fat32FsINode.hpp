@@ -15,9 +15,9 @@ class Fat32FsINode : public INode
 
     virtual ~Fat32FsINode() {}
 
-    virtual const UnorderedMap<StringView, INode*>& Children() const;
+    virtual const UnorderedMap<StringView, ::Ref<INode>>& Children() const;
 
-    virtual void  InsertChild(INode* node, StringView name) override;
+    virtual void  InsertChild(::Ref<INode> node, StringView name) override;
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override
     {
@@ -33,5 +33,5 @@ class Fat32FsINode : public INode
     usize                                  m_DirectoryOffset = 0;
     Atomic<usize>                          m_NextIndex       = 2;
 
-    UnorderedMap<StringView, INode*> m_Children;
+    UnorderedMap<StringView, ::Ref<INode>> m_Children;
 };

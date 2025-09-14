@@ -21,8 +21,9 @@ class Fat32Fs final : public Filesystem
 
     virtual ErrorOr<::Ref<DirectoryEntry>>
     Mount(StringView sourcePath, const void* data = nullptr) override;
-    ErrorOr<INode*>       CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
-                                     mode_t mode, uid_t uid = 0, gid_t gid = 0);
+    ErrorOr<::Ref<INode>> CreateNode(::Ref<INode>          parent,
+                                     ::Ref<DirectoryEntry> entry, mode_t mode,
+                                     uid_t uid = 0, gid_t gid = 0);
     virtual bool          Populate(DirectoryEntry* dentry) override;
 
     virtual ErrorOr<void> Stats(statfs& stats) override;
@@ -41,17 +42,17 @@ class Fat32Fs final : public Filesystem
     u32   SkipCluster(u32 cluster, usize count, bool& endCluster);
 
   private:
-    INode*          m_Device = nullptr;
-    Fat32BootRecord m_BootRecord;
-    Fat32FsInfo     m_FsInfo;
-    usize           m_ClusterSize    = 0;
-    usize           m_ClusterCount   = 0;
-    isize           m_FatOffset      = 0;
-    isize           m_DataOffset     = 0;
-    Atomic<i64>     m_NextINodeIndex = 3;
-    Fat32FsINode*   m_RootNode       = nullptr;
+    ::Ref<INode>        m_Device = nullptr;
+    Fat32BootRecord     m_BootRecord;
+    Fat32FsInfo         m_FsInfo;
+    usize               m_ClusterSize    = 0;
+    usize               m_ClusterCount   = 0;
+    isize               m_FatOffset      = 0;
+    isize               m_DataOffset     = 0;
+    Atomic<i64>         m_NextINodeIndex = 3;
+    ::Ref<Fat32FsINode> m_RootNode       = nullptr;
 
-    usize           GetClusterOffset(u32 cluster);
+    usize               GetClusterOffset(u32 cluster);
     constexpr usize
     GetClusterForDirectoryEntry(Fat32DirectoryEntry* entry) const
     {

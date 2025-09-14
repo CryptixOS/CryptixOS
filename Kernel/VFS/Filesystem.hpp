@@ -16,12 +16,7 @@
 #include <Prism/String/String.hpp>
 #include <Prism/Utility/Atomic.hpp>
 
-#include <VFS/DirectoryEntry.hpp>
-
-class INode;
-class DirectoryEntry;
-using INodeMode = mode_t;
-using DeviceID  = dev_t;
+#include <VFS/INode.hpp>
 
 /**
  * @class Filesystem
@@ -106,10 +101,10 @@ class Filesystem : public RefCounted
      * @param name Name of the newly created inode
      * @param mode File mode (type and permissions)
      *
-     * @return ErrorOr<INode*> Pointer to the new inode or error.
+     * @return ErrorOr<::Ref<INode>> Pointer to the new inode or error.
      */
-    virtual ErrorOr<INode*> AllocateNode(StringView name = "",
-                                         INodeMode  mode = 0)
+    virtual ErrorOr<::Ref<INode>> AllocateNode(StringView name = "",
+                                               INodeMode  mode = 0)
     {
         return Error(ENOSYS);
     }
@@ -119,7 +114,10 @@ class Filesystem : public RefCounted
      *
      * @return ErrorOr<void> Nothing or error.
      */
-    virtual ErrorOr<void> FreeINode(INode* inode) { return Error(ENOSYS); }
+    virtual ErrorOr<void> FreeINode(::Ref<INode> inode)
+    {
+        return Error(ENOSYS);
+    }
 
     /**
      * @brief Synchronize the filesystem to the storage device.
@@ -164,11 +162,11 @@ class Filesystem : public RefCounted
     u32                    m_Flags          = 0;
 
     ///> Backing device
-    INode*                 m_SourceDevice   = nullptr;
+    ::Ref<INode>           m_SourceDevice   = nullptr;
     ///> Root directory entry
     ::Ref<DirectoryEntry>  m_RootEntry      = nullptr;
     ///> Root inode
-    INode*                 m_Root           = nullptr;
+    ::Ref<INode>           m_Root           = nullptr;
 
     ///> Filesystem specific data
     void*                  m_MountData      = nullptr;

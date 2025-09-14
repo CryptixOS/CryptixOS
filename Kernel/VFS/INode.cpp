@@ -37,7 +37,7 @@ INode::INode(StringView name, class Filesystem* fs)
     m_Metadata.GID = process->Credentials().EffectiveGroupID;
 }
 
-const stat INode::Stats()
+const stat INode::Stats() const
 {
     stat stats{};
     stats.st_dev     = m_Metadata.RootDeviceID;
@@ -62,7 +62,7 @@ bool INode::IsFilesystemRoot() const
     auto fsRootEntry = m_Filesystem->RootDirectoryEntry();
     auto fsRootINode = fsRootEntry->INode();
 
-    return this == fsRootINode;
+    return this == fsRootINode.Raw();
 }
 
 bool INode::IsEmpty()
@@ -97,39 +97,42 @@ bool INode::ValidatePermissions(const Credentials& creds, u32 acc)
     return true;
 }
 
-ErrorOr<Ref<File>> INode::Open(class ::Ref<::DirectoryEntry> dentry, i64 flags,
-                               u64 accMode)
+ErrorOr<::Ref<File>> INode::Open(class ::Ref<::DirectoryEntry> dentry,
+                                 i64 flags, u64 accMode)
 {
     return CreateRef<File>(this);
 }
-ErrorOr<Ref<DirectoryEntry>> INode::CreateNode(Ref<DirectoryEntry> entry,
-                                               mode_t mode, dev_t dev)
+ErrorOr<::Ref<DirectoryEntry>> INode::CreateNode(::Ref<DirectoryEntry> entry,
+                                                 mode_t mode, dev_t dev)
 {
     return Error(ENOSYS);
 }
-ErrorOr<Ref<DirectoryEntry>> INode::CreateFile(Ref<DirectoryEntry> entry,
-                                               mode_t              mode)
+ErrorOr<::Ref<DirectoryEntry>> INode::CreateFile(::Ref<DirectoryEntry> entry,
+                                                 mode_t                mode)
 {
     return Error(ENOSYS);
 }
-ErrorOr<Ref<DirectoryEntry>> INode::CreateDirectory(Ref<DirectoryEntry> entry,
-                                                    mode_t              mode)
+ErrorOr<::Ref<DirectoryEntry>>
+INode::CreateDirectory(::Ref<DirectoryEntry> entry, mode_t mode)
 {
     return Error(ENOSYS);
 }
-ErrorOr<Ref<DirectoryEntry>> INode::Symlink(Ref<DirectoryEntry> entry,
-                                            PathView            targetPath)
+ErrorOr<::Ref<DirectoryEntry>> INode::Symlink(::Ref<DirectoryEntry> entry,
+                                              PathView              targetPath)
 {
     return Error(ENOSYS);
 }
-ErrorOr<Ref<DirectoryEntry>> INode::Link(Ref<DirectoryEntry> oldEntry,
-                                         Ref<DirectoryEntry> newEntry)
+ErrorOr<::Ref<DirectoryEntry>> INode::Link(::Ref<DirectoryEntry> oldEntry,
+                                           ::Ref<DirectoryEntry> newEntry)
 {
     return Error(ENOSYS);
 }
 
 ErrorOr<Path> INode::ReadLink() { return Error(ENOSYS); }
-ErrorOr<void> INode::Unlink(Ref<DirectoryEntry> entry) { return Error(ENOSYS); }
+ErrorOr<void> INode::Unlink(::Ref<DirectoryEntry> entry)
+{
+    return Error(ENOSYS);
+}
 
 ErrorOr<isize> INode::CheckPermissions(mode_t mask)
 {
@@ -143,7 +146,7 @@ ErrorOr<isize> INode::CheckPermissions(mode_t mask)
     return 0;
 }
 
-ErrorOr<Ref<DirectoryEntry>> INode::Lookup(Ref<DirectoryEntry> dentry)
+ErrorOr<::Ref<DirectoryEntry>> INode::Lookup(::Ref<DirectoryEntry> dentry)
 {
     return Error(ENOSYS);
 }

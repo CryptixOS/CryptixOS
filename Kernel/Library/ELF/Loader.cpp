@@ -35,7 +35,7 @@ namespace ELF
 
         return LoadImage(inode);
     }
-    ErrorOr<void> Loader::LoadImage(INode* inode)
+    ErrorOr<void> Loader::LoadImage(Ref<INode> inode)
     {
         auto status = m_Image->Load(inode);
 

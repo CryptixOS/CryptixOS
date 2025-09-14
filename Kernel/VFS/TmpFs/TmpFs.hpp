@@ -23,9 +23,9 @@ class TmpFs : public Filesystem
     virtual ErrorOr<::Ref<DirectoryEntry>>
     Mount(StringView sourcePath, const void* data = nullptr) override;
 
-    virtual ErrorOr<INode*> AllocateNode(StringView name,
-                                         INodeMode  mode) override;
-    virtual ErrorOr<void>   FreeINode(INode* inode) override;
+    virtual ErrorOr<::Ref<INode>> AllocateNode(StringView name,
+                                               INodeMode  mode) override;
+    virtual ErrorOr<void>         FreeINode(::Ref<INode> inode) override;
 
     virtual bool Populate(DirectoryEntry* dentry) override { return true; }
     virtual ErrorOr<void> Stats(statfs& stats) override;

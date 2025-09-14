@@ -16,19 +16,13 @@
 
 #include <VFS/DirectoryEntry.hpp>
 
-#include <errno.h>
-
 class FileDescriptor;
 
-using INodeID   = ino_t;
-using INodeMode = mode_t;
-using DeviceID  = dev_t;
-using UserID    = uid_t;
-using GroupID   = gid_t;
+using INodeID = ino_t;
 
 struct Credentials;
 class File;
-class INode
+class INode : public RefCounted
 {
   public:
     struct Metadata
@@ -58,38 +52,39 @@ class INode
     virtual ~INode() {}
 
     inline class Filesystem* Filesystem() { return m_Filesystem; }
-    virtual const stat       Stats();
+    virtual const stat       Stats() const;
 
     using DirectoryIterator
         = Delegate<bool(StringView name, loff_t offset, usize ino, u64 type)>;
-    virtual ErrorOr<void> TraverseDirectories(Ref<class DirectoryEntry> parent,
-                                              DirectoryIterator iterator)
+    virtual ErrorOr<void>
+    TraverseDirectories(::Ref<class DirectoryEntry> parent,
+                        DirectoryIterator           iterator)
     {
         return Error(ENOSYS);
     }
 
-    virtual ErrorOr<Ref<DirectoryEntry>> Lookup(Ref<DirectoryEntry> dentry);
+    virtual ErrorOr<::Ref<DirectoryEntry>> Lookup(::Ref<DirectoryEntry> dentry);
 
-    inline StringView                    Name() { return m_Name; }
-    DeviceID                             BackingDeviceID() const;
-    INodeID                              ID() const;
-    INodeMode                            Mode() const;
-    nlink_t                              LinkCount() const;
-    ::UserID                             UserID() const;
-    ::GroupID                            GroupID() const;
-    DeviceID                             DeviceID() const;
-    isize                                Size() const;
-    blksize_t                            BlockSize() const;
-    blkcnt_t                             BlockCount() const;
+    inline StringView                      Name() const { return m_Name; }
+    DeviceID                               BackingDeviceID() const;
+    INodeID                                ID() const;
+    INodeMode                              Mode() const;
+    nlink_t                                LinkCount() const;
+    ::UserID                               UserID() const;
+    ::GroupID                              GroupID() const;
+    DeviceID                               DeviceID() const;
+    isize                                  Size() const;
+    blksize_t                              BlockSize() const;
+    blkcnt_t                               BlockCount() const;
 
-    timespec                             AccessTime() const;
-    timespec                             ModificationTime() const;
-    timespec                             StatusChangeTime() const;
+    timespec                               AccessTime() const;
+    timespec                               ModificationTime() const;
+    timespec                               StatusChangeTime() const;
 
-    bool                                 IsFilesystemRoot() const;
-    bool                                 IsEmpty();
-    bool                                 ReadOnly();
-    bool                                 Immutable();
+    bool                                   IsFilesystemRoot() const;
+    bool                                   IsEmpty();
+    bool                                   ReadOnly();
+    bool                                   Immutable();
     bool        CanWrite(const Credentials& creds) const;
 
     inline bool IsCharDevice() const { return S_ISCHR(m_Metadata.Mode); }
@@ -103,20 +98,20 @@ class INode
     bool        ValidatePermissions(const Credentials& creds, u32 acc);
     void        UpdateATime();
 
-    virtual ErrorOr<Ref<File>> Open(class ::Ref<::DirectoryEntry> dentry,
-                                    i64 flags, u64 accMode);
-    virtual ErrorOr<Ref<DirectoryEntry>> CreateNode(Ref<DirectoryEntry> entry,
-                                                    mode_t mode, dev_t dev = 0);
-    virtual ErrorOr<Ref<DirectoryEntry>> CreateFile(Ref<DirectoryEntry> entry,
-                                                    mode_t              mode);
-    virtual ErrorOr<Ref<DirectoryEntry>>
-    CreateDirectory(Ref<DirectoryEntry> entry, mode_t mode);
-    virtual ErrorOr<Ref<DirectoryEntry>> Symlink(Ref<DirectoryEntry> entry,
-                                                 PathView targetPath);
-    virtual ErrorOr<Ref<DirectoryEntry>> Link(Ref<DirectoryEntry> oldEntry,
-                                              Ref<DirectoryEntry> entry);
+    virtual ErrorOr<::Ref<File>> Open(class ::Ref<::DirectoryEntry> dentry,
+                                      i64 flags, u64 accMode);
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode, dev_t dev = 0);
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    CreateFile(::Ref<DirectoryEntry> entry, INodeMode mode);
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    CreateDirectory(::Ref<DirectoryEntry> entry, INodeMode mode);
+    virtual ErrorOr<::Ref<DirectoryEntry>> Symlink(::Ref<DirectoryEntry> entry,
+                                                   PathView targetPath);
+    virtual ErrorOr<::Ref<DirectoryEntry>> Link(::Ref<DirectoryEntry> oldEntry,
+                                                ::Ref<DirectoryEntry> entry);
 
-    virtual void  InsertChild(INode* node, StringView name)            = 0;
+    virtual void  InsertChild(::Ref<INode> node, StringView name)      = 0;
     virtual isize Read(void* buffer, off_t offset, usize bytes)        = 0;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) = 0;
     virtual ErrorOr<isize> IoCtl(usize request, usize arg)
@@ -126,13 +121,13 @@ class INode
     virtual ErrorOr<Path>  ReadLink();
 
     virtual ErrorOr<isize> Truncate(usize size) { return Error(ENOSYS); }
-    virtual ErrorOr<void>  Rename(INode* newParent, StringView newName)
+    virtual ErrorOr<void>  Rename(::Ref<INode> newParent, StringView newName)
     {
         return Error(ENOSYS);
     }
 
-    virtual ErrorOr<void> Unlink(Ref<DirectoryEntry> entry);
-    virtual ErrorOr<void> RmDir(Ref<DirectoryEntry> entry)
+    virtual ErrorOr<void> Unlink(::Ref<DirectoryEntry> entry);
+    virtual ErrorOr<void> RmDir(::Ref<DirectoryEntry> entry)
     {
         return Error(ENOSYS);
     }

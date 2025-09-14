@@ -30,14 +30,14 @@ EchFs::~EchFs()
 }
 
 ErrorOr<::Ref<DirectoryEntry>> EchFs::Mount(StringView  sourcePath,
-                                          const void* data)
+                                            const void* data)
 {
     auto pathResolution
         = VFS::ResolvePath(nullptr, sourcePath).ValueOr(VFS::PathResolution{});
 
     auto sourceEntry = pathResolution.Entry;
     if (!sourceEntry || !sourceEntry->INode()) return nullptr;
-    auto source = sourceEntry->INode();
+    auto source     = sourceEntry->INode();
 
     m_IdentityTable = new EchFsIdentityTable;
     if (!m_IdentityTable) return nullptr;
@@ -90,10 +90,10 @@ ErrorOr<::Ref<DirectoryEntry>> EchFs::Mount(StringView  sourcePath,
     m_MainDirectoryEnd
         = m_MainDirectoryStart + mainDirectoryLength * m_BlockSize;
 
-    m_RootEntry  = new DirectoryEntry(nullptr, "/");
-    m_NativeRoot = new EchFsINode("/", reinterpret_cast<Filesystem*>(this),
-                                  0644 | S_IFDIR);
-    m_Root       = reinterpret_cast<INode*>(m_NativeRoot);
+    m_RootEntry  = CreateRef<DirectoryEntry>(nullptr, "/");
+    m_NativeRoot = CreateRef<EchFsINode>(
+        "/", reinterpret_cast<Filesystem*>(this), 0644 | S_IFDIR);
+    m_Root = m_NativeRoot.As<INode>();
 
     if (!m_NativeRoot) goto fail_free_id_table;
     m_RootEntry->Bind(m_Root);
@@ -131,7 +131,8 @@ ErrorOr<::Ref<DirectoryEntry>> EchFs::Mount(StringView  sourcePath,
 
     return m_RootEntry;
 fail_free_inode_and_id_table:
-    delete m_NativeRoot;
+    m_RootEntry.Reset();
+    m_NativeRoot.Reset();
 fail_free_id_table:
     delete m_IdentityTable;
     m_IdentityTable = nullptr;
@@ -168,7 +169,7 @@ bool EchFs::Populate(EchFsINode* native)
         }
         if (entry.ParentID != inodeDirectoryID) continue;
 
-        EchFsINode* child = new EchFsINode(
+        ::Ref<EchFsINode> child = CreateRef<EchFsINode>(
             name, reinterpret_cast<Filesystem*>(this), mode, entry, offset);
         child->m_Metadata.DeviceID
             = reinterpret_cast<Filesystem*>(this)->BackingDeviceID();
@@ -187,7 +188,7 @@ bool EchFs::Populate(EchFsINode* native)
         child->m_Metadata.AccessTime       = Time::GetReal();
         child->m_Metadata.ModificationTime = Time::GetReal();
 
-        inode->InsertChild(reinterpret_cast<INode*>(child), name);
+        inode->InsertChild(child.As<INode>(), name);
     }
 
     return (native->m_Populated = true);
@@ -197,7 +198,7 @@ bool EchFs::Populate(DirectoryEntry* entry)
     if (!entry) return_err(false, ENOENT);
     auto inode = entry->INode();
 
-    return Populate(reinterpret_cast<EchFsINode*>(inode));
+    return Populate(inode.As<EchFsINode>().Raw());
 }
 
 isize EchFs::ReadDirectoryEntry(EchFsDirectoryEntry& entry, u8* dest,

@@ -24,7 +24,7 @@ namespace ELF
 
         ErrorOr<void> LoadImage(PathView path);
         ErrorOr<void> LoadImage(Ref<DirectoryEntry> dentry);
-        ErrorOr<void> LoadImage(INode* inode);
+        ErrorOr<void> LoadImage(Ref<INode> inode);
         ErrorOr<void> LoadImage(Ref<FileDescriptor> file);
         ErrorOr<void> LoadImage(u8* data, usize size);
         ErrorOr<void> LoadImage(Ref<Image> image);

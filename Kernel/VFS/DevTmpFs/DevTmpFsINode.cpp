@@ -21,11 +21,12 @@ DevTmpFsINode::DevTmpFsINode(StringView name, class Filesystem* fs, INodeID id,
 {
 }
 
-ErrorOr<Ref<DirectoryEntry>>
-DevTmpFsINode::CreateNode(Ref<DirectoryEntry> entry, mode_t mode, dev_t dev)
+ErrorOr<::Ref<DirectoryEntry>>
+DevTmpFsINode::CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode,
+                          dev_t dev)
 {
     auto dentry = TryOrRet(SynthFsINode::CreateNode(entry, mode, dev));
-    auto inode  = reinterpret_cast<DevTmpFsINode*>(dentry->INode());
+    auto inode  = entry->INode().As<DevTmpFsINode>();
 
     if (inode->IsCharDevice())
     {

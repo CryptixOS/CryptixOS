@@ -40,8 +40,8 @@ SynthFsINode::SynthFsINode(StringView name, class Filesystem* fs, INodeID id,
 }
 
 ErrorOr<void>
-SynthFsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
-                                  DirectoryIterator         iterator)
+SynthFsINode::TraverseDirectories(::Ref<class DirectoryEntry> parent,
+                                  DirectoryIterator           iterator)
 {
     ScopedLock guard(m_Lock);
     usize      offset = 0;
@@ -57,7 +57,7 @@ SynthFsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
 
     return {};
 }
-ErrorOr<Ref<DirectoryEntry>> SynthFsINode::Lookup(Ref<DirectoryEntry> entry)
+ErrorOr<::Ref<DirectoryEntry>> SynthFsINode::Lookup(::Ref<DirectoryEntry> entry)
 {
     ScopedLock guard(m_Lock);
 
@@ -71,14 +71,13 @@ ErrorOr<Ref<DirectoryEntry>> SynthFsINode::Lookup(Ref<DirectoryEntry> entry)
     return Error(ENOENT);
 }
 
-ErrorOr<Ref<DirectoryEntry>> SynthFsINode::CreateNode(Ref<DirectoryEntry> entry,
-                                                      INodeMode mode, dev_t dev)
+ErrorOr<::Ref<DirectoryEntry>>
+SynthFsINode::CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode, dev_t dev)
 {
     ScopedLock guard(m_Lock);
     if (m_Children.Contains(entry->Name())) return Error(EEXIST);
-
-    auto inode = reinterpret_cast<SynthFsINode*>(
-        TryOrRet(m_Filesystem->AllocateNode(entry->Name(), mode)));
+    auto inode = TryOrRet(m_Filesystem->AllocateNode(entry->Name(), mode))
+                     .As<SynthFsINode>();
 
     inode->m_Parent = this;
     if (inode->IsRegular())
@@ -107,13 +106,13 @@ ErrorOr<Ref<DirectoryEntry>> SynthFsINode::CreateNode(Ref<DirectoryEntry> entry,
     entry->Bind(inode);
     return entry;
 }
-ErrorOr<Ref<DirectoryEntry>> SynthFsINode::CreateFile(Ref<DirectoryEntry> entry,
-                                                      INodeMode           mode)
+ErrorOr<::Ref<DirectoryEntry>>
+SynthFsINode::CreateFile(::Ref<DirectoryEntry> entry, INodeMode mode)
 {
     return CreateNode(entry, (mode & ~S_IFMT) | S_IFREG, 0);
 }
-ErrorOr<Ref<DirectoryEntry>>
-SynthFsINode::CreateDirectory(Ref<DirectoryEntry> entry, INodeMode mode)
+ErrorOr<::Ref<DirectoryEntry>>
+SynthFsINode::CreateDirectory(::Ref<DirectoryEntry> entry, INodeMode mode)
 {
 
     TryOrRet(CreateNode(entry, (mode & ~S_IFMT) | S_IFDIR, 0));
@@ -121,19 +120,19 @@ SynthFsINode::CreateDirectory(Ref<DirectoryEntry> entry, INodeMode mode)
     ++m_Metadata.LinkCount;
     return entry;
 }
-ErrorOr<Ref<DirectoryEntry>> SynthFsINode::Symlink(Ref<DirectoryEntry> entry,
-                                                   PathView targetPath)
+ErrorOr<::Ref<DirectoryEntry>>
+SynthFsINode::Symlink(::Ref<DirectoryEntry> entry, PathView targetPath)
 {
     auto dentry     = TryOrRet(CreateNode(entry, 0777 | S_IFLNK, 0));
-    auto inode      = reinterpret_cast<SynthFsINode*>(dentry->INode());
+    auto inode      = dentry->INode().As<SynthFsINode>();
 
     inode->m_Target = targetPath;
     return dentry;
 }
-ErrorOr<Ref<DirectoryEntry>> SynthFsINode::Link(Ref<DirectoryEntry> oldEntry,
-                                                Ref<DirectoryEntry> entry)
+ErrorOr<::Ref<DirectoryEntry>>
+SynthFsINode::Link(::Ref<DirectoryEntry> oldEntry, ::Ref<DirectoryEntry> entry)
 {
-    auto inode = reinterpret_cast<SynthFsINode*>(oldEntry->INode());
+    auto inode = oldEntry->INode().As<SynthFsINode>();
     if (inode->IsDirectory()) return Error(EPERM);
 
     m_Metadata.Size += DIRECTORY_ENTRY_SIZE;
@@ -149,7 +148,7 @@ ErrorOr<Ref<DirectoryEntry>> SynthFsINode::Link(Ref<DirectoryEntry> oldEntry,
     return entry;
 }
 
-void SynthFsINode::InsertChild(INode* inode, StringView name)
+void SynthFsINode::InsertChild(::Ref<INode> inode, StringView name)
 {
     ScopedLock guard(m_Lock);
     m_Children[name] = inode;
@@ -205,7 +204,7 @@ ErrorOr<isize> SynthFsINode::Truncate(usize size)
     return 0;
 }
 
-ErrorOr<void> SynthFsINode::Rename(INode* newParent, StringView newName)
+ErrorOr<void> SynthFsINode::Rename(::Ref<INode> newParent, StringView newName)
 {
     // TODO(v1tr10l7): Remove old inode
 
@@ -218,13 +217,13 @@ ErrorOr<void> SynthFsINode::Rename(INode* newParent, StringView newName)
     return {};
 }
 
-ErrorOr<void> SynthFsINode::Unlink(Ref<DirectoryEntry> entry)
+ErrorOr<void> SynthFsINode::Unlink(::Ref<DirectoryEntry> entry)
 {
     ScopedLock guard(m_Lock);
     auto       it = m_Children.Find(entry->Name());
     if (it == m_Children.end()) return {};
 
-    auto inode = reinterpret_cast<SynthFsINode*>(entry->INode());
+    auto inode = entry->INode().As<SynthFsINode>();
     m_Metadata.Size -= DIRECTORY_ENTRY_SIZE;
 
     auto currentTime = Time::GetReal();
@@ -247,9 +246,9 @@ ErrorOr<void> SynthFsINode::Unlink(Ref<DirectoryEntry> entry)
 
     return {};
 }
-ErrorOr<void> SynthFsINode::RmDir(Ref<DirectoryEntry> entry)
+ErrorOr<void> SynthFsINode::RmDir(::Ref<DirectoryEntry> entry)
 {
-    auto inode = reinterpret_cast<SynthFsINode*>(entry->INode());
+    auto inode = entry->INode().As<SynthFsINode>();
     if (!inode->Children().Empty()) return Error(ENOTEMPTY);
 
     m_Lock.Acquire();

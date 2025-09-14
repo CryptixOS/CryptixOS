@@ -23,9 +23,9 @@ class EchFsINode : public INode
 
     virtual ~EchFsINode() {}
 
-    virtual const UnorderedMap<StringView, INode*>& Children() const;
+    virtual const UnorderedMap<StringView, ::Ref<INode>>& Children() const;
 
-    virtual void  InsertChild(INode* node, StringView name) override;
+    virtual void  InsertChild(::Ref<INode> node, StringView name) override;
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override
     {
@@ -42,6 +42,6 @@ class EchFsINode : public INode
     usize                                  m_DirectoryEntryOffset;
     Atomic<usize>                          m_NextIndex = 2;
 
-    UnorderedMap<StringView, INode*> m_Children;
+    UnorderedMap<StringView, ::Ref<INode>> m_Children;
     friend class EchFs;
 };

@@ -20,10 +20,11 @@
 #include <Prism/Utility/Delegate.hpp>
 #include <Prism/Utility/PathView.hpp>
 
+#include <VFS/INode.hpp>
+
 class AddressSpace;
 class PageMap;
 class FileDescriptor;
-class INode;
 
 namespace ELF
 {
@@ -32,7 +33,7 @@ namespace ELF
       public:
         ErrorOr<void>  LoadFromMemory(u8* data, usize size);
         ErrorOr<void>  Load(FileDescriptor* file, Pointer loadBase = 0);
-        ErrorOr<void>  Load(INode* inode, Pointer loadBase = 0);
+        ErrorOr<void>  Load(::Ref<INode> inode, Pointer loadBase = 0);
 
         inline Pointer Raw() const { return m_Image.Raw(); }
         inline Pointer LoadBase() const { return m_LoadBase; }

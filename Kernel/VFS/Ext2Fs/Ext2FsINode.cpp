@@ -32,8 +32,9 @@ Ext2FsINode::Ext2FsINode(StringView name, Ext2Fs* fs, mode_t mode)
     m_Metadata.ModificationTime = Time::GetReal();
 }
 
-ErrorOr<void> Ext2FsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
-                                               DirectoryIterator iterator)
+ErrorOr<void>
+Ext2FsINode::TraverseDirectories(::Ref<class DirectoryEntry> parent,
+                                 DirectoryIterator           iterator)
 {
     LogTrace("Ext2fs: Traversing directories");
     m_Fs->ReadINodeEntry(&m_Meta, m_Metadata.ID);
@@ -91,7 +92,8 @@ ErrorOr<void> Ext2FsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
                 break;
         }
 
-        Ext2FsINode* newNode          = new Ext2FsINode(nameBuffer, m_Fs, mode);
+        ::Ref<Ext2FsINode> newNode
+            = CreateRef<Ext2FsINode>(nameBuffer, m_Fs, mode);
         newNode->m_Metadata.UID       = inodeMeta.UID;
         newNode->m_Metadata.GID       = inodeMeta.GID;
         newNode->m_Metadata.ID        = entry->INodeIndex;
@@ -137,7 +139,7 @@ ErrorOr<void> Ext2FsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
 
     return {};
 }
-ErrorOr<Ref<DirectoryEntry>> Ext2FsINode::Lookup(Ref<DirectoryEntry> dentry)
+ErrorOr<::Ref<DirectoryEntry>> Ext2FsINode::Lookup(::Ref<DirectoryEntry> dentry)
 {
     auto iterator
         = [&](StringView name, loff_t offset, usize ino, usize type) -> bool
@@ -164,7 +166,7 @@ ErrorOr<Ref<DirectoryEntry>> Ext2FsINode::Lookup(Ref<DirectoryEntry> dentry)
     return Error(ENOENT);
 }
 
-void Ext2FsINode::InsertChild(INode* node, StringView name)
+void Ext2FsINode::InsertChild(::Ref<INode> node, StringView name)
 {
     ScopedLock guard(m_Lock);
     m_Children[name] = node;

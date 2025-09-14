@@ -82,12 +82,12 @@ class ProcFsINode : public INode
     }
 
     virtual ErrorOr<void>
-    TraverseDirectories(Ref<class DirectoryEntry> parent,
-                        DirectoryIterator         iterator) override;
-    virtual ErrorOr<Ref<DirectoryEntry>>
-                  Lookup(Ref<DirectoryEntry> dentry) override;
+    TraverseDirectories(::Ref<class DirectoryEntry> parent,
+                        DirectoryIterator           iterator) override;
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+                  Lookup(::Ref<DirectoryEntry> dentry) override;
 
-    virtual void  InsertChild(INode* node, StringView name) override;
+    virtual void  InsertChild(::Ref<INode> node, StringView name) override;
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Truncate(usize size) override;
@@ -97,9 +97,9 @@ class ProcFsINode : public INode
     virtual bool Populate() { return false; }
 
   protected:
-    ProcFsProperty*              m_Property = nullptr;
-    UnorderedMap<String, INode*> m_Children;
-    bool                         m_Populated = false;
+    ProcFsProperty*                    m_Property = nullptr;
+    UnorderedMap<String, ::Ref<INode>> m_Children;
+    bool                               m_Populated = false;
 };
 class Process;
 class ProcFsRootINode : public ProcFsINode

@@ -82,8 +82,9 @@ ErrorOr<::Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
     return m_RootEntry;
 }
 
-ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
-                                   mode_t mode, uid_t uid, gid_t gid)
+ErrorOr<::Ref<INode>> Ext2Fs::CreateNode(::Ref<INode>          parent,
+                                         ::Ref<DirectoryEntry> entry,
+                                         mode_t mode, uid_t uid, gid_t gid)
 {
     usize inodeIndex = m_Allocator.AllocateINode();
     if (!inodeIndex) return nullptr;
@@ -146,8 +147,7 @@ ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
     dentry->Type       = Ext2Mode2DirectoryEntryType(mode);
     StringView(reinterpret_cast<char*>(dentry->Name), dentry->NameSize)
         .Copy(const_cast<char*>(entry->Name().Raw()), entry->Name().Size());
-    auto result
-        = reinterpret_cast<Ext2FsINode*>(parent)->AddDirectoryEntry(*dentry);
+    auto result = parent.As<Ext2FsINode>()->AddDirectoryEntry(*dentry);
     if (!result)
     {
         delete inode;
@@ -160,8 +160,8 @@ ErrorOr<INode*> Ext2Fs::CreateNode(INode* parent, ::Ref<DirectoryEntry> entry,
 
 bool Ext2Fs::Populate(DirectoryEntry* dentry)
 {
-    Ext2FsINode*    e2node = reinterpret_cast<Ext2FsINode*>(dentry->INode());
-    Ext2FsINodeMeta parentMeta;
+    ::Ref<Ext2FsINode> e2node = dentry->INode().As<Ext2FsINode>();
+    Ext2FsINodeMeta    parentMeta;
     ReadINodeEntry(&parentMeta, e2node->m_Metadata.ID);
 
     u8* buffer = new u8[parentMeta.GetSize()];
@@ -208,11 +208,11 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
                 break;
         }
 
-        Ext2FsINode* newNode           = new Ext2FsINode(name, this, mode);
-        newNode->m_Metadata.UID        = inodeMeta.UID;
-        newNode->m_Metadata.GID        = inodeMeta.GID;
-        newNode->m_Metadata.ID         = entry->INodeIndex;
-        newNode->m_Metadata.Size       = inodeMeta.GetSize();
+        ::Ref<Ext2FsINode> newNode = CreateRef<Ext2FsINode>(name, this, mode);
+        newNode->m_Metadata.UID    = inodeMeta.UID;
+        newNode->m_Metadata.GID    = inodeMeta.GID;
+        newNode->m_Metadata.ID     = entry->INodeIndex;
+        newNode->m_Metadata.Size   = inodeMeta.GetSize();
         newNode->m_Metadata.LinkCount  = inodeMeta.HardLinkCount;
         newNode->m_Metadata.BlockCount = newNode->m_Metadata.Size / m_BlockSize;
 
@@ -238,7 +238,7 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
     return true;
 }
 
-ErrorOr<void> Ext2Fs::FreeINode(INode* inode)
+ErrorOr<void> Ext2Fs::FreeINode(::Ref<INode> inode)
 {
     auto id = inode->ID();
     --id;

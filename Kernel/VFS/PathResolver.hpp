@@ -87,15 +87,15 @@ class PathResolver
         return m_CurrentSegment.Name;
     }
 
-    WeakRef<DirectoryEntry>    GetEffectiveParent(INode* node = nullptr);
+    WeakRef<DirectoryEntry>    GetEffectiveParent(::Ref<INode> node = nullptr);
     inline Ref<DirectoryEntry> ParentEntry() { return m_Parent; }
     inline Ref<DirectoryEntry> DirectoryEntry() { return m_DirectoryEntry; }
 
-    inline INode*              ParentINode()
+    inline ::Ref<INode>        ParentINode()
     {
         return m_Parent ? m_Parent->INode() : nullptr;
     }
-    inline INode* INode() const
+    inline ::Ref<INode> INode()
     {
         return m_DirectoryEntry ? m_DirectoryEntry->INode() : nullptr;
     }

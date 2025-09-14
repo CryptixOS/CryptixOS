@@ -21,14 +21,14 @@ EchFsINode::EchFsINode(StringView name, class Filesystem* fs, mode_t mode,
     m_NativeFs           = reinterpret_cast<EchFs*>(fs);
 }
 
-const UnorderedMap<StringView, INode*>& EchFsINode::Children() const
+const UnorderedMap<StringView, ::Ref<INode>>& EchFsINode::Children() const
 {
     auto inode = const_cast<EchFsINode*>(this);
     reinterpret_cast<EchFs*>(m_Filesystem)->Populate(inode);
     return m_Children;
 }
 
-void EchFsINode::InsertChild(INode* node, StringView name)
+void EchFsINode::InsertChild(::Ref<INode> node, StringView name)
 {
     ScopedLock guard(m_Lock);
     m_Children[name] = node;

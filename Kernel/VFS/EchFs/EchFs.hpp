@@ -20,8 +20,8 @@ class EchFs final : public Filesystem
     virtual ~EchFs();
 
     virtual ErrorOr<::Ref<DirectoryEntry>>
-    Mount(StringView sourcePath, const void* data = nullptr) override;
-    bool         Populate(EchFsINode* inode);
+         Mount(StringView sourcePath, const void* data = nullptr) override;
+    bool Populate(EchFsINode* inode);
     virtual bool Populate(DirectoryEntry* dentry) override;
 
     isize ReadDirectoryEntry(EchFsDirectoryEntry& entry, u8* dest, isize offset,
@@ -29,7 +29,7 @@ class EchFs final : public Filesystem
 
   private:
     EchFsIdentityTable* m_IdentityTable         = nullptr;
-    EchFsINode*         m_NativeRoot            = nullptr;
+    ::Ref<EchFsINode>   m_NativeRoot            = nullptr;
 
     usize               m_AllocationTableOffset = 0;
     usize               m_AllocationTableSize   = 0;

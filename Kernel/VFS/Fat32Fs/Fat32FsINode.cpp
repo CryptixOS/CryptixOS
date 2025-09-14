@@ -60,12 +60,12 @@ Fat32FsINode::Fat32FsINode(StringView name, class Filesystem* fs, mode_t mode)
     }
 }
 
-const UnorderedMap<StringView, INode*>& Fat32FsINode::Children() const
+const UnorderedMap<StringView, ::Ref<INode>>& Fat32FsINode::Children() const
 {
     // TODO(v1tr10l7): Populate records
     return m_Children;
 }
-void Fat32FsINode::InsertChild(INode* node, StringView name)
+void Fat32FsINode::InsertChild(::Ref<INode> node, StringView name)
 {
     ScopedLock guard(m_Lock);
     m_Children[name] = node;

@@ -81,7 +81,7 @@ class FileDescriptor : public RefCounted
                    i32 flags, FileAccessMode accMode);
     virtual ~FileDescriptor();
 
-    inline INode*         INode() const { return m_DirectoryEntry->INode(); }
+    inline ::Ref<INode>   INode() const { return m_DirectoryEntry->INode(); }
     ::Ref<DirectoryEntry> DirectoryEntry() const { return m_DirectoryEntry; }
     ::Ref<class File>     File() const { return m_File; }
     inline usize          GetOffset() const { return m_Offset; }
@@ -130,13 +130,13 @@ class FileDescriptor : public RefCounted
     // TODO(v1t10l7): verify whether the fd is blocking
     inline bool                 WouldBlock() const { return false; }
 
-    virtual bool                IsCharDevice() const;
-    virtual bool                IsFifo() const;
-    virtual bool                IsDirectory() const;
-    virtual bool                IsRegular() const;
-    virtual bool                IsSymlink() const;
-    bool                        IsSocket() const;
-    inline bool                 IsPipe() const
+    virtual bool                IsCharDevice();
+    virtual bool                IsFifo();
+    virtual bool                IsDirectory();
+    virtual bool                IsRegular();
+    virtual bool                IsSymlink();
+    bool                        IsSocket();
+    inline bool                 IsPipe()
     {
         // FIXME(v1tr10l7): implement this once pipes are supported
 

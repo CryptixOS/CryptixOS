@@ -24,8 +24,8 @@ class DevTmpFsINode final : public SynthFsINode, NonCopyable<DevTmpFsINode>
                   INodeMode mode, Device* device = nullptr);
     virtual ~DevTmpFsINode() {}
 
-    virtual ErrorOr<Ref<DirectoryEntry>>
-    CreateNode(Ref<DirectoryEntry> entry, mode_t mode, dev_t dev) override;
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    CreateNode(::Ref<DirectoryEntry> entry, mode_t mode, dev_t dev) override;
 
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;

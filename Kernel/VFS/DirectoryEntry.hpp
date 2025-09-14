@@ -63,14 +63,11 @@ class DirectoryEntry : public RefCounted
     {
     }
     DirectoryEntry(::WeakRef<DirectoryEntry> parent, StringView name);
-    DirectoryEntry(const DirectoryEntry& other)
-        : m_INode(other.m_INode)
-    {
-    }
+    DirectoryEntry(const DirectoryEntry& other);
 
     virtual ~DirectoryEntry();
 
-    inline class INode*              INode() const { return m_INode; }
+    ::Ref<class INode>               INode() const;
     inline StringView                Name() const { return m_Name; }
     inline ::WeakRef<DirectoryEntry> Parent() { return m_Parent; }
 
@@ -79,7 +76,7 @@ class DirectoryEntry : public RefCounted
 
     void                      SetParent(::WeakRef<DirectoryEntry> entry);
     void                      SetMountGate(::Ref<DirectoryEntry> mountGate);
-    void                      Bind(class INode* inode);
+    void                      Bind(::Ref<class INode> inode);
     void                      InsertChild(::Ref<class DirectoryEntry> entry);
     void                      RemoveChild(::Ref<class DirectoryEntry> entry);
 
@@ -116,7 +113,7 @@ class DirectoryEntry : public RefCounted
 
     String                    m_Name      = ""_s;
     DirectoryEntryFlags       m_Flags     = DirectoryEntryFlags::eNegative;
-    class INode*              m_INode     = nullptr;
+    ::Ref<class INode>        m_INode     = nullptr;
     bool                      m_Populated = false;
     usize                     m_DirOffset = 0;
 

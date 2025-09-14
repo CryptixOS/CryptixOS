@@ -13,6 +13,7 @@
 #include <Library/UserBuffer.hpp>
 #include <Prism/Containers/Deque.hpp>
 #include <Prism/Core/Error.hpp>
+#include <VFS/INode.hpp>
 
 class INode;
 class DirectoryEntry;
@@ -20,12 +21,12 @@ class File : public RefCounted
 {
   public:
     File() = default;
-    explicit File(class INode* inode);
+    explicit File(::Ref<class INode> inode);
     virtual ~File() = default;
 
-    virtual class INode*   INode() const;
+    virtual class ::Ref<class INode> INode() const;
 
-    virtual usize          Size() const;
+    virtual usize                    Size() const;
 
     virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes);
     virtual ErrorOr<isize> Write(const void* src, off_t offset, usize bytes);
@@ -49,7 +50,6 @@ class File : public RefCounted
     virtual bool           IsSocket() const { return false; }
 
   private:
-    Spinlock                    m_Lock;
-    CTOS_UNUSED DirectoryEntry* m_DirectoryEntry = nullptr;
-    CTOS_UNUSED class INode*    m_INode          = nullptr;
+    Spinlock           m_Lock;
+    ::Ref<class INode> m_INode          = nullptr;
 };

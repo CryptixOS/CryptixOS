@@ -7,12 +7,12 @@
 #include <VFS/File.hpp>
 #include <VFS/INode.hpp>
 
-File::File(class INode* inode)
+File::File(class ::Ref<class INode> inode)
     : m_INode(inode)
 {
 }
 
-class INode*   File::INode() const { return m_INode; }
+class ::Ref<class INode> File::INode() const { return m_INode; }
 usize          File::Size() const { return m_INode ? m_INode->Size() : 0; }
 
 ErrorOr<isize> File::Read(void* dest, off_t offset, usize bytes)

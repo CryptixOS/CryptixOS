@@ -257,9 +257,7 @@ namespace MM
 
                 if (fd)
                 {
-                    LogDebug("MM: Mapping fd");
                     isize nread = TryAcquire(fd->Read(virt, size));
-                    LogDebug("MM: Read fd");
                     if (nread != static_cast<isize>(size))
                         LogError("MM: Failed to read the file descriptor");
                 }

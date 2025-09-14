@@ -857,7 +857,7 @@ namespace API::VFS
         auto   path      = CPU::AsUser([&]() -> PathView { return pathname; });
         auto   pathResOr = ResolveAtFd(dirFdNum, path, flags);
 
-        INode* inode     = nullptr;
+        Ref<INode> inode     = nullptr;
         if (!pathResOr)
         {
             if (dirFdNum < 0 && dirFdNum != AT_FDCWD)
