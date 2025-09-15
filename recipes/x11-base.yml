@@ -115,7 +115,6 @@ packages:
       version: '21.1.8'
     tools_required:
       - system-gcc
-      - wayland-scanner
       - virtual: pkgconfig-for-target
         triple: "@OPTION:arch-triple@"
       - virtual: pkgconfig-for-host
@@ -125,8 +124,6 @@ packages:
       - xorg-util-macros
       - xcb-proto
       - xorg-proto
-      - libdrm
-      - systemd
       - libxshmfence
       - libx11
       - libxxf86vm
@@ -163,6 +160,7 @@ packages:
         - '-Dsuid_wrapper=false'
         - '-Dpciaccess=false'
         - '-Ddpms=false'
+        - '--disable-libdrm'
         - '-Dscreensaver=false'
         - '-Dxres=false'
         - '-Dxinerama=false'

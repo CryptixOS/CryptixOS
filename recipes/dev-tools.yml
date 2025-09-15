@@ -1,0 +1,115 @@
+packages:
+  - name: gcc
+    architecture: '@OPTION:arch@'
+    from_source: gcc
+    tools_required:
+      - tool: system-gcc
+      - host-automake-v1.15
+    pkgs_required:
+      - mlibc
+      - gmp
+      - mpfr
+      - mpc
+      - zlib
+    revision: 1
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--target=@OPTION:arch-triple@'
+        - '--with-sysroot=/'
+        - '--with-build-sysroot=@SYSROOT_DIR@'
+        - '--enable-languages=c,c++'
+        - '--enable-initfini-array'
+        - '--disable-nls'
+        - '--enable-lto'
+        - '--with-system-zlib'
+        # -g blows up GCC's binary size.
+        - 'CFLAGS=-O2'
+        - 'CXXFLAGS=-O2 -lgcc_s'
+    build:
+      - args: ['echo', '$CXXFLAGS']
+      - args: ['make', 'all-gcc', 'all-target-libgcc', 'all-target-libstdc++-v3', '-j@PARALLELISM@']
+      - args: ['make', 'install-gcc', 'install-target-libgcc', 'install-target-libstdc++-v3']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+      - args: ['ln', '-sf', 'gcc', '@THIS_COLLECT_DIR@/usr/bin/cc']
+
+  - name: llvm
+    architecture: '@OPTION:arch@'
+    from_source: llvm
+    tools_required:
+      - host-cmake
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - zlib
+    revision: 1
+    configure:
+      - args:
+        - 'cmake'
+        - '-GNinja'
+        - '-DCMAKE_TOOLCHAIN_FILE=@SOURCE_ROOT@/CrossFiles/CMakeToolchain-@OPTION:arch-triple@.txt'
+        - '-DCMAKE_INSTALL_PREFIX=/usr'
+        # We really have to build LLVM in Release mode.
+        # Building it in debug mode produces tens of GiB of debugging info.
+        - '-DCMAKE_BUILD_TYPE=Release'
+        - '-DLLVM_LINK_LLVM_DYLIB=ON'
+        # RTTI affects the ABI. Hence, we enable it.
+        - '-DLLVM_ENABLE_RTTI=ON'
+        - '-DLLVM_TARGETS_TO_BUILD=X86'
+        - '-DLLVM_TARGET_ARCH=@OPTION:arch@'
+        - '-DLLVM_DEFAULT_TARGET_TRIPLE=@OPTION:arch-triple@'
+        - '-DLLVM_HOST_TRIPLE=@OPTION:arch-triple@'
+        # Disable linking against ncurses, which we do not build with -fPIC.
+        - '-DLLVM_ENABLE_TERMINFO=OFF'
+        # Suppress developer warnings
+        - '-Wno-dev'
+        - '@THIS_SOURCE_DIR@/llvm'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+
+  - name: nasm
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: Groovy little assembler
+      description: NASM (Netwide Assembler) is an 80x86 assembler designed for portability and modularity. It includes a disassembler as well.
+      spdx: 'BSD-2-Clause'
+      website: 'https://www.nasm.us/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['dev-lang']
+    source:
+      subdir: 'sources'
+      url: 'https://web.archive.org/web/20250310173238if_/https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/nasm-2.16.03.tar.xz'
+      format: 'tar.xz'
+      checksum: blake2b:742cbf330341fde9f778d8ca13e8c06199f48796d47028ac973d39e3d9e434450cdfebe89f6ab248d372bdaeb0c88a25eb7153a39b66fc05e770523d4c9e11e9
+      extract_path: 'nasm-2.16.03'
+      version: '2.16.03'
+      tools_required:
+        - host-automake-v1.15
+      regenerate:
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@THIS_SOURCE_DIR@/autoconf/helpers/']
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+    revision: 1
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true

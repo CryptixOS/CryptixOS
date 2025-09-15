@@ -49,10 +49,10 @@ sources:
 
   - name: gcc
     subdir: 'sources'
-    url: 'https://ftp.gnu.org/gnu/gcc/gcc-14.1.0/gcc-14.1.0.tar.xz'
+    url: 'https://ftp.gnu.org/gnu/gcc/gcc-14.2.0/gcc-14.2.0.tar.xz'
     format: 'tar.xz'
-    extract_path: 'gcc-14.1.0'
-    version: '14.1.0'
+    extract_path: 'gcc-14.2.0'
+    version: '14.2.0'
     patch-path-strip: 1
     tools_required:
       - host-autoconf-v2.69
@@ -99,7 +99,7 @@ sources:
   - name: mlibc
     subdir: 'sources'
     git: 'https://github.com/managarm/mlibc.git'
-    branch: 'v6.x'
+    branch: 'master'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
