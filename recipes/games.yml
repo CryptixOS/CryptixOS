@@ -5,11 +5,14 @@ packages:
       subdir: 'sources'
       url: 'https://github.com/NSG650/doomgeneric-polaris/archive/4fb357cc9535ae35144d107d5c854c7407d3eefc.tar.gz'
       format: 'tar.gz'
-      extract_path: 'doom-generic-4.0'
+      extract_path: 'doom-generic'
       version: '4.0'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.15
+      regenerate:
+        - args: ['autoreconf', '-fvi']
+        - args: ['cp', '@THIS_SOURCE_DIR@/configfsf.guess', '@THIS_SOURCE_DIR@/config.guess']
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.15
@@ -18,7 +21,10 @@ packages:
       - mlibc
       - libiconv
     revision: 1
+    configure:
+      - args: ['cp', '-rp', '@THIS_SOURCE_DIR@/doomgeneric', '@THIS_COLLECT_DIR@']
     build:
-      - args: ['cp', '-rp', '@THIS_SOURCE_DIR@/doom-generic', '@THIS_COLLECT_DIR@']
-      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', '-C', '@THIS_SOURCE_DIR@/doomgeneric', '-j@PARALLELISM@']
+      - args: ['cp', '@THIS_SOURCE_DIR@/doomgeneric/doomgeneric', '@SYSROOT_DIR@/bin']
+      
   
