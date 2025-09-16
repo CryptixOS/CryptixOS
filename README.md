@@ -233,6 +233,7 @@ To run CryptixOS in QEMU:
 - ✅ VFS
 - ✅ Session Management
 - ⬜ Networking
+- ⬜ Evdev
 
 ## 📸 Screenshots / Output
 <img src="./Meta/images/screenshot.png">
