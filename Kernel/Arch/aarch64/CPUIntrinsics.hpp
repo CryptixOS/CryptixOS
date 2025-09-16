@@ -27,6 +27,16 @@ namespace CPU
     CTOS_ALWAYS_INLINE void EnableInterrupts() { Asm("msr daifclr, #0b1111"); }
     CTOS_ALWAYS_INLINE void DisableInterrupts() { Asm("msr daifset, #0b1111"); }
 
-    CTOS_ALWAYS_INLINE void EnableUserAccess() { Asm("straf" :: : "cc"); }
-    CTOS_ALWAYS_INLINE void DisableUserAccess() { Asm("clraf" :: : "cc"); }
+    CTOS_ALWAYS_INLINE void EnableUserAccess()
+    {
+        u64 val = 0;
+        Asm("msr pan, %0\n\t"
+            "isb\n\t" ::"r"(val) : "memory");
+    }
+    CTOS_ALWAYS_INLINE void DisableUserAccess()
+    {
+        u64 val = 0;
+        Asm("msr pan, %0\n\t"
+            "isb\n\t" ::"r"(val) : "memory");
+    }
 }; // namespace CPU
