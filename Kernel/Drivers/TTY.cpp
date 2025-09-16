@@ -10,6 +10,7 @@
 
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptGuard.hpp>
+#include <Arch/User.hpp>
 
 #include <Debug/Debug.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
@@ -120,10 +121,10 @@ winsize    TTY::GetSize() const { return Terminal::Active()->GetSize(); }
 
 void       TTY::SetTermios(const termios2& termios)
 {
+    m_Termios = termios;
 #if CTOS_TTY_LOG_TERMIOS
     LogDebug("TTY: Setting termios to ->\n{}", termios);
 #endif
-    m_Termios = termios;
     m_RawBuffer.Clear();
 }
 
@@ -177,6 +178,8 @@ ErrorOr<isize> TTY::Write(const void* src, off_t offset, usize bytes)
     static constexpr StringView MLIBC_LOG_SIGNATURE = "[mlibc]: "_sv;
 
     StringView                  str(s, bytes);
+    auto                        process = Process::Current();
+    if (process->Name().Contains("zsh")) LogDebug("zsh: writes {}", str);
 
     if (str.StartsWith(MLIBC_LOG_SIGNATURE))
     {
@@ -207,6 +210,8 @@ ErrorOr<isize> TTY::IoCtl(usize request, upointer argp)
 {
     if (!argp) return Error(EFAULT);
     Process* current = Process::Current();
+    if (current->Name().Contains("zsh"))
+        LogDebug("TTY::IoCtl: request => {:#x}, argp => {:#x}", request, argp);
 
     switch (request)
     {
@@ -214,7 +219,7 @@ ErrorOr<isize> TTY::IoCtl(usize request, upointer argp)
         {
             if (!current->ValidateWrite(argp, sizeof(termios2)))
                 return Error(EFAULT);
-            Memory::Copy(argp, &m_Termios, sizeof(m_Termios));
+            CopyToUser(argp, &m_Termios, sizeof(m_Termios));
             break;
         }
         case TCSETS:
@@ -240,14 +245,14 @@ ErrorOr<isize> TTY::IoCtl(usize request, upointer argp)
         {
             if (!current->ValidateWrite(argp, sizeof(termios2)))
                 return Error(EFAULT);
-            Memory::Copy(argp, &m_Termios, sizeof(termios2));
+            CopyToUser(argp, &m_Termios, sizeof(termios2));
             break;
         }
         case TCSETS2:
         {
             if (!current->ValidateRead(argp, sizeof(termios2)))
                 return Error(EFAULT);
-            Memory::Copy(&m_Termios, argp, sizeof(termios2));
+            CopyFromUser(&m_Termios, argp, sizeof(termios2));
             break;
         }
         case TCSETSW2:
@@ -255,7 +260,7 @@ ErrorOr<isize> TTY::IoCtl(usize request, upointer argp)
             // TODO(v1tr10l7): Drain the output buffer
             if (!current->ValidateRead(argp, sizeof(termios2)))
                 return Error(EFAULT);
-            Memory::Copy(&m_Termios, argp, sizeof(termios2));
+            CopyFromUser(&m_Termios, argp, sizeof(termios2));
             break;
         }
         case TCSETSF2:
@@ -264,7 +269,7 @@ ErrorOr<isize> TTY::IoCtl(usize request, upointer argp)
             //  and discard the input buffer
             if (!current->ValidateRead(argp, sizeof(termios2)))
                 return Error(EFAULT);
-            Memory::Copy(&m_Termios, argp, sizeof(termios2));
+            CopyFromUser(&m_Termios, argp, sizeof(termios2));
             break;
         }
 

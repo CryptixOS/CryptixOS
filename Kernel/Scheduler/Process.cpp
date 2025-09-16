@@ -330,9 +330,9 @@ ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
     auto fifo     = CreateRef<Fifo>();
 
     auto readerFd = fifo->OpenDirection(Fifo::Direction::eRead);
-    CPU::CopyToUser(pipeFds, static_cast<i32>(m_FdTable->Insert(readerFd)));
+    CopyToUser(pipeFds, static_cast<i32>(m_FdTable->Insert(readerFd)));
     auto writerFd = fifo->OpenDirection(Fifo::Direction::eWrite);
-    CPU::CopyToUser(pipeFds + 1, static_cast<i32>(m_FdTable->Insert(writerFd)));
+    CopyToUser(pipeFds + 1, static_cast<i32>(m_FdTable->Insert(writerFd)));
 
     return 0;
 }
@@ -408,7 +408,7 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
     PageMap = new class PageMap();
     Vector<StringView> argvArr;
     {
-        CPU::UserMemoryProtectionGuard guard;
+        UserMemoryProtectionGuard guard;
         for (char** arg = argv; *arg; arg++) argvArr.PushBack(*arg);
     }
 
@@ -427,7 +427,7 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 
     Vector<StringView> envpArr;
     {
-        CPU::UserMemoryProtectionGuard guard;
+        UserMemoryProtectionGuard guard;
         for (char** env = envp; *env; env++) envpArr.PushBack(*env);
     }
 
@@ -502,7 +502,7 @@ ErrorOr<ProcessID> Process::WaitPid(ProcessID pid, i32* wstatus, i32 flags,
             continue;
 
         if (wstatus)
-            CPU::CopyToUser(wstatus, W_EXITCODE(which->Status().ValueOr(0), 0));
+            CopyToUser(wstatus, W_EXITCODE(which->Status().ValueOr(0), 0));
 
         return which->ID();
     }
@@ -605,7 +605,7 @@ i32 Process::Exit(i32 code)
 ErrorOr<void> Process::WaitForFutex(i32* vaddr, i32 expected)
 {
     {
-        CPU::UserMemoryProtectionGuard guard;
+        UserMemoryProtectionGuard guard;
         if (*vaddr != expected) return Error(EAGAIN);
     }
 
@@ -622,7 +622,7 @@ ErrorOr<void> Process::WaitForFutex(i32* vaddr, i32 expected)
 ErrorOr<void> Process::WakeFutex(i32* vaddr)
 {
     {
-        CPU::UserMemoryProtectionGuard guard;
+        UserMemoryProtectionGuard guard;
         *(volatile int*)vaddr;
     }
 

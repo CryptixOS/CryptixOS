@@ -166,7 +166,7 @@ bool           Thread::DispatchSignal(u8 signal)
 
         upointer     trampolineVirt = m_Parent->m_SignalTrampolineVirt;
         {
-            CPU::UserMemoryProtectionGuard guard;
+            UserMemoryProtectionGuard guard;
 
             auto actualPhys = Pointer(rspWritable).FromHigherHalf();
             LogDebug("Thread: Phys => {:#x}, ActualPhys => {:#x}", phys,
@@ -247,7 +247,7 @@ ErrorOr<void> Thread::SignalReturn()
 #if CTOS_TARGET_X86_64
     Pointer rsp = Context.RSP;
     {
-        CPU::UserMemoryProtectionGuard guard;
+        UserMemoryProtectionGuard guard;
 
         usize fpuStorageSize = m_Tls.FpuStoragePageCount * PMM::PAGE_SIZE;
         Memory::Copy(m_Tls.FpuStorage, rsp.Offset(16 + 128), fpuStorageSize);

@@ -6,6 +6,7 @@
  */
 #include <Drivers/ACPI/Bus.hpp>
 #include <Drivers/ACPI/Device.hpp>
+#include <Library/Logger.hpp>
 
 namespace ACPI
 {

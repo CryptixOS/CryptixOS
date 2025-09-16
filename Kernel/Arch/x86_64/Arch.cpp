@@ -1,12 +1,10 @@
-/*
+/*gg
  * Created by v1tr10l7 on 17.11.2024.
  * Copyright (c) 2024-2024, Szymon Zemke <v1tr10l7@proton.me>
  *
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/Arch.hpp>
-
-#include <Common.hpp>
 
 #include <Arch/x86_64/CPU.hpp>
 #include <Arch/x86_64/Drivers/IoApic.hpp>
@@ -15,7 +13,6 @@
 #include <Arch/x86_64/Drivers/Time/HPET.hpp>
 #include <Arch/x86_64/Drivers/Time/PIT.hpp>
 #include <Arch/x86_64/Drivers/Time/RTC.hpp>
-#include <Arch/x86_64/IO.hpp>
 
 #include <Time/Time.hpp>
 
@@ -25,7 +22,7 @@ namespace InterruptManager
 };
 namespace Arch
 {
-    KERNEL_INIT_CODE
+    KERNEL_INIT_SECTION
     void InstallExceptions()
     {
         GDT::Initialize();
@@ -34,7 +31,7 @@ namespace Arch
         IDT::Initialize();
         IDT::Load();
     }
-    KERNEL_INIT_CODE
+    KERNEL_INIT_SECTION
     void Initialize()
     {
         auto pic = I8259A::Instance();
@@ -65,12 +62,12 @@ namespace Arch
 
     __attribute__((noreturn)) void Halt()
     {
-        for (;;) __asm__ volatile("hlt");
+        for (;;) Asm("hlt");
 
         Panic("Shouldn't Reach");
         AssertNotReached();
     }
-    void Pause() { __asm__ volatile("pause"); }
+    void Pause() { Asm("pause"); }
 
     void PowerOff() {}
     void Reboot()
@@ -92,7 +89,7 @@ namespace Arch
             u16      Limit = 0;
             upointer Base  = 0;
         } invalidIDT;
-        __asm__ volatile("lidt %0" ::"m"(invalidIDT));
+        Asm("lidt %0" ::"m"(invalidIDT));
 
         for (;;) HaltAndCatchFire(nullptr, nullptr);
     }

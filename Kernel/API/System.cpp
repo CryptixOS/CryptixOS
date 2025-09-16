@@ -30,7 +30,7 @@ namespace API::System
         auto process = Process::GetCurrent();
         if (!process->ValidateWrite(out)) return Error(EFAULT);
 
-        CPU::UserMemoryProtectionGuard guard;
+        UserMemoryProtectionGuard guard;
         Kernel::NAME.Copy(out->sysname, sizeof(out->sysname));
         Kernel::NAME.Copy(out->nodename, sizeof(out->nodename));
         Kernel::VERSION_STRING.Copy(out->release, sizeof(out->release));
@@ -45,7 +45,7 @@ namespace API::System
     ErrorOr<isize> GetResourceLimit(isize resource, rlimit* rlimit)
     {
         // TODO(v1tr10l7): Set proper limits
-        CPU::UserMemoryProtectionGuard guard;
+        UserMemoryProtectionGuard guard;
 
         rlimit->rlim_cur = INT64_MAX;
         rlimit->rlim_max = INT64_MAX;
@@ -101,7 +101,7 @@ namespace API::System
     ErrorOr<isize> ArchPrCtl(isize opcode, upointer arg1)
     {
 #ifdef CTOS_TARGET_X86_64
-        auto thread = CPU::GetCurrentThread();
+        auto thread = Thread::Current();
         switch (opcode)
         {
             case ARCH_SET_GS:
@@ -113,12 +113,12 @@ namespace API::System
                 CPU::SetFSBase(thread->FsBase());
                 break;
             case ARCH_GET_FS:
-                CPU::CopyToUser(reinterpret_cast<upointer*>(arg1),
-                                thread->FsBase().Raw());
+                CopyToUser(reinterpret_cast<upointer*>(arg1),
+                           thread->FsBase().Raw());
                 break;
             case ARCH_GET_GS:
-                CPU::CopyToUser(reinterpret_cast<upointer*>(arg1),
-                                thread->GsBase().Raw());
+                CopyToUser(reinterpret_cast<upointer*>(arg1),
+                           thread->GsBase().Raw());
                 break;
 
             default: return Error(EINVAL);
@@ -152,7 +152,7 @@ namespace API::System
         if (!process->IsSuperUser()) return Error(EPERM);
 
         auto image = CreateRef<ELF::Image>();
-        RetOnError(CPU::AsUser(
+        RetOnError(AsUser(
             [&image, moduleImage, imageSize]() -> auto
             {
                 return image->LoadFromMemory(Pointer(moduleImage).As<u8>(),
@@ -167,7 +167,7 @@ namespace API::System
 
     ErrorOr<upointer> SysPanic(const char* errorMessage)
     {
-        CPU::UserMemoryProtectionGuard guard;
+        UserMemoryProtectionGuard guard;
 
         EarlyLogMessage(AnsiColor::FOREGROUND_MAGENTA);
         EarlyLogMessage("SystemMemoryStatistics");
@@ -189,7 +189,7 @@ namespace API::System
         EarlyLogMessage(AnsiColor::FOREGROUND_WHITE);
         EarlyLogMessage(": %#p\n", PMM::GetUsedMemory());
 
-        usize lastSyscall = CPU::GetCurrent()->LastSyscallID;
+        usize lastSyscall = CPU::Current()->LastSyscallID;
         auto  syscallName = Syscall::GetName(lastSyscall);
         panic(std::format("SYS_PANIC: {}\nLast called syscall: "
                           "{}\n",
@@ -200,7 +200,7 @@ namespace API::System
     }
     ErrorOr<isize> DebugLog(const char* message)
     {
-        auto string = CPU::CopyStringFromUser(message);
+        auto string = CopyStringFromUser(message);
         LogDebug("{}", string);
         return 0;
     }

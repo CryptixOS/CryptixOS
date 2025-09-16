@@ -50,7 +50,7 @@ isize Fifo::Read(void* buffer, off_t offset, usize count)
     }
 
     count = Min(count, m_Buffer.Used());
-    nread = CPU::AsUser(
+    nread = AsUser(
         [&]() -> isize
         { return m_Buffer.Read(reinterpret_cast<u8*>(buffer), count); });
 
@@ -80,7 +80,7 @@ isize Fifo::Write(const void* buffer, off_t offset, usize count)
     if (m_Buffer.Used() + count > m_Buffer.Capacity())
         count = m_Buffer.Capacity() - m_Buffer.Used();
 
-    nwritten = CPU::AsUser(
+    nwritten = AsUser(
         [&]() -> isize
         { return m_Buffer.Write(reinterpret_cast<const u8*>(buffer), count); });
     m_Event.Trigger();

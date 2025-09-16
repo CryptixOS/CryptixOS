@@ -16,14 +16,13 @@ class [[nodiscard]] UserBuffer
   public:
     static ErrorOr<UserBuffer> ForUserBuffer(u8* userBuffer, usize size)
     {
-        if (userBuffer && !Arch::InUserRange(userBuffer, size))
-            return Error(EFAULT);
+        if (userBuffer && !InUserRange(userBuffer, size)) return Error(EFAULT);
 
         return UserBuffer(userBuffer);
     }
     static ErrorOr<UserBuffer> ForUserBuffer(Pointer buffer, usize size)
     {
-        if (buffer && !Arch::InUserRange(buffer, size)) return Error(EFAULT);
+        if (buffer && !InUserRange(buffer, size)) return Error(EFAULT);
 
         return UserBuffer(buffer, size);
     }
@@ -36,8 +35,8 @@ class [[nodiscard]] UserBuffer
     {
         if (m_Size < sizeof(T)) return Error(EFAULT);
 
-        CPU::UserMemoryProtectionGuard guard;
-        T                              value;
+        UserMemoryProtectionGuard guard;
+        T                         value;
         Read(&value, sizeof(T));
 
         return value;
@@ -52,9 +51,9 @@ class [[nodiscard]] UserBuffer
     inline isize Read(Pointer destination, usize count, isize pos = -1)
     {
         if (pos < 0) pos = 0;
-        usize                          copied = Min(count, m_Size - pos);
+        usize                     copied = Min(count, m_Size - pos);
 
-        CPU::UserMemoryProtectionGuard guard;
+        UserMemoryProtectionGuard guard;
         Memory::Copy(destination.As<u8>(), m_Base.Offset<Pointer>(pos).As<u8>(),
                      count);
 
@@ -65,7 +64,7 @@ class [[nodiscard]] UserBuffer
         if (pos < 0) pos = 0;
         count = Min(count, m_Size - pos);
 
-        CPU::UserMemoryProtectionGuard guard;
+        UserMemoryProtectionGuard guard;
         Memory::Copy(m_Base.Offset<Pointer>(pos).As<u8>(), source.As<u8>(),
                      count);
         return count;

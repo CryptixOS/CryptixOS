@@ -9,6 +9,7 @@
 #include <Common.hpp>
 
 #include <Arch/CPU.hpp>
+#include <Arch/User.hpp>
 
 #include <Prism/Containers/Tuple.hpp>
 #include <Prism/Utility/Path.hpp>
@@ -60,7 +61,7 @@ namespace Syscall
     {
         if constexpr (IsSameV<RemoveCvRefType<RemoveReferenceType<T>>,
                               Prism::PathView>)
-            return CPU::AsUser(
+            return AsUser(
                 [value]() -> PathView
                 {
                     return PathView(
@@ -96,7 +97,7 @@ namespace Syscall
             // Convert array to actual function arguments
 
             {
-                CPU::UserMemoryProtectionGuard guard;
+                UserMemoryProtectionGuard guard;
                 std::apply(
                     [&](auto&&... args)
                     {

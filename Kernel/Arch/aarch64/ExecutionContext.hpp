@@ -42,9 +42,11 @@ struct CTOS_PACKED ExecutionContext
     u64 X28;
     CtAliasedField(u64, X29, FramePointer);
     CtAliasedField(u64, X30, Link);
-
-    CtAliasedField(u64, SP, StackPointer);
+    u64 Flags;
     CtAliasedField(u64, PC, ProgramCounter);
+    CtAliasedField(u64, SP, StackPointer);
+    u64 TLS;
+    u64 ErrorCode;
 };
 
 template <>
@@ -63,13 +65,15 @@ struct fmt::formatter<ExecutionContext> : fmt::formatter<std::string>
                 "X19: {:#x}, X20: {:#x}, X21: {:#x}, X22: {:#x}\n"
                 "X23: {:#x}, X24: {:#x}, X25: {:#x}, X26: {:#x}\n"
                 "X27: {:#x}, X28: {:#x}, X29(fp): {:#x}, X30(lr): {:#x}\n"
-                "sp: {:#x}, pc: {:#x}",
+                "flags: {:#x}, pc: {:#x}, sp: {:#x}, tls: {:#x}\n"
+                "ErrorCode: {:#x}",
                 frame.X0, frame.X1, frame.X2, frame.X3, frame.X4, frame.X5,
                 frame.X6, frame.X7, frame.X8, frame.X9, frame.X10, frame.X11,
                 frame.X12, frame.X13, frame.X14, frame.X15, frame.X16,
                 frame.X17, frame.X18, frame.X19, frame.X20, frame.X21,
                 frame.X22, frame.X23, frame.X24, frame.X25, frame.X26,
-                frame.X27, frame.X28, frame.X29, frame.X30, frame.SP, frame.PC),
+                frame.X27, frame.X28, frame.X29, frame.X30, frame.Flags,
+                frame.PC, frame.SP, frame.TLS, frame.ErrorCode),
             ctx);
     }
 };

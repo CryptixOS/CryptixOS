@@ -51,69 +51,7 @@ namespace CPU
     void         HaltAll();
     void         WakeUp(usize id, bool everyone);
 
-    // NOTE(v1tr10l7): allows accessing usermode memory from ring0
-    struct UserMemoryProtectionGuard
-    {
-        UserMemoryProtectionGuard();
-        ~UserMemoryProtectionGuard();
-    };
-
-    template <typename F, typename... Args>
-        requires(!SameAs<Prism::InvokeResultType<F, Args...>, void>)
-    inline decltype(auto) AsUser(F&& f, Args&&... args)
-    {
-        UserMemoryProtectionGuard guard;
-
-        return f(Forward<Args>(args)...);
-    }
-    template <typename T>
-        requires(!SameAs<T, void>)
-    inline decltype(auto) CopyFromUser(const T& value)
-    {
-        UserMemoryProtectionGuard guard;
-
-        return value;
-    }
-    template <typename T>
-        requires(!SameAs<T, void>)
-    inline decltype(auto) CopyFromUser(const T& value, usize size)
-    {
-        T                         copied = {};
-        UserMemoryProtectionGuard guard;
-        Memory::Copy(&copied, &value, size);
-
-        return copied;
-    }
-
-    inline Path CopyStringFromUser(const char* string)
-    {
-        return AsUser([string]() -> Path { return string; });
-    }
-
-    template <typename T>
-        requires(!SameAs<T, void>)
-    inline void CopyToUser(T* userBuffer, const T& value)
-    {
-        UserMemoryProtectionGuard guard;
-
-        *userBuffer = value;
-    }
-    inline void CopyStringToUser(StringView source, char* dest, isize count)
-    {
-        UserMemoryProtectionGuard guard;
-
-        if (count < 0) count = source.Size();
-        source.Copy(dest, count);
-    }
-
-    template <typename F, typename... Args>
-    inline static void AsUser(F&& f, Args&&... args)
-    {
-        UserMemoryProtectionGuard guard;
-        f(Forward<Args>(args)...);
-    }
-
-    bool DuringSyscall();
-    void OnSyscallEnter(usize index);
-    void OnSyscallLeave();
+    bool         DuringSyscall();
+    void         OnSyscallEnter(usize index);
+    void         OnSyscallLeave();
 }; // namespace CPU

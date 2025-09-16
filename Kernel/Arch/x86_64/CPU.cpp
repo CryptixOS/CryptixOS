@@ -551,9 +551,6 @@ namespace CPU
         if (id.rcx & CPU_FEAT_ECX_UMIP) WriteCR4(ReadCR4() | CR4::UMIP);
     }
 
-    UserMemoryProtectionGuard::UserMemoryProtectionGuard() { Stac(); }
-    UserMemoryProtectionGuard::~UserMemoryProtectionGuard() { Clac(); }
-
     bool DuringSyscall()
     {
         auto       cpu = GetCurrent();

@@ -90,13 +90,13 @@ namespace API::Process
             old.sa_flags    = oldSignalAction.Flags;
             old.sa_restorer = nullptr;
             *reinterpret_cast<usize*>(&old.sa_mask) = oldSignalAction.Mask;
-            CPU::CopyToUser(oldAction, old);
+            CopyToUser(oldAction, old);
         }
 
         if (!action) return 0;
         SignalAction newAction{};
         {
-            CPU::UserMemoryProtectionGuard guard;
+            UserMemoryProtectionGuard guard;
             newAction.VirtualAddress = action->sa_handler;
             newAction.Flags          = action->sa_flags;
             newAction.Mask = *reinterpret_cast<const u32*>(&action->sa_mask);
@@ -135,15 +135,14 @@ namespace API::Process
             if (!process->ValidateWrite(oldSet, sizeof(SignalSet)))
                 return Error(EFAULT);
 
-            CPU::CopyToUser(reinterpret_cast<SignalSet*>(oldSet), currentMask);
+            CopyToUser(reinterpret_cast<SignalSet*>(oldSet), currentMask);
         }
 
         if (!set) return 0;
         if (!process->ValidateRead(set, sizeof(SignalSet)))
             return Error(EFAULT);
 
-        auto newSet
-            = CPU::CopyFromUser(*reinterpret_cast<const SignalSet*>(set));
+        auto newSet = CopyFromUser(*reinterpret_cast<const SignalSet*>(set));
         newSet.Remove(SIGKILL);
         newSet.Remove(SIGSTOP);
 
@@ -214,7 +213,7 @@ namespace API::Process
             if (!current->ValidateWrite(childTid, sizeof(i32)))
                 return Error(EFAULT);
 
-            CPU::CopyToUser(childTid, tid);
+            CopyToUser(childTid, tid);
         }
         if (flags & CLONE_PARENT_SETTID)
         {
@@ -222,7 +221,7 @@ namespace API::Process
             if (!current->ValidateWrite(parentTid, sizeof(i32)))
                 return Error(EFAULT);
 
-            CPU::CopyToUser(parentTid, current->ID());
+            CopyToUser(parentTid, current->ID());
         }
 
         return clonedThread->Parent()->ID();
@@ -256,7 +255,7 @@ namespace API::Process
         CPU::SetInterruptFlag(false);
 
         auto process = Process::Current();
-        Path path    = CPU::CopyStringFromUser(pathname);
+        Path path    = CopyStringFromUser(pathname);
 
         process->Exec(path.Raw(), argv, envp);
         return process->Exit(-1);
@@ -467,7 +466,7 @@ namespace API::Process
         if (!uargs) return Error(EINVAL);
         if (!current->ValidateRead(uargs)) return Error(EFAULT);
 
-        clone_args args         = CPU::CopyFromUser(*uargs, size);
+        clone_args args         = CopyFromUser(*uargs, size);
         auto       flags        = args.flags;
         i32*       parentTid    = reinterpret_cast<i32*>(args.parent_tid);
 
@@ -480,7 +479,7 @@ namespace API::Process
             if (!current->ValidateWrite(parentTid, sizeof(i32)))
                 return Error(EFAULT);
 
-            CPU::CopyToUser(parentTid, tid);
+            CopyToUser(parentTid, tid);
         }
 
         return tid;

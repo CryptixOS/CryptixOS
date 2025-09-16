@@ -8,33 +8,39 @@
 #include <Arch/User.hpp>
 #include <Debug/Assertions.hpp>
 
-namespace Arch
+UserMemoryProtectionGuard::UserMemoryProtectionGuard()
 {
-    ErrorOr<void> CopyToUser(Pointer dest, Pointer src, usize count)
-    {
-        if (!InUserRange(dest, count)) return Error(EFAULT);
+    CPU::EnableUserAccess();
+}
+UserMemoryProtectionGuard::~UserMemoryProtectionGuard()
+{
+    CPU::DisableUserAccess();
+}
 
-        Assert(!InUserRange(src, count));
-        CPU::UserMemoryProtectionGuard guard;
+ErrorOr<void> CopyToUser(Pointer dest, Pointer src, usize count)
+{
+    if (!InUserRange(dest, count)) return Error(EFAULT);
 
-        Memory::Copy(dest.As<void>(), src.As<void>(), count);
-        return {};
-    }
-    ErrorOr<void> CopyFromUser(Pointer dest, Pointer src, usize count)
-    {
-        if (!InUserRange(src, count)) return Error(EFAULT);
-        Assert(!InUserRange(dest, count));
-        CPU::UserMemoryProtectionGuard guard;
+    Assert(!InUserRange(src, count));
+    UserMemoryProtectionGuard guard;
 
-        Memory::Copy(dest.As<void>(), src.As<void>(), count);
-        return {};
-    }
-    ErrorOr<void> FillUser(Pointer buffer, isize value, usize count)
-    {
-        if (!InUserRange(buffer, count)) return Error(EFAULT);
-        CPU::UserMemoryProtectionGuard guard;
+    Memory::Copy(dest.As<void>(), src.As<void>(), count);
+    return {};
+}
+ErrorOr<void> CopyFromUser(Pointer dest, Pointer src, usize count)
+{
+    if (!InUserRange(src, count)) return Error(EFAULT);
+    Assert(!InUserRange(dest, count));
+    UserMemoryProtectionGuard guard;
 
-        Memory::Fill(buffer.As<void>(), value, count);
-        return {};
-    }
-}; // namespace Arch
+    Memory::Copy(dest.As<void>(), src.As<void>(), count);
+    return {};
+}
+ErrorOr<void> FillUser(Pointer buffer, isize value, usize count)
+{
+    if (!InUserRange(buffer, count)) return Error(EFAULT);
+    UserMemoryProtectionGuard guard;
+
+    Memory::Fill(buffer.As<void>(), value, count);
+    return {};
+}

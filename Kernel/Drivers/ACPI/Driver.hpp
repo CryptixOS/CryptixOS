@@ -11,6 +11,7 @@
 #include <Prism/Containers/IntrusiveRefList.hpp>
 #include <Prism/Containers/Span.hpp>
 #include <Prism/Core/Error.hpp>
+#include <Prism/String/String.hpp>
 
 namespace ACPI
 {

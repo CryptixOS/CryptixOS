@@ -26,4 +26,7 @@ namespace CPU
 
     CTOS_ALWAYS_INLINE void EnableInterrupts() { Asm("msr daifclr, #0b1111"); }
     CTOS_ALWAYS_INLINE void DisableInterrupts() { Asm("msr daifset, #0b1111"); }
+
+    CTOS_ALWAYS_INLINE void EnableUserAccess() { Asm("straf" :: : "cc"); }
+    CTOS_ALWAYS_INLINE void DisableUserAccess() { Asm("clraf" :: : "cc"); }
 }; // namespace CPU

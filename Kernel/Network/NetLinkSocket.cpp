@@ -6,10 +6,14 @@
  */
 #include <API/Posix/linux/netlink.h>
 #include <Network/NetLinkSocket.hpp>
+#include <Scheduler/Process.hpp>
+
+static UnorderedMap<NetLinkProtocol, NetLinkProtocolInfo> s_NetLinkProtocols;
 
 NetLinkSocket::NetLinkSocket(SocketDomain domain, SocketType type,
                              NetLinkProtocol protocol)
     : Socket(domain, type, static_cast<NetworkProtocol>(protocol))
+    , m_NetLinkProtocol(protocol)
 {
 }
 
@@ -28,9 +32,31 @@ ErrorOr<NetLinkSocket*> NetLinkSocket::Create(SocketDomain    domain,
 
 ErrorOr<void> NetLinkSocket::Bind(const struct sockaddr* addr, socklen_t len)
 {
+    auto        process = Process::Current();
     sockaddr_nl nladdr
-        = CPU::CopyFromUser(*reinterpret_cast<const sockaddr_nl*>(addr));
+        = CopyFromUser(*reinterpret_cast<const sockaddr_nl*>(addr));
     if (nladdr.nl_family != AF_NETLINK) return Error(EINVAL);
+
+    if (nladdr.nl_groups)
+    {
+        if (!process->IsSuperUser()) return Error(EPERM);
+        if (!s_NetLinkProtocols[m_NetLinkProtocol].Registered)
+            return Error(ENOENT);
+
+        if (m_Groups.Size() >= s_NetLinkProtocols[m_NetLinkProtocol].Groups)
+            return {};
+        m_Groups.Resize(s_NetLinkProtocols[m_NetLinkProtocol].Groups);
+        // realloc groups
+    }
+
+    if (m_Pid && nladdr.nl_pid != m_Pid) return Error(EINVAL);
+    else if (!m_Pid)
+    {
+        // Insert socket
+        // autobind
+    }
+
+    if (!nladdr.nl_groups && (m_Groups.Empty() || !m_Groups[0])) return {};
 
     return Error(ENOSYS);
 }

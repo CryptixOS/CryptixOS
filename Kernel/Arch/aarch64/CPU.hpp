@@ -7,25 +7,47 @@
 #pragma once
 
 #include <Arch/aarch64/CPUIntrinsics.hpp>
+#include <Library/Locking/Spinlock.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
 
 struct Thread;
 namespace CPU
 {
     struct CPU
     {
-        usize    ID;
-        void*    Empty;
+        usize     ID;
+        void*     Empty;
 
-        upointer ThreadStack;
-        upointer KernelStack;
+        upointer  ThreadStack;
+        upointer  KernelStack;
 
-        usize    HardwareID;
-        bool     IsOnline = false;
+        usize     HardwareID;
+        bool      IsOnline       = false;
 
-        Thread*  Idle;
-        Thread*  CurrentThread;
+        usize     FpuStorageSize = 512;
+        upointer  FpuStorage     = 0;
 
-        bool     DuringSyscall = false;
-        usize    LastSyscallID = usize(-1);
+        Spinlock* Lock;
+        bool      DuringSyscall = false;
+        usize     LastSyscallID = usize(-1);
+
+        ErrorCode Error;
+        Thread*   Idle;
+        Thread*   CurrentThread;
+
+        using HookType = IntrusiveRefListHook<CPU, CPU*>;
+        friend class IntrusiveRefList<CPU, HookType>;
+        friend struct IntrusiveRefListHook<CPU, CPU*>;
+
+        using List = IntrusiveRefList<CPU, HookType>;
+        HookType Hook;
     };
+
+    u64        GetBspId();
+    CPU&       GetBsp();
+    CPU&       GetCPU(usize id);
+
+    CPU::List& GetCPUs();
+    u64        GetOnlineCPUsCount();
+    u64        GetCurrentID();
 }; // namespace CPU

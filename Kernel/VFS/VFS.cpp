@@ -67,6 +67,7 @@ namespace VFS
     {
         for (;;)
         {
+            LogDebug("Sync");
             Time::NanoSleep(15'000'000'000);
             Sync();
         }

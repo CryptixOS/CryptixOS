@@ -24,7 +24,7 @@ namespace API::Time
         usize ns = 0;
         {
             timespec sleepDuration = {};
-            if (duration) sleepDuration = CPU::CopyFromUser(*duration);
+            if (duration) sleepDuration = CopyFromUser(*duration);
             if (sleepDuration.tv_sec < 0 || sleepDuration.tv_nsec < 0)
                 return Error(EINVAL);
 
@@ -34,7 +34,7 @@ namespace API::Time
         if (!status) return Error(status.Error());
 
         timespec reminder{};
-        if (rem) CPU::CopyToUser(rem, reminder);
+        if (rem) CopyToUser(rem, reminder);
         return 0;
     }
     ErrorOr<isize> GetITimer(isize which, struct itimerval* currentValue)
@@ -52,7 +52,7 @@ namespace API::Time
         if (!process->ValidateRead(value, sizeof(itimerval)))
             return Error(EFAULT);
         // FIXME(v1tr10l7): Validate <which>
-        newValue = CPU::CopyFromUser(*value);
+        newValue = CopyFromUser(*value);
 
         LogDebug(
             "SetITimer: value: {{ .it_interval: {{ .tv_usec: {}, .tv_sec: {} "
@@ -87,7 +87,7 @@ namespace API::Time
         if (oldValue)
         {
             if (!process->ValidateWrite(oldValue)) return Error(EFAULT);
-            CPU::CopyToUser(oldValue, previousState);
+            CopyToUser(oldValue, previousState);
         }
         return 0;
     }
@@ -175,7 +175,7 @@ namespace API::Time
         auto current = Process::GetCurrent();
         if (!current->ValidateWrite(res)) return Error(EFAULT);
 
-        CPU::AsUser([res, &ts]() { *res = ts; });
+        AsUser([res, &ts]() { *res = ts; });
         return 0;
     }
 }; // namespace API::Time

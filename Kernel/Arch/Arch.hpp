@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Common.hpp>
+#include <Compiler.hpp>
 
 #include <API/Posix/time.h>
 
@@ -22,16 +22,16 @@
 class HardwareTimer;
 namespace Arch
 {
-    KERNEL_INIT_CODE
+    KERNEL_INIT_SECTION
     void InstallExceptions();
-    KERNEL_INIT_CODE
-    void Initialize();
+    KERNEL_INIT_SECTION
+    void               Initialize();
 
-    [[noreturn]] void Halt();
-    void              Pause();
+    CTOS_NORETURN void Halt();
+    void               Pause();
 
-    void              PowerOff();
-    void              Reboot();
+    void               PowerOff();
+    void               Reboot();
 
-    time_t            GetEpoch();
+    time_t             GetEpoch();
 }; // namespace Arch

@@ -8,6 +8,14 @@
 
 #include <Network/Socket.hpp>
 
+class NetLinkSocket;
+struct NetLinkProtocolInfo
+{
+    bool                   Registered = false;
+    usize                  Groups     = 0;
+    Vector<NetLinkSocket*> BoundSockets;
+};
+
 class NetLinkSocket : public Socket
 {
   public:
@@ -19,4 +27,9 @@ class NetLinkSocket : public Socket
 
     virtual ErrorOr<void>          Bind(const struct sockaddr* addr,
                                         socklen_t              len) override;
+
+  private:
+    NetLinkProtocol m_NetLinkProtocol;
+    u64             m_Pid;
+    Vector<usize>   m_Groups;
 };

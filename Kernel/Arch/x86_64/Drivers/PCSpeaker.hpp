@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Common.hpp>
+#include <Prism/Core/Types.hpp>
 
 namespace PCSpeaker
 {

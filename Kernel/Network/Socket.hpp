@@ -10,6 +10,11 @@
 #include <Prism/Core/Types.hpp>
 #include <VFS/File.hpp>
 
+enum class SocketState
+{
+    eUnconnected = 0,
+    eConnected   = 1,
+};
 class Socket : public File
 {
   public:
@@ -25,4 +30,5 @@ class Socket : public File
     SocketDomain    m_Domain = SocketDomain::eUnspecified;
     SocketType      m_Type   = SocketType::eRaw;
     NetworkProtocol m_Protocol;
+    SocketState     m_State = SocketState::eUnconnected;
 };

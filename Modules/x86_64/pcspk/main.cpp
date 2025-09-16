@@ -49,9 +49,8 @@ class PCSpeakerDevice : public CharacterDevice
         {
             u16 Tone         = 0;
             u16 Milliseconds = 0;
-        } command
-            = CPU::AsUser([src]() -> Command
-                          { return *reinterpret_cast<const Command*>(src); });
+        } command = AsUser([src]() -> Command
+                           { return *reinterpret_cast<const Command*>(src); });
 
         if (command.Tone < 20 || command.Tone > 20'000
             || command.Milliseconds == 0)

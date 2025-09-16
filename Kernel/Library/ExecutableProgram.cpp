@@ -60,7 +60,7 @@ Pointer ExecutableProgram::PrepareStack(Pointer            stackTopWritable,
     (void)FillRandomBytes;
     StackBuilder                   builder(stackTopWritable);
 
-    CPU::UserMemoryProtectionGuard guard;
+    UserMemoryProtectionGuard guard;
 
 #if 1
     // --- 1. Copy envArr strings onto stack ---
