@@ -332,36 +332,36 @@ namespace API::Process
     ErrorOr<UserID> GetUid()
     {
         auto process = Process::Current();
-        return process->Credentials().UserID;
+        return process->UserID();
     }
     ErrorOr<GroupID> GetGid()
     {
         auto process = Process::Current();
-        return process->Credentials().GroupID;
+        return process->GroupID();
     }
     ErrorOr<isize> SetUid(UserID uid)
     {
         auto process = Process::Current();
-        process->SetUID(uid);
+        process->SetUserID(uid);
 
         return {};
     }
     ErrorOr<isize> SetGid(GroupID gid)
     {
         auto process = Process::Current();
-        process->SetGID(gid);
+        process->SetGroupID(gid);
 
         return {};
     }
     ErrorOr<UserID> GetEUid()
     {
         auto process = Process::Current();
-        return process->Credentials().EffectiveUserID;
+        return process->EffectiveUserID();
     }
     ErrorOr<GroupID> GetEGid()
     {
         auto process = Process::Current();
-        return process->Credentials().EffectiveGroupID;
+        return process->EffectiveGroupID();
     }
     ErrorOr<isize> SetPGid(ProcessID pid, ProcessID pgid)
     {

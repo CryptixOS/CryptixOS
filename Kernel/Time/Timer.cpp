@@ -4,4 +4,19 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Time/Time.hpp>
 
+namespace Time
+{
+    void Timer::Arm(usize id, Timestep expiration, Timestep reloadValue)
+    {
+        Index       = id;
+        When        = expiration;
+        ReloadValue = reloadValue;
+    }
+    void Timer::Disarm()
+    {
+        Index = NullOpt;
+        OnFired.Reset();
+    }
+}; // namespace Time

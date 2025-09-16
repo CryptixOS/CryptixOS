@@ -6,32 +6,32 @@
  */
 #pragma once
 
+#include <Prism/Utility/Delegate.hpp>
 #include <Prism/Utility/Time.hpp>
 #include <Scheduler/Event.hpp>
 
 namespace Time
 {
-    struct Timer
+    struct Timer : public RefCounted
     {
-        explicit Timer() = default;
-        explicit Timer(Timestep when)
-            : When(when)
-        {
-            Arm();
-        }
-        inline void Fire(Timestep when)
-        {
-            When = when;
-            Arm();
-        }
+        explicit Timer()       = default;
 
-        Optional<usize> Index = NullOpt;
-        bool            Fired = false;
-        Timestep        When{0};
-        Event           Event;
+        Optional<usize>  Index = NullOpt;
+        bool             Fired = false;
+        Timestep         When{0};
+        Timestep         ReloadValue{0};
+        Event            Event;
+        Delegate<void()> OnFired;
 
-        void            Arm();
-        void            Disarm();
+        void Arm(usize id, Timestep expiration, Timestep reloadValue = 0);
+        template <typename F>
+        inline void Arm(usize id, Timestep expiration, F fn,
+                        Timestep reloadValue = 0)
+        {
+            OnFired.BindLambda(fn);
+            Arm(id, expiration, reloadValue);
+        }
+        void Disarm();
     };
 }; // namespace Time
 using Time::Timer;

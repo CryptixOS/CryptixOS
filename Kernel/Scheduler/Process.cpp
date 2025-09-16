@@ -72,6 +72,8 @@ Process::Process(Process* parent, StringView name,
         m_FsView       = CreateRef<FilesystemView>();
         m_FdTable      = CreateRef<class FileDescriptorTable>();
     }
+
+    for (auto& timer : m_Timers) timer = CreateRef<struct Timer>();
 }
 Process::~Process()
 {
@@ -198,33 +200,47 @@ ProcessID Process::SetSid()
     return m_ID;
 }
 
-ErrorOr<isize> Process::SetReUID(UserID ruid, UserID euid)
+ErrorOr<void> Process::SetUserID(::UserID uid)
 {
-    if (ruid != static_cast<UserID>(-1)) m_Credentials.UserID = ruid;
-    if (euid != static_cast<UserID>(-1)) m_Credentials.EffectiveUserID = euid;
+    m_Credentials.UserID = uid;
+    return {};
+}
+ErrorOr<void> Process::SetGroupID(::GroupID gid)
+{
+    m_Credentials.GroupID = gid;
+    return {};
+}
+
+ErrorOr<isize> Process::SetReUID(::UserID ruid, ::UserID euid)
+{
+    if (ruid != static_cast<::UserID>(-1)) m_Credentials.UserID = ruid;
+    if (euid != static_cast<::UserID>(-1)) m_Credentials.EffectiveUserID = euid;
 
     return {};
 }
-ErrorOr<isize> Process::SetReGID(GroupID rgid, GroupID egid)
+ErrorOr<isize> Process::SetReGID(::GroupID rgid, ::GroupID egid)
 {
-    if (rgid != static_cast<GroupID>(-1)) m_Credentials.GroupID = rgid;
-    if (egid != static_cast<GroupID>(-1)) m_Credentials.EffectiveGroupID = egid;
+    if (rgid != static_cast<::GroupID>(-1)) m_Credentials.GroupID = rgid;
+    if (egid != static_cast<::GroupID>(-1))
+        m_Credentials.EffectiveGroupID = egid;
 
     return {};
 }
-ErrorOr<isize> Process::SetResUID(UserID ruid, UserID euid, UserID suid)
+ErrorOr<isize> Process::SetResUID(::UserID ruid, ::UserID euid, ::UserID suid)
 {
-    if (ruid != static_cast<UserID>(-1)) m_Credentials.UserID = ruid;
-    if (euid != static_cast<UserID>(-1)) m_Credentials.EffectiveUserID = euid;
-    if (suid != static_cast<UserID>(-1)) m_Credentials.SetUserID = suid;
+    if (ruid != static_cast<::UserID>(-1)) m_Credentials.UserID = ruid;
+    if (euid != static_cast<::UserID>(-1)) m_Credentials.EffectiveUserID = euid;
+    if (suid != static_cast<::UserID>(-1)) m_Credentials.SetUserID = suid;
 
     return {};
 }
-ErrorOr<isize> Process::SetResGID(GroupID rgid, GroupID egid, GroupID sgid)
+ErrorOr<isize> Process::SetResGID(::GroupID rgid, ::GroupID egid,
+                                  ::GroupID sgid)
 {
-    if (rgid != static_cast<GroupID>(-1)) m_Credentials.GroupID = rgid;
-    if (egid != static_cast<GroupID>(-1)) m_Credentials.EffectiveGroupID = egid;
-    if (sgid != static_cast<GroupID>(-1)) m_Credentials.SetGroupID = sgid;
+    if (rgid != static_cast<::GroupID>(-1)) m_Credentials.GroupID = rgid;
+    if (egid != static_cast<::GroupID>(-1))
+        m_Credentials.EffectiveGroupID = egid;
+    if (sgid != static_cast<::GroupID>(-1)) m_Credentials.SetGroupID = sgid;
 
     return {};
 }
@@ -311,12 +327,12 @@ ErrorOr<isize> Process::InsertFd(Ref<FileDescriptor> fd)
 
 ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
 {
-    auto fifo     = new Fifo();
-    auto readerFd = fifo->OpenDirection(Fifo::Direction::eRead);
-    CPU::AsUser([&]() { pipeFds[0] = m_FdTable->Insert(readerFd); });
+    auto fifo     = CreateRef<Fifo>();
 
+    auto readerFd = fifo->OpenDirection(Fifo::Direction::eRead);
+    CPU::CopyToUser(pipeFds, static_cast<i32>(m_FdTable->Insert(readerFd)));
     auto writerFd = fifo->OpenDirection(Fifo::Direction::eWrite);
-    CPU::AsUser([&]() { pipeFds[1] = m_FdTable->Insert(writerFd); });
+    CPU::CopyToUser(pipeFds + 1, static_cast<i32>(m_FdTable->Insert(writerFd)));
 
     return 0;
 }

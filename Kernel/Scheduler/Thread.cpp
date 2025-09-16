@@ -346,7 +346,6 @@ KeyValuePair<upointer, upointer> Thread::AllocateUserStack()
     Pointer guardVirt
         = m_Parent->m_UserStackTop.Offset(-pageCount * PMM::PAGE_SIZE);
     Pointer stackVirt = guardVirt.Offset(PMM::PAGE_SIZE);
-    // m_Parent->m_UserStackTop.Raw() - CPU::USER_STACK_SIZE;
 
     Assert(m_Parent->PageMap->MapRange(
         stackVirt, stackPhys, CPU::USER_STACK_SIZE,

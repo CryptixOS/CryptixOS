@@ -8,31 +8,45 @@
 
 #include <Prism/Core/Types.hpp>
 
-using cc_t           = u8;
-using speed_t        = u32;
-using tcflag_t       = u32;
+using cc_t           = unsigned char;
+using speed_t        = unsigned int;
+using tcflag_t       = unsigned int;
 
 constexpr usize NCCS = 0x20;
 
 struct termios
 {
-    tcflag_t c_iflag;    /* input mode flags */
-    tcflag_t c_oflag;    /* output mode flags */
-    tcflag_t c_cflag;    /* control mode flags */
-    tcflag_t c_lflag;    /* local mode flags */
-    cc_t     c_line;     /* line discipline */
-    cc_t     c_cc[NCCS]; /* control characters */
+    /* input mode flags */
+    tcflag_t c_iflag;
+    /* output mode flags */
+    tcflag_t c_oflag;
+    /* control mode flags */
+    tcflag_t c_cflag;
+    /* local mode flags */
+    tcflag_t c_lflag;
+    /* line discipline */
+    cc_t     c_line;
+    /* control characters */
+    cc_t     c_cc[NCCS];
 };
 struct ktermios
 {
-    tcflag_t c_iflag;    /* input mode flags */
-    tcflag_t c_oflag;    /* output mode flags */
-    tcflag_t c_cflag;    /* control mode flags */
-    tcflag_t c_lflag;    /* local mode flags */
-    cc_t     c_line;     /* line discipline */
-    cc_t     c_cc[NCCS]; /* control characters */
-    speed_t  c_ispeed;   /* input speed */
-    speed_t  c_ospeed;   /* output speed */
+    /* input mode flags */
+    tcflag_t c_iflag;
+    /* output mode flags */
+    tcflag_t c_oflag;
+    /* control mode flags */
+    tcflag_t c_cflag;
+    /* local mode flags */
+    tcflag_t c_lflag;
+    /* line discipline */
+    cc_t     c_line;
+    /* control characters */
+    cc_t     c_cc[NCCS];
+    /* input speed */
+    speed_t  c_ispeed;
+    /* output speed */
+    speed_t  c_ospeed;
 };
 
 // c_cc
@@ -56,73 +70,73 @@ constexpr usize VEOL2      = 16;
 
 // c_iflag
 // ignore break condition
-constexpr usize IGNBRK     = 0x000001;
+constexpr usize IGNBRK     = 000001;
 // Signal interrupt on break
-constexpr usize BRKINT     = 0x000002;
+constexpr usize BRKINT     = 000002;
 // Ignore characters with parity errors
-constexpr usize IGNPAR     = 0x000004;
+constexpr usize IGNPAR     = 000004;
 // Mark parity and framing errors
-constexpr usize PARMRK     = 0x000010;
+constexpr usize PARMRK     = 000010;
 // Enable input parity check
-constexpr usize INPCK      = 0x000020;
+constexpr usize INPCK      = 000020;
 // Strip 8th bit off characters
-constexpr usize ISTRIP     = 0x000040;
+constexpr usize ISTRIP     = 000040;
 // Map NL to CR on input
-constexpr usize INLCR      = 0x000100;
+constexpr usize INLCR      = 000100;
 // Ignore CR
-constexpr usize IGNCR      = 0x000200;
+constexpr usize IGNCR      = 000200;
 // Map CR to NL on input
-constexpr usize ICRNL      = 0x000400;
+constexpr usize ICRNL      = 000400;
 // Map uppercase characters to lowercase on input(not in POSIX)
-constexpr usize IUCLC      = 0x001000;
+constexpr usize IUCLC      = 001000;
 // Enable start/stop output control
-constexpr usize IXON       = 0x0002000;
+constexpr usize IXON       = 0002000;
 // Enable any character to restart output
-constexpr usize IXANY      = 0x0004000;
+constexpr usize IXANY      = 0004000;
 // Enable start/stop input control
-constexpr usize IXOFF      = 0x0010000;
+constexpr usize IXOFF      = 0010000;
 // Ring bell when input queue is full(not in POSIX)
-constexpr usize IMAXBEL    = 0x0020000;
+constexpr usize IMAXBEL    = 0020000;
 // Input is UTF-8
-constexpr usize IUTF8      = 0x0040000;
+constexpr usize IUTF8      = 0040000;
 
 // c_oflag
 // Post-process output
-constexpr usize OPOST      = 0x0000001;
+constexpr usize OPOST      = 0000001;
 // Map lowercase characters to uppercase on output (not in POSIX)
-constexpr usize OLCUC      = 0x0000002;
+constexpr usize OLCUC      = 0000002;
 // Map NL to CR-NL on output
-constexpr usize ONLCR      = 0x0000004;
+constexpr usize ONLCR      = 0000004;
 // Map CR to NL on output
-constexpr usize OCRNL      = 0x0000010;
+constexpr usize OCRNL      = 0000010;
 // No CR output at column 0
-constexpr usize ONOCR      = 0x0000020;
+constexpr usize ONOCR      = 0000020;
 // NL performs CR function
-constexpr usize ONLRET     = 0x0000020;
+constexpr usize ONLRET     = 0000020;
 // Use fill characters for delay
-constexpr usize OFILL      = 0x0000100;
+constexpr usize OFILL      = 0000100;
 // Fill is DEL
-constexpr usize OFDEL      = 0x00002000;
+constexpr usize OFDEL      = 00002000;
 constexpr usize XTABS      = 0014000;
 
 // c_cflag
 // Hang up
-constexpr usize B0         = 0x0000000;
-constexpr usize B50        = 0x0000001;
-constexpr usize B75        = 0x0000002;
-constexpr usize B110       = 0x0000003;
-constexpr usize B134       = 0x0000004;
-constexpr usize B150       = 0x0000005;
-constexpr usize B200       = 0x0000006;
-constexpr usize B300       = 0x0000007;
-constexpr usize B600       = 0x0000010;
-constexpr usize B1200      = 0x0000011;
-constexpr usize B1800      = 0x0000012;
-constexpr usize B2400      = 0x0000013;
-constexpr usize B4800      = 0x0000014;
-constexpr usize B9600      = 0x0000015;
-constexpr usize B19200     = 0x0000016;
-constexpr usize B38400     = 0x0000017;
+constexpr usize B0         = 0000000;
+constexpr usize B50        = 0000001;
+constexpr usize B75        = 0000002;
+constexpr usize B110       = 0000003;
+constexpr usize B134       = 0000004;
+constexpr usize B150       = 0000005;
+constexpr usize B200       = 0000006;
+constexpr usize B300       = 0000007;
+constexpr usize B600       = 0000010;
+constexpr usize B1200      = 0000011;
+constexpr usize B1800      = 0000012;
+constexpr usize B2400      = 0000013;
+constexpr usize B4800      = 0000014;
+constexpr usize B9600      = 0000015;
+constexpr usize B19200     = 0000016;
+constexpr usize B38400     = 0000017;
 
 /* Extra output baud rates (not in POSIX).  */
 constexpr usize B57600     = 0010001;
@@ -142,37 +156,37 @@ constexpr usize B3500000   = 0010016;
 constexpr usize B4000000   = 0010017;
 constexpr usize __MAX_BAUD = B4000000;
 
-constexpr usize CSIZE      = 0x0000060;
-constexpr usize CS5        = 0x0000000;
-constexpr usize CS6        = 0x0000020;
-constexpr usize CS7        = 0x0000040;
-constexpr usize CS8        = 0x0000060;
-constexpr usize CSTOPB     = 0x0000100;
-constexpr usize CREAD      = 0x0000200;
-constexpr usize PARENB     = 0x0000400;
-constexpr usize PARODD     = 0x0001000;
-constexpr usize HUPCL      = 0x0002000;
-constexpr usize CLOCAL     = 0x0004000;
+constexpr usize CSIZE      = 0000060;
+constexpr usize CS5        = 0000000;
+constexpr usize CS6        = 0000020;
+constexpr usize CS7        = 0000040;
+constexpr usize CS8        = 0000060;
+constexpr usize CSTOPB     = 0000100;
+constexpr usize CREAD      = 0000200;
+constexpr usize PARENB     = 0000400;
+constexpr usize PARODD     = 0001000;
+constexpr usize HUPCL      = 0002000;
+constexpr usize CLOCAL     = 0004000;
 
 // c_lflag
 // Enable signals
-constexpr usize ISIG       = 0x0000001;
+constexpr usize ISIG       = 0000001;
 // Canonical input (erase and kill processing)
-constexpr usize ICANON     = 0x0000002;
+constexpr usize ICANON     = 0000002;
 // Enable echo
-constexpr usize ECHO       = 0x0000010;
+constexpr usize ECHO       = 0000010;
 // Echo erase character as error-correcting backspace
-constexpr usize ECHOE      = 0x0000020;
+constexpr usize ECHOE      = 0000020;
 // Echo KILL
-constexpr usize ECHOK      = 0x0000040;
+constexpr usize ECHOK      = 0000040;
 // Echo NL
-constexpr usize ECHONL     = 0x0000100;
+constexpr usize ECHONL     = 0000100;
 // Disable flush after interrupt or quit
-constexpr usize NOFLSH     = 0x0000200;
+constexpr usize NOFLSH     = 0000200;
 // Send SIGTTOU for background output
-constexpr usize TOSTOP     = 0x0000400;
+constexpr usize TOSTOP     = 0000400;
 // If ECHO is also set, terminal special characters other than TAB, NL, START
-// and STOP are echoed as ^X, where X is the character with ASCII code 0x40
+// and STOP are echoed as ^X, where X is the character with ASCII code 40
 // greater than the special character (not in POSIX). Enable
 // implementation-defined input processing
 constexpr usize ECHOCTL    = 0001000;
@@ -182,7 +196,7 @@ constexpr usize ECHOPRT    = 0002000;
 // If ICANON is also set, KILL is echoed by erasing each character on the line,
 // as specified by ECHOE and ECHOPRT (not in POSIX).
 constexpr usize ECHOKE     = 0004000;
-constexpr usize IEXTEN     = 0x100000;
+constexpr usize IEXTEN     = 100000;
 
 constexpr usize TCOOFF     = 0;
 constexpr usize TCOON      = 1;

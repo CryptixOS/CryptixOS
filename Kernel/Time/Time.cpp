@@ -18,7 +18,6 @@
 #include <Prism/Containers/Deque.hpp>
 
 #include <Time/Time.hpp>
-#include <Time/Timer.hpp>
 
 namespace Time
 {
@@ -32,27 +31,9 @@ namespace Time
         Timestep            s_RealTime;
         Timestep            s_Monotonic;
 
-        Deque<Timer*>       s_ArmedTimers;
+        Deque<Ref<Timer>>   s_ArmedTimers;
         Spinlock            s_TimersLock;
     } // namespace
-
-    void Timer::Arm()
-    {
-        ScopedLock guard(s_TimersLock);
-
-        Index = s_ArmedTimers.Size();
-        s_ArmedTimers.PushBack(this);
-    }
-    void Timer::Disarm()
-    {
-        ScopedLock guard(s_TimersLock);
-        auto       it = s_ArmedTimers.begin();
-        for (; it != s_ArmedTimers.end(); it++)
-            if (*it == this) break;
-
-        if (it != s_ArmedTimers.end()) s_ArmedTimers.Erase(it);
-        Index = NullOpt;
-    }
 
     void Initialize(DateTime dateAtBoot)
     {
@@ -122,6 +103,26 @@ namespace Time
         return {};
     }
 
+    usize ArmTimer(Ref<Timer> timer, Timestep expiration, Timestep reloadValue)
+    {
+        ScopedLock guard(s_TimersLock, true);
+
+        auto       id = s_ArmedTimers.Size();
+        timer->Arm(id, expiration, reloadValue);
+        s_ArmedTimers.EmplaceBack(timer);
+        return id;
+    }
+    void DisarmTimer(::Ref<Timer> timer)
+    {
+        ScopedLock guard(s_TimersLock, true);
+        auto       it = s_ArmedTimers.begin();
+        for (; it != s_ArmedTimers.end(); it++)
+            if (*it == timer) break;
+
+        if (it != s_ArmedTimers.end()) s_ArmedTimers.Erase(it);
+        timer->Disarm();
+    }
+
     Timestep GetBootTime() { return s_BootTime; }
     Timestep GetTimeSinceBoot() { return GetRealTime() - s_BootTime; }
     Timestep GetRealTime() { return s_RealTime; }
@@ -147,32 +148,30 @@ namespace Time
 
     ErrorOr<void> NanoSleep(usize ns)
     {
-        Timer* timer = new Timer(ns);
-        timer->Event.Await(true);
-        timer->Disarm();
+        ::Ref<Timer> timer = CreateRef<Timer>();
+        ArmTimer(timer, ns);
 
-        delete timer;
+        timer->Event.Await(true);
         return {};
     }
     ErrorOr<void> Sleep(const timespec* duration, timespec* remaining)
     {
-        LogDebug("Sleeping");
         usize ns = static_cast<usize>(duration->tv_sec) * 1'000'000'000;
         if (ns == 0) ns = static_cast<usize>(duration->tv_nsec);
 
-        Timer* timer = new Timer(ns);
+        ::Ref<Timer> timer = CreateRef<Timer>();
+        ArmTimer(timer, ns);
 
         if (!timer->Event.Await(true))
         {
             if (remaining)
                 *remaining = {static_cast<isize>(timer->When.Seconds()),
                               static_cast<isize>(timer->When.Nanoseconds())};
-            timer->Disarm();
+            DisarmTimer(timer);
             return Error(EINTR);
         }
 
-        timer->Disarm();
-        delete timer;
+        DisarmTimer(timer);
         return {};
     }
 
@@ -205,11 +204,13 @@ namespace Time
 
                 if (ns >= timer->When.Nanoseconds()) timer->When = 0_ns;
                 else timer->When -= ns;
-                if (timer->When == 0_ns)
-                {
-                    timer->Event.Trigger(false);
-                    timer->Fired = true;
-                }
+                if (timer->When != 0_ns) continue;
+
+                if (timer->OnFired) timer->OnFired();
+                else timer->Event.Trigger(false);
+                timer->Fired = true;
+
+                if (timer->ReloadValue) ArmTimer(timer, timer->ReloadValue);
             }
 
             s_TimersLock.Release();

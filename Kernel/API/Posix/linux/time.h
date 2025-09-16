@@ -8,15 +8,29 @@
 
 #include <Prism/Core/Types.hpp>
 
-using clockid_t   = i32;
-using time_t      = i64;
-using suseconds_t = isize;
+using clockid_t              = i32;
+using time_t                 = i64;
+using suseconds_t            = isize;
+
+constexpr usize NSEC_PER_SEC = 1000000000l;
+constexpr usize USEC_PER_SEC = 1000000l;
 
 struct timespec
 {
-    time_t           tv_sec;
-    time_t           tv_nsec;
+    time_t                           tv_sec;
+    time_t                           tv_nsec;
 
+    inline static constexpr timespec FromNanoseconds(usize ns)
+    {
+        if (ns > 0) [[likely]]
+            return timespec(ns / NSEC_PER_SEC, ns % NSEC_PER_SEC);
+        if (!ns) return timespec(0, 0);
+
+        timespec ts;
+        ts.tv_sec  = ((-ns - 1) / NSEC_PER_SEC) * -1 - 1;
+        ts.tv_nsec = NSEC_PER_SEC - ((-ns - 1) % NSEC_PER_SEC) - 1;
+        return ts;
+    }
     inline constexpr operator bool() const
     {
         return tv_sec != 0 || tv_nsec != 0;
@@ -46,13 +60,19 @@ struct timespec
         return *this;
     }
 };
+using timespec64 = timespec;
 
 struct timeval
 {
     /* seconds */
-    time_t      tv_sec;
+    time_t           tv_sec;
     /* microseconds */
-    suseconds_t tv_usec;
+    suseconds_t      tv_usec;
+
+    inline constexpr operator bool() const
+    {
+        return tv_sec >= 0 && static_cast<usize>(tv_usec) < USEC_PER_SEC;
+    }
 };
 
 struct itimerspec

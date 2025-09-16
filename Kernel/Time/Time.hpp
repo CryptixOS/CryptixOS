@@ -13,6 +13,7 @@
 
 #include <Time/ClockSource.hpp>
 #include <Time/HardwareTimer.hpp>
+#include <Time/Timer.hpp>
 
 namespace Time
 {
@@ -22,16 +23,27 @@ namespace Time
     ErrorOr<void>  RegisterTimer(HardwareTimer* timer);
     ErrorOr<void>  RegisterClockSource(ClockSource* clock);
 
-    Timestep       GetBootTime();
-    Timestep       GetTimeSinceBoot();
-    Timestep       GetRealTime();
-    Timestep       GetMonotonicTime();
+    usize          ArmTimer(Ref<Timer> timer, Timestep expiration,
+                            Timestep reloadValue = 0);
+    template <typename Fn>
+    usize ArmTimer(Ref<Timer> timer, Timestep expiration, Fn&& fn,
+                   Timestep reloadValue = 0)
+    {
+        timer->OnFired.BindLambda(fn);
+        return ArmTimer(timer, expiration, reloadValue);
+    }
+    void          DisarmTimer(Ref<Timer> timer);
 
-    timespec       GetReal();
-    timespec       GetMonotonic();
+    Timestep      GetBootTime();
+    Timestep      GetTimeSinceBoot();
+    Timestep      GetRealTime();
+    Timestep      GetMonotonicTime();
 
-    ErrorOr<void>  NanoSleep(usize ns);
-    ErrorOr<void>  Sleep(const timespec* duration, timespec* remaining);
+    timespec      GetReal();
+    timespec      GetMonotonic();
 
-    void           Tick(usize ns);
+    ErrorOr<void> NanoSleep(usize ns);
+    ErrorOr<void> Sleep(const timespec* duration, timespec* remaining);
+
+    void          Tick(usize ns);
 } // namespace Time

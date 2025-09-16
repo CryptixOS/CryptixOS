@@ -89,13 +89,17 @@ class Process
         // TODO(v1tr10l7): What should we return, if there is no parent??
         return 0;
     }
-    inline Process*     Parent() const { return m_Parent; }
-    inline ProcessID    ID() const { return m_ID; }
-    inline StringView   Name() const { return m_Name; }
-    inline ProcessState State() const { return m_State; }
-    inline bool    IsDead() const { return m_State == ProcessState::eDead; }
+    inline Process*      Parent() const { return m_Parent; }
+    inline ProcessID     ID() const { return m_ID; }
+    inline StringView    Name() const { return m_Name; }
+    inline ProcessState  State() const { return m_State; }
+    inline Optional<i32> Status() const { return m_Status; }
+    inline bool        IsDead() const { return m_State == ProcessState::eDead; }
 
-    constexpr bool IsSuperUser() const
+    inline Ref<Thread> MainThread() { return m_MainThread; }
+    inline AddressSpace& AddressSpace() { return *m_AddressSpace; }
+
+    constexpr bool       IsSuperUser() const
     {
         return m_Credentials.EffectiveUserID == 0;
     }
@@ -105,23 +109,29 @@ class Process
         return m_Credentials.Capable(capability);
     }
 
-    inline Optional<i32> Status() const { return m_Status; }
+    inline ::UserID UserID() const { return m_Credentials.UserID; }
+    inline ::UserID EffectiveUserID() const
+    {
+        return m_Credentials.EffectiveUserID;
+    }
+    inline ::GroupID GroupID() const { return m_Credentials.GroupID; }
+    inline ::GroupID EffectiveGroupID() const
+    {
+        return m_Credentials.EffectiveGroupID;
+    }
 
-    inline Ref<Thread>   MainThread() { return m_MainThread; }
-    inline AddressSpace& AddressSpace() { return *m_AddressSpace; }
+    inline ProcessID Sid() const { return m_Credentials.SessionID; }
+    inline ProcessID PGid() const { return m_Credentials.ProcessGroupID; }
 
-    inline ProcessID     Sid() const { return m_Credentials.SessionID; }
-    inline ProcessID     PGid() const { return m_Credentials.ProcessGroupID; }
+    ErrorOr<void>    SetUserID(::UserID uid);
+    ErrorOr<void>    SetGroupID(::GroupID gid);
 
-    inline void    SetUID(UserID uid) { m_Credentials.EffectiveUserID = uid; }
-    inline void    SetGID(GroupID gid) { m_Credentials.EffectiveGroupID = gid; }
+    ErrorOr<isize>   SetReUID(::UserID ruid, ::UserID euid);
+    ErrorOr<isize>   SetReGID(::GroupID rgid, ::GroupID egid);
+    ErrorOr<isize>   SetResUID(::UserID ruid, ::UserID euid, ::UserID suid);
+    ErrorOr<isize>   SetResGID(::GroupID rgid, ::GroupID egid, ::GroupID sgid);
 
-    ErrorOr<isize> SetReUID(UserID ruid, UserID euid);
-    ErrorOr<isize> SetReGID(GroupID rgid, GroupID egid);
-    ErrorOr<isize> SetResUID(UserID ruid, UserID euid, UserID suid);
-    ErrorOr<isize> SetResGID(GroupID rgid, GroupID egid, GroupID sgid);
-
-    ProcessID      SetSid();
+    ProcessID        SetSid();
     inline void SetPGid(ProcessID pgid) { m_Credentials.ProcessGroupID = pgid; }
 
     inline TTY* TTY() const { return m_TTY; }
@@ -156,11 +166,17 @@ class Process
     {
         m_FsView->ChangeDirectory(cwd);
     }
-    inline INodeMode     Umask() const { return m_FsView->FileCreationMask(); }
-    INodeMode            Umask(INodeMode mask);
+    inline INodeMode Umask() const { return m_FsView->FileCreationMask(); }
+    INodeMode        Umask(INodeMode mask);
 
-    inline Timestep      Quantum() const { return m_Quantum; }
-    inline struct Timer& Timer(usize index) { return m_Timers[index]; }
+    inline Timestep  Quantum() const { return m_Quantum; }
+    inline Ref<struct Timer> Timer(usize index)
+    {
+        auto& timer = m_Timers[index];
+        if (!timer) timer = CreateRef<struct Timer>();
+
+        return timer;
+    }
 
     const struct SignalAction& SignalAction(SignalID signal) const;
     void SetSignalAction(SignalID signal, const struct SignalAction& action);
@@ -215,7 +231,7 @@ class Process
     Vector<Process*>                 m_Children;
     Vector<Process*>                 m_Zombies;
     Vector<Ref<Thread>>              m_Threads;
-    Array<struct Timer, 64>          m_Timers;
+    Array<Ref<struct Timer>, 3>      m_Timers;
 
     ::Ref<FilesystemView>            m_FsView       = nullptr;
     ::Ref<class FileDescriptorTable> m_FdTable      = nullptr;

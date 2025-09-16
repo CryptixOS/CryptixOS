@@ -23,10 +23,8 @@ namespace API::Time
 
         usize ns = 0;
         {
-            CPU::UserMemoryProtectionGuard guard;
-            timespec                       sleepDuration = {};
-            if (duration)
-                sleepDuration = *duration; // CPU::CopyFromUser(*duration);
+            timespec sleepDuration = {};
+            if (duration) sleepDuration = CPU::CopyFromUser(*duration);
             if (sleepDuration.tv_sec < 0 || sleepDuration.tv_nsec < 0)
                 return Error(EINVAL);
 
@@ -35,34 +33,63 @@ namespace API::Time
         auto status = ::Time::NanoSleep(ns);
         if (!status) return Error(status.Error());
 
-        {
-            CPU::UserMemoryProtectionGuard guard;
-            timespec                       reminder{};
-            if (rem) *rem = reminder;
-        }
+        timespec reminder{};
+        if (rem) CPU::CopyToUser(rem, reminder);
         return 0;
     }
     ErrorOr<isize> GetITimer(isize which, struct itimerval* currentValue)
     {
         return Error(ENOSYS);
     }
+
     ErrorOr<isize> SetITimer(isize which, const struct itimerval* value,
                              struct itimerval* oldValue)
     {
         auto      process  = Process::Current();
         itimerval newValue = {};
 
-        if (value)
-        {
-            if (!process->ValidateRead(value, sizeof(itimerval)))
-                return Error(EFAULT);
-            newValue = CPU::CopyFromUser(*value);
-        }
+        if (!value) return Error(EINVAL);
+        if (!process->ValidateRead(value, sizeof(itimerval)))
+            return Error(EFAULT);
+        // FIXME(v1tr10l7): Validate <which>
+        newValue = CPU::CopyFromUser(*value);
 
-        auto& timer = process->Timer(which);
-        IgnoreUnused(timer);
-        // TODO(v1tr10l7): return the old value
-        return Error(ENOSYS);
+        LogDebug(
+            "SetITimer: value: {{ .it_interval: {{ .tv_usec: {}, .tv_sec: {} "
+            "}}, .it_value: {{ .tv_usec: {}, .tv_sec: {} }} }}",
+            newValue.it_interval.tv_usec, newValue.it_interval.tv_sec,
+            newValue.it_value.tv_usec, newValue.it_value.tv_sec);
+        if (!newValue.it_value || !newValue.it_interval) return Error(EINVAL);
+        if (which != ITIMER_REAL && which != ITIMER_VIRTUAL
+            && which != ITIMER_PROF)
+            return Error(EINVAL);
+
+        auto      timer = process->Timer(which);
+        itimerval previousState;
+        previousState.it_interval.tv_usec = timer->When.Microseconds();
+        previousState.it_interval.tv_sec  = 0;
+        previousState.it_value.tv_usec    = timer->ReloadValue.Microseconds();
+        previousState.it_value.tv_sec     = 0;
+
+        auto  expirationPeriod            = newValue.it_interval;
+        usize ns                          = expirationPeriod.tv_usec;
+        if (ns) ns *= 1'000;
+        else ns = expirationPeriod.tv_sec * 1'000'000'000;
+        usize reloadValue = newValue.it_value.tv_usec;
+        if (reloadValue) reloadValue *= 1'000;
+        else reloadValue *= 1'000'000'000;
+
+        // TODO(v1tr10l7): generate a signal
+        if (ns)
+            Time::ArmTimer(timer, ns, []() { LogTrace("Fired"); }, reloadValue);
+        else Time::DisarmTimer(timer);
+
+        if (oldValue)
+        {
+            if (!process->ValidateWrite(oldValue)) return Error(EFAULT);
+            CPU::CopyToUser(oldValue, previousState);
+        }
+        return 0;
     }
 
     ErrorOr<isize> GetTimeOfDay(struct timeval* tv, struct timezone* tz)
