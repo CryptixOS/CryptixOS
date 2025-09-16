@@ -18,15 +18,15 @@ namespace VFS
 class FilesystemView : public RefCounted
 {
   public:
-    inline constexpr FilesystemView() = default;
-    inline constexpr FilesystemView(const FilesystemView& other)
+    inline FilesystemView() = default;
+    inline FilesystemView(const FilesystemView& other)
     {
         m_Root             = other.m_Root;
         m_WorkingDirectory = other.m_WorkingDirectory;
         m_FileCreationMask = other.m_FileCreationMask;
     }
 
-    CTOS_NODISCARD inline constexpr ::Ref<DirectoryEntry> Root() const
+    CTOS_NODISCARD inline ::Ref<DirectoryEntry> Root() const
     {
         ::Ref<DirectoryEntry> result;
         usize                 sequence;
@@ -38,8 +38,7 @@ class FilesystemView : public RefCounted
 
         return result;
     }
-    CTOS_NODISCARD inline constexpr ::Ref<DirectoryEntry>
-    WorkingDirectory() const
+    CTOS_NODISCARD inline ::Ref<DirectoryEntry> WorkingDirectory() const
     {
         ::Ref<DirectoryEntry> result;
         usize                 sequence;
@@ -51,7 +50,7 @@ class FilesystemView : public RefCounted
 
         return result;
     }
-    CTOS_NODISCARD inline constexpr INodeMode FileCreationMask() const
+    CTOS_NODISCARD inline INodeMode FileCreationMask() const
     {
         INodeMode result;
         usize     sequence;
@@ -64,17 +63,17 @@ class FilesystemView : public RefCounted
         return result;
     }
 
-    inline constexpr void SetRoot(::Ref<DirectoryEntry> root)
+    inline void SetRoot(::Ref<DirectoryEntry> root)
     {
         SequenceWriterGuard guard(m_Lock, true);
         m_Root = root;
     }
-    inline constexpr void ChangeDirectory(::Ref<DirectoryEntry> dir)
+    inline void ChangeDirectory(::Ref<DirectoryEntry> dir)
     {
         SequenceWriterGuard guard(m_Lock, true);
         m_WorkingDirectory = dir;
     }
-    inline constexpr void SetFileCreationMask(INodeMode mode)
+    inline void SetFileCreationMask(INodeMode mode)
     {
         SequenceWriterGuard guard(m_Lock, true);
         m_FileCreationMask = mode;
