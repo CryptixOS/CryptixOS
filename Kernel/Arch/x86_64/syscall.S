@@ -11,7 +11,7 @@
 .extern handleSyscall
 
 
-.include "Arch/x86_64/common.inc"
+#include "Arch/x86_64/common.inc"
 
 syscall_entry:
     swapgs
