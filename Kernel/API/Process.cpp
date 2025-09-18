@@ -416,10 +416,28 @@ namespace API::Process
         auto process = Process::Current();
         return process->SetResUID(ruid, euid, suid);
     }
+    ErrorOr<isize> GetResUid(UserID* ruid, UserID* euid, UserID* suid)
+    {
+        auto process = Process::Current();
+        CopyToUser(ruid, process->UserID());
+        CopyToUser(euid, process->EffectiveUserID());
+        CopyToUser(suid, process->Credentials().SetUserID);
+
+        return 0;
+    }
     ErrorOr<isize> SetResGid(GroupID rgid, GroupID egid, GroupID sgid)
     {
         auto process = Process::Current();
         return process->SetResGID(rgid, egid, sgid);
+    }
+    ErrorOr<isize> GetResGid(GroupID* rgid, GroupID* egid, GroupID* sgid)
+    {
+        auto process = Process::Current();
+        CopyToUser(rgid, process->GroupID());
+        CopyToUser(egid, process->EffectiveGroupID());
+        CopyToUser(sgid, process->Credentials().SetGroupID);
+
+        return 0;
     }
 
     ErrorOr<ProcessID> GetPGid(ProcessID pid)

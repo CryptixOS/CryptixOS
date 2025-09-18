@@ -100,7 +100,9 @@ namespace Syscall
         RegisterSyscall(ID::eSetReUid, API::Process::SetReUid);
         RegisterSyscall(ID::eSetReGid, API::Process::SetReGid);
         RegisterSyscall(ID::eSetResUid, API::Process::SetResUid);
+        RegisterSyscall(ID::eGetResUid, API::Process::GetResUid);
         RegisterSyscall(ID::eSetResGid, API::Process::SetResGid);
+        RegisterSyscall(ID::eGetResGid, API::Process::GetResGid);
         RegisterSyscall(ID::eGet_pGid, API::Process::GetPGid);
         RegisterSyscall(ID::eSid, API::Process::GetSid);
         RegisterSyscall(ID::eSigAltStack, API::Process::SigAltStack);
