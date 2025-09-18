@@ -13,6 +13,13 @@ srcs += files(
 c_args = []
 cxx_args = []
 
+if c.has_argument('-Wno-changes-meaning')
+  c_args += '-Wglobal-constructors' # clang
+endif
+if cxx.has_argument('-Wno-changes-meaning')
+  cxx_args += '-Wglobal-constructors' # clang
+endif
+
 ld_args = [
   '-nostdlib',
   '-static',

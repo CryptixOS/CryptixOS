@@ -29,7 +29,7 @@ arch = host_machine.cpu_family()
 qemulog = 'qemu.log'
 
 srcs = []
-initrd_dir = meson.project_source_root() / 'build-sysroot/system-root'
+initrd_dir = meson.project_source_root() / 'sysroot/'
 
 include_directories = [
   include_directories('Kernel'),
@@ -37,7 +37,7 @@ include_directories = [
 
 # ==============================================================================
 ### Compiler arguments
-warnings = [
+warning_args = [
   #'-Wno-error=#warnings',
   '-Wimplicit-fallthrough',
   '-Wno-builtin-macro-redefined',
@@ -47,10 +47,8 @@ warnings = [
   '-Wno-unused-parameter',
   '-Wno-frame-address',
   '-Wno-c23-extensions', # clang
-  # '-Wglobal-constructors', # clang
 ]
-
-macros = [
+macro_args = [
     '-DFMT_HEADER_ONLY',
     '-DFMT_STATIC_THOUSANDS_SEPARATOR=1',
     '-DFMT_USE_LONG_DOUBLE=0',
@@ -69,11 +67,7 @@ macros = [
     '-DFMT_BUILTIN_TYPES=0',
     '-D_LIBCPP_HAS_NO_THREADS',
 ]
-
-add_global_arguments(
-  [
-    warnings,
-    macros,
+global_args = [
     '-ffreestanding',
     # keep stack pointer in the appropriate register
     '-fno-omit-frame-pointer',
@@ -87,23 +81,33 @@ add_global_arguments(
     '-fPIE',
     '-nostdlib',
     '-static',
-  ],
-  language: ['c', 'cpp'],
-)
-
-add_global_arguments(
-  [
+]
+foreach arg : warning_args
+  if cxx.has_argument(arg)
+    global_args += arg
+  endif
+endforeach
+global_args += macro_args
+global_cxx_args = [
     # pass the size argument to delete operator
     '-fsized-deallocation',
-    '-D__cplusplus=202302L',
-    '-D__cpp_concepts=202207L',
     '-MP',
     '-fno-exceptions',
     '-fno-rtti',
     '-Wno-non-virtual-dtor',
     '-nostdinc++',
-    # '-Wno-changes-meaning', # gcc
-  ],
+]
+if cxx.has_argument('-Wno-changes-meaning')
+  global_cxx_args += '-Wno-changes-meaning' # gcc
+endif
+
+add_global_arguments(
+  global_args,
+  language: ['c', 'cpp'],
+)
+
+add_global_arguments(
+  global_cxx_args,
   language: 'cpp',
 )
 
@@ -439,6 +443,7 @@ run_bios = custom_target(
 ovmf_binaries = subproject('ovmf_binaries')
 ovmf = ovmf_binaries.get_variable(ovmf_id)
 
+message(qemu_args)
 run_uefi = custom_target(
   input: [iso, root_image],
   output: 'run_uefi',
