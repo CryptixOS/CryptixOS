@@ -1,0 +1,12 @@
+[binaries]
+c = 'aarch64-cryptix-gcc'
+cpp = 'aarch64-cryptix-g++'
+ar = 'aarch64-cryptix-ar'
+strip = 'aarch64-cryptix-strip'
+pkgconfig = 'aarch64-cryptix-pkg-config'
+
+[host_machine]
+system = 'cryptix'
+cpu_family = 'aarch64'
+cpu = 'cortex-a72'
+endian = 'little'
