@@ -235,6 +235,66 @@ To run CryptixOS in QEMU:
 - ⬜ Networking
 - ⬜ Evdev
 
+---
+
+## 📂 Project Structure
+
+  - BaseFiles => **basic system root template**
+  - CrossFiles => **meson config files for cross compilation**
+  - Documentation => **various documents describing the system**
+  - Kernel/ => **Source Root**
+    - API/ => **Userland API/Syscalls**
+    - Arch/ => **Architecture specific code**
+    - Boot/
+    - Debug/ => **Debug utilities**
+    - Drivers/ => **Driver Core**
+    - Embed/ => **Embedded resources**
+    - Firmware/ => **Subsystems interacting with the firmware**
+    - Library/ => **Kernel library**
+    - Memory/ => **Memory Management**
+    - Network/ => **Networking**
+    - Scheduler/ => **Scheduler code, and process related functionality**
+    - System/
+    - Time/ => **Timekeeping**
+    - VFS/ => **Virtual File System**
+  - Meta => **various scripts, and configuration files used for building CrypitxOS**
+    - docker => **docker files, helpful in building container with CryptixOS**
+    - fonts => **fonts for use by TTY**
+    - helix => **helper library, written in python used to build the image**
+    - images => **images/screenshots**
+    - sysroot-recipes => **recipes used to build the system root**
+      - host => **host tools used to build packages**
+        - build-tools.yml => **main toolchain**
+      - package => **application recipes**
+        - compress-utils.yml => **compression utilities**
+        - debug-utils.yml => **debug utilities**
+        - dev-tools.yml => **dev tools**
+        - fun-apps.yml => **some fun programs**
+        - games.yml => **games**
+        - network-utilities.yml => **network administration utilities**
+        - resources.yml => **different resources, such as man-pages, and pciids.txt**
+        - shell-apps.yml => **shells**
+        - sysinfo-utils.yml => **utilities gathering system information**
+        - system-libs.yml => **system libraries**
+        - system-services.yml => **system services**
+        - system-utilities.yml => **basic system administration utilities**
+        - text-editors.yml => **text editors**
+      - source => **source recipes**
+        - build-tools.yml => **toolchain source recipes**
+        - system-libs.yml => **system libraries source recipes**
+    - generate_symbols.sh => **helper script used to generate kernel symbols file**
+    - limine.conf => **limine bootloader config**
+    - run.py => **main script used to invoke the build-system**
+  - Modules => **kernel modules**
+  - patches => **patches for many ports**
+  - Prism => **freestanding library that powers the CryptixOS**
+  - subprojects => **meson subprojects**
+  - Tests => **Unit Tests**
+  - meson.build => **Main Build Script**
+  - typos.toml => => **typos configuration**
+
+---
+
 ## 📸 Screenshots / Output
 <img src="./Meta/images/screenshot.png">
 

@@ -1,0 +1,814 @@
+#*
+#* Created by v1tr10l7 on 18.09.2025.
+#* Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
+#*
+#* SPDX-License-Identifier: GPL-3
+#*/
+packages:
+  - name: gdbm
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: Standard GNU database libraries
+      description: This package contains the GNU Database Manager. It is a library of database functions that uses extensible hashing and works like the standard UNIX dbm. The library provides primitives for storing key/data pairs, searching and retrieving the data by its key and deleting a key along with its data.
+      spdx: 'GPL-3.0-only'
+      website: 'https://www.gnu.org/software/gdbm/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['sys-libs']
+    source:
+      subdir: sources
+      git: 'https://git.savannah.gnu.org/git/gdbm.git'
+      tag: 'v1.25'
+      version: '1.25'
+      tools_required:
+        - host-autoconf-v2.71
+        - host-automake-v1.16
+        - host-libtool
+      regenerate:
+        - args: ['./bootstrap']
+    tools_required:
+      - host-autoconf-v2.71
+      - host-automake-v1.16
+      - system-gcc
+    pkgs_required:
+      - mlibc
+    revision: 1
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--disable-nls'
+        - '--disable-static'
+        - '--enable-libgdbm-compat'
+        - '--without-readline'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: libiconv
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: GNU charset conversion library for libc which doesn't implement it
+      description: GNU charset conversion library for libc which doesn't implement it.
+      spdx: 'LGPL-2.1-or-later GPL-3.0-or-later'
+      website: 'https://www.gnu.org/software/libiconv/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['dev-libs']
+    source:
+      subdir: 'sources'
+      git: 'https://git.savannah.gnu.org/git/libiconv.git'
+      tag: 'v1.17'
+      version: '1.17'
+      sources_required:
+        - gnulib
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+        - host-pkg-config
+        - host-autoconf-archive
+        - host-gettext
+      regenerate:
+        - args: ['./gitsub.sh', 'pull']
+        # Checkout current gnulib master, 044bf893acee0a55b22b4be0ede0e3ce010c480a, 29-08-2022.
+        # This avoids random breakage in the future
+          isolate_network: false
+        - args: ['git', 'checkout', '044bf893acee0a55b22b4be0ede0e3ce010c480a']
+          workdir: '@THIS_SOURCE_DIR@/gnulib'
+        - args: ['./autogen.sh']
+          environ:
+            'NOCONFIGURE': 'yes'
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@THIS_SOURCE_DIR@/build-aux/']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@THIS_SOURCE_DIR@/libcharset/build-aux/']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-libtool/share/aclocal/libtool.m4',
+            '@THIS_SOURCE_DIR@/m4/']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-libtool/share/aclocal/libtool.m4',
+            '@THIS_SOURCE_DIR@/libcharset/m4/']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-libtool/share/libtool/build-aux/ltmain.sh',
+            '@THIS_SOURCE_DIR@/libcharset/build-aux/']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-libtool/share/libtool/build-aux/ltmain.sh',
+            '@THIS_SOURCE_DIR@/build-aux/']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-libtool/share/aclocal/ltversion.m4',
+            '@THIS_SOURCE_DIR@/m4/']
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-libtool/share/aclocal/ltversion.m4',
+            '@THIS_SOURCE_DIR@/libcharset/m4/']
+        - args: ['autoreconf', '-fvi', '-I@THIS_SOURCE_DIR@/m4', '-I@THIS_SOURCE_DIR@/srcm4']
+    tools_required:
+      - system-gcc
+      - host-libtool
+    pkgs_required:
+      - mlibc
+    revision: 8
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+        - '--disable-nls'
+        - '--enable-shared'
+        - '--disable-static'
+        - 'CFLAGS=-std=gnu89'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+  - name: libintl
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      url: 'https://ftp.gnu.org/gnu/gettext/gettext-0.21.1.tar.xz'
+      format: 'tar.xz'
+      extract_path: 'gettext-0.21.1'
+      version: '0.21.1'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+      regenerate:
+        - args: ['autoreconf', '-fvi']
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - libiconv
+    revision: 3
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--without-emacs'
+        - '--without-lispdir'
+        # Normally this controls nls behavior in general, but the libintl
+        # subdir is skipped unless this is explicitly set.
+        - '--enable-nls'
+        # This magic flag enables libintl.
+        - '--with-included-gettext'
+        - '--disable-c++'
+        - '--disable-libasprintf'
+        - '--disable-java'
+        - '--enable-shared'
+        - '--disable-static'
+        - '--enable-threads=posix'
+        - '--disable-curses'
+        - '--without-git'
+        - '--without-cvs'
+        - '--without-bzip2'
+        - '--without-xz'
+        - 'CFLAGS=-std=gnu89'
+    build:
+      - args: ['make', '-C', 'gettext-runtime/intl', '-j@PARALLELISM@']
+      - args: ['make', '-C', 'gettext-runtime/intl', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+
+  - name: libpipeline
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: A pipeline manipulation library
+      description: This package provides a library for manipulating pipelines of subprocesses in a flexible and convenient way.
+      spdx: 'GPL-3.0-only'
+      website: 'https://libpipeline.nongnu.org/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['dev-libs']
+    source:
+      subdir: sources
+      git: 'https://gitlab.com/cjwatson/libpipeline.git'
+      tag: '1.5.8'
+      version: '1.5.8'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-pkg-config
+        - host-libtool
+      regenerate:
+        - args: ['./bootstrap']
+          isolate_network: false
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@THIS_SOURCE_DIR@/build-aux/']
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+    revision: 1
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: linux-headers
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    from_source: linux-headers
+    metadata:
+      summary: Linux kernel headers
+      description: This package provides the Linux headers installed into /usr/include
+      spdx: 'GPL-2.0-only'
+      website: 'https://kernel.org'
+      maintainer: "no92 <no92.mail@gmail.com>"
+      categories: ['sys-kernel']
+    implict_package: true
+    configure:
+      - args: ['cp', '-Tr', '@THIS_SOURCE_DIR@', '.']
+    build:
+      - args: |
+          LINUX_ARCH="@OPTION:arch@"
+          case "$LINUX_ARCH" in
+            "aarch64")
+              LINUX_ARCH="arm64"
+              ;;
+            "riscv64")
+              LINUX_ARCH="riscv"
+              ;;
+          esac
+          make ARCH="$LINUX_ARCH" headers_install
+      - args: ['find', 'usr/include', '-type', 'f', '!', '-name', '*.h', '-delete']
+      # Sometimes, xbstrap does not clean collect dirs.  We don't want those
+      # cases to break.  If we don't do this special handling, and don't pass
+      # -T to GNU cp below, it might be the case that cp installs linux-headers
+      # into /usr/include/include or /usr/src/linux-headers/include.  GNU cp
+      # has -T, which disables this behavior, and instead lets us be specific
+      # about what we want our destination directory name to be.  This,
+      # however, also merges directories, so we want to clear any existing
+      # files.
+      - args: ['rm', '-rf', '@THIS_COLLECT_DIR@/usr/src/linux-headers']
+      - args: ['rm', '-rf', '@THIS_COLLECT_DIR@/usr/include']
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/src']
+      - args: ['cp', '-Tr', 'usr/include', '@THIS_COLLECT_DIR@/usr/include']
+      - args: ['cp', '-Tr', 'usr/include', '@THIS_COLLECT_DIR@/usr/src/linux-headers']
+
+  - name: mlibc-headers
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    from_source: mlibc
+    pkgs_required:
+      - linux-headers
+    implict_package: true
+    configure:
+      - args:
+        - 'meson'
+        - 'setup'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/@OPTION:arch-triple@-target.cross-file'
+        - '--prefix=/usr'
+        - '@THIS_SOURCE_DIR@'
+        #- '-Ddebug_allocator=true'
+        - '-Dlibgcc_dependency=true'
+        - '-Dposix_option=enabled'
+        - '-Dlinux_option=enabled'
+        - '-Dglibc_option=enabled'
+        - '-Dbsd_option=enabled'
+        #- '-Dbuild_tests=true'
+        - '--wrap-mode=nofallback'
+        - '-Dheaders_only=true'
+        - '-Dlinux_kernel_headers=@BUILD_ROOT@/packages/linux-headers/usr/include'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+  - name: mlibc
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    from_source: mlibc
+    tools_required:
+      - bootstrap-system-gcc
+      - virtual: pkgconfig-for-target
+        triple: "@OPTION:arch-triple@"
+    implict_package: true
+    pkgs_required:
+      - linux-headers
+      - mlibc-headers
+    configure:
+      - args:
+        - 'meson'
+        - 'setup'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/@OPTION:arch-triple@-target.cross-file'
+        - '--prefix=/usr'
+        - '--libdir=lib'
+        - '--buildtype=debugoptimized'
+        - '--wrap-mode=default'
+        - '-Db_sanitize=undefined'
+        - '-Ddefault_library=both'
+        #- '-Ddebug_allocator=true'
+        - '-Dlibgcc_dependency=true'
+        - '-Dbuild_tests=false'
+        - '-Dposix_option=enabled'
+        - '-Dlinux_option=enabled'
+        - '-Dglibc_option=enabled'
+        - '-Dbsd_option=enabled'
+        - '-Dlinux_kernel_headers=@BUILD_ROOT@/packages/linux-headers/usr/include'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+      - args: ['ln', '-sf', 'crt0.o', '@THIS_COLLECT_DIR@/usr/lib/crt1.o']
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/lib/@OPTION:arch-triple@']
+      - args: ['ln', '-sf', '../ld.so', '@THIS_COLLECT_DIR@/usr/lib/@OPTION:arch-triple@/ld.so']
+
+  - name: ncurses
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/ThomasDickey/ncurses-snapshots.git'
+      tag: 'v6_2'
+      version: '6.2'
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+    revision: 11
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--without-ada'
+        - '--enable-pc-files'
+        - '--with-shared'
+        - '--without-normal'
+        - '--with-manpage-format=normal'
+        - '--with-pkg-config-libdir=/usr/lib/pkgconfig'
+        - '--with-termlib'
+        - '--with-bool=bool'
+        - '--enable-widec'
+        - '--disable-stripping'
+        - 'CFLAGS=-std=c23'
+        - 'CXXFLAGS=-lsupc++ -lgcc_s -std=c++23'
+        environ:
+          cf_cv_func_nanosleep: 'yes'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
+        quiet: true
+      # As we build ncurses with wide character support, make some compatibility links
+      - args: |
+          for lib in ncurses form panel menu tinfo ; do
+              rm -vf                    @THIS_COLLECT_DIR@/usr/lib/lib${lib}.so
+              echo "INPUT(-l${lib}w)" > @THIS_COLLECT_DIR@/usr/lib/lib${lib}.so
+              ln -sfv ${lib}w.pc        @THIS_COLLECT_DIR@/usr/lib/pkgconfig/${lib}.pc
+          done
+          rm -vf                     @THIS_COLLECT_DIR@/usr/lib/libcursesw.so
+          echo "INPUT(-lncursesw)" > @THIS_COLLECT_DIR@/usr/lib/libcursesw.so
+          ln -sfv libncurses.so      @THIS_COLLECT_DIR@/usr/lib/libcurses.so
+
+  - name: neon 
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/CryptixOS/Neon.git'
+      branch: 'main'
+    tools_required:
+      - system-gcc
+      - host-pkg-config
+      - virtual: pkgconfig-for-target
+        triple: "@OPTION:arch-triple@"
+    pkgs_required:
+      - mlibc
+      - prism
+    configure: 
+      - args:
+        - 'meson'
+        - 'setup'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/@OPTION:arch-triple@-target.cross-file'
+        - '--prefix=/usr'
+        - '--libdir=lib'
+        - '--buildtype=debugoptimized'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+
+  - name: openssl
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: Robust, full-featured Open Source Toolkit for the Transport Layer Security (TLS)
+      description: The OpenSSL package contains management tools and libraries relating to cryptography. These are useful for providing cryptographic functions to other packages, such as OpenSSH, email applications, and web browsers (for accessing HTTPS sites).
+      spdx: 'Apache-2.0'
+      website: 'https://openssl-library.org/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['dev-libs']
+    source:
+      subdir: sources
+      git: 'https://github.com/openssl/openssl.git'
+      tag: 'OpenSSL_1_1_1w'
+      version: '1.1.1w'
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - zlib
+    revision: 2
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/Configure'
+        - '--prefix=/usr'
+        - '--openssldir=/etc/ssl'
+        - '--libdir=lib'
+        - '@OPTION:arch-triple@'
+        - 'shared'
+        - 'zlib-dynamic'
+        - 'no-afalgeng'
+        environ:
+          CC: '@OPTION:arch-triple@-gcc'
+          CXX: '@OPTION:arch-triple@-g++'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      # Disable installing static libraries
+      - args: ['sed', '-i', '/INSTALL_LIBS/s/libcrypto.a libssl.a//', '@THIS_BUILD_DIR@/Makefile']
+      # Suffix all man pages with ssl
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'MANSUFFIX=ssl', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+      # Move the doc dir to a versioned directory
+      - args: ['mv', '@THIS_COLLECT_DIR@/usr/share/doc/openssl', '@THIS_COLLECT_DIR@/usr/share/doc/openssl-1.1.1w']
+      # Install more documentation
+      - args: ['cp', '-fr', '@THIS_SOURCE_DIR@/doc/.', '@THIS_COLLECT_DIR@/usr/share/doc/openssl-1.1.1w']
+
+  - name: pcre
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: Perl-compatible regular expression library
+      description: This package contains the Perl Compatible Regular Expression libraries. These are useful for implementing regular expression pattern matching using the same syntax and semantics as Perl.
+      spdx: 'BSD'
+      website: 'http://www.pcre.org/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['dev-libs']
+    source:
+      subdir: sources
+      # Use a git mirror as pcre retired their svn repositories
+      git: 'https://github.com/vinix-os/pcre'
+      tag: '1767'
+      # Seems to be 8.45?
+      version: '8.45'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+        - host-pkg-config
+        - host-autoconf-archive
+      regenerate:
+        - args: ['./autogen.sh']
+    tools_required:
+      - system-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+    pkgs_required:
+      - mlibc
+    revision: 12
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+        - '--enable-unicode-properties'
+        - '--enable-pcre8'
+        - '--enable-pcre16'
+        - '--enable-pcre32'
+        - '--disable-static'
+        - 'CFLAGS=-lgcc_s'
+        environ:
+          PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
+          PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
+
+  - name: pcre2
+    labels: [aarch64, riscv64]
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: Perl-compatible regular expression library
+      description: This package contains a new generation of the Perl Compatible Regular Expression libraries. These are useful for implementing regular expression pattern matching using the same syntax and semantics as Perl.
+      spdx: 'BSD-3-Clause'
+      website: 'https://www.pcre.org/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['dev-libs']
+    source:
+      subdir: sources
+      git: 'https://github.com/PhilipHazel/pcre2.git'
+      tag: 'pcre2-10.44'
+      version: '10.44'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+        - host-pkg-config
+      regenerate:
+        - args: ['./autogen.sh']
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - bzip2
+      - ncurses
+      - readline
+      - zlib
+    revision: 1
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--with-sysroot=@SYSROOT_DIR@' # Set libtool's lt_sysroot.
+        - '--docdir=/usr/share/doc/pcre2-10.44'
+        - '--enable-unicode'
+        - '--enable-jit'
+        - '--enable-pcre2-16'
+        - '--enable-pcre2-32'
+        - '--enable-pcre2grep-libz'
+        - '--enable-pcre2grep-libbz2'
+        - '--enable-pcre2test-libreadline'
+        - '--disable-static'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: prism 
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/CryptixOS/Prism.git'
+      branch: 'master'
+    tools_required:
+      - system-gcc
+      - host-pkg-config
+      - virtual: pkgconfig-for-target
+        triple: "@OPTION:arch-triple@"
+    pkgs_required:
+      - mlibc
+    configure: 
+      - args:
+        - 'meson'
+        - 'setup'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/@OPTION:arch-triple@-target.cross-file'
+        - '--prefix=/usr'
+        - '--libdir=lib'
+        - '--buildtype=debugoptimized'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args: ['ninja']
+      - args: ['ninja', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: false
+
+  - name: readline
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      git: 'https://git.savannah.gnu.org/git/readline.git'
+      tag: 'readline-8.1'
+      version: '8.1'
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - ncurses
+    revision: 9
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--disable-static'
+        - '--enable-multibyte'
+        - '--with-curses'
+        - 'CFLAGS=-std=gnu89'
+    build:
+      - args: ['make', 'SHLIB_LIBS="-lncursesw"', '-j@PARALLELISM@']
+      - args: ['make', 'SHLIB_LIBS="-lncursesw"', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+      - args: ['patchelf', '--set-soname', 'libreadline.so', '@THIS_COLLECT_DIR@/usr/lib/libreadline.so.8']
+      - args: ['patchelf', '--set-soname', 'libhistory.so', '@THIS_COLLECT_DIR@/usr/lib/libhistory.so.8']
+      - args: ['mv', '@THIS_COLLECT_DIR@/usr/lib/libreadline.so.8', '@THIS_COLLECT_DIR@/usr/lib/libreadline.so']
+      - args: ['mv', '@THIS_COLLECT_DIR@/usr/lib/libhistory.so.8', '@THIS_COLLECT_DIR@/usr/lib/libhistory.so']
+
+  - name: util-linux-libs
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    from_source: util-linux
+    tools_required:
+      - system-gcc
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+    pkgs_required:
+      - mlibc
+      - readline
+      - ncurses
+      - zlib
+      - libiconv
+      - file
+      #- libxcrypt
+    revision: 13
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--exec-prefix=/usr'
+        - '--libdir=/usr/lib'
+        - '--bindir=/usr/bin'
+        - '--sbindir=/usr/sbin'
+        - '--without-udev'
+        - '--disable-nls'
+        - '--disable-static'
+        - '--without-python'
+        - '--without-systemd'
+        - '--without-systemdsystemunitdir'
+        - '--disable-fdisks'
+        - '--disable-mount'
+        - '--disable-losetup'
+        - '--disable-zramctl'
+        - '--disable-fsck'
+        - '--disable-partx'
+        - '--disable-uuidd'
+        - '--disable-wipefs'
+        - '--disable-mountpoint'
+        - '--disable-fallocate'
+        - '--disable-unshare'
+        - '--disable-nsenter'
+        - '--disable-setpriv'
+        - '--disable-hardlink'
+        - '--disable-eject'
+        - '--disable-agetty'
+        - '--disable-plymouth_support'
+        - '--disable-cramfs'
+        - '--disable-bfs'
+        - '--disable-minix'
+        - '--disable-fdformat'
+        - '--disable-hwclock'
+        - '--disable-hwclock-cmos'
+        - '--disable-hwclock-gplv3'
+        - '--disable-mkfs'
+        - '--disable-isosize'
+        - '--disable-lsblk'
+        - '--disable-lslogins'
+        - '--disable-wdctl'
+        - '--disable-swaplabel'
+        - '--disable-mkswap'
+        - '--disable-cal'
+        - '--disable-logger'
+        - '--disable-look'
+        - '--disable-mcookie'
+        - '--disable-namei'
+        - '--disable-getopt'
+        - '--disable-lslocks'
+        - '--disable-switch_root'
+        - '--disable-pivot_root'
+        - '--disable-flock'
+        - '--disable-lsmem'
+        - '--disable-chmem'
+        - '--disable-ipcmk'
+        - '--disable-ipcrm'
+        - '--disable-ipcs'
+        - '--disable-irqtop'
+        - '--disable-lsirq'
+        - '--disable-choom'
+        - '--disable-renice'
+        - '--disable-rfkill'
+        - '--disable-setsid'
+        - '--disable-ctrlaltdel'
+        - '--disable-script'
+        - '--disable-scriptreplay'
+        - '--disable-scriptlive'
+        - '--disable-col'
+        - '--disable-colcrt'
+        - '--disable-colrm'
+        - '--disable-column'
+        - '--disable-hexdump'
+        - '--disable-rev'
+        - '--disable-kill'
+        - '--disable-last'
+        - '--disable-utmpdump'
+        - '--disable-mesg'
+        - '--disable-raw'
+        - '--disable-rename'
+        - '--disable-chfn-chsh'
+        - '--disable-login'
+        - '--disable-nologin'
+        - '--disable-sulogin'
+        - '--disable-su'
+        - '--disable-runuser'
+        - '--disable-ul'
+        - '--disable-more'
+        - '--disable-setterm'
+        - '--disable-schedutils'
+        - '--disable-pg-bell'
+        - '--disable-fstrim'
+        - '--disable-swapon'
+        - '--disable-lscpu'
+        - '--disable-chcpu'
+        - '--disable-blockdev'
+        - '--disable-prlimit'
+        - '--disable-lsipc'
+        - '--disable-lsns'
+        - '--disable-readprofile'
+        - '--disable-dmesg'
+        - '--disable-fincore'
+        - '--disable-fsfreeze'
+        - '--disable-blkdiscard'
+        - '--disable-blkzone'
+        - '--disable-ldattach'
+        - '--disable-rtcwake'
+        - '--disable-setarch'
+        - '--disable-tunelp'
+        - '--disable-wall'
+        - '--disable-bash-completion'
+        - '--without-cap-ng'
+        - '--without-btrfs'
+        - '--without-selinux'
+        - '--without-audit'
+        - '--enable-usrdir-path'
+        - '--disable-makeinstall-chown'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/bin']
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/sbin']
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/share/bash-completion']
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/share/man/man1']
+      - args: ['rm', '-r', '@THIS_COLLECT_DIR@/usr/share/man/man8']
+
+  - name: zlib
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      url: 'https://zlib.net/zlib-1.3.1.tar.gz'
+      format: 'tar.gz'
+      extract_path: 'zlib-1.3.1'
+      version: '1.3.1'
+      patch-path-strip: 1
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-libtool
+        - host-pkg-config
+      regenerate:
+        - args: ['autoreconf', '-fvi']
+          workdir: '@THIS_SOURCE_DIR@/contrib/minizip'
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=/usr'
+        environ:
+          CHOST: '@OPTION:arch-triple@'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true

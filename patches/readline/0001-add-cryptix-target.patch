@@ -1,4 +1,4 @@
-From 54b66f733ad8e1f7bea9e63c12e5a1b8947b72a1 Mon Sep 17 00:00:00 2001
+From 42b7d8aab68b77bd9de5496ea8d2a73ac97db5da Mon Sep 17 00:00:00 2001
 From: V1tr10l7 <vitriol1744@gmail.com>
 Date: Tue, 4 Mar 2025 13:19:51 +0100
 Subject: [PATCH] add cryptix target
@@ -21,5 +21,5 @@ index c874b7a..d6c5831 100755
  	# This one is extra strict with allowed versions
  	sco3.2v2 | sco3.2v[4-9]* | sco5v6*)
 -- 
-2.48.1
+2.51.0
 

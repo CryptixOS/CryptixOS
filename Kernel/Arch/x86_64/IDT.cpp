@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Arch/x86_64/CPU.hpp>
-#include <Arch/x86_64//ExecutionContext.hpp>
+#include <Arch/x86_64/ExecutionContext.hpp>
 #include <Arch/x86_64/GDT.hpp>
 #include <Arch/x86_64/IDT.hpp>
 
@@ -73,10 +73,11 @@ constexpr u32 GATE_TYPE_TRAP      = 0xf;
 
 namespace Exception
 {
-    constexpr u8 DEBUG      = 0x01;
-    constexpr u8 NMI        = 0x02;
-    constexpr u8 BREAKPOINT = 0x03;
-    constexpr u8 PAGE_FAULT = 0x0e;
+    constexpr u8 DEBUG         = 0x01;
+    constexpr u8 NMI           = 0x02;
+    constexpr u8 BREAKPOINT    = 0x03;
+    constexpr u8 PAGE_FAULT    = 0x0e;
+    constexpr u8 MACHINE_CHECK = 0x12;
 }; // namespace Exception
 namespace MM
 {
@@ -142,16 +143,16 @@ CTOS_NORETURN static void raiseException(ExecutionContext* ctx)
 }
 
 // TODO(v1tr10l7): properly handle breakpoints
-static void            breakpoint(ExecutionContext* ctx) { EarlyPanic("Breakpoint"); }
+static void     breakpoint(ExecutionContext* ctx) { EarlyPanic("Breakpoint"); }
 
-constexpr usize        PAGE_FAULT_PRESENT           = Bit(0);
-constexpr usize        PAGE_FAULT_WRITE             = Bit(1);
-constexpr usize        PAGE_FAULT_USER              = Bit(2);
-constexpr usize        PAGE_FAULT_RESERVED_WRITE    = Bit(3);
-constexpr usize        PAGE_FAULT_INSTRUCTION_FETCH = Bit(4);
-constexpr usize        PAGE_FAULT_PROTECTION_KEY    = Bit(5);
-constexpr usize        PAGE_FAULT_SHADOW_STACK      = Bit(6);
-constexpr usize        PAGE_FAULT_SGX               = Bit(7);
+constexpr usize PAGE_FAULT_PRESENT           = Bit(0);
+constexpr usize PAGE_FAULT_WRITE             = Bit(1);
+constexpr usize PAGE_FAULT_USER              = Bit(2);
+constexpr usize PAGE_FAULT_RESERVED_WRITE    = Bit(3);
+constexpr usize PAGE_FAULT_INSTRUCTION_FETCH = Bit(4);
+constexpr usize PAGE_FAULT_PROTECTION_KEY    = Bit(5);
+constexpr usize PAGE_FAULT_SHADOW_STACK      = Bit(6);
+constexpr usize PAGE_FAULT_SGX               = Bit(7);
 
 inline PageFaultReason pageFaultReason(u64 errorCode)
 {
@@ -183,13 +184,17 @@ static void pageFault(ExecutionContext* ctx)
     PageFaultInfo faultInfo(faultAddress, faultReason, ctx);
     MM::HandlePageFault(faultInfo);
 }
+static void machineCheck(ExecutionContext* ctx)
+{
+    LogDebug("IDT: Hit machine check exception handler");
+}
 
 CTOS_NORETURN static void unhandledInterrupt(ExecutionContext* context)
 {
     EarlyLogError("\nAn unhandled interrupt %#x occurred",
                   context->InterruptVector);
 
-    for (;;) __asm__ volatile("cli; hlt");
+    for (;;) Asm("cli; hlt");
 }
 extern "C" void raiseInterrupt(ExecutionContext* ctx)
 {
@@ -221,8 +226,9 @@ namespace IDT
             if (i < 32) s_InterruptHandlers[i] = raiseException;
         }
 
-        s_InterruptHandlers[Exception::BREAKPOINT] = breakpoint;
-        s_InterruptHandlers[Exception::PAGE_FAULT] = pageFault;
+        s_InterruptHandlers[Exception::BREAKPOINT]    = breakpoint;
+        s_InterruptHandlers[Exception::PAGE_FAULT]    = pageFault;
+        s_InterruptHandlers[Exception::MACHINE_CHECK] = machineCheck;
 
         SetDPL(Exception::BREAKPOINT, 3);
         LogInfo("IDT: Initialized!");
@@ -236,7 +242,7 @@ namespace IDT
         } idtr;
         idtr.Limit = sizeof(s_IdtEntries) - 1;
         idtr.Base  = reinterpret_cast<upointer>(s_IdtEntries);
-        __asm__ volatile("lidt %0" : : "m"(idtr));
+        Asm("lidt %0" : : "m"(idtr));
     }
 
     u32  GetIST(u8 vector) { return s_IdtEntries[vector].IST; }

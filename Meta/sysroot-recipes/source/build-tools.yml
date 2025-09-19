@@ -1,0 +1,59 @@
+#*
+#* Created by v1tr10l7 on 18.09.2025.
+#* Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
+#*
+#* SPDX-License-Identifier: GPL-3
+#*/
+sources:
+  - name: binutils
+    subdir: 'sources'
+    url: 'https://sourceware.org/pub/binutils/releases/binutils-2.42.tar.xz'
+    format: 'tar.xz'
+    extract_path: 'binutils-2.42'
+    version: '2.42'
+    patch-path-strip: 1
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+    regenerate:
+      - args: ['automake']
+        workdir: '@THIS_SOURCE_DIR@/ld'
+  - name: 'bison'
+    subdir: 'sources'
+    git: 'https://git.savannah.gnu.org/git/bison.git'
+    tag: 'v3.6.2'
+    version: '3.6.2'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-libtool
+    regenerate: 
+      - args: ['git', 'submodule', 'update', '--init']
+        isolate_network: false
+      - args: ['./bootstrap']
+        isolate_network: false
+      - args: ['cp',
+           '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+           '@THIS_SOURCE_DIR@/build-aux/']
+  - name: gcc
+    subdir: 'sources'
+    url: 'https://sourceware.org/pub/gcc/releases/gcc-15.2.0/gcc-15.2.0.tar.xz'
+    format: 'tar.xz'
+    extract_path: 'gcc-15.2.0'
+    version: '15.2.0'
+    patch-path-strip: 1
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.11
+    regenerate:
+      - args: ['autoconf']
+        workdir: '@THIS_SOURCE_DIR@/gcc'
+      - args: ['autoconf']
+        workdir: '@THIS_SOURCE_DIR@/libstdc++-v3'
+
+  - name: gnuconfig
+    subdir: 'sources'
+    git: 'https://git.savannah.gnu.org/git/config.git'
+    branch: 'master'
+    commit: '63acb96f92473ceb5e21d873d7c0aee266b3d6d3'
+    version: '20230121'

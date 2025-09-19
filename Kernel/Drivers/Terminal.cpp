@@ -194,7 +194,7 @@ void Terminal::OnEscapeChar(char c)
             m_EscapeValueCount = 0;
             m_State            = State::eControlSequenceEntry;
             return;
-        case ']': break;
+        case ']': m_State = State::eOsCommand; return;
         case '_': break;
         // Reset
         case 'c':

@@ -196,7 +196,7 @@ constexpr usize ECHOPRT    = 0002000;
 // If ICANON is also set, KILL is echoed by erasing each character on the line,
 // as specified by ECHOE and ECHOPRT (not in POSIX).
 constexpr usize ECHOKE     = 0004000;
-constexpr usize IEXTEN     = 100000;
+constexpr usize IEXTEN     = 0100000;
 
 constexpr usize TCOOFF     = 0;
 constexpr usize TCOON      = 1;

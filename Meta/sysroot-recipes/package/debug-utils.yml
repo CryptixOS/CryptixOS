@@ -1,0 +1,73 @@
+packages:
+  - name: evtest
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: kernel input device debugging
+      description: evtest is a tool to print evdev kernel events. It reads directly from the kernel device and prints a device description and the events with the value and the symbolic name.
+      spdx: 'GPL-2.0-or-later'
+      website: 'https://gitlab.freedesktop.org/libevdev/evtest'
+      maintainer: "no92 <leo@managarm.org>"
+      categories: ['app-misc']
+    source:
+      subdir: 'sources'
+      git: 'https://gitlab.freedesktop.org/libevdev/evtest.git'
+      tag: 'evtest-1.35'
+      version: '1.35'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+      regenerate:
+        - args: ['autoreconf', '-fvi']
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+    revision: 1
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: vttest
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/hharte/vttest.git'
+      branch: 'master'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+      regenerate:
+        # While we do not need to regenerate the configure script, we need to touch it
+        # after patching config.sub so that make does not try to regenerate it.
+        - args: ['autoconf']
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - ncurses
+      - readline
+      - libiconv
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--with-curses'
+        - 'CFLAGS=-std=gnu89'
+        environ:
+          ac_cv_func_wcswidth: 'no'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'DESTDIR=@THIS_COLLECT_DIR@', 'install']
+        quiet: true

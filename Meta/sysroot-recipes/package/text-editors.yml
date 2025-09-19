@@ -1,0 +1,184 @@
+packages:
+  - name: text-editors
+    labels: [aarch64]
+    architecture: noarch
+    source:
+      subdir: 'sources'
+      version: '1.0'
+    pkgs_required:
+      - nano
+      - vim
+    configure: []
+    build: []
+
+  - name: nano
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: GNU GPL'd Pico clone with more functionality
+      description: This package provides a mall, simple text editor which aims to replace Pico, the default editor in the Pine package.
+      spdx: 'LGPL-2.1-or-later GPL-3.0-or-later'
+      website: 'https://www.nano-editor.org/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['app-editors']
+    source:
+      subdir: 'sources'
+      git: 'https://git.savannah.gnu.org/git/nano.git'
+      tag: 'v7.2'
+      version: '7.2'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-pkg-config
+        - virtual: pkgconfig-for-target
+          triple: "@OPTION:arch-triple@"
+      regenerate:
+        - args: |
+              if ! [ -d gnulib ]; then
+                  git clone https://git.savannah.gnu.org/git/gnulib.git gnulib
+              else
+                  git -C gnulib pull --unshallow || true
+              fi
+          isolate_network: false
+        - args: ['./autogen.sh']
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-pkg-config
+      - system-gcc
+      - virtual: pkgconfig-for-target
+        triple: "@OPTION:arch-triple@"
+    pkgs_required:
+      - mlibc
+      - file
+      - ncurses
+      - libintl
+      - zlib
+    revision: 7
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--sysconfdir=/etc'
+        - '--docdir=/usr/share/doc/nano-7.2'
+        environ:
+          PKG_CONFIG_SYSROOT_DIR: '@BUILD_ROOT@/system-root'
+          PKG_CONFIG_LIBDIR: '@BUILD_ROOT@/system-root/usr/lib/pkgconfig:@BUILD_ROOT@/system-root/usr/share/pkgconfig'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/etc']
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/home/cryptix']
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/root']
+      - args: ['cp', '@SYSROOT_DIR@/etc/nanorc', '@THIS_COLLECT_DIR@/home/cryptix/.nanorc']
+
+  - name: openvi
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: Portable OpenBSD vi for UNIX systems
+      description: OpenVi is an enhanced and portable implementation of the Berkeley vi / ex text editor
+      spdx: 'BSD-3-Clause'
+      website: 'https://github.com/johnsonjh/OpenVi'
+      maintainer: "Jeffrey H. Johnson <trnsz@pobox.com>"
+      categories: ['app-editors']
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/johnsonjh/OpenVi.git'
+      tag: '7.6.31'
+      version: '7.6.31'
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - ncurses
+    revision: 1
+    configure:
+      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@']
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+        environ:
+          CC: "@OPTION:arch-triple@-gcc"
+          CFLAGS: "-DBYTE_ORDER=__BYTE_ORDER__ -std=gnu23"
+          LDFLAGS: "-lncurses -ltinfo"
+          LTO: "1"
+      - args: ['make', 'install']
+        environ:
+          PREFIX: '/usr'
+          DESTDIR: '@THIS_COLLECT_DIR@'
+          CHOWN: "true"
+
+  - name: vim
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: Vim, an improved vi-style text editor
+      description: This package contains a powerful text editor.
+      spdx: 'no-spdx: vim'
+      website: 'https://www.vim.org/'
+      maintainer: "Dennis Bonke <dennis@managarm.org>"
+      categories: ['app-editors']
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/vim/vim.git'
+      tag: 'v9.0.2112'
+      version: '9.0.2112'
+    tools_required:
+      - system-gcc
+      - host-pkg-config
+      - host-automake-v1.15
+    pkgs_required:
+      - mlibc
+      - ncurses
+      - libiconv
+    revision: 5
+    configure:
+      # vim does not seem to support out-of-tree builds, so we just copy
+      # the source tree into the build directory instead
+      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/.', '@THIS_BUILD_DIR@']
+      - args:
+        - './configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--disable-gtktest'
+        - '--disable-icon-cache-update'
+        - '--disable-desktop-database-update'
+        - '--disable-canberra'
+        - '--disable-selinux'
+        - '--disable-xsmp'
+        - '--disable-channel'
+        - '--disable-netbeans'
+        - '--enable-multibyte'
+        - '--disable-acl'
+        - '--disable-gpm'
+        - '--disable-sysmouse'
+        - '--disable-nls'
+        - '--with-tlib=tinfo'
+        - '--enable-gui=no'
+        - '--without-x'
+        - '--with-features=small'
+        environ:
+          ac_cv_small_wchar_t: 'no'
+          ac_cv_func_sigsetjmp: 'no'
+          vim_cv_toupper_broken: 'no'
+          vim_cv_terminfo: 'yes'
+          vim_cv_tgetent: 'zero'
+          vim_cv_tty_group: ''
+          vim_cv_tty_mode: '0620'
+          vim_cv_getcwd_broken: 'no'
+          vim_cv_stat_ignores_slash: 'no'
+          vim_cv_memmove_handles_overlap: 'yes'
+          vim_cv_bcopy_handles_overlap: 'yes'
+          vim_cv_memcpy_handles_overlap: 'yes'
+          STRIP: '@OPTION:arch-triple@-strip'
+        workdir: '@THIS_BUILD_DIR@/src/'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+        quiet: true

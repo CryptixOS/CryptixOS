@@ -1,0 +1,41 @@
+From dcd600e73ce02b1cbabd368a91d3dcf548ee0fc1 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Thu, 18 Sep 2025 15:47:58 +0200
+Subject: [PATCH] port to cryptix
+
+---
+ Makefile.devel            | 4 ++--
+ libcharset/Makefile.devel | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/Makefile.devel b/Makefile.devel
+index 3102ad2..d49e74a 100644
+--- a/Makefile.devel
++++ b/Makefile.devel
+@@ -6,8 +6,8 @@ SHELL = /bin/sh
+ MAKE = make
+ AUTOCONF = autoconf
+ AUTOHEADER = autoheader
+-AUTOMAKE = automake-1.16
+-ACLOCAL = aclocal-1.16
++AUTOMAKE = automake
++ACLOCAL = aclocal
+ GPERF = gperf
+ CC = gcc -Wall
+ CFLAGS = -O
+diff --git a/libcharset/Makefile.devel b/libcharset/Makefile.devel
+index 7a991cd..3e0e2ca 100644
+--- a/libcharset/Makefile.devel
++++ b/libcharset/Makefile.devel
+@@ -5,7 +5,7 @@ SHELL = /bin/sh
+ MAKE = make
+ AUTOCONF = autoconf
+ AUTOHEADER = autoheader
+-ACLOCAL = aclocal-1.16
++ACLOCAL = aclocal
+ CP = cp
+ RM = rm -f
+ 
+-- 
+2.51.0
+

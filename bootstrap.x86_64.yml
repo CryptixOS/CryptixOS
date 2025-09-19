@@ -1,0 +1,58 @@
+#*
+#* Created by v1tr10l7 on 18.09.2025.
+#* Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
+#*
+#* SPDX-License-Identifier: GPL-3
+#*/
+declare_options:
+  - name: arch
+    default: x86_64
+  - name: arch-triple
+    default: x86_64-cryptix
+
+imports:
+  - file: Meta/sysroot-recipes/source/build-tools.yml
+  - file: Meta/sysroot-recipes/source/system-libs.yml
+  - file: Meta/sysroot-recipes/source/system-utilities.yml
+
+  - file: Meta/sysroot-recipes/host/build-tools.yml
+  - file: Meta/sysroot-recipes/host/language-tools.yml
+
+  - file: Meta/sysroot-recipes/package/compress-utils.yml
+  - file: Meta/sysroot-recipes/package/debug-utils.yml
+  - file: Meta/sysroot-recipes/package/dev-tools.yml
+  - file: Meta/sysroot-recipes/package/fun-apps.yml
+  - file: Meta/sysroot-recipes/package/games.yml
+  - file: Meta/sysroot-recipes/package/network-utilities.yml
+  - file: Meta/sysroot-recipes/package/resources.yml
+  - file: Meta/sysroot-recipes/package/shell-apps.yml
+  - file: Meta/sysroot-recipes/package/sysinfo-utils.yml
+  - file: Meta/sysroot-recipes/package/system-libs.yml
+  - file: Meta/sysroot-recipes/package/system-utilities.yml
+  - file: Meta/sysroot-recipes/package/system-services.yml
+  - file: Meta/sysroot-recipes/package/text-editors.yml
+
+packages:
+  - name: base
+    architecture: noarch
+    source:
+      subdir: 'sources'
+      version: '1.0'
+    pkgs_required:
+      - aurora
+      - base-files
+      - fun-apps
+      - shell-apps
+      - sys-apps
+      - text-editors
+    configure: []
+    build: []
+
+  - name: base-files
+    architecture: noarch
+    source:
+      subdir: 'sources'
+      version: '1.0'
+    configure: []
+    build:
+      - args: ['rsync', '-al', '@SOURCE_ROOT@/BaseFiles/', '@THIS_COLLECT_DIR@']

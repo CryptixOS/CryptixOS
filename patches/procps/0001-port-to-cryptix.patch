@@ -1,0 +1,24 @@
+From 6b14d24dd72d30e1a59ffab8878d4fa958de35ca Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Thu, 18 Sep 2025 17:24:19 +0200
+Subject: [PATCH] port to cryptix
+
+---
+ src/watch.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/watch.c b/src/watch.c
+index 7ec634b..e130137 100644
+--- a/src/watch.c
++++ b/src/watch.c
+@@ -55,6 +55,7 @@
+ #include "c.h"
+ #include "config.h"
+ #include "fileutils.h"
++#include <linux/stat.h>
+ #include "nls.h"
+ #include "signals.h"
+ #include "strutils.h"
+-- 
+2.51.0
+

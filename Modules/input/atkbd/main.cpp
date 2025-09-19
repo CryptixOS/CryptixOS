@@ -89,9 +89,10 @@ void AtKeyboard::HandleScanCodeSet1Key(u8 raw)
         bool disableArrowKeys
             = CommandLine::GetBoolean("disableArrowKeys").ValueOr(false);
 
-        char cursorSequence[3];
+        char cursorSequence[4];
         cursorSequence[0] = '\e';
         cursorSequence[1] = cursorKeyMode ? 'O' : '[';
+        cursorSequence[3] = '\0';
 
         switch (raw)
         {
@@ -105,22 +106,26 @@ void AtKeyboard::HandleScanCodeSet1Key(u8 raw)
             case SCANCODE_UP_ARROW:
                 if (disableArrowKeys) return;
                 cursorSequence[2] = 'A';
-                Emit(cursorSequence, 3);
+                Emit(cursorSequence, 4);
+                LogDebug("atkbd: UP_ARROW => {}", cursorSequence);
                 return;
             case SCANCODE_LEFT_ARROW:
                 if (disableArrowKeys) return;
                 cursorSequence[2] = 'D';
-                Emit(cursorSequence, 3);
+                Emit(cursorSequence, 4);
+                LogDebug("atkbd: LEFT_ARROW => {}", cursorSequence);
                 return;
             case SCANCODE_DOWN_ARROW:
                 if (disableArrowKeys) return;
                 cursorSequence[2] = 'B';
-                Emit(cursorSequence, 3);
+                Emit(cursorSequence, 4);
+                LogDebug("atkbd: DOWN_ARROW => {}", cursorSequence);
                 return;
             case SCANCODE_RIGHT_ARROW:
                 if (disableArrowKeys) return;
                 cursorSequence[2] = 'C';
-                Emit(cursorSequence, 3);
+                Emit(cursorSequence, 4);
+                LogDebug("atkbd: RIGHT_ARROW => {}", cursorSequence);
                 return;
             case SCANCODE_HOME_PRESS: Emit("\e[1~", 4); return;
             case SCANCODE_END_PRESS: Emit("\e[4~", 4); return;

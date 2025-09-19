@@ -15,7 +15,7 @@
 #include <Library/Logger.hpp>
 
 #include <Prism/Algorithm/Find.hpp>
-#include <Prism/Containers/Deque.hpp>
+#include <Prism/Containers/Vector.hpp>
 
 #include <Time/Time.hpp>
 
@@ -31,7 +31,7 @@ namespace Time
         Timestep            s_RealTime;
         Timestep            s_Monotonic;
 
-        Deque<Ref<Timer>>   s_ArmedTimers;
+        Vector<Ref<Timer>>   s_ArmedTimers;
         Spinlock            s_TimersLock;
     } // namespace
 
@@ -198,6 +198,7 @@ namespace Time
 
         if (s_TimersLock.TestAndAcquire())
         {
+            Assert(!s_TimersLock.Test());
             for (auto& timer : s_ArmedTimers)
             {
                 if (timer->Fired) continue;
@@ -210,7 +211,7 @@ namespace Time
                 else timer->Event.Trigger(false);
                 timer->Fired = true;
 
-                if (timer->ReloadValue) ArmTimer(timer, timer->ReloadValue);
+                // if (timer->ReloadValue) ArmTimer(timer, timer->ReloadValue);
             }
 
             s_TimersLock.Release();

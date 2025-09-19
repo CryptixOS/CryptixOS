@@ -71,8 +71,33 @@ bool TTY::GetCursorKeyMode() const
 {
     return Terminal::Active()->GetCursorKeyMode();
 }
+
+bool IsArrowKey(const char* string, usize bytes)
+{
+    StringView     sequence(string, bytes);
+    constexpr auto sequences = ToArray({
+        "\e[A"_sv,
+        "\e[B"_sv,
+        "\e[C"_sv,
+        "\e[D"_sv,
+        "\eOA"_sv,
+        "\eOB"_sv,
+        "\eOC"_sv,
+        "\eOD"_sv,
+    });
+
+    for (auto key : sequences)
+        if (sequence == key) return true;
+
+    return false;
+}
 void TTY::SendBuffer(const char* string, usize bytes)
 {
+    if (IsArrowKey(string, bytes) && !IsCanonicalMode())
+    {
+        for (usize i = 0; i < 4; i++) EnqueueChar(string[i]);
+        return;
+    }
     if (string[0] == '\e') m_State = State::eEscapeSequence;
     for (usize i = 0; i < bytes; i++)
     {
@@ -443,7 +468,7 @@ void TTY::EnqueueChar(u64 c)
 {
     UniqueGuard guard(m_RawMutex);
 
-#define TTY_DEBUG 0
+#define TTY_DEBUG 1
 #if TTY_DEBUG == 1
     LogDebug("raw: {:#x}", c);
 #endif
