@@ -327,12 +327,16 @@ ErrorOr<isize> Process::InsertFd(Ref<FileDescriptor> fd)
 
 ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
 {
-    auto fifo     = CreateRef<Fifo>();
+    auto fifo        = CreateRef<Fifo>();
 
-    auto readerFd = fifo->OpenDirection(Fifo::Direction::eRead);
-    CopyToUser(pipeFds, static_cast<i32>(m_FdTable->Insert(readerFd)));
-    auto writerFd = fifo->OpenDirection(Fifo::Direction::eWrite);
-    CopyToUser(pipeFds + 1, static_cast<i32>(m_FdTable->Insert(writerFd)));
+    auto readerFd    = fifo->OpenDirection(Fifo::Direction::eRead);
+    i32  readerFdNum = static_cast<i32>(m_FdTable->Insert(readerFd));
+    CopyToUser(pipeFds, readerFdNum);
+    auto writerFd    = fifo->OpenDirection(Fifo::Direction::eWrite);
+    i32  writerFdNum = static_cast<i32>(m_FdTable->Insert(writerFd));
+    CopyToUser(pipeFds + 1, writerFdNum);
+    LogTrace("Process::OpenPipe: readerFd => {}, writerFd => {}", readerFdNum,
+             writerFdNum);
 
     return 0;
 }
@@ -645,6 +649,7 @@ void Process::CopyFs(Process* process)
 }
 void Process::CopyFileDescriptors(Process* process)
 {
+    LogTrace("Copying file descriptors");
     process->m_FdTable = CreateRef<class FileDescriptorTable>();
     for (auto& [fdNum, fd] : *m_FdTable) process->m_FdTable->Insert(fd, fdNum);
 }

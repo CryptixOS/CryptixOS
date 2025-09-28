@@ -34,6 +34,7 @@ class File : public RefCounted
                                 isize offset = -1);
     virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
                                  isize offset = -1);
+    virtual ErrorOr<isize> IoCtl(usize request, usize arg);
     virtual ErrorOr<const stat> Stat() const;
     virtual ErrorOr<isize>      Seek(i32 whence, off_t offset)
     {
@@ -51,5 +52,5 @@ class File : public RefCounted
 
   private:
     Spinlock           m_Lock;
-    ::Ref<class INode> m_INode          = nullptr;
+    ::Ref<class INode> m_INode = nullptr;
 };

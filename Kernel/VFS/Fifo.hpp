@@ -12,7 +12,7 @@
 #include <VFS/FileDescriptor.hpp>
 #include <VFS/INode.hpp>
 
-class Fifo : public INode
+class Fifo : public File
 {
   public:
     Fifo();
@@ -23,18 +23,14 @@ class Fifo : public INode
         eWrite = 1,
     };
 
-    FileDescriptor* OpenDirection(Direction direction);
+    ::Ref<FileDescriptor>  OpenDirection(Direction direction);
 
-    virtual void    InsertChild(::Ref<INode>, StringView) override
-    {
-        AssertNotReached();
-    }
-    virtual isize Read(void* buffer, off_t offset, usize bytes) override;
-    virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
-
-    virtual const stat Stats() const override { return {}; }
+    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override;
+    virtual ErrorOr<isize> Write(const void* src, off_t offset,
+                                 usize bytes) override;
 
   private:
+    Spinlock      m_Lock;
     Atomic<usize> m_ReaderCount = 0;
     Atomic<usize> m_WriterCount = 0;
     Event         m_Event;

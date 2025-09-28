@@ -126,6 +126,11 @@ ErrorOr<isize> FileDescriptor::Write(const UserBuffer& in, usize count,
     m_Offset = offset;
     return bytesWritten;
 }
+ErrorOr<isize> FileDescriptor::IoCtl(usize request, usize arg)
+{
+    if (!m_File) return Error(ENOENT);
+    return m_File->IoCtl(request, arg);
+}
 ErrorOr<const stat> FileDescriptor::Stat() const
 {
     if (!m_File) return Error(ENOENT);

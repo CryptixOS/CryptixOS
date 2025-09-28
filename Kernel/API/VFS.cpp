@@ -73,8 +73,7 @@ namespace API::VFS
         if (!path.Absolute())
         {
             if (dirFdNum == AT_FDCWD) base = process->CWD();
-            else
-            {
+            else {
                 Ref<FileDescriptor> fd = process->GetFileHandle(dirFdNum);
                 if (!fd) return Error(EBADF);
                 base = fd->DirectoryEntry();
@@ -208,7 +207,7 @@ namespace API::VFS
 
         // FIXME(v1tr10l7): shouldn't be here
         UserMemoryProtectionGuard guard;
-        return fd->INode()->IoCtl(request, argument);
+        return fd->IoCtl(request, argument);
     }
 
     ErrorOr<isize> PRead(isize fdNum, void* out, usize count, off_t offset)
@@ -547,9 +546,9 @@ namespace API::VFS
         String fsType = CopyStringFromUser(filesystemType).StrView();
         if (fsType.Empty()) return ErrorCode(ENODEV);
 
-        Scope<u8[]> options = new u8[CopyStringFromUser(
-                                         reinterpret_cast<const char*>(data))
-                                         .Size()];
+        Scope<u8[]> options
+            = new u8[CopyStringFromUser(reinterpret_cast<const char*>(data))
+                         .Size()];
 
         LogDebug("VFS: Mounting `{}`({}) at `{}`", source, fsType, target);
         auto mountPoint = TryOrRet(::VFS::Mount(nullptr, source, target, fsType,
@@ -854,7 +853,7 @@ namespace API::VFS
         if (mtime.tv_nsec == UTIME_NOW) mtime = Time::GetReal();
         else if (mtime.tv_nsec == UTIME_OMIT) mtime = {};
 
-        auto       path = AsUser([&]() -> PathView { return pathname; });
+        auto       path      = AsUser([&]() -> PathView { return pathname; });
         auto       pathResOr = ResolveAtFd(dirFdNum, path, flags);
 
         Ref<INode> inode     = nullptr;
@@ -868,8 +867,7 @@ namespace API::VFS
 
             inode = fd->INode();
         }
-        else
-        {
+        else {
             auto dentry = pathResOr.Value().Entry;
             if (!dentry) return Error(ENOENT);
             inode = dentry->INode();
@@ -892,7 +890,11 @@ namespace API::VFS
         auto* process = Process::Current();
         return process->DupFd(oldFdNum, newFdNum, flags);
     }
-    ErrorOr<isize> Pipe2(i32* pipeFds, isize flags) { return Error(ENOSYS); }
+    ErrorOr<isize> Pipe2(i32* pipeFds, isize flags)
+    {
+        auto process = Process::Current();
+        return process->OpenPipe(pipeFds);
+    }
 
     ErrorOr<isize> SyncFs(isize fdNum)
     {

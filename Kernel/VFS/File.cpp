@@ -45,6 +45,11 @@ ErrorOr<isize> File::Write(const UserBuffer& in, usize count, isize offset)
 
     return m_INode->Write(in.Raw(), offset, count);
 }
+ErrorOr<isize> File::IoCtl(usize request, usize arg)
+{
+    if (!m_INode) return Error(ENOSYS);
+    return m_INode->IoCtl(request, arg);
+}
 
 ErrorOr<const stat> File::Stat() const
 {

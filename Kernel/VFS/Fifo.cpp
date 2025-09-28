@@ -4,34 +4,31 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Prism/String/StringUtils.hpp>
 #include <Scheduler/Process.hpp>
 
 #include <VFS/Fifo.hpp>
 
 constexpr usize FIFO_SIZE = 16 * PMM::PAGE_SIZE;
 
-Fifo::Fifo()
-    : INode("Fifo")
-{
-    m_Metadata.Mode = 0644 | S_IFIFO;
-    m_Buffer.Reserve(FIFO_SIZE);
-}
+Fifo::Fifo() { m_Buffer.Reserve(FIFO_SIZE); }
 
-FileDescriptor* Fifo::OpenDirection(Fifo::Direction direction)
+::Ref<FileDescriptor> Fifo::OpenDirection(Fifo::Direction direction)
 {
-
-    auto fd = new FileDescriptor(nullptr, 0,
-                                 direction == Direction::eRead
-                                     ? FileAccessMode::eRead
-                                     : FileAccessMode::eWrite);
+    auto dentry = CreateRef<DirectoryEntry>("");
+    auto fd     = CreateRef<FileDescriptor>(dentry, this, 0,
+                                        direction == Direction::eRead
+                                                ? FileAccessMode::eRead
+                                                : FileAccessMode::eWrite);
     if (direction == Direction::eRead) ++m_ReaderCount;
     else ++m_WriterCount;
 
+    LogTrace("Fifo: Opening for {}", StringUtils::ToString(direction));
     m_Event.Trigger(false);
     return fd;
 }
 
-isize Fifo::Read(void* buffer, off_t offset, usize count)
+ErrorOr<isize> Fifo::Read(void* buffer, off_t offset, usize count)
 {
     isize nread = 0;
     m_Lock.Acquire();
@@ -59,7 +56,7 @@ cleanup:
     m_Lock.Release();
     return nread;
 }
-isize Fifo::Write(const void* buffer, off_t offset, usize count)
+ErrorOr<isize> Fifo::Write(const void* buffer, off_t offset, usize count)
 {
     isize nwritten = 0;
     m_Lock.Acquire();

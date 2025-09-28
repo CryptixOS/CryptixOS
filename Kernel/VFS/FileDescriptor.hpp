@@ -120,6 +120,7 @@ class FileDescriptor : public RefCounted
 
         return Write(buffer, count, m_Offset);
     }
+    ErrorOr<isize>              IoCtl(usize request, usize arg);
     virtual ErrorOr<const stat> Stat() const;
     virtual ErrorOr<isize>      Seek(i32 whence, off_t offset);
     virtual ErrorOr<isize>      Truncate(off_t size);

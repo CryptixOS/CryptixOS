@@ -233,8 +233,6 @@ namespace API::Process
 
         clone_args args   = {};
         args.flags        = 0 & ~CSIGNAL;
-        // args.flags      = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND
-        //            | CLONE_SYSVSEM | CLONE_SETTLS | CLONE_PARENT_SETTID;
         args.pidfd        = 0;
         args.child_tid    = 0;
         args.parent_tid   = 0;

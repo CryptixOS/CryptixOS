@@ -96,6 +96,8 @@ void TTY::SendBuffer(const char* string, usize bytes)
     if (IsArrowKey(string, bytes) && !IsCanonicalMode())
     {
         for (usize i = 0; i < 4; i++) EnqueueChar(string[i]);
+        m_State = State::eNormal;
+        m_RawEvent.Trigger();
         return;
     }
     if (string[0] == '\e') m_State = State::eEscapeSequence;
