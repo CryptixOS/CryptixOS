@@ -17,6 +17,7 @@ class FileDescriptorTable : public RefCounted
     FileDescriptorTable() = default;
 
     isize       Insert(::Ref<FileDescriptor> descriptor, isize desired = -1);
+    isize       Replace(::Ref<FileDescriptor> descriptor, isize desired);
     isize       Erase(isize fdNum);
 
     void        Clear();

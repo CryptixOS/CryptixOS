@@ -75,14 +75,18 @@ FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry,
     , m_File(file)
     , m_DirectoryIterator(dentry->begin())
 {
-    m_DescriptionFlags = flags
-                       & ~(O_CREAT | O_DIRECTORY | O_EXCL | O_NOCTTY
-                           | O_NOFOLLOW | O_TRUNC | O_CLOEXEC);
-    m_AccessMode = accMode;
-    m_Flags      = flags & O_CLOEXEC;
+    m_DescriptionFlags = flags;
+    // & ~(O_CREAT | O_DIRECTORY | O_EXCL | O_NOCTTY
+    //     | O_NOFOLLOW | O_TRUNC | O_CLOEXEC);
+    m_AccessMode       = accMode;
+    m_Flags            = flags & O_CLOEXEC;
 }
 
-FileDescriptor::~FileDescriptor() {}
+FileDescriptor::~FileDescriptor()
+{
+    bool writer = CanWrite();
+    if (m_File && m_File->IsFifo()) m_File->Close(writer);
+}
 
 ErrorOr<isize> FileDescriptor::Read(const UserBuffer& out, usize count,
                                     isize offset)

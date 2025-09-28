@@ -12,9 +12,16 @@
 #include <VFS/FileDescriptor.hpp>
 #include <VFS/INode.hpp>
 
+struct Pipe
+{
+    ::Ref<FileDescriptor> Reader;
+    ::Ref<FileDescriptor> Writer;
+};
 class Fifo : public File
 {
   public:
+    static Pipe CreatePipe();
+
     Fifo();
 
     enum class Direction
@@ -24,10 +31,13 @@ class Fifo : public File
     };
 
     ::Ref<FileDescriptor>  OpenDirection(Direction direction);
+    virtual void           Close(bool writer) override;
 
     virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Write(const void* src, off_t offset,
                                  usize bytes) override;
+    virtual ErrorOr<const stat> Stat() const override;
+    virtual bool                IsFifo() const override { return true; }
 
   private:
     Spinlock      m_Lock;

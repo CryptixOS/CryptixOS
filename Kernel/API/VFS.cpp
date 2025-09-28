@@ -747,7 +747,7 @@ namespace API::VFS
             }
             else if (!fd) return Error(EBADF);
 
-            *out = fd->INode()->Stats();
+            *out = TryOrRet(fd->Stat());
             return 0;
         }
 

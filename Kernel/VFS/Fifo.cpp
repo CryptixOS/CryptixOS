@@ -11,6 +11,23 @@
 
 constexpr usize FIFO_SIZE = 16 * PMM::PAGE_SIZE;
 
+Pipe            Fifo::CreatePipe()
+{
+    auto fifo   = CreateRef<Fifo>();
+    auto dentry = CreateRef<DirectoryEntry>("");
+
+    Pipe pipe{};
+    pipe.Reader
+        = CreateRef<FileDescriptor>(dentry, fifo, 0, FileAccessMode::eRead);
+    ++fifo->m_ReaderCount;
+
+    pipe.Writer
+        = CreateRef<FileDescriptor>(dentry, fifo, 0, FileAccessMode::eWrite);
+    ++fifo->m_WriterCount;
+
+    return pipe;
+}
+
 Fifo::Fifo() { m_Buffer.Reserve(FIFO_SIZE); }
 
 ::Ref<FileDescriptor> Fifo::OpenDirection(Fifo::Direction direction)
@@ -26,6 +43,13 @@ Fifo::Fifo() { m_Buffer.Reserve(FIFO_SIZE); }
     LogTrace("Fifo: Opening for {}", StringUtils::ToString(direction));
     m_Event.Trigger(false);
     return fd;
+}
+void Fifo::Close(bool writer)
+{
+    if (writer) --m_WriterCount;
+    else --m_ReaderCount;
+
+    m_Event.Trigger(false);
 }
 
 ErrorOr<isize> Fifo::Read(void* buffer, off_t offset, usize count)
@@ -85,4 +109,12 @@ ErrorOr<isize> Fifo::Write(const void* buffer, off_t offset, usize count)
 cleanup:
     m_Lock.Release();
     return nwritten;
+}
+
+ErrorOr<const stat> Fifo::Stat() const
+{
+    stat stats{};
+    stats.st_mode = S_IFIFO;
+
+    return stats;
 }

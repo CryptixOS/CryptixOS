@@ -71,6 +71,12 @@ Process::Process(Process* parent, StringView name,
         m_AddressSpace = CreateRef<class AddressSpace>();
         m_FsView       = CreateRef<FilesystemView>();
         m_FdTable      = CreateRef<class FileDescriptorTable>();
+
+        isize fdNum = OpenAt(AT_FDCWD, "/dev/console", O_RDWR, S_IFCHR).Value();
+
+        DupFd(fdNum, 0, 0);
+        DupFd(fdNum, 1, 0);
+        DupFd(fdNum, 2, 0);
     }
 
     for (auto& timer : m_Timers) timer = CreateRef<struct Timer>();
@@ -310,11 +316,7 @@ ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
     Ref<FileDescriptor> oldFd = GetFileHandle(oldFdNum);
     if (!oldFd) return Error(EBADF);
 
-    Ref<FileDescriptor> newFd = GetFileHandle(newFdNum);
-    if (newFd) CloseFd(newFdNum);
-
-    newFd    = oldFd;
-    newFdNum = m_FdTable->Insert(newFd, newFdNum);
+    newFdNum = m_FdTable->Replace(oldFd, newFdNum);
     if (newFdNum < 0) return Error(EBADF);
 
     return newFdNum;
@@ -327,13 +329,10 @@ ErrorOr<isize> Process::InsertFd(Ref<FileDescriptor> fd)
 
 ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
 {
-    auto fifo        = CreateRef<Fifo>();
-
-    auto readerFd    = fifo->OpenDirection(Fifo::Direction::eRead);
-    i32  readerFdNum = static_cast<i32>(m_FdTable->Insert(readerFd));
+    auto pipe        = Fifo::CreatePipe();
+    i32  readerFdNum = static_cast<i32>(m_FdTable->Insert(pipe.Reader));
     CopyToUser(pipeFds, readerFdNum);
-    auto writerFd    = fifo->OpenDirection(Fifo::Direction::eWrite);
-    i32  writerFdNum = static_cast<i32>(m_FdTable->Insert(writerFd));
+    i32 writerFdNum = static_cast<i32>(m_FdTable->Insert(pipe.Writer));
     CopyToUser(pipeFds + 1, writerFdNum);
     LogTrace("Process::OpenPipe: readerFd => {}, writerFd => {}", readerFdNum,
              writerFdNum);
@@ -382,14 +381,21 @@ Vector<String> SplitArguments(const String& str)
 
 ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 {
-    if (m_FdTable) m_FdTable->Clear();
-    m_FdTable = CreateRef<class FileDescriptorTable>();
+    auto oldTable = m_FdTable;
+    m_FdTable     = CreateRef<class FileDescriptorTable>();
 
-    auto tty  = VFS::Open(VFS::RootDirectoryEntry(), "/dev/console", O_RDWR, 0)
-                   .Value();
-    m_FdTable->Insert(tty, 0);
-    m_FdTable->Insert(tty, 1);
-    m_FdTable->Insert(tty, 2);
+    if (oldTable)
+        for (const auto& [i, fd] : *oldTable)
+            if (!fd->CloseOnExec()) m_FdTable->Insert(fd, i);
+
+    if (m_ID <= 2)
+    {
+        isize fdNum
+            = TryOrRet(OpenAt(AT_FDCWD, "/dev/console", O_RDWR, S_IFCHR));
+        DupFd(fdNum, 0, 0);
+        DupFd(fdNum, 1, 0);
+        DupFd(fdNum, 2, 0);
+    }
 
     if (m_AddressSpace)
     {

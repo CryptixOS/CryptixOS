@@ -19,6 +19,13 @@ isize FileDescriptorTable::Insert(::Ref<FileDescriptor> fd, isize desired)
     ++m_NextIndex;
     return fdNum;
 }
+isize FileDescriptorTable::Replace(::Ref<FileDescriptor> fd, isize desired)
+{
+    ScopedLock guard(m_Lock);
+    m_Table[desired] = fd;
+
+    return desired;
+}
 isize FileDescriptorTable::Erase(isize fdNum)
 {
     ScopedLock            guard(m_Lock);

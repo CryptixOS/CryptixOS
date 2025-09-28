@@ -25,8 +25,8 @@ class File : public RefCounted
     virtual ~File() = default;
 
     virtual class ::Ref<class INode> INode() const;
-
     virtual usize                    Size() const;
+    virtual void                     Close(bool writer) {}
 
     virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes);
     virtual ErrorOr<isize> Write(const void* src, off_t offset, usize bytes);
