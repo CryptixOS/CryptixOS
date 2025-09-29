@@ -103,6 +103,11 @@ void Thread::SendSignal(u8 signal)
         signal, StringUtils::ToString(static_cast<SignalID>(signal)),
         m_Parent->ID(), ShouldIgnoreSignal(signal));
 
+    if (!signal)
+    {
+        LogDebug("Thread::SendSignal: Dummy signal, returning...");
+        // return;
+    }
     if (ShouldIgnoreSignal(signal)) return;
     m_PendingSignals.Add(signal);
     if (m_State == ThreadState::eBlocked)

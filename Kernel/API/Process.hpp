@@ -58,6 +58,7 @@ namespace API::Process
     ErrorOr<pid_t>     GetPGid(pid_t pid);
     ErrorOr<pid_t>     GetSid(pid_t pid);
 
+    ErrorOr<isize>     SigSuspend(const sigset_t* mask);
     ErrorOr<isize>     SigAltStack(const struct sigaltstack* ss,
                                    sigaltstack*              oldSs);
     ErrorOr<ThreadID>  GetTid();

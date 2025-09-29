@@ -280,7 +280,7 @@ namespace API::Process
         LogDebug("API::Kill: Sending signal #{}({}) to process {}", signal,
                  StringUtils::ToString(static_cast<SignalID>(signal)), pid);
 
-        if (signal < 1 || signal > _NSIG) return Error(EINVAL);
+        if (signal < 0 || signal > _NSIG) return Error(EINVAL);
         if (pid > 0)
         {
             auto target = Scheduler::GetProcess(pid);
@@ -300,8 +300,7 @@ namespace API::Process
 
         // Send to everyone you are permitted to, except 1
         if (pid == -1) Process::ForEach(appendProcess);
-        else
-        {
+        else {
             GroupID targetGroup
                 = pid == 0 ? current->Credentials().GroupID : -pid;
             Process::ForEachInGroup(targetGroup, appendProcess);
@@ -464,6 +463,7 @@ namespace API::Process
         return process->Sid();
     }
 
+    ErrorOr<isize> SigSuspend(const sigset_t* mask) { return Error(ENOSYS); }
     ErrorOr<isize> SigAltStack(const struct sigaltstack* ss, sigaltstack* oldSs)
     {
         return Error(ENOSYS);

@@ -105,6 +105,7 @@ namespace Syscall
         RegisterSyscall(ID::eGetResGid, API::Process::GetResGid);
         RegisterSyscall(ID::eGet_pGid, API::Process::GetPGid);
         RegisterSyscall(ID::eSid, API::Process::GetSid);
+        RegisterSyscall(ID::eSigSuspend, API::Process::SigSuspend);
         RegisterSyscall(ID::eSigAltStack, API::Process::SigAltStack);
         RegisterSyscall(ID::eUTime, API::VFS::UTime);
         RegisterSyscall(ID::eStatFs, API::VFS::StatFs);
