@@ -18,7 +18,8 @@ void Module::ParseModuleInfo()
     const char* sectionNames
         = Image->Raw().Offset<const char*>(stringTableSection.Offset);
 
-    ELF::SectionHeader* modInfoSection = nullptr;
+    ELF::SectionHeader* modInfoSection   = nullptr;
+    ELF::SectionHeader* modParamsSection = nullptr;
     for (usize i = 0; i < Image->SectionHeaderCount(); i++)
     {
         const auto& section     = Image->SectionHeader(i);
@@ -34,6 +35,11 @@ void Module::ParseModuleInfo()
         else if (sectionName.StartsWith(".modinfo"_sv))
         {
             modInfoSection = const_cast<ELF::SectionHeader*>(&section);
+            break;
+        }
+        else if (sectionName.StartsWith(".modparams"))
+        {
+            modParamsSection = const_cast<ELF::SectionHeader*>(&section);
             break;
         }
     }
@@ -91,8 +97,21 @@ void Module::ParseModuleInfo()
             pos = entryEnd + 1;
         }
     }
-}
 
+    if (!modParamsSection) return;
+    auto sectionAddr = modParamsSection->Address;
+    auto sectionSize = modParamsSection->Size;
+
+    if (sectionSize % sizeof(ModuleParameter) != 0)
+    {
+        Failed = true;
+        return;
+    }
+
+    usize count = sectionSize / sizeof(ModuleParameter);
+    Parameters  = Span<ModuleParameter, DynamicExtent>(
+        reinterpret_cast<ModuleParameter*>(sectionAddr), count);
+}
 void Module::Prepare()
 {
     for (auto f : InitArray)

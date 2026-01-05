@@ -42,6 +42,23 @@ struct ModuleInformation
     String License;
     String Version;
 };
+
+enum class ModuleParamType : u8
+{
+    eInt    = 1,
+    eBool   = 2,
+    eString = 3,
+};
+
+struct ModuleParameter
+{
+    const char*     Name;
+    ModuleParamType Type;
+    // Pointer to the actual variable in the module
+    void*           Address;
+    const char*     Description;
+};
+
 using InitArrayEntry = void (*)();
 using FiniArrayEntry = void (*)();
 
@@ -79,8 +96,10 @@ struct Module : public RefCounted
 
     ModuleInitProc                          Initialize;
     ModuleTerminateProc                     Terminate;
+    Span<ModuleParameter, DynamicExtent>    Parameters;
 
     void                                    ParseModuleInfo();
+    void                                    ResolveParameters();
 
     void                                    Prepare();
     ErrorOr<void>                           Dispatch();
@@ -112,3 +131,11 @@ struct Module : public RefCounted
 #define CTOS_MODULE_VERSION(version_) CTOS_MODULE_INFO_STRING(version, version_)
 
 #define CTOS_MODULE_SOFTDEP(deps)     CTOS_MODULE_INFO_STRING(softdep, deps)
+#define CTOS_MODULE_PARAM(name, type, default_val, desc)                       \
+    static type __param_##name = default_val;                                  \
+    CTOS_SECTION_FORCE_EMIT(".modparams")                                      \
+    static const ModuleParameter __pdesc_##name                                \
+        = {.Name        = #name, /* Assumes type matches enum */               \
+           .Type        = ModuleParamType::e##type,                            \
+           .Address     = &__param_##name,                                     \
+           .Description = desc};
