@@ -28,12 +28,16 @@ struct Rectangle
 class FramebufferConsole final : public Terminal
 {
   public:
-    static FramebufferConsole* Create(Framebuffer& framebuffer);
+    static FramebufferConsole* Create(Framebuffer& framebuffer,
+                                      StringView   name  = "fbcon",
+                                      usize        minor = 0);
     bool Initialize(const Framebuffer& framebuffer) override;
 
   protected:
     FramebufferConsole() = default;
-    explicit FramebufferConsole(const Framebuffer& framebuffer)
+    explicit FramebufferConsole(const Framebuffer& framebuffer, StringView name,
+                                usize minor)
+        : Terminal(name, minor)
     {
         Initialize(framebuffer);
     }

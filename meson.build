@@ -63,6 +63,7 @@ macro_args = [
     '-DPRISM_LOG_ENABLE=1',
     '-DPRISM_TARGET_CRYPTIX_KERNEL=1',
     '-DPRISM_TARGET_CRYPTIX=1',
+    '-DPRISM_USE_NAMESPACE=1',
     '-DUACPI_FORMATTED_LOGGING',
     '-DFMT_BUILTIN_TYPES=0',
     '-D_LIBCPP_HAS_NO_THREADS',
@@ -186,8 +187,12 @@ qemu_args = [
 
   # setup audio backend
   '-audiodev', 'id=audio,driver=alsa',
+  '-object', 'filter-dump,id=hue,netdev=breh,file=e1000.pcap',
+  #'-netdev', 'tap,ifname=tap0,id=br0',
+  '-netdev', 'user,id=breh,hostfwd=tcp:127.0.0.1:8888-10.0.2.15:8888,hostfwd=tcp:127.0.0.1:8823-10.0.2.15:23',
+  '-device', 'e1000,netdev=breh',
   # add rtl8139 nic card
-  '-nic', 'user,model=rtl8139',
+  # '-nic', 'user,model=rtl8139',
   # add erst table
   #'-object', 'memory-backend-file,id=erstnvram,mem-path=acpi-erst.backing,size=0x10000,share=on',
   #'-device', 'acpi-erst,memdev=erstnvram',

@@ -7,6 +7,7 @@
 #pragma once
 
 #include <API/Posix/termios.h>
+#include <Drivers/TTY.hpp>
 #include <Drivers/Video/Framebuffer.hpp>
 
 #include <Library/Color.hpp>
@@ -39,10 +40,10 @@ namespace AnsiColor
     constexpr const char* BACKGROUND_WHITE   = "\u001b[47m";
 }; // namespace AnsiColor
 
-class Terminal
+class Terminal : public TTY
 {
   protected:
-    Terminal();
+    Terminal(StringView name = "vcs", usize minor = 0);
 
   public:
     static Terminal*      Create(const Framebuffer& framebuffer);
@@ -105,7 +106,10 @@ class Terminal
         eDefaultBright = 0x13,
     };
 
-    virtual void RawPutChar(u8 c) = 0;
+    virtual ErrorOr<void>  TransmitChar(u64 c) override;
+    virtual ErrorOr<isize> Transmit(StringView data) override;
+
+    virtual void           RawPutChar(u8 c) = 0;
     virtual void MoveCharacter(usize newX, usize newY, usize oldX, usize oldY)
         = 0;
 

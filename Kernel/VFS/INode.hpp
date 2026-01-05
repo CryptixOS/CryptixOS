@@ -98,8 +98,8 @@ class INode : public RefCounted
     bool        ValidatePermissions(const Credentials& creds, u32 acc);
     void        UpdateATime();
 
-    virtual ErrorOr<::Ref<File>> Open(class ::Ref<::DirectoryEntry> dentry,
-                                      i64 flags, u64 accMode);
+    virtual ErrorOr<File*> Open(class ::Ref<::DirectoryEntry> dentry, i64 flags,
+                                u64 accMode);
     virtual ErrorOr<::Ref<DirectoryEntry>>
     CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode, dev_t dev = 0);
     virtual ErrorOr<::Ref<DirectoryEntry>>

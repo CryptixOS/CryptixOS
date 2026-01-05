@@ -24,9 +24,9 @@ constexpr Color     DEFAULT_BACKDROP    = Color(0x00'00'00'00);
 constexpr usize     BUILTIN_FONT_WIDTH  = 8;
 constexpr usize     BUILTIN_FONT_HEIGHT = 16;
 
-FramebufferConsole* FramebufferConsole::Create(Framebuffer& framebuffer)
+FramebufferConsole* FramebufferConsole::Create(Framebuffer& framebuffer, StringView name, usize minor)
 {
-    return new FramebufferConsole(framebuffer);
+    return new FramebufferConsole(framebuffer, name, minor);
 }
 bool FramebufferConsole::Initialize(const ::Framebuffer& framebuffer)
 {

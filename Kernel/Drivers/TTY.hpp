@@ -20,9 +20,11 @@
 class TTY : public CharacterDevice
 {
   public:
-    TTY(StringView name, Terminal* terminal, usize minor);
+    TTY(StringView name, usize minor);
 
+    inline static TTY*     Active() { return s_CurrentTTY; }
     inline static TTY*     GetCurrent() { return s_CurrentTTY; }
+    static ErrorOr<void>   SwitchTo(TTY* tty);
 
     bool                   GetCursorKeyMode() const;
     void                   SendBuffer(const char* string, usize bytes = 1);
@@ -33,6 +35,7 @@ class TTY : public CharacterDevice
     const termios2&        GetTermios() const { return m_Termios; }
     void                   SetTermios(const termios2& termios);
 
+    virtual ErrorOr<File*> Open(File* file) override;
     virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Write(const void* src, off_t offset,
                                  usize bytes) override;
@@ -46,6 +49,10 @@ class TTY : public CharacterDevice
 
     static void            Initialize();
 
+  protected:
+    virtual ErrorOr<void>  TransmitChar(u64 c) { return Error(ENOSYS); }
+    virtual ErrorOr<isize> Transmit(StringView data) { return Error(ENOSYS); }
+
   private:
     static Vector<TTY*>     s_TTYs;
     static TTY*             s_CurrentTTY;
@@ -57,7 +64,6 @@ class TTY : public CharacterDevice
     Mutex                   m_RawMutex;
     Mutex                   m_OutputMutex;
 
-    Terminal*               m_Terminal = nullptr;
     termios2                m_Termios;
 
     pid_t                   m_ControlSid = -1;

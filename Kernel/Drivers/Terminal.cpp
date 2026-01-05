@@ -23,9 +23,11 @@ Vector<Terminal*>                Terminal::s_Terminals = {};
 Span<Framebuffer, DynamicExtent> s_Framebuffers;
 static Terminal*                 s_ActiveTerminal = nullptr;
 
-Terminal::Terminal()
+Terminal::Terminal(StringView name, usize minor)
+    : TTY(name, minor)
 {
-    if (s_Terminals.Empty()) s_Terminals.PushBack(this);
+    s_Terminals.PushBack(this);
+    if (!s_ActiveTerminal) s_ActiveTerminal = this;
 }
 
 void Terminal::Resize(const winsize& windowSize) {}
@@ -150,7 +152,16 @@ void      Terminal::SwitchTo(usize index)
 
     s_ActiveTerminal = s_Terminals[index];
     s_ActiveTerminal->Refresh();
+    TTY::SwitchTo(s_ActiveTerminal);
 }
+
+ErrorOr<void> Terminal::TransmitChar(u64 c)
+{
+    PutChar(c);
+    return {};
+}
+ErrorOr<isize> Terminal::Transmit(StringView data) { return PrintString(data); }
+
 const Vector<Terminal*>& Terminal::EnumerateTerminals()
 {
     if (s_Framebuffers.Empty())

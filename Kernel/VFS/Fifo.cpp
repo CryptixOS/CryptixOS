@@ -13,10 +13,11 @@ constexpr usize FIFO_SIZE = 16 * PMM::PAGE_SIZE;
 
 Pipe            Fifo::CreatePipe()
 {
-    auto fifo   = CreateRef<Fifo>();
+    auto fifo   = new Fifo();
     auto dentry = CreateRef<DirectoryEntry>("");
 
     Pipe pipe{};
+    // FIXME(v1tr10l7): Clean up fifo
     pipe.Reader
         = CreateRef<FileDescriptor>(dentry, fifo, 0, FileAccessMode::eRead);
     ++fifo->m_ReaderCount;

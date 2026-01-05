@@ -77,13 +77,13 @@ class FileDescriptor : public RefCounted
   public:
     FileDescriptor(::Ref<DirectoryEntry> dentry, i32 flags,
                    FileAccessMode accMode);
-    FileDescriptor(::Ref<DirectoryEntry> dentry, ::Ref<class File> file,
-                   i32 flags, FileAccessMode accMode);
+    FileDescriptor(::Ref<DirectoryEntry> dentry, class File* file, i32 flags,
+                   FileAccessMode accMode);
     virtual ~FileDescriptor();
 
     inline ::Ref<INode>   INode() const { return m_DirectoryEntry->INode(); }
     ::Ref<DirectoryEntry> DirectoryEntry() const { return m_DirectoryEntry; }
-    ::Ref<class File>     File() const { return m_File; }
+    class File*           File() const { return m_File; }
     inline usize          GetOffset() const { return m_Offset; }
 
     inline i32            GetFlags() const { return m_Flags; }
@@ -120,7 +120,7 @@ class FileDescriptor : public RefCounted
 
         return Write(buffer, count, m_Offset);
     }
-    ErrorOr<isize>              IoCtl(usize request, usize arg);
+    ErrorOr<isize>              IoCtl(usize request, usize opcode);
     virtual ErrorOr<const stat> Stat() const;
     virtual ErrorOr<isize>      Seek(i32 whence, off_t offset);
     virtual ErrorOr<isize>      Truncate(off_t size);
@@ -164,7 +164,7 @@ class FileDescriptor : public RefCounted
   private:
     Spinlock                 m_Lock;
     ::Ref<::DirectoryEntry>  m_DirectoryEntry   = nullptr;
-    ::Ref<class File>        m_File             = nullptr;
+    class File*              m_File             = nullptr;
 
     FileAccessMode           m_AccessMode       = FileAccessMode::eRead;
     usize                    m_Offset           = 0;

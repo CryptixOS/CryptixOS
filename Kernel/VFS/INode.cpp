@@ -97,10 +97,10 @@ bool INode::ValidatePermissions(const Credentials& creds, u32 acc)
     return true;
 }
 
-ErrorOr<::Ref<File>> INode::Open(class ::Ref<::DirectoryEntry> dentry,
-                                 i64 flags, u64 accMode)
+ErrorOr<File*> INode::Open(class ::Ref<::DirectoryEntry> dentry, i64 flags,
+                           u64 accMode)
 {
-    return CreateRef<File>(this);
+    return new File(this);
 }
 ErrorOr<::Ref<DirectoryEntry>> INode::CreateNode(::Ref<DirectoryEntry> entry,
                                                  mode_t mode, dev_t dev)

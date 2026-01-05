@@ -16,6 +16,7 @@
 #include <Drivers/Core/DeviceManager.hpp>
 #include <Drivers/TTY.hpp>
 #include <Drivers/Terminal.hpp>
+#include <Drivers/Video/FramebufferConsole.hpp>
 
 #include <Prism/String/Formatter.hpp>
 #include <Prism/String/StringView.hpp>
@@ -30,15 +31,14 @@
 Vector<TTY*> TTY::s_TTYs{};
 TTY*         TTY::s_CurrentTTY = nullptr;
 
-TTY::TTY(StringView name, Terminal* terminal, usize minor)
+TTY::TTY(StringView name, usize minor)
     : CharacterDevice(name,
                       MakeDevice(name == "tty"_sv ? API::DeviceMajor::TTYAUX
                                                   : API::DeviceMajor::TTY,
                                  minor))
     , m_Name(name)
-    , m_Terminal(terminal)
 {
-    if (!s_CurrentTTY) s_CurrentTTY = this;
+    if (!s_CurrentTTY && name != "vcs") s_CurrentTTY = this;
 
     Memory::Fill(&m_Termios, 0, sizeof(m_Termios));
     m_Termios.c_iflag        = TTYDEF_IFLAG;
@@ -65,6 +65,14 @@ TTY::TTY(StringView name, Terminal* terminal, usize minor)
     m_Termios.c_cc[VWERASE]  = CWERASE;
     m_Termios.c_cc[VLNEXT]   = CLNEXT;
     m_Termios.c_cc[VEOL2]    = CEOL2;
+}
+
+ErrorOr<void> TTY::SwitchTo(TTY* tty)
+{
+    Assert(tty);
+    s_CurrentTTY = tty;
+
+    return {};
 }
 
 bool TTY::GetCursorKeyMode() const
@@ -155,6 +163,14 @@ void       TTY::SetTermios(const termios2& termios)
     m_RawBuffer.Clear();
 }
 
+ErrorOr<File*> TTY::Open(File* file)
+{
+    bool isTTYAux = m_ID == (5zu << 20zu);
+    LogDebug("TTY::Open: m_ID == (5zu << 20zu) => {}", isTTYAux);
+
+    if (isTTYAux) return TTY::Active();
+    return file;
+}
 ErrorOr<isize> TTY::Read(void* buffer, off_t offset, usize bytes)
 {
     if (IsCanonicalMode())
@@ -214,14 +230,14 @@ ErrorOr<isize> TTY::Write(const void* src, off_t offset, usize bytes)
         LogMessage("[{}mlibc{}]: {}", AnsiColor::FOREGROUND_MAGENTA,
                    AnsiColor::FOREGROUND_WHITE, str);
 
+        Assert(bytes);
         return bytes;
     }
 
     IgnoreUnused(m_RawLock);
     IgnoreUnused(m_OutputLock);
     UniqueGuard guard(m_OutputMutex);
-    Terminal::Active()->PrintString(str);
-    return bytes;
+    return TryOrRet(Transmit(str));
 }
 
 ErrorOr<isize> TTY::Read(const UserBuffer& out, usize count, isize offset)
@@ -367,31 +383,32 @@ void TTY::Initialize()
 {
     AssertPMM_Ready();
 
-    auto& terminals = Terminal::EnumerateTerminals();
+    // auto& terminals = Terminal::EnumerateTerminals();
     Assert(DeviceManager::AllocateCharMajor(API::DeviceMajor::TTY));
     Assert(DeviceManager::AllocateCharMajor(API::DeviceMajor::TTYAUX));
 
-    usize minor = 1;
-    for (auto& terminal : terminals)
+    auto  framebuffers = Terminal::Framebuffers();
+    auto& fb           = framebuffers[0];
+    for (usize minor = 0; minor <= 9; ++minor)
     {
         LogTrace("TTY: Creating device /dev/tty{}...", minor);
 
-        auto tty = new TTY(fmt::format("tty{}", minor).data(), terminal, minor);
+        StringView name = fmt::format("tty{}", minor).data();
+        auto       tty  = FramebufferConsole::Create(fb, name, minor);
         s_TTYs.PushBack(tty);
 
         auto result = DeviceManager::RegisterCharDevice(tty);
         if (!result) delete tty;
-        minor++;
     }
 
     if (s_TTYs.Empty())
     {
         LogTrace("TTY: Creating device /dev/tty...");
-        auto tty = new TTY("tty", Terminal::GetPrimary(), 0);
-        s_TTYs.PushBack(tty);
+        auto tty        = new TTY("tty", 0);
 
         auto registered = DeviceManager::RegisterCharDevice(tty);
         if (!registered) delete tty;
+        else s_TTYs.PushBack(tty);
     }
     if (!s_TTYs.Empty())
     {
@@ -492,7 +509,7 @@ void TTY::Echo(u64 c)
 
     EchoRaw(c);
 }
-void TTY::EchoRaw(u64 c) { Terminal::Active()->PutChar(c); }
+void TTY::EchoRaw(u64 c) { TransmitChar(c); }
 
 void TTY::EraseChar()
 {

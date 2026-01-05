@@ -58,7 +58,7 @@ FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry, i32 flags,
     , m_DirectoryIterator(dentry->begin())
 {
     auto inode = dentry->INode();
-    if (inode) m_File = CreateRef<class File>(inode);
+    if (inode) m_File = new class File(inode);
     dentry->PopulateDirectoryEntries();
     m_DirectoryIterator = dentry->begin();
 
@@ -69,7 +69,7 @@ FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry, i32 flags,
     m_Flags      = flags & O_CLOEXEC;
 }
 FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry,
-                               ::Ref<class File> file, i32 flags,
+                               class File* file, i32 flags,
                                FileAccessMode accMode)
     : m_DirectoryEntry(dentry)
     , m_File(file)

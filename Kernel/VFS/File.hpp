@@ -28,6 +28,7 @@ class File : public RefCounted
     virtual usize                    Size() const;
     virtual void                     Close(bool writer) {}
 
+    virtual ErrorOr<File*>           Open(File* file) { return file; }
     virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes);
     virtual ErrorOr<isize> Write(const void* src, off_t offset, usize bytes);
     virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,

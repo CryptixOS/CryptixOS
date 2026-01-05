@@ -282,7 +282,8 @@ namespace VFS
     {
         auto dentry = TryOrRet(OpenDirectoryEntry(parent, path, flags, mode));
 
-        auto acc    = flags & O_ACCMODE;
+        if (path.Contains("tty")) LogDebug("VFS: Extracting accMode");
+        auto           acc     = flags & O_ACCMODE;
         FileAccessMode accMode = FileAccessMode::eNone;
         switch (acc)
         {
@@ -303,12 +304,15 @@ namespace VFS
             auto     device = DeviceManager::LookupCharDevice(id);
             if (device)
             {
+                File* deviceFile  = reinterpret_cast<File*>(device);
+                deviceFile        = TryOrRet(deviceFile->Open(deviceFile));
+
                 DeviceMajor major = GetDeviceMajor(id);
                 DeviceMinor minor = GetDeviceMinor(id);
 
                 LogTrace("VFS: Opening device with id: {}.{}", major, minor);
-                return CreateRef<FileDescriptor>(
-                    dentry, reinterpret_cast<File*>(device), flags, accMode);
+                return CreateRef<FileDescriptor>(dentry, deviceFile, flags,
+                                                 accMode);
             }
         }
 
