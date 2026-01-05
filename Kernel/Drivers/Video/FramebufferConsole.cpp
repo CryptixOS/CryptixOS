@@ -16,6 +16,12 @@
 #include <System/System.hpp>
 
 #include <magic_enum/magic_enum.hpp>
+#define EnsureLoaded()                                                         \
+    if (!m_Loaded)                                                             \
+    {                                                                          \
+        m_Loaded = true;                                                       \
+        Load();                                                                \
+    }
 
 constexpr usize     MAX_FONT_GLYPHS     = 256;
 constexpr Color     DEFAULT_BACKGROUND  = Color(0xa0'00'00'00);
@@ -24,7 +30,8 @@ constexpr Color     DEFAULT_BACKDROP    = Color(0x00'00'00'00);
 constexpr usize     BUILTIN_FONT_WIDTH  = 8;
 constexpr usize     BUILTIN_FONT_HEIGHT = 16;
 
-FramebufferConsole* FramebufferConsole::Create(Framebuffer& framebuffer, StringView name, usize minor)
+FramebufferConsole* FramebufferConsole::Create(Framebuffer& framebuffer,
+                                               StringView name, usize minor)
 {
     return new FramebufferConsole(framebuffer, name, minor);
 }
@@ -33,9 +40,16 @@ bool FramebufferConsole::Initialize(const ::Framebuffer& framebuffer)
     if (!framebuffer.Address) return false;
     else if (m_Initialized) return true;
 
-    m_Framebuffer    = framebuffer;
+    m_Framebuffer = framebuffer;
 
-    auto fontAddress = reinterpret_cast<uintptr_t>(&Meta_fonts_font_bin);
+    return false;
+}
+bool FramebufferConsole::Load()
+{
+    if (!m_Framebuffer.Address) return false;
+    else if (m_Initialized) return true;
+
+    auto fontAddress = reinterpret_cast<upointer>(&Meta_fonts_font_bin);
     const BootModuleInfo* fontModule = System::FindBootModule("font");
     if (fontModule && fontModule->LoadAddress && fontModule->Size > 0)
         fontAddress = fontModule->LoadAddress.ToHigherHalf();
@@ -86,11 +100,13 @@ bool FramebufferConsole::Initialize(const ::Framebuffer& framebuffer)
     Reset();
     Refresh();
 
-    return (m_Initialized = true);
+    return (m_Initialized = m_Loaded = true);
 }
 
 void FramebufferConsole::Clear(u32 color, bool move)
 {
+    EnsureLoaded();
+
     Character empty;
     empty.CodePoint  = ' ';
     empty.Foreground = m_CurrentState.TextForeground;
@@ -108,6 +124,7 @@ void FramebufferConsole::Clear(u32 color, bool move)
 
 void FramebufferConsole::RawPutChar(u8 c)
 {
+    EnsureLoaded();
     if (m_CurrentState.CursorX >= m_Size.ws_col)
     {
         m_CurrentState.CursorX = 0;
@@ -130,6 +147,7 @@ void FramebufferConsole::RawPutChar(u8 c)
 void FramebufferConsole::MoveCharacter(usize newX, usize newY, usize oldX,
                                        usize oldY)
 {
+    EnsureLoaded();
     if (oldX >= m_Size.ws_col || oldY >= m_Size.ws_row || newX >= m_Size.ws_col
         || newY >= m_Size.ws_row)
         return;
@@ -144,6 +162,7 @@ void FramebufferConsole::MoveCharacter(usize newX, usize newY, usize oldX,
 
 void FramebufferConsole::Scroll(isize count)
 {
+    EnsureLoaded();
     bool revScroll = false;
     if (count < 0)
     {
@@ -156,6 +175,7 @@ void FramebufferConsole::Scroll(isize count)
 
 void FramebufferConsole::ScrollDown()
 {
+    EnsureLoaded();
     for (usize i = (m_ScrollTopMargin + 1) * m_Size.ws_col;
          i < m_ScrollBottomMargin * m_Size.ws_col; i++)
     {
@@ -174,6 +194,7 @@ void FramebufferConsole::ScrollDown()
 }
 void FramebufferConsole::ScrollUp()
 {
+    EnsureLoaded();
     for (usize i = (m_ScrollBottomMargin - 1) * m_Size.ws_col - 1;
          i >= m_ScrollTopMargin * m_Size.ws_col; i--)
     {
@@ -194,6 +215,7 @@ void FramebufferConsole::ScrollUp()
 
 void FramebufferConsole::Refresh()
 {
+    EnsureLoaded();
     auto bgColor = m_CurrentState.TextBackground;
     for (usize y = 0; y < m_Framebuffer.Height; y++)
     {
@@ -219,6 +241,7 @@ void FramebufferConsole::Refresh()
 }
 void FramebufferConsole::Flush()
 {
+    EnsureLoaded();
     DrawCursor();
     while (!m_Queue.Empty())
     {

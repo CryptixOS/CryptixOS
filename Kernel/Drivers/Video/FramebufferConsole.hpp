@@ -32,6 +32,7 @@ class FramebufferConsole final : public Terminal
                                       StringView   name  = "fbcon",
                                       usize        minor = 0);
     bool Initialize(const Framebuffer& framebuffer) override;
+    bool Load();
 
   protected:
     FramebufferConsole() = default;
@@ -76,6 +77,7 @@ class FramebufferConsole final : public Terminal
     virtual void Destroy() override;
 
   private:
+    bool        m_Loaded      = false;
     Framebuffer m_Framebuffer = {};
 
     struct Font

@@ -387,14 +387,23 @@ void TTY::Initialize()
     Assert(DeviceManager::AllocateCharMajor(API::DeviceMajor::TTY));
     Assert(DeviceManager::AllocateCharMajor(API::DeviceMajor::TTYAUX));
 
-    auto  framebuffers = Terminal::Framebuffers();
-    auto& fb           = framebuffers[0];
+    auto                framebuffers = Terminal::Framebuffers();
+    auto&               fb           = framebuffers[0];
+
+    FramebufferConsole* current      = nullptr;
     for (usize minor = 0; minor <= 9; ++minor)
     {
         LogTrace("TTY: Creating device /dev/tty{}...", minor);
 
         StringView name = fmt::format("tty{}", minor).data();
         auto       tty  = FramebufferConsole::Create(fb, name, minor);
+        if (minor == 1)
+        {
+            s_CurrentTTY = tty;
+            current      = tty;
+            current->Load();
+            LogDebug("/dev/tty1 => loaded");
+        }
         s_TTYs.PushBack(tty);
 
         auto result = DeviceManager::RegisterCharDevice(tty);
@@ -404,7 +413,7 @@ void TTY::Initialize()
     if (s_TTYs.Empty())
     {
         LogTrace("TTY: Creating device /dev/tty...");
-        auto tty        = new TTY("tty", 0);
+        auto tty        = new TTY("ttys_CurrentTTY", 0);
 
         auto registered = DeviceManager::RegisterCharDevice(tty);
         if (!registered) delete tty;
@@ -412,9 +421,8 @@ void TTY::Initialize()
     }
     if (!s_TTYs.Empty())
     {
-        VFS::CreateNode("/dev/tty"_sv, 0644 | S_IFCHR, s_TTYs.Front()->ID());
-        VFS::CreateNode("/dev/console"_sv, 0644 | S_IFCHR,
-                        s_TTYs.Front()->ID());
+        VFS::CreateNode("/dev/tty"_sv, 0644 | S_IFCHR, current->ID());
+        VFS::CreateNode("/dev/console"_sv, 0644 | S_IFCHR, current->ID());
     }
 
     LogInfo("TTY: Initialized");
