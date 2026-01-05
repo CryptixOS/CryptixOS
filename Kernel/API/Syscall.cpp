@@ -109,6 +109,7 @@ namespace Syscall
         RegisterSyscall(ID::eSigAltStack, API::Process::SigAltStack);
         RegisterSyscall(ID::eUTime, API::VFS::UTime);
         RegisterSyscall(ID::eStatFs, API::VFS::StatFs);
+        RegisterSyscall(ID::ePivotRoot, API::VFS::PivotRoot);
         RegisterSyscall(ID::ePrCtl, API::System::PrCtl);
         RegisterSyscall(ID::eArchPrCtl, API::System::ArchPrCtl);
         RegisterSyscall(ID::eSetTimeOfDay, API::Time::SetTimeOfDay);

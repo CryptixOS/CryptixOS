@@ -304,6 +304,45 @@ namespace API::VFS
 
         return *status;
     }
+    ErrorOr<isize> Connect(isize sockFdNum, const struct sockaddr* addr,
+                           socklen_t addrlen)
+    {
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        auto status = socket->Connect(addr, addrlen);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+    ErrorOr<isize> Accept(isize sockFdNum, struct sockaddr* addr,
+                          socklen_t* addrlen)
+    {
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        auto status = socket->Accept(addr, addrlen);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+    ErrorOr<isize> SendTo(isize sockFdNum, const u8* data, usize size,
+                          isize flags, const sockaddr* destAddr,
+                          socklen_t addrlen)
+    {
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        auto status = socket->SendTo(const_cast<u8*>(data), size, flags);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+    ErrorOr<isize> ReceiveFrom(isize sockFdNum, u8* data, usize size,
+                               isize flags, sockaddr* destAddr,
+                               socklen_t* addrlen)
+    {
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        auto status = socket->ReceiveFrom(data, size, flags, destAddr, addrlen);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+
     ErrorOr<isize> Bind(isize sockFdNum, const struct sockaddr* addr,
                         socklen_t addrlen)
     {
@@ -312,8 +351,58 @@ namespace API::VFS
             = TryOrRet(process->GetFileDescriptor(sockFdNum));
         if (!sockFd->IsSocket()) return Error(ENOTSOCK);
 
-        auto socket = sockFd->File().As<class Socket>();
+        auto socket = reinterpret_cast<class Socket*>(sockFd->File());
         auto status = socket->Bind(addr, addrlen);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+
+    ErrorOr<isize> Listen(isize sockFdNum, isize backlog)
+    {
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        auto status = socket->Listen(backlog);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+    ErrorOr<isize> GetSockName(isize sockFdNum, struct sockaddr* addr,
+                               socklen_t* addrlen)
+    {
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        auto status = socket->GetLocalAddress(addr, addrlen);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+    ErrorOr<isize> GetPeerName(isize sockFdNum, struct sockaddr* addr,
+                               socklen_t* addrlen)
+    {
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        auto status = socket->GetPeerAddress(addr, addrlen);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+    ErrorOr<isize> SocketPair(isize domain, isize type, isize protocol,
+                              isize* sv)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> SetSockOpt(isize sockFdNum, isize level, isize option,
+                              const u8* value, const usize valueSize)
+    {
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        auto status = socket->SetOption(level, option, value, valueSize);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+    ErrorOr<isize> GetSockOpt(isize sockFdNum, isize level, isize option,
+                              u8* value, socklen_t* valueSize)
+    {
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        auto status = socket->GetOption(level, option, value, valueSize);
 
         if (!status) return Error(status.Error());
         return 0;
@@ -712,6 +801,13 @@ namespace API::VFS
         RetOnError(fs->Stats(stats));
         CopyToUser(out, stats);
         return 0;
+    }
+    ErrorOr<isize> PivotRoot(const char* newRoot, const char* putOld)
+    {
+        auto newRootPath = CopyStringFromUser(newRoot);
+        auto putOldPath  = CopyStringFromUser(putOld);
+
+        return Error(ENOSYS);
     }
 
     ErrorOr<isize> FStatAt(isize dirFdNum, const char* path, isize flags,

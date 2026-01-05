@@ -40,8 +40,29 @@ namespace API::VFS
     ErrorOr<isize> Dup2(isize oldFdNum, isize newFdNum);
 
     ErrorOr<isize> Socket(isize domain, isize type, isize protocol);
+    ErrorOr<isize> Connect(isize sockFdNum, const struct sockaddr* addr,
+                           socklen_t addrlen);
+    ErrorOr<isize> Accept(isize sockFdNum, struct sockaddr* addr,
+                          socklen_t* addrlen);
+    ErrorOr<isize> SendTo(isize sockFdNum, const u8* data, usize size,
+                          isize flags, const sockaddr* destAddr,
+                          socklen_t addrlen);
+    ErrorOr<isize> ReceiveFrom(isize sockFdNum, u8* data, usize size,
+                               isize flags, sockaddr* destAddr,
+                               socklen_t* addrlen);
     ErrorOr<isize> Bind(isize sockFdNum, const struct sockaddr* addr,
                         socklen_t addrlen);
+    ErrorOr<isize> Listen(isize sockFdNum, isize backlog);
+    ErrorOr<isize> GetSockName(isize sockFdNum, struct sockaddr* addr,
+                               socklen_t* addrlen);
+    ErrorOr<isize> GetPeerName(isize sockFdNum, struct sockaddr* addr,
+                               socklen_t* addrlen);
+    ErrorOr<isize> SocketPair(isize domain, isize type, isize protocol,
+                              isize* sv);
+    ErrorOr<isize> SetSockOpt(isize sockFdNum, isize level, isize option,
+                              const u8* value, const usize valueSize);
+    ErrorOr<isize> GetSockOpt(isize sockFdNum, isize level, isize option,
+                              u8* value, socklen_t* valueSize);
     ErrorOr<isize> FCntl(isize fdNum, isize op, pointer arg);
 
     ErrorOr<isize> Truncate(PathView path, off_t length);
@@ -83,6 +104,7 @@ namespace API::VFS
                             const sigset_t* sigmask);
     ErrorOr<isize> UTime(PathView path, const utimbuf* out);
     ErrorOr<isize> StatFs(const char* pathname, statfs* out);
+    ErrorOr<isize> PivotRoot(const char* newRoot, const char* putOld);
     ErrorOr<isize> FStatAt(isize dirFd, const char* path, isize flags,
                            stat* out);
     ErrorOr<isize> UnlinkAt(isize dirFdNum, const char* path, isize flags);

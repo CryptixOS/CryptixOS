@@ -20,11 +20,53 @@ class Socket : public File
   public:
     Socket(SocketDomain domain, SocketType type, NetworkProtocol protocol);
 
-    static ErrorOr<Socket*> Create(SocketDomain domain, SocketType type,
-                                   NetworkProtocol protocol);
+    static ErrorOr<Socket*>       Create(SocketDomain domain, SocketType type,
+                                         NetworkProtocol protocol);
+    static ErrorOr<::Ref<Socket>> Get(isize sockFdNum);
 
-    virtual ErrorOr<void>   Bind(const struct sockaddr* addr, socklen_t addrlen)
-        = 0;
+    virtual ErrorOr<void>         Connect(const struct sockaddr* addr,
+                                          socklen_t              addrlen)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<void> Accept(sockaddr* addr, socklen_t* addrlen)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<isize> SendTo(u8* data, usize size, isize flags)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<isize> ReceiveFrom(u8* data, usize size, isize flags,
+                                       sockaddr* saddr, socklen_t* addrlen)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<void> Bind(const struct sockaddr* addr, socklen_t addrlen)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<void> Listen(i32 backlog) { return Error(ENOSYS); }
+
+    virtual ErrorOr<void> GetLocalAddress(sockaddr* addr, socklen_t* addrlen)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<void> GetPeerAddress(sockaddr* addr, socklen_t* addrlen)
+    {
+        return Error(ENOSYS);
+    }
+
+    virtual ErrorOr<void> GetOption(isize level, isize option, u8* out,
+                                    socklen_t* outSize)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<void> SetOption(isize level, isize option, const u8* value,
+                                    usize valueSize)
+    {
+        return Error(ENOSYS);
+    }
 
   protected:
     SocketDomain    m_Domain = SocketDomain::eUnspecified;

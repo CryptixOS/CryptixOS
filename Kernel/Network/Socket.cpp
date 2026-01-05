@@ -4,11 +4,13 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Library/Logger.hpp>
+
 #include <Network/IPv4Socket.hpp>
 #include <Network/NetLinkSocket.hpp>
 #include <Network/Socket.hpp>
 
-#include <Library/Logger.hpp>
+#include <Scheduler/Process.hpp>
 
 Socket::Socket(SocketDomain domain, SocketType type, NetworkProtocol protocol)
     : m_Domain(domain)
@@ -40,4 +42,13 @@ ErrorOr<Socket*> Socket::Create(SocketDomain domain, SocketType type,
     }
 
     return nullptr;
+}
+ErrorOr<::Ref<Socket>> Socket::Get(isize sockFdNum)
+{
+    auto                  process = Process::Current();
+    ::Ref<FileDescriptor> sockFd
+        = TryOrRet(process->GetFileDescriptor(sockFdNum));
+    if (!sockFd->IsSocket()) return Error(ENOTSOCK);
+
+    return reinterpret_cast<class Socket*>(sockFd->File());
 }
