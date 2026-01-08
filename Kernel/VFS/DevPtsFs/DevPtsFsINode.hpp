@@ -17,7 +17,7 @@
 
 using DeviceID = DeviceID;
 
-class DevPtsFsINode final : public SynthFsINode, NonCopyable<DevPtsFsINode>
+class DevPtsFsINode final : public INode, public NonCopyable<DevPtsFsINode>
 {
   public:
     DevPtsFsINode(StringView name, class Filesystem* fs, INodeID id,
@@ -25,14 +25,60 @@ class DevPtsFsINode final : public SynthFsINode, NonCopyable<DevPtsFsINode>
     virtual ~DevPtsFsINode() {}
 
     virtual ErrorOr<::Ref<DirectoryEntry>>
-                  CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode,
-                             ::DeviceID dev) override;
+    CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode,
+               ::DeviceID dev) override;
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    CreateFile(::Ref<DirectoryEntry> entry, mode_t mode) override
+    {
+        return Error(ENOENT);
+    }
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    CreateDirectory(::Ref<DirectoryEntry> entry, mode_t mode) override
+    {
+        return Error(ENOENT);
+    }
 
+    virtual ErrorOr<::Ref<DirectoryEntry>> Symlink(::Ref<DirectoryEntry> entry,
+                                                   PathView targetPath) override
+    {
+        return Error(ENOENT);
+    }
+
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    Link(::Ref<DirectoryEntry> oldEntry, ::Ref<DirectoryEntry> entry) override
+    {
+        return Error(ENOENT);
+    }
+
+    virtual void  InsertChild(::Ref<INode> node, StringView name) override;
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> IoCtl(usize request, usize arg) override;
+    virtual ErrorOr<Path>  ReadLink() override { return Error(ENOENT); }
+
+    virtual ErrorOr<isize> Truncate(usize size) override
+    {
+        return Error(ENOENT);
+    }
+    virtual ErrorOr<void> Rename(::Ref<INode> newParent,
+                                 StringView   newName) override
+    {
+        return Error(ENOENT);
+    }
+
+    virtual ErrorOr<void> Unlink(::Ref<DirectoryEntry> entry) override
+    {
+        return Error(ENOENT);
+    }
+
+    virtual ErrorOr<void> RmDir(::Ref<DirectoryEntry> entry) override
+    {
+        return Error(ENOENT);
+    }
 
   private:
-    Device* m_Device = nullptr;
+    Device*                                m_Device = nullptr;
+    UnorderedMap<StringView, ::Ref<INode>> m_Children;
+
     friend class DevPtsFs;
 };

@@ -16,6 +16,7 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Time/Time.hpp>
 
+#include <VFS/DevPtsFs/DevPtsFs.hpp>
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/EchFs/EchFs.hpp>
@@ -57,6 +58,7 @@ namespace VFS
     {
         registerFilesystem<TmpFs>("tmpfs");
         registerFilesystem<DevTmpFs>("devfs");
+        registerFilesystem<DevPtsFs>("devptsfs");
         registerFilesystem<ProcFs>("proc");
         registerFilesystem<Fat32Fs>("vfat");
         registerFilesystem<Ext2Fs>("ext2");
@@ -84,6 +86,10 @@ namespace VFS
 
         CreateDirectory("/proc", 0755);
         Assert(Mount(nullptr, "", "/proc", "proc"));
+
+        if (CreateDirectory("/dev/pts", 0755)
+            && !Mount(nullptr, "", "/dev/pts", "devptsfs"))
+            LogError("VFS: Failed to mount devptsfs");
 
         auto colonel = Scheduler::KernelProcess();
         auto syncd   = colonel->CreateThread(filesystemSyncDaemon, 0);
@@ -577,5 +583,57 @@ namespace VFS
 
         ToDo();
         return false;
+    }
+
+    ErrorOr<isize> SetExtendedAttribute(PathView path, StringView name,
+                                        const u8* value, usize size,
+                                        isize flags, bool followLinks)
+    {
+        auto pathRes = TryOrRet(
+            ResolvePath(VFS::RootDirectoryEntry(), path, followLinks));
+        auto dentry = pathRes.Entry;
+        if (!dentry) return Error(ENOENT);
+
+        auto inode = dentry->INode();
+        if (!inode) return Error(ENOENT);
+        return inode->SetExtendedAttribute(dentry, name, value, size, flags);
+    }
+    ErrorOr<isize> GetExtendedAttribute(PathView path, StringView name,
+                                        u8* value, usize size, bool followLinks)
+    {
+        auto pathRes = TryOrRet(
+            ResolvePath(VFS::RootDirectoryEntry(), path, followLinks));
+        auto dentry = pathRes.Entry;
+        if (!dentry) return Error(ENOENT);
+
+        auto inode = dentry->INode();
+        if (!inode) return Error(ENOENT);
+        return inode->GetExtendedAttribute(dentry, name, value, size);
+    }
+    ErrorOr<isize> ListExtendedAttributes(PathView path, char* list, usize size,
+                                          bool followLinks)
+    {
+        auto pathRes = TryOrRet(
+            ResolvePath(VFS::RootDirectoryEntry(), path, followLinks));
+        auto dentry = pathRes.Entry;
+        if (!dentry) return Error(ENOENT);
+
+        auto inode = dentry->INode();
+        if (!inode) return Error(ENOENT);
+        return inode->ListExtendedAttributes(dentry, list, size);
+    }
+    ErrorOr<isize> RemoveExtendedAttribute(PathView path, StringView name,
+                                           bool followLinks)
+    {
+        auto pathRes = TryOrRet(
+            ResolvePath(VFS::RootDirectoryEntry(), path, followLinks));
+        auto dentry = pathRes.Entry;
+        if (!dentry) return Error(ENOENT);
+
+        // TODO(v1tr10l7): Check permissions
+        auto inode = dentry->INode();
+        if (!inode) return Error(ENOENT);
+
+        return inode->RemoveExtendedAttribute(dentry, name);
     }
 } // namespace VFS

@@ -32,6 +32,7 @@ class MountPoint : public RefCounted
     static void              Iterate(Iterator iterator);
 
     ::Ref<MountPoint>        NextMountPoint() const;
+    ::Ref<DirectoryEntry>    ExchangeGuest(::Ref<DirectoryEntry> dentry);
 
   private:
     ::Ref<DirectoryEntry>   m_Host       = nullptr;

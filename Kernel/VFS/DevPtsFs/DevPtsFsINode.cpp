@@ -16,57 +16,49 @@
 
 DevPtsFsINode::DevPtsFsINode(StringView name, class Filesystem* fs, INodeID id,
                              INodeMode mode, Device* device)
-    : SynthFsINode(name, fs, id, mode)
+    : INode(name, fs)
     , m_Device(device)
 {
+    m_Metadata.ID           = id;
+    m_Metadata.Mode         = mode;
+
+    m_Metadata.Size         = 0;
+    m_Metadata.LinkCount    = 1;
+
+    m_Metadata.BlockSize    = PMM::PAGE_SIZE;
+    m_Metadata.BlockCount   = 0;
+
+    m_Metadata.RootDeviceID = fs->BackingDeviceID();
+    m_Metadata.DeviceID     = device ? device->ID() : 0;
 }
 
 ErrorOr<::Ref<DirectoryEntry>>
 DevPtsFsINode::CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode,
                           dev_t dev)
 {
-    auto dentry = TryOrRet(SynthFsINode::CreateNode(entry, mode, dev));
-    auto inode  = entry->INode().As<DevPtsFsINode>();
-
-    if (inode->IsCharDevice())
-    {
-        auto device
-            = reinterpret_cast<Device*>(DeviceManager::LookupCharDevice(dev));
-
-        inode->m_Device = device;
-    }
-    else if (inode->IsBlockDevice())
-    {
-        auto device
-            = reinterpret_cast<Device*>(DeviceManager::LookupBlockDevice(dev));
-
-        inode->m_Device = device;
-    }
-
-    return entry;
+    return Error(ENOENT);
 }
 
+void DevPtsFsINode::InsertChild(::Ref<INode> node, StringView name)
+{
+    ScopedLock guard(m_Lock);
+    m_Children[name] = node;
+}
 isize DevPtsFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
     if (!buffer) return_err(-1, EFAULT);
-    if (m_Device)
-    {
-        auto result = m_Device->Read(buffer, offset, bytes);
-        return result ? result.Value() : -1;
-    }
+    if (!m_Device) return_err(-1, ENODEV);
 
-    return SynthFsINode::Read(buffer, offset, bytes);
+    auto result = m_Device->Read(buffer, offset, bytes);
+    return result ? result.Value() : -1;
 }
 isize DevPtsFsINode::Write(const void* buffer, off_t offset, usize bytes)
 {
     if (!buffer) return_err(-1, EFAULT);
-    if (m_Device)
-    {
-        auto result = m_Device->Write(buffer, offset, bytes);
-        return result ? result.Value() : -1;
-    }
+    if (!m_Device) return_err(-1, ENODEV);
 
-    return SynthFsINode::Write(buffer, offset, bytes);
+    auto result = m_Device->Write(buffer, offset, bytes);
+    return result ? result.Value() : -1;
 }
 
 ErrorOr<isize> DevPtsFsINode::IoCtl(usize request, usize arg)

@@ -147,7 +147,8 @@ class Filesystem : public RefCounted
     virtual bool          ShouldUpdateCTime() { return true; }
 
   protected:
-    constexpr static usize TMPFS_MAGIC = 0x01021994;
+    constexpr static usize TMPFS_MAGIC    = 0x01021994;
+    constexpr static usize DEVPTSFS_MAGIC = 0x1cd1;
 
     // Synchronization lock for internal access
     Spinlock               m_Lock;

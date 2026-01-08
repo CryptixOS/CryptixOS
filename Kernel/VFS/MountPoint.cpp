@@ -43,4 +43,8 @@ void              MountPoint::Iterate(Iterator iterator)
         if (iterator(current) == IterationResult::eBreak) break;
 }
 
-::Ref<MountPoint> MountPoint::NextMountPoint() const { return Hook.Next; }
+::Ref<MountPoint>     MountPoint::NextMountPoint() const { return Hook.Next; }
+::Ref<DirectoryEntry> MountPoint::ExchangeGuest(::Ref<DirectoryEntry> dentry)
+{
+    return Exchange(m_Guest, dentry);
+}

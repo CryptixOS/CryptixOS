@@ -86,4 +86,15 @@ namespace VFS
                                       i32 flags = 0);
 
     bool Unlink(Ref<DirectoryEntry> parent, PathView path, i32 flags = 0);
+
+    ErrorOr<isize> SetExtendedAttribute(PathView path, StringView name,
+                                        const u8* value, usize size,
+                                        isize flags, bool followLinks = false);
+    ErrorOr<isize> GetExtendedAttribute(PathView path, StringView name,
+                                        const u8* value, usize size,
+                                        bool followLinks = false);
+    ErrorOr<isize> ListExtendedAttributes(PathView path, char* list, usize size,
+                                          bool followLinks = false);
+    ErrorOr<isize> RemoveExtendedAttribute(PathView path, StringView name,
+                                           bool followLinks = false);
 }; // namespace VFS

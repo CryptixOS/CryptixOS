@@ -139,7 +139,31 @@ class INode : public RefCounted
     virtual ErrorOr<void>  UpdateTimestamps(timespec atime = {},
                                             timespec mtime = {},
                                             timespec ctime = {});
-    virtual ErrorOr<void>  FlushMetadata() { return Error(ENOSYS); }
+
+    virtual ErrorOr<isize> SetExtendedAttribute(::Ref<DirectoryEntry> dentry,
+                                                StringView            name,
+                                                const u8* value, usize size,
+                                                isize flags)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<isize> GetExtendedAttribute(::Ref<DirectoryEntry> dentry,
+                                                StringView name, u8* value,
+                                                usize size)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<isize> ListExtendedAttributes(::Ref<DirectoryEntry> dentry,
+                                                 char* list, usize size)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<isize> RemoveExtendedAttribute(::Ref<DirectoryEntry> dentry,
+                                                   StringView            name)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<void> FlushMetadata() { return Error(ENOSYS); }
 
   protected:
     INode*            m_Parent;

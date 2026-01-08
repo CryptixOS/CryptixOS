@@ -10,6 +10,7 @@
 
 class DevPtsFs : public Filesystem
 {
+  public:
     explicit DevPtsFs(u32 flags);
     virtual ~DevPtsFs();
 
@@ -25,4 +26,6 @@ class DevPtsFs : public Filesystem
 
   private:
     friend class DevPtsFsINode;
+
+    ErrorOr<::Ref<INode>> CreatePTMXNode();
 };
