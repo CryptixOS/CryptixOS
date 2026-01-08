@@ -5,7 +5,6 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 srcs += files(
-  'TTY.cpp',
   'Terminal.cpp',
 )
 
@@ -15,4 +14,5 @@ subdir('Input')
 subdir('PCI')
 subdir('Storage')
 subdir('USB')
+subdir('TTY')
 subdir('Video')
