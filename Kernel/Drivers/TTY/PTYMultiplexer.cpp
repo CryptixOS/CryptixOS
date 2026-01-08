@@ -11,8 +11,8 @@
 
 PTYMultiplexer* PTYMultiplexer::s_PTMX = nullptr;
 
-PTYMultiplexer::PTYMultiplexer()
-    : CharacterDevice("ptmx", MakeDevice(API::DeviceMajor::TTYAUX, 2))
+PTYMultiplexer::PTYMultiplexer(DeviceMinor minor)
+    : CharacterDevice("ptmx", MakeDevice(API::DeviceMajor::TTYAUX, minor))
 {
 }
 PTYMultiplexer::~PTYMultiplexer() {}

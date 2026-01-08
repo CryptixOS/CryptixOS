@@ -11,7 +11,7 @@
 class PTYMultiplexer : public CharacterDevice
 {
   public:
-    PTYMultiplexer();
+    PTYMultiplexer(DeviceMinor minor);
     virtual ~PTYMultiplexer();
 
     static ErrorOr<void>   Initialize();

@@ -17,6 +17,7 @@ srcs += files(
   'VFS.cpp',
 )
 
+subdir('DevPtsFs')
 subdir('DevTmpFs')
 subdir('EchFs')
 subdir('Ext2Fs')
