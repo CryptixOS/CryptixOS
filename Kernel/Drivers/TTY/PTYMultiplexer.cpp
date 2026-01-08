@@ -17,19 +17,6 @@ PTYMultiplexer::PTYMultiplexer(DeviceMinor minor)
 }
 PTYMultiplexer::~PTYMultiplexer() {}
 
-ErrorOr<void> PTYMultiplexer::Initialize()
-{
-    s_PTMX = new PTYMultiplexer();
-    if (auto result = DeviceManager::RegisterCharDevice(s_PTMX); !result)
-        return Error(result.Error());
-    if (auto result
-        = VFS::CreateNode("/dev/ptmx", S_IFCHR | 0666, s_PTMX->ID());
-        !result)
-        return Error(result.Error());
-
-    return {};
-}
-
 static INodeID NewPTSIndex()
 {
     static Atomic<usize> s_NextID = 0;

@@ -14,7 +14,6 @@
 
 #include <Debug/Debug.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
-#include <Drivers/TTY/PTYMultiplexer.hpp>
 #include <Drivers/TTY/TTY.hpp>
 #include <Drivers/Terminal.hpp>
 #include <Drivers/Video/FramebufferConsole.hpp>
@@ -425,8 +424,6 @@ void TTY::Initialize()
         VFS::CreateNode("/dev/console"_sv, 0644 | S_IFCHR, current->ID());
     }
 
-    if (!PTYMultiplexer::Initialize())
-        LogError("TTY: Failed to initialize ptmx");
     LogInfo("TTY: Initialized");
 }
 

@@ -14,8 +14,6 @@ class PTYMultiplexer : public CharacterDevice
     PTYMultiplexer(DeviceMinor minor);
     virtual ~PTYMultiplexer();
 
-    static ErrorOr<void>   Initialize();
-
     virtual ErrorOr<File*> Open(File* file) override;
 
   private:
