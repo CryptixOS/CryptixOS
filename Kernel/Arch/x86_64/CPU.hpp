@@ -8,7 +8,7 @@
 
 #include <Common.hpp>
 
-#include <Arch/x86_64//ExecutionContext.hpp>
+#include <Arch/x86_64/ExecutionContext.hpp>
 #include <Arch/x86_64/CPUID.hpp>
 #include <Arch/x86_64/CPUIntrinsics.hpp>
 #include <Arch/x86_64/GDT.hpp>
@@ -141,8 +141,6 @@ namespace CPU
     };
 
     u32          KvmBase();
-    u64          RdTsc();
-
     void         HaltAll();
     void         WakeUp(usize id, bool everyone);
 
