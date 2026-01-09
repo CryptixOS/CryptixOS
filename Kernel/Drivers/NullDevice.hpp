@@ -16,9 +16,10 @@ class NullDevice final : public CharacterDevice
         : CharacterDevice("null", API::DeviceMajor::MEMORY, 0)
     {
     }
-    virtual StringView     Name() const noexcept override { return "null"; }
+    virtual StringView     Name() const noexcept override { return m_Name; }
 
-    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override
+    virtual ErrorOr<isize> Read(void* dest, OffsetType offset,
+                                usize bytes) override
     {
         return EOF;
     }
@@ -27,7 +28,7 @@ class NullDevice final : public CharacterDevice
     {
         return EOF;
     }
-    virtual ErrorOr<isize> Write(const void* src, off_t offset,
+    virtual ErrorOr<isize> Write(const void* src, OffsetType offset,
                                  usize bytes) override
     {
         return bytes;

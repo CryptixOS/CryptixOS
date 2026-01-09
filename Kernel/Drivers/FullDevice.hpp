@@ -17,9 +17,10 @@ class FullDevice final : public CharacterDevice
     {
     }
 
-    virtual StringView     Name() const noexcept override { return "full"; }
+    virtual StringView     Name() const noexcept override { return m_Name; }
 
-    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override
+    virtual ErrorOr<isize> Read(void* dest, OffsetType offset,
+                                usize bytes) override
     {
         Memory::Fill(dest, 0, bytes);
 
@@ -32,7 +33,7 @@ class FullDevice final : public CharacterDevice
 
         return count;
     }
-    virtual ErrorOr<isize> Write(const void* src, off_t offset,
+    virtual ErrorOr<isize> Write(const void* src, OffsetType offset,
                                  usize bytes) override
     {
         return Error(ENOSPC);
