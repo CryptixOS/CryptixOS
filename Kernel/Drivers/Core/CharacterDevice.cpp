@@ -6,6 +6,7 @@
  */
 #include <Drivers/FullDevice.hpp>
 #include <Drivers/NullDevice.hpp>
+#include <Drivers/RandomDevice.hpp>
 #include <Drivers/ZeroDevice.hpp>
 
 #include <Drivers/Core/CharacterDevice.hpp>
@@ -31,9 +32,17 @@ ErrorOr<void> CharacterDevice::RegisterBaseMemoryDevices()
         new NullDevice,
         new ZeroDevice,
         new FullDevice,
+        new RandomDevice,
     };
 
-    IgnoreUnused(DeviceManager::AllocateCharMajor(API::DeviceMajor::MEMORY));
+    if (auto result
+        = DeviceManager::AllocateCharMajor(API::DeviceMajor::MEMORY);
+        !result)
+    {
+        LogError(
+            "CharacterDevice: Failed to allocate major for Memory Devices");
+        return Error(ENOMEM);
+    }
     for (auto device : devices)
     {
         if (!device) return Error(ENOMEM);
