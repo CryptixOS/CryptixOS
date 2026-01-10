@@ -106,7 +106,7 @@ namespace NVMe
 
         bool                   Identify(NameSpaceInfo* nsid);
 
-        isize ReadWriteLba(u8* ddest, usize start, usize bytes, u8 write);
+        isize ReadWriteLba(u8* ddest, usize start, usize bytes, bool write);
 
         isize FindBlock(u64 block);
         isize CacheBlock(u64 block);

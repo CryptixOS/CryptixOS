@@ -152,67 +152,100 @@ namespace NVMe
         return true;
     }
 
-    isize NameSpace::ReadWriteLba(u8* dest, usize start, usize bytes, u8 write)
+    isize NameSpace::ReadWriteLba(u8* dest, usize start, usize lbaCount,
+                                  bool write)
     {
-        if (start + bytes >= m_LbaCount) bytes -= (start + bytes) - m_LbaCount;
+        /* ---------- Validate request ---------- */
 
-        usize pageOff          = u64(dest) & (PMM::PAGE_SIZE - 1);
-        bool  shouldUsePrp     = false;
-        bool  shouldUsePrpList = false;
+        if (!dest) return -1;
 
-        u32   cid              = m_IoQueue->GetCommandID();
+        if (start >= m_LbaCount) return -1;
 
-        if ((bytes * m_LbaSize) > PMM::PAGE_SIZE)
+        if (lbaCount == 0) return 0;
+
+        if (start + lbaCount > m_LbaCount) lbaCount = m_LbaCount - start;
+
+        const usize totalBytes = lbaCount * m_LbaSize;
+
+        /* ---------- PRP layout calculation ---------- */
+
+        const usize pageSize   = PMM::PAGE_SIZE;
+        const usize pageOffset
+            = reinterpret_cast<uintptr_t>(dest) & (pageSize - 1);
+
+        const usize firstPageBytes
+            = Math::Min(pageSize - pageOffset, totalBytes);
+
+        usize remainingBytes
+            = totalBytes > firstPageBytes ? totalBytes - firstPageBytes : 0;
+
+        const bool needsPrp2    = remainingBytes > 0;
+        const bool needsPrpList = remainingBytes > pageSize;
+
+        /* ---------- Allocate PRP list if needed ---------- */
+
+        u32        cid          = m_IoQueue->GetCommandID();
+
+        u64*       prpList      = nullptr;
+        usize      prpCount     = 0;
+
+        if (needsPrpList)
         {
-            if ((bytes * m_LbaSize) > (PMM::PAGE_SIZE * 2))
+            prpCount = (remainingBytes + pageSize - 1) / pageSize;
+
+            if (prpCount > m_MaxPhysRPages)
             {
-                usize prpcount = ((bytes - 1) * m_LbaSize) / PMM::PAGE_SIZE;
-                AssertFmt(!(prpcount > m_MaxPhysRPages),
-                          "NVMe: Exceeded physical region pages, prpcount => "
-                          "{:#x}, bytes => {:#x}",
-                          prpcount, bytes);
-                for (usize i = 0; i < prpcount; i++)
-                {
-                    m_IoQueue->GetPhysRegPages()[i + cid * m_MaxPhysRPages]
-                        = (Pointer(dest - pageOff).FromHigherHalf<u64>()
-                           + PMM::PAGE_SIZE + i * PMM::PAGE_SIZE);
-                }
-                shouldUsePrp     = false;
-                shouldUsePrpList = true;
+                LogError("NVMe: PRP list overflow ({} > {})", prpCount,
+                         m_MaxPhysRPages);
+                return -1;
             }
-            else shouldUsePrp = true;
+
+            prpList = &m_IoQueue->GetPhysRegPages()[cid * m_MaxPhysRPages];
+
+            uintptr_t pageBase
+                = reinterpret_cast<uintptr_t>(dest) & ~(pageSize - 1);
+
+            for (usize i = 0; i < prpCount; ++i)
+                prpList[i] = Pointer(pageBase + pageSize * (i + 1))
+                                 .FromHigherHalf<u64>();
         }
 
-        Submission cmd        = {};
-        cmd.OpCode            = write ? OpCode::IO_WRITE : OpCode::IO_READ;
-        cmd.Flags             = 0;
-        cmd.NameSpaceID       = m_ID;
-        cmd.ReadWrite.Control = 0;
-        cmd.ReadWrite.Dsmgmt  = 0;
-        cmd.ReadWrite.Ref     = 0;
-        cmd.ReadWrite.AppTag  = 0;
-        cmd.ReadWrite.AppMask = 0;
-        cmd.Metadata          = 0;
-        cmd.ReadWrite.SLba    = start;
-        cmd.ReadWrite.Len     = bytes - 1;
-        if (shouldUsePrpList)
+        /* ---------- Build command ---------- */
+
+        Submission cmd{};
+        cmd.OpCode         = write ? OpCode::IO_WRITE : OpCode::IO_READ;
+        cmd.Flags          = 0;
+        cmd.NameSpaceID    = m_ID;
+
+        cmd.ReadWrite.SLba = start;
+        cmd.ReadWrite.Len  = lbaCount - 1;
+
+        cmd.Prp1           = Pointer(dest).FromHigherHalf<u64>();
+
+        if (needsPrpList) { cmd.Prp2 = Pointer(prpList).FromHigherHalf<u64>(); }
+        else if (needsPrp2)
         {
-            cmd.Prp1 = Pointer(dest).FromHigherHalf<u64>();
-            cmd.Prp2
-                = Pointer(&m_IoQueue->GetPhysRegPages()[cid * m_MaxPhysRPages])
-                      .FromHigherHalf<u64>();
-        }
-        else if (shouldUsePrp)
-            cmd.Prp2 = Pointer(dest)
-                           .Offset<Pointer>(PMM::PAGE_SIZE)
-                           .FromHigherHalf<u64>();
+            uintptr_t secondPage
+                = (reinterpret_cast<uintptr_t>(dest) & ~(pageSize - 1))
+                + pageSize;
 
-        else cmd.Prp1 = Pointer(dest).FromHigherHalf<u64>();
+            cmd.Prp2 = Pointer(secondPage).FromHigherHalf<u64>();
+        }
+        else {
+            cmd.Prp2 = 0;
+        }
+
+        /* ---------- Submit ---------- */
 
         u16 status = m_IoQueue->AwaitSubmit(&cmd);
-        AssertFmt(!status, "NVMe: Failed to read/write with status {:#x}\n",
-                  status);
-        return 0;
+
+        if (status)
+        {
+            LogError("NVMe: I/O failed (status = {:#x})", status);
+            return -1;
+        }
+
+        return lbaCount;
     }
 
     isize NameSpace::FindBlock(u64 block)
