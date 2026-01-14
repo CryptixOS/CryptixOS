@@ -153,7 +153,7 @@ ErrorOr<isize> FramebufferDevice::Read(void* dest, off_t offset, usize bytes)
 
     if (!m_ScreenBase) return Error(ENODEV);
 
-    if (m_State != FBINFO_STATE_RUNNING) return Error(EPERM);
+    // if (m_State != FBINFO_STATE_RUNNING) return Error(EPERM);
 
     usize totalSize = m_ScreenSize;
 
@@ -197,7 +197,7 @@ ErrorOr<isize> FramebufferDevice::Write(const void* source, off_t offset,
 
     if (!m_ScreenBase) return Error(ENODEV);
 
-    if (m_State != FBINFO_STATE_RUNNING) return Error(EPERM);
+    // if (m_State != FBINFO_STATE_RUNNING) return Error(EPERM);
 
     usize totalSize = m_ScreenSize;
     if (totalSize == 0) totalSize = m_FixedScreenInfo.smem_len;

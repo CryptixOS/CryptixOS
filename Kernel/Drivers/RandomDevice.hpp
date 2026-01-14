@@ -94,7 +94,11 @@ class RandomDevice final : public CharacterDevice
 
     static u32 SeedFromKernel()
     {
-        u64 tsc   = CPU::ReadTsc();
+#ifdef CTOS_TARGET_X86_64
+        u64 tsc = CPU::ReadTsc();
+#else
+        u64 tsc = 0;
+#endif
         u64 time  = Time::GetRealTime();
         u64 cpu   = CPU::Current()->ID;
 
