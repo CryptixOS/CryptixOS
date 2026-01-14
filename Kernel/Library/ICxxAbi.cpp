@@ -10,7 +10,7 @@
 #include <Prism/Debug/Assertions.hpp>
 
 #include <cxxabi.h>
-#if CTOS_ARCH == CTOS_ARCH_X86_64
+#ifdef CTOS_TARGET_X86_64
     #include <immintrin.h>
 #endif
 
