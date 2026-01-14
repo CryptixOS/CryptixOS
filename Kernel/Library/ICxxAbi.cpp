@@ -93,7 +93,7 @@ extern "C"
     {
         u8* p;
         if (__stack_chk_guard != 0) return;
-#if CTOS_ARCH == CTOS_ARCH_X86_64
+#ifdef CTOS_TARGET_X86_64 
         if (_rdrand64_step(
                 reinterpret_cast<unsigned long long*>(&__stack_chk_guard))
             && __stack_chk_guard != 0)
