@@ -20,7 +20,21 @@ class Ext2FsINode : public INode
     TraverseDirectories(::Ref<class DirectoryEntry> parent,
                         DirectoryIterator           iterator) override;
     virtual ErrorOr<::Ref<DirectoryEntry>>
-    Lookup(::Ref<DirectoryEntry> dentry) override;
+                           Lookup(::Ref<DirectoryEntry> dentry) override;
+
+    virtual ErrorOr<File*> Open(class ::Ref<::DirectoryEntry> dentry, i64 flags,
+                                u64 accMode) override;
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode,
+               dev_t dev = 0) override;
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    CreateFile(::Ref<DirectoryEntry> entry, INodeMode mode) override;
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    CreateDirectory(::Ref<DirectoryEntry> entry, INodeMode mode) override;
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    Symlink(::Ref<DirectoryEntry> entry, PathView targetPath) override;
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+    Link(::Ref<DirectoryEntry> oldEntry, ::Ref<DirectoryEntry> entry) override;
 
     virtual const UnorderedMap<String, ::Ref<INode>>& Children() const
     {
@@ -32,7 +46,19 @@ class Ext2FsINode : public INode
     {
         return -1;
     }
+    virtual ErrorOr<Path>  ReadLink() override;
     virtual ErrorOr<isize> Truncate(usize size) override { return -1; }
+    virtual ErrorOr<void>  Rename(::Ref<INode> newParent,
+                                  StringView   newName) override
+    {
+        return Error(ENOSYS);
+    }
+
+    virtual ErrorOr<void> Unlink(::Ref<DirectoryEntry> entry) override;
+    virtual ErrorOr<void> RmDir(::Ref<DirectoryEntry> entry) override
+    {
+        return Error(ENOSYS);
+    }
 
     friend class Ext2Fs;
 
@@ -41,6 +67,7 @@ class Ext2FsINode : public INode
     Ext2FsINodeMeta                    m_Meta;
     UnorderedMap<String, ::Ref<INode>> m_Children;
     usize                              m_DirectoryOffset = 0;
+    Path                               m_LinkTarget      = ""_p;
 
     void          Initialize(ino_t index, mode_t mode, u16 type);
     ErrorOr<void> AddDirectoryEntry(Ext2FsDirectoryEntry& dentry);

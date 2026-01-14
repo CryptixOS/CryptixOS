@@ -204,8 +204,9 @@ namespace VFS
 
         return rootMount ? rootMount->GuestEntry() : s_RootEntry;
     }
+    Ref<MountPoint> RootMount() { return s_RootMountPoint; }
 
-    void RecursiveDelete(INode* node)
+    void            RecursiveDelete(INode* node)
     {
         if (!node) return;
 
@@ -433,6 +434,26 @@ namespace VFS
         // TODO: Unmount
         ToDo();
         return false;
+    }
+    ErrorOr<void> PivotRoot(PathView newRoot, PathView putOld)
+    {
+        auto newRootRes = TryOrRet(ResolvePath(RootDirectoryEntry(), newRoot));
+        auto newRootEntry = newRootRes.Entry;
+
+        auto putOldRes    = TryOrRet(ResolvePath(RootDirectoryEntry(), putOld));
+        auto putOldEntry  = putOldRes.Entry;
+
+        auto rootMount    = RootMount();
+        auto newRootMount = MountPoint::Lookup(newRootEntry);
+        if (!newRootMount) return Error(ENOENT);
+
+        auto oldRootFs   = rootMount->Filesystem();
+        auto oldRoot     = rootMount->ExchangeGuest(newRootMount->GuestEntry());
+
+        auto putOldMount = CreateRef<MountPoint>(oldRoot, oldRootFs);
+        MountPoint::Attach(putOldMount);
+
+        return {};
     }
 
     ErrorOr<void> Sync()

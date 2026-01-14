@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Drivers/Terminal.hpp>
+#include <Drivers/TTY/VirtualConsole.hpp>
 #include <Prism/Core/Types.hpp>
 
 #define ECHFS_DEBUG 1

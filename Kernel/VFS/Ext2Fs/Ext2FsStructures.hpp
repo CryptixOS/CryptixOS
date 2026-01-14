@@ -7,6 +7,7 @@
 #pragma once
 
 #include <API/UnixTypes.hpp>
+#include <Compiler.hpp>
 #include <Prism/Core/Types.hpp>
 
 enum class Ext2FsState : u16
@@ -21,7 +22,7 @@ enum class Ext2FsOnError : u16
     eKernelPanic     = 0x03,
 };
 
-struct [[gnu::packed]] Ext2FsSuperBlock
+struct CTOS_PACKED Ext2FsSuperBlock
 {
     u32           INodeCount;
     u32           BlockCount;
@@ -68,7 +69,7 @@ struct [[gnu::packed]] Ext2FsSuperBlock
     u32           HeadOfOrphanINodeList;
 };
 
-struct [[gnu::packed]] Ext2FsBlockGroupDescriptor
+struct CTOS_PACKED Ext2FsBlockGroupDescriptor
 {
     u32 BlockUsageBitmapAddress;
     u32 INodeUsageBitmapAddress;
@@ -78,7 +79,7 @@ struct [[gnu::packed]] Ext2FsBlockGroupDescriptor
     u16 DirectoryCount;
     u16 Reserved[7];
 };
-struct [[gnu::packed]] Ext2FsINodeMeta
+struct CTOS_PACKED Ext2FsINodeMeta
 {
     u16             Permissions;
     u16             UID;
@@ -122,7 +123,7 @@ enum class Ext2FsDirectoryEntryType : u8
     eSocket          = 0x06,
     eSymlink         = 0x07,
 };
-struct [[gnu::packed]] Ext2FsDirectoryEntry
+struct CTOS_PACKED Ext2FsDirectoryEntry
 {
     u32                      INodeIndex;
     u16                      Size;

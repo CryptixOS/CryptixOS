@@ -36,7 +36,6 @@ ErrorOr<void>
 Ext2FsINode::TraverseDirectories(::Ref<class DirectoryEntry> parent,
                                  DirectoryIterator           iterator)
 {
-    LogTrace("Ext2fs: Traversing directories");
     m_Fs->ReadINodeEntry(&m_Meta, m_Metadata.ID);
 
     u8* buffer = new u8[m_Meta.GetSize()];
@@ -45,7 +44,6 @@ Ext2FsINode::TraverseDirectories(::Ref<class DirectoryEntry> parent,
     usize bufferOffset = 0;
     usize i            = 0;
 
-    LogTrace("Ext2Fs: Reading children directory entries of {}", Name());
     for (bufferOffset = 0, i = 0; bufferOffset < m_Meta.GetSize(); i++)
     {
         Ext2FsDirectoryEntry* entry
@@ -110,13 +108,10 @@ Ext2FsINode::TraverseDirectories(::Ref<class DirectoryEntry> parent,
         newNode->m_Metadata.ModificationTime.tv_nsec = 0;
 
         newNode->m_Meta                              = inodeMeta;
-        LogTrace(
-            "Ext2Fs: New Ext2FsINode =>\n"
-            "\tname => {}\n"
-            "\tid => {}\n"
-            "index => {}\n",
-            newNode->Name(), newNode->m_Metadata.ID, i);
-
+        if (newNode->IsSymlink())
+        {
+            // TODO(v1tr10l7): symlink
+        }
         InsertChild(newNode, newNode->Name());
 
         // TODO(v1tr10l7): resolve link
@@ -152,18 +147,50 @@ ErrorOr<::Ref<DirectoryEntry>> Ext2FsINode::Lookup(::Ref<DirectoryEntry> dentry)
     Delegate<bool(StringView, loff_t, usize, usize)> delegate;
     delegate.BindLambda(iterator);
 
-    LogTrace("Ext2Fs: Looking up an inode => `{}`", dentry->Name());
     TraverseDirectories(dentry->Parent().Promote(), delegate);
 
     for (const auto& [name, inode] : Children())
     {
-        if (name != inode->Name()) continue;
+        if (name != dentry->Name()) continue;
 
         dentry->Bind(inode);
         return dentry;
     }
 
     return Error(ENOENT);
+}
+
+ErrorOr<File*> Ext2FsINode::Open(class ::Ref<::DirectoryEntry> dentry,
+                                 i64 flags, u64 accMode)
+{
+    return Error(ENOSYS);
+}
+ErrorOr<::Ref<DirectoryEntry>>
+Ext2FsINode::CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode, dev_t dev)
+{
+    // auto newNode = CreateRef<Ext2FsINode>();
+
+    return Error(ENOSYS);
+}
+ErrorOr<::Ref<DirectoryEntry>>
+Ext2FsINode::CreateFile(::Ref<DirectoryEntry> entry, INodeMode mode)
+{
+    return Error(ENOSYS);
+}
+ErrorOr<::Ref<DirectoryEntry>>
+Ext2FsINode::CreateDirectory(::Ref<DirectoryEntry> entry, INodeMode mode)
+{
+    return Error(ENOSYS);
+}
+ErrorOr<::Ref<DirectoryEntry>> Ext2FsINode::Symlink(::Ref<DirectoryEntry> entry,
+                                                    PathView targetPath)
+{
+    return Error(ENOSYS);
+}
+ErrorOr<::Ref<DirectoryEntry>> Ext2FsINode::Link(::Ref<DirectoryEntry> oldEntry,
+                                                 ::Ref<DirectoryEntry> entry)
+{
+    return Error(ENOSYS);
 }
 
 void Ext2FsINode::InsertChild(::Ref<INode> node, StringView name)
@@ -185,6 +212,21 @@ isize Ext2FsINode::Read(void* buffer, off_t offset, usize bytes)
 
     return m_Fs->ReadINode(m_Meta, reinterpret_cast<u8*>(buffer), offset,
                            bytes);
+}
+ErrorOr<Path> Ext2FsINode::ReadLink()
+{
+    if (!m_LinkTarget.Empty()) return m_LinkTarget;
+    if (m_Meta.GetSize() <= 60)
+        return (m_LinkTarget
+                = PathView(reinterpret_cast<const char*>(m_Meta.Blocks),
+                           m_Meta.GetSize()));
+
+    char* buffer = new char[m_Meta.GetSize()];
+    Read(buffer, 0, m_Meta.GetSize());
+    m_LinkTarget = buffer;
+    delete[] buffer;
+
+    return m_LinkTarget;
 }
 
 /*
@@ -313,4 +355,9 @@ ErrorOr<void> Ext2FsINode::AddDirectoryEntry(Ext2FsDirectoryEntry& dentry)
     PMM::FreePages(buffer, pageCount);
 
     return {};
+}
+
+ErrorOr<void> Ext2FsINode::Unlink(::Ref<DirectoryEntry> entry)
+{
+    return Error(ENOSYS);
 }

@@ -5,11 +5,13 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <API/Posix/dirent.h>
+#include <Library/Logger.hpp>
 #include <Memory/PMM.hpp>
+
 #include <Prism/String/StringBuilder.hpp>
 #include <Prism/String/StringUtils.hpp>
-#include <Scheduler/Scheduler.hpp>
 
+#include <Scheduler/Scheduler.hpp>
 #include <Time/Time.hpp>
 #include <VFS/Filesystem.hpp>
 #include <VFS/ProcFs/ProcFsINode.hpp>
@@ -98,6 +100,7 @@ void ProcFsINode::InsertChild(::Ref<INode> node, StringView name)
 }
 isize ProcFsINode::Read(void* buffer, off_t offset, usize bytes)
 {
+    LogTrace("ProcFsINode::Read: Reading {} bytes at offset {}", bytes, offset);
     u8* dest = reinterpret_cast<u8*>(buffer);
 
     return m_Property ? m_Property->Read(dest, offset, bytes) : -1;

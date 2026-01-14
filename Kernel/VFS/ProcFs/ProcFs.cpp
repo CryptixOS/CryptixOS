@@ -247,7 +247,7 @@ ErrorOr<void> ProcFs::Stats(statfs& stats)
 
 void ProcFs::AddChild(StringView name)
 {
-    auto entry = new DirectoryEntry(nullptr, name);
+    auto entry = CreateRef<DirectoryEntry>(nullptr, name);
     auto inode = CreateProcFsNode(m_Root, name, this);
     entry->Bind(inode);
 

@@ -14,7 +14,7 @@ class FileDescriptorTable : public RefCounted
     using TableType = UnorderedMap<isize, ::Ref<FileDescriptor>>;
 
   public:
-    FileDescriptorTable() = default;
+    FileDescriptorTable();
 
     isize       Insert(::Ref<FileDescriptor> descriptor, isize desired = -1);
     isize       Replace(::Ref<FileDescriptor> descriptor, isize desired);

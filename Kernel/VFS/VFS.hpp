@@ -32,6 +32,7 @@ namespace VFS
     ErrorOr<void>       UnregisterFilesystem(Ref<FilesystemDriver> driver);
 
     Ref<DirectoryEntry> RootDirectoryEntry();
+    Ref<MountPoint>     RootMount();
     void                RecursiveDelete(INode* node);
 
     struct PathResolution
@@ -57,6 +58,8 @@ namespace VFS
                                    PathView target, StringView fsName,
                                    i32 flags = 0, const void* data = nullptr);
     bool Unmount(Ref<DirectoryEntry> parent, PathView path, i32 flags = 0);
+
+    ErrorOr<void>                PivotRoot(PathView newRoot, PathView putOld);
 
     ErrorOr<void>                Sync();
 

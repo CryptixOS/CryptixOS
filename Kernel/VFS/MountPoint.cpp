@@ -46,5 +46,6 @@ void              MountPoint::Iterate(Iterator iterator)
 ::Ref<MountPoint>     MountPoint::NextMountPoint() const { return Hook.Next; }
 ::Ref<DirectoryEntry> MountPoint::ExchangeGuest(::Ref<DirectoryEntry> dentry)
 {
+    m_Filesystem = dentry->INode()->Filesystem();
     return Exchange(m_Guest, dentry);
 }

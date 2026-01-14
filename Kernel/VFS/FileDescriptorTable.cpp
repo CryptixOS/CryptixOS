@@ -7,6 +7,7 @@
 #include <VFS/FileDescriptorTable.hpp>
 #include <VFS/VFS.hpp>
 
+FileDescriptorTable::FileDescriptorTable() { m_NextIndex = 1; }
 isize FileDescriptorTable::Insert(::Ref<FileDescriptor> fd, isize desired)
 {
     ScopedLock guard(m_Lock);
