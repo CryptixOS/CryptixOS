@@ -9,7 +9,7 @@
     #include <Arch/x86_64/IO.hpp>
 #endif
 
-#include <Drivers/Terminal.hpp>
+#include <Drivers/TTY/VirtualConsole.hpp>
 #include <Firmware/ACPI/ACPI.hpp>
 #include <Firmware/EFI/SystemTable.hpp>
 
@@ -19,7 +19,7 @@ namespace PowerManager
 {
     void Reboot()
     {
-        Terminal* terminal = Terminal::GetPrimary();
+        VirtualConsole* terminal = VirtualConsole::GetPrimary();
 
         terminal->Clear();
         auto print = [terminal](const char* string)
