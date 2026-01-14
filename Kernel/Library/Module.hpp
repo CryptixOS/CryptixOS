@@ -72,6 +72,10 @@ enum class ModuleState
 };
 struct Module : public RefCounted
 {
+    static Module* s_ThisModule;
+    constexpr Module() { s_ThisModule = this; }
+    static constexpr Module* ThisModule() { return s_ThisModule; }
+
     friend class IntrusiveRefList<Module>;
     friend struct IntrusiveRefListHook<Module>;
 
@@ -139,3 +143,5 @@ struct Module : public RefCounted
            .Type        = ModuleParamType::e##type,                            \
            .Address     = &__param_##name,                                     \
            .Description = desc};
+
+#define CTOS_THIS_MODULE() Module::ThisModule()

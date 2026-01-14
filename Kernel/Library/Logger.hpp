@@ -37,14 +37,14 @@ constexpr u64   RESET_COLOR              = 0x6d305b1b;
 
 #define CTOS_NO_KASAN __attribute__((no_sanitize("address")))
 
-class Terminal;
+class VirtualConsole;
 using Prism::LogLevel;
 namespace Logger
 {
     CTOS_NO_KASAN void EnableSink(usize sink);
     CTOS_NO_KASAN void DisableSink(usize sink);
 
-    Terminal&          GetTerminal();
+    VirtualConsole&          GetTerminal();
     void               Unlock();
 } // namespace Logger
 

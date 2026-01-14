@@ -4,7 +4,10 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Common.hpp>
+#include <Compiler.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Assertions.hpp>
 
 #include <cxxabi.h>
 #if CTOS_ARCH == CTOS_ARCH_X86_64
@@ -76,19 +79,19 @@ extern "C"
         __builtin_unreachable();
     }
 
-    uintptr_t __stack_chk_guard = 0;
+    upointer __stack_chk_guard = 0;
 
-    [[noreturn]]
+    CTOS_NORETURN
     void __stack_chk_fail()
     {
         Panic("icxxabi: stack smashing detected!");
         __builtin_unreachable();
     }
 
-    [[maybe_unused]]
+    CTOS_UNUSED
     void __attribute__((no_stack_protector)) __guard_setup(void)
     {
-        unsigned char* p;
+        u8* p;
         if (__stack_chk_guard != 0) return;
 #if CTOS_ARCH == CTOS_ARCH_X86_64
         if (_rdrand64_step(
@@ -98,7 +101,7 @@ extern "C"
 #endif
         /* If a random generator can't be used, the protector switches the guard
            to the "terminator canary".  */
-        p = reinterpret_cast<unsigned char*>(&__stack_chk_guard);
+        p = reinterpret_cast<u8*>(&__stack_chk_guard);
         p[sizeof(__stack_chk_guard) - 1] = 255;
         p[sizeof(__stack_chk_guard) - 2] = '\n';
         p[0]                             = 0;

@@ -6,6 +6,8 @@
  */
 #include <Library/Module.hpp>
 
+Module* Module::s_ThisModule = nullptr;
+
 namespace System
 {
     Ref<Module> FindModule(StringView name);

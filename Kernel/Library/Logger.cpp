@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: GPL-3
  */
 #include <Drivers/Serial.hpp>
-#include <Drivers/Terminal.hpp>
+#include <Drivers/TTY/VirtualConsole.hpp>
 
 #include <Library/Locking/Spinlock.hpp>
 #include <Library/Logger.hpp>
@@ -43,7 +43,7 @@ class CoreSink final : public LogSink<SpinLockPolicy>
         nwritten = nwritten ?: ret;
         if (s_EnabledSinks & LOG_SINK_TERMINAL)
         {
-            auto terminal = Terminal::GetPrimary();
+            auto terminal = VirtualConsole::GetPrimary();
             if (!terminal) return nwritten;
 
             if (nwritten == 0) nwritten = terminal->PrintString(str);
@@ -64,15 +64,15 @@ namespace Logger
 
     CTOS_NO_KASAN void EnableSink(usize output)
     {
-        auto terminal = Terminal::GetPrimary();
+        auto terminal = VirtualConsole::GetPrimary();
         if (output == LOG_SINK_TERMINAL && terminal)
-            terminal->Initialize(Terminal::PrimaryFramebuffer());
+            terminal->Initialize(VirtualConsole::PrimaryFramebuffer());
 
         s_EnabledSinks |= output;
     }
     CTOS_NO_KASAN void DisableSink(usize output) { s_EnabledSinks &= ~output; }
     isize Print(StringView string) { return g_CoreSink.WriteNoLock(string); }
 
-    Terminal& GetTerminal() { return *Terminal::GetPrimary(); }
+    VirtualConsole& GetTerminal() { return *VirtualConsole::GetPrimary(); }
     void      Unlock() { s_Lock.Release(); }
 } // namespace Logger
