@@ -10,35 +10,35 @@
     #include <Arch/x86_64/IO.hpp>
 #endif
 #include <Drivers/Serial.hpp>
-#include <Drivers/TTY.hpp>
-#include <Drivers/Terminal.hpp>
+#include <Drivers/TTY/TTY.hpp>
 #include <Drivers/Video/FramebufferConsole.hpp>
+#include <Drivers/TTY/VirtualConsole.hpp>
 
 #include <Library/Unicode.hpp>
 #include <Memory/PMM.hpp>
 #include <Prism/String/StringUtils.hpp>
 using namespace StringUtils;
 
-Vector<Terminal*>                Terminal::s_Terminals = {};
+Vector<VirtualConsole*>          VirtualConsole::s_Terminals = {};
 Span<Framebuffer, DynamicExtent> s_Framebuffers;
-static Terminal*                 s_ActiveTerminal = nullptr;
+static VirtualConsole*           s_ActiveTerminal = nullptr;
 
-Terminal::Terminal(StringView name, usize minor)
+VirtualConsole::VirtualConsole(StringView name, usize minor)
     : TTY(name, minor)
 {
     s_Terminals.PushBack(this);
     if (!s_ActiveTerminal) s_ActiveTerminal = this;
 }
 
-void Terminal::Resize(const winsize& windowSize) {}
+void VirtualConsole::Resize(const winsize& windowSize) {}
 
-void Terminal::PutChar(u64 c)
+void VirtualConsole::PutChar(u64 c)
 {
     PutCharImpl(c);
 
     Flush();
 }
-void Terminal::PutCharImpl(u64 c)
+void VirtualConsole::PutCharImpl(u64 c)
 {
     if (!m_Initialized) return;
 
@@ -104,7 +104,7 @@ void Terminal::PutCharImpl(u64 c)
     RawPutChar(0xfe);
 }
 
-isize Terminal::PrintString(StringView str)
+isize VirtualConsole::PrintString(StringView str)
 {
     if (!m_Initialized) return 0;
 
@@ -115,7 +115,7 @@ isize Terminal::PrintString(StringView str)
     return nwritten;
 }
 
-void Terminal::Bell()
+void VirtualConsole::Bell()
 {
 #ifdef CTOS_TARGET_X86_64
     PCSpeaker::ToneOn(1000);
@@ -124,7 +124,8 @@ void Terminal::Bell()
 #endif
 }
 
-void Terminal::SetupFramebuffers(Span<Framebuffer, DynamicExtent> framebuffers)
+void VirtualConsole::SetupFramebuffers(
+    Span<Framebuffer, DynamicExtent> framebuffers)
 {
     static bool s_Initialized = false;
     if (s_Initialized) return;
@@ -133,20 +134,20 @@ void Terminal::SetupFramebuffers(Span<Framebuffer, DynamicExtent> framebuffers)
     s_Initialized  = true;
 }
 
-Framebuffer& Terminal::PrimaryFramebuffer()
+Framebuffer& VirtualConsole::PrimaryFramebuffer()
 {
     Assert(!s_Framebuffers.Empty());
     return s_Framebuffers[0];
 }
-Span<Framebuffer> Terminal::Framebuffers() { return s_Framebuffers; }
+Span<Framebuffer> VirtualConsole::Framebuffers() { return s_Framebuffers; }
 
-Terminal*         Terminal::GetPrimary()
+VirtualConsole*   VirtualConsole::GetPrimary()
 {
     return !s_Terminals.Empty() ? s_Terminals[0] : nullptr;
 }
 
-Terminal* Terminal::Active() { return s_ActiveTerminal; }
-void      Terminal::SwitchTo(usize index)
+VirtualConsole* VirtualConsole::Active() { return s_ActiveTerminal; }
+void            VirtualConsole::SwitchTo(usize index)
 {
     Assert(index < s_Terminals.Size());
 
@@ -155,23 +156,27 @@ void      Terminal::SwitchTo(usize index)
     TTY::SwitchTo(s_ActiveTerminal);
 }
 
-ErrorOr<void> Terminal::TransmitChar(u64 c)
+ErrorOr<void> VirtualConsole::TransmitChar(u64 c)
 {
     PutChar(c);
     return {};
 }
-ErrorOr<isize> Terminal::Transmit(StringView data) { return PrintString(data); }
+ErrorOr<isize> VirtualConsole::Transmit(StringView data)
+{
+    return PrintString(data);
+}
 
-const Vector<Terminal*>& Terminal::EnumerateTerminals()
+const Vector<VirtualConsole*>& VirtualConsole::EnumerateTerminals()
 {
     if (s_Framebuffers.Empty())
     {
-        LogWarn("Terminal: Can't to enumerate, no available framebuffers");
+        LogWarn(
+            "VirtualConsole: Can't to enumerate, no available framebuffers");
         return s_Terminals;
     }
     if (!s_Terminals.Empty()) return s_Terminals;
 
-    LogTrace("Terminal: Initializing terminals for {} framebuffers...",
+    LogTrace("VirtualConsole: Initializing terminals for {} framebuffers...",
              s_Framebuffers.Size());
 
     for (usize i = 0; i < s_Framebuffers.Size(); i++)
@@ -185,15 +190,15 @@ const Vector<Terminal*>& Terminal::EnumerateTerminals()
             s_Terminals.PushBack(terminal);
         }
 
-        LogTrace("Terminal: Instantiated a terminal");
+        LogTrace("VirtualConsole: Instantiated a terminal");
     }
 
-    LogInfo("Terminal: Initialized {} terminals", s_Terminals.Size());
+    LogInfo("VirtualConsole: Initialized {} terminals", s_Terminals.Size());
     if (!s_Terminals.Empty()) s_ActiveTerminal = s_Terminals[0];
     return s_Terminals;
 }
 
-void Terminal::OnEscapeChar(char c)
+void VirtualConsole::OnEscapeChar(char c)
 {
     auto [x, y] = GetCursorPos();
 
@@ -257,7 +262,7 @@ void Terminal::OnEscapeChar(char c)
 
     m_State = State::eNormal;
 }
-void Terminal::OnCsi(char c)
+void VirtualConsole::OnCsi(char c)
 {
     if (IsDigit(c))
     {
@@ -320,7 +325,9 @@ void Terminal::OnCsi(char c)
         }
         case 'E':
         case 'F':
-            LogWarn("Terminal: Sequence 'ESC[{:c}' is not implemented yet", c);
+            LogWarn(
+                "VirtualConsole: Sequence 'ESC[{:c}' is not implemented yet",
+                c);
             break;
         case 'G': CHA(param); break;
         case 'H': CUP(); break;
@@ -331,7 +338,9 @@ void Terminal::OnCsi(char c)
         case 'P':
         case 'X':
         case 'a':
-            LogWarn("Terminal: Sequence 'ESC[{:c}' is not implemented yet", c);
+            LogWarn(
+                "VirtualConsole: Sequence 'ESC[{:c}' is not implemented yet",
+                c);
             CTOS_FALLTHROUGH;
         case 'c':
         {
@@ -354,7 +363,9 @@ void Terminal::OnCsi(char c)
         case 'e':
         case 'f':
         case 'g':
-            LogWarn("Terminal: Sequence 'ESC[{:c}' is not implemented yet", c);
+            LogWarn(
+                "VirtualConsole: Sequence 'ESC[{:c}' is not implemented yet",
+                c);
             break;
         case 'h':
         case 'l':
@@ -387,11 +398,14 @@ void Terminal::OnCsi(char c)
         case 's':
         case 'u':
         case '`':
-            LogWarn("Terminal: Sequence 'ESC[{:c}' is not implemented yet", c);
+            LogWarn(
+                "VirtualConsole: Sequence 'ESC[{:c}' is not implemented yet",
+                c);
             break;
         case ']':
             LogWarn(
-                "Terminal: Linux Console Private CSI Sequences are currently "
+                "VirtualConsole: Linux Console Private CSI Sequences are "
+                "currently "
                 "not implemented");
             break;
     }
@@ -400,14 +414,14 @@ void Terminal::OnCsi(char c)
     m_DecPrivate = false;
 }
 
-void Terminal::Reset()
+void VirtualConsole::Reset()
 {
     m_TabSize            = 8;
     m_EscapeValueCount   = 0;
     m_ScrollTopMargin    = 0;
     m_ScrollBottomMargin = m_Size.ws_row;
 }
-bool Terminal::DecSpecialPrint(u8 c)
+bool VirtualConsole::DecSpecialPrint(u8 c)
 {
     switch (c)
     {
@@ -446,7 +460,7 @@ bool Terminal::DecSpecialPrint(u8 c)
     return true;
 }
 
-void Terminal::ICH(u64 count)
+void VirtualConsole::ICH(u64 count)
 {
     auto [x, y] = GetCursorPos();
     for (isize i = m_Size.ws_col - 1; i >= static_cast<isize>(x); i--)
@@ -458,7 +472,7 @@ void Terminal::ICH(u64 count)
     SetCursorPos(x, y);
 }
 
-void Terminal::CHA(u64 column)
+void VirtualConsole::CHA(u64 column)
 {
     --column;
     if (column >= m_Size.ws_col) column = m_Size.ws_col - 1;
@@ -466,7 +480,7 @@ void Terminal::CHA(u64 column)
     auto y = GetCursorPos().Value;
     SetCursorPos(column, y);
 }
-void Terminal::CUP()
+void VirtualConsole::CUP()
 {
     usize x = m_EscapeValues[1];
     usize y = m_EscapeValues[0];
@@ -480,7 +494,7 @@ void Terminal::CUP()
     SetCursorPos(x, y);
 }
 
-void Terminal::ED(u64 parameter)
+void VirtualConsole::ED(u64 parameter)
 {
     auto [startX, startY] = GetCursorPos();
     if (m_EscapeValueCount == 0)
@@ -502,7 +516,7 @@ void Terminal::ED(u64 parameter)
         SetCursorPos(0, 0);
     }
 }
-void Terminal::EL(u64 parameter)
+void VirtualConsole::EL(u64 parameter)
 {
     auto [x, y]  = GetCursorPos();
     usize startX = x;
@@ -519,7 +533,7 @@ void Terminal::EL(u64 parameter)
     for (usize x = startX; x < endX; x++) RawPutChar(' ');
     if (parameter != 1) SetCursorPos(x, y);
 }
-void Terminal::VPA(u64 row)
+void VirtualConsole::VPA(u64 row)
 {
     --row;
     if (row >= m_Size.ws_row) row = m_Size.ws_row - 1;
@@ -527,7 +541,7 @@ void Terminal::VPA(u64 row)
     auto x = GetCursorPos().Key;
     SetCursorPos(x, row);
 }
-void Terminal::SGR(u64 parameter)
+void VirtualConsole::SGR(u64 parameter)
 {
     AnsiColor color
         = static_cast<AnsiColor>((parameter % 10) + (parameter >= 90 ? 10 : 0));

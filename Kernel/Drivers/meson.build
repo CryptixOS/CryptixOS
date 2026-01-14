@@ -5,7 +5,6 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 srcs += files(
-  'Terminal.cpp',
 )
 
 subdir('ACPI')

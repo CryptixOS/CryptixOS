@@ -7,4 +7,5 @@
 srcs += files(
   'PTYMultiplexer.cpp',
   'TTY.cpp',
+  'VirtualConsole.cpp',
 )

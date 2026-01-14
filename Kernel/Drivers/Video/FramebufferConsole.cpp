@@ -58,7 +58,7 @@ bool FramebufferConsole::Load()
         = System::FindBootModule("background");
     if (!backgroundModule || !backgroundModule->LoadAddress
         || backgroundModule->Size == 0)
-        LogError("Terminal background not found");
+        LogError("VirtualConsole background not found");
     else
         SetCanvas(backgroundModule->LoadAddress.As<u8>(),
                   backgroundModule->Size);

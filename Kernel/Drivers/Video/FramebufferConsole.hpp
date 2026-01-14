@@ -5,7 +5,8 @@
  * SPDX-License-Identifier: GPL-3
  */
 #pragma once
-#include <Drivers/Terminal.hpp>
+
+#include <Drivers/TTY/VirtualConsole.hpp>
 
 #include <Library/Image.hpp>
 
@@ -25,7 +26,7 @@ struct Rectangle
     }
 };
 
-class FramebufferConsole final : public Terminal
+class FramebufferConsole final : public VirtualConsole
 {
   public:
     static FramebufferConsole* Create(Framebuffer& framebuffer,
@@ -38,7 +39,7 @@ class FramebufferConsole final : public Terminal
     FramebufferConsole() = default;
     explicit FramebufferConsole(const Framebuffer& framebuffer, StringView name,
                                 usize minor)
-        : Terminal(name, minor)
+        : VirtualConsole(name, minor)
     {
         Initialize(framebuffer);
     }

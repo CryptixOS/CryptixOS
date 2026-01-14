@@ -13,8 +13,8 @@
 
 #include <Arch/PowerManager.hpp>
 #include <Boot/CommandLine.hpp>
-#include <Drivers/TTY.hpp>
-#include <Drivers/Terminal.hpp>
+#include <Drivers/TTY/TTY.hpp>
+#include <Drivers/TTY/VirtualConsole.hpp>
 
 #include <Prism/Core/Ranges.hpp>
 #include <Prism/String/StringUtils.hpp>
@@ -188,7 +188,7 @@ void AtKeyboard::HandleScanCodeSet1Key(u8 raw)
         {
             isize index = c - '!' + 1;
             Assert(index >= 0);
-            Terminal::SwitchTo(index - 1);
+            VirtualConsole::SwitchTo(index - 1);
         }
     }
     else if (m_Modifiers & KeyModifier::eShift

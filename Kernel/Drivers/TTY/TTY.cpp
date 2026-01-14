@@ -15,7 +15,7 @@
 #include <Debug/Debug.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
 #include <Drivers/TTY/TTY.hpp>
-#include <Drivers/Terminal.hpp>
+#include <Drivers/TTY/VirtualConsole.hpp>
 #include <Drivers/Video/FramebufferConsole.hpp>
 
 #include <Prism/String/Formatter.hpp>
@@ -77,7 +77,7 @@ ErrorOr<void> TTY::SwitchTo(TTY* tty)
 
 bool TTY::GetCursorKeyMode() const
 {
-    return Terminal::Active()->GetCursorKeyMode();
+    return VirtualConsole::Active()->GetCursorKeyMode();
 }
 
 bool IsArrowKey(const char* string, usize bytes)
@@ -152,7 +152,7 @@ void TTY::SendBuffer(const char* string, usize bytes)
 }
 
 StringView TTY::Name() const noexcept { return m_Name; }
-winsize    TTY::GetSize() const { return Terminal::Active()->GetSize(); }
+winsize    TTY::GetSize() const { return VirtualConsole::Active()->GetSize(); }
 
 void       TTY::SetTermios(const termios2& termios)
 {
@@ -386,7 +386,7 @@ void TTY::Initialize()
     Assert(DeviceManager::AllocateCharMajor(API::DeviceMajor::TTY));
     Assert(DeviceManager::AllocateCharMajor(API::DeviceMajor::TTYAUX));
 
-    auto                framebuffers = Terminal::Framebuffers();
+    auto                framebuffers = VirtualConsole::Framebuffers();
     auto&               fb           = framebuffers[0];
 
     FramebufferConsole* current      = nullptr;

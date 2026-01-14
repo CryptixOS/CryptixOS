@@ -16,7 +16,10 @@ args = [
   '-fPIC',
 ]
 
-if arch == 'aarch64'
+if arch == 'x86_64'
+  args += ['-DCTOS_ARCH=CTOS_ARCH_X86_64', '-DCTOS_TARGET_X86_64']
+elif arch == 'aarch64'
+  args += ['-DCTOS_ARCH=CTOS_ARCH_AARCH64', '-DCTOS_TARGET_AARCH64']
   args += [
     '-mgeneral-regs-only', '-march=armv8-a+nofp+nosimd',
     '-mcmodel=small',

@@ -178,30 +178,33 @@ class I8042 : public ACPI::Device, public SerioController
     static constexpr isize     READ_WRITE_TIMEOUT = 10'000;
     static I8042*              s_Controller;
 
+    Spinlock                   m_Lock;
     ::Ref<InterruptDispatcher> m_IrqDispatcher  = nullptr;
 
     bool                       m_Port1Available = false;
     bool                       m_Port2Available = false;
 
     static bool                QuerySupport();
-    static IrqResult HandleInterrupt(::Device* device, ExecutionContext* context);
+    static IrqResult           HandleInterrupt(::Device*         device,
+                                               ExecutionContext* context);
 
-    ErrorOr<void>    DisableDevices();
+    ErrorOr<void>              DisableDevices();
 
-    bool             PerformSelfTest();
-    bool             IsDualChannel();
+    bool                       PerformSelfTest();
+    bool                       IsDualChannel();
 
-    bool             TestInterfaces();
-    bool             TestSingleInterface(DevicePort port);
+    bool                       TestInterfaces();
+    bool                       TestSingleInterface(DevicePort port);
 
-    void             EnumerateDevices();
-    ErrorOr<Ps2DeviceType> ScanPortForDevices(DevicePort port);
+    void                       EnumerateDevices();
+    ErrorOr<Ps2DeviceType>     ScanPortForDevices(DevicePort port);
 
-    ErrorOr<void>          WaitForIncomingData();
-    ErrorOr<void>          WaitForWriteReady();
+    ErrorOr<void>              WaitForIncomingData();
+    ErrorOr<void>              WaitForWriteReady();
 
-    u8                     ReadPort(Port port);
-    void                   WritePort(Port port, u8 data);
+    Status                     ReadStatus();
+    u8                         ReadPort(Port port);
+    void                       WritePort(Port port, u8 data);
 };
 
 using I8042Port          = I8042::Port;

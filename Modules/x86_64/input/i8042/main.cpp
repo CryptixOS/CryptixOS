@@ -15,6 +15,7 @@
 
 #include <Prism/Core/Error.hpp>
 #include <System/InterruptManager.hpp>
+#include <System/System.hpp>
 
 CTOS_MODULE_AUTHOR("v1tr10l7");
 CTOS_MODULE_DESCRIPTION("i8042 controller driver");
@@ -165,17 +166,26 @@ ErrorOr<void> I8042::TryWrite(Port port, u8 data)
 
 ErrorOr<void> I8042::FlushReadBuffer()
 {
-    constexpr isize MAX_FLUSH_READ_TRY_COUNT = 16;
-    isize           tryCount                 = 0;
+    // ScopedLock      guard(m_Lock, true);
 
-    while (!IsOutputEmpty())
+    constexpr isize BUFFER_SIZE       = 16;
+    constexpr usize I8042_STR_AUXDATA = 0x20;
+    isize           i                 = 0;
+    u8              str               = 0;
+
+    while (!IsOutputEmpty()) ReadPort(Port::eBuffer);
+    return {};
+    while (((str = ToUnderlying(ReadStatus()))
+            & ToUnderlying(Status::eOutBufferFull))
+           && (i < BUFFER_SIZE))
     {
-        if (tryCount++ >= MAX_FLUSH_READ_TRY_COUNT) return Error(EIO);
-
         IO::Delay(50);
-        CtosUnused(ReadPort(Port::eBuffer));
-    }
+        auto data = ReadPort(Port::eBuffer);
+        ++i;
 
+        LogDebug("{:#02x} <- i8042 (flush, {})\n", data,
+                 str & I8042_STR_AUXDATA ? "aux" : "kbd");
+    }
     return {};
 }
 ErrorOr<void> I8042::SendCommand(Command command)
@@ -315,6 +325,11 @@ ErrorOr<void> I8042::Probe(ACPI::DeviceHandle* handle, StringView)
     Assert(handle);
 
     LogDebug("I8042: Probing the controller");
+    // auto ioResource = TryOrRet(System::AllocateIoPortAt(
+    //     CTOS_THIS_MODULE(), ToUnderlying(I8042::Port::eBuffer), 16));
+    // IgnoreUnused(ioResource);
+    // FIXME(v1tr10l7): track io resource and free
+
     auto                 major = API::DeviceMajor::MISCELLANEOUS;
     static Atomic<usize> minor = 100;
     auto device = s_Controller = new I8042(handle, major, minor);
@@ -394,7 +409,8 @@ bool I8042::PerformSelfTest()
     }
 
     LogTrace(
-        "I8042: Giving up on the controller's self-test, continuing anyway...");
+        "I8042: Giving up on the controller's self-test, continuing "
+        "anyway...");
     // On some hardware the self test might reset the device,
     // so we're writing to the configuration byte again
     if (!SendCommand(Command::eWriteConfigurationByte)) return false;
@@ -573,7 +589,6 @@ static ACPI::Driver s_Driver = {
 extern "C" CTOS_EXPORT bool ModuleInit()
 {
     LogTrace("I8042: Initializing the module");
-
     return ACPI::Bus::RegisterDriver(&s_Driver).operator bool();
 }
 MODULE_INIT(i8042, ModuleInit);

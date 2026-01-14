@@ -7,7 +7,7 @@
 #pragma once
 
 #include <API/Posix/termios.h>
-#include <Drivers/TTY.hpp>
+#include <Drivers/TTY/TTY.hpp>
 #include <Drivers/Video/Framebuffer.hpp>
 
 #include <Library/Color.hpp>
@@ -40,40 +40,40 @@ namespace AnsiColor
     constexpr const char* BACKGROUND_WHITE   = "\u001b[47m";
 }; // namespace AnsiColor
 
-class Terminal : public TTY
+class VirtualConsole : public TTY
 {
   protected:
-    Terminal(StringView name = "vcs", usize minor = 0);
+    VirtualConsole(StringView name = "vcs", usize minor = 0);
 
   public:
-    static Terminal*      Create(const Framebuffer& framebuffer);
-    virtual bool          Initialize(const Framebuffer& framebuffer) = 0;
+    static VirtualConsole* Create(const Framebuffer& framebuffer);
+    virtual bool           Initialize(const Framebuffer& framebuffer) = 0;
 
-    inline const winsize& GetSize() const { return m_Size; }
+    inline const winsize&  GetSize() const { return m_Size; }
 
-    inline bool           GetCursorKeyMode() const { return m_CursorKeyMode; }
-    void                  Resize(const winsize& newDimensions);
+    inline bool            GetCursorKeyMode() const { return m_CursorKeyMode; }
+    void                   Resize(const winsize& newDimensions);
 
-    virtual void          Clear(u32 color = 0xffffffff, bool move = true) = 0;
+    virtual void           Clear(u32 color = 0xffffffff, bool move = true) = 0;
 
-    void                  PutChar(u64 c);
-    void                  PutCharImpl(u64 c);
+    void                   PutChar(u64 c);
+    void                   PutCharImpl(u64 c);
 
-    isize                 PrintString(StringView str);
+    isize                  PrintString(StringView str);
 
-    void                  Bell();
+    void                   Bell();
 
     static void
     SetupFramebuffers(Span<Framebuffer, DynamicExtent> framebuffers);
 
-    static Framebuffer&             PrimaryFramebuffer();
-    static Span<Framebuffer>        Framebuffers();
+    static Framebuffer&                   PrimaryFramebuffer();
+    static Span<Framebuffer>              Framebuffers();
 
-    static Terminal*                GetPrimary();
-    static const Vector<Terminal*>& EnumerateTerminals();
+    static VirtualConsole*                GetPrimary();
+    static const Vector<VirtualConsole*>& EnumerateTerminals();
 
-    static Terminal*                Active();
-    static void                     SwitchTo(usize index);
+    static VirtualConsole*                Active();
+    static void                           SwitchTo(usize index);
 
   protected:
     bool     m_Initialized = false;
@@ -196,5 +196,5 @@ class Terminal : public TTY
     void                                DECSTBM(u64 parameter);
     void                                HPA(u64 parameter);
 
-    static Vector<Terminal*>            s_Terminals;
+    static Vector<VirtualConsole*>      s_Terminals;
 };
