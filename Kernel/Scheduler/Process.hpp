@@ -10,7 +10,7 @@
 
 #include <API/Credentials.hpp>
 #include <API/Signals.hpp>
-#include <Drivers/TTY.hpp>
+#include <Drivers/TTY/TTY.hpp>
 
 #include <Memory/AddressSpace.hpp>
 #include <Memory/Region.hpp>
@@ -190,11 +190,12 @@ class Process
     isize                FirstFreeFdIndex();
     ErrorOr<isize>       DupFd(isize oldFdNum, isize newFdNum, isize flags);
     i32                  CloseFd(i32 fd);
-    ErrorOr<isize>       InsertFd(Ref<FileDescriptor> fd);
-    ErrorOr<isize>       OpenPipe(i32* pipeFds);
+    ErrorOr<isize>       InsertFd(Ref<::FileDescriptor> fd);
+    ErrorOr<isize>       OpenPipe(i32* pipeFds, isize flags = 0);
     inline bool IsFdValid(i32 fd) const { return m_FdTable->IsValid(fd); }
-    ErrorOr<Ref<FileDescriptor>> GetFileDescriptor(isize fdNum);
-    inline Ref<FileDescriptor>   GetFileHandle(i32 fd)
+    ErrorOr<Ref<::FileDescriptor>> GetFileDescriptor(isize fdNum);
+    ErrorOr<Ref<::FileDescriptor>> FileDescriptor(isize fdNum);
+    inline Ref<::FileDescriptor>   GetFileHandle(i32 fd)
     {
         return m_FdTable->GetFd(fd);
     }

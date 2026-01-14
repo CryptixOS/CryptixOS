@@ -292,7 +292,7 @@ ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags,
     if (path.Absolute()) parent = VFS::RootDirectoryEntry();
     else if (dirFd != AT_FDCWD)
     {
-        Ref<FileDescriptor> descriptor = GetFileHandle(dirFd);
+        Ref<::FileDescriptor> descriptor = GetFileHandle(dirFd);
         if (!descriptor) return Error(EBADF);
         auto entry = descriptor->DirectoryEntry();
 
@@ -313,7 +313,7 @@ ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
 {
     if (oldFdNum == newFdNum) return Error(EINVAL);
 
-    Ref<FileDescriptor> oldFd = GetFileHandle(oldFdNum);
+    Ref<::FileDescriptor> oldFd = GetFileHandle(oldFdNum);
     if (!oldFd) return Error(EBADF);
 
     newFdNum = m_FdTable->Replace(oldFd, newFdNum);
@@ -322,12 +322,12 @@ ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
     return newFdNum;
 }
 i32            Process::CloseFd(i32 fd) { return m_FdTable->Erase(fd); }
-ErrorOr<isize> Process::InsertFd(Ref<FileDescriptor> fd)
+ErrorOr<isize> Process::InsertFd(Ref<::FileDescriptor> fd)
 {
     return m_FdTable->Insert(fd);
 }
 
-ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
+ErrorOr<isize> Process::OpenPipe(i32* pipeFds, isize flags )
 {
     auto pipe        = Fifo::CreatePipe();
     i32  readerFdNum = static_cast<i32>(m_FdTable->Insert(pipe.Reader));
@@ -339,12 +339,16 @@ ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
 
     return 0;
 }
-ErrorOr<Ref<FileDescriptor>> Process::GetFileDescriptor(isize fdNum)
+ErrorOr<Ref<::FileDescriptor>> Process::GetFileDescriptor(isize fdNum)
 {
     auto fd = m_FdTable->GetFd(fdNum);
     if (!fd) return Error(EBADF);
 
     return fd;
+}
+ErrorOr<Ref<::FileDescriptor>> Process::FileDescriptor(isize fdNum)
+{
+    return GetFileDescriptor(fdNum);
 }
 
 Vector<String> SplitArguments(const String& str)
