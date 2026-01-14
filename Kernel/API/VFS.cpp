@@ -11,6 +11,7 @@
 #include <API/Posix/dirent.h>
 #include <API/Posix/fcntl.h>
 #include <API/Posix/linux/netlink.h>
+#include <API/Posix/linux/uio.h>
 #include <API/Posix/sys/mman.h>
 #include <API/Posix/sys/select.h>
 #include <API/Posix/sys/statfs.h>
@@ -123,9 +124,9 @@ namespace API::VFS
         bool creat  = flags & O_CREAT;
         bool excl   = flags & O_EXCL;
         LogDebug(
-            "API::Open: flags =>\n"
+            "API::Open: Path => {}\nflags =>\n"
             "O_APPEND: {}, O_CREAT: {}, O_EXCL: {}",
-            append, creat, excl);
+            path, append, creat, excl);
         return current->OpenAt(AT_FDCWD, path, flags, mode);
     }
     ErrorOr<isize> Close(isize fdNum)
@@ -241,6 +242,20 @@ namespace API::VFS
 
         return fd->Write(inBuffer, count, offset);
     }
+    ErrorOr<isize> ReadV(isize fdNum, const struct iovec* vec, usize vlen)
+    {
+        auto process = Process::Current();
+        auto fd      = TryOrRet(process->FileDescriptor(fdNum));
+
+        if (!fd->CanRead()) return Error(EBADF);
+        if (vlen > UIO_MAXIOV) return Error(EINVAL);
+
+        return Error(EINVAL);
+    }
+    ErrorOr<isize> WriteV(isize fdNum, const struct iovec* vec, usize vlen)
+    {
+        return Error(EINVAL);
+    }
 
     ErrorOr<isize> Access(const char* filename, INodeMode mode)
     {
@@ -266,6 +281,12 @@ namespace API::VFS
             return Error(EROFS);
 
         return status;
+    }
+    ErrorOr<isize> Pipe(isize pipefd[2], isize flags)
+    {
+        auto process = Process::Current();
+
+        return process->OpenPipe(reinterpret_cast<i32*>(pipefd), flags);
     }
 
     ErrorOr<isize> Dup(isize oldFdNum)
@@ -645,6 +666,67 @@ namespace API::VFS
 
         return 0;
     }
+    ErrorOr<isize> SetXAttr(const char* upath, const char* uname,
+                            const u8* value, usize size, isize flags)
+    {
+        auto path = CopyStringFromUser(upath);
+        auto name = CopyStringFromUser(uname);
+
+        return VFS::SetExtendedAttribute(path, name, value, size, flags);
+    }
+    ErrorOr<isize> LSetXAttr(const char* upath, const char* uname,
+                             const u8* value, usize size, isize flags)
+    {
+        auto path = CopyStringFromUser(upath);
+        auto name = CopyStringFromUser(uname);
+
+        return VFS::SetExtendedAttribute(path, name, value, size, flags, true);
+    }
+    ErrorOr<isize> FSetXAttr(isize fdNum, const char* name, const u8* value,
+                             usize size, isize flags)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> GetXAttr(const char* path, const char* name, const u8* value,
+                            usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> LGetXAttr(const char* path, const char* name,
+                             const u8* value, usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> FGetXAttr(isize fdNum, const char* name, const u8* value,
+                             usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> ListXAttr(const char* path, char* list, usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> LListXAttr(const char* path, char* list, usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> FListXAttr(isize fdNum, char* list, usize size)
+    {
+        return Error(ENOSYS);
+    }
+
+    ErrorOr<isize> RemoveXAttr(const char* path, const char* name)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> LRemoveXAttr(const char* path, const char* name)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> FRemoveXAttr(isize fdNum, const char* name)
+    {
+        return Error(ENOSYS);
+    }
 
     CTOS_NO_SANITIZE("alignment")
     ErrorOr<isize> GetDEnts64(isize fdNum, dirent* const outBuffer, usize count)
@@ -760,6 +842,64 @@ namespace API::VFS
     end_check:
     }
 
+    inline constexpr usize MAX_PPOLL_FDS = 32;
+    inline constexpr usize POLLNVAL      = 0x0020;
+    ErrorOr<isize>         PPoll(pollfd* fds, nfds_t nfds, int timeout)
+    {
+        //     Process*        process    = Process::Current();
+        //     Thread*         thread     = Thread::Current();
+        //
+        //     isize           fdCount    = 0;
+        //     isize           eventCount = 0;
+        //     isize           ret        = 0;
+        //     isize           fdIndices[MAX_PPOLL_FDS];
+        //
+        //     FileDescriptor* fdList[MAX_PPOLL_FDS];
+        //     Timer           timer;
+        //
+        //     if (!nfds || nfds > MAX_PPOLL_FDS) return Error(EINVAL);
+        //
+        //     for (usize i = 0; i < nfds; i++)
+        //     {
+        //         pollfd* pollfd  = &fds[i];
+        //
+        //         pollfd->revents = 0;
+        //         if (pollfd->fd < 0) continue;
+        //
+        //         auto maybeFd = process->GetFileDescriptor(pollfd->fd);
+        //         if (!maybeFd) continue;
+        //         auto fd = maybeFd.Value();
+        //
+        //         if (!fd)
+        //         {
+        //             pollfd->revents = POLLNVAL;
+        //             ++ret;
+        //             continue;
+        //         }
+        //
+        //         fdList[fdCount]    = fd.Raw();
+        //         fdIndices[fdCount] = i;
+        //         events[eventCount] = fd->Event;
+        //
+        //         ++fdCount;
+        //         ++eventCount;
+        //     }
+        //
+        //     for (;;)
+        //     {
+        //         isize which = Event::Await(events, eventCount, true);
+        //         if (which == -1) return Error(EINTR);
+        //
+        //         if (timer != NULL && which == eventCount - 1) return
+        //         Error(EINVAL);
+        //
+        //         struct pollfd*  pollfd = &fds[fdIndices[which]];
+        //         FileDescriptor* fd     = fdList[which];
+        //     }
+        //
+        return Error(ENOSYS);
+    }
+
     ErrorOr<isize> UTime(PathView path, const utimbuf* out)
     {
         auto pathRes = TryOrRet(
@@ -788,10 +928,18 @@ namespace API::VFS
     {
         auto         path = CopyStringFromUser(pathname);
         PathResolver resolver(nullptr, path);
-        auto         entry = TryOrRet(resolver.Resolve(
+        auto         entry      = TryOrRet(resolver.Resolve(
             PathLookupFlags::eFollowLinks | PathLookupFlags::eFollowMounts));
 
-        auto         inode = entry->INode();
+        auto         inode      = entry->INode();
+        auto         mountpoint = MountPoint::Lookup(entry);
+        if (mountpoint)
+        {
+            auto fs     = mountpoint->Filesystem();
+            auto dentry = fs->RootDirectoryEntry();
+            LogInfo("Stats of {}", fs->Name());
+            inode = dentry->INode();
+        }
         if (!inode || !inode->Filesystem()) return Error(ENOENT);
 
         auto   fs = inode->Filesystem();
@@ -804,10 +952,15 @@ namespace API::VFS
     }
     ErrorOr<isize> PivotRoot(const char* newRoot, const char* putOld)
     {
-        auto newRootPath = CopyStringFromUser(newRoot);
-        auto putOldPath  = CopyStringFromUser(putOld);
-
         return Error(ENOSYS);
+        Path newRootPath = CopyStringFromUser(newRoot);
+        Path putOldPath  = CopyStringFromUser(putOld);
+        LogTrace("VFS::PivotRoot: newRoot => {}, putOld => {}", newRootPath,
+                 putOldPath);
+        auto result = ::VFS::PivotRoot(newRootPath, putOldPath);
+        if (!result) return Error(result.Error());
+
+        return {};
     }
 
     ErrorOr<isize> FStatAt(isize dirFdNum, const char* path, isize flags,
@@ -1035,4 +1188,33 @@ namespace API::VFS
         if (!success) return Error(success.Error());
         return 0;
     }
+    ErrorOr<isize> SetXAttrAt(isize dirFdNum, const char* path, usize flags,
+                              const char* name, const struct xattr_args* uargs,
+                              usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> GetXAttrAt(isize dirFdNum, const char* path, usize flags,
+                              const char* name, const struct xattr_args* uargs,
+                              usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> ListXAttrAt(isize dirFdNum, const char* path, usize flags,
+                               char* list, usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> RemoveXAttrAt(isize dirFdNum, const char* path, usize flags,
+                                 const char* name)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> OpenTreeAttr(isize dirFdNum, const char* filename,
+                                usize flags, struct mount_attr* uattr,
+                                usize size)
+    {
+        return Error(ENOSYS);
+    }
+
 }; // namespace API::VFS

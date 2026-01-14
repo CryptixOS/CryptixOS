@@ -49,8 +49,10 @@ namespace Syscall
         RegisterSyscall(ID::eIoCtl, API::VFS::IoCtl);
         RegisterSyscall(ID::ePRead64, API::VFS::PRead);
         RegisterSyscall(ID::ePWrite64, API::VFS::PWrite);
+        RegisterSyscall(ID::eReadV, API::VFS::ReadV);
+        RegisterSyscall(ID::eWriteV, API::VFS::WriteV);
         RegisterSyscall(ID::eAccess, API::VFS::Access);
-        // RegisterSyscall(ID::ePipe, API::VFS::Pipe);
+        RegisterSyscall(ID::ePipe, API::VFS::Pipe);
         RegisterSyscall(ID::eSchedYield, API::Process::SchedYield);
         RegisterSyscall(ID::eDup, API::VFS::Dup);
         RegisterSyscall(ID::eDup2, API::VFS::Dup2);
@@ -118,6 +120,18 @@ namespace Syscall
         RegisterSyscall(ID::eReboot, API::System::Reboot);
         RegisterSyscall(ID::eInitModule, API::System::InitModule);
         RegisterSyscall(ID::eGetTid, API::Process::GetTid);
+        RegisterSyscall(ID::eSetXAttr, API::VFS::SetXAttr);
+        RegisterSyscall(ID::eLSetXAttr, API::VFS::LSetXAttr);
+        RegisterSyscall(ID::eFSetXAttr, API::VFS::FSetXAttr);
+        RegisterSyscall(ID::eGetXAttr, API::VFS::GetXAttr);
+        RegisterSyscall(ID::eLGetXAttr, API::VFS::LGetXAttr);
+        RegisterSyscall(ID::eFGetXAttr, API::VFS::FGetXAttr);
+        RegisterSyscall(ID::eListXAttr, API::VFS::ListXAttr);
+        RegisterSyscall(ID::eLListXAttr, API::VFS::LListXAttr);
+        RegisterSyscall(ID::eFListXAttr, API::VFS::FListXAttr);
+        RegisterSyscall(ID::eRemoveXAttr, API::VFS::RemoveXAttr);
+        RegisterSyscall(ID::eLRemoveXAttr, API::VFS::LRemoveXAttr);
+        RegisterSyscall(ID::eFRemoveXAttr, API::VFS::FRemoveXAttr);
         RegisterSyscall(ID::eGetDents64, API::VFS::GetDEnts64);
         RegisterSyscall(ID::eClockGetTime, API::Time::ClockGetTime);
         RegisterSyscall(ID::ePanic, API::System::SysPanic);
@@ -132,6 +146,7 @@ namespace Syscall
         RegisterSyscall(ID::eReadLinkAt, API::VFS::ReadLinkAt);
         RegisterSyscall(ID::eFChModAt, API::VFS::FChModAt);
         RegisterSyscall(ID::ePSelect6, API::VFS::PSelect6);
+        RegisterSyscall(ID::ePPoll, API::VFS::PPoll);
         RegisterSyscall(ID::eUtimensAt, API::VFS::UtimensAt);
         RegisterSyscall(ID::eDup3, API::VFS::Dup3);
         RegisterSyscall(ID::ePipe2, API::VFS::Pipe2);
@@ -140,6 +155,10 @@ namespace Syscall
         RegisterSyscall(ID::eClone3, API::Process::Clone3);
         RegisterSyscall(ID::eFutexWake, API::Process::FutexWake);
         RegisterSyscall(ID::eFutexWait, API::Process::FutexWait);
+        RegisterSyscall(ID::eSetXAttrAt, API::VFS::SetXAttrAt);
+        RegisterSyscall(ID::eGetXAttrAt, API::VFS::GetXAttrAt);
+        RegisterSyscall(ID::eListXAttrAt, API::VFS::ListXAttrAt);
+        RegisterSyscall(ID::eRemoveXAttrAt, API::VFS::RemoveXAttrAt);
         RegisterSyscall(ID::eDebugLog, API::System::DebugLog);
     }
     void Handle(Arguments& args)

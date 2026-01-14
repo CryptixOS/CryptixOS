@@ -13,7 +13,7 @@
 #include <Arch/Arch.hpp>
 #include <Arch/PowerManager.hpp>
 
-#include <Drivers/Terminal.hpp>
+#include <Drivers/TTY/VirtualConsole.hpp>
 
 #include <Prism/String/String.hpp>
 

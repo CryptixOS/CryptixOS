@@ -28,3 +28,5 @@ using INodeMode   = mode_t;
 using LinkCount   = nlink_t;
 using UserID      = uid_t;
 using GroupID     = gid_t;
+
+using OffsetType  = off_t;

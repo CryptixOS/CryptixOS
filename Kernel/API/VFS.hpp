@@ -10,6 +10,7 @@
 #include <API/UnixTypes.hpp>
 
 #include <API/Posix/bits/socket.h>
+#include <API/Posix/poll.h>
 #include <API/Posix/signal.h>
 #include <Prism/Utility/PathView.hpp>
 
@@ -34,7 +35,10 @@ namespace API::VFS
     ErrorOr<isize> PRead(isize fdNum, void* out, usize count, off_t offset);
     ErrorOr<isize> PWrite(isize fdNum, const void* in, usize count,
                           off_t offset);
+    ErrorOr<isize> ReadV(isize fdNum, const struct iovec* vec, usize vlen);
+    ErrorOr<isize> WriteV(isize fdNum, const struct iovec* vec, usize vlen);
     ErrorOr<isize> Access(const char* filename, INodeMode mode);
+    ErrorOr<isize> Pipe(isize pipefd[2], isize flags);
 
     ErrorOr<isize> Dup(isize oldFdNum);
     ErrorOr<isize> Dup2(isize oldFdNum, isize newFdNum);
@@ -87,6 +91,26 @@ namespace API::VFS
                          const char* filesystemType, usize flags,
                          const void* data);
 
+    ErrorOr<isize> SetXAttr(const char* path, const char* name, const u8* value,
+                            usize size, isize flags);
+    ErrorOr<isize> LSetXAttr(const char* path, const char* name,
+                             const u8* value, usize size, isize flags);
+    ErrorOr<isize> FSetXAttr(isize fdNum, const char* name, const u8* value,
+                             usize size, isize flags);
+    ErrorOr<isize> GetXAttr(const char* path, const char* name, const u8* value,
+                            usize size);
+    ErrorOr<isize> LGetXAttr(const char* path, const char* name,
+                             const u8* value, usize size);
+    ErrorOr<isize> FGetXAttr(isize fdNum, const char* name, const u8* value,
+                             usize size);
+    ErrorOr<isize> ListXAttr(const char* path, char* list, usize size);
+    ErrorOr<isize> LListXAttr(const char* path, char* list, usize size);
+    ErrorOr<isize> FListXAttr(isize fdNum, char* list, usize size);
+
+    ErrorOr<isize> RemoveXAttr(const char* path, const char* name);
+    ErrorOr<isize> LRemoveXAttr(const char* path, const char* name);
+    ErrorOr<isize> FRemoveXAttr(isize fdNum, const char* name);
+
     CTOS_NO_SANITIZE("alignment")
     ErrorOr<isize> GetDEnts64(isize dirFdNum, dirent* const outBuffer,
                               usize count);
@@ -102,6 +126,7 @@ namespace API::VFS
     ErrorOr<isize> PSelect6(isize fdCount, fd_set* readFds, fd_set* writeFds,
                             fd_set* exceptFds, const timeval* timeout,
                             const sigset_t* sigmask);
+    ErrorOr<isize> PPoll(pollfd* fds, nfds_t nfds, int timeout);
     ErrorOr<isize> UTime(PathView path, const utimbuf* out);
     ErrorOr<isize> StatFs(const char* pathname, statfs* out);
     ErrorOr<isize> PivotRoot(const char* newRoot, const char* putOld);
@@ -123,4 +148,18 @@ namespace API::VFS
     ErrorOr<isize> RenameAt2(isize oldDirFdNum, const char* oldPath,
                              isize newDirFdNum, const char* newPath,
                              usize flags);
+
+    ErrorOr<isize> SetXAttrAt(isize dirFdNum, const char* path, usize flags,
+                              const char* name, const struct xattr_args* uargs,
+                              usize size);
+    ErrorOr<isize> GetXAttrAt(isize dirFdNum, const char* path, usize flags,
+                              const char* name, const struct xattr_args* uargs,
+                              usize size);
+    ErrorOr<isize> ListXAttrAt(isize dirFdNum, const char* path, usize flags,
+                               char* list, usize size);
+    ErrorOr<isize> RemoveXAttrAt(isize dirFdNum, const char* path, usize flags,
+                                 const char* name);
+    ErrorOr<isize> OpenTreeAttr(isize dirFdNum, const char* filename,
+                                usize flags, struct mount_attr* uattr,
+                                usize size);
 } // namespace API::VFS
