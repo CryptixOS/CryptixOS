@@ -74,7 +74,7 @@ struct Module : public RefCounted
 {
     static Module* s_ThisModule;
     constexpr Module() { s_ThisModule = this; }
-    static constexpr Module* ThisModule() { return s_ThisModule; }
+    static Module* ThisModule() { return s_ThisModule; }
 
     friend class IntrusiveRefList<Module>;
     friend struct IntrusiveRefListHook<Module>;
