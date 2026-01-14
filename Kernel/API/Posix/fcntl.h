@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Prism/Core/Types.hpp>
+#include <API/Posix/sys/stat.h>
 
 constexpr usize O_RDONLY    = 0x0000;
 constexpr usize O_WRONLY    = 0x0001;
@@ -103,3 +103,9 @@ constexpr usize S_IROTH             = 00004;
 constexpr usize S_IWOTH             = 00002;
 // exec
 constexpr usize S_IXOTH             = 00001;
+
+constexpr usize S_IRWXUGO           = (S_IRWXU | S_IRWXG | S_IRWXO);
+constexpr usize S_IALLUGO           = (S_ISUID | S_ISGID | S_ISVTX | S_IRWXUGO);
+constexpr usize S_IRUGO             = (S_IRUSR | S_IRGRP | S_IROTH);
+constexpr usize S_IWUGO             = (S_IWUSR | S_IWGRP | S_IWOTH);
+constexpr usize S_IXUGO             = (S_IXUSR | S_IXGRP | S_IXOTH);
