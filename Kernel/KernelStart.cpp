@@ -17,8 +17,8 @@
 #include <Drivers/Core/CharacterDevice.hpp>
 #include <Drivers/PCI/PCI.hpp>
 #include <Drivers/Serial.hpp>
-#include <Drivers/TTY.hpp>
-#include <Drivers/Terminal.hpp>
+#include <Drivers/TTY/TTY.hpp>
+#include <Drivers/TTY/VirtualConsole.hpp>
 #include <Drivers/USB/USB.hpp>
 #include <Drivers/Video/FramebufferDevice.hpp>
 
@@ -64,6 +64,8 @@ namespace EFI
     bool Initialize(Pointer systemTable, const EfiMemoryMap& memoryMap);
 };
 bool        g_LogTmpFs = false;
+
+// CTOS_DEFINE_PER_CPU_CACHE_HOT(i32, s_Preempt);
 
 static bool loadInitProcess(Path initPath)
 {
@@ -152,7 +154,7 @@ static void setupLogging(Span<Framebuffer, DynamicExtent> framebuffers)
         CommandLine::GetBoolean("log.terminal").ValueOr(true),
     };
 
-    Terminal::SetupFramebuffers(framebuffers);
+    VirtualConsole::SetupFramebuffers(framebuffers);
     for (usize i = 0; i < sizeof(enabledSinks) / sizeof(enabledSinks[0]); i++)
     {
         if (enabledSinks[i]) Logger::EnableSink(Bit(i));
@@ -206,8 +208,8 @@ kernelStart(const BootInformation& info)
 
     Device::Initialize();
 #if CTOS_DEVICE_TREE_DISABLE == 0
-    if (CommandLine::GetBoolean("dtb.enable").ValueOr(true))
-        DeviceTree::Initialize(info.DeviceTreeBlob);
+    // if (CommandLine::GetBoolean("dtb.enable").ValueOr(true))
+    //     DeviceTree::Initialize(info.DeviceTreeBlob);
 #endif
 
 #if CTOS_ACPI_DISABLE == 0
@@ -227,7 +229,7 @@ kernelStart(const BootInformation& info)
     Scheduler::Initialize();
     auto process = Scheduler::KernelProcess();
     auto thread
-        = process->CreateThread(kernelThread, false, CPU::GetCurrent()->ID);
+        = process->CreateThread(kernelThread, false, CPU::Current()->ID);
 
     Scheduler::EnqueueThread(thread.Raw());
     Syscall::InstallAll();
