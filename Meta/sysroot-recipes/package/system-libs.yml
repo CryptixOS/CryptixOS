@@ -262,6 +262,40 @@ packages:
       - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/src']
       - args: ['cp', '-Tr', 'usr/include', '@THIS_COLLECT_DIR@/usr/include']
       - args: ['cp', '-Tr', 'usr/include', '@THIS_COLLECT_DIR@/usr/src/linux-headers']
+  - name: linux-pam
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: sources
+      git: 'https://github.com/linux-pam/linux-pam.git'
+      branch: 'master'
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      - zlib
+    revision: 2
+    configure:
+      - args:
+        - 'meson'
+        - 'setup'
+        - '--cross-file'
+        - '@SOURCE_ROOT@/CrossFiles/@OPTION:arch-triple@-target.cross-file'
+        - '--prefix=/usr'
+        - '--libdir=lib'
+        - '--buildtype=debugoptimized'
+        - '--wrap-mode=default'
+        - '@THIS_SOURCE_DIR@'
+    build:
+      - args:
+        - 'CFLAGS=-D__NR_keyctl=222'  
+        # - 'CXXFLAGS=-D__NR_keyctl=222'  
+        - 'meson'
+        - 'compile'
+        - '-C'
+        - '@THIS_SOURCE_DIR@'
+      - args: ['ninja', 'install']
+        environ:
 
   - name: mlibc-headers
     labels: [aarch64]
@@ -316,7 +350,6 @@ packages:
         - '--libdir=lib'
         - '--buildtype=debugoptimized'
         - '--wrap-mode=default'
-        - '-Db_sanitize=undefined'
         - '-Ddefault_library=both'
         #- '-Ddebug_allocator=true'
         - '-Dlibgcc_dependency=true'

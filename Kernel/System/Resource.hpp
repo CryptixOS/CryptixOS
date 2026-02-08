@@ -6,10 +6,21 @@
  */
 #pragma once
 
+#include <Library/Module.hpp>
 #include <Prism/Core/Types.hpp>
 
-struct Resource
+#ifdef CTOS_TARGET_X86_64
+constexpr usize MAX_IO_PORT_COUNT = 65536;
+
+struct IoPortResource
 {
-    usize Start = 0;
-    usize End = 0;
+    u16     Base   = 0;
+    u16     Length = 0;
+    Module* Owner  = nullptr;
+
+    friend class IntrusiveList<IoPortResource>;
+    friend struct IntrusiveListHook<IoPortResource>;
+
+    IntrusiveListHook<IoPortResource> Hook;
 };
+#endif

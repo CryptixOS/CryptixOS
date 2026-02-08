@@ -57,3 +57,29 @@ sources:
     branch: 'master'
     commit: '63acb96f92473ceb5e21d873d7c0aee266b3d6d3'
     version: '20230121'
+
+  - name: host-bootstrap-cargo
+    subdir: 'ports'
+    url: 'https://static.rust-lang.org/dist/cargo-1.86.0-x86_64-unknown-linux-gnu.tar.xz'
+    format: 'tar.xz'
+    checksum: blake2b:b26feeeb4469dea045249baf7ece4dc8252c969c5de570fc5d2bbd0264a9ec6f0c3478121b707e68ed3a50ff01f2bc2708ce34f07e6065c53a283fcf7e95af3d
+    extract_path: 'cargo-1.86.0-x86_64-unknown-linux-gnu'
+    version: '1.86.0'
+
+  - name: llvm
+    subdir: 'sources'
+    git: 'https://github.com/llvm/llvm-project'
+    tag: 'llvmorg-21.1.0'
+    version: '21.1.0'
+
+  - name: openposixtestsuite
+    subdir: 'sources'
+    git: 'https://github.com/emscripten-core/posixtestsuite'
+    branch: 'main'
+
+  - name: rust
+    subdir: 'sources'
+    git: 'https://github.com/rust-lang/rust.git'
+    tag: '1.92.0'
+    version: '1.92.0'
+

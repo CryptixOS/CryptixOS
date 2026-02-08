@@ -24,7 +24,9 @@ namespace ELF
     {
         auto pathRes
             = TryOrRet(VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), path));
+
         auto dentry = pathRes.Entry;
+        if (!dentry) return Error(ENOENT);
 
         return LoadImage(dentry);
     }

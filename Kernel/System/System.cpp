@@ -16,6 +16,7 @@
 #include <Library/Module.hpp>
 
 #include <Memory/VMM.hpp>
+#include <Prism/Containers/BitSpan.hpp>
 #include <Prism/String/StringUtils.hpp>
 
 #include <System/System.hpp>
@@ -35,6 +36,12 @@ namespace System
         Span<BootModuleInfo, DynamicExtent> s_BootModules;
 
         SpinlockProtected<Module::List>     s_Modules;
+
+#ifdef CTOS_TARGET_X86_64
+        BitSpan<MAX_IO_PORT_COUNT>    s_UsedPorts;
+        IntrusiveList<IoPortResource> s_IoResources;
+        Spinlock                      s_IoPortLock;
+#endif
     }; // namespace
 
     ErrorOr<void> LoadKernelSymbols(const BootModuleInfo& kernelExecutable)
@@ -366,8 +373,7 @@ namespace System
 
             module->State = ModuleState::eLoaded;
         }
-        else
-        {
+        else {
             LogError("System: Module `{}` doesn't have any entry point",
                      module->Name);
             return Error(ENOEXEC);
@@ -458,4 +464,21 @@ namespace System
 
         return it->Value;
     }
+
+#ifdef CTOS_TARGET_X86_64
+    ErrorOr<IoPortResource*> AllocateIoPortAt(Module* owner, u16 base,
+                                              u16 length)
+    {
+        ScopedLock lock(s_IoPortLock);
+
+        for (u32 i = 0; i < length; ++i)
+            if (s_UsedPorts.Test(base + i)) return Error(EBUSY);
+        for (u32 i = 0; i < length; ++i) s_UsedPorts.Set(base + i);
+
+        auto* res = new IoPortResource{base, length, owner, {}};
+        s_IoResources.PushBack(res);
+
+        return res;
+    }
+#endif
 }; // namespace System

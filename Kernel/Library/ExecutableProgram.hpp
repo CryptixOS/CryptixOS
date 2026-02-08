@@ -16,6 +16,8 @@ class ExecutableProgram
 
     ErrorOr<void> Load(PathView path, PageMap* pageMap,
                        AddressSpace& addressSpace, Pointer loadBase = 0);
+    ErrorOr<void> Load(::Ref<DirectoryEntry> entry, PageMap* pageMap,
+                       AddressSpace& addressSpace, Pointer loadBase = 0);
     Pointer PrepareStack(Pointer _stack, Pointer sp, Vector<StringView> argv,
                          Vector<StringView> envp);
 
@@ -38,4 +40,9 @@ class ExecutableProgram
     ErrorOr<Ref<ELF::Image>> LoadImage(PathView path, PageMap* pageMap,
                                        AddressSpace& addressSpace,
                                        bool          interpreter = false);
+
+    ErrorOr<Ref<ELF::Image>> LoadImage(::Ref<DirectoryEntry> dentry,
+                                       PageMap*              pageMap,
+                                       AddressSpace&         addressSpace,
+                                       bool interpreter = false);
 };

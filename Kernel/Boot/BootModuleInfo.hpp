@@ -28,7 +28,7 @@ struct BootModuleInfo
     usize         Size              = 0;
 
     BootMediaType MediaType         = BootMediaType::eGeneric;
-    IPv4Address   TFTP_IPv4         = "127.0.0.1"_sv;
+    IPv4Address   TFTP_IPv4         = IPv4Address("127.0.0.1"_sv);
     u32           TFTP_Port         = 21;
 
     usize         PartitionIndex    = 0;

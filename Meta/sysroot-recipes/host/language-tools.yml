@@ -1,4 +1,53 @@
 tools:
+  - name: host-cargo
+    architecture: noarch
+    labels: [aarch64]
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/rust-lang/cargo.git'
+      tag: '0.87.0'
+      version: '0.87.0'
+    tools_required:
+      - tool: host-rust
+        recursive: true
+      - tool: system-gcc # GCC is used for linking
+        recursive: true
+    sources_required:
+      # This cargo runs on the host, so we don't actually need any patches here. We just
+      # add the sources used by cargo so that the dependency resolver doesn't complain.
+      - rust-patched-libs
+      # Cargo requires cargo to build, so we download a binary that we can use temporarily
+      - host-bootstrap-cargo
+    revision: 1
+    compile:
+      - args:
+        - '@THIS_SOURCE_DIR@/../host-bootstrap-cargo/cargo/bin/cargo'
+        - 'install'
+        - '--target'
+        - 'x86_64-unknown-linux-gnu'
+        - '--target-dir'
+        - '@THIS_BUILD_DIR@'
+        - '--path'
+        - '@THIS_SOURCE_DIR@'
+        - '-j@PARALLELISM@'
+        - '--root'
+        - '@PREFIX@'
+        isolate_network: false
+  - name: host-cmake
+    labels: [aarch64]
+    architecture: noarch
+    from_source: cmake
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/bootstrap'
+        - '--prefix=@PREFIX@'
+        - '--parallel=@PARALLELISM@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+      - args: ['ln', '-sf', '@SOURCE_ROOT@/scripts/cryptix.cmake', '@PREFIX@/share/cmake-4.0/Modules/Platform/']
+
   - name: host-icmake
     labels: [aarch64]
     architecture: '@OPTION:arch@'
@@ -18,6 +67,176 @@ tools:
     install:
       - args: ['@THIS_SOURCE_DIR@/icmake/icm_install', 'strip', 'all', '/']
         workdir: '@THIS_SOURCE_DIR@/icmake'
+
+  - name: host-libffi
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    from_source: libffi
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+  - name: host-llvm-toolchain
+    labels: [aarch64]
+    architecture: noarch
+    exports_shared_libs: true
+    from_source: llvm
+    sources_required:
+      - binutils
+    tools_required:
+      - host-cmake
+    revision: 1
+    configure:
+      - args:
+        - 'cmake'
+        - '-GNinja'
+        - '-DCMAKE_INSTALL_PREFIX=@PREFIX@'
+        - '-DCMAKE_C_COMPILER=gcc'
+        - '-DCMAKE_CXX_COMPILER=g++'
+
+        # LLVM configuration options.
+        # We really have to build LLVM in Release mode.
+        # Building it in debug mode produces tens of GiB of debugging info.
+        - '-DCMAKE_BUILD_TYPE=Release'
+        - '-DLLVM_LINK_LLVM_DYLIB=ON'
+        - '-DLLVM_TARGETS_TO_BUILD=X86;AArch64'
+        - '-DLLVM_ENABLE_PROJECTS=clang;clang-tools-extra;lld'
+
+        # clang configuration options.
+        - '-DDEFAULT_SYSROOT=@SYSROOT_DIR@'
+
+        # Gold linker configuration options.
+        - '-DLLVM_BINUTILS_INCDIR=@SOURCE_ROOT@/ports/binutils/include'
+
+        - '@THIS_SOURCE_DIR@/llvm'
+    compile:
+      - args: ['ninja']
+      # Build on a single CPU to prevent OOM on smaller systems.
+      #- args: ['ninja', '-j1']
+    install:
+      - args: ['ninja', 'install']
+        quiet: true
+
+  - name: host-python
+    labels: [aarch64]
+    architecture: noarch
+    from_source: python
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--prefix=@PREFIX@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
+  - name: host-rust
+    labels: [aarch64]
+    architecture: noarch
+    from_source: rust
+    sources_required:
+      - rust-patched-libs
+    tools_required:
+      - system-gcc
+      - host-llvm-toolchain
+      - host-python
+      - host-libffi
+    revision: 1
+    stages:
+      - name: config
+        compile:
+          - args: |
+              cat << EOF > bootstrap.toml
+              change-id = 142379
+
+              [llvm]
+              targets = "X86;AArch64"
+              download-ci-llvm = false
+
+              [build]
+              target = ["x86_64-unknown-cryptix-mlibc", "x86_64-unknown-linux-gnu"]
+              build-dir = "@THIS_BUILD_DIR@"
+              docs = false
+
+              [install]
+              prefix = "@PREFIX@"
+              sysconfdir = "etc"
+
+              [rust]
+              codegen-tests = false
+              deny-warnings = false
+
+              [target.x86_64-unknown-linux-gnu]
+              llvm-config = "@BUILD_ROOT@/tools/host-llvm-toolchain/bin/llvm-config"
+
+              [target.x86_64-unknown-cryptix-mlibc]
+              llvm-config = "@BUILD_ROOT@/tools/host-llvm-toolchain/bin/llvm-config"
+              cc = "@OPTION:arch-triple@-gcc"
+              cxx = "@OPTION:arch-triple@-g++"
+              ar = "@OPTION:arch-triple@-ar"
+              ranlib = "@OPTION:arch-triple@-ranlib"
+              linker = "@OPTION:arch-triple@-gcc"
+              EOF
+      - name: compiler
+        tools_required:
+          - tool: host-rust
+            stage_dependencies: [config]
+        compile:
+          - args: ['python3', '@THIS_SOURCE_DIR@/x.py', 'build', 'rustc', '--stage', '2', '-j', '@PARALLELISM@']
+            cargo_home: false
+            isolate_network: false
+            environ:
+              CARGO_HOME: '@THIS_BUILD_DIR@/cargo-home'
+              BOOTSTRAP_SKIP_TARGET_SANITY: '1'
+        install:
+          - args: ['python3', '@THIS_SOURCE_DIR@/x.py', 'install', 'rustc', '-j', '@PARALLELISM@']
+            cargo_home: false
+            environ:
+              CARGO_HOME: '@THIS_BUILD_DIR@/cargo-home'
+              BOOTSTRAP_SKIP_TARGET_SANITY: '1'
+            isolate_network: false
+      - name: std
+        tools_required:
+          - tool: host-rust
+            stage_dependencies: [compiler]
+        pkgs_required:
+         - mlibc
+        compile:
+          - args: ['python3', '@THIS_SOURCE_DIR@/x.py', 'build', 'std', '--stage', '2', '-j', '@PARALLELISM@']
+            cargo_home: false
+            isolate_network: false
+            environ:
+              CARGO_HOME: '@THIS_BUILD_DIR@/cargo-home'
+              BOOTSTRAP_SKIP_TARGET_SANITY: '1'
+        install:
+          - args: ['python3', '@THIS_SOURCE_DIR@/x.py', 'install', 'std', '-j', '@PARALLELISM@']
+            cargo_home: false
+            environ:
+              CARGO_HOME: '@THIS_BUILD_DIR@/cargo-home'
+              BOOTSTRAP_SKIP_TARGET_SANITY: '1'
+            isolate_network: false
+      - name: clippy
+        tools_required:
+          - tool: host-rust
+            stage_dependencies: [compiler]
+        compile:
+          - args: ['python3', '@THIS_SOURCE_DIR@/x.py', 'build', 'clippy', '--stage', '2', '-j', '@PARALLELISM@']
+            cargo_home: false
+            isolate_network: false
+            environ:
+              CARGO_HOME: '@THIS_BUILD_DIR@/cargo-home'
+              BOOTSTRAP_SKIP_TARGET_SANITY: '1'
+        install:
+          - args: ['python3', '@THIS_SOURCE_DIR@/x.py', 'install', 'clippy', '-j', '@PARALLELISM@']
+            cargo_home: false
+            environ:
+              CARGO_HOME: '@THIS_BUILD_DIR@/cargo-home'
+              BOOTSTRAP_SKIP_TARGET_SANITY: '1'
+            isolate_network: false
 
   - name: host-yodl
     labels: [aarch64]

@@ -327,7 +327,7 @@ ErrorOr<isize> Process::InsertFd(Ref<::FileDescriptor> fd)
     return m_FdTable->Insert(fd);
 }
 
-ErrorOr<isize> Process::OpenPipe(i32* pipeFds, isize flags )
+ErrorOr<isize> Process::OpenPipe(i32* pipeFds, isize flags)
 {
     auto pipe        = Fifo::CreatePipe();
     i32  readerFdNum = static_cast<i32>(m_FdTable->Insert(pipe.Reader));
@@ -385,6 +385,37 @@ Vector<String> SplitArguments(const String& str)
 
 ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 {
+    auto pathRes = TryOrRet(VFS::ResolvePath(CWD().Raw(), path));
+    auto dentry  = pathRes.Entry;
+    auto inode   = dentry->INode();
+    if (!inode) return Error(ENOENT);
+    if (!inode->CanExecute(m_Credentials)) return Error(EPERM);
+
+    // TODO(v1tr10l7): suid can be disable when mounting with flags
+    if (inode->IsSetUserID()) m_Credentials.EffectiveUserID = inode->UserID();
+    if (inode->IsSetGroupID())
+        m_Credentials.EffectiveGroupID = inode->GroupID();
+
+    isize size     = inode->Size();
+    auto  buffer   = new u8[PMM::PAGE_SIZE];
+    isize readSize = size < static_cast<isize>(PMM::PAGE_SIZE)
+                       ? size
+                       : static_cast<isize>(PMM::PAGE_SIZE);
+    inode->Read(buffer, 0, readSize);
+    StringView data(reinterpret_cast<char*>(buffer), readSize);
+    bool       hasSheBang      = data.StartsWith("#!"_sv);
+
+    StringView interpreterPath = "";
+    if (hasSheBang)
+    {
+        auto spaceIt    = data.FindFirstOf(' ');
+        auto count      = spaceIt != String::NPos ? spaceIt : data.Size();
+
+        // FIXME(v1tr10l7): Validate path?
+        interpreterPath = data.Substr(2, count - 2);
+    }
+    delete[] buffer;
+
     auto oldTable = m_FdTable;
     m_FdTable     = CreateRef<class FileDescriptorTable>();
 
@@ -421,13 +452,22 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 
     PageMap = new class PageMap();
     Vector<StringView> argvArr;
+    if (hasSheBang && !interpreterPath.Empty())
+    {
+        argvArr.PushBack(path);
+        auto pathRes = TryOrRet(VFS::ResolvePath(CWD().Raw(), interpreterPath));
+        dentry       = pathRes.Entry;
+        inode        = dentry->INode();
+        if (!inode) return Error(ENOENT);
+    }
+
     {
         UserMemoryProtectionGuard guard;
         for (char** arg = argv; *arg; arg++) argvArr.PushBack(*arg);
     }
 
     ExecutableProgram program;
-    if (!program.Load(path, PageMap, *m_AddressSpace)) return Error(ENOEXEC);
+    if (!program.Load(dentry, PageMap, *m_AddressSpace)) return Error(ENOEXEC);
     Thread* currentThread = CPU::GetCurrentThread();
     currentThread->SetState(ThreadState::eExited);
 
@@ -459,6 +499,7 @@ ErrorOr<ProcessID> Process::WaitPid(ProcessID pid, i32* wstatus, i32 flags,
     Vector<Event*> events;
     for (;;)
     {
+        // LogTrace("Process::WaitPid: Waiting for pid: {}", pid);
         events.Clear();
         events.ShrinkToFit();
         Process*         process = Process::GetCurrent();
@@ -504,10 +545,26 @@ ErrorOr<ProcessID> Process::WaitPid(ProcessID pid, i32* wstatus, i32 flags,
             procs.PushBack(*it);
         }
 
-        for (auto& proc : procs) events.PushBack(&proc->m_Event);
+        for (auto& child : procs)
+        {
+            events.PushBack(&child->m_Event);
+            continue;
+            // Check if process is dead or has a pending status change
+            if (child->m_State == ProcessState::eDead || child->m_Exited)
+            {
+                if (wstatus) CopyToUser(wstatus, child->m_Status.ValueOr(0));
+
+                ProcessID foundId = child->ID();
+
+                // FIXME: zombies
+                return foundId;
+            }
+        }
 
         auto ret = Event::Await(Span(events.Raw(), events.Size()), block);
         if (!ret.HasValue()) return Error(EINTR);
+        LogTrace("Process::WaitPid: Woken up for pid: {}",
+                 procs[ret.Value()]->ID());
 
         auto which = procs[ret.Value()];
         if (!(flags & WUNTRACED) && WIFSTOPPED(which->Status().ValueOr(0)))
@@ -687,4 +744,16 @@ ErrorOr<void> Process::CopyMemory(Process* process)
     }
 
     return {};
+}
+
+void Process::ReapChild(Process* child)
+{
+    Assert(child->m_Parent == this);
+    Assert(child->m_State == ProcessState::eZombie);
+    child->m_State = ProcessState::eDead;
+
+    auto it        = Find(m_Children.begin(), m_Children.end(), child);
+    Assert(it != m_Children.end());
+    m_Children.Erase(it);
+    Scheduler::RemoveProcess(child->ID());
 }

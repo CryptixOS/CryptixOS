@@ -25,6 +25,21 @@
     #error "Unsupported compiler"
 #endif
 
+#define CTOS_PER_CPU_SECTION_BASE_SECTION ".data..percpu"
+#define CTOS_PER_CPU_SECTION_ATTRIBUTES(section_suffix)                        \
+    CTOS_SECTION(CTOS_PER_CPU_SECTION_BASE_SECTION section_suffix)
+
+#define CTOS_DECLARE_PER_CPU_SECTION(type, name, section)                      \
+    extern CTOS_PER_CPU_SECTION_ATTRIBUTES(section) __typeof__(type) name
+
+#define CTOS_DEFINE_PER_CPU_SECTION(type, name, section)                       \
+    CTOS_PER_CPU_SECTION_ATTRIBUTES(section) __typeof__(type) name
+#define CTOS_DECLARE_PER_CPU_CACHE_HOT(type, name)                             \
+    CTOS_DECLARE_PER_CPU_SECTION(type, name, "..hot.." #name)
+
+#define CTOS_DEFINE_PER_CPU_CACHE_HOT(type, name)                              \
+    CTOS_DEFINE_PER_CPU_SECTION(type, name, "..hot.." #name)
+
 #define CTOS_ATTRIBUTE(name)           [[CTOS_ATTR_PREFIX::name]]
 #define CTOS_ALWAYS_INLINE             CTOS_ATTRIBUTE(always_inline) inline
 #define CTOS_UNUSED                    [[maybe_unused]]

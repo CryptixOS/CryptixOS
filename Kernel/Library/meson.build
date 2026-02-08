@@ -8,6 +8,7 @@ srcs += files(
   'ExecutableProgram.cpp',
   'ICxxAbi.cpp',
   'Image.cpp',
+  'KernelObject.cpp',
   'Logger.cpp',
   'Module.cpp',
   'Stacktrace.cpp',

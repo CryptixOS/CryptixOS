@@ -36,6 +36,24 @@ ErrorOr<void> ExecutableProgram::Load(PathView path, PageMap* pageMap,
 
     return {};
 }
+ErrorOr<void> ExecutableProgram::Load(::Ref<DirectoryEntry> dentry,
+                                      PageMap*              pageMap,
+                                      AddressSpace&         addressSpace,
+                                      Pointer               loadBase)
+{
+    m_LoadBase   = loadBase;
+    m_Image      = TryOrRet(LoadImage(dentry, pageMap, addressSpace));
+    m_EntryPoint = m_Image->EntryPoint();
+
+    auto ldPath  = m_Image->InterpreterPath();
+    if (ldPath.Empty()) return {};
+
+    m_LoadBase    = 0x41000000zu;
+    m_Interpreter = TryOrRet(LoadImage(ldPath, pageMap, addressSpace, true));
+    m_EntryPoint  = m_Interpreter->EntryPoint();
+
+    return {};
+}
 
 // --- Helper: small PRNG to fill AT_RANDOM if kernel RNG isn't available.
 //     It's fine for non-cryptographic purposes (glibc only needs
@@ -58,7 +76,7 @@ Pointer ExecutableProgram::PrepareStack(Pointer            stackTopWritable,
                                         Vector<StringView> envArr)
 {
     (void)FillRandomBytes;
-    StackBuilder                   builder(stackTopWritable);
+    StackBuilder              builder(stackTopWritable);
 
     UserMemoryProtectionGuard guard;
 
@@ -273,11 +291,17 @@ ExecutableProgram::LoadImage(PathView path, PageMap* pageMap,
         = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), path).Value().Entry;
     if (!entry) return Error(ENOENT);
 
+    return LoadImage(entry, pageMap, addressSpace, interpreter);
+}
+ErrorOr<Ref<ELF::Image>>
+ExecutableProgram::LoadImage(::Ref<DirectoryEntry> entry, PageMap* pageMap,
+                             AddressSpace& addressSpace, bool interpreter)
+{
     auto inode = entry->INode();
     if (!inode) return Error(ENOENT);
 
     auto file = TryOrRet(
-        VFS::Open(VFS::RootDirectoryEntry().Raw(), path, O_RDONLY, 0));
+        VFS::Open(VFS::RootDirectoryEntry().Raw(), entry->Path(), O_RDONLY, 0));
     Ref image = CreateRef<ELF::Image>();
 
     if (!image->Load(file.Raw(), m_LoadBase)) return Error(ENOEXEC);

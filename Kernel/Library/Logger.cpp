@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Drivers/KernelMessageDevice.hpp>
 #include <Drivers/Serial.hpp>
 #include <Drivers/TTY/VirtualConsole.hpp>
 
@@ -30,7 +31,7 @@ namespace E9
     }
 }; // namespace E9
 
-static usize   s_EnabledSinks = 0;
+static usize s_EnabledSinks = 0;
 class CoreSink final : public LogSink<SpinLockPolicy>
 {
   public:
@@ -48,6 +49,7 @@ class CoreSink final : public LogSink<SpinLockPolicy>
 
             if (nwritten == 0) nwritten = terminal->PrintString(str);
         }
+        KernelMessageDevice::Write(str);
 
         return nwritten;
     }
@@ -74,5 +76,5 @@ namespace Logger
     isize Print(StringView string) { return g_CoreSink.WriteNoLock(string); }
 
     VirtualConsole& GetTerminal() { return *VirtualConsole::GetPrimary(); }
-    void      Unlock() { s_Lock.Release(); }
+    void            Unlock() { s_Lock.Release(); }
 } // namespace Logger

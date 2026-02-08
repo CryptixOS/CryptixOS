@@ -17,6 +17,7 @@
 #include <Prism/Memory/Pointer.hpp>
 #include <Prism/Memory/Ref.hpp>
 #include <Prism/Utility/PathView.hpp>
+#include <System/Resource.hpp>
 
 namespace ELF
 {
@@ -55,4 +56,9 @@ namespace System
     const RedBlackTree<StringView, u64>& KernelSymbols();
 
     u64                                  LookupKernelSymbol(StringView name);
+
+#if CTOS_TARGET_X86_64
+    ErrorOr<IoPortResource*> AllocateIoPortAt(Module* owner, u16 base,
+                                              u16 length);
+#endif
 }; // namespace System

@@ -36,6 +36,7 @@ enum class ProcessState
     eIdle    = 0,
     eRunning = 1,
     eDead    = 2,
+    eZombie  = 3,
 };
 
 class INode;
@@ -254,6 +255,8 @@ class Process
     void                           CopyFs(Process* dest);
     void                           CopyFileDescriptors(Process* dest);
     ErrorOr<void>                  CopyMemory(Process* process);
+
+    void                           ReapChild(Process* child);
 
     friend class Scheduler;
     friend struct Thread;

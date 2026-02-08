@@ -202,7 +202,7 @@ To run CryptixOS in QEMU:
 - ⬜ Virtio NIC
 
 ### 🌐 Socket Families
-- ⬜ Unix
+- ✅ Unix
 - ⬜ IPv4
 - ⬜ IPv6
 - ⬜ NetLink
