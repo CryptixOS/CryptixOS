@@ -5,6 +5,7 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 srcs += files(
+  'MasterPTY.cpp',
   'PTYMultiplexer.cpp',
   'TTY.cpp',
   'VirtualConsole.cpp',

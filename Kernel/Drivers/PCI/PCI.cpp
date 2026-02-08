@@ -25,14 +25,16 @@ namespace PCI
     static UnorderedMap<u32, HostController*> s_HostControllers;
     struct Vendor
     {
-        String                          Name;
+        String                    Name;
         UnorderedMap<u16, String> DeviceIDs;
     };
 
     UnorderedMap<u16, Vendor> s_VendorIDs;
 
-    void                            ParseVendorID(StringView line)
+    void                      ParseVendorID(StringView line)
     {
+        using namespace CodePoints;
+
         if (line.Size() < 4) return;
         for (usize i = 0; i < 4; i++)
             if (!IsHexDigit(line[i])) return;
@@ -53,8 +55,8 @@ namespace PCI
     }
     void InitializeDatabase()
     {
-        PathView path = "/usr/share/hwdata/pci.ids";
-        Ref entry = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), path)
+        PathView path  = "/usr/share/hwdata/pci.ids";
+        Ref      entry = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), path)
                         .value()
                         .Entry;
         if (!entry) return;

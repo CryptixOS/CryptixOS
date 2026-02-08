@@ -11,5 +11,7 @@
 class MasterPTY : public TTY
 {
   public:
+    MasterPTY(StringView name, usize minor);
+
   private:
 };

@@ -6,6 +6,7 @@
  */
 #include <API/DeviceIDs.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
+#include <Drivers/TTY/MasterPTY.hpp>
 #include <Drivers/TTY/PTYMultiplexer.hpp>
 #include <VFS/VFS.hpp>
 
@@ -24,8 +25,15 @@ static INodeID NewPTSIndex()
 }
 ErrorOr<File*> PTYMultiplexer::Open(File* file)
 {
-    auto newIndex = NewPTSIndex();
-    IgnoreUnused(newIndex);
+    LogTrace("PTYMultiplexer: Open called");
+    auto   newIndex = NewPTSIndex();
+    String ptyName  = fmt::format("pts{}", newIndex).data();
+    auto   master   = new MasterPTY(ptyName, newIndex);
+
+    DeviceManager::RegisterCharDevice(master);
+    auto ptyPath = fmt::format("/dev/pts/{}", ptyName).data();
+    VFS::CreateNode(ptyPath, S_IFCHR | 0666, master->ID());
+
     // TODO(v1tr10l7): Open new pty master/slave pair
-    return Error(ENOSYS);
+    return master;
 }
