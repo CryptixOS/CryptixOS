@@ -7,13 +7,15 @@
 #pragma once
 
 #include <API/Sockets.hpp>
+#include <Prism/Containers/Queue.hpp>
 #include <Prism/Core/Types.hpp>
 #include <VFS/File.hpp>
 
 enum class SocketState
 {
-    eUnconnected = 0,
-    eConnected   = 1,
+    eNotConnected = 0,
+    eConnected    = 1,
+    eListening    = 2,
 };
 class Socket : public File
 {
@@ -39,6 +41,10 @@ class Socket : public File
     }
     virtual ErrorOr<isize> ReceiveFrom(u8* data, usize size, isize flags,
                                        sockaddr* saddr, socklen_t* addrlen)
+    {
+        return Error(ENOSYS);
+    }
+    virtual ErrorOr<isize> SendMsg(const struct msghdr* msg, isize flags)
     {
         return Error(ENOSYS);
     }
@@ -68,9 +74,16 @@ class Socket : public File
         return Error(ENOSYS);
     }
 
+    virtual bool  IsSocket() const override { return true; }
+
+    ErrorOr<void> QueueConnectionFrom(Socket* peer);
+
   protected:
     SocketDomain    m_Domain = SocketDomain::eUnspecified;
     SocketType      m_Type   = SocketType::eRaw;
     NetworkProtocol m_Protocol;
-    SocketState     m_State = SocketState::eUnconnected;
+    SocketState     m_State = SocketState::eNotConnected;
+
+    Deque<Socket*>  m_Pending;
+    usize           m_BackLog = 0;
 };

@@ -82,6 +82,15 @@ bool INode::IsEmpty()
 }
 bool INode::ReadOnly() { return false; }
 bool INode::Immutable() { return false; }
+bool INode::CanRead(const Credentials& creds) const
+{
+    if (creds.EffectiveUserID == 0 || m_Metadata.Mode & S_IROTH) return true;
+    if (creds.EffectiveUserID == m_Metadata.UID && m_Metadata.Mode & S_IRUSR)
+        return true;
+
+    return m_Metadata.GID == creds.EffectiveGroupID
+        && m_Metadata.Mode & S_IRGRP;
+}
 bool INode::CanWrite(const Credentials& creds) const
 {
     if (creds.EffectiveUserID == 0 || m_Metadata.Mode & S_IWOTH) return true;
@@ -90,6 +99,15 @@ bool INode::CanWrite(const Credentials& creds) const
 
     return m_Metadata.GID == creds.EffectiveGroupID
         && m_Metadata.Mode & S_IWGRP;
+}
+bool INode::CanExecute(const Credentials& creds) const
+{
+    if (creds.EffectiveUserID == m_Metadata.UID && m_Metadata.Mode & S_IXUSR)
+        return true;
+    if (creds.EffectiveGroupID == m_Metadata.GID && m_Metadata.Mode & S_IXGRP)
+        return true;
+    if (m_Metadata.Mode & S_IXOTH) return true;
+    return false;
 }
 
 bool INode::ValidatePermissions(const Credentials& creds, u32 acc)
@@ -103,17 +121,17 @@ ErrorOr<File*> INode::Open(class ::Ref<::DirectoryEntry> dentry, i64 flags,
     return new File(this);
 }
 ErrorOr<::Ref<DirectoryEntry>> INode::CreateNode(::Ref<DirectoryEntry> entry,
-                                                 mode_t mode, dev_t dev)
+                                                 INodeMode mode, dev_t dev)
 {
     return Error(ENOSYS);
 }
 ErrorOr<::Ref<DirectoryEntry>> INode::CreateFile(::Ref<DirectoryEntry> entry,
-                                                 mode_t                mode)
+                                                 INodeMode             mode)
 {
     return Error(ENOSYS);
 }
 ErrorOr<::Ref<DirectoryEntry>>
-INode::CreateDirectory(::Ref<DirectoryEntry> entry, mode_t mode)
+INode::CreateDirectory(::Ref<DirectoryEntry> entry, INodeMode mode)
 {
     return Error(ENOSYS);
 }
@@ -134,7 +152,7 @@ ErrorOr<void> INode::Unlink(::Ref<DirectoryEntry> entry)
     return Error(ENOSYS);
 }
 
-ErrorOr<isize> INode::CheckPermissions(mode_t mask)
+ErrorOr<isize> INode::CheckPermissions(INodeMode mask)
 {
     if (mask & W_OK)
     {
@@ -166,8 +184,9 @@ timespec  INode::AccessTime() const { return m_Metadata.AccessTime; }
 timespec INode::ModificationTime() const { return m_Metadata.ModificationTime; }
 timespec INode::StatusChangeTime() const { return m_Metadata.ChangeTime; }
 
-ErrorOr<void> INode::SetOwner(uid_t uid, gid_t gid)
+ErrorOr<void> INode::SetOwner(::UserID uid, ::GroupID gid)
 {
+    ScopedLock guard(m_Lock);
     if (uid == m_Metadata.UID && gid == m_Metadata.GID) return {};
     m_Metadata.UID = uid;
     m_Metadata.GID = gid;
@@ -175,10 +194,10 @@ ErrorOr<void> INode::SetOwner(uid_t uid, gid_t gid)
     m_Dirty        = true;
     return {};
 }
-ErrorOr<void> INode::ChangeMode(mode_t mode)
+ErrorOr<void> INode::ChangeMode(INodeMode mode)
 {
-    m_Metadata.Mode |= (mode & 0777);
-    m_Dirty = true;
+    m_Metadata.Mode = (m_Metadata.Mode & ~07777u) | (mode & 07777u);
+    m_Dirty         = true;
 
     return {};
 }

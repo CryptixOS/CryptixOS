@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Prism/Core/Types.hpp>
+#include <API/Posix/linux/uio.h>
 
 /* Protocol families.  */
 /* Unspecified.  */
@@ -206,4 +206,27 @@ struct sockaddr
 {
     sa_family_t sa_family;
     u8          sa_data[14];
+};
+
+struct msghdr
+{
+    /* Address to send to/receive from.  */
+    void*         msg_name;
+    /* Length of address data.  */
+    socklen_t     msg_namelen;
+
+    /* Vector of data to send/receive into.  */
+    struct iovec* msg_iov;
+    /* Number of elements in the vector.  */
+    usize         msg_iovlen;
+
+    /* Ancillary data (eg BSD filedesc passing). */
+    void*         msg_control;
+    /* Ancillary data buffer length.
+    !! The type should be socklen_t but the
+                                         definition of the kernel is
+    incompatible with this.  */
+    usize         msg_controllen;
+    /* Flags on received message.  */
+    i32           msg_flags;
 };

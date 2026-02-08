@@ -42,11 +42,12 @@ namespace VFS
         Path                BaseName = ""_s;
     };
 
+    bool                         Access(PathView path, INodeMode mode);
     ErrorOr<Ref<DirectoryEntry>> OpenDirectoryEntry(Ref<DirectoryEntry> parent,
                                                     PathView path, isize flags,
-                                                    mode_t mode);
+                                                    INodeMode mode);
     ErrorOr<Ref<FileDescriptor>> Open(Ref<DirectoryEntry> parent, PathView path,
-                                      isize flags, mode_t mode);
+                                      isize flags, INodeMode mode);
 
     ErrorOr<PathResolution>      ResolvePath(Ref<DirectoryEntry> parent,
                                              PathView path, bool followLinks = true);
@@ -64,18 +65,20 @@ namespace VFS
     ErrorOr<void>                Sync();
 
     ErrorOr<Ref<DirectoryEntry>> CreateNode(Ref<DirectoryEntry> parent,
-                                            StringView name, mode_t mode,
-                                            dev_t dev, PathView target = ""_pv);
-    ErrorOr<Ref<DirectoryEntry>> CreateNode(PathView path, mode_t mode,
-                                            dev_t dev);
+                                            StringView name, INodeMode mode,
+                                            DeviceID dev,
+                                            PathView target = ""_pv);
+    ErrorOr<Ref<DirectoryEntry>> CreateNode(PathView path, INodeMode mode,
+                                            DeviceID dev);
 
     ErrorOr<Ref<DirectoryEntry>> CreateFile(Ref<DirectoryEntry> directory,
-                                            StringView name, mode_t mode);
-    ErrorOr<Ref<DirectoryEntry>> CreateFile(PathView path, mode_t mode);
+                                            StringView name, INodeMode mode);
+    ErrorOr<Ref<DirectoryEntry>> CreateFile(PathView path, INodeMode mode);
 
     ErrorOr<Ref<DirectoryEntry>> CreateDirectory(Ref<DirectoryEntry> directory,
-                                                 StringView name, mode_t mode);
-    ErrorOr<Ref<DirectoryEntry>> CreateDirectory(PathView path, mode_t mode);
+                                                 StringView          name,
+                                                 INodeMode           mode);
+    ErrorOr<Ref<DirectoryEntry>> CreateDirectory(PathView path, INodeMode mode);
 
     ErrorOr<Ref<DirectoryEntry>> Symlink(Ref<DirectoryEntry> directory,
                                          StringView name, PathView targetPath);

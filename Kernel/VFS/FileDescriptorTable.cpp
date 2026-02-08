@@ -33,6 +33,9 @@ isize FileDescriptorTable::Erase(isize fdNum)
     ::Ref<FileDescriptor> fd = GetFd(fdNum);
     if (!fd) return_err(-1, EBADF);
 
+    if (fd->DirectoryEntry()
+        && fd->DirectoryEntry()->Name().Contains("ctl.sock"))
+        LogTrace("Erasing auroractl.sock => {}", fd->DirectoryEntry()->Path());
     m_Table.Erase(fdNum);
     return 0;
 }

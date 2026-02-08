@@ -180,6 +180,4 @@ class Filesystem : public RefCounted
         static Atomic<fsid_t> id = 1000;
         return id++;
     }
-
-  private:
 };

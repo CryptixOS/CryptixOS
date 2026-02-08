@@ -18,7 +18,11 @@ usize          File::Size() const { return m_INode ? m_INode->Size() : 0; }
 ErrorOr<isize> File::Read(void* dest, off_t offset, usize bytes)
 {
     ScopedLock guard(m_Lock);
-    if (!m_INode) return Error(ENOENT);
+    if (!m_INode)
+    {
+        LogDebug("File::Read: m_INode is nullptr");
+        return Error(ENOENT);
+    }
     if (m_INode->IsDirectory()) return Error(EISDIR);
 
     return m_INode->Read(dest, offset, bytes);

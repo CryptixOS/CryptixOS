@@ -33,7 +33,7 @@ namespace API::MM
         return access;
     }
 
-    ErrorOr<intptr_t> MMap(Pointer addr, usize length, i32 prot, i32 flags,
+    ErrorOr<ipointer> MMap(Pointer addr, usize length, i32 prot, i32 flags,
                            i32 fdNum, off_t offset)
     {
         Process*          current   = Process::GetCurrent();

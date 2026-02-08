@@ -16,6 +16,8 @@ class Ext2FsAllocator
     void  Initialize(Ext2Fs* fs);
 
     usize AllocateINode();
+    void  FreeINode(ino_t ino);
+
     usize AllocateBlock(Ext2FsINodeMeta& meta, u32 inode);
 
   private:

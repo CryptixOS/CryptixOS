@@ -235,7 +235,7 @@ bool Fat32Fs::Populate(DirectoryEntry* dentry)
 
         usize nameLen = 0;
         char* start   = nameBuffer.Raw();
-        while (*start && IsAlphanumeric(*start++)) nameLen++;
+        while (*start && CodePoints::IsAlphanumeric(*start++)) nameLen++;
         String name;
         name.Resize(nameLen);
 

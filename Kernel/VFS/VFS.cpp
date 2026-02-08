@@ -13,6 +13,8 @@
 #include <Library/Locking/Spinlock.hpp>
 #include <Library/Locking/SpinlockProtected.hpp>
 
+#include <Prism/String/StringUtils.hpp>
+
 #include <Scheduler/Scheduler.hpp>
 #include <Time/Time.hpp>
 
@@ -90,6 +92,9 @@ namespace VFS
         if (CreateDirectory("/dev/pts", 0755)
             && !Mount(nullptr, "", "/dev/pts", "devptsfs"))
             LogError("VFS: Failed to mount devptsfs");
+
+        CreateDirectory("/run", 0755);
+        Mount(nullptr, "", "/run", "tmpfs");
 
         auto colonel = Scheduler::KernelProcess();
         auto syncd   = colonel->CreateThread(filesystemSyncDaemon, 0);
@@ -218,6 +223,16 @@ namespace VFS
         delete node;
     }
 
+    bool Access(PathView path, INodeMode mode)
+    {
+        auto pathRes
+            = TryOrRetVal(ResolvePath(RootDirectoryEntry(), path), false);
+        auto dentry = pathRes.Entry;
+
+        Assert(dentry);
+        auto inode = dentry->INode();
+        return inode && inode->CheckPermissions(mode);
+    }
     ErrorOr<Ref<DirectoryEntry>> OpenDirectoryEntry(Ref<DirectoryEntry> parent,
                                                     PathView path, isize flags,
                                                     INodeMode mode)
@@ -247,18 +262,42 @@ namespace VFS
         PathResolver resolver(parent, path);
         auto         lookupFlags = PathLookupFlags::eFollowMounts;
         if (followSymlinks) lookupFlags |= PathLookupFlags::eFollowLinks;
-        Ref dentry    = TryOrRet(resolver.Resolve(lookupFlags));
-        Ref directory = resolver.ParentEntry();
+
+        auto status    = resolver.Resolve(lookupFlags);
+        Ref  dentry    = status ? *status : nullptr;
+        Ref  directory = resolver.ParentEntry();
+
+        LogDebug("VFS::Open: O_EXCL => {}, O_CREAT => {}", flags & O_EXCL,
+                 flags & O_CREAT);
+        if (!dentry)
+        {
+            LogTrace("VFS::Open: Parent resolving...\nParentPath => {}",
+                     path.ParentPath());
+            auto parentPathRes = TryOrRet(
+                VFS::ResolvePath(RootDirectoryEntry(), path.ParentPath()));
+            directory = parentPathRes.Entry;
+        }
 
         if (!dentry)
         {
-            didExist = false;
-            if (errno != ENOENT || !(flags & O_CREAT)) return Error(ENOENT);
+            LogTrace("VFS::Open: Creating entry...");
 
+            didExist = false;
+            if (errno != ENOENT || (!(flags & O_CREAT) && !(flags & O_EXCL)))
+            {
+                LogError("VFS: Open failed to find entry: `{}`\nerrno => {}",
+                         path, StringUtils::ToString(ErrorCode(errno)));
+                return Error(ENOENT);
+            }
+
+            if (!directory || !directory->INode()) return Error(ENOENT);
             if (!directory->INode()->ValidatePermissions(current->Credentials(),
                                                          5))
                 return Error(EACCES);
 
+            if (path.Contains("sock"))
+                LogTrace("VFS: Creating socket: {}, parent => `{}`", path,
+                         directory->Path());
             dentry = TryOrRet(VFS::CreateFile(directory, path.BaseName(),
                                               mode & ~current->Umask()));
 
@@ -289,8 +328,7 @@ namespace VFS
     {
         auto dentry = TryOrRet(OpenDirectoryEntry(parent, path, flags, mode));
 
-        if (path.Contains("tty")) LogDebug("VFS: Extracting accMode");
-        auto           acc     = flags & O_ACCMODE;
+        auto acc    = flags & O_ACCMODE;
         FileAccessMode accMode = FileAccessMode::eNone;
         switch (acc)
         {

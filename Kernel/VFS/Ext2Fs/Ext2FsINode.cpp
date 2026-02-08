@@ -12,7 +12,7 @@
 
 #include <Time/Time.hpp>
 
-Ext2FsINode::Ext2FsINode(StringView name, Ext2Fs* fs, mode_t mode)
+Ext2FsINode::Ext2FsINode(StringView name, Ext2Fs* fs, INodeMode mode)
     : INode(name, fs)
     , m_Fs(fs)
 {
@@ -30,6 +30,12 @@ Ext2FsINode::Ext2FsINode(StringView name, Ext2Fs* fs, mode_t mode)
     m_Metadata.AccessTime       = Time::GetReal();
     m_Metadata.ChangeTime       = Time::GetReal();
     m_Metadata.ModificationTime = Time::GetReal();
+}
+Ext2FsINode::Ext2FsINode(StringView name, class Ext2Fs* fs, INodeID ino,
+                         INodeMode mode)
+    : Ext2FsINode(name, fs, mode)
+{
+    m_Metadata.ID = ino;
 }
 
 ErrorOr<void>
@@ -160,11 +166,6 @@ ErrorOr<::Ref<DirectoryEntry>> Ext2FsINode::Lookup(::Ref<DirectoryEntry> dentry)
     return Error(ENOENT);
 }
 
-ErrorOr<File*> Ext2FsINode::Open(class ::Ref<::DirectoryEntry> dentry,
-                                 i64 flags, u64 accMode)
-{
-    return Error(ENOSYS);
-}
 ErrorOr<::Ref<DirectoryEntry>>
 Ext2FsINode::CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode, dev_t dev)
 {
@@ -230,7 +231,7 @@ ErrorOr<Path> Ext2FsINode::ReadLink()
 }
 
 /*
-ErrorOr<void> Ext2FsINode::ChMod(mode_t mode)
+ErrorOr<void> Ext2FsINode::ChMod(INodeMode mode)
 {
     ScopedLock guard(m_Lock);
     m_Fs->ReadINodeEntry(&m_Meta, m_Metadata.ID);
@@ -247,7 +248,7 @@ ErrorOr<void> Ext2FsINode::ChMod(mode_t mode)
 }
 */
 
-void Ext2FsINode::Initialize(ino_t index, mode_t mode, u16 type)
+void Ext2FsINode::Initialize(INodeID index, INodeMode mode, u16 type)
 {
     m_Metadata.DeviceID             = m_Fs->BackingDeviceID();
     m_Metadata.ID                   = index;

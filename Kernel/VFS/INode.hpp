@@ -85,7 +85,9 @@ class INode : public RefCounted
     bool                                   IsEmpty();
     bool                                   ReadOnly();
     bool                                   Immutable();
+    bool        CanRead(const Credentials& creds) const;
     bool        CanWrite(const Credentials& creds) const;
+    bool        CanExecute(const Credentials& creds) const;
 
     inline bool IsCharDevice() const { return S_ISCHR(m_Metadata.Mode); }
     inline bool IsBlockDevice() const { return S_ISBLK(m_Metadata.Mode); }
@@ -94,6 +96,9 @@ class INode : public RefCounted
     inline bool IsRegular() const { return S_ISREG(m_Metadata.Mode); }
     inline bool IsSymlink() const { return S_ISLNK(m_Metadata.Mode); }
     inline bool IsSocket() const { return S_ISSOCK(m_Metadata.Mode); }
+
+    inline bool IsSetUserID() const { return m_Metadata.Mode & S_ISUID; }
+    inline bool IsSetGroupID() const { return m_Metadata.Mode & S_ISGID; }
 
     bool        ValidatePermissions(const Credentials& creds, u32 acc);
     void        UpdateATime();
@@ -154,7 +159,7 @@ class INode : public RefCounted
         return Error(ENOSYS);
     }
     virtual ErrorOr<isize> ListExtendedAttributes(::Ref<DirectoryEntry> dentry,
-                                                 char* list, usize size)
+                                                  char* list, usize size)
     {
         return Error(ENOSYS);
     }

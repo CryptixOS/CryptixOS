@@ -25,6 +25,7 @@ usize Ext2FsAllocator::AllocateINode()
 {
     auto  superBlock = m_Filesystem->GetSuperBlock();
     usize blockCount = superBlock->BlockCount;
+    if (superBlock->FreeINodeCount == 0) return 0;
 
     for (usize i = 0; i < blockCount; i++)
     {
@@ -46,6 +47,33 @@ usize Ext2FsAllocator::AllocateINode()
 
     return 0;
 }
+void Ext2FsAllocator::FreeINode(ino_t ino)
+{
+    auto  superBlock = m_Filesystem->GetSuperBlock();
+    usize blockSize  = m_Filesystem->GetBlockSize();
+    --ino;
+
+    usize blockGroupIndex                 = ino / superBlock->INodesPerGroup;
+    Ext2FsBlockGroupDescriptor blockGroup = {};
+    m_Filesystem->ReadBlockGroupDescriptor(&blockGroup, blockGroupIndex);
+
+    Bitmap bitmap;
+    bitmap.Allocate(superBlock->BlockCount);
+    m_Device->Read(bitmap.Raw(), blockGroup.INodeUsageBitmapAddress * blockSize,
+                   blockSize);
+    bitmap.SetIndex(ino % superBlock->INodesPerGroup, false);
+
+    m_Device->Write(bitmap.Raw(),
+                    blockGroup.INodeUsageBitmapAddress * blockSize, blockSize);
+
+    ++blockGroup.FreeINodeCount;
+    ++superBlock->FreeINodeCount;
+
+    m_Filesystem->WriteBlockGroupDescriptor(blockGroup, blockGroupIndex);
+    m_Filesystem->FlushSuperBlock();
+    bitmap.Free();
+}
+
 usize Ext2FsAllocator::AllocateBlock(Ext2FsINodeMeta& meta, u32 inode)
 {
     auto blockGroupIndex = LocateFreeGroup();

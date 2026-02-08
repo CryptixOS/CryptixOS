@@ -51,6 +51,7 @@ namespace API::VFS
     ErrorOr<isize> SendTo(isize sockFdNum, const u8* data, usize size,
                           isize flags, const sockaddr* destAddr,
                           socklen_t addrlen);
+    ErrorOr<isize> SendMsg(isize sockFdNum, const msghdr* msg, isize flags);
     ErrorOr<isize> ReceiveFrom(isize sockFdNum, u8* data, usize size,
                                isize flags, sockaddr* destAddr,
                                socklen_t* addrlen);
@@ -85,6 +86,9 @@ namespace API::VFS
     ErrorOr<isize> ReadLink(PathView path, char* out, usize size);
     ErrorOr<isize> ChMod(const char* path, INodeMode mode);
     ErrorOr<isize> FChMod(isize fdNum, INodeMode mode);
+    ErrorOr<isize> ChOwn(const char* path, UserID uid, GroupID gid);
+    ErrorOr<isize> FChOwn(isize fdNum, UserID uid, GroupID gid);
+    ErrorOr<isize> LChOwn(const char* path, UserID uid, GroupID gid);
 
     ErrorOr<isize> SyncFilesystems();
     ErrorOr<isize> Mount(const char* path, const char* target,
@@ -119,6 +123,8 @@ namespace API::VFS
     ErrorOr<isize> MkDirAt(isize dirFdNum, const char* path, INodeMode mode);
     ErrorOr<isize> MkNodAt(isize dirFdNum, const char* path, INodeMode mode,
                            dev_t dev);
+    ErrorOr<isize> FChOwnAt(isize dirFdNum, const char* path, UserID uid,
+                            GroupID gid, isize flags);
     ErrorOr<isize> ReadLinkAt(isize dirFdNum, const char* path, char* out,
                               usize bufferSize);
     ErrorOr<isize> FChModAt(isize dirFdNum, const char* path, INodeMode mode,

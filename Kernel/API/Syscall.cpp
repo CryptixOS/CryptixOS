@@ -61,9 +61,15 @@ namespace Syscall
         RegisterSyscall(ID::eSetITimer, API::Time::SetITimer);
         RegisterSyscall(ID::ePid, API::Process::Pid);
         RegisterSyscall(ID::eSocket, API::VFS::Socket);
+        RegisterSyscall(ID::eConnect, API::VFS::Connect);
+        RegisterSyscall(ID::eAccept, API::VFS::Accept);
+        RegisterSyscall(ID::eSendTo, API::VFS::SendTo);
+        RegisterSyscall(ID::eSendMsg, API::VFS::SendMsg);
         RegisterSyscall(ID::eBind, API::VFS::Bind);
+        RegisterSyscall(ID::eListen, API::VFS::Listen);
         RegisterSyscall(ID::eClone, API::Process::Clone);
         RegisterSyscall(ID::eFork, API::Process::Fork);
+        RegisterSyscall(ID::eVFork, API::Process::VFork);
         RegisterSyscall(ID::eExecve, API::Process::Execve);
         RegisterSyscall(ID::eExit, API::Process::Exit);
         RegisterSyscall(ID::eWait4, API::Process::Wait4);
@@ -85,6 +91,9 @@ namespace Syscall
         RegisterSyscall(ID::eReadLink, API::VFS::ReadLink);
         RegisterSyscall(ID::eChMod, API::VFS::ChMod);
         RegisterSyscall(ID::eFChMod, API::VFS::FChMod);
+        RegisterSyscall(ID::eChOwn, API::VFS::ChOwn);
+        RegisterSyscall(ID::eFChOwn, API::VFS::FChOwn);
+        RegisterSyscall(ID::eLChOwn, API::VFS::LChOwn);
         RegisterSyscall(ID::eUmask, API::Process::Umask);
         RegisterSyscall(ID::eGetTimeOfDay, API::Time::GetTimeOfDay);
         RegisterSyscall(ID::eGetResourceLimit, API::System::GetResourceLimit);
@@ -138,6 +147,7 @@ namespace Syscall
         RegisterSyscall(ID::eOpenAt, API::VFS::OpenAt);
         RegisterSyscall(ID::eMkDirAt, API::VFS::MkDirAt);
         RegisterSyscall(ID::eMkNodAt, API::VFS::MkNodAt);
+        RegisterSyscall(ID::eFChOwnAt, API::VFS::FChOwnAt);
         RegisterSyscall(ID::eFStatAt, API::VFS::FStatAt);
         RegisterSyscall(ID::eUnlinkAt, API::VFS::UnlinkAt);
         RegisterSyscall(ID::eRenameAt, API::VFS::RenameAt);
@@ -218,24 +228,25 @@ namespace Syscall
 
         if (s_Syscalls.Contains(static_cast<ID>(args.Index)))
         {
-            auto ret = s_Syscalls[static_cast<ID>(args.Index)]->Run(arr);
+            auto ret       = s_Syscalls[static_cast<ID>(args.Index)]->Run(arr);
+
+            auto syscallID = static_cast<ID>(args.Index);
+            auto syscallName = StringUtils::ToString(syscallID);
+            syscallName.RemovePrefix(1);
 
             if (ret) args.ReturnValue = ret.Value();
             else if (static_cast<ID>(args.Index) != ID::eMMap)
             {
                 if (g_LogSyscalls)
-                {
-                    auto syscallID   = static_cast<ID>(args.Index);
-                    auto syscallName = StringUtils::ToString(syscallID);
-                    syscallName.RemovePrefix(1);
-
                     SyscallError("Syscall: '{}' caused error", syscallName);
-                }
                 args.ReturnValue = static_cast<usize>(ret.Error()) != MAP_FAILED
                                      ? -ipointer(ret.Error())
                                      : MAP_FAILED;
             }
 
+            if (thread->Parent()->Name().Contains("cat") && !ret)
+                LogError("Syscall[{}] in process 'cat' caused error: {}",
+                         syscallName, StringUtils::ToString(ret.Error()));
             thread->OnSyscallLeave();
             CPU::OnSyscallLeave();
             return;

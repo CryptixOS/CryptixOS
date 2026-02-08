@@ -82,82 +82,60 @@ ErrorOr<::Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
     return m_RootEntry;
 }
 
-ErrorOr<::Ref<INode>> Ext2Fs::CreateNode(::Ref<INode>          parent,
-                                         ::Ref<DirectoryEntry> entry,
-                                         mode_t mode, uid_t uid, gid_t gid)
+ErrorOr<::Ref<INode>> Ext2Fs::AllocateNode(StringView name, INodeMode mode)
 {
-    usize inodeIndex = m_Allocator.AllocateINode();
-    if (!inodeIndex) return nullptr;
+    INodeID ino = m_Allocator.AllocateINode();
+    if (ino == 0) return Error(ENOSPC);
 
-    auto inode = new Ext2FsINode(entry->Name(), this, mode);
-    if (!inode) return nullptr;
-
-    inode->Initialize(inodeIndex, mode, Ext2Mode2INodeType(mode));
-
-    // TODO(v1tr10l7): Defer allocation of inode blocks
-    AssignINodeBlocks(inode->m_Meta, inodeIndex, 0, 1);
-    WriteINodeEntry(inode->m_Meta, inodeIndex);
-
-    Ext2FsINodeMeta parentMeta{};
-    ReadINodeEntry(&parentMeta, parent->Stats().st_ino);
-
-    if (S_ISDIR(mode))
+    auto inode = CreateRef<Ext2FsINode>(name, this, NextINodeIndex(), mode);
+    if (!inode)
     {
-        u8*  buffer          = new u8[m_BlockSize];
-
-        auto dotEntry        = reinterpret_cast<Ext2FsDirectoryEntry*>(buffer);
-        dotEntry->INodeIndex = inodeIndex;
-        dotEntry->Size       = 12;
-        dotEntry->NameSize   = 1;
-        dotEntry->Type       = Ext2FsDirectoryEntryType::eSymlink;
-        dotEntry->Name[0]    = '.';
-
-        auto dotDotEntry
-            = reinterpret_cast<Ext2FsDirectoryEntry*>(buffer + dotEntry->Size);
-        dotDotEntry->INodeIndex = parent->Stats().st_ino;
-        dotDotEntry->Size       = m_BlockSize - dotEntry->Size;
-        dotDotEntry->NameSize   = 2;
-        dotDotEntry->Type       = Ext2FsDirectoryEntryType::eSymlink;
-        dotDotEntry->Name[0]    = '.';
-        dotDotEntry->Name[1]    = '.';
-
-        WriteINode(inode->m_Meta, buffer, inodeIndex, 0, m_BlockSize);
-
-        usize bgdIndex
-            = (inode->m_Metadata.ID - 1) / m_SuperBlock->INodesPerGroup;
-        Ext2FsBlockGroupDescriptor blockGroup{};
-        ReadBlockGroupDescriptor(&blockGroup, bgdIndex);
-        ++blockGroup.DirectoryCount;
-        WriteBlockGroupDescriptor(blockGroup, bgdIndex);
-
-        ++parentMeta.HardLinkCount;
-        //++inode->m_Meta.HardLinkCount;
-        WriteINodeEntry(parentMeta, parent->Stats().st_ino);
-        WriteINodeEntry(inode->m_Meta, inodeIndex);
+        m_Allocator.FreeINode(ino);
+        return Error(ENOMEM);
     }
 
-    usize entrySize = Math::AlignUp(8 + entry->Name().Size(), 4);
-    Ext2FsDirectoryEntry* dentry
-        = Pointer(new u8[entrySize]).As<Ext2FsDirectoryEntry>();
-    Memory::Fill(dentry, 0, entrySize);
+    AssignINodeBlocks(inode->m_Meta, inode->m_Metadata.ID, 0, 1);
+    WriteINodeEntry(inode->m_Meta, inode->m_Metadata.ID);
 
-    dentry->INodeIndex = inodeIndex;
-    dentry->Size       = entrySize;
-    dentry->NameSize   = entry->Name().Size();
-    dentry->Type       = Ext2Mode2DirectoryEntryType(mode);
-    StringView(reinterpret_cast<char*>(dentry->Name), dentry->NameSize)
-        .Copy(const_cast<char*>(entry->Name().Raw()), entry->Name().Size());
-    auto result = parent.As<Ext2FsINode>()->AddDirectoryEntry(*dentry);
-    if (!result)
-    {
-        delete inode;
-        // TODO(v1tr10l7): Free INode
-        return nullptr;
-    }
+    // TODO(v1tr10l7): parent
+    // TODO(v1tr10l7): Allocate
+    return Error(ENOSYS);
+}
+ErrorOr<void> Ext2Fs::FreeINode(::Ref<INode> inode)
+{
+    auto id = inode->ID();
+    --id;
 
-    return inode;
+    usize blockGroupIndex = id / m_SuperBlock->INodesPerGroup;
+    Ext2FsBlockGroupDescriptor blockGroup;
+    ReadBlockGroupDescriptor(&blockGroup, blockGroupIndex);
+
+    Bitmap bitmap;
+    bitmap.Allocate(m_BlockSize);
+    m_Device->Read(bitmap.Raw(),
+                   blockGroup.INodeUsageBitmapAddress * m_BlockSize,
+                   m_BlockSize);
+
+    bitmap.SetIndex(id % m_SuperBlock->INodesPerGroup, false);
+    m_Device->Write(bitmap.Raw(),
+                    blockGroup.INodeUsageBitmapAddress * m_BlockSize,
+                    m_BlockSize);
+
+    ++blockGroup.FreeINodeCount;
+    ++m_SuperBlock->FreeINodeCount;
+
+    WriteBlockGroupDescriptor(blockGroup, blockGroupIndex);
+    FlushSuperBlock();
+
+    bitmap.Free();
+    return {};
 }
 
+ErrorOr<void> Ext2Fs::Sync()
+{
+    // TODO(v1tr10l7): Sync
+    return Error(ENOSYS);
+}
 bool Ext2Fs::Populate(DirectoryEntry* dentry)
 {
     ::Ref<Ext2FsINode> e2node = dentry->INode().As<Ext2FsINode>();
@@ -237,35 +215,86 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
     delete[] buffer;
     return true;
 }
-
-ErrorOr<void> Ext2Fs::FreeINode(::Ref<INode> inode)
+ErrorOr<void> Ext2Fs::Stats(statfs& stats)
 {
-    auto id = inode->ID();
-    --id;
+    // TODO(v1tr10l7): Stats
+    return Error(ENOSYS);
+}
 
-    usize blockGroupIndex = id / m_SuperBlock->INodesPerGroup;
-    Ext2FsBlockGroupDescriptor blockGroup;
-    ReadBlockGroupDescriptor(&blockGroup, blockGroupIndex);
+ErrorOr<::Ref<INode>> Ext2Fs::CreateNode(::Ref<INode>          parent,
+                                         ::Ref<DirectoryEntry> entry,
+                                         mode_t mode, uid_t uid, gid_t gid)
+{
+    usize inodeIndex = m_Allocator.AllocateINode();
+    if (!inodeIndex) return nullptr;
 
-    Bitmap bitmap;
-    bitmap.Allocate(m_BlockSize);
-    m_Device->Read(bitmap.Raw(),
-                   blockGroup.INodeUsageBitmapAddress * m_BlockSize,
-                   m_BlockSize);
+    auto inode = new Ext2FsINode(entry->Name(), this, mode);
+    if (!inode) return nullptr;
 
-    bitmap.SetIndex(id % m_SuperBlock->INodesPerGroup, false);
-    m_Device->Write(bitmap.Raw(),
-                    blockGroup.INodeUsageBitmapAddress * m_BlockSize,
-                    m_BlockSize);
+    inode->Initialize(inodeIndex, mode, Ext2Mode2INodeType(mode));
 
-    ++blockGroup.FreeINodeCount;
-    ++m_SuperBlock->FreeINodeCount;
+    // TODO(v1tr10l7): Defer allocation of inode blocks
+    AssignINodeBlocks(inode->m_Meta, inodeIndex, 0, 1);
+    WriteINodeEntry(inode->m_Meta, inodeIndex);
 
-    WriteBlockGroupDescriptor(blockGroup, blockGroupIndex);
-    FlushSuperBlock();
+    Ext2FsINodeMeta parentMeta{};
+    ReadINodeEntry(&parentMeta, parent->Stats().st_ino);
 
-    bitmap.Free();
-    return {};
+    if (S_ISDIR(mode))
+    {
+        u8*  buffer          = new u8[m_BlockSize];
+
+        auto dotEntry        = reinterpret_cast<Ext2FsDirectoryEntry*>(buffer);
+        dotEntry->INodeIndex = inodeIndex;
+        dotEntry->Size       = 12;
+        dotEntry->NameSize   = 1;
+        dotEntry->Type       = Ext2FsDirectoryEntryType::eSymlink;
+        dotEntry->Name[0]    = '.';
+
+        auto dotDotEntry
+            = reinterpret_cast<Ext2FsDirectoryEntry*>(buffer + dotEntry->Size);
+        dotDotEntry->INodeIndex = parent->Stats().st_ino;
+        dotDotEntry->Size       = m_BlockSize - dotEntry->Size;
+        dotDotEntry->NameSize   = 2;
+        dotDotEntry->Type       = Ext2FsDirectoryEntryType::eSymlink;
+        dotDotEntry->Name[0]    = '.';
+        dotDotEntry->Name[1]    = '.';
+
+        WriteINode(inode->m_Meta, buffer, inodeIndex, 0, m_BlockSize);
+
+        usize bgdIndex
+            = (inode->m_Metadata.ID - 1) / m_SuperBlock->INodesPerGroup;
+        Ext2FsBlockGroupDescriptor blockGroup{};
+        ReadBlockGroupDescriptor(&blockGroup, bgdIndex);
+        ++blockGroup.DirectoryCount;
+        WriteBlockGroupDescriptor(blockGroup, bgdIndex);
+
+        ++parentMeta.HardLinkCount;
+        //++inode->m_Meta.HardLinkCount;
+        WriteINodeEntry(parentMeta, parent->Stats().st_ino);
+        WriteINodeEntry(inode->m_Meta, inodeIndex);
+    }
+
+    usize entrySize = Math::AlignUp(8 + entry->Name().Size(), 4);
+    Ext2FsDirectoryEntry* dentry
+        = Pointer(new u8[entrySize]).As<Ext2FsDirectoryEntry>();
+    Memory::Fill(dentry, 0, entrySize);
+
+    dentry->INodeIndex = inodeIndex;
+    dentry->Size       = entrySize;
+    dentry->NameSize   = entry->Name().Size();
+    dentry->Type       = Ext2Mode2DirectoryEntryType(mode);
+    StringView(reinterpret_cast<char*>(dentry->Name), dentry->NameSize)
+        .Copy(const_cast<char*>(entry->Name().Raw()), entry->Name().Size());
+    auto result = parent.As<Ext2FsINode>()->AddDirectoryEntry(*dentry);
+    if (!result)
+    {
+        delete inode;
+        // TODO(v1tr10l7): Free INode
+        return nullptr;
+    }
+
+    return inode;
 }
 
 isize Ext2Fs::SetINodeBlock(Ext2FsINodeMeta& meta, u32 inode, u32 iblock,

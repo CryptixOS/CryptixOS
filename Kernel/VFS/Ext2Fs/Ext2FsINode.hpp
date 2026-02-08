@@ -13,6 +13,7 @@ class Ext2FsINode : public INode
 {
   public:
     Ext2FsINode(StringView name, class Ext2Fs* fs, mode_t mode);
+    Ext2FsINode(StringView name, class Ext2Fs* fs, INodeID ino, INodeMode mode);
 
     virtual ~Ext2FsINode() {}
 
@@ -20,10 +21,8 @@ class Ext2FsINode : public INode
     TraverseDirectories(::Ref<class DirectoryEntry> parent,
                         DirectoryIterator           iterator) override;
     virtual ErrorOr<::Ref<DirectoryEntry>>
-                           Lookup(::Ref<DirectoryEntry> dentry) override;
+    Lookup(::Ref<DirectoryEntry> dentry) override;
 
-    virtual ErrorOr<File*> Open(class ::Ref<::DirectoryEntry> dentry, i64 flags,
-                                u64 accMode) override;
     virtual ErrorOr<::Ref<DirectoryEntry>>
     CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode,
                dev_t dev = 0) override;

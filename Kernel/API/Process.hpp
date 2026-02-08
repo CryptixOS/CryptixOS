@@ -26,6 +26,7 @@ namespace API::Process
     ErrorOr<ProcessID> Clone(usize flags, usize newSp, i32* parentTid,
                              i32* childTid, usize tls);
     ErrorOr<ProcessID> Fork();
+    ErrorOr<ProcessID> VFork();
     ErrorOr<isize>     Execve(char* pathname, char** argv, char** envp);
     ErrorOr<isize>     Exit(isize exitcode);
     ErrorOr<isize>     Wait4(pid_t pid, isize* wstatus, isize flags,

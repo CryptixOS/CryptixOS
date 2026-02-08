@@ -18,7 +18,7 @@ PathResolver::PathResolver(class Ref<::DirectoryEntry> const root,
 ErrorOr<void> PathResolver::Initialize(Ref<class ::DirectoryEntry> const root,
                                        PathView                          path)
 {
-    if (path.Empty()) return Terminate(EINVAL);
+    if (path.Empty()) path = "/"_pv;
     m_Root           = root ?: VFS::RootDirectoryEntry();
 
     m_Path           = path;

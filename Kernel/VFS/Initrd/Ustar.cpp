@@ -29,6 +29,7 @@ namespace Ustar
     ErrorOr<void> Load(Pointer address, usize size)
     {
         LogTrace("USTAR: Loading at '{:#x}'...", address);
+        usize nextThreshold = 10;
 
         // ZLib::Decompressor decompressor(address, size);
         // Assert(decompressor.Decompress(size));
@@ -36,8 +37,8 @@ namespace Ustar
         // address = decompressor.DecompressedData();
         // size = decompressor.DecompressedSize();
 
-        auto current = address.As<FileHeader>();
-        auto getNextFile
+        auto  current       = address.As<FileHeader>();
+        auto  getNextFile
             = [](FileHeader* current, usize fileSize) -> FileHeader*
         {
             Pointer nextFile
@@ -48,6 +49,16 @@ namespace Ustar
 
         while (StringView(current->Signature, MAGIC_LENGTH - 1) == MAGIC)
         {
+            usize offset     = Pointer(current) - address;
+            usize percentage = (offset * 100) / size;
+
+            if (percentage >= nextThreshold)
+            {
+                LogInfo("USTAR: Loading progress: {}%", (percentage / 10) * 10);
+
+                nextThreshold = ((percentage / 10) + 1) * 10;
+            }
+
             PathView filename(current->FileName);
             PathView linkName(current->LinkName);
 
@@ -60,6 +71,7 @@ namespace Ustar
                 continue;
             }
 
+            // LogTrace("File: {}", filename);
             Ref<DirectoryEntry> dentry = nullptr;
             switch (current->Type)
             {
@@ -133,6 +145,7 @@ namespace Ustar
             current = getNextFile(current, size);
         }
 
+        LogInfo("USTAR: Loading complete (100%)");
         return {};
     }
 } // namespace Ustar

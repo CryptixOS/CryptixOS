@@ -43,6 +43,7 @@ ErrorOr<::Ref<DirectoryEntry>> DevPtsFs::Mount(StringView  sourcePath,
 
     m_RootEntry->Bind(m_Root);
     m_RootEntry->SetParent(m_RootEntry);
+    m_RootEntry->InsertChild(ptmxEntry);
 
     return m_RootEntry;
 }
@@ -85,7 +86,7 @@ ErrorOr<::Ref<INode>> DevPtsFs::CreatePTMXNode()
     root->m_Lock.Acquire();
 
     auto      id    = NextINodeIndex();
-    INodeMode mode  = DEVPTS_DEFAULT_PTMX_MODE;
+    INodeMode mode  = DEVPTS_DEFAULT_PTMX_MODE | S_IFCHR;
     auto      inode = CreateRef<DevPtsFsINode>(dentry->Name(), this, id, mode);
     if (!inode) return Error(ENOMEM);
 

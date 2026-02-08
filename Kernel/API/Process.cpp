@@ -248,6 +248,28 @@ namespace API::Process
         auto newProcess   = clonedThread->Parent();
         return newProcess->ID();
     }
+    ErrorOr<ProcessID> VFork()
+    {
+        class Process* process = Process::Current();
+        Assert(process);
+
+        clone_args args   = {};
+        args.flags        = (0 & ~CSIGNAL) | CLONE_VFORK | CLONE_VM;
+        args.pidfd        = 0;
+        args.child_tid    = 0;
+        args.parent_tid   = 0;
+        args.exit_signal  = SIGCHLD;
+        args.stack        = 0;
+        args.stack_size   = 0;
+        args.tls          = 0;
+        args.set_tid      = 0;
+        args.set_tid_size = 0;
+        args.cgroup       = 0;
+
+        auto clonedThread = TryOrRet(DoClone3(args));
+        auto newProcess   = clonedThread->Parent();
+        return newProcess->ID();
+    }
     ErrorOr<isize> Execve(char* pathname, char** argv, char** envp)
     {
         CPU::SetInterruptFlag(false);

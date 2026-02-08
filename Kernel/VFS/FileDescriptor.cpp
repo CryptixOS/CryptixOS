@@ -94,7 +94,11 @@ ErrorOr<isize> FileDescriptor::Read(const UserBuffer& out, usize count,
     ScopedLock guard(m_Lock);
 
     if (!CanRead()) return Error(EBADF);
-    if (!m_File) return Error(ENOENT);
+    if (!m_File)
+    {
+        LogError("FileDescriptor::Read: m_File is nullptr");
+        return Error(ENOENT);
+    }
     if (m_File->IsDirectory()) return Error(EISDIR);
 
     // if (WouldBlock())
@@ -198,7 +202,7 @@ bool FileDescriptor::IsFifo() { return INode() && INode()->IsFifo(); }
 bool FileDescriptor::IsDirectory() { return DirectoryEntry()->IsDirectory(); }
 bool FileDescriptor::IsRegular() { return DirectoryEntry()->IsRegular(); }
 bool FileDescriptor::IsSymlink() { return DirectoryEntry()->IsSymlink(); }
-bool FileDescriptor::IsSocket() { return INode() && INode()->IsSocket(); }
+bool FileDescriptor::IsSocket() { return File() && File()->IsSocket(); }
 
 [[clang::no_sanitize("alignment")]] ErrorOr<isize>
 FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
