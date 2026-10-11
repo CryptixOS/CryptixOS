@@ -1,4 +1,4 @@
-# 🧬 CryptixOS
+# CryptixOS
 
 **CryptixOS** is a modern, modular, Unix-like operating system for `x86_64` and `aarch64`, written entirely in C++. It features its own kernel, and standard library (`Prism`). Designed for clarity, extensibility, and education, CryptixOS serves as a powerful base for learning OS development or building your own custom system from scratch.
 
@@ -12,7 +12,7 @@
   <img src="./Meta/images/logo.jpg" width="50%" height="50%">
 </p>
 
-# 🔥 Motivation & Goals
+# Motivation & Goals
 CryptixOS was created out of curiosity and a desire to understand how modern operating systems work—from kernel bootstrapping and memory management to user-facing system calls. The goal is to build a modular, maintainable, and educational operating system from scratch, with clean C++ abstractions, not just C.
 
 This project is ideal for:
@@ -20,7 +20,7 @@ This project is ideal for:
 * Experimenting with low-level C++ in a systems context
 * Building an actual custom OS on real or emulated hardware
 
-# ⚙️ Architecture Overview
+# Architecture Overview
 CryptixOS is a monolithic kernel designed for the x86_64 architecture. It features:
 * Physical & virtual memory manager with paging and kernel heap allocation
 * Custom C++ STL-like containers (vector, string, intrusive list, unordered map)
@@ -31,8 +31,8 @@ CryptixOS is a monolithic kernel designed for the x86_64 architecture. It featur
 * Basic device drivers: PS/2, serial, VGA, RTC, PCI, etc.
 * It uses its own standard library (Prism) and custom build tools.
 
-# 🚀 Build & Run Instructions
-## 🛠 Prerequisites
+# Build & Run Instructions
+## Prerequisites
 Make sure the following tools are installed on your system:
 - C++20 compiler (GCC or Clang)
 - NASM (for low-level assembly)
@@ -42,7 +42,7 @@ Make sure the following tools are installed on your system:
 - python-guestfs (for creating and formatting the root filesystem image)
 - xorriso (for ISO image creation)
 
-## 📦 Setting Up the Sysroot
+## Setting Up the Sysroot
 Before building the kernel, you need to build the system root (toolchain and base packages). Here's how:
 ```
 mkdir build-sysroot       # Create a directory for the sysroot
@@ -52,14 +52,14 @@ xbstrap install base      # Build and install base packages
 ```
 This step ensures you have the tools and libraries needed for building the OS.
 
-## 🧱 Building the Kernel & Image
+## Building the Kernel & Image
 Once the sysroot is ready:
 ```
 ./Meta/run.py --target-arch x86_64 --compiler clang --build-type release setup # Configure for your target architecture
 ./Meta/run.py --target-arch x86_64 --compiler clang --build-type release build # Build the kernel and generate a bootable .iso
 ```
 
-## 💻 Running in an Emulator
+## Running in an Emulator
 To run CryptixOS in QEMU:
 ```
 ./Meta/run.py --target-arch x86_64 --compiler clang --build-type release <run_uefi|run_bios>
@@ -72,7 +72,7 @@ To run CryptixOS in QEMU:
 
 ---
 
-## ✨ Features
+## Features
 
 - ✅ Fully custom C++ kernel with standard containers
 - ✅ ELF loading and userland support
@@ -86,7 +86,7 @@ To run CryptixOS in QEMU:
 
 ---
 
-## 📚 References & Credits
+## References & Credits
 
 ### Tools & Docs
 
@@ -108,7 +108,7 @@ To run CryptixOS in QEMU:
 
 ---
 
-# 🤝 Contributing
+# Contributing
 **CryptixOS** welcomes contributions in the following areas:
 * New drivers (network, USB, GPU)
 * Scheduler enhancements (preemption, SMP support)
@@ -117,13 +117,13 @@ To run CryptixOS in QEMU:
 * Unit tests & test harness
 * Documentation (inline + developer guides)
 
-## 🧹 Code Style
+## Code Style
 * Use PascalCase for types and functions
 * Use m_PascalCase for private members
 * Follow Prism conventions and RAII principles
 * Prefer Ref over raw pointers
 
-## ✅ To-Do Tracker
+## To-Do Tracker
 
 ## Subsystems
 
@@ -141,12 +141,12 @@ To run CryptixOS in QEMU:
 - ✅ Heap Slab Allocator
 - ⬜ Heap Slob Allocator
 
-## 🔌 Drivers
+## Drivers
 
-### 🧱 Base
+### Base
 - ✅ Kernel Module Loader
 
-### 💾 Storage
+### Storage
 - ✅ MBR
 - ⬜ EBR
 - ✅ GPT
@@ -155,18 +155,18 @@ To run CryptixOS in QEMU:
 - ⬜ SCSI
 - ⬜ Virtio
 
-### ⏱ Timekeeping
+### Timekeeping
 - ✅ PIT
 - ✅ Local APIC Timer
 - ✅ RTC
 - ⬜ KVM Clock
 - ✅ HPET
 
-### ⚡ IRQ Controllers
+### IRQ Controllers
 - ✅ PIC
 - ✅ I/O APIC
 
-### 🧩 Hardware Abstraction & Buses
+### Hardware Abstraction & Buses
 - ✅ PCI
 - ✅ PCIe
 - ✅ Device Tree
@@ -175,7 +175,7 @@ To run CryptixOS in QEMU:
 - ⬜ USB
 - ⬜ Embedded Controller
 
-### 📟 Character Devices
+### Character Devices
 - ✅ TTY
 - ⬜ PTY
 - ✅ Serial
@@ -184,22 +184,22 @@ To run CryptixOS in QEMU:
 - ✅ PC Speaker
 - ⬜ Virtio Console
 
-## 🌐 Network Stack
+## Network Stack
 
-### 📡 Protocols
+### Protocols
 - ⬜ ARP
 - ⬜ TCP
 - ⬜ UDP
 
-### 🔌 Network Interface Cards (NICs)
+### Network Interface Cards (NICs)
 - ✅ Rtl8139
 - ⬜ Virtio NIC
 
-## 📁 Virtual File System
+## Virtual File System
 
 - ⬜ Named Pipes
 
-### 📂 File Systems
+### File Systems
 - ✅ DevTmpFs
 - ✅ Ext2Fs
 - ✅ Fat32Fs
@@ -213,7 +213,7 @@ To run CryptixOS in QEMU:
 - ⬜ Iso9660Fs
 - ⬜ EfiVarsFs
 
-## 🧠 Syscall & Core
+## Syscall & Core
 
 - ⬜ Signals
 - ⬜ Thread API
@@ -221,9 +221,9 @@ To run CryptixOS in QEMU:
 - ✅ Session Management
 - ⬜ Networking
 
-## 📸 Screenshots / Output
+## Screenshots / Output
 <img src="./Meta/images/screenshot.png">
 
-## 📚 License
+## License
 CryptixOS is licensed under the GPL-3.0. See LICENSE for details.
 
