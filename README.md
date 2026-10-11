@@ -74,15 +74,15 @@ To run CryptixOS in QEMU:
 
 ## Features
 
-- ✅ Fully custom C++ kernel with standard containers
-- ✅ ELF loading and userland support
-- ✅ PCI / ACPI / APIC / HPET / NVMe / PS/2
-- ✅ Multiple filesystems: ext2, tmpfs, procfs, fat32
-- ✅ Basic userland shell
-- ✅ Lazy Loading the pages 
-- ⏳ Signals, AHCI, and full networking coming soon
-- ⏳ Networking
-- ⏳ Module support
+- [x] Fully custom C++ kernel with standard containers
+- [x] ELF loading and userland support
+- [x] PCI / ACPI / APIC / HPET / NVMe / PS/2
+- [x] Multiple filesystems: ext2, tmpfs, procfs, fat32
+- [x] Basic userland shell
+- [x] Lazy Loading the pages 
+- [ ] Signals, AHCI, and full networking coming soon
+- [ ] Networking
+- [ ] Module support
 
 ---
 
@@ -128,98 +128,98 @@ To run CryptixOS in QEMU:
 ## Subsystems
 
 ### Scheduler
-- ✅ Per-CPU Wait, Ready, Blocked Queues using IntrusiveLists
-- ✅ Multi-threading
-- ✅ SMP
-- ✅ WaitPid
-- ✅ Events
+- [x] Per-CPU Wait, Ready, Blocked Queues using IntrusiveLists
+- [x] Multi-threading
+- [x] SMP
+- [x] WaitPid
+- [x] Events
 
 ### Memory Manager 
-- ✅ Physical Bitmap Allocator
-- ⬜ Physical Buddy Allocator
-- ✅ Virtual Memory Allocator, using Red-Black Tree
-- ✅ Heap Slab Allocator
-- ⬜ Heap Slob Allocator
+- [x] Physical Bitmap Allocator
+- [ ] Physical Buddy Allocator
+- [x] Virtual Memory Allocator, using Red-Black Tree
+- [x] Heap Slab Allocator
+- [ ] Heap Slob Allocator
 
 ## Drivers
 
 ### Base
-- ✅ Kernel Module Loader
+- [x] Kernel Module Loader
 
 ### Storage
-- ✅ MBR
-- ⬜ EBR
-- ✅ GPT
-- ✅ NVMe
-- ⬜ AHCI
-- ⬜ SCSI
-- ⬜ Virtio
+- [x] MBR
+- [ ] EBR
+- [x] GPT
+- [x] NVMe
+- [ ] AHCI
+- [ ] SCSI
+- [ ] Virtio
 
 ### Timekeeping
-- ✅ PIT
-- ✅ Local APIC Timer
-- ✅ RTC
-- ⬜ KVM Clock
-- ✅ HPET
+- [x] PIT
+- [x] Local APIC Timer
+- [x] RTC
+- [ ] KVM Clock
+- [x] HPET
 
 ### IRQ Controllers
-- ✅ PIC
-- ✅ I/O APIC
+- [x] PIC
+- [x] I/O APIC
 
 ### Hardware Abstraction & Buses
-- ✅ PCI
-- ✅ PCIe
-- ✅ Device Tree
-- ✅ ACPI
-- ✅ Basic Power Management (Reboot, Shutdown)
-- ⬜ USB
-- ⬜ Embedded Controller
+- [x] PCI
+- [x] PCIe
+- [x] Device Tree
+- [x] ACPI
+- [x] Basic Power Management (Reboot, Shutdown)
+- [ ] USB
+- [ ] Embedded Controller
 
 ### Character Devices
-- ✅ TTY
-- ⬜ PTY
-- ✅ Serial
-- ✅ I8042 Controller
-- ✅ PS/2 Keyboard
-- ✅ PC Speaker
-- ⬜ Virtio Console
+- [x] TTY
+- [ ] PTY
+- [x] Serial
+- [x] I8042 Controller
+- [x] PS/2 Keyboard
+- [x] PC Speaker
+- [ ] Virtio Console
 
 ## Network Stack
 
 ### Protocols
-- ⬜ ARP
-- ⬜ TCP
-- ⬜ UDP
+- [ ] ARP
+- [ ] TCP
+- [ ] UDP
 
 ### Network Interface Cards (NICs)
-- ✅ Rtl8139
-- ⬜ Virtio NIC
+- [x] Rtl8139
+- [ ] Virtio NIC
 
 ## Virtual File System
 
-- ⬜ Named Pipes
+- [ ] Named Pipes
 
 ### File Systems
-- ✅ DevTmpFs
-- ✅ Ext2Fs
-- ✅ Fat32Fs
-- ✅ ProcFs
-- ✅ TmpFs
-- ✅ Initrd
-- ⬜ SysFs
-- ⬜ DevPtsFs
-- ⬜ Plan9Fs
-- ⬜ DevLoopFs
-- ⬜ Iso9660Fs
-- ⬜ EfiVarsFs
+- [x] DevTmpFs
+- [x] Ext2Fs
+- [x] Fat32Fs
+- [x] ProcFs
+- [x] TmpFs
+- [x] Initrd
+- [ ] SysFs
+- [ ] DevPtsFs
+- [ ] Plan9Fs
+- [ ] DevLoopFs
+- [ ] Iso9660Fs
+- [ ] EfiVarsFs
 
 ## Syscall & Core
 
-- ⬜ Signals
-- ⬜ Thread API
-- ✅ VFS
-- ✅ Session Management
-- ⬜ Networking
+- [ ] Signals
+- [ ] Thread API
+- [x] VFS
+- [x] Session Management
+- [ ] Networking
 
 ## Screenshots / Output
 <img src="./Meta/images/screenshot.png">
