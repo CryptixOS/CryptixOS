@@ -25,9 +25,6 @@ export import :Arch.x86_64.IO;
 export import :Memory.AddressRange;
 export import :Memory.MMIO;
 
-#ifdef CTOS_TARGET_X86_64
-#endif
-
 export enum class IoSpace
 {
     eNone = 0x00,

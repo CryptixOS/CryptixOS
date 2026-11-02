@@ -79,9 +79,6 @@ import :Memory.PMM;
 import :Memory.VMM;
 import :System.InterruptManager;
 
-#ifdef CTOS_TARGET_X86_64
-#endif
-
 namespace PCI
 {
     Pointer Bar::Map(usize alignment)

@@ -6,7 +6,6 @@
 
 target_sources(cryptix_kernel
   PRIVATE
-    Syscall.cpp
     interrupts.S
     signal_trampoline.S
   PUBLIC FILE_SET CXX_MODULES FILES
@@ -16,6 +15,7 @@ target_sources(cryptix_kernel
     Arch.cpp
     CPU.cpp
     InterruptManager.cpp
+    Syscall.cpp
     VMM.cpp
 )
 

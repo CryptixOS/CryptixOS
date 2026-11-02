@@ -74,7 +74,9 @@ module;
 module Cryptix:Impl.API.Time;
 
 import :API.Time;
+#if defined(CTOS_TARGET_X86_64)
 import :Arch.x86_64.Drivers.Time.RTC;
+#endif
 import :Scheduler.Process;
 import :Time.Time;
 

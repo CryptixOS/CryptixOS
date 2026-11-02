@@ -65,9 +65,6 @@
 
 import Cryptix;
 
-#ifdef CTOS_TARGET_X86_64
-#endif
-
 class BochsAdapter : public PCI::Device
 {
   public:

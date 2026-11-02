@@ -71,9 +71,6 @@ export import :Drivers.USB.UHCI.Definitions;
 export import :Drivers.USB.UHCI.UHCiDescriptorPool;
 export import :Memory.IORegion;
 
-#ifdef CTOS_TARGET_X86_64
-#endif
-
 export namespace USB::UHCI
 {
     class Controller : public HostController, public PCI::Device, public Device

@@ -29,9 +29,6 @@ export import :Arch.x86_64.IO;
 #endif
 export import :Memory.MMIO;
 
-#ifdef CTOS_TARGET_X86_64
-#endif
-
 export namespace ACPI
 {
     struct CTOS_PACKED SDTHeader

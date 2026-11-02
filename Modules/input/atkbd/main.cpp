@@ -75,9 +75,6 @@ import Cryptix;
 import Cryptix.Modules.I8042;
 #endif
 
-#ifdef __x86_64__
-#endif
-
 using namespace Prism;
 
 constexpr usize   SCANCODE_MAX               = Size(PS2_Set1_Keys);

@@ -85,9 +85,6 @@ import :Time.Time;
 import :VFS.MountPoint;
 import :VFS.VFS;
 
-#ifdef CTOS_TARGET_X86_64
-#endif
-
 namespace
 {
     Spinlock s_Lock{};

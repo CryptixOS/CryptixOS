@@ -74,9 +74,6 @@ import :Firmware.ACPI.ACPI;
 import :Firmware.EFI.SystemTable;
 import :Memory.VMM;
 
-#ifdef CTOS_TARGET_X86_64
-#endif
-
 namespace PowerManager
 {
     void Reboot()

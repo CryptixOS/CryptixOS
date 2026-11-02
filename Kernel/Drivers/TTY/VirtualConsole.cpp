@@ -78,9 +78,6 @@ import :Drivers.TTY.VirtualConsole;
 import :Library.Unicode;
 import :Memory.PMM;
 
-#ifdef CTOS_TARGET_X86_64
-#endif
-
 using namespace StringUtils;
 
 Vector<VirtualConsole*>          VirtualConsole::s_Terminals = {};

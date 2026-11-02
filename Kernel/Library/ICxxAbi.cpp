@@ -22,9 +22,6 @@ module Cryptix:Impl.Library.ICxxAbi;
 
 import :Library.Logger;
 
-#ifdef CTOS_TARGET_X86_64
-#endif
-
 using DestructorFunction = void (*)(void*);
 
 struct AtExitFunctionEntry

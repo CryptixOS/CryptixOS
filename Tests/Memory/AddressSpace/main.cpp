@@ -4,8 +4,9 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Memory/AddressSpace.hpp>
-#include <Memory/Region.hpp>
+#include <Common.hpp>
+
+import Cryptix;
 
 void Test_AllocateBasicRegion()
 {
