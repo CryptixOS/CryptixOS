@@ -4,15 +4,45 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/BootMemoryInfo.hpp>
-#include <Debug/Debug.hpp>
 
-#include <Firmware/EFI/Memory.hpp>
-#include <Firmware/EFI/SystemTable.hpp>
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
 #include <Library/Logger.hpp>
-
-#include <Memory/VMM.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Debug/Debug.hpp>
+#include <Firmware/EFI/Types.hpp>
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
 #include <Prism/String/StringUtils.hpp>
+
+module Cryptix:Impl.Firmware.EFI.Initialize;
+
+import :Boot.BootMemoryInfo;
+import :Firmware.EFI.Memory;
+import :Firmware.EFI.SystemTable;
+import :Library.Logger;
+import :Memory.VMM;
 
 namespace EFI
 {

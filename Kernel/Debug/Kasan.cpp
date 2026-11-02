@@ -4,20 +4,32 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <Common.hpp>
-
 #include <Debug/Assertions.hpp>
-#include <Debug/Kasan.hpp>
-#include <Debug/Panic.hpp>
-
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Prism/Memory/Pointer.hpp>
 #include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
 
-namespace MM
-{
-    usize HigherHalfOffset();
-};
-using MM::HigherHalfOffset;
+module Cryptix:Impl.Debug.Kasan;
+
+import :Debug.Assertions;
+import :Library.Logger;
+import :Library.Stacktrace;
+import :Debug.Kasan;
+import :Debug.KernelPanic;
+
+using MM::HigherHalfOffset;      // declared by Prism/Memory/Pointer.hpp
 
 namespace Kasan
 {

@@ -4,60 +4,128 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <Common.hpp>
-#include <Version.hpp>
-
-#include <API/Syscall.hpp>
-
-#include <Arch/CPU.hpp>
-#include <Boot/BootInfo.hpp>
-#include <Boot/CommandLine.hpp>
-
-#include <Drivers/ACPI/Bus.hpp>
-#include <Drivers/Core/CharacterDevice.hpp>
-#include <Drivers/PCI/PCI.hpp>
-#include <Drivers/Serial.hpp>
-#include <Drivers/TTY/TTY.hpp>
-#include <Drivers/TTY/VirtualConsole.hpp>
-#include <Drivers/USB/USB.hpp>
-#include <Drivers/Video/FramebufferDevice.hpp>
-
-#include <Firmware/ACPI/ACPI.hpp>
-#include <Firmware/DMI/SMBIOS.hpp>
-#include <Firmware/DeviceTree/DeviceTree.hpp>
-
-#include <Library/ExecutableProgram.hpp>
-#include <Library/ICxxAbi.hpp>
-#include <Library/Image.hpp>
-#include <Library/Module.hpp>
-#include <Library/Stacktrace.hpp>
-
-#include <Memory/MM.hpp>
-#include <Memory/PMM.hpp>
-#include <Memory/ScopedMapping.hpp>
-#include <Memory/VMM.hpp>
-
-#include <Memory/Allocator/KernelHeap.hpp>
-
-#include <Prism/Containers/Array.hpp>
-#include <Prism/Containers/RedBlackTree.hpp>
-#include <Prism/Memory/Endian.hpp>
-#include <Prism/String/StringUtils.hpp>
+#include <Debug/Assertions.hpp>
 #include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/Syscall.hpp>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Tuple.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <magic_enum/magic_enum.hpp>
+#include <magic_enum/magic_enum_format.hpp>
+#include <Prism/Core/UUID.hpp>
+#include <Prism/Network/IPv4Address.hpp>
+#include <limine.h>
+#include <Prism/Utility/Optional.hpp>
+#include <API/UnixTypes.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
 #include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <API/Posix/linux/fb.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Core/Concepts.hpp>
+#endif
+#include <Prism/String/StringUtils.hpp>
+#include <Prism/Memory/Endian.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/ByteStream.hpp>
+#include <Library/Module.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <API/Posix/linux/capability.h>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
+#include <Prism/Core/Singleton.hpp>
+#include <Prism/Core/Iterator.hpp>
+#include <API/Posix/sys/statfs.h>
 
-#include <Scheduler/Process.hpp>
-#include <Scheduler/Scheduler.hpp>
-#include <Scheduler/Thread.hpp>
+module Cryptix:Impl.KernelStart;
 
-#include <System/System.hpp>
-#include <Time/Time.hpp>
-
-#include <VFS/Filesystem.hpp>
-#include <VFS/INode.hpp>
-#include <VFS/Initrd/Initrd.hpp>
-#include <VFS/MountPoint.hpp>
-#include <VFS/VFS.hpp>
+import :Debug.Assertions;
+import :Library.Logger;
+import :Library.Stacktrace;
+import :API.Syscall;
+import :Arch.CPU;
+import :Boot.BootInfo;
+import :Boot.CommandLine;
+import :Drivers.ACPI.Bus;
+import :Drivers.Core.CharacterDevice;
+import :Drivers.PCI.PCI;
+import :Drivers.Serial;
+import :Drivers.TTY.TTY;
+import :Drivers.TTY.VirtualConsole;
+import :Drivers.USB.USB;
+import :Drivers.Video.FramebufferDevice;
+import :Firmware.ACPI.ACPI;
+import :Firmware.DMI.SMBIOS;
+import :Firmware.DeviceTree.DeviceTree;
+import :Library.ExecutableProgram;
+import :Library.ICxxAbi;
+import :Library.Image;
+import :Library.Module;
+import :Memory.MM;
+import :Memory.PMM;
+import :Memory.ScopedMapping;
+import :Memory.VMM;
+import :Memory.Allocator.KernelHeap;
+import :Scheduler.Process;
+import :Scheduler.Scheduler;
+import :Scheduler.Thread;
+import :System.System;
+import :Time.Time;
+import :VFS.Filesystem;
+import :VFS.INode;
+import :VFS.Initrd.Initrd;
+import :VFS.MountPoint;
+import :VFS.VFS;
+import :Version;
 
 namespace EFI
 {

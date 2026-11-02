@@ -4,14 +4,25 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <Compiler.hpp>
 #include <Library/Logger.hpp>
 #include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
 #include <Prism/Debug/Assertions.hpp>
-
 #include <cxxabi.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <immintrin.h>
+#endif
+
+module Cryptix:Impl.Library.ICxxAbi;
+
+import :Library.Logger;
+
 #ifdef CTOS_TARGET_X86_64
-    #include <immintrin.h>
 #endif
 
 using DestructorFunction = void (*)(void*);

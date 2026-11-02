@@ -4,18 +4,86 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/x86_64/CPU.hpp>
-#include <Arch/x86_64/Drivers/Time/HPET.hpp>
-#include <Arch/x86_64/Drivers/Time/Lapic.hpp>
-#include <Arch/x86_64/Drivers/Time/PIT.hpp>
 
-#include <Firmware/ACPI/ACPI.hpp>
+module;
 
-#include <Memory/VMM.hpp>
-#include <Scheduler/Scheduler.hpp>
-#include <System/InterruptManager.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Core/Concepts.hpp>
+#endif
+#include <Prism/String/StringUtils.hpp>
+#include <API/UnixTypes.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Core/Singleton.hpp>
+#include <Prism/Memory/RefCounted.hpp>
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <API/Posix/linux/capability.h>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
 
-#include <Time/Time.hpp>
+module Cryptix:Impl.Arch.x86_64.Drivers.Time.Lapic;
+
+import :Arch.x86_64.CPU;
+import :Arch.x86_64.Drivers.Time.HPET;
+import :Arch.x86_64.Drivers.Time.Lapic;
+import :Arch.x86_64.Drivers.Time.PIT;
+import :Firmware.ACPI.ACPI;
+import :Memory.VMM;
+import :Scheduler.Scheduler;
+import :System.InterruptManager;
+import :Time.Time;
 
 constexpr u32                  LAPIC_EOI_ACK                      = 0x00;
 CTOS_UNUSED constexpr u32      APIC_BASE_MSR                      = 0x1b;

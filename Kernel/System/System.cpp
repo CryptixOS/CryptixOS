@@ -4,24 +4,90 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/BootModuleInfo.hpp>
-#include <Drivers/PCI/PCI.hpp>
 
-#include <Firmware/ACPI/ACPI.hpp>
-#include <Firmware/ACPI/SRAT.hpp>
+module;
 
-#include <Library/ELF/Image.hpp>
-#include <Library/ELF/Loader.hpp>
-#include <Library/Locking/SpinlockProtected.hpp>
-#include <Library/Module.hpp>
-
-#include <Memory/VMM.hpp>
-#include <Prism/Containers/BitSpan.hpp>
+#include <Prism/Core/UUID.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Network/IPv4Address.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/UnixTypes.hpp>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Core/Concepts.hpp>
+#endif
 #include <Prism/String/StringUtils.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Library/Module.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <Prism/Containers/BitSpan.hpp>
+#include <Prism/Core/Iterator.hpp>
+#include <API/Posix/sys/statfs.h>
 
-#include <System/System.hpp>
-#include <VFS/DirectoryEntry.hpp>
-#include <VFS/VFS.hpp>
+module Cryptix:Impl.System.System;
+
+import :Boot.BootModuleInfo;
+import :Drivers.PCI.PCI;
+import :Firmware.ACPI.ACPI;
+import :Firmware.ACPI.SRAT;
+import :Library.ELF.Image;
+import :Library.ELF.Loader;
+import :Library.Locking.SpinlockProtected;
+import :Library.Module;
+import :Memory.VMM;
+import :System.System;
+import :VFS.INode;
+import :VFS.VFS;
 
 extern "C" ModulePreludium module_init_start_addr[];
 extern "C" ModulePreludium module_init_end_addr[];

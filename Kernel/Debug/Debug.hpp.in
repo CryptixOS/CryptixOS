@@ -10,12 +10,12 @@
 // Any debug options land here
 //--------------------------------------------------------------------------
 
-#mesondefine CTOS_MM_DUMP_MEMMAP
-#mesondefine CTOS_PCI_DUMP_IRQ_ROUTES
-#mesondefine CTOS_DTB_DUMP
-#mesondefine CTOS_EFI_DUMP_MEMMAP
-#mesondefine CTOS_TTY_LOG_TERMIOS
-#mesondefine CTOS_VFS_DEBUG_ECHFS
-#mesondefine CTOS_DUMP_INIT_ARRAY
-#mesondefine CTOS_ELF_DEBUG
-#mesondefine CTOS_DEVICE_TREE_DUMP
+#define CTOS_MM_DUMP_MEMMAP @CTOS_MM_DUMP_MEMMAP@
+#define CTOS_PCI_DUMP_IRQ_ROUTES @CTOS_PCI_DUMP_IRQ_ROUTES@
+#define CTOS_DTB_DUMP @CTOS_DTB_DUMP@
+#define CTOS_EFI_DUMP_MEMMAP @CTOS_EFI_DUMP_MEMMAP@
+#define CTOS_TTY_LOG_TERMIOS @CTOS_TTY_LOG_TERMIOS@
+#define CTOS_VFS_DEBUG_ECHFS @CTOS_VFS_DEBUG_ECHFS@
+#define CTOS_DUMP_INIT_ARRAY @CTOS_DUMP_INIT_ARRAY@
+#define CTOS_ELF_DEBUG @CTOS_ELF_DEBUG@
+#define CTOS_DEVICE_TREE_DUMP @CTOS_DEVICE_TREE_DUMP@

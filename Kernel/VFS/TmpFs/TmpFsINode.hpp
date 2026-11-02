@@ -4,16 +4,10 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
 #pragma once
 
-#include <Library/Logger.hpp>
 #include <Prism/Memory/Buffer.hpp>
-
-#include <VFS/DirectoryEntry.hpp>
-#include <VFS/SynthFsINode.hpp>
-
-extern bool g_LogTmpFs;
-
 #define CTOS_DEBUG_TMPFS 1
 #if CTOS_DEBUG_TMPFS != 0
     #define TmpFsTrace(...)                                                    \
@@ -21,13 +15,3 @@ extern bool g_LogTmpFs;
 #else
     #define TmpFsTrace(...)
 #endif
-
-class TmpFsINode final : public SynthFsINode
-{
-  public:
-    TmpFsINode(StringView name, class Filesystem* fs, INodeID id,
-               INodeMode mode);
-
-  private:
-    friend class TmpFs;
-};

@@ -6,9 +6,6 @@
  */
 #pragma once
 
-#include <Debug/Assertions.hpp>
-#include <Library/Logger.hpp>
-#include <Library/Stacktrace.hpp>
 #include <Prism/Core/Types.hpp>
 
 #define KERNEL_INIT_CODE_SECTION_NAME ".kernel_init"

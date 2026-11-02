@@ -4,34 +4,99 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <API/Limits.hpp>
-#include <Arch/CPU.hpp>
-
-#include <Drivers/Core/BlockDevice.hpp>
-#include <Drivers/Core/DeviceManager.hpp>
-
-#include <Library/Locking/Spinlock.hpp>
-#include <Library/Locking/SpinlockProtected.hpp>
-
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <API/UnixTypes.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <Prism/Containers/Array.hpp>
 #include <Prism/String/StringUtils.hpp>
+#include <Prism/Core/Singleton.hpp>
+#include <API/Posix/linux/capability.h>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Config.hpp>
+#include <API/Posix/sys/resource.h>
+#include <Library/Module.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <API/Posix/sys/statfs.h>
+#include <VFS/EchFs/EchFsStructures.hpp>
+#include <VFS/TmpFs/TmpFsINode.hpp>
 
-#include <Scheduler/Scheduler.hpp>
-#include <Time/Time.hpp>
+module Cryptix:Impl.VFS.VFS;
 
-#include <VFS/DevPtsFs/DevPtsFs.hpp>
-#include <VFS/DevTmpFs/DevTmpFs.hpp>
-#include <VFS/DirectoryEntry.hpp>
-#include <VFS/EchFs/EchFs.hpp>
-#include <VFS/EchFs/EchFsINode.hpp>
-#include <VFS/Ext2Fs/Ext2Fs.hpp>
-#include <VFS/Fat32Fs/Fat32Fs.hpp>
-#include <VFS/INode.hpp>
-#include <VFS/Initrd/Initrd.hpp>
-#include <VFS/MountPoint.hpp>
-#include <VFS/PathResolver.hpp>
-#include <VFS/ProcFs/ProcFs.hpp>
-#include <VFS/TmpFs/TmpFs.hpp>
-#include <VFS/VFS.hpp>
+import :Arch.CPU;
+import :Drivers.Core.BlockDevice;
+import :Drivers.Core.DeviceManager;
+import :Library.Locking.Spinlock;
+import :Library.Locking.SpinlockProtected;
+import :Scheduler.Scheduler;
+import :Time.Time;
+import :VFS.DevPtsFs.DevPtsFs;
+import :VFS.DevTmpFs.DevTmpFs;
+import :VFS.INode;
+import :VFS.EchFs.EchFs;
+import :VFS.EchFs.EchFsINode;
+import :VFS.Ext2Fs.Ext2Fs;
+import :VFS.Fat32Fs.Fat32Fs;
+import :VFS.Initrd.Initrd;
+import :VFS.MountPoint;
+import :VFS.PathResolver;
+import :VFS.ProcFs.ProcFs;
+import :VFS.TmpFs.TmpFs;
+import :VFS.VFS;
 
 namespace VFS
 {

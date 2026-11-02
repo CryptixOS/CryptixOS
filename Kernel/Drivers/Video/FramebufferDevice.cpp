@@ -4,19 +4,79 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <API/DeviceIDs.hpp>
 
-#include <Drivers/Core/DeviceManager.hpp>
-#include <Drivers/TTY/VirtualConsole.hpp>
-#include <Drivers/Video/FramebufferDevice.hpp>
+module;
 
+#include <Prism/Core/Types.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/termios.h>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/UnixTypes.hpp>
+#include <Compiler.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <API/Posix/linux/fb.h>
 #include <Prism/Algorithm/Find.hpp>
 #include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Compare.hpp>
+#include <API/Posix/sys/statfs.h>
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
 
-#include <VFS/DevTmpFs/DevTmpFs.hpp>
-#include <VFS/INode.hpp>
-#include <VFS/VFS.hpp>
+module Cryptix:Impl.Drivers.Video.FramebufferDevice;
+
+import :API.DeviceIDs;
+import :Drivers.Core.DeviceManager;
+import :Drivers.TTY.VirtualConsole;
+import :Drivers.Video.FramebufferDevice;
+import :VFS.DevTmpFs.DevTmpFs;
+import :VFS.INode;
+import :VFS.VFS;
 
 static Mutex               s_Mutex;
 static FramebufferDevice*  s_PrimaryFramebuffer = nullptr;
@@ -377,7 +437,7 @@ ErrorOr<void> FramebufferDevice::SetVar(fb_var_screeninfo& var)
 
     if ((var.activate & FB_ACTIVATE_FORCE)
         || Memory::Compare(&m_VariableScreenInfo, &var,
-                           sizeof(struct fb_var_screeninfo)))
+                           sizeof(fb_var_screeninfo)))
     {
         u32  activate = var.activate;
 
@@ -391,7 +451,7 @@ ErrorOr<void> FramebufferDevice::SetVar(fb_var_screeninfo& var)
 
         if ((var.activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW)
         {
-            struct fb_var_screeninfo oldVar;
+            fb_var_screeninfo oldVar;
             auto                     ret = CheckCapabilities(var, activate);
             if (ret) return {};
 
@@ -405,11 +465,11 @@ ErrorOr<void> FramebufferDevice::SetVar(fb_var_screeninfo& var)
 ErrorOr<void> FramebufferDevice::SetUserColorMap(fb_cmap& cmap)
 {
     int            size = cmap.len * sizeof(u16);
-    struct fb_cmap umap;
+    fb_cmap umap;
 
     if (size < 0 || size < static_cast<int>(cmap.len)) return Error(E2BIG);
 
-    Memory::Fill(&umap, 0, sizeof(struct fb_cmap));
+    Memory::Fill(&umap, 0, sizeof(fb_cmap));
 
     if (!CopyFromUser(umap.red, cmap.red, size)
         || !CopyFromUser(umap.green, cmap.green, size)

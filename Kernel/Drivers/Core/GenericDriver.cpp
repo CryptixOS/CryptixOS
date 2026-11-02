@@ -4,7 +4,15 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Drivers/Core/GenericDriver.hpp>
+
+module;
+
+#include <Prism/String/String.hpp>
+#include <Prism/Core/Error.hpp>
+
+module Cryptix:Impl.Drivers.Core.GenericDriver;
+
+import :Drivers.Core.GenericDriver;
 
 static Vector<GenericDriver*> s_GenericDrivers;
 

@@ -4,23 +4,91 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <API/Posix/linux/ptrace.h>
 #include <API/Posix/linux/sched.h>
 #include <API/Posix/sys/mman.h>
 #include <API/Posix/sys/wait.h>
-#include <API/Process.hpp>
-#include <Arch/InterruptGuard.hpp>
-
+#include <API/Posix/signal.h>
+#include <API/Syscall.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Tuple.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <magic_enum/magic_enum.hpp>
+#include <magic_enum/magic_enum_format.hpp>
+#include <API/UnixTypes.hpp>
+#include <API/Posix/linux/time.h>
+#include <API/Posix/sys/resource.h>
 #include <Prism/String/StringUtils.hpp>
-#include <Scheduler/Process.hpp>
-#include <Scheduler/Scheduler.hpp>
-#include <Scheduler/Thread.hpp>
-#include <Time/Time.hpp>
+#include <API/Posix/linux/capability.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <Prism/Core/Singleton.hpp>
+
+module Cryptix:Impl.API.Process;
+
+import :API.Process;
+import :Arch.InterruptGuard;
+import :Scheduler.Process;
+import :Scheduler.Scheduler;
+import :Scheduler.Thread;
+import :Time.Time;
 
 namespace API::Process
 {
     using ::Process;
-    static ErrorOr<Thread*> DoClone3(struct clone_args& args)
+    static ErrorOr<Thread*> DoClone3(clone_args& args)
     {
         auto  current       = Process::Current();
         auto  currentThread = Thread::Current();
@@ -67,7 +135,7 @@ namespace API::Process
         return cloned.Raw();
     }
 
-    ErrorOr<isize> SigAction(isize signal, const struct sigaction* action,
+    ErrorOr<isize> SigAction(isize signal, const sigaction* action,
                              sigaction* oldAction)
     {
         auto process = Process::Current();
@@ -85,7 +153,7 @@ namespace API::Process
             const SignalAction& oldSignalAction
                 = process->SignalAction(static_cast<SignalID>(signal));
 
-            struct sigaction old{};
+            sigaction old{};
             old.sa_handler  = oldSignalAction.VirtualAddress;
             old.sa_flags    = oldSignalAction.Flags;
             old.sa_restorer = nullptr;
@@ -486,7 +554,7 @@ namespace API::Process
     }
 
     ErrorOr<isize> SigSuspend(const sigset_t* mask) { return Error(ENOSYS); }
-    ErrorOr<isize> SigAltStack(const struct sigaltstack* ss, sigaltstack* oldSs)
+    ErrorOr<isize> SigAltStack(const sigaltstack* ss, sigaltstack* oldSs)
     {
         return Error(ENOSYS);
     }
@@ -497,7 +565,7 @@ namespace API::Process
         return thread->ID();
     }
 
-    ErrorOr<isize> Clone3(struct clone_args* uargs, usize size)
+    ErrorOr<isize> Clone3(clone_args* uargs, usize size)
     {
         auto current = Process::Current();
 

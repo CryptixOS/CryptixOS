@@ -4,14 +4,44 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <Common.hpp>
-
-#include <Library/Locking/Spinlock.hpp>
-#include <Memory/PMM.hpp>
-#include <Memory/PageMap.hpp>
-
-#include <Memory/Allocator/KernelHeap.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
 #include <Prism/Memory/SlabPool.hpp>
+
+module Cryptix:Impl.Memory.Allocator.KernelHeap;
+
+import :Debug.Assertions;
+import :Library.Logger;
+import :Library.Stacktrace;
+import :Library.Locking.Spinlock;
+import :Memory.PMM;
+import :Memory.PageMap;
+import :Memory.Allocator.KernelHeap;
 
 namespace VMM
 {
@@ -114,29 +144,3 @@ namespace KernelHeap
     }
     void Free(Pointer memory) { return s_SlabPool->Free(memory); }
 } // namespace KernelHeap
-
-void* operator new(usize size) { return KernelHeap::Callocate(size); }
-void* operator new(usize size, AlignmentType)
-{
-    return KernelHeap::Callocate(size);
-}
-void* operator new[](usize size) { return KernelHeap::Callocate(size); }
-void* operator new[](usize size, AlignmentType)
-{
-    return KernelHeap::Callocate(size);
-}
-void operator delete(void* memory) noexcept { KernelHeap::Free(memory); }
-void operator delete(void* memory, AlignmentType) noexcept
-{
-    KernelHeap::Free(memory);
-}
-void operator delete(void* memory, usize) noexcept { KernelHeap::Free(memory); }
-void operator delete[](void* memory) noexcept { KernelHeap::Free(memory); }
-void operator delete[](void* memory, AlignmentType) noexcept
-{
-    KernelHeap::Free(memory);
-}
-void operator delete[](void* memory, usize) noexcept
-{
-    KernelHeap::Free(memory);
-}

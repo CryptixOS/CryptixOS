@@ -1,0 +1,55 @@
+/*
+ * Created by v1tr10l7 on 24.06.2025.
+ * Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
+ *
+ * SPDX-License-Identifier: GPL-3
+ */
+
+module;
+
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Utility/Delegate.hpp>
+
+export module Cryptix:VFS.MountPoint;
+
+import :VFS.INode;
+import :VFS.Filesystem;
+
+export class DirectoryEntry;
+export class Filesystem;
+export class MountPoint : public RefCounted
+{
+  public:
+    using Iterator = Delegate<IterationResult(::Ref<MountPoint> mountPoint)>;
+
+    explicit MountPoint(::Ref<DirectoryEntry> hostEntry  = nullptr,
+                        ::Ref<Filesystem>     filesystem = nullptr);
+
+    ::Ref<DirectoryEntry>    HostEntry() const;
+    ::Ref<DirectoryEntry>    GuestEntry() const;
+    ::Ref<Filesystem>        Filesystem() const;
+
+    static void              Attach(::Ref<MountPoint> mountPoint);
+    static ::Ref<MountPoint> Lookup(::Ref<DirectoryEntry> entry);
+
+    static ::Ref<MountPoint> Head();
+    static ::Ref<MountPoint> Tail();
+    static void              Iterate(Iterator iterator);
+
+    ::Ref<MountPoint>        NextMountPoint() const;
+    ::Ref<DirectoryEntry>    ExchangeGuest(::Ref<DirectoryEntry> dentry);
+
+  private:
+    ::Ref<DirectoryEntry>   m_Host       = nullptr;
+    ::Ref<DirectoryEntry>   m_Guest      = nullptr;
+    ::Ref<class Filesystem> m_Filesystem = nullptr;
+
+    friend class IntrusiveRefList<MountPoint>;
+    friend struct IntrusiveRefListHook<MountPoint>;
+
+    IntrusiveRefListHook<MountPoint> Hook;
+
+    using List = IntrusiveRefList<MountPoint>;
+    static List s_MountPoints;
+};

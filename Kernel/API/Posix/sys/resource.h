@@ -31,7 +31,7 @@ struct rusage
     i64     ru_inblock;
     i64     ru_oublock;
     i64     ru_msgsnd;
-    i64     ru_msgrscv;
+    i64     ru_msgrcv;
     i64     ru_nsignals;
     i64     ru_nvcsw;
     i64     ru_nivcsw;

@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <Common.hpp>
+#include <Prism/Core/Types.hpp>
 
 constexpr usize MS_RDONLY      = Bit(0);
 constexpr usize MS_NOSUID      = Bit(1);

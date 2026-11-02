@@ -4,12 +4,84 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Network/LocalSocket.hpp>
-#include <Prism/String/StringUtils.hpp>
-#include <Scheduler/Process.hpp>
-#include <VFS/VFS.hpp>
 
-static UnorderedMap<INode*, LocalSocket*> s_Sockets;
+module;
+
+#include <API/Posix/bits/socket.h>
+#include <API/Posix/bits/socket_type.h>
+#include <Prism/Containers/Queue.hpp>
+#include <Prism/Core/Types.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Deque.hpp>
+#include <API/UnixTypes.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <linux/un.h>
+#include <Prism/String/StringUtils.hpp>
+#include <API/Posix/linux/capability.h>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
+#include <Library/Module.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <API/Posix/sys/statfs.h>
+
+module Cryptix:Impl.Network.LocalSocket;
+
+import :Network.LocalSocket;
+import :Scheduler.Process;
+import :VFS.VFS;
+
+static UnorderedMap<usize, LocalSocket*> s_Sockets;
 
 LocalSocket::LocalSocket(SocketDomain, SocketType type, NetworkProtocol proto)
     : Socket(SocketDomain::eLocal, type, proto)
@@ -29,7 +101,7 @@ ErrorOr<LocalSocket*> LocalSocket::Create(SocketDomain domain, SocketType type,
     return new LocalSocket(domain, type, proto);
 }
 
-ErrorOr<void> LocalSocket::Connect(const struct sockaddr* addr,
+ErrorOr<void> LocalSocket::Connect(const sockaddr* addr,
                                    socklen_t              addrlen)
 {
     Assert(m_State == SocketState::eNotConnected);
@@ -56,7 +128,7 @@ ErrorOr<void> LocalSocket::Connect(const struct sockaddr* addr,
     auto entry    = pathRes.Entry;
     auto inode    = entry->INode();
 
-    auto socketIt = s_Sockets.Find(inode.Raw());
+    auto socketIt = s_Sockets.Find(reinterpret_cast<usize>(inode.Raw()));
     if (socketIt == s_Sockets.end()) return Error(ECONNREFUSED);
 
     auto listener = socketIt->Value;
@@ -89,12 +161,12 @@ ErrorOr<isize> LocalSocket::ReceiveFrom(u8* data, usize size, isize flags,
     return Error(ENOSYS);
 }
 
-ErrorOr<isize> LocalSocket::SendMsg(const struct msghdr* msg, isize flags)
+ErrorOr<isize> LocalSocket::SendMsg(const msghdr* msg, isize flags)
 {
     LogDebug("LocalSocket::SendMsg called");
     return Error(ENOSYS);
 }
-ErrorOr<void> LocalSocket::Bind(const struct sockaddr* addr, socklen_t len)
+ErrorOr<void> LocalSocket::Bind(const sockaddr* addr, socklen_t len)
 {
     Assert(m_State == SocketState::eNotConnected);
     if (len != sizeof(sockaddr_un))
@@ -142,8 +214,8 @@ ErrorOr<void> LocalSocket::Bind(const struct sockaddr* addr, socklen_t len)
 
     auto inode = dentry->INode();
 
-    if (s_Sockets.Contains(inode.Raw())) return Error(EADDRINUSE);
-    s_Sockets[inode.Raw()] = this;
+    if (s_Sockets.Contains(reinterpret_cast<usize>(inode.Raw()))) return Error(EADDRINUSE);
+    s_Sockets[reinterpret_cast<usize>(inode.Raw())] = this;
     m_INode                = inode.Raw();
 
     m_Path                 = Move(path);

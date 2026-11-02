@@ -1,0 +1,343 @@
+/*
+ * Created by v1tr10l7 on 25.11.2024.
+ * Copyright (c) 2024-2024, Szymon Zemke <v1tr10l7@proton.me>
+ *
+ * SPDX-License-Identifier: GPL-3
+ */
+
+module;
+
+#include <API/Syscall.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Tuple.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <magic_enum/magic_enum.hpp>
+#include <magic_enum/magic_enum_format.hpp>
+
+export module Cryptix:API.Syscall;
+
+export import :Debug.Assertions;
+export import :Library.Logger;
+export import :Library.Stacktrace;
+export import :Arch.CPU;
+export import :Arch.User;
+
+namespace Syscall
+{
+    export template <typename>
+    struct Signature;
+
+    template <typename Ret, typename... Args>
+    struct Signature<Ret(Args...)>
+    {
+        using Type          = Ret(Args...);
+        using ArgsContainer = std::tuple<Args...>;
+        using RetType       = Ret;
+    };
+
+    export struct NullableString
+    {
+        const char* String;
+        explicit constexpr NullableString(const char* s)
+            : String(s)
+        {
+        }
+    };
+    export inline constexpr auto FormatAs(NullableString n)
+    {
+        return n.String ?: "(null)";
+    }
+
+    export template <typename T>
+    using ToFormattablePtr = Conditional<
+        IsPointerV<T>,
+        Conditional<IsConvertibleV<StringView, T>, NullableString, const void*>,
+        T>;
+
+    export template <typename... Ts>
+    auto Ptr(const std::tuple<Ts...>& tup)
+    {
+        return std::tuple<ToFormattablePtr<Ts>...>(tup);
+    }
+
+    export template <typename T>
+    constexpr auto ConvertArgument(upointer value)
+    {
+        if constexpr (IsSameV<RemoveCvRefType<RemoveReferenceType<T>>,
+                              Prism::PathView>)
+            return AsUser(
+                [value]() -> PathView
+                {
+                    return PathView(
+                        StringView(reinterpret_cast<const char*>(value)));
+                });
+        else if constexpr (IsPointerV<T>) return reinterpret_cast<T>(value);
+        else return static_cast<T>(value);
+    }
+
+    export class WrapperBase
+    {
+      public:
+        virtual ~WrapperBase()                                       = default;
+        virtual ErrorOr<upointer> Run(Array<upointer, 6> args) const = 0;
+    };
+    export template <typename Func>
+    class Wrapper : public WrapperBase
+    {
+      public:
+        using Sign = Signature<RemoveCvRefType<Func>>;
+
+        constexpr Wrapper(const char* name, Func* func)
+            : Function(func)
+            , Name(name)
+        {
+        }
+
+        ErrorOr<upointer> Run(Array<upointer, 6> arr) const
+        {
+            typename Sign::ArgsContainer args;
+            usize                        i = 0;
+
+            // Convert array to actual function arguments
+
+            {
+                UserMemoryProtectionGuard guard;
+                std::apply(
+                    [&](auto&&... args)
+                    {
+                        (std::invoke([&]<typename T>(T& arg)
+                                     { arg = ConvertArgument<T>(arr[i++]); },
+                                     args),
+                         ...);
+                    },
+                    args);
+            }
+            errno    = no_error;
+            auto ret = std::apply(Function, args);
+            if (!ret) return Error(ret.error());
+
+            return ret;
+        }
+
+      private:
+        Func*       Function;
+        const char* Name;
+    };
+
+    export struct Arguments
+    {
+        u64      Index;
+        u64      Args[6];
+
+        upointer ReturnValue;
+
+        template <typename T>
+        inline T Get(usize index) const
+        {
+            return T(Args[index]);
+        }
+    };
+
+    export enum class ID : u64
+    {
+        eRead             = 0,
+        eWrite            = 1,
+        eOpen             = 2,
+        eClose            = 3,
+        eStat             = 4,
+        eFStat            = 5,
+        eLStat            = 6,
+        ePoll             = 7,
+        eLSeek            = 8,
+        eMMap             = 9,
+        eMProtect         = 10,
+        eMUnMap           = 11,
+        eBrk              = 12,
+        eSigAction        = 13,
+        eSigProcMask      = 14,
+        eSigReturn        = 15,
+        eIoCtl            = 16,
+        ePRead64          = 17,
+        ePWrite64         = 18,
+        eReadV            = 19,
+        eWriteV           = 20,
+        eAccess           = 21,
+        ePipe             = 22,
+        eSchedYield       = 24,
+        eDup              = 32,
+        eDup2             = 33,
+        eNanoSleep        = 35,
+        eGetITimer        = 36,
+        eAlarm            = 37,
+        eSetITimer        = 38,
+        ePid              = 39,
+        eSocket           = 41,
+        eConnect          = 42,
+        eAccept           = 43,
+        eSendTo           = 44,
+        eRecvFrom         = 45,
+        eSendMsg          = 46,
+        eRecvMsg          = 47,
+        eShutdown         = 48,
+        eBind             = 49,
+        eListen           = 50,
+        eGetSockName      = 51,
+        eGetPeerName      = 52,
+        eSocketPair       = 53,
+        eSetSockOpt       = 54,
+        eGetSockOpt       = 55,
+        eClone            = 56,
+        eFork             = 57,
+        eVFork            = 58,
+        eExecve           = 59,
+        eExit             = 60,
+        eWait4            = 61,
+        eKill             = 62,
+        eUname            = 63,
+        eFCntl            = 72,
+        eTruncate         = 76,
+        eFTruncate        = 77,
+        eGetCwd           = 79,
+        eChDir            = 80,
+        eFChDir           = 81,
+        eRename           = 82,
+        eMkDir            = 83,
+        eRmDir            = 84,
+        eCreat            = 85,
+        eLink             = 86,
+        eUnlink           = 87,
+        eSymlink          = 88,
+        eReadLink         = 89,
+        eChMod            = 90,
+        eFChMod           = 91,
+        eChOwn            = 92,
+        eFChOwn           = 93,
+        eLChOwn           = 94,
+        eUmask            = 95,
+        eGetTimeOfDay     = 96,
+        eGetResourceLimit = 97,
+        eGetResourceUsage = 98,
+        eGetUid           = 102,
+        eGetGid           = 104,
+        eSetUid           = 105,
+        eSetGid           = 106,
+        eGet_eUid         = 107,
+        eGet_eGid         = 108,
+        eSet_pGid         = 109,
+        eGet_pPid         = 110,
+        eGetPgrp          = 111,
+        eSetSid           = 112,
+        eSetReUid         = 113,
+        eSetReGid         = 114,
+        eSetResUid        = 117,
+        eGetResUid        = 118,
+        eSetResGid        = 119,
+        eGetResGid        = 120,
+        eGet_pGid         = 121,
+        eSid              = 124,
+        eSigPending       = 127,
+        eSigTimedWait     = 128,
+        eSigQueueInfo     = 129,
+        eSigSuspend       = 130,
+        eSigAltStack      = 131,
+        eUTime            = 132,
+        eStatFs           = 137,
+        ePivotRoot        = 155,
+        ePrCtl            = 157,
+        eArchPrCtl        = 158,
+        eSync             = 162,
+        eSetTimeOfDay     = 164,
+        eMount            = 165,
+        eUMount           = 166,
+        eReboot           = 169,
+        eInitModule       = 175,
+        eGetTid           = 186,
+        eSetXAttr         = 188,
+        eLSetXAttr        = 189,
+        eFSetXAttr        = 190,
+        eGetXAttr         = 191,
+        eLGetXAttr        = 192,
+        eFGetXAttr        = 193,
+        eListXAttr        = 194,
+        eLListXAttr       = 195,
+        eFListXAttr       = 196,
+        eRemoveXAttr      = 197,
+        eLRemoveXAttr     = 198,
+        eFRemoveXAttr     = 199,
+        eFutex            = 202,
+        eGetDents64       = 217,
+        eClockGetTime     = 228,
+        eClockNanoSleep   = 230,
+        ePanic            = 255,
+        eOpenAt           = 257,
+        eMkDirAt          = 258,
+        eMkNodAt          = 259,
+        eFChOwnAt         = 260,
+        eFStatAt          = 262,
+        eUnlinkAt         = 263,
+        eRenameAt         = 264,
+        eLinkAt           = 265,
+        eSymlinkAt        = 266,
+        eReadLinkAt       = 267,
+        eFChModAt         = 268,
+        ePSelect6         = 270,
+        ePPoll            = 271,
+        eUtimensAt        = 280,
+        eDup3             = 292,
+        ePipe2            = 293,
+        eSyncFs           = 306,
+        eFinitModule      = 313,
+        eRenameAt2        = 316,
+        eClone3           = 435,
+        eFutexWakeV       = 449,
+        eFutexWake        = 454,
+        eFutexWait        = 455,
+        eFutexRequeue     = 456,
+        eSetXAttrAt       = 463,
+        eGetXAttrAt       = 464,
+        eListXAttrAt      = 465,
+        eRemoveXAttrAt    = 466,
+        eOpenTreeAttr     = 467,
+        eDebugLog         = 1024,
+    };
+
+    export StringView GetName(usize index);
+
+    export void InstallAll();
+    export void Handle(Arguments& args);
+}; // namespace Syscall

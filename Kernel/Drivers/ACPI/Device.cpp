@@ -4,9 +4,32 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Drivers/ACPI/Bus.hpp>
-#include <Drivers/ACPI/Device.hpp>
+
+module;
+
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/String/String.hpp>
 #include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+
+module Cryptix:Impl.Drivers.ACPI.Device;
+
+import :Drivers.ACPI.Bus;
+import :Drivers.ACPI.Device;
+import :Library.Logger;
 
 namespace ACPI
 {

@@ -4,10 +4,17 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/x86_64/CMOS.hpp>
-#include <Arch/x86_64/IO.hpp>
 
+module;
+
+#include <Prism/Core/Types.hpp>
+#include <Prism/Core/Concepts.hpp>
 #include <Prism/Core/Core.hpp>
+
+module Cryptix:Impl.Arch.x86_64.CMOS;
+
+import :Arch.x86_64.CMOS;
+import :Arch.x86_64.IO;
 
 namespace CMOS
 {

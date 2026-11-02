@@ -4,37 +4,101 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <API/Limits.hpp>
 #include <API/UnixTypes.hpp>
-#include <API/VFS.hpp>
-
+#include <API/Syscall.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Tuple.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <magic_enum/magic_enum.hpp>
+#include <magic_enum/magic_enum_format.hpp>
+#include <API/Posix/bits/socket.h>
+#include <API/Posix/poll.h>
+#include <API/Posix/signal.h>
 #include <API/Posix/dirent.h>
+#include <API/Posix/sys/select.h>
+#include <API/Posix/utime.h>
+#include <API/Posix/sys/statfs.h>
+#include <API/Posix/linux/uio.h>
 #include <API/Posix/fcntl.h>
 #include <API/Posix/linux/netlink.h>
-#include <API/Posix/linux/uio.h>
-#include <API/Posix/sys/mman.h>
-#include <API/Posix/sys/select.h>
-#include <API/Posix/sys/statfs.h>
-#include <API/Posix/time.h>
-#include <API/Posix/utime.h>
-
-#include <Arch/CPU.hpp>
-
-#include <Network/Socket.hpp>
+#include <API/Posix/bits/socket_type.h>
+#include <Prism/Containers/Queue.hpp>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
 #include <Prism/Memory/Scope.hpp>
 #include <Prism/String/StringUtils.hpp>
-#include <Prism/Utility/Path.hpp>
+#include <API/Posix/linux/capability.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
+#include <Library/Module.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
 
-#include <Scheduler/Process.hpp>
-#include <Scheduler/Thread.hpp>
-#include <Time/Time.hpp>
+module Cryptix:Impl.API.VFS;
 
-#include <VFS/FileDescriptor.hpp>
-#include <VFS/Filesystem.hpp>
-#include <VFS/INode.hpp>
-#include <VFS/MountPoint.hpp>
-#include <VFS/PathResolver.hpp>
-#include <VFS/VFS.hpp>
+import :API.VFS;
+import :Arch.CPU;
+import :Network.Socket;
+import :Scheduler.Process;
+import :Scheduler.Thread;
+import :Time.Time;
+import :VFS.FileDescriptor;
+import :VFS.Filesystem;
+import :VFS.INode;
+import :VFS.MountPoint;
+import :VFS.PathResolver;
+import :VFS.VFS;
 
 namespace API::VFS
 {
@@ -243,7 +307,7 @@ namespace API::VFS
 
         return fd->Write(inBuffer, count, offset);
     }
-    ErrorOr<isize> ReadV(isize fdNum, const struct iovec* vec, usize vlen)
+    ErrorOr<isize> ReadV(isize fdNum, const iovec* vec, usize vlen)
     {
         auto process = Process::Current();
         auto fd      = TryOrRet(process->FileDescriptor(fdNum));
@@ -253,7 +317,7 @@ namespace API::VFS
 
         return Error(EINVAL);
     }
-    ErrorOr<isize> WriteV(isize fdNum, const struct iovec* vec, usize vlen)
+    ErrorOr<isize> WriteV(isize fdNum, const iovec* vec, usize vlen)
     {
         return Error(EINVAL);
     }
@@ -332,7 +396,7 @@ namespace API::VFS
 
         return *status;
     }
-    ErrorOr<isize> Connect(isize sockFdNum, const struct sockaddr* addr,
+    ErrorOr<isize> Connect(isize sockFdNum, const sockaddr* addr,
                            socklen_t addrlen)
     {
         LogDebug("API::VFS::Connect: SockFdNum => {:#x}", sockFdNum);
@@ -343,7 +407,7 @@ namespace API::VFS
         if (!status) return Error(status.Error());
         return 0;
     }
-    ErrorOr<isize> Accept(isize sockFdNum, struct sockaddr* addr,
+    ErrorOr<isize> Accept(isize sockFdNum, sockaddr* addr,
                           socklen_t* addrlen)
     {
         return Error(ENOSYS);
@@ -375,7 +439,7 @@ namespace API::VFS
         if (!status) return Error(status.Error());
         return 0;
     }
-    ErrorOr<isize> SendMsg(isize sockFdNum, const struct msghdr* msg,
+    ErrorOr<isize> SendMsg(isize sockFdNum, const msghdr* msg,
                            isize flags)
     {
         LogDebug("API::VFS::SendMsg: SockFdNum => {:#x}", sockFdNum);
@@ -394,7 +458,7 @@ namespace API::VFS
         return 0;
     }
 
-    ErrorOr<isize> Bind(isize sockFdNum, const struct sockaddr* addr,
+    ErrorOr<isize> Bind(isize sockFdNum, const sockaddr* addr,
                         socklen_t addrlen)
     {
         auto                process = Process::Current();
@@ -422,7 +486,7 @@ namespace API::VFS
         if (!status) return Error(status.Error());
         return 0;
     }
-    ErrorOr<isize> GetSockName(isize sockFdNum, struct sockaddr* addr,
+    ErrorOr<isize> GetSockName(isize sockFdNum, sockaddr* addr,
                                socklen_t* addrlen)
     {
         auto socket = TryOrRet(Socket::Get(sockFdNum));
@@ -431,7 +495,7 @@ namespace API::VFS
         if (!status) return Error(status.Error());
         return 0;
     }
-    ErrorOr<isize> GetPeerName(isize sockFdNum, struct sockaddr* addr,
+    ErrorOr<isize> GetPeerName(isize sockFdNum, sockaddr* addr,
                                socklen_t* addrlen)
     {
         auto socket = TryOrRet(Socket::Get(sockFdNum));
@@ -992,7 +1056,7 @@ namespace API::VFS
         //         if (timer != NULL && which == eventCount - 1) return
         //         Error(EINVAL);
         //
-        //         struct pollfd*  pollfd = &fds[fdIndices[which]];
+        //         pollfd*  pollfd = &fds[fdIndices[which]];
         //         FileDescriptor* fd     = fdList[which];
         //     }
         //

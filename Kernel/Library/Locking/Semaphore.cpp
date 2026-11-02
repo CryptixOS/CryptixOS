@@ -4,7 +4,27 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Library/Locking/Semaphore.hpp>
+
+module;
+
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Utility/Optional.hpp>
+
+module Cryptix:Impl.Library.Locking.Semaphore;
+
+import :Library.Locking.Semaphore;
 
 void Semaphore::Signal()
 {

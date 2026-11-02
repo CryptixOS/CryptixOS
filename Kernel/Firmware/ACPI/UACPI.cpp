@@ -4,12 +4,92 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/CPU.hpp>
-#include <Scheduler/Thread.hpp>
-#include <System/InterruptManager.hpp>
+
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <API/UnixTypes.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <Prism/Memory/RefCounted.hpp>
+#include <Library/Module.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Core/Concepts.hpp>
+#endif
+#include <Prism/Containers/Bitmap.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <uacpi/types.h>
+#include <uacpi/uacpi.h>
+#include <Prism/String/StringUtils.hpp>
+#include <uacpi/kernel_api.h>
+
+module Cryptix:Impl.Firmware.ACPI.UACPI;
+
+import :Arch.CPU;
+import :Scheduler.Thread;
+import :System.InterruptManager;
+#if defined(CTOS_TARGET_X86_64)
+import :Arch.x86_64.IO;
+#endif
+import :Drivers.PCI.Device;
+import :Drivers.PCI.HostController;
+import :Drivers.PCI.PCI;
+import :Firmware.ACPI.ACPI;
+import :Library.Locking.Mutex;
+import :Memory.MMIO;
+import :Time.Time;
 
 #ifdef CTOS_TARGET_X86_64
-    #include <Arch/x86_64/IO.hpp>
 
     #define ArchReadIo(port, type)         IO::In<type>(port)
     #define ArchWriteIo(port, value, type) IO::Out<type>(port)
@@ -17,19 +97,6 @@
     #define ArchReadIo(port, type)
     #define ArchWriteIo(port, value, type)
 #endif
-
-#include <Drivers/PCI/Device.hpp>
-#include <Drivers/PCI/HostController.hpp>
-#include <Drivers/PCI/PCI.hpp>
-#include <Firmware/ACPI/ACPI.hpp>
-
-#include <Library/Locking/Mutex.hpp>
-#include <Memory/MMIO.hpp>
-
-#include <Prism/Utility/Math.hpp>
-#include <Time/Time.hpp>
-
-#include <uacpi/kernel_api.h>
 
 namespace uACPI
 {

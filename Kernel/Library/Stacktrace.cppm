@@ -1,0 +1,37 @@
+/*
+ * Created by v1tr10l7 on 17.11.2024.
+ * Copyright (c) 2024-2024, Szymon Zemke <v1tr10l7@proton.me>
+ *
+ * SPDX-License-Identifier: GPL-3
+ */
+
+module;
+
+#include <Prism/Core/Types.hpp>
+#include <Prism/String/String.hpp>
+#include <compare>
+
+export module Cryptix:Library.Stacktrace;
+
+export namespace Stacktrace
+{
+    struct StackFrame
+    {
+        StackFrame* Base;
+        Pointer     InstructionPointer;
+    };
+    struct Symbol
+    {
+        String                   Name;
+        upointer                 Address;
+
+        constexpr StrongOrdering operator<=>(const Symbol& rhs) const
+        {
+            return Address <=> rhs.Address;
+        }
+    };
+
+    bool Initialize();
+    void Print(usize maxFrames = 16);
+}; // namespace Stacktrace
+export using KernelSymbol = Stacktrace::Symbol;

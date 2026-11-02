@@ -4,17 +4,71 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/x86_64/CPU.hpp>
-#include <Arch/x86_64/ExecutionContext.hpp>
-#include <Arch/x86_64/GDT.hpp>
-#include <Arch/x86_64/IDT.hpp>
 
-#include <Firmware/ACPI/MADT.hpp>
-#include <Library/Stacktrace.hpp>
+module;
 
-#include <Memory/PageFault.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Core/Concepts.hpp>
+#endif
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Containers/Array.hpp>
-#include <System/InterruptHandler.hpp>
+#include <Prism/Memory/RefCounted.hpp>
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <API/UnixTypes.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Utility/Path.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+
+module Cryptix:Impl.Arch.x86_64.IDT;
+
+import :Arch.x86_64.CPU;
+import :Arch.x86_64.ExecutionContext;
+import :Arch.x86_64.GDT;
+import :Arch.x86_64.IDT;
+import :Firmware.ACPI.MADT;
+import :Library.Stacktrace;
+import :Memory.PageFault;
+import :System.InterruptHandler;
 
 namespace InterruptManager
 {

@@ -4,25 +4,58 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/PowerManager.hpp>
-#include <Boot/CommandLine.hpp>
 
-#include <Firmware/ACPI/ACPI.hpp>
-#include <Firmware/ACPI/Interpreter/Interpreter.hpp>
-#include <Firmware/ACPI/MADT.hpp>
+module;
 
-#include <Memory/ScopedMapping.hpp>
-#include <Memory/VMM.hpp>
-
-#include <Prism/Containers/Array.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Core/Concepts.hpp>
+#endif
+#include <Compiler.hpp>
+#include <Prism/Memory/Pointer.hpp>
 #include <Prism/String/StringUtils.hpp>
-
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/ByteStream.hpp>
+#include <Prism/Containers/Vector.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/Array.hpp>
 #include <uacpi/context.h>
 #include <uacpi/event.h>
 #include <uacpi/notify.h>
 #include <uacpi/resources.h>
 #include <uacpi/uacpi.h>
 #include <uacpi/utilities.h>
+
+module Cryptix:Impl.Firmware.ACPI.ACPI;
+
+import :Arch.PowerManager;
+import :Boot.CommandLine;
+import :Firmware.ACPI.ACPI;
+import :Firmware.ACPI.Interpreter.Interpreter;
+import :Firmware.ACPI.MADT;
+import :Memory.ScopedMapping;
+import :Memory.VMM;
 
 #define uAcpiCall(cmd, ...)                                                    \
     {                                                                          \

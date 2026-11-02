@@ -4,9 +4,30 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Firmware/ACPI/MADT.hpp>
 
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Core/Concepts.hpp>
+#endif
+#include <Compiler.hpp>
+#include <Prism/Memory/Pointer.hpp>
 #include <Prism/String/StringUtils.hpp>
+#include <Prism/Containers/Vector.hpp>
+
+module Cryptix:Impl.Firmware.ACPI.MADT;
+
+import :Firmware.ACPI.MADT;
 
 namespace MADT
 {

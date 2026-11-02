@@ -4,14 +4,43 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <Debug/Assertions.hpp>
-#include <Debug/Panic.hpp>
-
-#include <Library/Locking/Spinlock.hpp>
-#include <Memory/MM.hpp>
-#include <Memory/VMM.hpp>
-
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Common.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
 #include <Prism/Core/Ranges.hpp>
+
+module Cryptix:Impl.Arch.aarch64.VMM;
+
+import :Debug.Assertions;
+import :Debug.KernelPanic;
+import :Library.Locking.Spinlock;
+import :Memory.MM;
+import :Memory.VMM;
 
 struct CTOS_PACKED TTBR
 {

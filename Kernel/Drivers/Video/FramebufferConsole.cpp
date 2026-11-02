@@ -4,18 +4,81 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/BootModuleInfo.hpp>
 
-#include <Drivers/Video/FramebufferConsole.hpp>
-#include <Embed/Font.hpp>
+module;
 
+#include <Prism/Core/UUID.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Network/IPv4Address.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <API/Posix/termios.h>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/Debug/Assertions.hpp>
 #include <Library/Logger.hpp>
-#include <Memory/VMM.hpp>
-
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/UnixTypes.hpp>
+#include <Compiler.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Memory/Endian.hpp>
+#include <Prism/Memory/ByteStream.hpp>
 #include <Prism/Core/Ranges.hpp>
-#include <System/System.hpp>
-
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <Prism/Core/Iterator.hpp>
 #include <magic_enum/magic_enum.hpp>
+
+module Cryptix:Impl.Drivers.Video.FramebufferConsole;
+
+import :Boot.BootModuleInfo;
+import :Drivers.Video.FramebufferConsole;
+import :Embed.Font;
+import :Library.Logger;
+import :Memory.VMM;
+import :System.System;
+
 #define EnsureLoaded()                                                         \
     if (!m_Loaded)                                                             \
     {                                                                          \
@@ -29,6 +92,13 @@ constexpr Color     DEFAULT_BACKDROP    = Color(0x00'00'00'00);
 
 constexpr usize     BUILTIN_FONT_WIDTH  = 8;
 constexpr usize     BUILTIN_FONT_HEIGHT = 16;
+
+FramebufferConsole::FramebufferConsole(const Framebuffer& framebuffer,
+                                       StringView name, usize minor)
+    : VirtualConsole(name, minor)
+{
+    Initialize(framebuffer);
+}
 
 FramebufferConsole* FramebufferConsole::Create(Framebuffer& framebuffer,
                                                StringView name, usize minor)

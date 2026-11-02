@@ -4,8 +4,44 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/aarch64/Drivers/GIC.hpp>
-#include <Memory/VMM.hpp>
+
+module;
+
+#include <Prism/Core/Error.hpp>
+#include <Prism/Memory/RefCounted.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/Endian.hpp>
+#include <Prism/String/String.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/termios.h>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <compare>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Utility/Math.hpp>
+
+module Cryptix:Impl.Arch.aarch64.Drivers.GIC;
+
+import :Arch.aarch64.Drivers.GIC;
+import :Memory.VMM;
 
 DeviceTree::Driver GIC::s_Driver = {
     .Name       = "gic-v1"_sv,

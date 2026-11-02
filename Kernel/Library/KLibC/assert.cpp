@@ -4,9 +4,26 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <assert.h>
 
+module;
+
+#include <assert.h>
 #include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+
+module Cryptix:Impl.Library.KLibC.assert_;
+
+import :Debug.Assertions;
+import :Library.Logger;
+import :Library.Stacktrace;
 
 extern "C"
 {

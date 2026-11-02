@@ -4,13 +4,23 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/CommandLine.hpp>
 
+module;
+
+#include <Prism/Core/Types.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Utility/Optional.hpp>
 #include <Library/Logger.hpp>
-
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
 #include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/String/String.hpp>
 #include <Prism/String/StringUtils.hpp>
+
+module Cryptix:Impl.Boot.CommandLine;
+
+import :Boot.CommandLine;
+import :Library.Logger;
 
 namespace CommandLine
 {

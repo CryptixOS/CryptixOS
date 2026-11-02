@@ -4,19 +4,26 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <stdio.h>
-
 #include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
 #include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
 
-namespace std
-{
-    [[gnu::noreturn]]
-    void terminate() noexcept
-    {
-        Panic("std::terminate()");
-    }
-} // namespace std
+module Cryptix:Impl.Library.KLibC.stdio;
+
+import :Debug.Assertions;
+import :Library.Logger;
+import :Library.Stacktrace;
 
 extern "C"
 {

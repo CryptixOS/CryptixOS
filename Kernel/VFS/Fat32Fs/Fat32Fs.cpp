@@ -4,25 +4,86 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Memory/PMM.hpp>
 
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
 #include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
+#include <API/UnixTypes.hpp>
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <API/Posix/sys/statfs.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Containers/Array.hpp>
 
-#include <VFS/DirectoryEntry.hpp>
-#include <VFS/INode.hpp>
-#include <VFS/VFS.hpp>
+module Cryptix:Impl.VFS.Fat32Fs.Fat32Fs;
 
-#include <VFS/Fat32Fs/Fat32Fs.hpp>
-#include <VFS/Fat32Fs/Fat32FsINode.hpp>
-
-#include <Time/Time.hpp>
+import :Memory.PMM;
+import :VFS.INode;
+import :VFS.VFS;
+import :VFS.Fat32Fs.Fat32Fs;
+import :VFS.Fat32Fs.Fat32FsINode;
+import :Time.Time;
 
 constexpr StringView           FAT32_IDENTIFIER_STRING       = "FAT32   "_sv;
 constexpr usize                FAT32_FS_INFO_SIGNATURE       = 0x41615252;
 constexpr usize                FAT32_FS_INFO_OFFSET          = 484;
 constexpr usize                FAT32_REAL_FS_INFO_SIGNATURE  = 0x61417272;
 constexpr usize                FAT32_REAL_FS_INFO_SIGNATURE2 = 0xaa550000;
+
+Fat32Fs::Fat32Fs(u32 flags)
+    : Filesystem("Fat32Fs", flags)
+{
+}
 
 ErrorOr<::Ref<DirectoryEntry>> Fat32Fs::Mount(StringView  sourcePath,
                                               const void* data)
@@ -235,7 +296,7 @@ bool Fat32Fs::Populate(DirectoryEntry* dentry)
 
         usize nameLen = 0;
         char* start   = nameBuffer.Raw();
-        while (*start && CodePoints::IsAlphanumeric(*start++)) nameLen++;
+        while (*start && Prism::CodePoints::IsAlphanumeric(*start++)) nameLen++;
         String name;
         name.Resize(nameLen);
 

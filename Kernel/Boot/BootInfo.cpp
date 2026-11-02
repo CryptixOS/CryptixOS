@@ -4,13 +4,57 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <Common.hpp>
-
-#include <Arch/CPU.hpp>
-#include <Boot/BootInfo.hpp>
-
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
 #include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
 #include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Core/UUID.hpp>
+#include <Prism/Network/IPv4Address.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <limine.h>
+
+module Cryptix:Impl.Boot.BootInfo;
+
+import :Debug.Assertions;
+import :Library.Logger;
+import :Library.Stacktrace;
+import :Arch.CPU;
+import :Boot.BootInfo;
 
 #define LIMINE_REQUEST                                                         \
     __attribute__((used, section(".limine_requests"))) volatile

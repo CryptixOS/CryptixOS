@@ -4,11 +4,32 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Common.hpp>
 
-#include <Arch/x86_64/Drivers/PIC.hpp>
-#include <Arch/x86_64/IDT.hpp>
-#include <Arch/x86_64/IO.hpp>
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Memory/RefCounted.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Core/Concepts.hpp>
+
+module Cryptix:Impl.Arch.x86_64.Drivers.PIC;
+
+import :Debug.Assertions;
+import :Library.Logger;
+import :Library.Stacktrace;
+import :Arch.x86_64.Drivers.PIC;
+import :Arch.x86_64.IDT;
+import :Arch.x86_64.IO;
 
 // https://pdos.csail.mit.edu/6.828/2005/readings/hardware/8259A.pdf
 inline static constexpr const u32 PIC1          = 0x20;

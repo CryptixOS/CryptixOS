@@ -4,9 +4,31 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/x86_64/GDT.hpp>
 
-#include <Library/Locking/Spinlock.hpp>
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+
+module Cryptix:Impl.Arch.x86_64.GDT;
+
+import :Arch.x86_64.GDT;
+import :Library.Locking.Spinlock;
 
 namespace GDT
 {

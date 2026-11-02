@@ -4,9 +4,27 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <Debug/Assertions.hpp>
-#include <Firmware/DeviceTree/Node.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/Endian.hpp>
+#include <Prism/String/String.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/termios.h>
 #include <Prism/String/Formatter.hpp>
+
+module Cryptix:Impl.Firmware.DeviceTree.Node;
+
+import :Debug.Assertions;
+import :Firmware.DeviceTree.Node;
 
 namespace DeviceTree
 {
