@@ -7,31 +7,27 @@ import argparse
 from helix.log import trace, info, error, fail
 from helix import shell
 
-def setup(build_dir: str, target: str, build_type: str, cxx: str = 'gcc'):
+def setup(build_dir: str, target: str, build_type: str, cxx: str = 'clang'):
     trace(f'🔧 Setting the build directory => `{build_dir}`')
     info(f'target architecture: {target}')
     info(f'build-type: {build_type}')
     info(f'cxx: {cxx}')
 
-    cross_file_path = f'CrossFiles/kernel-target-{cxx}-{target}.cross-file'
-    info(f'cross-file: {cross_file_path}')
-
-    if build_type == 'dist':
-        build_type = 'release'
-    elif build_type == 'release':
-        build_type = 'debugoptimized'
-    elif build_type != 'debug':
+    if build_type not in ['debug', 'release', 'dist']:
         fail(f'invalid build type \'{build_type}\'')
 
+    # CMakePresets.json defines a `<arch>-<build type>` configure preset for every combination
+    preset = f'{target}-{build_type}'
+    info(f'preset: {preset}')
+
     shell.run(['rm', '-rf', build_dir])
-    shell.run(['meson', 'setup', build_dir, f'--cross-file={cross_file_path}', '--force-fallback-for=fmt', f'--buildtype={build_type}'])
-    shell.run(['mkdir', '-p', f'{build_dir}/iso_root'])
+    shell.run(['cmake', '--preset', preset, '-B', build_dir])
     info('✅ All selected builds are set up!')
 
 def build(build_dir: str):
     info('Starting compilation...')
     try:
-        shell.try_run(['meson', 'compile', '-C', build_dir, '-j5', 'build'], stream=True)
+        shell.try_run(['cmake', '--build', build_dir, '--target', 'build', '-j5'], stream=True)
     except Exception:
         error('Compilation failed.')
         sys.exit(1)
@@ -42,7 +38,7 @@ def run_qemu(build_dir: str, firmware_type: str):
     if firmware_type == '':
         firmware_type = 'uefi'
 
-    shell.try_run(['meson', 'compile', '-C', build_dir, '-j5', f'run_{firmware_type}'], stream=True)
+    shell.try_run(['cmake', '--build', build_dir, '--target', f'run_{firmware_type}', '-j5'], stream=True)
 
 def prompt(message: str) -> str:
     result: str = ''
@@ -54,7 +50,7 @@ def run():
     build_dir = f'build_{args.build_type}_{args.target_arch}' if args.build_dir == '' else args.build_dir
 
     if not os.path.isdir(build_dir) and args.action != 'setup' and args.action != 'all':
-        error('Build directory {build_dir} does not exist. Please run the Meson setup step before compiling.')
+        error('Build directory {build_dir} does not exist. Please run the configure step (`setup`) before compiling.')
     if args.action == 'r':
         args.action = 'run'
 
@@ -81,7 +77,7 @@ def run():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--target-arch', choices=['x86_64', 'aarch64'], default='x86_64', help='target architecture')
-    parser.add_argument('-c', '--compiler', choices=['clang', 'gcc'], default='gcc', help='compiler')
+    parser.add_argument('-c', '--compiler', choices=['clang'], default='clang', help='compiler (C++20 modules need clang)')
     parser.add_argument('-b', '--build-type', choices=['release', 'debug', 'dist'], default='release', help='build type')
     parser.add_argument('-C', '--build-dir', type=str, default='', help='build directory', required=False)
     parser.add_argument('action', type=str, choices=['setup', 'build', 'rebuild', 'run', 'run-bios', 'run-uefi', 's', 'b', 'rb', 'r'], help='')

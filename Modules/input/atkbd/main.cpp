@@ -4,20 +4,80 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <AtKeyboard.hpp>
-#include <Scancodes.hpp>
 
-#ifdef __x86_64__
-    #include <x86_64/input/i8042/I8042.hpp>
+module;
+
+#include <Prism/Core/Types.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/UnixTypes.hpp>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Memory/Scope.hpp>
+#if defined(__x86_64__)
+#include <Prism/Core/Concepts.hpp>
+#endif
+#include <Prism/String/StringUtils.hpp>
+#if defined(__x86_64__)
+#include <Prism/Memory/RefCounted.hpp>
+#endif
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Core/Ranges.hpp>
+
+module Cryptix.Modules.AtKeyboard;
+
+import Cryptix;
+#if defined(__x86_64__)
+import Cryptix.Modules.I8042;
 #endif
 
-#include <Arch/PowerManager.hpp>
-#include <Boot/CommandLine.hpp>
-#include <Drivers/TTY/TTY.hpp>
-#include <Drivers/TTY/VirtualConsole.hpp>
+#ifdef __x86_64__
+#endif
 
-#include <Prism/Core/Ranges.hpp>
-#include <Prism/String/StringUtils.hpp>
 using namespace Prism;
 
 constexpr usize   SCANCODE_MAX               = Size(PS2_Set1_Keys);
@@ -41,8 +101,6 @@ constexpr usize   SCANCODE_END_PRESS         = 0x4f;
 constexpr usize   SCANCODE_PAGE_UP_PRESS     = 0x49;
 constexpr usize   SCANCODE_PAGE_DOWN_PRESS   = 0x51;
 constexpr usize   SCANCODE_DELETE_PRESS      = 0x53;
-
-extern AtomicBool g_LogSyscalls;
 
 void              AtKeyboard::Initialize()
 {
@@ -205,9 +263,6 @@ void AtKeyboard::Emit(const char* str, usize count)
 
     current->SendBuffer(str, count);
 }
-
-#include <Library/Logger.hpp>
-#include <Library/Module.hpp>
 
 CTOS_MODULE_AUTHOR("v1tr10l7");
 CTOS_MODULE_DESCRIPTION("i8042 atkbd keyboard driver");

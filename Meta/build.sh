@@ -13,21 +13,15 @@ log_info "Build directory: $BUILD_DIR"
 
 # Ensure the build directory exists
 if [[ ! -d "$BUILD_DIR" ]]; then
-    log_error "Build directory '$BUILD_DIR' does not exist. Please run the Meson setup step before compiling."
+    log_error "Build directory '$BUILD_DIR' does not exist. Please run the CMake configure step (Meta/setup.sh) before compiling."
     exit 1
 fi
 
-# Compile the project using Meson
+# Compile the project using CMake
 log_info "Starting compilation..."
-if meson compile -C "$BUILD_DIR" -j5 build; then
+if cmake --build "$BUILD_DIR" --target build -j5; then
     log_success "Compilation completed successfully."
 else
     log_error "Compilation failed."
     exit 1
 fi
-
-# Create the iso_root directory within the build directory
-log_info "Creating iso_root directory..."
-mkdir -p $BUILD_DIR/iso_root
-log_success "iso_root directory created at '$BUILD_DIR/iso_root'."
-

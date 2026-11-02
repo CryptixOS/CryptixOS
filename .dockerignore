@@ -4,9 +4,7 @@ debug.log
 qemu.log
 serial.log
 .xbstrap/
-subprojects/*/
-!subprojects/packagefiles/
-!subprojects/*.wrap
+build_*/
 build-sysroot/
 sysroot/
 sources

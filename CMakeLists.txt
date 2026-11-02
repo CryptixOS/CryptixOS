@@ -103,8 +103,6 @@ set(CRYPTIX_COMMON_FLAGS
   -fsanitize=undefined
   -fstack-protector-all
   -mstack-protector-guard=global
-  -fno-PIC
-  -fPIE
   -Wimplicit-fallthrough
   -Wno-builtin-macro-redefined
   -Wno-macro-redefined
@@ -140,9 +138,10 @@ else()
   set(CRYPTIX_MODULE_ARCH_FLAGS ${CRYPTIX_ARCH_FLAGS} -mcmodel=small)
 endif()
 
-# Code model + CPU flags of everything that is linked into the kernel image.
+# Code model + CPU flags of everything that is linked into the kernel image (a static PIE).
+# Loadable modules are position independent instead (-fPIC), see Modules/CMakeLists.txt.
 add_library(cryptix_kernel_arch INTERFACE)
-target_compile_options(cryptix_kernel_arch INTERFACE ${CRYPTIX_KERNEL_ARCH_FLAGS})
+target_compile_options(cryptix_kernel_arch INTERFACE -fno-PIC -fPIE ${CRYPTIX_KERNEL_ARCH_FLAGS})
 
 # Include directories shared by the kernel, Prism and the bundled C/C++ libraries.
 add_library(cryptix_includes INTERFACE)

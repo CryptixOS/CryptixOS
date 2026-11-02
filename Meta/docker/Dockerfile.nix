@@ -2,8 +2,7 @@
 FROM nixos/nix:latest
 
 # Install required packages via nix-env
-RUN nix-env -iA nixpkgs.meson \
-    nixpkgs.ninja \
+RUN nix-env -iA nixpkgs.ninja \
     nixpkgs.clang \
     nixpkgs.lld \
     nixpkgs.llvmPackages_11.llvm \

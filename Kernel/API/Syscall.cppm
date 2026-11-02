@@ -57,6 +57,8 @@ export import :Library.Stacktrace;
 export import :Arch.CPU;
 export import :Arch.User;
 
+export extern AtomicBool g_LogSyscalls;
+
 namespace Syscall
 {
     export template <typename>

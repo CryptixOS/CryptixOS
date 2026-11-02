@@ -204,7 +204,7 @@ target_compile_options(compiler_rt_builtins PRIVATE
   -Wno-format-nonliteral -Wno-unused-macros -Wno-shift-sign-overflow -Wno-shorten-64-to-32
   -Wno-unreachable-code-break -Wno-conditional-uninitialized -Wno-missing-variable-declarations
   -Wno-reserved-id-macro -Wno-missing-prototypes
-  -D__ELF__)
+  -fno-PIC -fPIE -D__ELF__)
 # The builtins are built against the kernel's own libc headers.
 target_include_directories(compiler_rt_builtins PRIVATE ${PROJECT_SOURCE_DIR}/Kernel/Library/KLibC)
 target_link_libraries(compiler_rt_builtins PRIVATE cryptix_c_flags)

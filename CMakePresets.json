@@ -1,0 +1,74 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 28, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build_${presetName}"
+    },
+    {
+      "name": "x86_64-base",
+      "hidden": true,
+      "inherits": "base",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/clang-x86_64.cmake"
+    },
+    {
+      "name": "aarch64-base",
+      "hidden": true,
+      "inherits": "base",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/clang-aarch64.cmake"
+    },
+    {
+      "name": "x86_64-debug",
+      "displayName": "x86_64 debug",
+      "inherits": "x86_64-base",
+      "binaryDir": "${sourceDir}/build_debug_x86_64",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "x86_64-release",
+      "displayName": "x86_64 release (optimized, with debug info)",
+      "inherits": "x86_64-base",
+      "binaryDir": "${sourceDir}/build_release_x86_64",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+    },
+    {
+      "name": "x86_64-dist",
+      "displayName": "x86_64 dist (fully optimized)",
+      "inherits": "x86_64-base",
+      "binaryDir": "${sourceDir}/build_dist_x86_64",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "aarch64-debug",
+      "displayName": "aarch64 debug",
+      "inherits": "aarch64-base",
+      "binaryDir": "${sourceDir}/build_debug_aarch64",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "aarch64-release",
+      "displayName": "aarch64 release (optimized, with debug info)",
+      "inherits": "aarch64-base",
+      "binaryDir": "${sourceDir}/build_release_aarch64",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+    },
+    {
+      "name": "aarch64-dist",
+      "displayName": "aarch64 dist (fully optimized)",
+      "inherits": "aarch64-base",
+      "binaryDir": "${sourceDir}/build_dist_aarch64",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "x86_64-debug",    "configurePreset": "x86_64-debug",    "targets": ["build"] },
+    { "name": "x86_64-release",  "configurePreset": "x86_64-release",  "targets": ["build"] },
+    { "name": "x86_64-dist",     "configurePreset": "x86_64-dist",     "targets": ["build"] },
+    { "name": "aarch64-debug",   "configurePreset": "aarch64-debug",   "targets": ["build"] },
+    { "name": "aarch64-release", "configurePreset": "aarch64-release", "targets": ["build"] },
+    { "name": "aarch64-dist",    "configurePreset": "aarch64-dist",    "targets": ["build"] }
+  ]
+}

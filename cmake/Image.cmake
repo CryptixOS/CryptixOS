@@ -39,7 +39,7 @@ get_property(CRYPTIX_MODULE_TARGETS GLOBAL PROPERTY CRYPTIX_MODULE_TARGETS)
 
 add_custom_command(
   OUTPUT  ${CMAKE_BINARY_DIR}/ksyms.sym
-  COMMAND ${PROJECT_SOURCE_DIR}/Meta/generate_symbols.sh
+  COMMAND sh ${PROJECT_SOURCE_DIR}/Meta/generate_symbols.sh
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
   DEPENDS Cryptix.elf
   COMMENT "Generating ksyms.sym"

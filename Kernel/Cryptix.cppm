@@ -221,3 +221,4 @@ export import :VFS.SynthFsINode;
 export import :VFS.TmpFs.TmpFs;
 export import :VFS.TmpFs.TmpFsINode;
 export import :VFS.VFS;
+export import :Version;

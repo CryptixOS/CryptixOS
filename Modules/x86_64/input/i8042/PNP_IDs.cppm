@@ -4,12 +4,15 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#pragma once
+
+module;
 
 #include <Prism/Containers/Array.hpp>
 #include <Prism/String/StringView.hpp>
 
-static auto s_MatchIDs = ToArray<StringView>({
+export module Cryptix.Modules.I8042:PNP_IDs;
+
+export inline auto s_MatchIDs = ToArray<StringView>({
     "PNP0300", "PNP0301", "PNP0302", "PNP0303", "PNP0304", "PNP0305", "PNP0306",
     "PNP0309", "PNP030a", "PNP030b", "PNP0320", "PNP0343", "PNP0344", "PNP0345",
     "CPQA0D7", "AUI0200", "FJC6000", "FJC6001", "PNP0f03", "PNP0f0b", "PNP0f0e",

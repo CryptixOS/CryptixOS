@@ -4,22 +4,73 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#pragma once
 
-#include <API/DeviceIDs.hpp>
-#include <Arch/x86_64/IO.hpp>
-#include <Arch/x86_64/Types.hpp>
-#include <Drivers/ACPI/Bus.hpp>
-#include <Drivers/ACPI/Device.hpp>
-#include <Drivers/Core/CharacterDevice.hpp>
-#include <Drivers/Input/InputDevice.hpp>
+module;
 
-#include <Modules/serio/SerioController.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Core/Concepts.hpp>
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/String/String.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <compare>
+#include <API/UnixTypes.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
 #include <Prism/String/StringUtils.hpp>
-#include <System/InterruptHandler.hpp>
+#include <Prism/Memory/RefCounted.hpp>
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
 
-class InterruptDispatcher;
-enum class Ps2DeviceType
+export module Cryptix.Modules.I8042;
+
+import Cryptix;
+import Cryptix.Modules.Serio;
+export import :PNP_IDs;
+
+export enum class Ps2DeviceType
 {
     eUndefined = 0,
     eATKeyboard,
@@ -37,8 +88,7 @@ enum class Ps2DeviceType
     eNcdSunKeyboard
 };
 
-struct ExecutionContext;
-class I8042 : public ACPI::Device, public SerioController
+export class I8042 : public ACPI::Device, public SerioController
 {
   public:
     I8042(ACPI::DeviceHandle* handle, DeviceMajor major, DeviceMinor minor)
@@ -207,31 +257,31 @@ class I8042 : public ACPI::Device, public SerioController
     void                       WritePort(Port port, u8 data);
 };
 
-using I8042Port          = I8042::Port;
-using I8042Command       = I8042::Command;
-using I8042Configuration = I8042::Configuration;
-using I8042Response      = I8042::Response;
-using PS2Port            = I8042::DevicePort;
+export using I8042Port          = I8042::Port;
+export using I8042Command       = I8042::Command;
+export using I8042Configuration = I8042::Configuration;
+export using I8042Response      = I8042::Response;
+export using PS2Port            = I8042::DevicePort;
 
-inline u8 operator~(I8042Configuration lhs) { return ~ToUnderlying(lhs); }
-inline u8 operator&(u8 lhs, const I8042Configuration rhs)
+export inline u8 operator~(I8042Configuration lhs) { return ~ToUnderlying(lhs); }
+export inline u8 operator&(u8 lhs, const I8042Configuration rhs)
 {
     return lhs & ToUnderlying(rhs);
 }
-inline I8042Configuration operator|(I8042Configuration       lhs,
+export inline I8042Configuration operator|(I8042Configuration       lhs,
                                     const I8042Configuration rhs)
 {
     u8 config = ToUnderlying(lhs) | ToUnderlying(rhs);
 
     return static_cast<I8042Configuration>(config);
 }
-inline u8& operator&=(u8& lhs, const I8042Configuration rhs)
+export inline u8& operator&=(u8& lhs, const I8042Configuration rhs)
 {
     lhs &= ToUnderlying(rhs);
 
     return lhs;
 }
-inline u8& operator|=(u8& lhs, const I8042Configuration rhs)
+export inline u8& operator|=(u8& lhs, const I8042Configuration rhs)
 {
     lhs |= ToUnderlying(rhs);
 

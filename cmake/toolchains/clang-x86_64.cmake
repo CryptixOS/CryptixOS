@@ -20,5 +20,4 @@ set(CMAKE_C_COMPILER_TARGET   x86_64-linux-elf)
 set(CMAKE_CXX_COMPILER_TARGET x86_64-linux-elf)
 set(CMAKE_ASM_COMPILER_TARGET x86_64-linux-elf)
 
-# There is no hosted environment to link a test program against.
-set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+include(${CMAKE_CURRENT_LIST_DIR}/common.cmake)

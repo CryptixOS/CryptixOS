@@ -4,20 +4,65 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#pragma once
 
-#include <API/DeviceIDs.hpp>
+module;
 
-#include <Drivers/Core/CharacterDevice.hpp>
-#include <Drivers/Core/DeviceManager.hpp>
-#include <Drivers/Input/InputDevice.hpp>
-
-#include <Modules/serio/SerioController.hpp>
-
-#include <Prism/Memory/Scope.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/UnixTypes.hpp>
+#include <Compiler.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Memory/Scope.hpp>
 
-enum class KeyModifier
+export module Cryptix.Modules.AtKeyboard;
+
+import Cryptix;
+import Cryptix.Modules.Serio;
+export import :Scancodes;
+
+export enum class KeyModifier
 {
     eNone     = 0x00,
     eControl  = Bit(0),
@@ -26,29 +71,29 @@ enum class KeyModifier
     eCapsLock = Bit(3),
 };
 
-constexpr inline KeyModifier operator~(KeyModifier lhs)
+export constexpr inline KeyModifier operator~(KeyModifier lhs)
 {
     auto result = ~ToUnderlying(lhs);
     return static_cast<KeyModifier>(result);
 }
-constexpr inline bool operator&(KeyModifier lhs, KeyModifier rhs)
+export constexpr inline bool operator&(KeyModifier lhs, KeyModifier rhs)
 {
     return ToUnderlying(lhs) & ToUnderlying(rhs);
 }
-constexpr inline KeyModifier& operator|=(KeyModifier& lhs, KeyModifier rhs)
+export constexpr inline KeyModifier& operator|=(KeyModifier& lhs, KeyModifier rhs)
 {
     u64 result = ToUnderlying(lhs) | ToUnderlying(rhs);
 
     return (lhs = static_cast<KeyModifier>(result));
 }
-constexpr inline KeyModifier& operator&=(KeyModifier& lhs, KeyModifier rhs)
+export constexpr inline KeyModifier& operator&=(KeyModifier& lhs, KeyModifier rhs)
 {
     u64 result = ToUnderlying(lhs) & ToUnderlying(rhs);
 
     return (lhs = static_cast<KeyModifier>(result));
 }
 
-class AtKeyboard : public SerioDevice
+export class AtKeyboard : public SerioDevice
 {
   public:
     enum class ScanCodeSet
@@ -117,4 +162,4 @@ class AtKeyboard : public SerioDevice
     void             Emit(const char* str, usize count);
 };
 
-using Ps2ScanCodeSet = AtKeyboard::ScanCodeSet;
+export using Ps2ScanCodeSet = AtKeyboard::ScanCodeSet;

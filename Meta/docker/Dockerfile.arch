@@ -6,7 +6,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Install required dependencies and Python pipx
 RUN pacman -Syu --noconfirm \
-    meson \
     ninja \
     clang \
     lld \

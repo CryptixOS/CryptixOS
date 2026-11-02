@@ -4,11 +4,14 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#pragma once
+
+module;
 
 #include <Prism/Core/Types.hpp>
 
-constexpr const u8 s_Ps2ScanCodeSet1_Map[256] = {
+export module Cryptix.Modules.AtKeyboard:Scancodes;
+
+export constexpr const u8 s_Ps2ScanCodeSet1_Map[256] = {
     /* 0x00 */ 0x00, // Undefined
     /* 0x01 */ '\e', // Esc
     /* 0x02 */ '1',
@@ -99,7 +102,7 @@ constexpr const u8 s_Ps2ScanCodeSet1_Map[256] = {
     /* 0x57 */ 0x00, // F11
     /* 0x58 */ 0x00, // F12
 };
-constexpr const u8 s_Ps2ScanCodeSet1_ShiftMap[256] = {
+export constexpr const u8 s_Ps2ScanCodeSet1_ShiftMap[256] = {
     /* 0x00 */ 0x00, // Undefined
     /* 0x01 */ 0x1B, // Esc
     /* 0x02 */ '!',  // Shift + 1
@@ -190,7 +193,7 @@ constexpr const u8 s_Ps2ScanCodeSet1_ShiftMap[256] = {
     /* 0x57 */ 0x00, // F11
     /* 0x58 */ 0x00, // F12
 };
-constexpr const u8 s_Ps2ScanCodeSet1_CapsLockMap[256] = {
+export constexpr const u8 s_Ps2ScanCodeSet1_CapsLockMap[256] = {
     /* 0x00 */ 0x00, // Undefined
     /* 0x01 */ 0x1B, // Esc
     /* 0x02 */ '1',  // Numbers remain the same
@@ -281,7 +284,7 @@ constexpr const u8 s_Ps2ScanCodeSet1_CapsLockMap[256] = {
     /* 0x57 */ 0x00, // F11
     /* 0x58 */ 0x00, // F12
 };
-constexpr const u8 s_Ps2ScanCodeSet1_ShiftCapsLockMap[256] = {
+export constexpr const u8 s_Ps2ScanCodeSet1_ShiftCapsLockMap[256] = {
     /* 0x00 */ 0x00, // Undefined
     /* 0x01 */ 0x1B, // Esc
     /* 0x02 */ '!',  // Shift + Caps Lock + 1
@@ -373,7 +376,7 @@ constexpr const u8 s_Ps2ScanCodeSet1_ShiftCapsLockMap[256] = {
     /* 0x58 */ 0x00, // F12
 };
 
-enum class KeyCode : i16
+export enum class KeyCode : i16
 {
     eUnknown = 0,
     eNone,
@@ -489,7 +492,7 @@ enum class KeyCode : i16
     eKeyCount,
 };
 
-struct Key
+export struct Key
 {
     KeyCode Key;
     u32     CodePoint;
@@ -498,7 +501,7 @@ struct Key
     u32     ShiftCapsLockCodePoint;
 };
 
-constexpr Key PS2_Set1_Keys[] = {
+export constexpr Key PS2_Set1_Keys[] = {
     {KeyCode::eNone, 0, 0, 0, 0}, // No key
     {KeyCode::eEscape, '\e', '\e', '\e', '\e'},
     {KeyCode::eNum1, '1', '!', '1', '!'},
