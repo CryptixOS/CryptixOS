@@ -74,10 +74,6 @@ export import :Library.ExecutableProgram;
 export import :Memory.Region;
 export import :Scheduler.Event;
 
-#if CTOS_ARCH == CTOS_ARCH_X86_64
-#elif CTOS_ARCH == CTOS_ARCH_AARCH64
-#endif
-
 export namespace CPU
 {
     Thread* GetCurrentThread();

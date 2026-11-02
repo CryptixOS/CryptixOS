@@ -15,10 +15,6 @@ module;
 
 export module Cryptix:Arch.Arch;
 
-#if CTOS_ARCH == CTOS_ARCH_X86_64
-#elif CTOS_ARCH == CTOS_ARCH_AARCH64
-#endif
-
 export class HardwareTimer;
 export namespace Arch
 {

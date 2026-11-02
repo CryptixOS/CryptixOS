@@ -59,10 +59,6 @@ export import :VFS.SynthFsINode;
 
 export extern bool g_LogTmpFs;
 
-#if CTOS_DEBUG_TMPFS != 0
-#else
-#endif
-
 export class TmpFsINode final : public SynthFsINode
 {
   public:

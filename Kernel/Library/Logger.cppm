@@ -49,12 +49,3 @@ export namespace Logger
     void               Unlock();
 } // namespace Logger
 
-#ifdef CTOS_BUILD_DEBUG
-#else
-#endif
-
-#if ENABLE_LOGGING == true
-
-#else
-
-#endif

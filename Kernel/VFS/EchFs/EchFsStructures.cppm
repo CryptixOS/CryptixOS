@@ -63,10 +63,6 @@ export module Cryptix:VFS.EchFs.EchFsStructures;
 
 export import :Drivers.TTY.VirtualConsole;
 
-#if ECHFS_DEBUG == 1
-#else
-#endif
-
 export struct [[gnu::packed]] EchFsIdentityTable
 {
     u8  JumpInstruction[4];

@@ -54,10 +54,6 @@ export import :Arch.aarch64.CPU;
 #endif
 export import :Memory.VMM;
 
-#ifdef CTOS_TARGET_X86_64
-#elifdef CTOS_TARGET_AARCH64
-#endif
-
 export class ClockSource;
 export struct Thread;
 export struct ExecutionContext;
