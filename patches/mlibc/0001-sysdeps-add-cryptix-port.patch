@@ -1,4 +1,4 @@
-From 7b101ec7c3cf595bd7777711eb03ba2a5ed7260c Mon Sep 17 00:00:00 2001
+From ffa57612a1025544a6cb9d8bf9f7194479067589 Mon Sep 17 00:00:00 2001
 From: V1tr10l7 <vitriol1744@gmail.com>
 Date: Thu, 18 Sep 2025 07:49:55 +0200
 Subject: [PATCH] sysdeps: add cryptix port
@@ -70,7 +70,7 @@ Subject: [PATCH] sysdeps: add cryptix port
  sysdeps/cryptix/include/abi-bits/vt.h         |   1 +
  sysdeps/cryptix/include/abi-bits/wait.h       |   1 +
  sysdeps/cryptix/include/abi-bits/xattr.h      |   1 +
- sysdeps/cryptix/include/cryptix/syscall.h     | 308 +++++++++++
+ sysdeps/cryptix/include/cryptix/syscall.h     | 309 +++++++++++
  sysdeps/cryptix/include/meson.build           |  60 +++
  sysdeps/cryptix/meson.build                   |  11 +
  sysdeps/cryptix/sysdeps/internal.cpp          |  16 +
@@ -81,7 +81,7 @@ Subject: [PATCH] sysdeps: add cryptix port
  sysdeps/cryptix/sysdeps/system.cpp            |  91 ++++
  sysdeps/cryptix/sysdeps/time.cpp              |  41 ++
  sysdeps/cryptix/sysdeps/vfs.cpp               | 488 ++++++++++++++++++
- 77 files changed, 1670 insertions(+)
+ 77 files changed, 1671 insertions(+)
  create mode 100644 sysdeps/cryptix/arch/aarch64/crt0.S
  create mode 100644 sysdeps/cryptix/arch/aarch64/crti.S
  create mode 100644 sysdeps/cryptix/arch/aarch64/crtn.S
@@ -903,10 +903,10 @@ index 00000000..66412d70
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
 new file mode 100644
-index 00000000..e0aad435
+index 00000000..b96bf70c
 --- /dev/null
 +++ b/sysdeps/cryptix/include/cryptix/syscall.h
-@@ -0,0 +1,308 @@
+@@ -0,0 +1,309 @@
 +#include <stddef.h>
 +#include <stdint.h>
 +
@@ -1006,6 +1006,7 @@ index 00000000..e0aad435
 +constexpr size_t SYS_SIGSUSPEND = 130;
 +constexpr size_t SYS_SIGALTSTACK = 131;
 +constexpr size_t SYS_STATFS = 137;
++constexpr size_t SYS_PIVOT_ROOT = 155;
 +constexpr size_t SYS_PRCTL = 157;
 +constexpr size_t SYS_ARCH_PRCTL = 158;
 +constexpr size_t SYS_SYNC = 162;
@@ -2350,5 +2351,5 @@ index 00000000..1ac9b85e
 +}
 +} // namespace mlibc
 -- 
-2.51.0
+2.43.0
 

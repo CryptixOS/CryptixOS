@@ -1,0 +1,38 @@
+From 508faa3ab069b4863ca4781a1b360a08ca8719b4 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 3 Nov 2026 22:44:26 +0000
+Subject: [PATCH] fix: build with PRISM_DISABLE_FMT=1
+
+Only include <fmt/format.h> when fmt is enabled (the check was inverted), and
+only re-export Prism::Format into the global namespace when it is defined.
+---
+ Source/Prism/String/Formatter.hpp | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/Source/Prism/String/Formatter.hpp b/Source/Prism/String/Formatter.hpp
+index 8fe2716..7a5e94e 100644
+--- a/Source/Prism/String/Formatter.hpp
++++ b/Source/Prism/String/Formatter.hpp
+@@ -11,9 +11,8 @@
+ #include <Prism/String/FormatString.hpp>
+ #include <Prism/String/StringBuilder.hpp>
+ 
+-#if PRISM_DISABLE_FMT != 0
++#if PRISM_DISABLE_FMT == 0
+     #include <fmt/format.h>
+-#else
+ #endif
+ 
+ namespace Prism
+@@ -202,6 +201,8 @@ namespace Prism
+ }; // namespace Prism
+ 
+ #if PRISM_USE_NAMESPACE != 0
++    #if PRISM_DISABLE_FMT == 0
+ using Prism::Format;
++    #endif
+ using Prism::Formatter;
+ #endif
+-- 
+2.43.0
+

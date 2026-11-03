@@ -422,6 +422,20 @@ packages:
           echo "INPUT(-lncursesw)" > @THIS_COLLECT_DIR@/usr/lib/libcursesw.so
           ln -sfv libncurses.so      @THIS_COLLECT_DIR@/usr/lib/libcurses.so
 
+  # Header-only.  Prism's installed headers include <magic_enum/magic_enum.hpp> but Prism
+  # does not install it, so everything that uses Prism needs it in the sysroot.
+  - name: magic_enum
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/Neargye/magic_enum.git'
+      tag: 'v0.9.5'
+      version: '0.9.5'
+    build:
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/include']
+      - args: ['cp', '-r', '@THIS_SOURCE_DIR@/include/magic_enum', '@THIS_COLLECT_DIR@/usr/include/']
+
   - name: neon 
     labels: [aarch64]
     architecture: '@OPTION:arch@'
@@ -429,6 +443,9 @@ packages:
       subdir: 'sources'
       git: 'https://github.com/CryptixOS/Neon.git'
       branch: 'main'
+      # Pinned like mlibc: tracking `main` breaks this build whenever Neon starts using
+      # something newer than the mlibc port / Prism patch in this repository provide.
+      commit: 'a5a3b5f013224ffd4596a7c9ca23c39e3ca1aff2'
     tools_required:
       - system-gcc
       - host-pkg-config
@@ -437,6 +454,7 @@ packages:
     pkgs_required:
       - mlibc
       - prism
+      - magic_enum
     configure: 
       - args:
         - 'meson'
@@ -611,6 +629,9 @@ packages:
       subdir: 'sources'
       git: 'https://github.com/CryptixOS/Prism.git'
       branch: 'master'
+      # Pinned: patches/prism/ is written against this revision.  It is the last Prism before
+      # `RefCounted` became a class template, which the pinned Neon revision does not expect.
+      commit: 'aae714fcfa7a0e42eae5bc67804461c64e0d8488'
     tools_required:
       - system-gcc
       - host-pkg-config
