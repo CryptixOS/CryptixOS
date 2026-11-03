@@ -46,7 +46,15 @@ add_custom_command(
   USES_TERMINAL VERBATIM)
 add_custom_target(ksyms ALL DEPENDS ${CMAKE_BINARY_DIR}/ksyms.sym)
 
-file(GLOB_RECURSE CRYPTIX_BASE_FILES CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/BaseFiles/*)
+# Only regular files: BaseFiles contains symlinks (bin -> usr/bin, ...) that dangle in the
+# source tree and cannot be build dependencies.
+file(GLOB_RECURSE _base_candidates CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/BaseFiles/*)
+set(CRYPTIX_BASE_FILES "")
+foreach(_f IN LISTS _base_candidates)
+  if(NOT IS_SYMLINK "${_f}" AND NOT IS_DIRECTORY "${_f}")
+    list(APPEND CRYPTIX_BASE_FILES "${_f}")
+  endif()
+endforeach()
 
 add_custom_command(
   OUTPUT  ${CMAKE_BINARY_DIR}/image.hdd
