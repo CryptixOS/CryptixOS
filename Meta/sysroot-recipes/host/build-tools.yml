@@ -199,12 +199,13 @@ tools:
       git: 'https://git.savannah.gnu.org/git/automake.git'
       tag: 'v1.16.5'
       version: '1.16.5'
-      sources_required: ['gnuconfig']
       tools_required:
        - host-autoconf-v2.71
+      # patches/automake-v1.16 already updates lib/config.{sub,guess} and adds Cryptix to
+      # them.  Do not copy gnuconfig over them here: regenerate runs after patching, and the
+      # stock gnuconfig rejects `x86_64-cryptix`, which breaks every package that takes its
+      # config.sub from this automake (e.g. gdbm's `autoreconf -f -i`).
       regenerate:
-       - args: ['cp', '@SOURCE_ROOT@/sources/gnuconfig/config.sub', '@THIS_SOURCE_DIR@/lib/']
-       - args: ['cp', '@SOURCE_ROOT@/sources/gnuconfig/config.guess', '@THIS_SOURCE_DIR@/lib/']
        - args: ['./bootstrap']
     tools_required:
       - host-autoconf-v2.71

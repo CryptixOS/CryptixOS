@@ -42,6 +42,8 @@ packages:
       subdir: 'sources'
       git: 'https://github.com/CryptixOS/Cryptix-Utils.git'
       branch: 'main'
+      # Pinned like neon so that tracking `main` cannot break the bootstrap.
+      commit: 'f5f2049ec19816928b7a9f125098dc199f4c5fca'
       version: '0.1'
     tools_required:
       - system-gcc
@@ -442,6 +444,14 @@ packages:
       checksum: blake2b:355888b0dfe3e4e1679a8a9e1255a935fa48be220408abc441fae69fe0b26bd39e0544ed20e75497ed5bccaa75e788d9aec17007c668f15eaf6b1599faa131a0
       extract_path: 'which-2.21'
       version: '2.21'
+      tools_required:
+        - host-automake-v1.15
+      regenerate:
+        # Like the other autotools packages here: which-2.21 predates Cryptix, so give it a
+        # config.sub that knows `*-cryptix`.
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@THIS_SOURCE_DIR@/']
     tools_required:
       - system-gcc
     pkgs_required:
