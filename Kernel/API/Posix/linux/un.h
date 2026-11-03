@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <linux/socket.h>
+#include <API/Posix/linux/socket.h>
 
 #define UNIX_PATH_MAX 108
 

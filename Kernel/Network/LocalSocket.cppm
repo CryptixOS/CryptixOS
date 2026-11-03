@@ -55,7 +55,7 @@ module;
 #include <API/Posix/sys/stat.h>
 #include <Prism/Containers/UnorderedMap.hpp>
 #include <Prism/Memory/WeakRef.hpp>
-#include <linux/un.h>
+#include <API/Posix/linux/un.h>
 
 export module Cryptix:Network.LocalSocket;
 
