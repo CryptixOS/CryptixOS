@@ -353,6 +353,11 @@ packages:
         - '-Ddefault_library=both'
         #- '-Ddebug_allocator=true'
         - '-Dlibgcc_dependency=true'
+        # mlibc's meson.build probes find_library('gcc').  Current Meson links a test
+        # program (and a test shared library) for that, which cannot work yet: the
+        # target's crt0.o and libc are what this package builds.  Link the probes with
+        # -nostdlib so that the already installed libgcc.a is found.
+        - '-Dc_link_args=-nostdlib'
         - '-Dbuild_tests=false'
         - '-Dposix_option=enabled'
         - '-Dlinux_option=enabled'
