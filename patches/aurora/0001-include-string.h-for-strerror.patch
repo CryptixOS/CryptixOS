@@ -1,0 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 3 Nov 2026 23:45:00 +0000
+Subject: [PATCH] fix: include <string.h> for strerror()
+
+init calls strerror() but never includes <string.h>, relying on some other
+header to declare it.  With the Prism and mlibc revisions the sysroot is
+built against, none does.
+---
+ Source/Aurora/main.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Source/Aurora/main.cpp b/Source/Aurora/main.cpp
+index 75c2eee..21de3e2 100644
+--- a/Source/Aurora/main.cpp
++++ b/Source/Aurora/main.cpp
+@@ -17,6 +17,7 @@
+ #include <cryptix/syscall.h>
+ #include <fcntl.h>
+ #include <signal.h>
++#include <string.h>
+ #include <sys/mman.h>
+ #include <sys/mount.h>
+ #include <sys/socket.h>
+-- 
+2.43.0
+

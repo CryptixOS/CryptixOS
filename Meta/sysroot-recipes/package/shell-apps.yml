@@ -21,6 +21,8 @@ packages:
       version: '0.1'
       git: 'https://github.com/CryptixOS/Aurora.git'
       branch: 'main'
+      # Pinned like neon: patches/awsh/ (a link to patches/aurora/) is written against this revision.
+      commit: '1707c71d5fa892ea2f0aa50ac98e00ebb6f6031b'
     tools_required:
       - system-gcc
       - host-pkg-config
@@ -29,6 +31,7 @@ packages:
     pkgs_required:
       - mlibc
       - prism
+      - neon
     configure: 
       - args:
         - 'meson'
