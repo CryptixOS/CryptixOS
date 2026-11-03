@@ -1,0 +1,43 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 3 Nov 2026 23:30:00 +0000
+Subject: [PATCH] fix: do not resize a String just to use it as a demangle
+ buffer
+
+GCC 15 rejects the old Demangle() with -Werror=array-bounds: once
+String::Resize(128) is inlined it cannot prove that the string switched to
+its heap storage and reports `Raw()[newSize] = 0` as writing past the
+24-byte object.  Use a plain heap buffer instead, as upstream Prism does
+since 68d1a60.
+---
+ Source/Prism/Debug/Stacktrace.cpp | 14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/Source/Prism/Debug/Stacktrace.cpp b/Source/Prism/Debug/Stacktrace.cpp
+index 31c8f6b..9b5067d 100644
+--- a/Source/Prism/Debug/Stacktrace.cpp
++++ b/Source/Prism/Debug/Stacktrace.cpp
+@@ -18,11 +18,15 @@ namespace Prism
+     const String Stacktrace::Symbol::Demangle() const
+     {
+ #if PRISM_TARGET_CARBONC == 0
+-        String str;
+-        str.Resize(128);
+-        if (absl::debugging_internal::Demangle(Name, str.Raw(), str.Size()))
+-            return str;
+-        return "";
++        String          demangled   = "";
++
++        constexpr usize BUFFER_SIZE = 256;
++        char*           buffer      = new char[BUFFER_SIZE];
++        if (absl::debugging_internal::Demangle(Name, buffer, BUFFER_SIZE))
++            demangled = buffer;
++
++        delete[] buffer;
++        return demangled;
+ #else
+         return Name;
+ #endif
+-- 
+2.43.0
+
