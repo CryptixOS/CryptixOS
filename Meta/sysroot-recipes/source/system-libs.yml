@@ -55,6 +55,12 @@ sources:
     subdir: 'sources'
     git: 'https://github.com/managarm/mlibc.git'
     branch: 'master'
+    # Pinned: patches/mlibc/0001-sysdeps-add-cryptix-port.patch is written against
+    # this revision (the master tip of 2025-09-16, whose meson.build matches the
+    # patch's base blob 37f82008).  Tracking the moving branch makes the patch stop
+    # applying as soon as upstream touches the sysdeps dispatch in meson.build.
+    # To move to a newer mlibc, rebase the patch first, then bump this commit.
+    commit: '0cc3366d0b8be7bf3ac38700ce3ae6ec68062586'
     rolling_version: true
     version: '0.0pl@ROLLING_ID@'
 
