@@ -41,6 +41,11 @@ packages:
               fi
           isolate_network: false
         - args: ['./autogen.sh']
+        # The presence of roll-a-release.sh makes configure apply git-checkout sanity checks,
+        # one of which looks for pkg.m4 only in `aclocal --print-ac-dir`.  For our
+        # host-automake that is its own prefix, so configure fails even though autogen.sh found
+        # host-pkg-config's pkg.m4 through ACLOCAL_PATH.  Build it like a release tarball.
+        - args: ['rm', '-f', '@THIS_SOURCE_DIR@/roll-a-release.sh']
     tools_required:
       - host-autoconf-v2.69
       - host-automake-v1.15
