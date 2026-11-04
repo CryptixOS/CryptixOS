@@ -443,9 +443,6 @@ packages:
       subdir: 'sources'
       git: 'https://github.com/CryptixOS/Neon.git'
       branch: 'main'
-      # Pinned like mlibc: tracking `main` breaks this build whenever Neon starts using
-      # something newer than the mlibc port / Prism patch in this repository provide.
-      commit: 'a5a3b5f013224ffd4596a7c9ca23c39e3ca1aff2'
     tools_required:
       - system-gcc
       - host-pkg-config
@@ -629,9 +626,6 @@ packages:
       subdir: 'sources'
       git: 'https://github.com/CryptixOS/Prism.git'
       branch: 'master'
-      # Pinned: patches/prism/ is written against this revision.  It is the last Prism before
-      # `RefCounted` became a class template, which the pinned Neon revision does not expect.
-      commit: 'aae714fcfa7a0e42eae5bc67804461c64e0d8488'
     tools_required:
       - system-gcc
       - host-pkg-config

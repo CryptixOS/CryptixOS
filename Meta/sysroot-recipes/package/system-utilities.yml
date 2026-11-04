@@ -42,8 +42,6 @@ packages:
       subdir: 'sources'
       git: 'https://github.com/CryptixOS/Cryptix-Utils.git'
       branch: 'main'
-      # Pinned like neon so that tracking `main` cannot break the bootstrap.
-      commit: 'f5f2049ec19816928b7a9f125098dc199f4c5fca'
       version: '0.1'
     tools_required:
       - system-gcc
