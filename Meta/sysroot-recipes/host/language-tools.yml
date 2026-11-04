@@ -248,6 +248,9 @@ tools:
       regenerate:
         - args: ['sed', '-i', 's#"/usr"#"/"#', '@THIS_SOURCE_DIR@/yodl/INSTALL.im']
         - args: ['sed', '-i', 's#/usr/bin/icmake#@BUILD_ROOT@/tools/host-icmake/bin/icmake#', '@THIS_SOURCE_DIR@/yodl/build']
+        # CLS makes icmbuild run `tput clear`, which fails (and fails the build) when $TERM
+        # is unset, as it is on CI runners.
+        - args: ['sed', '-i', '/#define CLS/d', '@THIS_SOURCE_DIR@/yodl/verbinsert/icmconf']
     tools_required:
       - host-icmake
     compile:
