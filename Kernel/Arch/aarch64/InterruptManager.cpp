@@ -4,9 +4,25 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Common.hpp>
 
-#include <Arch/InterruptHandler.hpp>
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+
+module Cryptix:Impl.Arch.aarch64.InterruptManager;
+
+import :Debug.Assertions;
+import :Library.Logger;
+import :Library.Stacktrace;
 
 extern "C" void raiseSyncException()
 {
@@ -23,10 +39,11 @@ extern "C" void raiseIrq()
     while (true) __asm__ volatile("wfi");
 }
 
-namespace InterruptManager
+namespace Arch
 {
     extern "C" char* exception_handlers;
-    void             InstallExceptions()
+    KERNEL_INIT_CODE
+    void InstallExceptions()
     {
         __asm__ volatile("msr VBAR_EL1, %0" ::"r"(&exception_handlers));
         __asm__ volatile(
@@ -44,9 +61,4 @@ namespace InterruptManager
             :
             : "x0", "x1", "memory");
     }
-
-    InterruptHandler* AllocateHandler(u8 hint) { return nullptr; }
-
-    void              Mask(u8 vector) { (void)(vector); }
-    void              Unmask(u8 vector) { (void)(vector); }
-} // namespace InterruptManager
+}; // namespace Arch

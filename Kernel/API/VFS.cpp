@@ -4,34 +4,101 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <API/Limits.hpp>
 #include <API/UnixTypes.hpp>
-#include <API/VFS.hpp>
-
-#include <API/Posix/dirent.h>
-#include <API/Posix/fcntl.h>
+#include <API/Syscall.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
 #include <API/Posix/sys/mman.h>
-#include <API/Posix/sys/select.h>
-#include <API/Posix/sys/statfs.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
 #include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Tuple.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <magic_enum/magic_enum.hpp>
+#include <magic_enum/magic_enum_format.hpp>
+#include <API/Posix/bits/socket.h>
+#include <API/Posix/poll.h>
+#include <API/Posix/signal.h>
+#include <API/Posix/dirent.h>
+#include <API/Posix/sys/select.h>
 #include <API/Posix/utime.h>
-
-#include <Arch/CPU.hpp>
-
-#include <Scheduler/Process.hpp>
-#include <Scheduler/Thread.hpp>
-
+#include <API/Posix/sys/statfs.h>
+#include <API/Posix/linux/uio.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/linux/netlink.h>
+#include <API/Posix/bits/socket_type.h>
+#include <Prism/Containers/Queue.hpp>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
 #include <Prism/Memory/Scope.hpp>
 #include <Prism/String/StringUtils.hpp>
-#include <Prism/Utility/Path.hpp>
-#include <Time/Time.hpp>
+#include <API/Posix/linux/capability.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
+#include <Library/Module.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
 
-#include <VFS/FileDescriptor.hpp>
-#include <VFS/Filesystem.hpp>
-#include <VFS/INode.hpp>
-#include <VFS/MountPoint.hpp>
-#include <VFS/PathResolver.hpp>
-#include <VFS/VFS.hpp>
+module Cryptix:Impl.API.VFS;
+
+import :API.VFS;
+import :Arch.CPU;
+import :Network.Socket;
+import :Scheduler.Process;
+import :Scheduler.Thread;
+import :Time.Time;
+import :VFS.FileDescriptor;
+import :VFS.Filesystem;
+import :VFS.INode;
+import :VFS.MountPoint;
+import :VFS.PathResolver;
+import :VFS.VFS;
 
 namespace API::VFS
 {
@@ -39,7 +106,7 @@ namespace API::VFS
     ErrorOr<::VFS::PathResolution> ResolveAtFd(isize dirFdNum, PathView path,
                                                isize flags)
     {
-        auto process = Process::GetCurrent();
+        auto process = Process::Current();
 
         errno        = no_error;
         if (!path.Raw() || path.Empty())
@@ -51,6 +118,7 @@ namespace API::VFS
                 auto parent     = cwd->Parent();
                 auto parentName = parent->Name();
 
+                // FIXME(v1tr10l7): find more elegant solution
                 return ::VFS::PathResolution{
                     parent->Parent()->Lookup(parentName), cwd, cwd->Name()};
             }
@@ -71,8 +139,7 @@ namespace API::VFS
         if (!path.Absolute())
         {
             if (dirFdNum == AT_FDCWD) base = process->CWD();
-            else
-            {
+            else {
                 Ref<FileDescriptor> fd = process->GetFileHandle(dirFdNum);
                 if (!fd) return Error(EBADF);
                 base = fd->DirectoryEntry();
@@ -81,46 +148,55 @@ namespace API::VFS
         }
 
         const bool followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
-        auto       res = ::VFS::ResolvePath(base, path, followSymlinks);
-        if (errno != no_error && errno != ENOENT) return Error(errno);
-
+        auto res = TryOrRet(::VFS::ResolvePath(base, path, followSymlinks));
         return res;
     }
 
     ErrorOr<isize> Read(isize fdNum, u8* out, usize bytes)
     {
-        Process* current = Process::GetCurrent();
+        Process* current = Process::Current();
         if (!current->ValidateWrite(out, bytes)) return Error(EFAULT);
 
         Ref<FileDescriptor> fd = current->GetFileHandle(fdNum);
         if (!fd || !fd->CanRead()) return Error(EBADF);
 
-        CPU::UserMemoryProtectionGuard guard;
+        UserMemoryProtectionGuard guard;
         return fd->Read(out, bytes);
     }
     ErrorOr<isize> Write(isize fdNum, const u8* in, usize bytes)
     {
-        Process* current = Process::GetCurrent();
+        Process* current = Process::Current();
         if (!current->ValidateRead(in, bytes)) return Error(EFAULT);
 
         Ref<FileDescriptor> fd = current->GetFileHandle(fdNum);
         if (!fd) return Error(EBADF);
 
-        CPU::UserMemoryProtectionGuard guard;
+        UserMemoryProtectionGuard guard;
         return fd->Write(in, bytes);
     }
-    ErrorOr<isize> Open(PathView path, isize flags, mode_t mode)
+    ErrorOr<isize> Open(const char* pathname, isize flags, INodeMode mode)
     {
-        Process* current = Process::GetCurrent();
-        if (!current->ValidateRead(path.Raw(), Limits::MAX_PATH_LENGTH))
+        Process* current = Process::Current();
+        if (!current->ValidateRead(pathname, Limits::MAX_PATH_LENGTH))
             return Error(EFAULT);
+
+        Path path = CopyStringFromUser(pathname);
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
+        bool append = flags & O_APPEND;
+        bool creat  = flags & O_CREAT;
+        bool excl   = flags & O_EXCL;
+        LogDebug(
+            "API::Open: Path => {}\nflags =>\n"
+            "O_APPEND: {}, O_CREAT: {}, O_EXCL: {}",
+            path, append, creat, excl);
         return current->OpenAt(AT_FDCWD, path, flags, mode);
     }
     ErrorOr<isize> Close(isize fdNum)
     {
-        Process* current = Process::GetCurrent();
+        Process* current = Process::Current();
+
+        LogDebug("API::VFS::Close: fdNum => {:#x}", fdNum);
         return current->CloseFd(fdNum);
     }
     ErrorOr<isize> Stat(const char* path, stat* out)
@@ -158,7 +234,7 @@ namespace API::VFS
             case FIONBIO:
             {
                 isize nonblocking
-                    = CPU::CopyFromUser(*reinterpret_cast<isize*>(argument));
+                    = CopyFromUser(*reinterpret_cast<isize*>(argument));
 
                 auto flags = fd->GetDescriptionFlags();
                 if (nonblocking) flags |= O_NONBLOCK;
@@ -170,7 +246,7 @@ namespace API::VFS
             case FIOASYNC:
             {
                 isize fasync
-                    = CPU::CopyFromUser(*reinterpret_cast<isize*>(argument));
+                    = CopyFromUser(*reinterpret_cast<isize*>(argument));
 
                 auto flags = fd->GetDescriptionFlags();
                 if (fasync) flags |= FASYNC;
@@ -188,7 +264,7 @@ namespace API::VFS
                 // bytes to inode class
                 usize size = fd->INode()->Stats().st_size;
 
-                CPU::CopyToUser(reinterpret_cast<usize*>(argument), size);
+                CopyToUser(reinterpret_cast<usize*>(argument), size);
                 return 0;
             }
 
@@ -196,8 +272,8 @@ namespace API::VFS
         }
 
         // FIXME(v1tr10l7): shouldn't be here
-        CPU::UserMemoryProtectionGuard guard;
-        return fd->INode()->IoCtl(request, argument);
+        UserMemoryProtectionGuard guard;
+        return fd->IoCtl(request, argument);
     }
 
     ErrorOr<isize> PRead(isize fdNum, void* out, usize count, off_t offset)
@@ -231,13 +307,27 @@ namespace API::VFS
 
         return fd->Write(inBuffer, count, offset);
     }
+    ErrorOr<isize> ReadV(isize fdNum, const iovec* vec, usize vlen)
+    {
+        auto process = Process::Current();
+        auto fd      = TryOrRet(process->FileDescriptor(fdNum));
 
-    ErrorOr<isize> Access(const char* filename, mode_t mode)
+        if (!fd->CanRead()) return Error(EBADF);
+        if (vlen > UIO_MAXIOV) return Error(EINVAL);
+
+        return Error(EINVAL);
+    }
+    ErrorOr<isize> WriteV(isize fdNum, const iovec* vec, usize vlen)
+    {
+        return Error(EINVAL);
+    }
+
+    ErrorOr<isize> Access(const char* filename, INodeMode mode)
     {
         auto process = Process::Current();
         if (!process->ValidateRead(filename, Limits::MAX_PATH_LENGTH))
             return Error(EFAULT);
-        Path path = CPU::CopyStringFromUser(filename);
+        Path path = CopyStringFromUser(filename);
 
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
         if (mode != (mode & S_IRWXO)) return Error(EINVAL);
@@ -257,12 +347,18 @@ namespace API::VFS
 
         return status;
     }
+    ErrorOr<isize> Pipe(isize pipefd[2], isize flags)
+    {
+        auto process = Process::Current();
+
+        return process->OpenPipe(reinterpret_cast<i32*>(pipefd), flags);
+    }
 
     ErrorOr<isize> Dup(isize oldFdNum)
     {
         Process* process = Process::Current();
 
-        return process->DupFd(oldFdNum, -1, 0);
+        return process->DupFd(oldFdNum, process->FirstFreeFdIndex(), 0);
     }
     ErrorOr<isize> Dup2(isize oldFdNum, isize newFdNum)
     {
@@ -270,9 +366,171 @@ namespace API::VFS
 
         return process->DupFd(oldFdNum, newFdNum, 0);
     }
+
+    ErrorOr<isize> Socket(isize domain, isize sockType, isize protocol)
+    {
+        // FIXME(v1tr10l7): all socket types
+        SocketType type = SocketType::eRaw;
+        if (sockType & SOCK_STREAM) type = SocketType::eStream;
+        else if (sockType & SOCK_SEQPACKET)
+            type = SocketType::eSequentialPacket;
+
+        auto socket
+            = TryOrRet(Socket::Create(static_cast<SocketDomain>(domain), type,
+                                      static_cast<NetworkProtocol>(protocol)));
+
+        auto dentry   = new DirectoryEntry("/");
+        auto socketFd = CreateRef<FileDescriptor>(
+            dentry, reinterpret_cast<File*>(socket), O_RDWR,
+            FileAccessMode::eRead | FileAccessMode::eWrite);
+        auto process = Process::Current();
+        auto status  = process->InsertFd(socketFd);
+
+        if (!status)
+        {
+            delete dentry;
+            socketFd.Reset();
+
+            return Error(status.Error());
+        }
+
+        return *status;
+    }
+    ErrorOr<isize> Connect(isize sockFdNum, const sockaddr* addr,
+                           socklen_t addrlen)
+    {
+        LogDebug("API::VFS::Connect: SockFdNum => {:#x}", sockFdNum);
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        LogDebug("API::VFS::Connect: Socket => {:#x}", upointer(socket));
+        auto status = socket->Connect(addr, addrlen);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+    ErrorOr<isize> Accept(isize sockFdNum, sockaddr* addr,
+                          socklen_t* addrlen)
+    {
+        return Error(ENOSYS);
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        auto status = socket->Accept(addr, addrlen);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+    ErrorOr<isize> SendTo(isize sockFdNum, const u8* data, usize size,
+                          isize flags, const sockaddr* destAddr,
+                          socklen_t addrlen)
+    {
+        LogDebug("API::VFS::SendTo: SockFdNum => {:#x}", sockFdNum);
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        LogDebug("API::VFS::SendMsg: Socket => {:#x}", upointer(socket));
+        auto status = socket->SendTo(const_cast<u8*>(data), size, flags);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+    ErrorOr<isize> ReceiveFrom(isize sockFdNum, u8* data, usize size,
+                               isize flags, sockaddr* destAddr,
+                               socklen_t* addrlen)
+    {
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        auto status = socket->ReceiveFrom(data, size, flags, destAddr, addrlen);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+    ErrorOr<isize> SendMsg(isize sockFdNum, const msghdr* msg,
+                           isize flags)
+    {
+        LogDebug("API::VFS::SendMsg: SockFdNum => {:#x}", sockFdNum);
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        LogDebug("API::VFS::SendMsg: SockFd => {:#x}", upointer(socket));
+        if (!socket || !socket->IsSocket())
+        {
+            LogError("API::VFS::SendMsg: Failed to acquire socket at fd => {}",
+                     sockFdNum);
+            return Error(ENOTSOCK);
+        }
+
+        auto status = socket->SendMsg(msg, flags);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+
+    ErrorOr<isize> Bind(isize sockFdNum, const sockaddr* addr,
+                        socklen_t addrlen)
+    {
+        auto                process = Process::Current();
+        Ref<FileDescriptor> sockFd
+            = TryOrRet(process->GetFileDescriptor(sockFdNum));
+        if (!sockFd->IsSocket()) return Error(ENOTSOCK);
+
+        auto socket = reinterpret_cast<class Socket*>(sockFd->File());
+        auto status = socket->Bind(addr, addrlen);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+
+    ErrorOr<isize> Listen(isize sockFdNum, isize backlog)
+    {
+        auto process  = Process::Current();
+
+        auto socketFd = TryOrRet(process->GetFileDescriptor(sockFdNum));
+        if (!socketFd->IsSocket()) return Error(ENOTSOCK);
+
+        auto socket = reinterpret_cast<class Socket*>(socketFd->File());
+        auto status = socket->Listen(backlog);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+    ErrorOr<isize> GetSockName(isize sockFdNum, sockaddr* addr,
+                               socklen_t* addrlen)
+    {
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        auto status = socket->GetLocalAddress(addr, addrlen);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+    ErrorOr<isize> GetPeerName(isize sockFdNum, sockaddr* addr,
+                               socklen_t* addrlen)
+    {
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        auto status = socket->GetPeerAddress(addr, addrlen);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+    ErrorOr<isize> SocketPair(isize domain, isize type, isize protocol,
+                              isize* sv)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> SetSockOpt(isize sockFdNum, isize level, isize option,
+                              const u8* value, const usize valueSize)
+    {
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        auto status = socket->SetOption(level, option, value, valueSize);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+    ErrorOr<isize> GetSockOpt(isize sockFdNum, isize level, isize option,
+                              u8* value, socklen_t* valueSize)
+    {
+        auto socket = TryOrRet(Socket::Get(sockFdNum));
+        auto status = socket->GetOption(level, option, value, valueSize);
+
+        if (!status) return Error(status.Error());
+        return 0;
+    }
+
     ErrorOr<isize> FCntl(isize fdNum, isize op, pointer arg)
     {
-        Process*            current = Process::GetCurrent();
+        Process*            current = Process::Current();
         Ref<FileDescriptor> fd = TryOrRet(current->GetFileDescriptor(fdNum));
 
         bool                cloExec = true;
@@ -332,7 +590,7 @@ namespace API::VFS
     ErrorOr<isize> FTruncate(isize fdNum, off_t length)
     {
         if (length < 0) return Error(EINVAL);
-        Process*            current = Process::GetCurrent();
+        Process*            current = Process::Current();
 
         Ref<FileDescriptor> fd      = current->GetFileHandle(fdNum);
         if (!fd) return Error(EBADF);
@@ -340,7 +598,7 @@ namespace API::VFS
     }
     ErrorOr<isize> GetCwd(char* buffer, usize size)
     {
-        Process* process = Process::GetCurrent();
+        Process* process = Process::Current();
 
         if (!buffer || size == 0) return Error(EINVAL);
         if (!process->ValidateWrite(buffer, size)) return Error(EFAULT);
@@ -350,7 +608,7 @@ namespace API::VFS
 
         if (size < cwdPath.Size()) return Error(ERANGE);
 
-        CPU::UserMemoryProtectionGuard guard;
+        UserMemoryProtectionGuard guard;
         cwdPath.StrView().Copy(buffer, cwdPath.Size());
         return 0;
     }
@@ -358,16 +616,13 @@ namespace API::VFS
     {
         auto process = Process::Current();
         if (!process->ValidateRead(filename)) return Error(EFAULT);
-        Path path = CPU::AsUser([filename]() -> Path { return filename; });
-
+        Path path = CopyStringFromUser(filename);
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
         auto cwd = process->CWD();
         if (!cwd) return Error(ENOENT);
 
-        auto maybePathRes = ::VFS::ResolvePath(cwd, path);
-        RetOnError(maybePathRes);
-        auto pathRes      = maybePathRes.Value();
+        auto pathRes      = TryOrRet(::VFS::ResolvePath(cwd, path));
 
         auto newDirectory = pathRes.Entry;
         if (!newDirectory) return Error(ENOENT);
@@ -401,7 +656,7 @@ namespace API::VFS
     {
         return RenameAt(AT_FDCWD, oldPath, AT_FDCWD, newPath);
     }
-    ErrorOr<isize> MkDir(const char* pathname, mode_t mode)
+    ErrorOr<isize> MkDir(const char* pathname, INodeMode mode)
     {
         return MkDirAt(AT_FDCWD, pathname, mode);
     }
@@ -410,7 +665,7 @@ namespace API::VFS
         auto process = Process::Current();
         if (!process->ValidateRead(pathname, 255)) return Error(EFAULT);
 
-        Path path = pathname ? CPU::CopyStringFromUser(pathname) : ""_p;
+        Path path = pathname ? CopyStringFromUser(pathname) : ""_p;
 
         auto cwd  = process->CWD();
         Assert(cwd);
@@ -437,13 +692,13 @@ namespace API::VFS
 
         return 0;
     }
-    ErrorOr<isize> Creat(const char* pathname, mode_t mode)
+    ErrorOr<isize> Creat(const char* pathname, INodeMode mode)
     {
-        Process* current = Process::GetCurrent();
+        Process* current = Process::Current();
         if (!current->ValidateRead(pathname, Limits::MAX_PATH_LENGTH))
             return Error(EFAULT);
 
-        auto path = CPU::CopyStringFromUser(pathname);
+        auto path = CopyStringFromUser(pathname);
         if (!path.ValidateLength()) return Error(ENAMETOOLONG);
 
         return current->OpenAt(AT_FDCWD, path, O_CREAT | O_WRONLY | O_TRUNC,
@@ -462,13 +717,25 @@ namespace API::VFS
     {
         return ReadLinkAt(AT_FDCWD, path.Raw(), out, size);
     }
-    ErrorOr<isize> ChMod(const char* path, mode_t mode)
+    ErrorOr<isize> ChMod(const char* path, INodeMode mode)
     {
         return FChModAt(AT_FDCWD, path, mode, 0);
     }
-    ErrorOr<isize> FChMod(isize fdNum, mode_t mode)
+    ErrorOr<isize> FChMod(isize fdNum, INodeMode mode)
     {
         return FChModAt(fdNum, ".", mode, 0);
+    }
+    ErrorOr<isize> ChOwn(const char* path, UserID uid, GroupID gid)
+    {
+        return FChOwnAt(AT_FDCWD, path, uid, gid, 0);
+    }
+    ErrorOr<isize> FChOwn(isize fdNum, UserID uid, GroupID gid)
+    {
+        return FChOwnAt(fdNum, "", uid, gid, AT_EMPTY_PATH);
+    }
+    ErrorOr<isize> LChOwn(const char* path, UserID uid, GroupID gid)
+    {
+        return FChOwnAt(AT_FDCWD, path, uid, gid, AT_SYMLINK_NOFOLLOW);
     }
 
     ErrorOr<isize> SyncFilesystems()
@@ -480,7 +747,7 @@ namespace API::VFS
                          const char* filesystemType, usize flags,
                          const void* data)
     {
-        Process* current = Process::GetCurrent();
+        Process* current = Process::Current();
         if (!current->IsSuperUser()) return ErrorCode(EPERM);
 
         if (pathname
@@ -492,23 +759,84 @@ namespace API::VFS
         if (data && !current->ValidateRead(data, PMM::PAGE_SIZE))
             return Error(EFAULT);
 
-        Path source = pathname ? CPU::CopyStringFromUser(pathname) : ""_p;
-        Path target = targetPath ? CPU::CopyStringFromUser(targetPath) : ""_p;
+        Path source = pathname ? CopyStringFromUser(pathname) : ""_p;
+        Path target = targetPath ? CopyStringFromUser(targetPath) : ""_p;
         if (target.Empty()) return Error(ENOENT);
 
         if (!filesystemType) return Error(EINVAL);
-        String fsType = CPU::CopyStringFromUser(filesystemType).StrView();
+        String fsType = CopyStringFromUser(filesystemType).StrView();
         if (fsType.Empty()) return ErrorCode(ENODEV);
 
-        Scope<u8[]> options = new u8[CPU::CopyStringFromUser(
-                                         reinterpret_cast<const char*>(data))
-                                         .Size()];
+        Scope<u8[]> options
+            = new u8[CopyStringFromUser(reinterpret_cast<const char*>(data))
+                         .Size()];
 
         LogDebug("VFS: Mounting `{}`({}) at `{}`", source, fsType, target);
         auto mountPoint = TryOrRet(::VFS::Mount(nullptr, source, target, fsType,
                                                 flags, options.Raw()));
 
         return 0;
+    }
+    ErrorOr<isize> SetXAttr(const char* upath, const char* uname,
+                            const u8* value, usize size, isize flags)
+    {
+        auto path = CopyStringFromUser(upath);
+        auto name = CopyStringFromUser(uname);
+
+        return VFS::SetExtendedAttribute(path, name, value, size, flags);
+    }
+    ErrorOr<isize> LSetXAttr(const char* upath, const char* uname,
+                             const u8* value, usize size, isize flags)
+    {
+        auto path = CopyStringFromUser(upath);
+        auto name = CopyStringFromUser(uname);
+
+        return VFS::SetExtendedAttribute(path, name, value, size, flags, true);
+    }
+    ErrorOr<isize> FSetXAttr(isize fdNum, const char* name, const u8* value,
+                             usize size, isize flags)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> GetXAttr(const char* path, const char* name, const u8* value,
+                            usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> LGetXAttr(const char* path, const char* name,
+                             const u8* value, usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> FGetXAttr(isize fdNum, const char* name, const u8* value,
+                             usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> ListXAttr(const char* path, char* list, usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> LListXAttr(const char* path, char* list, usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> FListXAttr(isize fdNum, char* list, usize size)
+    {
+        return Error(ENOSYS);
+    }
+
+    ErrorOr<isize> RemoveXAttr(const char* path, const char* name)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> LRemoveXAttr(const char* path, const char* name)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> FRemoveXAttr(isize fdNum, const char* name)
+    {
+        return Error(ENOSYS);
     }
 
     CTOS_NO_SANITIZE("alignment")
@@ -520,31 +848,23 @@ namespace API::VFS
             return Error(EFAULT);
 
         Ref<FileDescriptor> fd = TryOrRet(current->GetFileDescriptor(fdNum));
-        LogDebug("SysGetDents64: {{ Path: {} }}", fd->DirectoryEntry()->Path());
-
-        CPU::UserMemoryProtectionGuard guard;
+        UserMemoryProtectionGuard guard;
         return fd->GetDirEntries(outBuffer, count);
     }
     ErrorOr<isize> OpenAt(isize dirFdNum, const char* pathname, isize flags,
-                          mode_t mode)
+                          INodeMode mode)
     {
-        Process* current = Process::GetCurrent();
-        Path     path    = CPU::CopyStringFromUser(pathname);
+        Process* current = Process::Current();
+        Path     path    = CopyStringFromUser(pathname);
 
         return current->OpenAt(dirFdNum, path, flags, mode);
     }
-    ErrorOr<isize> MkDirAt(isize dirFdNum, const char* pathname, mode_t mode)
+    ErrorOr<isize> MkDirAt(isize dirFdNum, const char* pathname, INodeMode mode)
     {
         auto process = Process::Current();
         if (!process->ValidateRead(pathname, 255)) return Error(EFAULT);
 
-        auto path = CPU::AsUser(
-            [&pathname]() -> Path
-            {
-                if (!pathname || *pathname == 0) return "";
-
-                return pathname;
-            });
+        auto path      = CopyStringFromUser(pathname);
 
         auto pathRes   = TryOrRet(ResolveAtFd(dirFdNum, path, 0));
         auto directory = pathRes.Parent;
@@ -552,50 +872,92 @@ namespace API::VFS
 
         return ::VFS::CreateDirectory(directory, baseName, mode);
     }
-    ErrorOr<isize> MkNodAt(isize dirFdNum, const char* pathname, mode_t mode,
+    ErrorOr<isize> MkNodAt(isize dirFdNum, const char* pathname, INodeMode mode,
                            dev_t dev)
     {
         auto process = Process::Current();
         if (!process->ValidateRead(pathname, 255)) return Error(EFAULT);
 
-        auto getPath = [](const char* path) -> Path
-        { return CPU::AsUser([path]() -> Path { return path; }); };
-
-        auto path      = getPath(pathname);
+        auto path      = CopyStringFromUser(pathname);
         auto pathRes   = TryOrRet(ResolveAtFd(dirFdNum, path, 0));
         auto directory = pathRes.Parent;
         auto baseName  = pathRes.BaseName;
 
         return ::VFS::CreateNode(directory, baseName, mode, dev);
     }
-    ErrorOr<isize> ReadLinkAt(isize dirFdNum, const char* pathView,
-                              char* outBuffer, usize bufferSize)
+    ErrorOr<isize> FChOwnAt(isize dirFdNum, const char* pathname, UserID uid,
+                            GroupID gid, isize flags)
     {
-        Path path
-            = CPU::AsUser([&pathView]() -> Path { return Path(pathView); });
+        auto current = Process::Current();
+        if (pathname
+            && !current->ValidateRead(pathname, Limits::MAX_PATH_LENGTH))
+            return Error(EFAULT);
 
-        auto pathResOr = ResolveAtFd(dirFdNum, path, AT_SYMLINK_NOFOLLOW);
-        if (!pathResOr) return Error(pathResOr.Error());
-        auto pathRes = pathResOr.Value();
+        auto path = CopyStringFromUser(pathname);
+        if (!path.ValidateLength()) return Error(ENAMETOOLONG);
+
+        auto pathRes = TryOrRet(ResolveAtFd(dirFdNum, path, 0));
 
         auto entry   = pathRes.Entry;
         if (!entry) return Error(ENOENT);
-        auto inode     = entry->INode();
 
-        auto linkValue = TryOrRet(inode->ReadLink());
-        CPU::AsUser(
-            [&]()
-            {
-                Memory::Copy(outBuffer, linkValue.Raw(),
-                             Min(linkValue.Size(), bufferSize));
-            });
+        auto inode = entry->INode();
+        if (!inode) return Error(ENOENT);
 
-        return 0;
+        if (!current->IsSuperUser()
+            && current->Credentials().UserID != inode->UserID())
+            return Error(EPERM);
+
+        auto& creds      = current->Credentials();
+        auto  newUserID  = inode->UserID();
+        auto  newGroupID = inode->GroupID();
+
+        if (uid != static_cast<UserID>(-1))
+        {
+            if (creds.UserID != uid && !current->IsSuperUser())
+                return Error(EPERM);
+            newUserID = uid;
+        }
+        if (gid != static_cast<GroupID>(-1))
+        {
+            if (creds.GroupID != gid && !current->IsSuperUser())
+                return Error(EPERM);
+            newGroupID = gid;
+        }
+
+        if (inode->ReadOnly()) return Error(EROFS);
+        if (inode->IsSetUserID() || inode->IsSetGroupID())
+        {
+            auto result
+                = inode->ChangeMode(inode->Mode() & ~(S_ISUID | S_ISGID));
+            if (!result) return Error(result.Error());
+        }
+
+        // FIXME(v1tr10l7): error handling
+        inode->SetOwner(newUserID, newGroupID);
+        return {};
     }
-    ErrorOr<isize> FChModAt(isize dirFdNum, const char* pathView, mode_t mode,
-                            isize flags)
+    ErrorOr<isize> ReadLinkAt(isize dirFdNum, const char* pathView,
+                              char* outBuffer, usize bufferSize)
     {
-        Path path    = CPU::CopyStringFromUser(pathView);
+        Path path = CopyStringFromUser(pathView);
+
+        auto pathRes
+            = TryOrRet(ResolveAtFd(dirFdNum, path, AT_SYMLINK_NOFOLLOW));
+
+        auto entry = pathRes.Entry;
+        if (!entry) return Error(ENOENT);
+        auto  inode     = entry->INode();
+
+        auto  linkValue = TryOrRet(inode->ReadLink()).StrView();
+        usize count     = Min(linkValue.Size(), bufferSize);
+        CopyStringToUser(linkValue, outBuffer, count);
+        return count;
+    }
+    ErrorOr<isize> FChModAt(isize dirFdNum, const char* pathView,
+                            INodeMode mode, isize flags)
+    {
+        Path path    = CopyStringFromUser(pathView);
         auto pathRes = TryOrRet(ResolveAtFd(dirFdNum, path, mode));
 
         auto entry   = pathRes.Entry;
@@ -618,10 +980,10 @@ namespace API::VFS
                             fd_set* exceptFds, const timeval* timeout,
                             const sigset_t* sigmask)
     {
-        auto                   current = Process::GetCurrent();
+        auto              current = Process::Current();
 
-        [[maybe_unused]] isize i, j, max;
-        return -1;
+        CTOS_UNUSED isize i, j, max;
+        return 0;
         usize set = 0;
         for (isize i = 0; i < FD_SETSIZE; i++)
         {
@@ -643,21 +1005,77 @@ namespace API::VFS
     end_check:
     }
 
+    inline constexpr usize MAX_PPOLL_FDS = 32;
+    inline constexpr usize POLLNVAL      = 0x0020;
+    ErrorOr<isize>         PPoll(pollfd* fds, nfds_t nfds, int timeout)
+    {
+        //     Process*        process    = Process::Current();
+        //     Thread*         thread     = Thread::Current();
+        //
+        //     isize           fdCount    = 0;
+        //     isize           eventCount = 0;
+        //     isize           ret        = 0;
+        //     isize           fdIndices[MAX_PPOLL_FDS];
+        //
+        //     FileDescriptor* fdList[MAX_PPOLL_FDS];
+        //     Timer           timer;
+        //
+        //     if (!nfds || nfds > MAX_PPOLL_FDS) return Error(EINVAL);
+        //
+        //     for (usize i = 0; i < nfds; i++)
+        //     {
+        //         pollfd* pollfd  = &fds[i];
+        //
+        //         pollfd->revents = 0;
+        //         if (pollfd->fd < 0) continue;
+        //
+        //         auto maybeFd = process->GetFileDescriptor(pollfd->fd);
+        //         if (!maybeFd) continue;
+        //         auto fd = maybeFd.Value();
+        //
+        //         if (!fd)
+        //         {
+        //             pollfd->revents = POLLNVAL;
+        //             ++ret;
+        //             continue;
+        //         }
+        //
+        //         fdList[fdCount]    = fd.Raw();
+        //         fdIndices[fdCount] = i;
+        //         events[eventCount] = fd->Event;
+        //
+        //         ++fdCount;
+        //         ++eventCount;
+        //     }
+        //
+        //     for (;;)
+        //     {
+        //         isize which = Event::Await(events, eventCount, true);
+        //         if (which == -1) return Error(EINTR);
+        //
+        //         if (timer != NULL && which == eventCount - 1) return
+        //         Error(EINVAL);
+        //
+        //         pollfd*  pollfd = &fds[fdIndices[which]];
+        //         FileDescriptor* fd     = fdList[which];
+        //     }
+        //
+        return Error(ENOSYS);
+    }
+
     ErrorOr<isize> UTime(PathView path, const utimbuf* out)
     {
-        auto maybePathRes
-            = ::VFS::ResolvePath(::VFS::RootDirectoryEntry(), path, true);
-        RetOnError(maybePathRes);
-        auto pathRes = maybePathRes.Value();
+        auto pathRes = TryOrRet(
+            ::VFS::ResolvePath(::VFS::RootDirectoryEntry(), path, true));
 
-        auto entry   = pathRes.Entry;
+        auto entry = pathRes.Entry;
         if (!entry) return Error(ENOENT);
         auto inode = entry->INode();
         if (!inode) return Error(ENOENT);
 
-        Process* process = Process::GetCurrent();
+        Process* process = Process::Current();
         if (!inode->CanWrite(process->Credentials())) return Error(EPERM);
-        auto     utime      = CPU::AsUser([&out]() -> utimbuf { return *out; });
+        auto     utime      = AsUser([&out]() -> utimbuf { return *out; });
 
         timespec accessTime = {utime.actime, 0};
         timespec modificationTime = {utime.modtime, 0};
@@ -669,46 +1087,82 @@ namespace API::VFS
 
         return {};
     }
-    ErrorOr<isize> StatFs(PathView path, statfs* out)
+    ErrorOr<isize> StatFs(const char* pathname, statfs* out)
     {
-        PathResolver resolver(nullptr,
-                              CPU::AsUser([path]() -> Path { return path; }));
-        auto entry = TryOrRet(resolver.Resolve(PathLookupFlags::eFollowLinks));
+        auto         path = CopyStringFromUser(pathname);
+        PathResolver resolver(nullptr, path);
+        auto         entry      = TryOrRet(resolver.Resolve(
+            PathLookupFlags::eFollowLinks | PathLookupFlags::eFollowMounts));
 
-        auto inode = entry->INode();
+        auto         inode      = entry->INode();
+        auto         mountpoint = MountPoint::Lookup(entry);
+        if (mountpoint)
+        {
+            auto fs     = mountpoint->Filesystem();
+            auto dentry = fs->RootDirectoryEntry();
+            LogInfo("Stats of {}", fs->Name());
+            inode = dentry->INode();
+        }
         if (!inode || !inode->Filesystem()) return Error(ENOENT);
 
         auto   fs = inode->Filesystem();
-
         statfs stats;
         Memory::Fill(&stats, 0, sizeof(stats));
 
         RetOnError(fs->Stats(stats));
-        CPU::CopyToUser(out, stats);
+        CopyToUser(out, stats);
         return 0;
     }
+    ErrorOr<isize> PivotRoot(const char* newRoot, const char* putOld)
+    {
+        return {};
+        Path newRootPath = CopyStringFromUser(newRoot);
+        Path putOldPath  = CopyStringFromUser(putOld);
+        LogTrace("VFS::PivotRoot: newRoot => {}, putOld => {}", newRootPath,
+                 putOldPath);
+        auto result = ::VFS::PivotRoot(newRootPath, putOldPath);
+        if (!result) return Error(result.Error());
 
-    ErrorOr<isize> FStatAt(isize dirFdNum, const char* path, isize flags,
+        auto pathRes
+            = TryOrRet(VFS::ResolvePath(VFS::RootDirectoryEntry(), "/usr/bin"));
+        auto entry = pathRes.Entry;
+
+        LogWarn("Dump after pivoting");
+        entry->PopulateDirectoryEntries();
+        for (auto& [name, entry] : *entry) LogTrace("{}", name);
+        return {};
+    }
+
+    ErrorOr<isize> FStatAt(isize dirFdNum, const char* pathname, isize flags,
                            stat* out)
     {
         if (flags & ~(AT_EMPTY_PATH | AT_NO_AUTOMOUNT | AT_SYMLINK_NOFOLLOW)
             || !out)
             return Error(EINVAL);
 
-        Process* current = Process::GetCurrent();
-        if (path && !current->ValidateRead(path)) return Error(EFAULT);
+        Process* current = Process::Current();
+        if (pathname && !current->ValidateRead(pathname)) return Error(EFAULT);
 
-        CPU::UserMemoryProtectionGuard guard;
-        if (!PathView(path).ValidateLength()) return Error(ENAMETOOLONG);
+        auto path = pathname ? CopyStringFromUser(pathname) : ""_p;
+        UserMemoryProtectionGuard guard;
+        if (!PathView(pathname).ValidateLength()) return Error(ENAMETOOLONG);
 
         Ref<FileDescriptor> fd             = current->GetFileHandle(dirFdNum);
         bool                followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
 
         auto                cwdEntry       = current->CWD();
+
+        Assert(cwdEntry);
         if (!cwdEntry) return Error(ENOENT);
         auto cwd = cwdEntry->INode();
 
-        if (!path || !*path)
+        if ((!pathname || !*pathname) && !(!path.Raw() || path.Empty()))
+            LogDebug(
+                "VFS::FStatAt: path.Raw() => `{:#x}`, path.Empty() => {}, path "
+                "=> {}",
+                path.Raw(), path.Empty(), path);
+
+        if (!pathname || !*pathname)
         {
             if (!(flags & AT_EMPTY_PATH)) return Error(ENOENT);
 
@@ -721,12 +1175,27 @@ namespace API::VFS
             }
             else if (!fd) return Error(EBADF);
 
-            *out = fd->INode()->Stats();
+            auto inode = fd->INode();
+            if (!inode) return Error(ENOENT);
+            out->st_dev     = inode->DeviceID();
+            out->st_ino     = inode->ID();
+            out->st_nlink   = inode->LinkCount();
+            out->st_mode    = inode->Mode();
+            out->st_uid     = inode->UserID();
+            out->st_gid     = inode->GroupID();
+            out->st_rdev    = inode->BackingDeviceID();
+            out->st_size    = inode->Size();
+            out->st_blksize = inode->BlockSize();
+            out->st_blocks  = inode->BlockCount();
+            out->st_atim    = inode->AccessTime();
+            out->st_mtim    = inode->ModificationTime();
+            out->st_ctim    = inode->StatusChangeTime();
             return 0;
         }
 
-        WeakRef parentEntry
-            = PathView(path).Absolute() ? ::VFS::RootDirectoryEntry() : nullptr;
+        WeakRef parentEntry = PathView(pathname).Absolute()
+                                ? ::VFS::RootDirectoryEntry()
+                                : nullptr;
         if (!parentEntry)
         {
             if (dirFdNum == AT_FDCWD) parentEntry = cwdEntry;
@@ -736,14 +1205,12 @@ namespace API::VFS
                 if (!parentEntry->IsDirectory()) return Error(ENOTDIR);
             }
             else return Error(EBADF);
-
-            parentEntry = parentEntry->FollowMounts();
         }
 
-        Ref<DirectoryEntry> entry
-            = ::VFS::ResolvePath(parentEntry.Promote(), path, followSymlinks)
-                  .Value()
-                  .Entry;
+        Ref<DirectoryEntry> entry = ::VFS::ResolvePath(parentEntry.Promote(),
+                                                       pathname, followSymlinks)
+                                        .Value()
+                                        .Entry;
         if (!entry) return Error(errno);
 
         auto inode = entry->INode();
@@ -764,11 +1231,8 @@ namespace API::VFS
     ErrorOr<isize> LinkAt(isize oldDirFdNum, const char* oldPath,
                           isize newDirFdNum, const char* newPath, isize flags)
     {
-        auto getPath = [](const char* path) -> Path
-        { return CPU::AsUser([path]() -> Path { return path; }); };
-
-        auto oldPathName = getPath(oldPath);
-        auto newPathName = getPath(newPath);
+        auto oldPathName = CopyStringFromUser(oldPath);
+        auto newPathName = CopyStringFromUser(newPath);
         LogTrace("VFS::LinkAt Entry => linking `{}` to `{}`...", oldPathName,
                  newPathName);
 
@@ -792,11 +1256,8 @@ namespace API::VFS
     ErrorOr<isize> SymlinkAt(const char* targetPath, isize newDirFdNum,
                              const char* linkPath)
     {
-        auto getPath = [](const char* path) -> Path
-        { return CPU::AsUser([path]() -> Path { return path; }); };
-
-        auto target    = getPath(targetPath);
-        auto link      = getPath(linkPath);
+        auto target    = CopyStringFromUser(targetPath);
+        auto link      = CopyStringFromUser(linkPath);
 
         auto pathRes   = TryOrRet(ResolveAtFd(newDirFdNum, link, 0));
         auto directory = pathRes.Parent;
@@ -813,8 +1274,8 @@ namespace API::VFS
             || (times && !process->ValidateRead(times, sizeof(timespec) * 2)))
             return Error(EFAULT);
 
-        auto atime = times ? CPU::CopyFromUser(times[0]) : Time::GetReal();
-        auto mtime = times ? CPU::CopyFromUser(times[1]) : Time::GetReal();
+        auto atime = times ? CopyFromUser(times[0]) : Time::GetReal();
+        auto mtime = times ? CopyFromUser(times[1]) : Time::GetReal();
         auto ctime = Time::GetReal();
         if (atime.tv_nsec == UTIME_OMIT && mtime.tv_nsec == UTIME_OMIT)
             return 0;
@@ -835,10 +1296,10 @@ namespace API::VFS
         if (mtime.tv_nsec == UTIME_NOW) mtime = Time::GetReal();
         else if (mtime.tv_nsec == UTIME_OMIT) mtime = {};
 
-        auto   path      = CPU::AsUser([&]() -> PathView { return pathname; });
-        auto   pathResOr = ResolveAtFd(dirFdNum, path, flags);
+        auto       path      = AsUser([&]() -> PathView { return pathname; });
+        auto       pathResOr = ResolveAtFd(dirFdNum, path, flags);
 
-        INode* inode     = nullptr;
+        Ref<INode> inode     = nullptr;
         if (!pathResOr)
         {
             if (dirFdNum < 0 && dirFdNum != AT_FDCWD)
@@ -849,8 +1310,7 @@ namespace API::VFS
 
             inode = fd->INode();
         }
-        else
-        {
+        else {
             auto dentry = pathResOr.Value().Entry;
             if (!dentry) return Error(ENOENT);
             inode = dentry->INode();
@@ -870,12 +1330,19 @@ namespace API::VFS
     {
         if (oldFdNum == newFdNum) return Error(EINVAL);
 
-        auto* process = Process::GetCurrent();
+        auto* process = Process::Current();
         return process->DupFd(oldFdNum, newFdNum, flags);
+    }
+    ErrorOr<isize> Pipe2(i32* pipeFds, isize flags)
+    {
+        auto process = Process::Current();
+        return process->OpenPipe(pipeFds);
     }
 
     ErrorOr<isize> SyncFs(isize fdNum)
     {
+        LogDebug("API: SyncFs");
+
         auto process = Process::Current();
         auto fd      = TryOrRet(process->GetFileDescriptor(fdNum));
         auto inode   = fd->INode();
@@ -883,39 +1350,65 @@ namespace API::VFS
         auto fs      = inode->Filesystem();
         if (!fs) return Error(ENODEV);
 
-        RetOnError(fs->Sync());
+        auto status = fs->Sync();
+        if (!status)
+        {
+            LogError("API: SyncFs Failed => {}", ToString(status.Error()));
+            return Error(status.Error());
+        }
+
+        LogDebug("API: SyncFs succeeded");
         return 0;
     }
     ErrorOr<isize> RenameAt2(isize oldDirFdNum, const char* oldPath,
                              isize newDirFdNum, const char* newPath,
                              usize flags)
     {
-        auto getPath = [](const char* path) -> Path
-        { return CPU::AsUser([path]() -> Path { return path; }); };
+        auto oldPathRes = TryOrRet(
+            ResolveAtFd(oldDirFdNum, CopyStringFromUser(oldPath), 0));
 
-        auto oldPathResolutionOr
-            = ResolveAtFd(oldDirFdNum, getPath(oldPath), 0);
-        if (!oldPathResolutionOr) return Error(oldPathResolutionOr.Error());
-        auto oldPathResolution = oldPathResolutionOr.Value();
-
-        auto newPathResolutionOr
-            = ResolveAtFd(newDirFdNum, getPath(newPath), 0);
-        if (!newPathResolutionOr) return Error(newPathResolutionOr.Error());
-        auto newPathResolution = newPathResolutionOr.Value();
-
-        auto oldParent         = oldPathResolution.Parent->INode();
+        auto newPathRes = TryOrRet(
+            ResolveAtFd(newDirFdNum, CopyStringFromUser(newPath), 0));
+        auto oldParent = oldPathRes.Parent->INode();
         if (!oldParent->IsDirectory()) return Error(ENOTDIR);
 
-        if (!oldPathResolution.Entry) return Error(ENOENT);
-        if (newPathResolution.Entry) return Error(EEXIST);
+        if (!oldPathRes.Entry) return Error(ENOENT);
+        if (newPathRes.Entry) return Error(EEXIST);
 
-        auto newParent = newPathResolution.Parent;
-        auto newName   = newPathResolution.BaseName.Size() > 0
-                           ? newPathResolution.BaseName
-                           : oldPathResolution.BaseName;
+        auto newParent = newPathRes.Parent;
+        auto newName   = newPathRes.BaseName.Size() > 0 ? newPathRes.BaseName
+                                                        : oldPathRes.BaseName;
         auto success   = oldParent->Rename(newParent->INode(), newName);
-
         if (!success) return Error(success.Error());
         return 0;
     }
+    ErrorOr<isize> SetXAttrAt(isize dirFdNum, const char* path, usize flags,
+                              const char* name, const struct xattr_args* uargs,
+                              usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> GetXAttrAt(isize dirFdNum, const char* path, usize flags,
+                              const char* name, const struct xattr_args* uargs,
+                              usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> ListXAttrAt(isize dirFdNum, const char* path, usize flags,
+                               char* list, usize size)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> RemoveXAttrAt(isize dirFdNum, const char* path, usize flags,
+                                 const char* name)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<isize> OpenTreeAttr(isize dirFdNum, const char* filename,
+                                usize flags, struct mount_attr* uattr,
+                                usize size)
+    {
+        return Error(ENOSYS);
+    }
+
 }; // namespace API::VFS

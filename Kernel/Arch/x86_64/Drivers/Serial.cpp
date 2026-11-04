@@ -4,12 +4,27 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/x86_64/IO.hpp>
 
-#include <Drivers/Serial.hpp>
-#include <Library/Locking/Spinlock.hpp>
+module;
 
+#include <Prism/Core/Types.hpp>
+#include <Prism/Core/Concepts.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Prism/Utility/Atomic.hpp>
 #include <utility>
+
+module Cryptix:Impl.Arch.x86_64.Drivers.Serial;
+
+import :Arch.x86_64.IO;
+import :Drivers.Serial;
+import :Library.Locking.Spinlock;
 
 namespace Serial
 {

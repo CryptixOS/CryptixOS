@@ -4,26 +4,75 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/CPU.hpp>
-#include <Arch/x86_64/Drivers/PCSpeaker.hpp>
-#include <Arch/x86_64/IO.hpp>
-
-#include <Drivers/Core/CharacterDevice.hpp>
-#include <Drivers/Core/DeviceManager.hpp>
-#include <Drivers/Core/GenericDriver.hpp>
-
-#include <Library/Module.hpp>
 
 #include <Prism/Core/Types.hpp>
-#include <VFS/DevTmpFs/DevTmpFs.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Core/Concepts.hpp>
+#include <API/UnixTypes.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <API/Posix/sys/statfs.h>
 
-#include <VFS/VFS.hpp>
+import Cryptix;
+
+CTOS_MODULE_AUTHOR("v1tr10l7");
+CTOS_MODULE_DESCRIPTION("pc speaker driver");
+CTOS_MODULE_LICENSE("GPL-3");
+CTOS_MODULE_VERSION("0.2");
 
 class PCSpeakerDevice : public CharacterDevice
 {
   public:
     PCSpeakerDevice()
-        : CharacterDevice("pcspk", MakeDevice(AllocateMajor().Value(), 0))
+        : CharacterDevice("pcspk", API::DeviceMajor::MISCELLANEOUS, 254)
     {
     }
 
@@ -36,19 +85,18 @@ class PCSpeakerDevice : public CharacterDevice
     virtual ErrorOr<isize> Write(const void* src, off_t offset,
                                  usize bytes) override
     {
-        if (!src || bytes < sizeof(u32)) return_err(-1, EINVAL);
+        if (!src || bytes < sizeof(u32)) return Error(EINVAL);
 
         struct Command
         {
             u16 Tone         = 0;
             u16 Milliseconds = 0;
-        } command
-            = CPU::AsUser([src]() -> Command
-                          { return *reinterpret_cast<const Command*>(src); });
+        } command = AsUser([src]() -> Command
+                           { return *reinterpret_cast<const Command*>(src); });
 
         if (command.Tone < 20 || command.Tone > 20'000
             || command.Milliseconds == 0)
-            return_err(-1, EINVAL);
+            return Error(EINVAL);
 
         PCSpeaker::ToneOn(command.Tone);
         IO::Delay(command.Milliseconds);
@@ -68,9 +116,9 @@ class PCSpeakerDevice : public CharacterDevice
         return Write(in.Raw(), offset, count);
     }
 
-    virtual i32 IoCtl(usize request, uintptr_t argp) override
+    virtual ErrorOr<isize> IoCtl(usize request, upointer argp) override
     {
-        return_err(-1, ENOSYS);
+        return Error(ENOSYS);
     }
 };
 
@@ -86,12 +134,15 @@ namespace
         return {};
     }
 
-    GenericDriver s_PCSpeakerDriver = {
+    static GenericDriver s_PCSpeakerDriver = {
         .Name   = "pcspk",
         .Probe  = Probe,
         .Remove = nullptr,
     };
 
-    bool ModuleInit() { return RegisterGenericDriver(s_PCSpeakerDriver); }
+    extern "C" CTOS_EXPORT bool ModuleInit()
+    {
+        return RegisterGenericDriver(s_PCSpeakerDriver);
+    }
 } // namespace
 MODULE_INIT(pcspk, ModuleInit);

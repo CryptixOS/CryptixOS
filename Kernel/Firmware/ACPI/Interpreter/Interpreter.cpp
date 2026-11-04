@@ -4,23 +4,45 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/CommandLine.hpp>
-#include <Firmware/ACPI/Interpreter/Interpreter.hpp>
 
+module;
+
+#include <Prism/Core/Types.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <Prism/Containers/UnorderedMap.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Core/Concepts.hpp>
+#endif
+#include <Compiler.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/String/StringUtils.hpp>
+#include <Prism/Memory/ByteStream.hpp>
 #include <Prism/Containers/Array.hpp>
 #include <Prism/Containers/Deque.hpp>
-#include <Prism/String/String.hpp>
-#include <Prism/String/StringUtils.hpp>
-#include <Prism/Utility/Optional.hpp>
+
+module Cryptix:Impl.Firmware.ACPI.Interpreter.Interpreter;
+
+import :Boot.CommandLine;
+import :Firmware.ACPI.Interpreter.Interpreter;
 
 namespace ACPI::Interpreter
 {
-    static NameSpace*        s_RootNameSpace = nullptr;
-    static Vector<CodeBlock> s_ScopesToParse;
-    static ExecutionContext  s_Context;
-    static CodeBlock         s_CurrentBlock;
+    namespace
+    {
+        NameSpace*        s_RootNameSpace = nullptr;
+        Vector<CodeBlock> s_ScopesToParse;
+        ExecutionContext  s_Context;
+        CodeBlock         s_CurrentBlock;
+    }; // namespace
 
-    inline u8                PeekNextByte()
+    inline u8 PeekNextByte()
     {
         auto& stream = s_Context.Stream;
 

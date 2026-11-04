@@ -4,17 +4,83 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/CPU.hpp>
 
-#include <Scheduler/Process.hpp>
-#include <Scheduler/Scheduler.hpp>
-#include <Scheduler/Thread.hpp>
+module;
 
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
 #include <Prism/Utility/Math.hpp>
-#include <VFS/DirectoryEntry.hpp>
-#include <VFS/FileDescriptor.hpp>
-#include <VFS/INode.hpp>
-#include <VFS/VFS.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <API/Posix/linux/capability.h>
+#include <API/UnixTypes.hpp>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
+#include <Prism/Core/Singleton.hpp>
+#include <Library/Module.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <API/Posix/sys/statfs.h>
+
+module Cryptix:Impl.VFS.FileDescriptor;
+
+import :Arch.CPU;
+import :Scheduler.Process;
+import :Scheduler.Scheduler;
+import :Scheduler.Thread;
+import :VFS.INode;
+import :VFS.FileDescriptor;
+import :VFS.MountPoint;
+import :VFS.VFS;
 
 void DirectoryEntries::Push(StringView name, loff_t offset, usize ino,
                             usize type)
@@ -57,7 +123,7 @@ FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry, i32 flags,
     , m_DirectoryIterator(dentry->begin())
 {
     auto inode = dentry->INode();
-    if (inode) m_File = new File(inode);
+    if (inode) m_File = new class File(inode);
     dentry->PopulateDirectoryEntries();
     m_DirectoryIterator = dentry->begin();
 
@@ -67,20 +133,25 @@ FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry, i32 flags,
     m_AccessMode = accMode;
     m_Flags      = flags & O_CLOEXEC;
 }
-FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry, File* file,
-                               i32 flags, FileAccessMode accMode)
+FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry,
+                               class File* file, i32 flags,
+                               FileAccessMode accMode)
     : m_DirectoryEntry(dentry)
     , m_File(file)
     , m_DirectoryIterator(dentry->begin())
 {
-    m_DescriptionFlags = flags
-                       & ~(O_CREAT | O_DIRECTORY | O_EXCL | O_NOCTTY
-                           | O_NOFOLLOW | O_TRUNC | O_CLOEXEC);
-    m_AccessMode = accMode;
-    m_Flags      = flags & O_CLOEXEC;
+    m_DescriptionFlags = flags;
+    // & ~(O_CREAT | O_DIRECTORY | O_EXCL | O_NOCTTY
+    //     | O_NOFOLLOW | O_TRUNC | O_CLOEXEC);
+    m_AccessMode       = accMode;
+    m_Flags            = flags & O_CLOEXEC;
 }
 
-FileDescriptor::~FileDescriptor() { delete m_File; }
+FileDescriptor::~FileDescriptor()
+{
+    bool writer = CanWrite();
+    if (m_File && m_File->IsFifo()) m_File->Close(writer);
+}
 
 ErrorOr<isize> FileDescriptor::Read(const UserBuffer& out, usize count,
                                     isize offset)
@@ -88,7 +159,11 @@ ErrorOr<isize> FileDescriptor::Read(const UserBuffer& out, usize count,
     ScopedLock guard(m_Lock);
 
     if (!CanRead()) return Error(EBADF);
-    if (!m_File) return Error(ENOENT);
+    if (!m_File)
+    {
+        LogError("FileDescriptor::Read: m_File is nullptr");
+        return Error(ENOENT);
+    }
     if (m_File->IsDirectory()) return Error(EISDIR);
 
     // if (WouldBlock())
@@ -101,8 +176,7 @@ ErrorOr<isize> FileDescriptor::Read(const UserBuffer& out, usize count,
     // }
 
     if (offset < 0) offset = m_Offset;
-
-    isize bytesRead = m_File->Read(out, count, offset).ValueOr(0);
+    isize bytesRead = m_File->Read(out.Raw(), offset, count).ValueOr(0);
     offset += bytesRead;
 
     m_Offset = offset;
@@ -117,12 +191,18 @@ ErrorOr<isize> FileDescriptor::Write(const UserBuffer& in, usize count,
 
     if (!m_File) return Error(ENOENT);
     if (offset < 0) offset = m_Offset;
+    if (m_Flags & O_APPEND) TryOrRet(Seek(SEEK_END, 0));
 
-    isize bytesWritten = m_File->Write(in, count, offset).ValueOr(0);
+    isize bytesWritten = m_File->Write(in.Raw(), offset, count).ValueOr(0);
     offset += bytesWritten;
 
     m_Offset = offset;
     return bytesWritten;
+}
+ErrorOr<isize> FileDescriptor::IoCtl(usize request, usize arg)
+{
+    if (!m_File) return Error(ENOENT);
+    return m_File->IoCtl(request, arg);
 }
 ErrorOr<const stat> FileDescriptor::Stat() const
 {
@@ -179,18 +259,15 @@ ErrorOr<isize> FileDescriptor::Truncate(off_t size)
     return m_File->Truncate(size);
 }
 
-bool FileDescriptor::IsCharDevice() const
+bool FileDescriptor::IsCharDevice()
 {
     return INode() && INode()->IsCharDevice();
 }
-bool FileDescriptor::IsFifo() const { return INode() && INode()->IsFifo(); }
-bool FileDescriptor::IsDirectory() const
-{
-    return DirectoryEntry()->IsDirectory();
-}
-bool FileDescriptor::IsRegular() const { return DirectoryEntry()->IsRegular(); }
-bool FileDescriptor::IsSymlink() const { return DirectoryEntry()->IsSymlink(); }
-bool FileDescriptor::IsSocket() const { return INode() && INode()->IsSocket(); }
+bool FileDescriptor::IsFifo() { return INode() && INode()->IsFifo(); }
+bool FileDescriptor::IsDirectory() { return DirectoryEntry()->IsDirectory(); }
+bool FileDescriptor::IsRegular() { return DirectoryEntry()->IsRegular(); }
+bool FileDescriptor::IsSymlink() { return DirectoryEntry()->IsSymlink(); }
+bool FileDescriptor::IsSocket() { return File() && File()->IsSocket(); }
 
 [[clang::no_sanitize("alignment")]] ErrorOr<isize>
 FileDescriptor::GetDirEntries(dirent* const out, usize maxSize)
@@ -241,7 +318,13 @@ bool FileDescriptor::GenerateDirEntries()
     DirectoryEntries& dirEntries = GetDirEntries();
     dirEntries.Clear();
 
-    auto current = DirectoryEntry()->FollowMounts()->FollowSymlinks();
+    auto current = DirectoryEntry();
+    if (current->IsMountPoint())
+    {
+        auto mountPoint = MountPoint::Lookup(current);
+        if (mountPoint) current = mountPoint->GuestEntry();
+    }
+    current = current->FollowSymlinks().Promote();
 
     if (m_DirectoryIterator == current->end())
     {

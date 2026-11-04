@@ -4,24 +4,81 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/CPU.hpp>
-#include <Arch/InterruptHandler.hpp>
-#include <Arch/InterruptManager.hpp>
 
-#include <Drivers/Core/DeviceManager.hpp>
-#include <Drivers/Storage/NVMe/NVMeController.hpp>
-#include <Drivers/Storage/NVMe/NVMeNameSpace.hpp>
-#include <Drivers/Storage/StorageDevicePartition.hpp>
+module;
 
-#include <Memory/PMM.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Utility/Delegate.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/UnixTypes.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Memory/Scope.hpp>
+#include <API/Posix/sys/statfs.h>
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
 
-#include <VFS/DevTmpFs/DevTmpFs.hpp>
-#include <VFS/VFS.hpp>
+module Cryptix:Impl.Drivers.Storage.NVMe.NVMeNameSpace;
+
+import :API.DeviceIDs;
+import :Arch.CPU;
+import :Drivers.Core.DeviceManager;
+import :Drivers.Storage.NVMe.NVMeController;
+import :Drivers.Storage.NVMe.NVMeNameSpace;
+import :Drivers.Storage.StorageDevicePartition;
+import :Memory.PMM;
+import :VFS.DevTmpFs.DevTmpFs;
+import :VFS.VFS;
 
 namespace NVMe
 {
-    NameSpace::NameSpace(u32 id, Controller* controller)
-        : StorageDevice(259, 0)
+    NameSpace::NameSpace(StringView name, u32 id, Controller* controller)
+        : StorageDevice(name, MakeDevice(API::DeviceMajor::BLOCK_EXTENDED, 0))
         , m_ID(id)
         , m_Controller(controller)
     {
@@ -46,48 +103,27 @@ namespace NVMe
         m_Stats.st_size    = info->TotalBlockCount * m_LbaSize;
         m_Stats.st_blocks  = info->TotalBlockCount;
         m_Stats.st_blksize = m_LbaSize;
-        m_Stats.st_rdev    = 0;
+        m_BlockSize        = m_LbaSize;
+        m_Stats.st_rdev    = ID();
         m_Stats.st_mode    = 0666 | S_IFBLK;
 
-        DevTmpFs::RegisterDevice(this);
-
-        StringView path
-            = fmt::format("/dev/{}n{}", m_Controller->Name(), m_ID).data();
-        LogTrace("NVMe: Creating device at '{}'", path);
-        VFS::CreateNode(path, m_Stats.st_mode, ID());
         DeviceManager::RegisterBlockDevice(this);
-        // TODO(v1tr10l7): enumerate partitions
+        StringView path = fmt::format("/dev/{}", Name()).data();
+        LogTrace("NVMe: Creating namespace node at `{}`", path);
 
         m_PartitionTable.Load(*this);
-
-        for (usize i = 0; i < m_IoQueue->GetDepth(); i++)
-        {
-            break;
-            auto handler = InterruptManager::AllocateHandler();
-            handler->Reserve();
-            /*
-            if (!MsiXSet(CPU::GetCurrent()->LapicID,
-                         handler->GetInterruptVector(), -1))
-            {
-                if (i == 0)
-                    LogError(
-                        "Could not install any irq handlers for io queues");
-                break;
-            }*/
-        }
-
         usize i = 1;
         for (const auto& entry : m_PartitionTable)
         {
-            StorageDevicePartition* partition = new StorageDevicePartition(
-                *this, entry.FirstBlock, entry.LastBlock, 292, i);
-            DevTmpFs::RegisterDevice(partition);
-            DeviceManager::RegisterBlockDevice(partition);
+            StringView name = fmt::format("{}p{}", Name(), i).data();
 
-            StringView partitionPath
-                = fmt::format("/dev/{}n{}p{}", m_Controller->Name(), m_ID, i)
-                      .data();
-            VFS::CreateNode(partitionPath, m_Stats.st_mode, partition->ID());
+            StorageDevicePartition* partition = new StorageDevicePartition(
+                name, *this, entry.FirstBlock, entry.LastBlock,
+                API::DeviceMajor::BLOCK_EXTENDED, i);
+
+            DeviceManager::RegisterBlockDevice(partition);
+            LogTrace("NVMe: Addining a device partition at `{}`",
+                     fmt::format("/dev/{}", name.Raw()).data());
 
             ++i;
         }
@@ -110,7 +146,7 @@ namespace NVMe
             if (chunk > m_CacheBlockSize - off) chunk = m_CacheBlockSize - off;
 
             Memory::Copy(reinterpret_cast<u8*>(dest) + progress,
-                        &m_Cache[slot].Cache[off], chunk);
+                         &m_Cache[slot].Cache[off], chunk);
             progress += chunk;
         }
 
@@ -160,12 +196,6 @@ namespace NVMe
         return NameSpace::Write(in.Raw(), offset, count);
     }
 
-    StringView NameSpace::Name() const noexcept
-    {
-        auto name = fmt::format("{}n{}", m_Controller->Name(), m_ID);
-        return StringView(name.data(), name.size());
-    }
-
     bool NameSpace::Identify(NameSpaceInfo* nsid)
     {
         Submission cmd   = {};
@@ -180,67 +210,100 @@ namespace NVMe
         return true;
     }
 
-    isize NameSpace::ReadWriteLba(u8* dest, usize start, usize bytes, u8 write)
+    isize NameSpace::ReadWriteLba(u8* dest, usize start, usize lbaCount,
+                                  bool write)
     {
-        if (start + bytes >= m_LbaCount) bytes -= (start + bytes) - m_LbaCount;
+        /* ---------- Validate request ---------- */
 
-        usize pageOff          = u64(dest) & (PMM::PAGE_SIZE - 1);
-        bool  shouldUsePrp     = false;
-        bool  shouldUsePrpList = false;
+        if (!dest) return -1;
 
-        u32   cid              = m_IoQueue->GetCommandID();
+        if (start >= m_LbaCount) return -1;
 
-        if ((bytes * m_LbaSize) > PMM::PAGE_SIZE)
+        if (lbaCount == 0) return 0;
+
+        if (start + lbaCount > m_LbaCount) lbaCount = m_LbaCount - start;
+
+        const usize totalBytes = lbaCount * m_LbaSize;
+
+        /* ---------- PRP layout calculation ---------- */
+
+        const usize pageSize   = PMM::PAGE_SIZE;
+        const usize pageOffset
+            = reinterpret_cast<uintptr_t>(dest) & (pageSize - 1);
+
+        const usize firstPageBytes
+            = Math::Min(pageSize - pageOffset, totalBytes);
+
+        usize remainingBytes
+            = totalBytes > firstPageBytes ? totalBytes - firstPageBytes : 0;
+
+        const bool needsPrp2    = remainingBytes > 0;
+        const bool needsPrpList = remainingBytes > pageSize;
+
+        /* ---------- Allocate PRP list if needed ---------- */
+
+        u32        cid          = m_IoQueue->GetCommandID();
+
+        u64*       prpList      = nullptr;
+        usize      prpCount     = 0;
+
+        if (needsPrpList)
         {
-            if ((bytes * m_LbaSize) > (PMM::PAGE_SIZE * 2))
+            prpCount = (remainingBytes + pageSize - 1) / pageSize;
+
+            if (prpCount > m_MaxPhysRPages)
             {
-                usize prpcount = ((bytes - 1) * m_LbaSize) / PMM::PAGE_SIZE;
-                AssertFmt(!(prpcount > m_MaxPhysRPages),
-                          "NVMe: Exceeded physical region pages, prpcount => "
-                          "{:#x}, bytes => {:#x}",
-                          prpcount, bytes);
-                for (usize i = 0; i < prpcount; i++)
-                {
-                    m_IoQueue->GetPhysRegPages()[i + cid * m_MaxPhysRPages]
-                        = (Pointer(dest - pageOff).FromHigherHalf<u64>()
-                           + PMM::PAGE_SIZE + i * PMM::PAGE_SIZE);
-                }
-                shouldUsePrp     = false;
-                shouldUsePrpList = true;
+                LogError("NVMe: PRP list overflow ({} > {})", prpCount,
+                         m_MaxPhysRPages);
+                return -1;
             }
-            else shouldUsePrp = true;
+
+            prpList = &m_IoQueue->GetPhysRegPages()[cid * m_MaxPhysRPages];
+
+            uintptr_t pageBase
+                = reinterpret_cast<uintptr_t>(dest) & ~(pageSize - 1);
+
+            for (usize i = 0; i < prpCount; ++i)
+                prpList[i] = Pointer(pageBase + pageSize * (i + 1))
+                                 .FromHigherHalf<u64>();
         }
 
-        Submission cmd        = {};
-        cmd.OpCode            = write ? OpCode::IO_WRITE : OpCode::IO_READ;
-        cmd.Flags             = 0;
-        cmd.NameSpaceID       = m_ID;
-        cmd.ReadWrite.Control = 0;
-        cmd.ReadWrite.Dsmgmt  = 0;
-        cmd.ReadWrite.Ref     = 0;
-        cmd.ReadWrite.AppTag  = 0;
-        cmd.ReadWrite.AppMask = 0;
-        cmd.Metadata          = 0;
-        cmd.ReadWrite.SLba    = start;
-        cmd.ReadWrite.Len     = bytes - 1;
-        if (shouldUsePrpList)
+        /* ---------- Build command ---------- */
+
+        Submission cmd{};
+        cmd.OpCode         = write ? OpCode::IO_WRITE : OpCode::IO_READ;
+        cmd.Flags          = 0;
+        cmd.NameSpaceID    = m_ID;
+
+        cmd.ReadWrite.SLba = start;
+        cmd.ReadWrite.Len  = lbaCount - 1;
+
+        cmd.Prp1           = Pointer(dest).FromHigherHalf<u64>();
+
+        if (needsPrpList) { cmd.Prp2 = Pointer(prpList).FromHigherHalf<u64>(); }
+        else if (needsPrp2)
         {
-            cmd.Prp1 = Pointer(dest).FromHigherHalf<u64>();
-            cmd.Prp2
-                = Pointer(&m_IoQueue->GetPhysRegPages()[cid * m_MaxPhysRPages])
-                      .FromHigherHalf<u64>();
-        }
-        else if (shouldUsePrp)
-            cmd.Prp2 = Pointer(dest)
-                           .Offset<Pointer>(PMM::PAGE_SIZE)
-                           .FromHigherHalf<u64>();
+            uintptr_t secondPage
+                = (reinterpret_cast<uintptr_t>(dest) & ~(pageSize - 1))
+                + pageSize;
 
-        else cmd.Prp1 = Pointer(dest).FromHigherHalf<u64>();
+            cmd.Prp2 = Pointer(secondPage).FromHigherHalf<u64>();
+        }
+        else {
+            cmd.Prp2 = 0;
+        }
+
+        /* ---------- Submit ---------- */
 
         u16 status = m_IoQueue->AwaitSubmit(&cmd);
-        AssertFmt(!status, "nvme: failed to read/write with status {:#x}\n",
-                  status);
-        return 0;
+
+        if (status)
+        {
+            LogError("NVMe: I/O failed (status = {:#x})", status);
+            return -1;
+        }
+
+        return lbaCount;
     }
 
     isize NameSpace::FindBlock(u64 block)

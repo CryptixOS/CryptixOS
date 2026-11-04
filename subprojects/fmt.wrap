@@ -1,8 +1,0 @@
-[wrap-git]
-url = https://github.com/fmtlib/fmt.git
-revision = master
-depth = 1
-patch_filename = fmt.tar
-
-[provide]
-fmt = fmt_dep

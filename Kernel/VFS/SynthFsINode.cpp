@@ -4,11 +4,75 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Scheduler/Process.hpp>
-#include <Time/Time.hpp>
 
-#include <VFS/Filesystem.hpp>
-#include <VFS/SynthFsINode.hpp>
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/Posix/linux/capability.h>
+#include <API/UnixTypes.hpp>
+#include <Compiler.hpp>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
+#include <API/Posix/sys/statfs.h>
+
+module Cryptix:Impl.VFS.SynthFsINode;
+
+import :Scheduler.Process;
+import :Time.Time;
+import :VFS.Filesystem;
+import :VFS.SynthFsINode;
 
 SynthFsINode::SynthFsINode(StringView name, class Filesystem* fs, INodeID id,
                            INodeMode mode)
@@ -40,16 +104,16 @@ SynthFsINode::SynthFsINode(StringView name, class Filesystem* fs, INodeID id,
 }
 
 ErrorOr<void>
-SynthFsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
-                                  DirectoryIterator         iterator)
+SynthFsINode::TraverseDirectories(::Ref<class DirectoryEntry> parent,
+                                  DirectoryIterator           iterator)
 {
     ScopedLock guard(m_Lock);
     usize      offset = 0;
-    for (const auto [name, inode] : Children())
+    for (const auto& [name, inode] : Children())
     {
-        usize  ino  = inode->ID();
-        mode_t mode = inode->Mode();
-        auto   type = IF2DT(mode);
+        usize     ino  = inode->ID();
+        INodeMode mode = inode->Mode();
+        auto      type = IF2DT(mode);
 
         if (!iterator(name, offset, ino, type)) break;
         ++offset;
@@ -57,7 +121,7 @@ SynthFsINode::TraverseDirectories(Ref<class DirectoryEntry> parent,
 
     return {};
 }
-ErrorOr<Ref<DirectoryEntry>> SynthFsINode::Lookup(Ref<DirectoryEntry> entry)
+ErrorOr<::Ref<DirectoryEntry>> SynthFsINode::Lookup(::Ref<DirectoryEntry> entry)
 {
     ScopedLock guard(m_Lock);
 
@@ -71,17 +135,16 @@ ErrorOr<Ref<DirectoryEntry>> SynthFsINode::Lookup(Ref<DirectoryEntry> entry)
     return Error(ENOENT);
 }
 
-ErrorOr<Ref<DirectoryEntry>> SynthFsINode::CreateNode(Ref<DirectoryEntry> entry,
-                                                      mode_t mode, dev_t dev)
+ErrorOr<::Ref<DirectoryEntry>>
+SynthFsINode::CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode, dev_t dev)
 {
     ScopedLock guard(m_Lock);
     if (m_Children.Contains(entry->Name())) return Error(EEXIST);
-
-    auto inode = reinterpret_cast<SynthFsINode*>(
-        TryOrRet(m_Filesystem->AllocateNode(entry->Name(), mode)));
+    auto inode = TryOrRet(m_Filesystem->AllocateNode(entry->Name(), mode))
+                     .As<SynthFsINode>();
 
     inode->m_Parent = this;
-    if (S_ISREG(mode))
+    if (inode->IsRegular())
     {
         inode->m_Metadata.Size = inode->GetDefaultSize();
         inode->m_Buffer.Resize(GetDefaultSize());
@@ -107,13 +170,13 @@ ErrorOr<Ref<DirectoryEntry>> SynthFsINode::CreateNode(Ref<DirectoryEntry> entry,
     entry->Bind(inode);
     return entry;
 }
-ErrorOr<Ref<DirectoryEntry>> SynthFsINode::CreateFile(Ref<DirectoryEntry> entry,
-                                                      mode_t              mode)
+ErrorOr<::Ref<DirectoryEntry>>
+SynthFsINode::CreateFile(::Ref<DirectoryEntry> entry, INodeMode mode)
 {
     return CreateNode(entry, (mode & ~S_IFMT) | S_IFREG, 0);
 }
-ErrorOr<Ref<DirectoryEntry>>
-SynthFsINode::CreateDirectory(Ref<DirectoryEntry> entry, mode_t mode)
+ErrorOr<::Ref<DirectoryEntry>>
+SynthFsINode::CreateDirectory(::Ref<DirectoryEntry> entry, INodeMode mode)
 {
 
     TryOrRet(CreateNode(entry, (mode & ~S_IFMT) | S_IFDIR, 0));
@@ -121,19 +184,19 @@ SynthFsINode::CreateDirectory(Ref<DirectoryEntry> entry, mode_t mode)
     ++m_Metadata.LinkCount;
     return entry;
 }
-ErrorOr<Ref<DirectoryEntry>> SynthFsINode::Symlink(Ref<DirectoryEntry> entry,
-                                                   PathView targetPath)
+ErrorOr<::Ref<DirectoryEntry>>
+SynthFsINode::Symlink(::Ref<DirectoryEntry> entry, PathView targetPath)
 {
     auto dentry     = TryOrRet(CreateNode(entry, 0777 | S_IFLNK, 0));
-    auto inode      = reinterpret_cast<SynthFsINode*>(dentry->INode());
+    auto inode      = dentry->INode().As<SynthFsINode>();
 
     inode->m_Target = targetPath;
     return dentry;
 }
-ErrorOr<Ref<DirectoryEntry>> SynthFsINode::Link(Ref<DirectoryEntry> oldEntry,
-                                                Ref<DirectoryEntry> entry)
+ErrorOr<::Ref<DirectoryEntry>>
+SynthFsINode::Link(::Ref<DirectoryEntry> oldEntry, ::Ref<DirectoryEntry> entry)
 {
-    auto inode = reinterpret_cast<SynthFsINode*>(oldEntry->INode());
+    auto inode = oldEntry->INode().As<SynthFsINode>();
     if (inode->IsDirectory()) return Error(EPERM);
 
     m_Metadata.Size += DIRECTORY_ENTRY_SIZE;
@@ -149,7 +212,7 @@ ErrorOr<Ref<DirectoryEntry>> SynthFsINode::Link(Ref<DirectoryEntry> oldEntry,
     return entry;
 }
 
-void SynthFsINode::InsertChild(INode* inode, StringView name)
+void SynthFsINode::InsertChild(::Ref<INode> inode, StringView name)
 {
     ScopedLock guard(m_Lock);
     m_Children[name] = inode;
@@ -205,7 +268,7 @@ ErrorOr<isize> SynthFsINode::Truncate(usize size)
     return 0;
 }
 
-ErrorOr<void> SynthFsINode::Rename(INode* newParent, StringView newName)
+ErrorOr<void> SynthFsINode::Rename(::Ref<INode> newParent, StringView newName)
 {
     // TODO(v1tr10l7): Remove old inode
 
@@ -218,13 +281,13 @@ ErrorOr<void> SynthFsINode::Rename(INode* newParent, StringView newName)
     return {};
 }
 
-ErrorOr<void> SynthFsINode::Unlink(Ref<DirectoryEntry> entry)
+ErrorOr<void> SynthFsINode::Unlink(::Ref<DirectoryEntry> entry)
 {
     ScopedLock guard(m_Lock);
     auto       it = m_Children.Find(entry->Name());
     if (it == m_Children.end()) return {};
 
-    auto inode = reinterpret_cast<SynthFsINode*>(entry->INode());
+    auto inode = entry->INode().As<SynthFsINode>();
     m_Metadata.Size -= DIRECTORY_ENTRY_SIZE;
 
     auto currentTime = Time::GetReal();
@@ -247,9 +310,9 @@ ErrorOr<void> SynthFsINode::Unlink(Ref<DirectoryEntry> entry)
 
     return {};
 }
-ErrorOr<void> SynthFsINode::RmDir(Ref<DirectoryEntry> entry)
+ErrorOr<void> SynthFsINode::RmDir(::Ref<DirectoryEntry> entry)
 {
-    auto inode = reinterpret_cast<SynthFsINode*>(entry->INode());
+    auto inode = entry->INode().As<SynthFsINode>();
     if (!inode->Children().Empty()) return Error(ENOTEMPTY);
 
     m_Lock.Acquire();

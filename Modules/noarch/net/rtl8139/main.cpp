@@ -4,12 +4,67 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include "RTL8139.hpp"
 
-#include <Arch/CPU.hpp>
-#include <Library/Module.hpp>
-#include <Prism/Containers/Array.hpp>
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/UnixTypes.hpp>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
 #include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+
+module Cryptix.Modules.RTL8139;
+
+import Cryptix;
 
 namespace RTL8139
 {
@@ -81,8 +136,7 @@ namespace RTL8139
         {
             auto potentialBuffer = (m_TransmitNext + i) % 4;
             auto status          = Read<TransmitStatus>(static_cast<Register>(
-                potentialBuffer
-                + ToUnderlying(Register::eTransmitStatus0)));
+                potentialBuffer + ToUnderlying(Register::eTransmitStatus0)));
             if (status.Own == 1)
             {
                 bufferIndex = potentialBuffer;
@@ -171,7 +225,7 @@ namespace RTL8139
         receiverConfig.AcceptMulticast     = true;
         receiverConfig.AcceptBroadcast     = true;
         receiverConfig.Wrap                = true;
-        receiverConfig.MaxDma = ToUnderlying(DmaSize::e1024Bytes);
+        receiverConfig.MaxDma              = ToUnderlying(DmaSize::e1024Bytes);
         receiverConfig.BufferLength
             = ToUnderlying(ReceiverBufferLength::eK8P16);
         receiverConfig.EarlyThreshold = 0b111;
@@ -179,16 +233,15 @@ namespace RTL8139
 
         auto transmitConfig
             = Read<TransmitConfiguration>(Register::eTransmitConfig);
-        transmitConfig.RetryCount = 0;
-        transmitConfig.MaxDma     = ToUnderlying(DmaSize::e1024Bytes);
+        transmitConfig.RetryCount        = 0;
+        transmitConfig.MaxDma            = ToUnderlying(DmaSize::e1024Bytes);
         transmitConfig.InterframeGapTime = 0b11;
         Write<TransmitConfiguration>(Register::eTransmitConfig, transmitConfig);
 
         for (usize i = 0; auto& buffer : m_TransmitBuffers)
         {
-            buffer = new u8[TRANSMIT_BUFFER_SIZE];
-            usize bufferRegister
-                = ToUnderlying(Register::eTransmitBuffer0) + i;
+            buffer               = new u8[TRANSMIT_BUFFER_SIZE];
+            usize bufferRegister = ToUnderlying(Register::eTransmitBuffer0) + i;
 
             Write<u32>(
                 static_cast<Register>(bufferRegister),
@@ -257,6 +310,8 @@ namespace RTL8139
     ErrorOr<void> ProbeDevice(PCI::DeviceAddress&  address,
                               const PCI::DeviceID& id)
     {
+        return Error(ENOSYS);
+
         LogTrace("RTL8139: Detected pci nic device");
         auto nic = new AdapterCard(address);
 
@@ -267,16 +322,15 @@ namespace RTL8139
         }
         return {};
     }
-    void               RemoveDevice(PCI::Device& device) {}
-
-    static PCI::Driver s_Driver = {
-        .Name     = "rtl8139",
-        .MatchIDs = Span<PCI::DeviceID>(s_IdTable.begin(), s_IdTable.Size()),
-        .Probe    = ProbeDevice,
-        .Remove   = RemoveDevice,
-    };
-
-    bool ModuleInit() { return PCI::RegisterDriver(s_Driver); }
-
-    MODULE_INIT(rtl8139, ModuleInit);
+    void RemoveDevice(PCI::Device& device) {}
 }; // namespace RTL8139
+
+static PCI::Driver s_Driver = {
+    .Name     = "rtl8139",
+    .MatchIDs = Span<PCI::DeviceID>(RTL8139::s_IdTable.begin(),
+                                    RTL8139::s_IdTable.Size()),
+    .Probe    = RTL8139::ProbeDevice,
+    .Remove   = RTL8139::RemoveDevice,
+};
+extern "C" bool ModuleInit() { return PCI::RegisterDriver(s_Driver); }
+MODULE_INIT(rtl8139, ModuleInit);

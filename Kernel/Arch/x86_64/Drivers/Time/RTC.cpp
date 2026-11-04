@@ -4,21 +4,44 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/x86_64/Drivers/Time/RTC.hpp>
 
+module;
+
+#include <API/Posix/time.h>
 #include <Arch/Arch.hpp>
-#include <Arch/x86_64/CMOS.hpp>
-
-#include <Firmware/ACPI/ACPI.hpp>
+#include <Compiler.hpp>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Core/Concepts.hpp>
+#endif
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Time.hpp>
+
+module Cryptix:Impl.Arch.x86_64.Drivers.Time.RTC;
+
+import :Arch.x86_64.Drivers.Time.RTC;
+import :Arch.Arch;
+import :Arch.x86_64.CMOS;
+import :Firmware.ACPI.ACPI;
 
 namespace RTC
 {
     namespace
     {
-        std::optional<bool> s_FormatInBcd = std::nullopt;
+        Optional<bool> s_FormatInBcd = NullOpt;
 
-        inline bool         IsUpdateInProgress()
+        inline bool    IsUpdateInProgress()
         {
             return CMOS::Read(CMOS::Register::eRtcStatusA) & 0x80;
         }
@@ -80,10 +103,9 @@ namespace RTC
 
     time_t CurrentTime()
     {
-        while (IsUpdateInProgress())
-            ;
+        while (IsUpdateInProgress());
 
-        if (!s_FormatInBcd.has_value())
+        if (!s_FormatInBcd.HasValue())
             s_FormatInBcd = !(ReadRegister(CMOS::Register::eRtcStatusB) & 0x04);
         DateTime date;
         date.Year   = GetCentury() * 100 + GetYear();

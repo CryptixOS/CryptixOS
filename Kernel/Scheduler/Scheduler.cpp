@@ -4,26 +4,86 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/CPU.hpp>
-#include <Arch/InterruptHandler.hpp>
-#include <Arch/InterruptManager.hpp>
 
-#ifdef CTOS_TARGET_X86_64
-    #include <Arch/x86_64/Drivers/IoApic.hpp>
-    #include <Arch/x86_64/Drivers/Time/Lapic.hpp>
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Core/Singleton.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Memory/RefCounted.hpp>
 #endif
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <API/UnixTypes.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <API/Posix/linux/capability.h>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
+#include <API/Posix/sys/statfs.h>
 
-#include <Library/Locking/Spinlock.hpp>
-#include <Memory/PMM.hpp>
+module Cryptix:Impl.Scheduler.Scheduler;
 
-#include <Scheduler/Process.hpp>
-#include <Scheduler/Scheduler.hpp>
-#include <Scheduler/Thread.hpp>
-#include <Time/Time.hpp>
-
-#include <VFS/MountPoint.hpp>
-#include <VFS/ProcFs/ProcFs.hpp>
-#include <VFS/VFS.hpp>
+import :Arch.CPU;
+#if defined(CTOS_TARGET_X86_64)
+import :Arch.x86_64.Drivers.Time.Lapic;
+#endif
+import :Library.Locking.Spinlock;
+import :Memory.PMM;
+import :Scheduler.Process;
+import :Scheduler.Scheduler;
+import :Scheduler.Thread;
+import :Time.Time;
+import :VFS.MountPoint;
+import :VFS.VFS;
 
 namespace
 {
@@ -34,12 +94,11 @@ namespace
     {
         Atomic<bool> PreemptionEnabled;
     };
-    CPULocalData*                 s_CPULocalData;
+    CPULocalData* s_CPULocalData;
 
-    Process*                      s_KernelProcess = nullptr;
-    Spinlock                      s_ProcessListLock;
-    UnorderedMap<pid_t, Process*> s_Processes;
-    Ref<ProcFs>                   s_ProcFs = nullptr;
+    Process*      s_KernelProcess = nullptr;
+    Spinlock      s_ProcessListLock;
+    Process::List s_ProcessList;
 } // namespace
 
 struct ThreadQueue
@@ -154,19 +213,10 @@ void Scheduler::Initialize()
     for (usize i = 0; i < cpuCount; i++)
         s_CPULocalData[i].PreemptionEnabled.Store(true);
     s_SchedulerEnabled = true;
-    Time::GetSchedulerTimer()->SetCallback<Tick>();
+    Time::SchedulerTimer()->SetCallback<Tick>();
 
     LogInfo("Scheduler: Kernel process created");
     LogInfo("Scheduler: Initialized");
-}
-KERNEL_INIT_CODE
-void Scheduler::InitializeProcFs()
-{
-    VFS::CreateDirectory("/proc", 0755);
-    Assert(VFS::Mount(nullptr, "", "/proc", "proc"));
-
-    s_ProcFs = MountPoint::Head()->Filesystem().As<ProcFs>();
-    s_ProcFs->AddProcess(s_KernelProcess);
 }
 void Scheduler::PrepareAP(bool start)
 {
@@ -182,7 +232,8 @@ void Scheduler::PrepareAP(bool start)
     {
         CPU::SetInterruptFlag(true);
 
-        CPU::WakeUp(0, true);
+        Time::SchedulerTimer()->Start(TimerMode::eOneShot, 1'000_ms);
+        // CPU::WakeUp(0, true);
         for (;;) Arch::Halt();
     }
 };
@@ -192,8 +243,7 @@ bool Scheduler::IsPreemptionEnabled()
     if (!s_SchedulerEnabled) return false;
 
     u64 cpuID = CPU::GetCurrentID();
-    return s_CPULocalData[cpuID].PreemptionEnabled.Load(
-        MemoryOrder::eAtomicRelaxed);
+    return s_CPULocalData[cpuID].PreemptionEnabled.Load(MemoryOrder::eRelaxed);
 }
 
 void Scheduler::EnablePreemption()
@@ -201,16 +251,14 @@ void Scheduler::EnablePreemption()
     if (!s_SchedulerEnabled) return;
 
     u64 cpuID = CPU::GetCurrentID();
-    s_CPULocalData[cpuID].PreemptionEnabled.Store(true,
-                                                  MemoryOrder::eAtomicRelease);
+    s_CPULocalData[cpuID].PreemptionEnabled.Store(true, MemoryOrder::eRelease);
 }
 void Scheduler::DisablePreemption()
 {
     if (!s_SchedulerEnabled) return;
 
     u64 cpuID = CPU::GetCurrentID();
-    s_CPULocalData[cpuID].PreemptionEnabled.Store(false,
-                                                  MemoryOrder::eAtomicAcquire);
+    s_CPULocalData[cpuID].PreemptionEnabled.Store(false, MemoryOrder::eAcquire);
 }
 
 void Scheduler::Block(Thread* thread)
@@ -231,18 +279,14 @@ void Scheduler::Unblock(Thread* thread)
         EnqueueThread(thread);
     }
 
-#ifdef CTOS_TARGET_X86_64
-    Lapic::Instance()->SendIpi(Time::GetSchedulerTimer()->InterruptVector(),
-                               CPU::Current()->LapicID);
-#endif
+    Time::SchedulerTimer()->Start(TimerMode::eOneShot,
+                                  thread->Parent()->Quantum());
 }
 
 void Scheduler::Yield(bool saveCtx)
 {
     CPU::SetInterruptFlag(false);
-#ifdef CTOS_TARGET_X86_64
-    Lapic::Instance()->Stop();
-#endif
+    Time::SchedulerTimer()->Stop();
 
     Thread* currentThread = Thread::Current();
     if (saveCtx) currentThread->YieldAwaitLock.Acquire();
@@ -250,17 +294,13 @@ void Scheduler::Yield(bool saveCtx)
     {
 #ifdef CTOS_TARGET_X86_64
         CPU::SetGSBase(
-            reinterpret_cast<uintptr_t>(&CPU::Current()->Idle->m_Tls));
+            reinterpret_cast<upointer>(&CPU::Current()->Idle->m_Tls));
         CPU::SetKernelGSBase(
-            reinterpret_cast<uintptr_t>(&CPU::Current()->Idle->m_Tls));
+            reinterpret_cast<upointer>(&CPU::Current()->Idle->m_Tls));
 #endif
     }
 
-#ifdef CTOS_TARGET_X86_64
-    Lapic::Instance()->SendIpi(Time::GetSchedulerTimer()->InterruptVector(),
-                               CPU::Current()->LapicID);
-#endif
-
+    Time::SchedulerTimer()->Start(TimerMode::eOneShot, 0);
     CPU::SetInterruptFlag(true);
 
     if (saveCtx)
@@ -281,31 +321,35 @@ Process* Scheduler::CreateProcess(Process* parent, StringView name,
     auto       proc = new Process(parent, name, creds);
 
     ScopedLock guard(s_ProcessListLock);
-    s_Processes[proc->Pid()] = proc;
-#if 0
-    s_ProcFs->AddProcess(proc);
-#endif
+    s_ProcessList.PushBack(proc);
 
     return proc;
 }
-void Scheduler::RemoveProcess(pid_t pid)
+void Scheduler::RemoveProcess(ProcessID pid)
 {
     ScopedLock guard(s_ProcessListLock);
-    s_Processes.Erase(pid);
-    s_ProcFs->RemoveProcess(pid);
+
+    s_ProcessListLock.Release();
+    auto found = GetProcess(pid);
+    s_ProcessListLock.Acquire();
+    if (found) found->Hook.Unlink(found);
 }
 
-bool Scheduler::ValidatePid(pid_t pid)
+bool Scheduler::ValidatePid(ProcessID pid)
 {
     ScopedLock guard(s_ProcessListLock);
-    return s_Processes.Contains(pid);
-}
-Process* Scheduler::GetProcess(pid_t pid)
-{
-    ScopedLock guard(s_ProcessListLock);
-    auto       it = s_Processes.Find(pid);
 
-    return it != s_Processes.end() ? s_Processes[pid] : nullptr;
+    for (auto& process : s_ProcessList)
+        if (process.ID() == pid) return true;
+    return false;
+}
+Process* Scheduler::GetProcess(ProcessID pid)
+{
+    ScopedLock guard(s_ProcessListLock);
+    for (auto& process : s_ProcessList)
+        if (process.ID() == pid) return &process;
+
+    return nullptr;
 }
 
 void Scheduler::EnqueueThread(Thread* thread)
@@ -343,12 +387,9 @@ void Scheduler::DequeueThread(Thread* thread)
     thread->Hook.Unlink(thread);
 }
 
-UnorderedMap<pid_t, Process*>& Scheduler::GetProcessMap()
-{
-    return s_Processes;
-}
+Process::List& Scheduler::ProcessList() { return s_ProcessList; }
 
-Thread* Scheduler::GetNextThread(usize cpuID)
+Thread*        Scheduler::GetNextThread(usize cpuID)
 {
     if (ExecutionQueue(CPU::GetCurrentID()).IsEmpty()) return nullptr;
 
@@ -385,10 +426,9 @@ Thread* Scheduler::PickReadyThread()
     Thread* currentThread = Thread::Current();
     if (!newThread) return currentThread ? currentThread : CPU::Current()->Idle;
 
-    newThread->DispatchAnyPendingSignal();
     return newThread;
 }
-void Scheduler::SwitchContext(Thread* newThread, CPUContext* oldContext)
+void Scheduler::SwitchContext(Thread* newThread, ExecutionContext* oldContext)
 {
     auto currentThread = CPU::GetCurrentThread();
     if (currentThread) currentThread->YieldAwaitLock.Release();
@@ -404,14 +444,13 @@ void Scheduler::SwitchContext(Thread* newThread, CPUContext* oldContext)
     }
 
     CPU::LoadThread(newThread, oldContext);
-
     if (currentThread && currentThread->IsDead()
         && currentThread->Parent()->IsDead()
         && currentThread != CPU::Current()->Idle)
         delete currentThread->Parent();
 }
 
-void Scheduler::Tick(CPUContext* ctx)
+void Scheduler::Tick(ExecutionContext* ctx)
 {
     Thread* newThread = nullptr;
     if (!IsPreemptionEnabled()) goto reschedule;
@@ -419,10 +458,12 @@ void Scheduler::Tick(CPUContext* ctx)
     newThread = PickReadyThread();
     Assert(newThread);
     SwitchContext(newThread, ctx);
+    if (newThread->DispatchAnyPendingSignal()) *ctx = newThread->Context;
 
     if (newThread != CPU::Current()->Idle)
         newThread->SetState(ThreadState::eRunning);
 
 reschedule:
-    CPU::Reschedule(newThread->Parent()->m_Quantum * 1_ms);
+    Time::SchedulerTimer()->Start(TimerMode::eOneShot,
+                                  newThread->Parent()->Quantum() * 1_ms);
 }

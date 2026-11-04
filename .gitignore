@@ -5,9 +5,7 @@ qemu.log
 serial.log
 .xbstrap/
 *.xbstrap
-subprojects/*/
-!subprojects/packagefiles/
-!subprojects/*.wrap
+build_*/
 build-sysroot/
 sysroot/
 sources
@@ -18,3 +16,6 @@ Meta/firmware/*
 compile_commands.json
 Meta/helix/__pycache__/*
 Meta/helix/__pycache__/
+
+# leftovers of the former Meson subprojects
+subprojects/

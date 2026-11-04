@@ -4,14 +4,29 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <Debug/Debug.hpp>
-
-#include <Firmware/DeviceTree/DeviceTree.hpp>
 #include <Library/Logger.hpp>
-
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/Endian.hpp>
+#include <Prism/String/String.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/termios.h>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Memory/Pointer.hpp>
 #include <Prism/Containers/Vector.hpp>
 #include <Prism/Debug/Assertions.hpp>
 #include <Prism/Utility/Math.hpp>
+
+module Cryptix:Impl.Firmware.DeviceTree.DeviceTree;
+
+import :Firmware.DeviceTree.DeviceTree;
+import :Library.Logger;
 
 namespace DeviceTree
 {
@@ -50,6 +65,7 @@ namespace DeviceTree
                     break;
                 }
                 case FDT_TokenType::eEndNode:
+                    current->Parse();
                     current = (current && current->Parent()) ? current->Parent()
                                                              : root;
                     break;
@@ -68,12 +84,8 @@ namespace DeviceTree
                     offset = Math::AlignUp(offset, 4);
 
                     if (current)
-                    {
-                        Property* property
-                            = new Property(current, propertyName, propertyData,
-                                           propertyDataSize);
-                        current->InsertProperty(propertyName, property);
-                    }
+                        current->AddProperty(propertyName, propertyData,
+                                             propertyDataSize);
                     break;
                 }
                 case FDT_TokenType::eNop:
@@ -114,11 +126,37 @@ namespace DeviceTree
         auto success = ParseFDT(header);
         if (!success) return false;
 
-#if CTOS_DUMP_DEVICE_TREE
+#undef CTOS_DEVICE_TREE_DUMP
+#define CTOS_DEVICE_TREE_DUMP 1
+#if CTOS_DEVICE_TREE_DUMP != 0
         s_RootNode->Print();
 #endif
 
         LogInfo("DeviceTree: FDT parsed successfully");
         return success;
+    }
+
+    static Node* FindCompatibleNode(const Driver& driver, Node& node)
+    {
+        if (node.IsCompatible(driver.Compatible)) return &node;
+
+        for (auto& [name, child] : node)
+        {
+            auto found = FindCompatibleNode(driver, *child);
+            if (found) return found;
+        }
+
+        return nullptr;
+    }
+    bool RegisterDriver(const Driver& driver)
+    {
+        auto found = FindCompatibleNode(driver, *s_RootNode);
+        if (!found) return false;
+
+        if (!driver.Probe) return false;
+        auto success = driver.Probe(*found);
+
+        if (!success) return false;
+        return true;
     }
 } // namespace DeviceTree

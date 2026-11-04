@@ -4,36 +4,107 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <API/Limits.hpp>
-#include <Arch/CPU.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <API/UnixTypes.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/String/StringUtils.hpp>
+#include <Prism/Core/Singleton.hpp>
+#include <API/Posix/linux/capability.h>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Config.hpp>
+#include <API/Posix/sys/resource.h>
+#include <Library/Module.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <API/Posix/sys/statfs.h>
+#include <VFS/EchFs/EchFsStructures.hpp>
+#include <VFS/TmpFs/TmpFsINode.hpp>
 
-#include <Drivers/Core/DeviceManager.hpp>
+module Cryptix:Impl.VFS.VFS;
 
-#include <Library/Locking/Spinlock.hpp>
-#include <Library/Locking/SpinlockProtected.hpp>
-
-#include <Scheduler/Scheduler.hpp>
-#include <Time/Time.hpp>
-
-#include <VFS/DevTmpFs/DevTmpFs.hpp>
-#include <VFS/DirectoryEntry.hpp>
-#include <VFS/EchFs/EchFs.hpp>
-#include <VFS/Ext2Fs/Ext2Fs.hpp>
-#include <VFS/Fat32Fs/Fat32Fs.hpp>
-#include <VFS/INode.hpp>
-#include <VFS/Initrd/Initrd.hpp>
-#include <VFS/MountPoint.hpp>
-#include <VFS/PathResolver.hpp>
-#include <VFS/ProcFs/ProcFs.hpp>
-#include <VFS/TmpFs/TmpFs.hpp>
-#include <VFS/VFS.hpp>
+import :Arch.CPU;
+import :Drivers.Core.BlockDevice;
+import :Drivers.Core.DeviceManager;
+import :Library.Locking.Spinlock;
+import :Library.Locking.SpinlockProtected;
+import :Scheduler.Scheduler;
+import :Time.Time;
+import :VFS.DevPtsFs.DevPtsFs;
+import :VFS.DevTmpFs.DevTmpFs;
+import :VFS.INode;
+import :VFS.EchFs.EchFs;
+import :VFS.EchFs.EchFsINode;
+import :VFS.Ext2Fs.Ext2Fs;
+import :VFS.Fat32Fs.Fat32Fs;
+import :VFS.Initrd.Initrd;
+import :VFS.MountPoint;
+import :VFS.PathResolver;
+import :VFS.ProcFs.ProcFs;
+import :VFS.TmpFs.TmpFs;
+import :VFS.VFS;
 
 namespace VFS
 {
     static SpinlockProtected<FilesystemDriver::List> s_FilesystemDrivers;
 
-    static bool                s_Initialized        = false;
-    static Ref<DirectoryEntry> s_RootDirectoryEntry = nullptr;
+    static bool                                      s_Initialized    = false;
+    static Ref<DirectoryEntry>                       s_RootEntry      = nullptr;
+    static Ref<MountPoint>                           s_RootMountPoint = nullptr;
 
     template <typename T>
     static void registerFilesystem(StringView name)
@@ -54,6 +125,7 @@ namespace VFS
     {
         registerFilesystem<TmpFs>("tmpfs");
         registerFilesystem<DevTmpFs>("devfs");
+        registerFilesystem<DevPtsFs>("devptsfs");
         registerFilesystem<ProcFs>("proc");
         registerFilesystem<Fat32Fs>("vfat");
         registerFilesystem<Ext2Fs>("ext2");
@@ -64,6 +136,7 @@ namespace VFS
     {
         for (;;)
         {
+            LogDebug("Sync");
             Time::NanoSleep(15'000'000'000);
             Sync();
         }
@@ -78,26 +151,38 @@ namespace VFS
         CreateDirectory("/dev", 0755);
         Assert(Mount(nullptr, "", "/dev", "devfs"));
 
-        Scheduler::InitializeProcFs();
+        CreateDirectory("/proc", 0755);
+        Assert(Mount(nullptr, "", "/proc", "proc"));
+
+        if (CreateDirectory("/dev/pts", 0755)
+            && !Mount(nullptr, "", "/dev/pts", "devptsfs"))
+            LogError("VFS: Failed to mount devptsfs");
+
+        CreateDirectory("/run", 0755);
+        Mount(nullptr, "", "/run", "tmpfs");
 
         auto colonel = Scheduler::KernelProcess();
         auto syncd   = colonel->CreateThread(filesystemSyncDaemon, 0);
         Scheduler::EnqueueThread(syncd.Raw());
 
-        using DeviceManager::DeviceIterator;
-        DeviceIterator deviceIterator;
-        deviceIterator.BindLambda(
-            [](auto device) -> bool
-            {
-                auto path = "/dev/"_s + device->Name();
-                if (!CreateNode(path, S_IFCHR | 0666, device->ID()))
-                    LogError("VFS: Failed to create device node for: `{}`",
-                             path);
+        using DeviceManager::BlockDeviceIterator;
+        using DeviceManager::CharDeviceIterator;
+        CharDeviceIterator  cdevIterator;
+        BlockDeviceIterator blkdevIterator;
+        auto                iterator = [](auto device) -> bool
+        {
+            auto path = "/dev/"_s + device->Name();
+            if (!CreateNode(path, S_IFCHR | 0666, device->ID()))
+                LogError("VFS: Failed to create device node for: `{}`", path);
 
-                return true;
-            });
+            return true;
+        };
 
-        DeviceManager::IterateDevices(deviceIterator);
+        cdevIterator.BindLambda(iterator);
+        blkdevIterator.BindLambda(iterator);
+
+        DeviceManager::IterateCharDevices(cdevIterator);
+        DeviceManager::IterateBlockDevices(blkdevIterator);
         s_Initialized = true;
     }
     bool                           IsInitialized() { return s_Initialized; }
@@ -185,12 +270,13 @@ namespace VFS
 
     Ref<DirectoryEntry> RootDirectoryEntry()
     {
-        auto root = s_RootDirectoryEntry;
+        auto rootMount = s_RootMountPoint;
 
-        return root->FollowMounts().Promote();
+        return rootMount ? rootMount->GuestEntry() : s_RootEntry;
     }
+    Ref<MountPoint> RootMount() { return s_RootMountPoint; }
 
-    void RecursiveDelete(INode* node)
+    void            RecursiveDelete(INode* node)
     {
         if (!node) return;
 
@@ -202,9 +288,19 @@ namespace VFS
         delete node;
     }
 
+    bool Access(PathView path, INodeMode mode)
+    {
+        auto pathRes
+            = TryOrRetVal(ResolvePath(RootDirectoryEntry(), path), false);
+        auto dentry = pathRes.Entry;
+
+        Assert(dentry);
+        auto inode = dentry->INode();
+        return inode && inode->CheckPermissions(mode);
+    }
     ErrorOr<Ref<DirectoryEntry>> OpenDirectoryEntry(Ref<DirectoryEntry> parent,
                                                     PathView path, isize flags,
-                                                    mode_t mode)
+                                                    INodeMode mode)
     {
         Process* current        = Process::GetCurrent();
         bool     followSymlinks = !(flags & O_NOFOLLOW);
@@ -229,29 +325,57 @@ namespace VFS
         }
 
         PathResolver resolver(parent, path);
-        Ref  directory = TryOrRet(resolver.Resolve(PathLookupFlags::eParent));
+        auto         lookupFlags = PathLookupFlags::eFollowMounts;
+        if (followSymlinks) lookupFlags |= PathLookupFlags::eFollowLinks;
 
-        auto maybePathRes = ResolvePath(parent, path, followSymlinks);
-        RetOnError(maybePathRes);
-        Ref<DirectoryEntry> dentry = maybePathRes.Value().Entry;
+        auto status    = resolver.Resolve(lookupFlags);
+        Ref  dentry    = status ? *status : nullptr;
+        Ref  directory = resolver.ParentEntry();
+
+        LogDebug("VFS::Open: O_EXCL => {}, O_CREAT => {}", flags & O_EXCL,
+                 flags & O_CREAT);
+        if (!dentry)
+        {
+            LogTrace("VFS::Open: Parent resolving...\nParentPath => {}",
+                     path.ParentPath());
+            auto parentPathRes = TryOrRet(
+                VFS::ResolvePath(RootDirectoryEntry(), path.ParentPath()));
+            directory = parentPathRes.Entry;
+        }
 
         if (!dentry)
         {
-            didExist = false;
-            if (errno != ENOENT || !(flags & O_CREAT)) return Error(ENOENT);
+            LogTrace("VFS::Open: Creating entry...");
 
+            didExist = false;
+            if (errno != ENOENT || (!(flags & O_CREAT) && !(flags & O_EXCL)))
+            {
+                LogError("VFS: Open failed to find entry: `{}`\nerrno => {}",
+                         path, StringUtils::ToString(ErrorCode(errno)));
+                return Error(ENOENT);
+            }
+
+            if (!directory || !directory->INode()) return Error(ENOENT);
             if (!directory->INode()->ValidatePermissions(current->Credentials(),
                                                          5))
                 return Error(EACCES);
 
+            if (path.Contains("sock"))
+                LogTrace("VFS: Creating socket: {}, parent => `{}`", path,
+                         directory->Path());
             dentry = TryOrRet(VFS::CreateFile(directory, path.BaseName(),
                                               mode & ~current->Umask()));
 
             if (!dentry) return Error(ENOENT);
         }
-        else if (flags & O_EXCL) return Error(EEXIST);
+        else if (flags & O_EXCL && dentry->INode()) return Error(EEXIST);
 
-        dentry = dentry->FollowMounts()->FollowSymlinks().Promote();
+        if (dentry->IsMountPoint())
+        {
+            auto mountPoint = MountPoint::Lookup(dentry);
+            if (mountPoint) dentry = mountPoint->GuestEntry();
+        }
+        dentry = dentry->FollowSymlinks().Promote();
 
         if (dentry->IsSymlink()) return Error(ELOOP);
         if ((flags & O_DIRECTORY && !dentry->IsDirectory()))
@@ -265,12 +389,11 @@ namespace VFS
         return dentry;
     }
     ErrorOr<Ref<FileDescriptor>> Open(Ref<DirectoryEntry> parent, PathView path,
-                                      isize flags, mode_t mode)
+                                      isize flags, INodeMode mode)
     {
-        auto maybeEntry = OpenDirectoryEntry(parent, path, flags, mode);
-        RetOnError(maybeEntry);
+        auto dentry = TryOrRet(OpenDirectoryEntry(parent, path, flags, mode));
 
-        auto           acc     = flags & O_ACCMODE;
+        auto acc    = flags & O_ACCMODE;
         FileAccessMode accMode = FileAccessMode::eNone;
         switch (acc)
         {
@@ -284,19 +407,21 @@ namespace VFS
         }
         if (flags & O_PATH) accMode = FileAccessMode::eNone;
 
-        auto dentry = maybeEntry.Value();
-        auto inode  = dentry->INode();
+        auto inode = dentry->INode();
         if (inode && inode->IsCharDevice())
         {
-            dev_t id     = inode->DeviceID();
-            auto  device = DevTmpFs::Lookup(id);
+            DeviceID id     = inode->DeviceID();
+            auto     device = DeviceManager::LookupCharDevice(id);
             if (device)
             {
+                File* deviceFile  = reinterpret_cast<File*>(device);
+                deviceFile        = TryOrRet(deviceFile->Open(deviceFile));
+
                 DeviceMajor major = GetDeviceMajor(id);
                 DeviceMinor minor = GetDeviceMinor(id);
 
                 LogTrace("VFS: Opening device with id: {}.{}", major, minor);
-                return CreateRef<FileDescriptor>(dentry, device, flags,
+                return CreateRef<FileDescriptor>(dentry, deviceFile, flags,
                                                  accMode);
             }
         }
@@ -311,7 +436,10 @@ namespace VFS
         PathResolution res = {nullptr, nullptr, ""_sv};
 
         PathResolver   resolver(parent, path);
-        auto           resolutionResult = resolver.Resolve(followLinks);
+
+        auto           flags = PathLookupFlags::eFollowMounts;
+        if (followLinks) flags |= PathLookupFlags::eFollowLinks;
+        auto resolutionResult = resolver.Resolve(flags);
         CtosUnused(resolutionResult);
 
         auto parentEntry = resolver.ParentEntry();
@@ -328,25 +456,33 @@ namespace VFS
                                                PathView            path)
     {
         PathResolver resolver(RootDirectoryEntry(), path);
-        auto directory = TryOrRet(resolver.Resolve(PathLookupFlags::eParent));
+        auto         directory = TryOrRet(resolver.Resolve(
+            PathLookupFlags::eParent | PathLookupFlags::eFollowMounts
+            | PathLookupFlags::eFollowLinks));
         if (directory->IsMountPoint())
-            directory = directory->FollowMounts().Promote();
+        {
+            auto mountPoint = MountPoint::Lookup(directory);
+            if (mountPoint) directory = mountPoint->GuestEntry();
+        }
 
         return directory;
     }
 
     ErrorOr<Ref<MountPoint>> MountRoot(StringView filesystemName)
     {
-        if (s_RootDirectoryEntry)
+        if (s_RootMountPoint)
         {
             LogError("VFS: Root already mounted!");
             return Error(EEXIST);
         }
 
-        auto root = s_RootDirectoryEntry = CreateRef<DirectoryEntry>("/");
+        auto root = CreateRef<DirectoryEntry>("/");
         if (!root) return Error(ENOMEM);
 
-        return TryOrRet(Mount(nullptr, ""_pv, "/"_pv, filesystemName));
+        s_RootEntry = root;
+        s_RootMountPoint
+            = TryOrRet(Mount(nullptr, ""_pv, "/"_pv, filesystemName));
+        return s_RootMountPoint;
     }
 
     // TODO: flags
@@ -360,7 +496,8 @@ namespace VFS
 
         PathResolver targetResolver(parent, target);
         auto         targetEntry = TryOrRet(targetResolver.Resolve(
-            PathLookupFlags::eRegular | PathLookupFlags::eMountPoint));
+            PathLookupFlags::eRegular | PathLookupFlags::eFollowMounts
+            | PathLookupFlags::eFollowLinks));
 
         bool         isRoot      = targetEntry == RootDirectoryEntry();
         if (!isRoot && !targetEntry->IsDirectory())
@@ -371,8 +508,7 @@ namespace VFS
 
         if (targetEntry->IsMountPoint() || MountPoint::Lookup(targetEntry))
             return Error(EBUSY);
-        Ref<MountPoint> mountPoint = CreateRef<MountPoint>(targetEntry, fs);
-        auto            fsRoot     = TryOrRetFmt(
+        auto fsRoot = TryOrRetFmt(
             fs->Mount(sourcePath, data), Error(result.Error()),
             "VFS: Failed to mount filesystem '{}' on '/'", fsName);
 
@@ -382,7 +518,7 @@ namespace VFS
             return Error(ENODEV);
         }
 
-        fsRoot->SetParent(targetEntry);
+        fsRoot->SetParent(fsRoot);
         targetEntry->SetMountGate(fsRoot);
 
         if (sourcePath.Empty())
@@ -391,6 +527,7 @@ namespace VFS
             LogTrace("VFS: Mounted  '{}' on '{}' with Filesystem '{}'",
                      sourcePath, target, fsName);
 
+        Ref<MountPoint> mountPoint = CreateRef<MountPoint>(targetEntry, fs);
         MountPoint::Attach(mountPoint);
         return mountPoint;
     }
@@ -401,25 +538,43 @@ namespace VFS
         ToDo();
         return false;
     }
+    ErrorOr<void> PivotRoot(PathView newRoot, PathView putOld)
+    {
+        auto newRootRes = TryOrRet(ResolvePath(RootDirectoryEntry(), newRoot));
+        auto newRootEntry = newRootRes.Entry;
+
+        auto putOldRes    = TryOrRet(ResolvePath(RootDirectoryEntry(), putOld));
+        auto putOldEntry  = putOldRes.Entry;
+
+        auto rootMount    = RootMount();
+        auto newRootMount = MountPoint::Lookup(newRootEntry);
+        if (!newRootMount) return Error(ENOENT);
+
+        auto oldRootFs   = rootMount->Filesystem();
+        auto oldRoot     = rootMount->ExchangeGuest(newRootMount->GuestEntry());
+
+        auto putOldMount = CreateRef<MountPoint>(oldRoot, oldRootFs);
+        MountPoint::Attach(putOldMount);
+
+        return {};
+    }
 
     ErrorOr<void> Sync()
     {
-        MountPoint::Iterator iterator;
-        iterator.BindLambda(
-            [](Ref<MountPoint> mount) -> bool
+        MountPoint::Iterate(
+            [](Ref<MountPoint> mount) -> IterationResult
             {
                 auto fs = mount->Filesystem();
                 fs->Sync();
 
-                return true;
+                return IterationResult::eContinue;
             });
 
-        MountPoint::Iterate(iterator);
         return {};
     }
 
     ErrorOr<Ref<DirectoryEntry>> CreateNode(Ref<DirectoryEntry> directory,
-                                            StringView name, mode_t mode,
+                                            StringView name, INodeMode mode,
                                             dev_t dev, PathView target)
     {
         Assert(directory);
@@ -452,7 +607,7 @@ namespace VFS
         entry->SetParent(directory);
         return entry;
     }
-    ErrorOr<Ref<DirectoryEntry>> CreateNode(PathView path, mode_t mode,
+    ErrorOr<Ref<DirectoryEntry>> CreateNode(PathView path, INodeMode mode,
                                             dev_t dev)
     {
         return CreateNode(TryOrRet(ResolveParent(RootDirectoryEntry(), path)),
@@ -460,28 +615,29 @@ namespace VFS
     }
 
     ErrorOr<Ref<DirectoryEntry>> CreateFile(Ref<DirectoryEntry> directory,
-                                            StringView name, mode_t mode)
+                                            StringView name, INodeMode mode)
     {
         mode &= ~S_IFMT;
         mode |= S_IFREG;
 
         return CreateNode(directory, name, mode, 0);
     }
-    ErrorOr<Ref<DirectoryEntry>> CreateFile(PathView path, mode_t mode)
+    ErrorOr<Ref<DirectoryEntry>> CreateFile(PathView path, INodeMode mode)
     {
         return CreateFile(TryOrRet(ResolveParent(RootDirectoryEntry(), path)),
                           path.BaseName(), mode);
     }
 
     ErrorOr<Ref<DirectoryEntry>> CreateDirectory(Ref<DirectoryEntry> directory,
-                                                 StringView name, mode_t mode)
+                                                 StringView          name,
+                                                 INodeMode           mode)
     {
         mode &= ~S_IFMT;
         mode |= S_IFDIR;
 
         return CreateNode(directory, name, mode, 0);
     }
-    ErrorOr<Ref<DirectoryEntry>> CreateDirectory(PathView path, mode_t mode)
+    ErrorOr<Ref<DirectoryEntry>> CreateDirectory(PathView path, INodeMode mode)
     {
         return CreateDirectory(
             TryOrRet(ResolveParent(RootDirectoryEntry(), path)),
@@ -491,7 +647,7 @@ namespace VFS
     ErrorOr<Ref<DirectoryEntry>> Symlink(Ref<DirectoryEntry> directory,
                                          StringView name, PathView targetPath)
     {
-        mode_t mode = 0777 | S_IFLNK;
+        INodeMode mode = 0777 | S_IFLNK;
 
         return CreateNode(directory, name, mode, 0, targetPath);
     }
@@ -551,5 +707,57 @@ namespace VFS
 
         ToDo();
         return false;
+    }
+
+    ErrorOr<isize> SetExtendedAttribute(PathView path, StringView name,
+                                        const u8* value, usize size,
+                                        isize flags, bool followLinks)
+    {
+        auto pathRes = TryOrRet(
+            ResolvePath(VFS::RootDirectoryEntry(), path, followLinks));
+        auto dentry = pathRes.Entry;
+        if (!dentry) return Error(ENOENT);
+
+        auto inode = dentry->INode();
+        if (!inode) return Error(ENOENT);
+        return inode->SetExtendedAttribute(dentry, name, value, size, flags);
+    }
+    ErrorOr<isize> GetExtendedAttribute(PathView path, StringView name,
+                                        u8* value, usize size, bool followLinks)
+    {
+        auto pathRes = TryOrRet(
+            ResolvePath(VFS::RootDirectoryEntry(), path, followLinks));
+        auto dentry = pathRes.Entry;
+        if (!dentry) return Error(ENOENT);
+
+        auto inode = dentry->INode();
+        if (!inode) return Error(ENOENT);
+        return inode->GetExtendedAttribute(dentry, name, value, size);
+    }
+    ErrorOr<isize> ListExtendedAttributes(PathView path, char* list, usize size,
+                                          bool followLinks)
+    {
+        auto pathRes = TryOrRet(
+            ResolvePath(VFS::RootDirectoryEntry(), path, followLinks));
+        auto dentry = pathRes.Entry;
+        if (!dentry) return Error(ENOENT);
+
+        auto inode = dentry->INode();
+        if (!inode) return Error(ENOENT);
+        return inode->ListExtendedAttributes(dentry, list, size);
+    }
+    ErrorOr<isize> RemoveExtendedAttribute(PathView path, StringView name,
+                                           bool followLinks)
+    {
+        auto pathRes = TryOrRet(
+            ResolvePath(VFS::RootDirectoryEntry(), path, followLinks));
+        auto dentry = pathRes.Entry;
+        if (!dentry) return Error(ENOENT);
+
+        // TODO(v1tr10l7): Check permissions
+        auto inode = dentry->INode();
+        if (!inode) return Error(ENOENT);
+
+        return inode->RemoveExtendedAttribute(dentry, name);
     }
 } // namespace VFS

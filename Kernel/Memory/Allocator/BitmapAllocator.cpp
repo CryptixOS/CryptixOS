@@ -4,8 +4,41 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Memory/Allocator/BitmapAllocator.hpp>
+
+module;
+
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Containers/Bitmap.hpp>
 #include <Prism/Utility/Math.hpp>
+
+module Cryptix:Impl.Memory.Allocator.BitmapAllocator;
+
+import :Memory.Allocator.BitmapAllocator;
+
+BitmapAllocator::BitmapAllocator() = default;
 
 ErrorOr<void> BitmapAllocator::Initialize(MemoryMap& memoryMap, usize pageSize)
 {
@@ -41,8 +74,9 @@ ErrorOr<void> BitmapAllocator::Initialize(MemoryMap& memoryMap, usize pageSize)
     usize bitmapEntryCount = m_UsableMemoryTop.Raw() / pageSize;
     m_PageBitmap.Allocate(bitmapEntryCount);
     m_PageBitmap.SetAll(0xff);
+    LogInfo("PMM: Allocated {}KiB bitmap for {} pages", bitmapEntryCount / 1024, bitmapEntryCount);
 
-    Assert(m_PageBitmap.GetSize() != 0);
+    Assert(m_PageBitmap.BitCount() != 0);
     for (usize i = 0; i < memoryMap.EntryCount; i++)
     {
         auto& current = memoryMap.Entries[i];
@@ -106,7 +140,7 @@ Pointer BitmapAllocator::FindFreeRegions(usize& start, usize count, usize limit)
     usize contiguousPages = 0;
     while (start < limit)
     {
-        if (!m_PageBitmap.GetIndex(start++))
+        if (!m_PageBitmap.At(start++))
         {
             if (++contiguousPages == count)
             {

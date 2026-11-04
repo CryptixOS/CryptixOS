@@ -4,55 +4,168 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
+#include <API/Posix/linux/sched.h>
 #include <API/Posix/sys/wait.h>
-#include <Arch/CPU.hpp>
-
-#include <Prism/String/StringUtils.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
 #include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Algorithm/Find.hpp>
+#include <Prism/String/StringUtils.hpp>
+#include <API/Posix/linux/capability.h>
+#include <API/UnixTypes.hpp>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
+#include <Prism/Core/Singleton.hpp>
+#include <Prism/Containers/RingBuffer.hpp>
+#include <Library/Module.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <API/Posix/sys/statfs.h>
 
-#include <Scheduler/Process.hpp>
-#include <Scheduler/Scheduler.hpp>
-#include <Scheduler/Thread.hpp>
+module Cryptix:Impl.Scheduler.Process;
 
-#include <VFS/Fifo.hpp>
-#include <VFS/FileDescriptor.hpp>
-#include <VFS/VFS.hpp>
+import :Arch.CPU;
+import :Scheduler.Process;
+import :Scheduler.Scheduler;
+import :Scheduler.Thread;
+import :VFS.Fifo;
+import :VFS.FileDescriptor;
+import :VFS.VFS;
+
+extern "C" char sigret_trampoline_start[];
+extern "C" char sigret_trampoline_end[];
+
+Pointer         g_SignalTrampoline = nullptr;
+usize g_SignalTrampolineSize = sigret_trampoline_end - sigret_trampoline_start;
+
+KeyValuePair<Pointer, usize> SignalTrampoline()
+{
+    static KeyValuePair signalTrampoline = []() -> KeyValuePair<Pointer, usize>
+    {
+        usize pageCount
+            = Math::DivRoundUp(g_SignalTrampolineSize, PMM::PAGE_SIZE);
+
+        LogTrace(
+            "Process: Allocating the global signal trampoline => size: {:#x}, "
+            "pageRoundedSize => {:#x}",
+            g_SignalTrampolineSize, pageCount * PMM::PAGE_SIZE);
+        g_SignalTrampoline = PMM::CallocatePages(pageCount);
+        Memory::Copy(g_SignalTrampoline.ToHigherHalf(), sigret_trampoline_start,
+                     g_SignalTrampolineSize);
+
+        return {g_SignalTrampoline, g_SignalTrampolineSize};
+    }();
+
+    return signalTrampoline;
+}
 
 inline usize AllocatePid()
 {
     static Spinlock lock;
     ScopedLock      guard(lock);
-    for (pid_t i = 1; i < std::numeric_limits<pid_t>::max(); i++)
+    for (ProcessID i = 1; i < std::numeric_limits<ProcessID>::max(); i++)
         if (!Scheduler::ValidatePid(i)) return i;
     return -1;
 }
 
-Credentials Credentials::s_Root = {
-    .UserID            = 0,
-    .GroupID           = 0,
-    .EffectiveUserID   = 0,
-    .EffectiveGroupID  = 0,
-    .FilesystemUserID  = 0,
-    .FilesystemGroupID = 0,
-
-    .SetUserID         = 0,
-    .SetGroupID        = 0,
-    .SessionID         = 0,
-    .ProcessGroupID    = 0,
-};
-
 Process::Process(Process* parent, StringView name,
                  const struct Credentials& creds)
     : m_Parent(parent)
-    , m_Pid(AllocatePid())
+    , m_ID(AllocatePid())
     , m_Name(name)
     , m_Credentials(creds)
     , m_Ring(PrivilegeLevel::eUnprivileged)
-    , m_NextTid(m_Pid)
-    , m_CWD(VFS::RootDirectoryEntry())
+    , m_NextTid(m_ID)
 
 {
-    m_FdTable.OpenStdioStreams();
+    if (m_ID == 1)
+    {
+        m_AddressSpace = CreateRef<class AddressSpace>();
+        m_FsView       = CreateRef<FilesystemView>();
+        m_FdTable      = CreateRef<class FileDescriptorTable>();
+
+        isize fdNum = OpenAt(AT_FDCWD, "/dev/console", O_RDWR, S_IFCHR).Value();
+
+        DupFd(fdNum, 0, 0);
+        DupFd(fdNum, 1, 0);
+        DupFd(fdNum, 2, 0);
+    }
+
+    for (auto& timer : m_Timers) timer = CreateRef<struct Timer>();
+}
+Process::~Process()
+{
+    Arch::VMM::DestroyPageMap(PageMap);
+    delete PageMap;
+    if (!m_AddressSpace) return;
+
+    for (auto& [virt, region] : *m_AddressSpace)
+    {
+        if (region->VirtualBase() == m_SignalTrampolineVirt)
+        {
+            LogDebug("~Process: Hit signal trampoline region, omitting...");
+            continue;
+        }
+        auto  phys      = region->PhysicalBase();
+        usize size      = region->Size();
+        usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
+
+        PMM::FreePages(phys, pageCount);
+    }
 }
 
 Process* Process::GetCurrent()
@@ -70,44 +183,56 @@ Process* Process::Current()
 Process* Process::CreateKernelProcess()
 {
     Process* kernelProcess = Scheduler::GetKernelProcess();
-    if (kernelProcess) goto ret;
+    if (kernelProcess) return kernelProcess;
 
-    kernelProcess                = new Process;
-    kernelProcess->m_Pid         = 0;
-    kernelProcess->m_Name        = "TheOverlord"_s;
-    kernelProcess->PageMap       = VMM::GetKernelPageMap();
-    kernelProcess->m_Credentials = Credentials::s_Root;
-    kernelProcess->m_Ring        = PrivilegeLevel::ePrivileged;
-    kernelProcess->m_NextTid     = 0;
-    kernelProcess->m_Umask       = 0;
+    kernelProcess                 = new Process;
+    kernelProcess->m_ID           = 0;
+    kernelProcess->m_Name         = "TheOverlord"_s;
+    kernelProcess->PageMap        = VMM::GetKernelPageMap();
+    kernelProcess->m_Credentials  = s_RootCredentials;
+    kernelProcess->m_Ring         = PrivilegeLevel::ePrivileged;
+    kernelProcess->m_NextTid      = 0;
+    kernelProcess->m_FsView       = CreateRef<FilesystemView>();
+    kernelProcess->m_FdTable      = CreateRef<class FileDescriptorTable>();
+    kernelProcess->m_AddressSpace = CreateRef<class AddressSpace>();
 
     // FIXME(v1tr10l7): What about m_AddressSpace?
-
-ret:
     return kernelProcess;
 }
 Process* Process::CreateIdleProcess()
 {
-    static Atomic<pid_t> idlePids(-1);
+    static Atomic<ProcessID> idlePids(-1);
 
-    Process*             idle = new Process;
+    Process*                 idle = new Process;
 
-    idle->m_Pid               = idlePids--;
-    idle->m_Name              = "Idle Process for CPU: "_s;
+    idle->m_ID                    = idlePids--;
+    idle->m_Name                  = "Idle Process for CPU: "_s;
     idle->m_Name += StringUtils::ToString(CPU::GetCurrentID());
-
     idle->PageMap = VMM::GetKernelPageMap();
 
     return idle;
 }
 
+void Process::ForEach(Iterator it)
+{
+    for (auto& process : Scheduler::ProcessList())
+        if (it(&process) == IterationResult::eBreak) break;
+}
+void Process::ForEachInGroup(ProcessID pgid, Iterator it)
+{
+    for (auto& process : Scheduler::ProcessList())
+    {
+        if (process.Credentials().ProcessGroupID != pgid) continue;
+
+        if (it(&process) == IterationResult::eBreak) break;
+    }
+}
+
 Ref<Thread> Process::CreateThread(Pointer rip, bool isUser, i64 runOn)
 {
-    auto thread      = new Thread(this, rip, 0, runOn);
-    thread->m_IsUser = isUser;
+    auto thread = CreateRef<Thread>(this, rip, nullptr, runOn, isUser);
 
     if (m_Threads.Empty()) m_MainThread = thread;
-
     m_Threads.PushBack(thread);
     return thread;
 }
@@ -115,10 +240,9 @@ Ref<Thread> Process::CreateThread(Vector<StringView>& argv,
                                   Vector<StringView>& envp,
                                   ExecutableProgram& program, i64 runOn)
 {
-    auto thread = new Thread(this, argv, envp, program, runOn);
+    auto thread = CreateRef<Thread>(this, argv, envp, program, runOn);
 
     if (m_Threads.Empty()) m_MainThread = thread;
-
     m_Threads.PushBack(thread);
     return thread;
 }
@@ -126,7 +250,8 @@ Ref<Thread> Process::CreateThread(Vector<StringView>& argv,
 bool Process::ValidateAddress(Pointer address, i32 accessMode, usize size)
 {
     // TODO(v1tr10l7): Validate access mode
-    for (const auto& [base, region] : m_AddressSpace)
+    if (!m_AddressSpace) return false;
+    for (const auto& [base, region] : *m_AddressSpace)
     {
         if (region->Contains(address)) return true;
         if (!region->Contains(address)
@@ -141,120 +266,155 @@ bool Process::ValidateAddress(Pointer address, i32 accessMode, usize size)
     return false;
 }
 
-pid_t Process::SetSid()
+ProcessID Process::SetSid()
 {
-    m_Credentials.SessionID = m_Credentials.ProcessGroupID = m_Pid;
-    return m_Pid;
+    m_Credentials.SessionID = m_Credentials.ProcessGroupID = m_ID;
+    return m_ID;
 }
 
-ErrorOr<isize> Process::SetReUID(uid_t ruid, uid_t euid)
+ErrorOr<void> Process::SetUserID(::UserID uid)
 {
-    m_Credentials.UserID          = ruid;
-    m_Credentials.EffectiveUserID = euid;
-
+    m_Credentials.UserID = uid;
     return {};
 }
-ErrorOr<isize> Process::SetReGID(gid_t rgid, gid_t egid)
+ErrorOr<void> Process::SetGroupID(::GroupID gid)
 {
-    m_Credentials.GroupID          = rgid;
-    m_Credentials.EffectiveGroupID = egid;
-
-    return {};
-}
-ErrorOr<isize> Process::SetResUID(uid_t ruid, uid_t euid, uid_t suid)
-{
-    m_Credentials.UserID          = ruid;
-    m_Credentials.EffectiveUserID = euid;
-    m_Credentials.SetUserID       = suid;
-
-    return {};
-}
-ErrorOr<isize> Process::SetResGID(gid_t rgid, gid_t egid, gid_t sgid)
-{
-    m_Credentials.GroupID          = rgid;
-    m_Credentials.EffectiveGroupID = egid;
-    m_Credentials.SetGroupID       = sgid;
-
+    m_Credentials.GroupID = gid;
     return {};
 }
 
-mode_t Process::Umask(mode_t mask)
+ErrorOr<isize> Process::SetReUID(::UserID ruid, ::UserID euid)
 {
-    mode_t previous = m_Umask;
-    m_Umask         = mask;
+    if (ruid != static_cast<::UserID>(-1)) m_Credentials.UserID = ruid;
+    if (euid != static_cast<::UserID>(-1)) m_Credentials.EffectiveUserID = euid;
+
+    return {};
+}
+ErrorOr<isize> Process::SetReGID(::GroupID rgid, ::GroupID egid)
+{
+    if (rgid != static_cast<::GroupID>(-1)) m_Credentials.GroupID = rgid;
+    if (egid != static_cast<::GroupID>(-1))
+        m_Credentials.EffectiveGroupID = egid;
+
+    return {};
+}
+ErrorOr<isize> Process::SetResUID(::UserID ruid, ::UserID euid, ::UserID suid)
+{
+    if (ruid != static_cast<::UserID>(-1)) m_Credentials.UserID = ruid;
+    if (euid != static_cast<::UserID>(-1)) m_Credentials.EffectiveUserID = euid;
+    if (suid != static_cast<::UserID>(-1)) m_Credentials.SetUserID = suid;
+
+    return {};
+}
+ErrorOr<isize> Process::SetResGID(::GroupID rgid, ::GroupID egid,
+                                  ::GroupID sgid)
+{
+    if (rgid != static_cast<::GroupID>(-1)) m_Credentials.GroupID = rgid;
+    if (egid != static_cast<::GroupID>(-1))
+        m_Credentials.EffectiveGroupID = egid;
+    if (sgid != static_cast<::GroupID>(-1)) m_Credentials.SetGroupID = sgid;
+
+    return {};
+}
+
+INodeMode Process::Umask(INodeMode mask)
+{
+    INodeMode previous = m_FsView->FileCreationMask();
+    m_FsView->SetFileCreationMask(mask);
 
     return previous;
 }
 
-void Process::SendGroupSignal(pid_t pgid, i32 signal)
+const struct SignalAction& Process::SignalAction(SignalID signal) const
 {
-    auto& processMap = Scheduler::GetProcessMap();
-    for (auto [pid, process] : processMap)
-        if (process->Credentials().ProcessGroupID == pgid)
-            process->SendSignal(signal);
+    Assert(signal <= SignalID::eLastRealTime);
+
+    const struct SignalAction* action;
+    m_SignalActions.With([&action, signal](auto& actions)
+                         { action = &actions[ToUnderlying(signal)]; });
+    return *action;
+}
+void Process::SetSignalAction(SignalID                   signal,
+                              const struct SignalAction& action)
+{
+    Assert(signal <= SignalID::eLastRealTime);
+
+    m_SignalActions.With([&action, signal](auto& actions)
+                         { actions[ToUnderlying(signal)] = action; });
+}
+
+void Process::SendGroupSignal(ProcessID pgid, i32 signal)
+{
+    for (auto& process : Scheduler::ProcessList())
+        if (process.Credentials().ProcessGroupID == pgid)
+            process.SendSignal(signal);
 }
 void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
-ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags, mode_t mode)
+ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags,
+                               INodeMode mode)
 {
     Ref parent = CWD();
-    if (CPU::AsUser([path]() -> bool { return path.Absolute(); }))
-        parent = VFS::RootDirectoryEntry();
+    if (path.Absolute()) parent = VFS::RootDirectoryEntry();
     else if (dirFd != AT_FDCWD)
     {
-        Ref<FileDescriptor> descriptor = GetFileHandle(dirFd);
+        Ref<::FileDescriptor> descriptor = GetFileHandle(dirFd);
         if (!descriptor) return Error(EBADF);
         auto entry = descriptor->DirectoryEntry();
 
         parent     = entry;
     }
 
-    auto descriptor
-        = CPU::AsUser([&]() -> ErrorOr<Ref<FileDescriptor>>
-                      { return VFS::Open(parent, path, flags, mode); });
-    if (!descriptor) return Error(descriptor.Error());
+    auto descriptor = TryOrRet(VFS::Open(parent, path, flags, mode));
+    return m_FdTable->Insert(descriptor);
+}
+isize Process::FirstFreeFdIndex()
+{
+    isize fdNum = 0;
+    while (m_FdTable->IsValid(fdNum)) ++fdNum;
 
-    return m_FdTable.Insert(descriptor.Value());
+    return fdNum;
 }
 ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
 {
     if (oldFdNum == newFdNum) return Error(EINVAL);
 
-    Ref<FileDescriptor> oldFd = GetFileHandle(oldFdNum);
+    Ref<::FileDescriptor> oldFd = GetFileHandle(oldFdNum);
     if (!oldFd) return Error(EBADF);
 
-    while (newFdNum < 0 || m_FdTable.IsValid(newFdNum)) ++newFdNum;
-    Ref<FileDescriptor> newFd = GetFileHandle(newFdNum);
-    if (newFd) CloseFd(newFdNum);
-
-    // newFd = CreateRef<FileDescriptor>(oldFd, flags);
-    // if (!newFd) return Error(ENOMEM);
-
-    newFd    = oldFd;
-    newFdNum = m_FdTable.Insert(newFd, newFdNum);
+    newFdNum = m_FdTable->Replace(oldFd, newFdNum);
     if (newFdNum < 0) return Error(EBADF);
 
     return newFdNum;
 }
-i32            Process::CloseFd(i32 fd) { return m_FdTable.Erase(fd); }
-
-ErrorOr<isize> Process::OpenPipe(i32* pipeFds)
+i32            Process::CloseFd(i32 fd) { return m_FdTable->Erase(fd); }
+ErrorOr<isize> Process::InsertFd(Ref<::FileDescriptor> fd)
 {
-    auto fifo     = new Fifo();
-    auto readerFd = fifo->Open(Fifo::Direction::eRead);
-    CPU::AsUser([&]() { pipeFds[0] = m_FdTable.Insert(readerFd); });
+    return m_FdTable->Insert(fd);
+}
 
-    auto writerFd = fifo->Open(Fifo::Direction::eWrite);
-    CPU::AsUser([&]() { pipeFds[1] = m_FdTable.Insert(writerFd); });
+ErrorOr<isize> Process::OpenPipe(i32* pipeFds, isize flags)
+{
+    auto pipe        = Fifo::CreatePipe();
+    i32  readerFdNum = static_cast<i32>(m_FdTable->Insert(pipe.Reader));
+    CopyToUser(pipeFds, readerFdNum);
+    i32 writerFdNum = static_cast<i32>(m_FdTable->Insert(pipe.Writer));
+    CopyToUser(pipeFds + 1, writerFdNum);
+    LogTrace("Process::OpenPipe: readerFd => {}, writerFd => {}", readerFdNum,
+             writerFdNum);
 
     return 0;
 }
-ErrorOr<Ref<FileDescriptor>> Process::GetFileDescriptor(isize fdNum)
+ErrorOr<Ref<::FileDescriptor>> Process::GetFileDescriptor(isize fdNum)
 {
-    auto fd = m_FdTable.GetFd(fdNum);
+    auto fd = m_FdTable->GetFd(fdNum);
     if (!fd) return Error(EBADF);
 
     return fd;
+}
+ErrorOr<Ref<::FileDescriptor>> Process::FileDescriptor(isize fdNum)
+{
+    return GetFileDescriptor(fdNum);
 }
 
 Vector<String> SplitArguments(const String& str)
@@ -291,32 +451,89 @@ Vector<String> SplitArguments(const String& str)
 
 ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 {
-    m_FdTable.Clear();
-    m_FdTable.OpenStdioStreams();
+    auto pathRes = TryOrRet(VFS::ResolvePath(CWD().Raw(), path));
+    auto dentry  = pathRes.Entry;
+    auto inode   = dentry->INode();
+    if (!inode) return Error(ENOENT);
+    if (!inode->CanExecute(m_Credentials)) return Error(EPERM);
 
-    for (const auto& [virt, region] : m_AddressSpace)
+    // TODO(v1tr10l7): suid can be disable when mounting with flags
+    if (inode->IsSetUserID()) m_Credentials.EffectiveUserID = inode->UserID();
+    if (inode->IsSetGroupID())
+        m_Credentials.EffectiveGroupID = inode->GroupID();
+
+    isize size     = inode->Size();
+    auto  buffer   = new u8[PMM::PAGE_SIZE];
+    isize readSize = size < static_cast<isize>(PMM::PAGE_SIZE)
+                       ? size
+                       : static_cast<isize>(PMM::PAGE_SIZE);
+    inode->Read(buffer, 0, readSize);
+    StringView data(reinterpret_cast<char*>(buffer), readSize);
+    bool       hasSheBang      = data.StartsWith("#!"_sv);
+
+    StringView interpreterPath = "";
+    if (hasSheBang)
     {
-        auto  phys      = region->PhysicalBase();
-        usize pageCount = Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE);
-        PMM::FreePages(phys, pageCount);
+        auto spaceIt    = data.FindFirstOf(' ');
+        auto count      = spaceIt != String::NPos ? spaceIt : data.Size();
+
+        // FIXME(v1tr10l7): Validate path?
+        interpreterPath = data.Substr(2, count - 2);
+    }
+    delete[] buffer;
+
+    auto oldTable = m_FdTable;
+    m_FdTable     = CreateRef<class FileDescriptorTable>();
+
+    if (oldTable)
+        for (const auto& [i, fd] : *oldTable)
+            if (!fd->CloseOnExec()) m_FdTable->Insert(fd, i);
+
+    if (m_ID <= 2)
+    {
+        isize fdNum
+            = TryOrRet(OpenAt(AT_FDCWD, "/dev/console", O_RDWR, S_IFCHR));
+        DupFd(fdNum, 0, 0);
+        DupFd(fdNum, 1, 0);
+        DupFd(fdNum, 2, 0);
     }
 
-    m_Name = path;
+    if (m_AddressSpace)
+    {
+        for (const auto& [virt, region] : *m_AddressSpace)
+        {
+            if (region->VirtualBase() == m_SignalTrampolineVirt) continue;
+
+            auto  phys      = region->PhysicalBase();
+            usize pageCount = Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE);
+            PMM::FreePages(phys, pageCount);
+        }
+        m_AddressSpace->Clear();
+    }
+    m_AddressSpace = CreateRef<class AddressSpace>();
+
+    m_Name         = path;
     Arch::VMM::DestroyPageMap(PageMap);
     delete PageMap;
 
     PageMap = new class PageMap();
-
     Vector<StringView> argvArr;
+    if (hasSheBang && !interpreterPath.Empty())
     {
-        CPU::UserMemoryProtectionGuard guard;
-        // for (auto& arg : args) argvArr.EmplaceBack(arg, arg.Size());
+        argvArr.PushBack(path);
+        auto pathRes = TryOrRet(VFS::ResolvePath(CWD().Raw(), interpreterPath));
+        dentry       = pathRes.Entry;
+        inode        = dentry->INode();
+        if (!inode) return Error(ENOENT);
     }
 
-    static ExecutableProgram program;
+    {
+        UserMemoryProtectionGuard guard;
+        for (char** arg = argv; *arg; arg++) argvArr.PushBack(*arg);
+    }
 
-    if (!program.Load(path, PageMap, m_AddressSpace)) return Error(ENOEXEC);
-
+    ExecutableProgram program;
+    if (!program.Load(dentry, PageMap, *m_AddressSpace)) return Error(ENOEXEC);
     Thread* currentThread = CPU::GetCurrentThread();
     currentThread->SetState(ThreadState::eExited);
 
@@ -328,34 +545,27 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
         if (thread == currentThread) m_MainThread = currentThread;
     m_Threads.Clear();
 
-    {
-        CPU::UserMemoryProtectionGuard guard;
-        for (char** arg = argv; *arg; arg++) argvArr.PushBack(*arg);
-
-        // for (usize i = 0; auto& arg : args)
-        //     LogDebug("Process::Exec: argv[{}] = '{}'", i++, arg);
-    }
-
     Vector<StringView> envpArr;
     {
-        CPU::UserMemoryProtectionGuard guard;
+        UserMemoryProtectionGuard guard;
         for (char** env = envp; *env; env++) envpArr.PushBack(*env);
     }
 
     auto thread
         = CreateThread(argvArr, envpArr, program, CPU::GetCurrent()->ID);
-    Scheduler::EnqueueThread(thread.Raw());
 
+    Scheduler::EnqueueThread(thread.Raw());
     Scheduler::Yield();
     return 0;
 }
-ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
-                                rusage* rusage)
+ErrorOr<ProcessID> Process::WaitPid(ProcessID pid, i32* wstatus, i32 flags,
+                                    rusage* rusage)
 {
     bool           block = !(flags & WNOHANG);
     Vector<Event*> events;
     for (;;)
     {
+        // LogTrace("Process::WaitPid: Waiting for pid: {}", pid);
         events.Clear();
         events.ShrinkToFit();
         Process*         process = Process::GetCurrent();
@@ -364,47 +574,63 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
 
         if (pid < -1)
         {
-            pid_t gid = -pid;
-            auto  it  = std::find_if(m_Children.begin(), m_Children.end(),
-                                     [gid](Process* proc) -> bool
-                                     {
-                                       if (proc->PGid() == gid) return true;
-                                       return false;
-                                   });
+            ProcessID gid = -pid;
+            auto      it  = FindIf(m_Children.begin(), m_Children.end(),
+                                   [gid](Process* proc) -> bool
+                                   {
+                                 if (proc->PGid() == gid) return true;
+                                 return false;
+                             });
             if (it == m_Children.end()) return Error(ECHILD);
             procs.PushBack(*it);
         }
         else if (pid == -1) procs = process->m_Children;
         else if (pid == 0)
         {
-            auto it = std::find_if(m_Children.begin(), m_Children.end(),
-                                   [process](Process* proc) -> bool
-                                   {
-                                       if (proc->PGid() == process->PGid())
-                                           return true;
-                                       return false;
-                                   });
+            auto it = FindIf(m_Children.begin(), m_Children.end(),
+                             [process](Process* proc) -> bool
+                             {
+                                 if (proc->PGid() == process->PGid())
+                                     return true;
+                                 return false;
+                             });
 
             if (it == m_Children.end()) return Error(ECHILD);
             procs.PushBack(*it);
         }
         else if (pid > 0)
         {
-            auto it = std::find_if(m_Children.begin(), m_Children.end(),
-                                   [pid](Process* proc) -> bool
-                                   {
-                                       if (proc->Pid() == pid) return true;
-                                       return false;
-                                   });
+            auto it = FindIf(m_Children.begin(), m_Children.end(),
+                             [pid](Process* proc) -> bool
+                             {
+                                 if (proc->ID() == pid) return true;
+                                 return false;
+                             });
 
             if (it == m_Children.end()) return Error(ECHILD);
             procs.PushBack(*it);
         }
 
-        for (auto& proc : procs) events.PushBack(&proc->m_Event);
+        for (auto& child : procs)
+        {
+            events.PushBack(&child->m_Event);
+            continue;
+            // Check if process is dead or has a pending status change
+            if (child->m_State == ProcessState::eDead || child->m_Exited)
+            {
+                if (wstatus) CopyToUser(wstatus, child->m_Status.ValueOr(0));
+
+                ProcessID foundId = child->ID();
+
+                // FIXME: zombies
+                return foundId;
+            }
+        }
 
         auto ret = Event::Await(Span(events.Raw(), events.Size()), block);
         if (!ret.HasValue()) return Error(EINTR);
+        LogTrace("Process::WaitPid: Woken up for pid: {}",
+                 procs[ret.Value()]->ID());
 
         auto which = procs[ret.Value()];
         if (!(flags & WUNTRACED) && WIFSTOPPED(which->Status().ValueOr(0)))
@@ -413,101 +639,60 @@ ErrorOr<pid_t> Process::WaitPid(pid_t pid, i32* wstatus, i32 flags,
             continue;
 
         if (wstatus)
-            CPU::AsUser(
-                [wstatus, &which]()
-                { *wstatus = W_EXITCODE(which->Status().ValueOr(0), 0); });
+            CopyToUser(wstatus, W_EXITCODE(which->Status().ValueOr(0), 0));
 
-        return which->Pid();
+        return which->ID();
     }
 }
 
-ErrorOr<Process*> Process::Fork()
+ErrorOr<Process*> Process::Clone(usize flags)
 {
-    LogDebug("Process: Forking {}...", m_Pid);
-    Thread* currentThread = CPU::GetCurrentThread();
-    Assert(currentThread && currentThread->m_Parent == this);
+    LogDebug("Process: Forking {}...", m_ID);
+    Assert(Thread::Current() && Thread::Current()->m_Parent == this);
 
+    CPU::DisableInterrupts();
     Process* newProcess = Scheduler::CreateProcess(this, m_Name, m_Credentials);
     Assert(newProcess);
 
-    LogTrace("Process: new process created!");
     // TODO(v1tr10l7): implement PageMap::Fork;
-    class PageMap* pageMap = new class PageMap();
-    if (!pageMap) return Error(ENOMEM);
+    newProcess->PageMap        = PageMap;
+    newProcess->m_AddressSpace = m_AddressSpace;
 
-    newProcess->PageMap = pageMap;
-    newProcess->m_CWD   = m_CWD;
-    newProcess->m_Umask = m_Umask;
-    m_Children.PushBack(newProcess);
-
-    newProcess->m_AddressSpace.Clear();
-    LogDebug("Process: Copying the address space");
-    for (const auto& [base, range] : m_AddressSpace)
+    if (!(flags & CLONE_VM))
     {
-        usize pageCount
-            = Math::AlignUp(range->Size(), PMM::PAGE_SIZE) / PMM::PAGE_SIZE;
-
-        uintptr_t physicalSpace = PMM::CallocatePages<uintptr_t>(pageCount);
-        Assert(physicalSpace);
-
-        Memory::Copy(Pointer(physicalSpace).ToHigherHalf<void*>(),
-                     range->PhysicalBase().ToHigherHalf<void*>(),
-                     range->Size());
-        pageMap->MapRange(range->VirtualBase(), physicalSpace, range->Size(),
-                          PageAttributes::eRWXU | PageAttributes::eWriteBack);
-
-        auto newRegion
-            = new Region(physicalSpace, range->VirtualBase(), range->Size());
-        newRegion->SetAccessMode(range->Access());
-        newProcess->m_AddressSpace.Insert(range->VirtualBase(), newRegion);
-        continue;
-        // auto newRegion = newProcess->m_AddressSpace.AllocateFixed(
-        //     range->VirtualBase(), range->Size());
-        // if (!newRegion)
-        //    newRegion
-        //        = newProcess->m_AddressSpace.AllocateRegion(range->Size());
-        newRegion->SetPhysicalBase(physicalSpace);
-        newRegion->SetAccessMode(range->Access());
-
-        // pageMap->MapRegion(newRegion);
-        //  TODO(v1tr10l7): Free regions;
+        auto status = CopyMemory(newProcess);
+        if (!status) return Error(status.Error());
     }
-
+    newProcess->m_Parent->m_Children.PushBack(newProcess);
     newProcess->m_NextTid.Store(m_NextTid.Load());
-    LogDebug("Process: Copying fd table");
-    for (const auto& [i, fd] : m_FdTable)
-    {
-        // Ref<FileDescriptor> newFd = new FileDescriptor(fd);
-        newProcess->m_FdTable.Insert(fd, i);
-    }
+    newProcess->m_FsView = m_FsView;
+    if (!(flags & CLONE_FS)) CopyFs(newProcess);
 
-    auto thread                = currentThread->Fork(newProcess);
-    thread->m_IsEnqueued       = false;
+    newProcess->m_FdTable = m_FdTable;
+    if (!(flags & CLONE_FILES)) CopyFileDescriptors(newProcess);
+    if (flags & CLONE_PARENT) newProcess->m_Parent = m_Parent;
+
     newProcess->m_UserStackTop = m_UserStackTop;
-
-    LogDebug("Process: enqueuing thread");
-    Scheduler::EnqueueThread(thread.Raw());
-
-    LogDebug("Process: Spawned {}", newProcess->m_Pid);
+    LogDebug("Process: Spawned {}", newProcess->m_ID);
     return newProcess;
 }
 
 i32 Process::Exit(i32 code)
 {
-    LogDebug("Process: Exiting {} with exit code => {}", m_Pid, code);
     AssertMsg(this != Scheduler::GetKernelProcess(),
               "Process::Exit(): The process with pid 1 tries to exit!");
+    Assert(m_ID != 1 && "Process: init process tries to exit");
     CPU::SetInterruptFlag(false);
     ScopedLock guard(m_Lock);
 
     // FIXME(v1tr10l7): Do proper cleanup of all resources
-    m_FdTable.Clear();
+    m_FdTable->Clear();
 
     Thread* currentThread   = Thread::Current();
     currentThread->m_Parent = Scheduler::GetKernelProcess();
 
     Process* subreaper      = Scheduler::GetProcess(1);
-    if (m_Pid > 1)
+    if (m_ID > 1)
     {
         for (auto& child : m_Children)
         {
@@ -544,12 +729,97 @@ i32 Process::Exit(i32 code)
     currentThread->SetState(ThreadState::eExited);
     m_State = ProcessState::eDead;
 
-    Scheduler::RemoveProcess(m_Pid);
+    Scheduler::RemoveProcess(m_ID);
     VMM::LoadPageMap(*VMM::GetKernelPageMap(), false);
 
     Event::Trigger(&m_Event, false);
 
-    LogDebug("Process: {} exited with exit code: {}", m_Pid, code);
+    LogDebug("Process: {} exited with exit code: {}", m_ID, code);
     Scheduler::Yield();
     AssertNotReached();
+}
+
+ErrorOr<void> Process::WaitForFutex(i32* vaddr, i32 expected)
+{
+    {
+        UserMemoryProtectionGuard guard;
+        if (*vaddr != expected) return Error(EAGAIN);
+    }
+
+    auto it = m_FutexEvents.Find(reinterpret_cast<upointer>(vaddr));
+    if (it == m_FutexEvents.end())
+        m_FutexEvents[reinterpret_cast<upointer>(vaddr)] = new Event;
+    auto event = m_FutexEvents[reinterpret_cast<upointer>(vaddr)] = new Event;
+
+    bool interrupted = !event->Await(true);
+    if (interrupted) return Error(EINTR);
+
+    return {};
+}
+ErrorOr<void> Process::WakeFutex(i32* vaddr)
+{
+    {
+        UserMemoryProtectionGuard guard;
+        *(volatile int*)vaddr;
+    }
+
+    auto it = m_FutexEvents.Find(reinterpret_cast<upointer>(vaddr));
+    if (it == m_FutexEvents.end())
+        m_FutexEvents[reinterpret_cast<upointer>(vaddr)] = new Event;
+    auto event = m_FutexEvents[reinterpret_cast<upointer>(vaddr)] = new Event;
+
+    event->Trigger(false);
+    return {};
+}
+
+void Process::CopyFs(Process* process)
+{
+    process->m_FsView = CreateRef<FilesystemView>(*m_FsView);
+
+    m_FsView->SetRoot(m_FsView->Root());
+    m_FsView->ChangeDirectory(m_FsView->WorkingDirectory());
+    m_FsView->SetFileCreationMask(m_FsView->FileCreationMask());
+}
+void Process::CopyFileDescriptors(Process* process)
+{
+    LogTrace("Copying file descriptors");
+    process->m_FdTable = CreateRef<class FileDescriptorTable>();
+    for (auto& [fdNum, fd] : *m_FdTable) process->m_FdTable->Insert(fd, fdNum);
+}
+ErrorOr<void> Process::CopyMemory(Process* process)
+{
+    class PageMap* pageMap = new class PageMap();
+    if (!pageMap) return Error(ENOMEM);
+
+    process->PageMap        = pageMap;
+    process->m_AddressSpace = CreateRef<class AddressSpace>();
+
+    for (auto& [virt, region] : *m_AddressSpace)
+    {
+        if (region->VirtualBase() == m_SignalTrampolineVirt) continue;
+        usize size      = region->Size();
+        usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
+        auto  phys      = PMM::CallocatePages(pageCount);
+
+        Memory::Copy(Pointer(phys).ToHigherHalf<void*>(),
+                     region->PhysicalBase().ToHigherHalf<void*>(),
+                     region->Size());
+        auto newRegion = process->m_AddressSpace->AllocateFixed(virt, size);
+        newRegion->SetAccessMode(region->Access());
+        process->PageMap->MapRange(virt, phys, size, region->PageAttributes());
+    }
+
+    return {};
+}
+
+void Process::ReapChild(Process* child)
+{
+    Assert(child->m_Parent == this);
+    Assert(child->m_State == ProcessState::eZombie);
+    child->m_State = ProcessState::eDead;
+
+    auto it        = Find(m_Children.begin(), m_Children.end(), child);
+    Assert(it != m_Children.end());
+    m_Children.Erase(it);
+    Scheduler::RemoveProcess(child->ID());
 }

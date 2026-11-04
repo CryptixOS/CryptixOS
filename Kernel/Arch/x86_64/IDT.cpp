@@ -4,20 +4,77 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/InterruptHandler.hpp>
 
-#include <Arch/x86_64/CPU.hpp>
-#include <Arch/x86_64/CPUContext.hpp>
-#include <Arch/x86_64/Drivers/PIC.hpp>
-#include <Arch/x86_64/GDT.hpp>
-#include <Arch/x86_64/IDT.hpp>
+module;
 
-#include <Firmware/ACPI/MADT.hpp>
-#include <Library/Stacktrace.hpp>
-
-#include <Memory/PageFault.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Core/Concepts.hpp>
+#endif
+#include <Prism/String/StringUtils.hpp>
 #include <Prism/Containers/Array.hpp>
+#include <Prism/Memory/RefCounted.hpp>
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <API/UnixTypes.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Utility/Path.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
 
+module Cryptix:Impl.Arch.x86_64.IDT;
+
+import :Arch.x86_64.CPU;
+import :Arch.x86_64.ExecutionContext;
+import :Arch.x86_64.GDT;
+import :Arch.x86_64.IDT;
+import :Firmware.ACPI.MADT;
+import :Library.Stacktrace;
+import :Memory.PageFault;
+import :System.InterruptHandler;
+
+namespace InterruptManager
+{
+    void      SendEOI(u32 irq);
+    IrqResult Handle(ExecutionContext* ctx);
+}; // namespace InterruptManager
 namespace Stacktrace
 {
     void Print(StackFrame* stackFrame, usize maxFrames);
@@ -70,15 +127,18 @@ constexpr u32 GATE_TYPE_TRAP      = 0xf;
 
 namespace Exception
 {
-    constexpr u8 BREAKPOINT = 0x03;
-    constexpr u8 PAGE_FAULT = 0x0e;
+    constexpr u8 DEBUG         = 0x01;
+    constexpr u8 NMI           = 0x02;
+    constexpr u8 BREAKPOINT    = 0x03;
+    constexpr u8 PAGE_FAULT    = 0x0e;
+    constexpr u8 MACHINE_CHECK = 0x12;
 }; // namespace Exception
 namespace MM
 {
     void HandlePageFault(const PageFaultInfo& info);
 };
 
-struct [[gnu::packed]] IDTEntry
+struct CTOS_PACKED IDTEntry
 {
     u16 IsrLow;
     u16 KernelCS;
@@ -86,7 +146,7 @@ struct [[gnu::packed]] IDTEntry
     union
     {
         u8 Attributes;
-        struct [[gnu::packed]]
+        struct CTOS_PACKED
         {
             u8 GateType : 4;
             u8 Unused   : 1;
@@ -99,10 +159,10 @@ struct [[gnu::packed]] IDTEntry
     u32 Reserved;
 };
 
-[[maybe_unused]] alignas(0x10) static IDTEntry s_IdtEntries[256] = {};
-extern "C" void*        interrupt_handlers[];
-static InterruptHandler s_InterruptHandlers[256];
-static void (*exceptionHandlers[32])(CPUContext*);
+constexpr usize IDT_ENTRY_COUNT                                         = 256;
+CTOS_UNUSED alignas(0x10) static IDTEntry s_IdtEntries[IDT_ENTRY_COUNT] = {};
+extern "C" void* interrupt_handlers[];
+static void (*s_InterruptHandlers[IDT_ENTRY_COUNT])(ExecutionContext*);
 
 static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
 {
@@ -118,36 +178,35 @@ static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
     entry->IsrHigh    = (handler & 0xffffffff00000000) >> 32;
 }
 
-[[noreturn]] static void raiseException(CPUContext* ctx)
+CTOS_NORETURN static void raiseException(ExecutionContext* ctx)
 {
     u64 cpuID = CPU::GetCurrentID();
     using Stacktrace::StackFrame;
     StackFrame frame;
-    frame.Base               = Pointer(ctx->rbp).As<StackFrame>();
-    frame.InstructionPointer = ctx->rip;
+    frame.Base               = Pointer(ctx->RBP).As<StackFrame>();
+    frame.InstructionPointer = ctx->RIP;
     Stacktrace::Print(&frame, 6);
-
-    EarlyPanic(
-        "Captured exception[%#x] on cpu %zu: '%s'\n\rError Code: "
-        "%#b\n\rrip: "
-        "%#p",
-        ctx->interruptVector, cpuID, s_ExceptionNames[ctx->interruptVector],
-        ctx->errorCode, ctx->rip);
+    Panic(
+        "Captured exception[{:#x}] on cpu {}: '{}'\n\rError Code: "
+        "{:#b}\n\rrip: "
+        "{:#x}\nRegister Dump => \n{}",
+        ctx->InterruptVector, cpuID, s_ExceptionNames[ctx->InterruptVector],
+        ctx->ErrorCode, ctx->RIP, *ctx);
 
     Arch::Halt();
 }
 
 // TODO(v1tr10l7): properly handle breakpoints
-static void            breakpoint(CPUContext* ctx) { EarlyPanic("Breakpoint"); }
+static void     breakpoint(ExecutionContext* ctx) { EarlyPanic("Breakpoint"); }
 
-constexpr usize        PAGE_FAULT_PRESENT           = Bit(0);
-constexpr usize        PAGE_FAULT_WRITE             = Bit(1);
-constexpr usize        PAGE_FAULT_USER              = Bit(2);
-constexpr usize        PAGE_FAULT_RESERVED_WRITE    = Bit(3);
-constexpr usize        PAGE_FAULT_INSTRUCTION_FETCH = Bit(4);
-constexpr usize        PAGE_FAULT_PROTECTION_KEY    = Bit(5);
-constexpr usize        PAGE_FAULT_SHADOW_STACK      = Bit(6);
-constexpr usize        PAGE_FAULT_SGX               = Bit(7);
+constexpr usize PAGE_FAULT_PRESENT           = Bit(0);
+constexpr usize PAGE_FAULT_WRITE             = Bit(1);
+constexpr usize PAGE_FAULT_USER              = Bit(2);
+constexpr usize PAGE_FAULT_RESERVED_WRITE    = Bit(3);
+constexpr usize PAGE_FAULT_INSTRUCTION_FETCH = Bit(4);
+constexpr usize PAGE_FAULT_PROTECTION_KEY    = Bit(5);
+constexpr usize PAGE_FAULT_SHADOW_STACK      = Bit(6);
+constexpr usize PAGE_FAULT_SGX               = Bit(7);
 
 inline PageFaultReason pageFaultReason(u64 errorCode)
 {
@@ -170,35 +229,34 @@ inline PageFaultReason pageFaultReason(u64 errorCode)
     return reason;
 }
 
-static void pageFault(CPUContext* ctx)
+static void pageFault(ExecutionContext* ctx)
 {
     Pointer       faultAddress = CPU::ReadCR2();
-    auto          errorCode    = ctx->errorCode;
+    auto          errorCode    = ctx->ErrorCode;
     auto          faultReason  = pageFaultReason(errorCode);
 
     PageFaultInfo faultInfo(faultAddress, faultReason, ctx);
     MM::HandlePageFault(faultInfo);
 }
+static void machineCheck(ExecutionContext* ctx)
+{
+    LogDebug("IDT: Hit machine check exception handler");
+}
 
-[[noreturn]] static void unhandledInterrupt(CPUContext* context)
+CTOS_NORETURN static void unhandledInterrupt(ExecutionContext* context)
 {
     EarlyLogError("\nAn unhandled interrupt %#x occurred",
-                  context->interruptVector);
+                  context->InterruptVector);
 
-    for (;;) __asm__ volatile("cli; hlt");
+    for (;;) Asm("cli; hlt");
 }
-extern "C" void raiseInterrupt(CPUContext* ctx)
+extern "C" void raiseInterrupt(ExecutionContext* ctx)
 {
-    auto& handler = s_InterruptHandlers[ctx->interruptVector];
-
-    if (ctx->interruptVector < 0x20)
-        return exceptionHandlers[ctx->interruptVector](ctx);
-    else if (handler.IsUsed())
+    auto handler = s_InterruptHandlers[ctx->InterruptVector];
+    if (handler) return handler(ctx);
+    else if (InterruptManager::Handle(ctx) == IrqResult::eHandled)
     {
-        if (handler.eoiFirst) InterruptManager::SendEOI(ctx->interruptVector);
-        handler(ctx);
-        if (!handler.eoiFirst) InterruptManager::SendEOI(ctx->interruptVector);
-
+        InterruptManager::SendEOI(ctx->InterruptVector);
         return;
     }
 
@@ -211,64 +269,37 @@ namespace IDT
     {
         for (u32 i = 0; i < 256; i++)
         {
+            u8 gateType = GATE_TYPE_INTERRUPT;
+            if (i == Exception::DEBUG || i == Exception::BREAKPOINT
+                || i == Exception::NMI)
+                gateType = GATE_TYPE_TRAP;
 
-            idtWriteEntry(
-                i, reinterpret_cast<uintptr_t>(interrupt_handlers[i]),
-                IDT_ENTRY_PRESENT
-                    | (i < 0x20 ? GATE_TYPE_TRAP : GATE_TYPE_INTERRUPT));
+            idtWriteEntry(i, reinterpret_cast<uintptr_t>(interrupt_handlers[i]),
+                          IDT_ENTRY_PRESENT | gateType);
 
-            s_InterruptHandlers[i].SetInterruptVector(i);
-            if (i < 32) exceptionHandlers[i] = raiseException;
+            if (i < 32) s_InterruptHandlers[i] = raiseException;
         }
 
-        exceptionHandlers[Exception::BREAKPOINT] = breakpoint;
-        exceptionHandlers[Exception::PAGE_FAULT] = pageFault;
+        s_InterruptHandlers[Exception::BREAKPOINT]    = breakpoint;
+        s_InterruptHandlers[Exception::PAGE_FAULT]    = pageFault;
+        s_InterruptHandlers[Exception::MACHINE_CHECK] = machineCheck;
 
         SetDPL(Exception::BREAKPOINT, 3);
         LogInfo("IDT: Initialized!");
     }
     void Load()
     {
-        struct [[gnu::packed]]
+        struct CTOS_PACKED
         {
             u16      Limit;
             upointer Base;
         } idtr;
         idtr.Limit = sizeof(s_IdtEntries) - 1;
         idtr.Base  = reinterpret_cast<upointer>(s_IdtEntries);
-        __asm__ volatile("lidt %0" : : "m"(idtr));
+        Asm("lidt %0" : : "m"(idtr));
     }
 
-    InterruptHandler* AllocateHandler(u8 hint)
-    {
-        LogTrace("IDT: Allocating handler...");
-        if (hint < 0x20) hint += 0x20;
-
-        if (MADT::LegacyPIC())
-        {
-            if ((hint >= 0x20 && hint <= (0x20 + 15))
-                && !s_InterruptHandlers[hint].IsUsed())
-                return &s_InterruptHandlers[hint];
-        }
-
-        for (usize i = hint; i < 256; i++)
-        {
-            if (!s_InterruptHandlers[i].IsUsed()
-                && !s_InterruptHandlers[i].IsReserved())
-            {
-                s_InterruptHandlers[i].Reserve();
-                s_InterruptHandlers[i].SetInterruptVector(i);
-                return &s_InterruptHandlers[i];
-            }
-        }
-
-        Panic("IDT: Out of interrupt handlers");
-    }
-    InterruptHandler* GetHandler(u8 vector)
-    {
-        return &s_InterruptHandlers[vector];
-    }
-
+    u32  GetIST(u8 vector) { return s_IdtEntries[vector].IST; }
     void SetIST(u8 vector, u32 value) { s_IdtEntries[vector].IST = value; }
     void SetDPL(u8 vector, u8 dpl) { s_IdtEntries[vector].DPL = dpl; }
 } // namespace IDT

@@ -34,10 +34,11 @@ CryptixOS is a monolithic kernel designed for the x86_64 architecture. It featur
 # Build & Run Instructions
 ## Prerequisites
 Make sure the following tools are installed on your system:
-- C++20 compiler (GCC or Clang)
+- Clang 17 or newer, together with `clang-scan-deps` (the kernel is a C++20 module, see [Documentation/Modules.md](Documentation/Modules.md))
+- LLD
+- CMake 3.28 or newer + Ninja (build system)
 - NASM (for low-level assembly)
 - QEMU (or Bochs) for emulation
-- Meson + Ninja (build system)
 - xbstrap + Python 3 (for sysroot management)
 - python-guestfs (for creating and formatting the root filesystem image)
 - xorriso (for ISO image creation)
@@ -58,6 +59,13 @@ Once the sysroot is ready:
 ./Meta/run.py --target-arch x86_64 --compiler clang --build-type release setup # Configure for your target architecture
 ./Meta/run.py --target-arch x86_64 --compiler clang --build-type release build # Build the kernel and generate a bootable .iso
 ```
+or, directly with CMake presets (`<x86_64|aarch64>-<debug|release|dist>`):
+```
+cmake --preset x86_64-release
+cmake --build --preset x86_64-release
+```
+Dependencies (fmt, magic_enum, uACPI, Limine, ...) are fetched while configuring; see `cmake/Dependencies.cmake`
+for how to point CMake at local checkouts.
 
 ## Running in an Emulator
 To run CryptixOS in QEMU:
@@ -90,7 +98,7 @@ To run CryptixOS in QEMU:
 
 ### Tools & Docs
 
-- [Meson](https://mesonbuild.com/) - Meson is an open source build system meant to be both extremely fast, and, even more importantly, as user friendly as possible.
+- [CMake](https://cmake.org/) - build system generator; its Ninja generator drives the C++20 module build.
 - [Limine Boot Protocol](https://github.com/limine-bootloader/limine)
 - [OSDev Wiki](https://wiki.osdev.org/Main_Page) – A comprehensive resource for operating system development.
 - [mlibc](https://github.com/managarm/mlibc.git) - mlibc is a fully featured C standard library designed with portability in mind.

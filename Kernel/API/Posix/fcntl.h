@@ -6,18 +6,18 @@
  */
 #pragma once
 
-#include <Prism/Core/Types.hpp>
+#include <API/Posix/sys/stat.h>
 
 constexpr usize O_RDONLY    = 0x0000;
 constexpr usize O_WRONLY    = 0x0001;
 constexpr usize O_RDWR      = 0x0002;
 
-constexpr usize O_CREAT     = 0x0100;
-constexpr usize O_EXCL      = 0x0200;
-constexpr usize O_NOCTTY    = 0x0400;
-constexpr usize O_TRUNC     = 0x1000;
-constexpr usize O_APPEND    = 0x2000;
-constexpr usize O_NONBLOCK  = 0x4000;
+constexpr usize O_CREAT     = 0100;
+constexpr usize O_EXCL      = 0200;
+constexpr usize O_NOCTTY    = 0400;
+constexpr usize O_TRUNC     = 1000;
+constexpr usize O_APPEND    = 2000;
+constexpr usize O_NONBLOCK  = 4000;
 constexpr usize O_NDELAY    = O_NONBLOCK;
 constexpr usize O_DSYNC     = 010000;
 constexpr usize O_ASYNC     = 020000;
@@ -103,3 +103,9 @@ constexpr usize S_IROTH             = 00004;
 constexpr usize S_IWOTH             = 00002;
 // exec
 constexpr usize S_IXOTH             = 00001;
+
+constexpr usize S_IRWXUGO           = (S_IRWXU | S_IRWXG | S_IRWXO);
+constexpr usize S_IALLUGO           = (S_ISUID | S_ISGID | S_ISVTX | S_IRWXUGO);
+constexpr usize S_IRUGO             = (S_IRUSR | S_IRGRP | S_IROTH);
+constexpr usize S_IWUGO             = (S_IWUSR | S_IWGRP | S_IWOTH);
+constexpr usize S_IXUGO             = (S_IXUSR | S_IXGRP | S_IXOTH);

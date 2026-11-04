@@ -1,0 +1,28 @@
+/*
+ * Created by v1tr10l7 on 91.03.2025.
+ * Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
+ *
+ * SPDX-License-Identifier: GPL-3
+ */
+
+module;
+
+#include <Prism/Core/Types.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Utility/Optional.hpp>
+
+export module Cryptix:Boot.CommandLine;
+
+export namespace CommandLine
+{
+    void           Initialize(StringView commandLine);
+
+    StringView     KernelCommandLine();
+    bool           Contains(StringView key);
+
+    Optional<bool> Boolean(StringView key);
+    StringView     String(StringView key);
+
+    Optional<bool> GetBoolean(StringView key);
+    StringView     GetString(StringView key);
+}; // namespace CommandLine

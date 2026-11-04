@@ -31,5 +31,5 @@ inline constexpr void FD_SET(isize fdNum, fd_set* set)
 }
 inline constexpr void FD_ZERO(fd_set* set)
 {
-    std::memset(set->fds_bits, 0, sizeof(fd_set));
+    Memory::Fill(set->fds_bits, 0, sizeof(fd_set));
 }

@@ -4,16 +4,86 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/x86_64/CPU.hpp>
-#include <Arch/x86_64/Drivers/Time/HPET.hpp>
-#include <Arch/x86_64/Drivers/Time/Lapic.hpp>
-#include <Arch/x86_64/Drivers/Time/PIT.hpp>
 
-#include <Firmware/ACPI/ACPI.hpp>
+module;
 
-#include <Memory/VMM.hpp>
-#include <Scheduler/Scheduler.hpp>
-#include <Time/Time.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Core/Concepts.hpp>
+#endif
+#include <Prism/String/StringUtils.hpp>
+#include <API/UnixTypes.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Core/Singleton.hpp>
+#include <Prism/Memory/RefCounted.hpp>
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <API/Posix/linux/capability.h>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
+
+module Cryptix:Impl.Arch.x86_64.Drivers.Time.Lapic;
+
+import :Arch.x86_64.CPU;
+import :Arch.x86_64.Drivers.Time.HPET;
+import :Arch.x86_64.Drivers.Time.Lapic;
+import :Arch.x86_64.Drivers.Time.PIT;
+import :Firmware.ACPI.ACPI;
+import :Memory.VMM;
+import :Scheduler.Scheduler;
+import :System.InterruptManager;
+import :Time.Time;
 
 constexpr u32                  LAPIC_EOI_ACK                      = 0x00;
 CTOS_UNUSED constexpr u32      APIC_BASE_MSR                      = 0x1b;
@@ -77,10 +147,9 @@ void Lapic::Initialize()
                                      PageAttributes::eRW
                                          | PageAttributes::eUncacheableStrong);
     }
-
-    m_BaseAddress = ToHigherHalfAddress<uintptr_t>(base & ~(0xfff));
-    m_ID          = m_X2Apic ? Read(LAPIC_ID_REGISTER)
-                             : (Read(LAPIC_ID_REGISTER) >> 24) & 0xff;
+    else m_BaseAddress = ToHigherHalfAddress<upointer>(base & ~(0xfff));
+    m_ID = m_X2Apic ? Read(LAPIC_ID_REGISTER)
+                    : (Read(LAPIC_ID_REGISTER) >> 24) & 0xff;
 
     Write(LAPIC_TASK_PRIORITY_REGISTER, 0x00);
     Write(LAPIC_SPURIOUS_REGISTER, 0xff | Bit(8));
@@ -101,39 +170,49 @@ void Lapic::Initialize()
 
     if (!s_Initialized)
     {
-        s_Initialized      = true;
-        m_InterruptHandler = IDT::AllocateHandler();
-        m_InterruptHandler->Reserve();
-        LogInfo("LAPIC: Interrupt Vector: {}",
-                m_InterruptHandler->GetInterruptVector());
-        m_InterruptHandler->SetHandler(Tick);
+        s_Initialized = true;
+        m_Dispatcher = InterruptManager::AllocateHandler(0x30, this, "cryptix");
+        LogInfo("LAPIC: Allocated interrupt handler at irq line => {:#x}",
+                m_Dispatcher->IrqLine());
+
+        IDT::SetIST(m_Dispatcher->IrqLine() + 0x20, 1);
+        m_Dispatcher->SetHandler(Tick);
     }
     LogInfo("LAPIC: Initialized");
 };
 
-usize Lapic::InterruptVector() const
-{
-    return m_InterruptHandler->GetInterruptVector();
-}
+usize Lapic::InterruptVector() const { return m_Dispatcher->IrqLine() + 0x20; }
 
-void Lapic::SendIpi(u32 flags, u32 m_ID)
+void  Lapic::SendIpi(u32 vector, u32 destApicId)
 {
+    // Fixed delivery mode, physical dest, edge trigger, level=assert
+    constexpr u32 DELIVERY_FIXED = 0x000;
+    constexpr u32 DESTMODE_PHYS  = 0x000;
+    constexpr u32 LEVEL_ASSERT   = (1u << 14);
+    constexpr u32 TRIGGER_EDGE   = 0x000;
+    constexpr u32 SHORTHAND_NONE = 0x000;
+
+    u32 icrLow = vector | DELIVERY_FIXED | DESTMODE_PHYS | LEVEL_ASSERT
+               | TRIGGER_EDGE | SHORTHAND_NONE;
+
     if (!m_X2Apic)
     {
-        Write(LAPIC_ICR_HIGH_REGISTER, m_ID << 24);
-        Write(LAPIC_ICR_LOW_REGISTER, flags);
-        return;
+        Write(LAPIC_ICR_HIGH_REGISTER, destApicId << 24);
+        Write(LAPIC_ICR_LOW_REGISTER, icrLow);
     }
-
-    Write(LAPIC_ICR_LOW_REGISTER,
-          (static_cast<u64>(m_ID) << 32) | Bit(14) | flags);
+    else
+    {
+        u64 icr = (static_cast<u64>(destApicId) << 32) | icrLow;
+        CPU::WriteMSR(0x830, icr); // IA32_X2APIC_ICR MSR
+    }
 }
+
 void          Lapic::SendEOI() { Write(LAPIC_EOI_REGISTER, LAPIC_EOI_ACK); }
 
 ErrorOr<void> Lapic::Start(TimerMode tm, Timestep interval)
 {
     Mode  mode   = tm == TimerMode::eOneShot ? Mode::eOneshot : Mode::ePeriodic;
-    u8    vector = m_InterruptHandler->GetInterruptVector();
+    u8    vector = m_Dispatcher->IrqLine() + 0x20;
     usize ms     = interval.Milliseconds();
 
     if (m_TicksPerMs == 0) CalibrateTimer();
@@ -162,7 +241,7 @@ u32 Lapic::Read(u32 reg)
 {
     if (m_X2Apic) return CPU::ReadMSR((reg >> 4) + 0x800);
 
-    volatile auto ptr = reinterpret_cast<volatile u32*>(m_BaseAddress);
+    volatile auto ptr = reinterpret_cast<volatile u32*>(m_BaseAddress + reg);
     return *ptr;
 }
 
@@ -199,7 +278,10 @@ void Lapic::SetNmi(u8 vector, u8 currentCPUID, u8 cpuID, u16 flags, u8 lint)
     else if (lint == 1) Write(LAPIC_LINT1_REGISTER, nmi);
 }
 
-void Lapic::Tick(CPUContext* context)
+IrqResult Lapic::Tick(Device* device, ExecutionContext* context)
 {
-    if (Instance()->m_OnTickCallback) Instance()->m_OnTickCallback(context);
+    auto lapic = reinterpret_cast<Lapic*>(device);
+
+    if (lapic->m_OnTickCallback) lapic->m_OnTickCallback(context);
+    return IrqResult::eHandled;
 }

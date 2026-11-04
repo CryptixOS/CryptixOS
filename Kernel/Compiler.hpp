@@ -25,6 +25,21 @@
     #error "Unsupported compiler"
 #endif
 
+#define CTOS_PER_CPU_SECTION_BASE_SECTION ".data..percpu"
+#define CTOS_PER_CPU_SECTION_ATTRIBUTES(section_suffix)                        \
+    CTOS_SECTION(CTOS_PER_CPU_SECTION_BASE_SECTION section_suffix)
+
+#define CTOS_DECLARE_PER_CPU_SECTION(type, name, section)                      \
+    extern CTOS_PER_CPU_SECTION_ATTRIBUTES(section) __typeof__(type) name
+
+#define CTOS_DEFINE_PER_CPU_SECTION(type, name, section)                       \
+    CTOS_PER_CPU_SECTION_ATTRIBUTES(section) __typeof__(type) name
+#define CTOS_DECLARE_PER_CPU_CACHE_HOT(type, name)                             \
+    CTOS_DECLARE_PER_CPU_SECTION(type, name, "..hot.." #name)
+
+#define CTOS_DEFINE_PER_CPU_CACHE_HOT(type, name)                              \
+    CTOS_DEFINE_PER_CPU_SECTION(type, name, "..hot.." #name)
+
 #define CTOS_ATTRIBUTE(name)           [[CTOS_ATTR_PREFIX::name]]
 #define CTOS_ALWAYS_INLINE             CTOS_ATTRIBUTE(always_inline) inline
 #define CTOS_UNUSED                    [[maybe_unused]]
@@ -43,20 +58,39 @@
 #define CTOS_SECTION_FORCE_EMIT(name, ...)                                     \
     CTOS_SECTION(name, CTOS_ATTR_PREFIX::used __VA_OPT__(, ) __VA_ARGS__)
 
-#define CTOS_CDECL               CTOS_ATTRIBUTE(cdecl)
-#define CTOS_FASTCALL            CTOS_ATTRIBUTE(rastcall)
-#define CTOS_SYSVABI             CTOS_ATTRIBUTE(sysv_abi)
-#define CTOS_NAKED               CTOS_ATTRIBUTE(naked)
+#define CTOS_CDECL    CTOS_ATTRIBUTE(cdecl)
+#define CTOS_FASTCALL CTOS_ATTRIBUTE(rastcall)
+#define CTOS_SYSVABI  CTOS_ATTRIBUTE(sysv_abi)
+#define CTOS_NAKED    CTOS_ATTRIBUTE(naked)
 
-#define CTOS_EXPORT              __attribute__((visibility("default")))
+#define CTOS_EXPORT   __attribute__((visibility("default")))
 
-#define CtStringifyInner(x)      #x
-#define CtStringify(x)           CtStringifyInner(x)
+#define CtAliasedField(type, name, alias)                                      \
+    union                                                                      \
+    {                                                                          \
+        type name;                                                             \
+        type alias;                                                            \
+    }
+
+#define CtStringifyInner(x...)   #x
+#define CtStringify(x...)        CtStringifyInner(x)
 
 #define CtConcatenateName(a, b)  CtConcatenateInner(a, b)
 #define CtConcatenateInner(a, b) a##b
 #define CtUniqueName(name)                                                     \
     CtConcatenateName(_##name##__, CtConcatenateName(__COUNTER__, __LINE__))
+
+#define CtUniqueID(prefix)                                                     \
+    CtConcatenateName(CtConcatenateName(__UNIQUE_ID_, prefix), __COUNTER__)
+#define CtDefineSymbolAttr(symbol, attributes)                                 \
+    static void* CTOS_FORCE_EMIT attributes CtUniqueID(                        \
+        CtConcatenateName(__addressable_, symbol))                             \
+        = reinterpret_cast<void*>(upointer) & symbol;
+
+#define CtDefineSymbol(symbol)                                                 \
+    CtDefineSymbolAttr(symbol, CTOS_SECTION_FORCE_EMIT(".discard."             \
+                                                       "addressable"))
+#define CtExportSymbol(sym)      _EXPORT_SYMBOL(sym, "")
 
 //--------------------------------------------------------------------------
 // Sections

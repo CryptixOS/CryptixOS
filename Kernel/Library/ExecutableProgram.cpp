@@ -4,176 +4,380 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <API/Posix/fcntl.h>
-#include <Library/ExecutableProgram.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <API/UnixTypes.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Utility/Path.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Config.hpp>
+#include <API/Posix/linux/capability.h>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
+#include <Library/Module.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <API/Posix/sys/statfs.h>
 
-#include <Memory/AddressSpace.hpp>
-#include <Memory/PMM.hpp>
-#include <Memory/VMM.hpp>
+module Cryptix:Impl.Library.ExecutableProgram;
 
-#include <VFS/DirectoryEntry.hpp>
-#include <VFS/FileDescriptor.hpp>
-#include <VFS/VFS.hpp>
+import :Library.ELF.Loader;
+import :Library.ExecutableProgram;
+import :Library.StackBuilder;
+import :Memory.AddressSpace;
+import :Memory.PMM;
+import :Memory.VMM;
+import :Scheduler.Process;
+import :VFS.INode;
+import :VFS.FileDescriptor;
+import :VFS.VFS;
 
 ErrorOr<void> ExecutableProgram::Load(PathView path, PageMap* pageMap,
                                       AddressSpace& addressSpace,
                                       Pointer       loadBase)
 {
-    m_LoadBase      = loadBase;
-    auto maybeImage = LoadImage(path, pageMap, addressSpace);
-    RetOnError(maybeImage);
-
-    m_Image      = maybeImage.Value();
+    m_LoadBase   = loadBase;
+    m_Image      = TryOrRet(LoadImage(path, pageMap, addressSpace));
     m_EntryPoint = m_Image->EntryPoint();
 
     auto ldPath  = m_Image->InterpreterPath();
     if (ldPath.Empty()) return {};
 
-    m_LoadBase = 0x41000000;
-    maybeImage = LoadImage(ldPath, pageMap, addressSpace, true);
-    RetOnError(maybeImage);
+    m_LoadBase    = 0x41000000zu;
+    m_Interpreter = TryOrRet(LoadImage(ldPath, pageMap, addressSpace, true));
+    m_EntryPoint  = m_Interpreter->EntryPoint();
 
-    m_Interpreter = maybeImage.Value();
+    return {};
+}
+ErrorOr<void> ExecutableProgram::Load(::Ref<DirectoryEntry> dentry,
+                                      PageMap*              pageMap,
+                                      AddressSpace&         addressSpace,
+                                      Pointer               loadBase)
+{
+    m_LoadBase   = loadBase;
+    m_Image      = TryOrRet(LoadImage(dentry, pageMap, addressSpace));
+    m_EntryPoint = m_Image->EntryPoint();
+
+    auto ldPath  = m_Image->InterpreterPath();
+    if (ldPath.Empty()) return {};
+
+    m_LoadBase    = 0x41000000zu;
+    m_Interpreter = TryOrRet(LoadImage(ldPath, pageMap, addressSpace, true));
     m_EntryPoint  = m_Interpreter->EntryPoint();
 
     return {};
 }
 
+// --- Helper: small PRNG to fill AT_RANDOM if kernel RNG isn't available.
+//     It's fine for non-cryptographic purposes (glibc only needs
+//     unpredictability).
+static void FillRandomBytes(void* dst, usize len, upointer seedHint)
+{
+    u8*      out   = reinterpret_cast<u8*>(dst);
+    // 64-bit LCG
+    uint64_t state = (uint64_t)seedHint ^ 0x9E3779B97F4A7C15ULL;
+    for (usize i = 0; i < len; ++i)
+    {
+        state  = state * 6364136223846793005ULL + 1ULL;
+        out[i] = u8((state >> (i & 7) * 8) & 0xFF);
+    }
+}
+
 Pointer ExecutableProgram::PrepareStack(Pointer            stackTopWritable,
                                         Pointer            stackTopVirt,
-                                        Vector<StringView> argv,
-                                        Vector<StringView> envp)
+                                        Vector<StringView> argArr,
+                                        Vector<StringView> envArr)
 {
-    auto                           stack = stackTopWritable.As<uintptr_t>();
+    (void)FillRandomBytes;
+    StackBuilder              builder(stackTopWritable);
 
-    CPU::UserMemoryProtectionGuard guard;
-    for (auto env : envp)
+    UserMemoryProtectionGuard guard;
+
+#if 1
+    // --- 1. Copy envArr strings onto stack ---
+    Pointer          stackCursor = stackTopVirt;
+    Vector<upointer> envp;
+    for (auto env : envArr)
     {
-        stack = Pointer(stack).Offset<uintptr_t*>(-env.Size() - 1);
-        Memory::Copy(stack, env.Raw(), env.Size());
-    }
-    for (auto arg : argv)
-    {
-        stack = Pointer(stack).Offset<uintptr_t*>(-arg.Size() - 1);
-        Memory::Copy(stack, arg.Raw(), arg.Size());
-    }
-
-    stack = Pointer(Math::AlignDown(Pointer(stack), 16));
-    if ((argv.Size() + envp.Size() + 1) & 1) stack--;
-
-    *(--stack) = 0;
-    *(--stack) = 0;
-    stack -= 2;
-    stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eEntry),
-    stack[1] = Image().EntryPoint();
-    stack -= 2;
-    stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eProgramHeader),
-    stack[1] = Image().ProgramHeaderAddress();
-    stack -= 2;
-    stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eProgramHeaderEntrySize),
-    stack[1] = Image().ProgramHeaderEntrySize();
-    stack -= 2;
-    stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eProgramHeaderCount),
-    stack[1] = Image().ProgramHeaderCount();
-
-    // if (m_InterpreterBase)
-    // {
-    //     stack -= 2;
-    //     stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eInterpreterBase),
-    //     stack[1] = m_InterpreterBase;
-    // }
-    // stack -= 2;
-    // stack[0] = ToUnderlying(ELF::AuxiliaryValueType::ePageSize),
-    // stack[1] = PMM::PAGE_SIZE;
-    // stack -= 2;
-    // stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eUid), stack[1] = 0;
-    // stack -= 2;
-    // stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eEUid), stack[1] = 0;
-    // stack -= 2;
-    // stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eGid), stack[1] = 0;
-    // stack -= 2;
-    // stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eEGid), stack[1] = 0;
-    // stack -= 2;
-    // stack[0] = ToUnderlying(ELF::AuxiliaryValueType::eExec), stack[1] = 0;
-
-    Pointer stackPointer = stackTopVirt;
-    *(--stack)           = 0;
-    stack -= envp.Size();
-    for (usize i = 0; auto env : envp)
-    {
-        stackPointer -= env.Size() + 1;
-        stack[i++] = stackPointer;
+        stackCursor -= env.Size() + 1;
+        envp.EmplaceBack(stackCursor);
+        builder.Write(env.Raw(), env.Size() + 1);
     }
 
-    *(--stack) = 0;
-    stack -= argv.Size();
-    for (usize i = 0; auto arg : argv)
+    // --- 2. Copy argArr strings onto stack ---
+    Vector<upointer> argv;
+    for (auto arg : argArr)
     {
-        stackPointer -= arg.Size() + 1;
-        stack[i++] = stackPointer;
+        stackCursor -= arg.Size() + 1;
+        argv.EmplaceBack(stackCursor);
+        builder.Write(arg.Raw(), arg.Size() + 1);
     }
 
-    *(--stack) = argv.Size();
-    return stackTopVirt.Raw() - (stackTopWritable.Raw() - Pointer(stack).Raw());
+    // --- 3. Copy executable path for AT_EXECFN ---
+    auto execPath = m_ExecutablePath;
+    stackCursor -= execPath.Size() + 1;
+    upointer execPathAddr = stackCursor;
+    builder.Write(execPath.Raw(), execPath.Size() + 1);
+
+    // --- 4. Align stack to 16 bytes ---
+    builder.Align(16);
+    // padding
+    if ((argArr.Size() + envArr.Size() + 1) & 1) builder.Write(0);
+
+    // --- 5. Push null terminators for argArr/envArr ---
+    builder.Write(0);
+    builder.Write(0);
+
+    using AuxVal = ELF::AuxiliaryValueType;
+    // --- 6. Push auxv entries ---
+    builder.Write(AuxVal::eEntry, Image().EntryPoint());
+    builder.Write(AuxVal::eProgramHeaders, Image().ProgramHeaderAddress());
+    builder.Write(AuxVal::eProgramHeaderEntrySize,
+                  Image().ProgramHeaderEntrySize());
+    builder.Write(AuxVal::eProgramHeaderCount, Image().ProgramHeaderCount());
+
+    if (m_InterpreterBase)
+        builder.Write(AuxVal::eInterpreterBase, m_InterpreterBase);
+    builder.Write(AuxVal::ePageSize, PMM::PAGE_SIZE);
+
+    Credentials creds{};
+    builder.Write(AuxVal::eUserID, creds.UserID);
+    builder.Write(AuxVal::eEffectiveUserID, creds.EffectiveUserID);
+    builder.Write(AuxVal::eGroupID, creds.GroupID);
+    builder.Write(AuxVal::eEffectiveGroupID, creds.EffectiveGroupID);
+    builder.Write(AuxVal::eExecutablePath, execPathAddr);
+
+    // --- 7. Push envArr pointers ---
+    builder.Write(0);
+    for (usize i = envp.Size(); i > 0; i--) builder.Write(envp[i - 1]);
+
+    // --- 8. Push argArr pointers ---
+    builder.Write(0);
+    for (usize i = argv.Size(); i > 0; i--) builder.Write(argv[i - 1]);
+
+    // --- 9. Push argc ---
+    builder.Write(argArr.Size());
+    // builder.Align(16);
+
+    // --- 10. Return new stack pointer ---
+    return stackTopVirt - (builder.Top() - builder.Current());
+#else
+    // --- 1. Copy strings (we keep strings at high addresses; stack grows down)
+    // ---
+    Pointer          writeCursor = stackTopVirt;
+    Vector<upointer> envp; // virtual addresses of env strings (forward order)
+    envp.Clear();
+    for (auto& env : envArr)
+    {
+        writeCursor -= (env.Size() + 1);
+        envp.EmplaceBack(writeCursor);
+        builder.Write(env.Raw(), env.Size() + 1);
+    }
+
+    Vector<upointer> argv; // virtual addresses of argv strings (forward order)
+    argv.Clear();
+    for (auto& arg : argArr)
+    {
+        writeCursor -= (arg.Size() + 1);
+        argv.EmplaceBack(writeCursor);
+        builder.Write(arg.Raw(), arg.Size() + 1);
+    }
+
+    // --- Copy executable path (for AT_EXECFN) ---
+    auto execPath = m_ExecutablePath;
+    writeCursor -= (execPath.Size() + 1);
+    upointer execPathAddr = writeCursor;
+    builder.Write(execPath.Raw(), execPath.Size() + 1);
+
+    // --- Place AT_RANDOM (16 bytes) on the stack (above strings) ---
+    constexpr usize RANDOM_BYTES = 16;
+    writeCursor -= RANDOM_BYTES;
+    Pointer  randomDst = writeCursor;
+    u8       randomBuf[RANDOM_BYTES];
+    // seedHint: combine top-of-stack and entry point for variability
+    upointer seedHint
+        = upointer(stackTopVirt.Raw()) ^ upointer(Image().EntryPoint());
+    FillRandomBytes(randomBuf, RANDOM_BYTES, seedHint);
+    builder.Write(Pointer(randomBuf), RANDOM_BYTES);
+    upointer randomAddr = randomDst; // virtual address of AT_RANDOM data
+
+    // --- Align pointer-area start to 16 bytes ---
+    // We aligned the top-of-strings region; builder.Align aligns m_StackCurrent
+    // which is top.
+    builder.Align(16);
+
+    // --- We'll now write pointer area & auxv. Because builder writes downward,
+    //     we must write objects in *reverse* of how we want them in memory.
+    //     However, our helper Write(aux, val) already writes value then type
+    //     so that memory ends up (type, value) in increasing addresses.
+    using AuxVal = ELF::AuxiliaryValueType;
+
+    // --- 1) auxv terminator AT_NULL (write it first because we write downward)
+    // ---
+    builder.Write((upointer)0);                           // a_val = 0
+    builder.Write((upointer)ToUnderlying(AuxVal::eNull)); // a_type = AT_NULL
+
+    // --- 2) auxv entries (write in reverse order so they appear forward in
+    // memory) --- We'll collect them then write in reverse for clarity.
+    struct AuxEntry
+    {
+        AuxVal   type;
+        upointer val;
+    };
+    Vector<AuxEntry> auxs;
+    auxs.Clear();
+
+    // Add typical aux entries expected by dynamic linkers / libc.
+    auxs.EmplaceBack(AuxVal::eExecutablePath, (upointer)execPathAddr);
+    auxs.EmplaceBack(AuxVal::eUserID, (upointer)Credentials{}.UserID);
+    auxs.EmplaceBack(AuxVal::eEffectiveUserID,
+                     (upointer)Credentials{}.EffectiveUserID);
+    auxs.EmplaceBack(AuxVal::eGroupID, (upointer)Credentials{}.GroupID);
+    auxs.EmplaceBack(AuxVal::eEffectiveGroupID,
+                     (upointer)Credentials{}.EffectiveGroupID);
+
+    auxs.EmplaceBack(AuxVal::ePageSize, (upointer)PMM::PAGE_SIZE);
+
+    if (m_InterpreterBase)
+        auxs.EmplaceBack(AuxVal::eInterpreterBase, (upointer)m_InterpreterBase);
+
+    // Program header / entry info
+    auxs.EmplaceBack(AuxVal::eProgramHeaders,
+                     (upointer)Image().ProgramHeaderAddress());
+    auxs.EmplaceBack(AuxVal::eProgramHeaderEntrySize,
+                     (upointer)Image().ProgramHeaderEntrySize());
+    auxs.EmplaceBack(AuxVal::eProgramHeaderCount,
+                     (upointer)Image().ProgramHeaderCount());
+    auxs.EmplaceBack(AuxVal::eEntry, (upointer)Image().EntryPoint());
+
+    // AT_RANDOM (address of 16 random bytes we placed above)
+    auxs.EmplaceBack(AuxVal::eRandom, (upointer)randomAddr);
+
+    // Add AT_PHDR / AT_PHENT / AT_PHNUM aliases if your ELF enum differs:
+    // some systems use AT_PHDR, AT_PHENT, AT_PHNUM (these correspond to
+    // ProgramHeaderAddress/EntrySize/Count)
+    auxs.EmplaceBack(AuxVal::eProgramHeaders,
+                     (upointer)Image().ProgramHeaderAddress());
+    auxs.EmplaceBack(AuxVal::eProgramHeaderEntrySize,
+                     (upointer)Image().ProgramHeaderEntrySize());
+    auxs.EmplaceBack(AuxVal::eProgramHeaderCount,
+                     (upointer)Image().ProgramHeaderCount());
+
+    // Write aux entries in reverse so they appear in forward order in memory
+    for (usize i = auxs.Size(); i > 0; --i)
+    {
+        auto& e = auxs[i - 1];
+        builder.Write(e.val);
+        builder.Write(ToUnderlying(e.type));
+    }
+
+    // --- 3) envp pointers (forward order in memory)
+    // Because builder writes downward, write NULL first then pointers in
+    // reverse.
+    builder.Write((upointer)0); // envp NULL terminator
+    for (usize i = envp.Size(); i > 0; --i)
+        builder.Write((upointer)envp[i - 1]);
+
+    // --- 4) argv pointers (forward order in memory)
+    builder.Write((upointer)0); // argv NULL terminator
+    for (usize i = argv.Size(); i > 0; --i)
+        builder.Write((upointer)argv[i - 1]);
+
+    // --- 5) argc ---
+    builder.Write((upointer)argArr.Size());
+
+    // --- Final alignment: ensure RSP % 16 == 0 at program entry ---
+    // Align again in case the counts caused misalignment.
+    builder.Align(16);
+
+    // --- Return new stack pointer (virtual) ---
+    Pointer newRsp = stackTopVirt - (builder.Top() - builder.Current());
+    return newRsp;
+#endif
 }
 
 ErrorOr<Ref<ELF::Image>>
 ExecutableProgram::LoadImage(PathView path, PageMap* pageMap,
                              AddressSpace& addressSpace, bool interpreter)
 {
-    Ref entry = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), path)
-                    .Value()
-                    .Entry;
+    Ref entry
+        = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), path).Value().Entry;
     if (!entry) return Error(ENOENT);
 
+    return LoadImage(entry, pageMap, addressSpace, interpreter);
+}
+ErrorOr<Ref<ELF::Image>>
+ExecutableProgram::LoadImage(::Ref<DirectoryEntry> entry, PageMap* pageMap,
+                             AddressSpace& addressSpace, bool interpreter)
+{
     auto inode = entry->INode();
     if (!inode) return Error(ENOENT);
 
-    auto maybeFile
-        = VFS::Open(VFS::RootDirectoryEntry().Raw(), path, O_RDONLY, 0);
-    RetOnError(maybeFile);
-
-    Ref file  = maybeFile.Value();
+    auto file = TryOrRet(
+        VFS::Open(VFS::RootDirectoryEntry().Raw(), entry->Path(), O_RDONLY, 0));
     Ref image = CreateRef<ELF::Image>();
 
     if (!image->Load(file.Raw(), m_LoadBase)) return Error(ENOEXEC);
+    // if (image->IsExecutable() && !image->InterpreterPath().Empty())
+    //     return image;
 
-    auto forEachProgramHeader = [&](ELF::ProgramHeader* header) -> bool
-    {
-        if (header->Type == ELF::HeaderType::eLoad)
-        {
-            usize misalign  = header->VirtualAddress & (PMM::PAGE_SIZE - 1);
-            usize pageCount = Math::DivRoundUp(
-                header->SegmentSizeInMemory + misalign, PMM::PAGE_SIZE);
+    ELF::Loader loader(image);
+    loader.LoadSegments(*pageMap, addressSpace, PageAttributes::eRWXU,
+                        m_LoadBase);
+    auto minVirt       = loader.MinVirt();
 
-            Pointer phys = PMM::CallocatePages(pageCount);
-            Assert(phys);
-
-            auto  virt = header->VirtualAddress + m_LoadBase;
-            usize size = pageCount * PMM::PAGE_SIZE;
-            Assert(pageMap->MapRange(virt, phys, size,
-                                     PageAttributes::eRWXU
-                                         | PageAttributes::eWriteBack));
-            auto region
-                = new Region(phys, header->VirtualAddress + m_LoadBase, size);
-            using VMM::Access;
-            region->SetAccessMode(Access::eReadWriteExecute | Access::eUser);
-
-            addressSpace.Insert(region->VirtualBase(), region);
-            Memory::Copy(phys.Offset<Pointer>(misalign).ToHigherHalf(),
-                         image->Raw().Offset(header->Offset),
-                         header->SegmentSizeInFile);
-
-            // if (interpreter)
-            //     m_InterpreterBase = std::min(m_InterpreterBase, virt);
-        }
-
-        return true;
-    };
-
-    ELF::Image::ProgramHeaderEnumerator programHeaderIterator;
-    programHeaderIterator.BindLambda(forEachProgramHeader);
-
-    image->ForEachProgramHeader(programHeaderIterator);
+    m_SignalTrampoline = loader.TrampolineVirt();
+    if (interpreter) m_InterpreterBase = minVirt;
     return image;
 }

@@ -4,21 +4,83 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <Debug/Debug.hpp>
-
-#include <Memory/PMM.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
 #include <Prism/Utility/Math.hpp>
+#include <API/UnixTypes.hpp>
+#include <Prism/Utility/Time.hpp>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <API/Posix/sys/statfs.h>
+#include <VFS/EchFs/EchFsStructures.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
 
-#include <Time/Time.hpp>
-#include <VFS/DirectoryEntry.hpp>
-#include <VFS/INode.hpp>
-#include <VFS/VFS.hpp>
+module Cryptix:Impl.VFS.EchFs.EchFs;
 
-#include <VFS/EchFs/EchFs.hpp>
-#include <VFS/EchFs/EchFsINode.hpp>
+import :Memory.PMM;
+import :Time.Time;
+import :VFS.INode;
+import :VFS.VFS;
+import :VFS.EchFs.EchFs;
+import :VFS.EchFs.EchFsINode;
 
 constexpr StringView ECHFS_SIGNATURE = "_ECH_FS_"_sv;
 
+EchFs::EchFs(u32 flags)
+    : Filesystem("EchFs", flags)
+{
+}
 EchFs::~EchFs()
 {
     // TODO(v1tr10l7): if (m_Root) VFS::RecursiveDelete(m_Root);
@@ -30,14 +92,14 @@ EchFs::~EchFs()
 }
 
 ErrorOr<::Ref<DirectoryEntry>> EchFs::Mount(StringView  sourcePath,
-                                          const void* data)
+                                            const void* data)
 {
     auto pathResolution
         = VFS::ResolvePath(nullptr, sourcePath).ValueOr(VFS::PathResolution{});
 
     auto sourceEntry = pathResolution.Entry;
     if (!sourceEntry || !sourceEntry->INode()) return nullptr;
-    auto source = sourceEntry->INode();
+    auto source     = sourceEntry->INode();
 
     m_IdentityTable = new EchFsIdentityTable;
     if (!m_IdentityTable) return nullptr;
@@ -90,10 +152,10 @@ ErrorOr<::Ref<DirectoryEntry>> EchFs::Mount(StringView  sourcePath,
     m_MainDirectoryEnd
         = m_MainDirectoryStart + mainDirectoryLength * m_BlockSize;
 
-    m_RootEntry  = new DirectoryEntry(nullptr, "/");
-    m_NativeRoot = new EchFsINode("/", reinterpret_cast<Filesystem*>(this),
-                                  0644 | S_IFDIR);
-    m_Root       = reinterpret_cast<INode*>(m_NativeRoot);
+    m_RootEntry  = CreateRef<DirectoryEntry>(nullptr, "/");
+    m_NativeRoot = CreateRef<EchFsINode>(
+        "/", reinterpret_cast<Filesystem*>(this), 0644 | S_IFDIR);
+    m_Root = m_NativeRoot.As<INode>();
 
     if (!m_NativeRoot) goto fail_free_id_table;
     m_RootEntry->Bind(m_Root);
@@ -131,7 +193,8 @@ ErrorOr<::Ref<DirectoryEntry>> EchFs::Mount(StringView  sourcePath,
 
     return m_RootEntry;
 fail_free_inode_and_id_table:
-    delete m_NativeRoot;
+    m_RootEntry.Reset();
+    m_NativeRoot.Reset();
 fail_free_id_table:
     delete m_IdentityTable;
     m_IdentityTable = nullptr;
@@ -168,7 +231,7 @@ bool EchFs::Populate(EchFsINode* native)
         }
         if (entry.ParentID != inodeDirectoryID) continue;
 
-        EchFsINode* child = new EchFsINode(
+        ::Ref<EchFsINode> child = CreateRef<EchFsINode>(
             name, reinterpret_cast<Filesystem*>(this), mode, entry, offset);
         child->m_Metadata.DeviceID
             = reinterpret_cast<Filesystem*>(this)->BackingDeviceID();
@@ -187,7 +250,7 @@ bool EchFs::Populate(EchFsINode* native)
         child->m_Metadata.AccessTime       = Time::GetReal();
         child->m_Metadata.ModificationTime = Time::GetReal();
 
-        inode->InsertChild(reinterpret_cast<INode*>(child), name);
+        inode->InsertChild(child.As<INode>(), name);
     }
 
     return (native->m_Populated = true);
@@ -197,7 +260,7 @@ bool EchFs::Populate(DirectoryEntry* entry)
     if (!entry) return_err(false, ENOENT);
     auto inode = entry->INode();
 
-    return Populate(reinterpret_cast<EchFsINode*>(inode));
+    return Populate(inode.As<EchFsINode>().Raw());
 }
 
 isize EchFs::ReadDirectoryEntry(EchFsDirectoryEntry& entry, u8* dest,

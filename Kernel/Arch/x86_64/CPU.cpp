@@ -4,23 +4,89 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/x86_64/CPU.hpp>
 
-#include <Arch/x86_64/Drivers/Time/KVMClock.hpp>
-#include <Arch/x86_64/Drivers/Time/Lapic.hpp>
-#include <Arch/x86_64/Drivers/Time/PIT.hpp>
+module;
 
-#include <Boot/BootInfo.hpp>
-#include <Debug/Panic.hpp>
-
-#include <Memory/MM.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
 #include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#include <API/UnixTypes.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Core/Singleton.hpp>
+#include <Prism/Memory/RefCounted.hpp>
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <Prism/Core/UUID.hpp>
+#include <Prism/Network/IPv4Address.hpp>
+#include <limine.h>
+#include <API/Posix/linux/capability.h>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
 
-#include <Scheduler/Process.hpp>
-#include <Scheduler/Scheduler.hpp>
-#include <Scheduler/Thread.hpp>
+module Cryptix:Impl.Arch.x86_64.CPU;
 
-#include <Time/Time.hpp>
+import :Arch.x86_64.CPU;
+import :Arch.x86_64.Drivers.Time.KVMClock;
+import :Arch.x86_64.Drivers.Time.Lapic;
+import :Arch.x86_64.Drivers.Time.PIT;
+import :Boot.BootInfo;
+import :Boot.CommandLine;
+import :Debug.KernelPanic;
+import :Memory.MM;
+import :Scheduler.Process;
+import :Scheduler.Scheduler;
+import :Scheduler.Thread;
+import :System.InterruptManager;
+import :Time.Time;
 
 u8                         g_PanicIpiVector = 255;
 
@@ -30,30 +96,6 @@ namespace CPU
 {
     namespace
     {
-        inline void XSave(uintptr_t ctx)
-        {
-            __asm__ volatile("xsave (%0)"
-                             :
-                             : "r"(ctx), "a"(0xffffffff), "d"(0xffffffff)
-                             : "memory");
-        }
-        inline void XRestore(uintptr_t ctx)
-        {
-            __asm__ volatile("xrstor (%0)"
-                             :
-                             : "r"(ctx), "a"(0xffffffff), "d"(0xffffffff)
-                             : "memory");
-        }
-
-        inline void FXSave(uintptr_t ctx)
-        {
-            __asm__ volatile("fxsave (%0)" : : "r"(ctx) : "memory");
-        }
-        inline void FXRestore(uintptr_t ctx)
-        {
-            __asm__ volatile("fxrstor (%0)" : : "r"(ctx) : "memory");
-        }
-
         CPU*        s_BSP        = nullptr;
         u64         s_BspLapicId = 0;
         CPU::List   s_CPUs;
@@ -160,10 +202,10 @@ namespace CPU
             GDT::Initialize();
             GDT::Load(current->ID);
 
-            current->TSS.rsp[0] = Pointer(PMM::CallocatePages(KERNEL_STACK_SIZE
-                                                              / PMM::PAGE_SIZE))
-                                      .ToHigherHalf<Pointer>()
-                                      .Offset<uintptr_t>(KERNEL_STACK_SIZE);
+            current->TSS.RSP0 = Pointer(PMM::CallocatePages(KERNEL_STACK_SIZE
+                                                            / PMM::PAGE_SIZE))
+                                    .ToHigherHalf<Pointer>()
+                                    .Offset<upointer>(KERNEL_STACK_SIZE);
             GDT::LoadTSS((&current->TSS));
             IDT::Load();
 
@@ -191,16 +233,17 @@ namespace CPU
                    << 32));
 
         // Syscall EntryPoint
-        WriteMSR(MSR::LSTAR, reinterpret_cast<uintptr_t>(syscall_entry));
+        WriteMSR(MSR::LSTAR, reinterpret_cast<upointer>(syscall_entry));
         WriteMSR(MSR::SFMASK, ~u32(2));
 
         Lapic::Instance()->Initialize();
 
-        GetCurrent()->TSS.ist[0]
-            = ToHigherHalfAddress<uintptr_t>(PMM::AllocatePages<uintptr_t>(
+        GetCurrent()->TSS.IST1
+            = ToHigherHalfAddress<upointer>(PMM::AllocatePages<upointer>(
                   KERNEL_STACK_SIZE / PMM::PAGE_SIZE))
             + KERNEL_STACK_SIZE;
         IDT::SetIST(14, 2);
+        GDT::LoadTSS(&GetCurrent()->TSS);
 
         if (s_KvmClock && !s_KvmClock->Enable())
             LogError("CPU[{}]: Failed to initialize kvm clock", Current()->ID);
@@ -241,10 +284,10 @@ namespace CPU
             GDT::Initialize();
             GDT::Load(current->LapicID);
 
-            current->TSS.rsp[0] = Pointer(PMM::CallocatePages(KERNEL_STACK_SIZE
-                                                              / PMM::PAGE_SIZE))
-                                      .ToHigherHalf<Pointer>()
-                                      .Offset<uintptr_t>(KERNEL_STACK_SIZE);
+            current->TSS.RSP0 = Pointer(PMM::CallocatePages(KERNEL_STACK_SIZE
+                                                            / PMM::PAGE_SIZE))
+                                    .ToHigherHalf<Pointer>()
+                                    .Offset<upointer>(KERNEL_STACK_SIZE);
             GDT::LoadTSS(&current->TSS);
 
             IDT::Initialize();
@@ -259,9 +302,7 @@ namespace CPU
             current->IsOnline = true;
         }
 
-        IDT::SetIST(Lapic::Instance()->InterruptVector(), 1);
         LogInfo("BSP: Initialized");
-
         Identify();
     }
     KERNEL_INIT_CODE
@@ -306,57 +347,27 @@ namespace CPU
             ++i;
         }
 
-        auto handler = IDT::GetHandler(255);
-        handler->Reserve();
-        handler->SetInterruptVector(255);
-        handler->SetHandler(HaltAndCatchFire);
+        static Ref<InterruptDispatcher> dispatcher
+            = InterruptManager::AllocateHandler(g_PanicIpiVector, nullptr,
+                                                "cryptix");
+
+        dispatcher->SetHandler(HaltAndCatchFire);
     }
 
-    ID::ID(u64 leaf, u64 subleaf)
-    {
-        __asm__ volatile("cpuid"
-                         : "=a"(rax), "=b"(rbx), "=c"(rcx), "=d"(rdx)
-                         : "a"(leaf), "c"(subleaf));
-    }
+    ID::ID(u64 leaf, u64 subleaf) { CPUID(leaf, subleaf, rax, rbx, rcx, rdx); }
     bool ID::operator()(u64 leaf, u64 subleaf)
     {
         u32 cpuidMax;
-        __asm__ volatile("cpuid"
-                         : "=a"(cpuidMax)
-                         : "a"(leaf & 0x80000000)
-                         : "rbx", "rcx", "rdx");
+        Asm("cpuid" : "=a"(cpuidMax) : "a"(leaf & 0x80000000) : "rbx", "rcx",
+            "rdx");
         if (leaf > cpuidMax) return false;
 
-        __asm__ volatile("cpuid"
-                         : "=a"(rax), "=b"(rbx), "=c"(rcx), "=d"(rdx)
-                         : "a"(leaf), "c"(subleaf));
+        Asm("cpuid" : "=a"(rax), "=b"(rbx), "=c"(rcx), "=d"(rdx) : "a"(leaf),
+            "c"(subleaf));
         return true;
     }
 
-    void DumpRegisters(CPUContext* ctx)
-    {
-        LogInfo("RAX: {:#x}, RBX: {:#x}, RCX: {:#x}, RDX: {:#x}", ctx->rax,
-                ctx->rbx, ctx->rcx, ctx->rdx);
-        LogInfo("RSI: {:#x}, RDI: {:#x}, RBP: {:#x}, RSP: {:#x}", ctx->rsi,
-                ctx->rdi, ctx->rbp, ctx->rsp);
-        LogInfo("R8: {:#x}, R9: {:#x}, R10: {:#x}, R11: {:#x}", ctx->r8,
-                ctx->r9, ctx->r10, ctx->r11);
-        LogInfo("R12: {:#x}, R13: {:#x}, R14: {:#x}, R15: {:#x}", ctx->r12,
-                ctx->r13, ctx->r14, ctx->r15);
-        LogInfo("CS: {:#x}, SS: {:#x}, DS: {:#x}, ES: {:#x}", ctx->cs, ctx->ss,
-                ctx->ds, ctx->es);
-        LogInfo("RIP: {:#x}, RFLAGS: {:#b}", ctx->rip, ctx->rflags);
-    }
-    bool GetInterruptFlag()
-    {
-        u64 rflags;
-        __asm__ volatile(
-            "pushf\n"
-            "pop %0"
-            : "=m"(rflags));
-
-        return rflags & Bit(9);
-    }
+    bool GetInterruptFlag() { return InterruptsEnabled(); }
     void SetInterruptFlag(bool enabled)
     {
         if (enabled) __asm__ volatile("sti");
@@ -411,11 +422,11 @@ namespace CPU
 
     void Stac()
     {
-        if (ReadCR4() & Bit(21)) __asm__ volatile("stac" ::: "cc");
+        if (ReadCR4() & Bit(21)) EnableUserAccess();
     }
     void Clac()
     {
-        if (ReadCR4() & Bit(21)) __asm__ volatile("clac" ::: "cc");
+        if (ReadCR4() & Bit(21)) DisableUserAccess();
     }
 
     Pointer GetFSBase() { return ReadMSR(MSR::FS_BASE); }
@@ -469,20 +480,20 @@ namespace CPU
 
     void PrepareThread(Thread* thread, Pointer pc, Pointer arg)
     {
-        CPU* current           = GetCurrent();
-        thread->Context.rflags = 0x202;
-        thread->Context.rip    = pc;
-        thread->Context.rdi    = arg;
+        CPU* current          = GetCurrent();
+        thread->Context.Flags = 0x202;
+        thread->Context.RIP   = pc;
+        thread->Context.RDI   = arg;
 
         Pointer kernelStack
-            = PMM::AllocatePages<uintptr_t>(KERNEL_STACK_SIZE / PMM::PAGE_SIZE);
+            = PMM::AllocatePages<upointer>(KERNEL_STACK_SIZE / PMM::PAGE_SIZE);
 
         current->KernelStack
             = kernelStack.Offset<Pointer>(KERNEL_STACK_SIZE).ToHigherHalf();
         thread->SetKernelStack(current->KernelStack);
 
         Pointer pfStack
-            = PMM::AllocatePages<uintptr_t>(KERNEL_STACK_SIZE / PMM::PAGE_SIZE);
+            = PMM::AllocatePages<upointer>(KERNEL_STACK_SIZE / PMM::PAGE_SIZE);
         thread->SetPageFaultStack(
             pfStack.Offset<Pointer>(KERNEL_STACK_SIZE).ToHigherHalf());
 
@@ -495,11 +506,11 @@ namespace CPU
         thread->SetGsBase(thread);
         if (thread->IsUser())
         {
-            thread->Context.cs = GDT::USERLAND_CODE_SELECTOR | 0x03;
-            thread->Context.ss = GDT::USERLAND_DATA_SELECTOR | 0x03;
-            thread->Context.ds = thread->Context.es = thread->Context.ss;
+            thread->Context.CS = GDT::USERLAND_CODE_SELECTOR | 0x03;
+            thread->Context.SS = GDT::USERLAND_DATA_SELECTOR | 0x03;
+            thread->Context.DS = thread->Context.ES = thread->Context.SS;
 
-            thread->Context.rsp                     = thread->GetStack();
+            thread->Context.RSP                     = thread->GetStack();
             current->FpuRestore(thread->FpuStorage());
 
             u16 defaultFcw = 0b1100111111;
@@ -511,15 +522,15 @@ namespace CPU
         }
         else
         {
-            thread->Context.cs = GDT::KERNEL_CODE_SELECTOR;
-            thread->Context.ss = GDT::KERNEL_DATA_SELECTOR;
-            thread->Context.ds = thread->Context.es = thread->Context.ss;
+            thread->Context.CS = GDT::KERNEL_CODE_SELECTOR;
+            thread->Context.SS = GDT::KERNEL_DATA_SELECTOR;
+            thread->Context.DS = thread->Context.ES = thread->Context.SS;
 
-            thread->Context.rsp                     = thread->KernelStack();
+            thread->Context.RSP                     = thread->KernelStack();
             thread->SetStack(thread->KernelStack());
         }
     }
-    void SaveThread(Thread* thread, CPUContext* ctx)
+    void SaveThread(Thread* thread, ExecutionContext* ctx)
     {
         thread->Context = *ctx;
 
@@ -528,11 +539,12 @@ namespace CPU
 
         GetCurrent()->FpuSave(thread->FpuStorage());
     }
-    void LoadThread(Thread* thread, CPUContext* ctx)
+    void LoadThread(Thread* thread, ExecutionContext* ctx)
     {
         thread->SetRunningOn(GetCurrent()->ID);
 
-        GetCurrent()->TSS.ist[1] = thread->PageFaultStack();
+        GetCurrent()->TSS.IST2 = thread->PageFaultStack();
+        GDT::LoadTSS(&GetCurrent()->TSS);
         GetCurrent()->FpuRestore(thread->FpuStorage());
 
         thread->Parent()->PageMap->Load();
@@ -545,7 +557,7 @@ namespace CPU
     }
     void Reschedule(Timestep interval)
     {
-        Assert(Lapic::Instance()->Start(TimerMode::eOneShot, interval));
+        Time::SchedulerTimer()->Start(TimerMode::eOneShot, interval);
     }
 
     bool EnableSSE()
@@ -602,9 +614,6 @@ namespace CPU
         ID id(7, 0);
         if (id.rcx & CPU_FEAT_ECX_UMIP) WriteCR4(ReadCR4() | CR4::UMIP);
     }
-
-    UserMemoryProtectionGuard::UserMemoryProtectionGuard() { Stac(); }
-    UserMemoryProtectionGuard::~UserMemoryProtectionGuard() { Clac(); }
 
     bool DuringSyscall()
     {

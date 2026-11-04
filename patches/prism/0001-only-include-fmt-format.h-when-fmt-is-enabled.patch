@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 07:30:00 +0000
+Subject: [PATCH] fix: only include <fmt/format.h> when fmt is enabled
+
+The check was inverted: with PRISM_DISABLE_FMT=1 (as Neon, Aurora and the
+CryptixOS userland build Prism) Formatter.hpp included <fmt/format.h>,
+which is not installed, and failed to compile.
+---
+ Source/Prism/String/Formatter.hpp | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/Source/Prism/String/Formatter.hpp b/Source/Prism/String/Formatter.hpp
+index 1bce539..7a5e94e 100644
+--- a/Source/Prism/String/Formatter.hpp
++++ b/Source/Prism/String/Formatter.hpp
+@@ -11,9 +11,8 @@
+ #include <Prism/String/FormatString.hpp>
+ #include <Prism/String/StringBuilder.hpp>
+ 
+-#if PRISM_DISABLE_FMT != 0
++#if PRISM_DISABLE_FMT == 0
+     #include <fmt/format.h>
+-#else
+ #endif
+ 
+ namespace Prism
+-- 
+2.43.0
+

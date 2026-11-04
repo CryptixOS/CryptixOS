@@ -4,18 +4,69 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Drivers/Serial.hpp>
-#include <Drivers/Video/VideoTerminal.hpp>
 
-#include <Library/Locking/Spinlock.hpp>
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
 #include <Library/Logger.hpp>
-
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/UnixTypes.hpp>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/RingBuffer.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
 #include <Prism/Debug/LogSink.hpp>
 
-#include <Prism/String/Printf.hpp>
-#include <Prism/String/StringUtils.hpp>
+module Cryptix:Impl.Library.Logger;
 
-#include <Prism/Utility/Math.hpp>
+import :Drivers.KernelMessageDevice;
+import :Drivers.Serial;
+import :Drivers.TTY.VirtualConsole;
+import :Library.Locking.Spinlock;
+import :Library.Logger;
 
 namespace E9
 {
@@ -35,10 +86,8 @@ namespace E9
     }
 }; // namespace E9
 
-using namespace Prism;
-
-static usize   s_EnabledSinks = 0;
-class CoreSink final : public LogSink
+static usize s_EnabledSinks = 0;
+class CoreSink final : public LogSink<SpinLockPolicy>
 {
   public:
     isize WriteNoLock(StringView str) override
@@ -50,257 +99,43 @@ class CoreSink final : public LogSink
         nwritten = nwritten ?: ret;
         if (s_EnabledSinks & LOG_SINK_TERMINAL)
         {
-            auto terminal = Terminal::GetPrimary();
+            auto terminal = VirtualConsole::GetPrimary();
             if (!terminal) return nwritten;
 
             if (nwritten == 0) nwritten = terminal->PrintString(str);
         }
+        KernelMessageDevice::Write(str);
 
         return nwritten;
     }
 };
-CoreSink g_CoreSink;
 
 namespace Logger
 {
     namespace
     {
         Spinlock s_Lock;
-        u64      s_LogForegroundColors[] = {
-            FOREGROUND_COLOR_WHITE,  FOREGROUND_COLOR_MAGENTA,
-            FOREGROUND_COLOR_GREEN,  FOREGROUND_COLOR_CYAN,
-            FOREGROUND_COLOR_YELLOW, FOREGROUND_COLOR_RED,
-            FOREGROUND_COLOR_WHITE,
-        };
-
-        using ArgumentType       = Printf::ArgumentType;
-        using Sign               = Printf::Sign;
-        using PrintfFormatSpec   = Printf::FormatSpec;
-        using PrintfFormatParser = Printf::FormatParser;
-        template <typename T>
-        CTOS_NO_KASAN isize LogNumber(va_list& args, PrintfFormatSpec& spec)
-        {
-            isize nwritten = 0;
-            T     value    = va_arg(args, T);
-
-            if (value < 0 && spec.Base == 10)
-            {
-                spec.Sign = Sign::eMinus;
-                value *= -1;
-            }
-            String str     = ToString(value, spec.Base);
-
-            char   padding = spec.ZeroPad ? '0' : ' ';
-            if (spec.Sign != Sign::eNone && spec.Length > 0) spec.Length--;
-            if (!spec.JustifyLeft)
-            {
-                while (static_cast<isize>(str.Size()) < spec.Length)
-                {
-                    LogChar(padding);
-                    --spec.Length;
-                    ++nwritten;
-                }
-            }
-
-            if (spec.Sign == Sign::ePlus) LogChar('+'), ++nwritten;
-            else if (spec.Sign == Sign::eMinus) LogChar('-'), ++nwritten;
-            else if (spec.Sign == Sign::eSpace) LogChar(' '), ++nwritten;
-
-            if (spec.Base != 10 && spec.PrintBase)
-            {
-                if (spec.Base == 2) nwritten += Print("0b");
-                else if (spec.Base == 8) nwritten += Print("0");
-                else if (spec.Base == 16) nwritten += Print("0x");
-            }
-
-            for (const auto c : str)
-                LogChar(spec.UpperCase && c >= 'a' && c <= 'z'
-                            ? StringUtils::ToUpper(c)
-                            : c),
-                    ++nwritten;
-            while (spec.JustifyLeft
-                   && static_cast<isize>(str.Size()) < spec.Length)
-            {
-                LogChar(padding);
-                --spec.Length;
-                ++nwritten;
-            }
-
-            return nwritten;
-        }
-
-        CTOS_NO_KASAN isize PrintLogLevel(LogLevel logLevel)
-        {
-            isize nwritten = 0;
-            if (logLevel == LogLevel::eNone) return nwritten;
-            nwritten += Print("[");
-
-            LogChar(s_LogForegroundColors[ToUnderlying(logLevel)]);
-            ++nwritten;
-            if (logLevel == LogLevel::eFatal)
-                LogChar(BACKGROUND_COLOR_RED), ++nwritten;
-
-            auto logLevelString = StringUtils::ToString(logLevel);
-            logLevelString.RemovePrefix(1);
-
-            nwritten += Print(logLevelString);
-
-            LogChar(FOREGROUND_COLOR_WHITE);
-            LogChar(BACKGROUND_COLOR_BLACK);
-            LogChar(RESET_COLOR);
-
-            nwritten += Print("]:") + 3;
-
-            for (usize i = 0; i < 8 - logLevelString.Size(); i++, nwritten++)
-                LogChar(' ');
-
-            return nwritten;
-        }
-    }; // namespace
+        CoreSink g_CoreSink;
+        // LogLevel s_CurrentLogLevel = LogLevel::eDebug;
+    } // namespace
 
     CTOS_NO_KASAN void EnableSink(usize output)
     {
-        auto terminal = Terminal::GetPrimary();
+        auto terminal = VirtualConsole::GetPrimary();
         if (output == LOG_SINK_TERMINAL && terminal)
-            terminal->Initialize(Terminal::PrimaryFramebuffer());
+            terminal->Initialize(VirtualConsole::PrimaryFramebuffer());
 
         s_EnabledSinks |= output;
     }
     CTOS_NO_KASAN void DisableSink(usize output) { s_EnabledSinks &= ~output; }
-
-    void  LogChar(u64 c) { Print(reinterpret_cast<const char*>(&c)); }
     isize Print(StringView string) { return g_CoreSink.WriteNoLock(string); }
-    isize Printv(const char* format, va_list* args)
-    {
-        return Logv(LogLevel::eNone, format, *args);
-    }
 
-    CTOS_NO_KASAN isize Log(LogLevel logLevel, StringView string,
-                            bool printNewline)
-    {
-        ScopedLock guard(s_Lock, true);
-
-        isize      nwritten = PrintLogLevel(logLevel);
-        nwritten += Print(string);
-
-        if (printNewline && logLevel != LogLevel::eNone)
-            LogChar('\n'), ++nwritten;
-        return nwritten;
-    }
-
-    CTOS_NO_KASAN isize Logf(LogLevel logLevel, const char* fmt, ...)
-    {
-        va_list args;
-        va_start(args, fmt);
-        auto nwritten = Logv(logLevel, fmt, args);
-        va_end(args);
-
-        return nwritten;
-    }
-
-    isize PrintArgument(StringView::Iterator& it, va_list& args,
-                        PrintfFormatSpec& specs)
-    {
-        isize nwritten = 0;
-
-        switch (specs.Type)
-        {
-            case ArgumentType::eChar:
-            {
-                i32 c = va_arg(args, i32);
-                LogChar(c);
-                ++nwritten;
-                break;
-            }
-            case ArgumentType::eInteger:
-                nwritten += LogNumber<int>(args, specs);
-                break;
-            case ArgumentType::eLong:
-                nwritten += LogNumber<long>(args, specs);
-                break;
-            case ArgumentType::eLongLong:
-                nwritten += LogNumber<long long>(args, specs);
-                break;
-            case ArgumentType::eSize:
-                nwritten += LogNumber<isize>(args, specs);
-                break;
-            case ArgumentType::eUnsignedChar:
-            {
-                i32 c = va_arg(args, i32);
-                LogChar(c);
-                ++nwritten;
-                break;
-            }
-            case ArgumentType::eUnsignedInteger:
-                nwritten += LogNumber<unsigned int>(args, specs);
-                break;
-            case ArgumentType::eUnsignedLong:
-                nwritten += LogNumber<unsigned long>(args, specs);
-                break;
-            case ArgumentType::eUnsignedLongLong:
-                nwritten += LogNumber<unsigned long long>(args, specs);
-                break;
-            case ArgumentType::eUnsignedSize:
-                nwritten += LogNumber<usize>(args, specs);
-                break;
-            case ArgumentType::eString:
-            {
-                StringView string = va_arg(args, const char*);
-                usize      size   = string.Size();
-                if (specs.Precision > 0
-                    && specs.Precision < static_cast<isize>(size))
-                    size = static_cast<usize>(specs.Precision);
-                if (size == 0) break;
-
-                for (const auto& c : string.Substr(0, size))
-                    LogChar(c), ++nwritten;
-                break;
-            }
-            case ArgumentType::eOutWrittenCharCount:
-            {
-                i32* out = va_arg(args, i32*);
-                *out     = nwritten;
-                break;
-            }
-
-            default: break;
-        }
-
-        return nwritten;
-    }
-    CTOS_NO_KASAN isize Logv(LogLevel level, const char* fmt, va_list& args,
-                             bool printNewline)
-    {
-        ScopedLock guard(s_Lock, true);
-        PrintLogLevel(level);
-
-        isize      nwritten = 0;
-        auto       it       = fmt;
-        while (*it)
-        {
-            if (*it == '%' && *(it + 1) != '%')
-            {
-                PrintfFormatParser parser;
-                auto   specs = parser(it, args);
-
-                nwritten += PrintArgument(it, args, specs);
-                continue;
-            }
-            else if (*it == '\n')
-            {
-                LogChar('\r');
-                LogChar('\n');
-                it++;
-                nwritten += 2;
-                continue;
-            }
-            LogChar(*it++), nwritten++;
-        }
-
-        if (printNewline) LogChar('\n'), ++nwritten;
-        return nwritten;
-    }
-
-    Terminal& GetTerminal() { return *Terminal::GetPrimary(); }
-    void      Unlock() { s_Lock.Release(); }
+    VirtualConsole& GetTerminal() { return *VirtualConsole::GetPrimary(); }
+    void            Unlock() { s_Lock.Release(); }
 } // namespace Logger
+
+// Forwarded to by Logger::Print in Library/PrismHooks.cpp
+extern "C" isize CryptixLoggerPrint(const char* message, usize size)
+{
+    return Logger::Print(StringView(message, size));
+}

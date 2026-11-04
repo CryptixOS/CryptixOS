@@ -9,7 +9,7 @@
 
 .section .text
 
-.include "Arch/x86_64/common.inc"
+#include "Arch/x86_64/common.inc"
 
 .altmacro
 .macro interrupt_handler int_number

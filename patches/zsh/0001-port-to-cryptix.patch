@@ -1,0 +1,24 @@
+From f8b1b72f12e76ae9e718a1eb1ea73b4c45baf02b Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Thu, 18 Sep 2025 22:19:37 +0200
+Subject: [PATCH] port to cryptix
+
+---
+ Src/jobs.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Src/jobs.c b/Src/jobs.c
+index a91ef78..023b038 100644
+--- a/Src/jobs.c
++++ b/Src/jobs.c
+@@ -29,6 +29,7 @@
+ 
+ #include "zsh.mdh"
+ #include "jobs.pro"
++#include <strings.h>
+ 
+ /*
+  * Job control in zsh
+-- 
+2.51.0
+

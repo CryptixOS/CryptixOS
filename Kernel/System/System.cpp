@@ -4,20 +4,93 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Boot/BootModuleInfo.hpp>
-#include <Firmware/ACPI/ACPI.hpp>
-#include <Firmware/ACPI/SRAT.hpp>
 
-#include <Library/ELF.hpp>
+module;
+
+#include <Prism/Core/UUID.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Network/IPv4Address.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/UnixTypes.hpp>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Core/Concepts.hpp>
+#endif
+#include <Prism/String/StringUtils.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <Prism/Containers/Array.hpp>
 #include <Library/Module.hpp>
-#include <Memory/VMM.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <Prism/Containers/BitSpan.hpp>
+#include <Prism/Core/Iterator.hpp>
+#include <API/Posix/sys/statfs.h>
 
-#include <System/System.hpp>
-#include <VFS/DirectoryEntry.hpp>
-#include <VFS/VFS.hpp>
+module Cryptix:Impl.System.System;
 
-extern "C" ModuleHeader module_init_start_addr[];
-extern "C" ModuleHeader module_init_end_addr[];
+import :Boot.BootModuleInfo;
+import :Drivers.PCI.PCI;
+import :Firmware.ACPI.ACPI;
+import :Firmware.ACPI.SRAT;
+import :Library.ELF.Image;
+import :Library.ELF.Loader;
+import :Library.Locking.SpinlockProtected;
+import :Library.Module;
+import :Memory.VMM;
+import :System.System;
+import :VFS.INode;
+import :VFS.VFS;
+
+extern "C" ModulePreludium module_init_start_addr[];
+extern "C" ModulePreludium module_init_end_addr[];
 
 namespace System
 {
@@ -28,14 +101,18 @@ namespace System
         RedBlackTree<StringView, u64>       s_KernelSymbols;
         Span<BootModuleInfo, DynamicExtent> s_BootModules;
 
-        static constexpr Pointer            MODULE_LOAD_BASE = nullptr;
-        Module::List                        s_Modules;
+        SpinlockProtected<Module::List>     s_Modules;
+
+#ifdef CTOS_TARGET_X86_64
+        BitSpan<MAX_IO_PORT_COUNT>    s_UsedPorts;
+        IntrusiveList<IoPortResource> s_IoResources;
+        Spinlock                      s_IoPortLock;
+#endif
     }; // namespace
 
     ErrorOr<void> LoadKernelSymbols(const BootModuleInfo& kernelExecutable)
     {
         LogTrace("System: Loading kernel symbols...");
-
         s_KernelExecutable    = kernelExecutable;
         Pointer kernelAddress = kernelExecutable.LoadAddress;
         usize   kernelSize    = kernelExecutable.Size;
@@ -49,7 +126,6 @@ namespace System
         LogTrace(
             "System: Loaded the kernel executable with size `{}`KiB at `{:#x}`",
             kernelSize / 1024, kernelAddress.Raw());
-
         auto status = s_KernelImage.LoadFromMemory(kernelAddress, kernelSize);
         if (!status)
         {
@@ -57,17 +133,14 @@ namespace System
             return Error(ENOEXEC);
         }
 
-        ELF::Image::SymbolEnumerator it;
-        it.BindLambda(
-            [&](StringView name, Pointer value) -> bool
+        s_KernelImage.ForEachSymbol(
+            [&](StringView name, Pointer value) -> IterationResult
             {
-                if (name.Empty()) return true;
+                if (name.Empty()) return IterationResult::eContinue;
 
                 s_KernelSymbols[name] = value;
-                return true;
+                return IterationResult::eContinue;
             });
-
-        s_KernelImage.ForEachSymbol(it);
         LogTrace("System: Successfully loaded the kernel symbols");
 
         Stacktrace::Initialize();
@@ -76,9 +149,9 @@ namespace System
 
     static void MapBootModule(const BootModuleInfo& module)
     {
-        PageMap*     pageMap   = VMM::GetKernelPageMap();
-        Pointer      virtBase  = module.LoadAddress.ToHigherHalf();
-        usize        size      = module.Size;
+        PageMap*     pageMap  = VMM::GetKernelPageMap();
+        Pointer      virtBase = module.LoadAddress.ToHigherHalf();
+        usize        size     = module.Size;
         auto         flags = PageAttributes::eRWX | PageAttributes::eWriteBack;
 
         static usize index = 0;
@@ -109,13 +182,17 @@ namespace System
         LogTrace("System: Retrieving numa domains information from SRAT table");
         auto srat = ACPI::GetTable<SRAT>("SRAT");
         if (!srat) return;
-        usize   length    = srat->Header.Length;
+        usize   length  = srat->Header.Length;
 
-        Pointer start     = srat;
-        Pointer end       = start.Offset(length);
-        Pointer current   = start.Offset(sizeof(SRAT));
+        Pointer start   = srat;
+        Pointer end     = start.Offset(length);
+        Pointer current = start.Offset(sizeof(SRAT));
 
-        usize   nodeIndex = 0;
+#ifndef CTOS_TARGET_X86_64
+        return;
+#endif
+
+        usize nodeIndex = 0;
         while (current < end)
         {
             auto entry = current.As<EntryHeader>();
@@ -165,6 +242,7 @@ namespace System
                 case EntryType::eGiccAffinity:
                 {
                     auto gicc = current.As<ACPI::SRAT::GiccAffinity>();
+
                     LogMessage("\t\tProximity Domain: {}\n",
                                gicc->ProximityDomain);
                     LogMessage("\t\tProcessor UID: {}\n", gicc->ProcessorUID);
@@ -215,12 +293,11 @@ namespace System
         }
     }
 
-    ErrorOr<void> LoadModules()
+    ErrorOr<void> LoadBuiltinModules()
     {
-
         auto modulesStart = module_init_start_addr;
         auto modulesEnd   = module_init_end_addr;
-        for (ModuleHeader* moduleHeader = modulesStart;
+        for (ModulePreludium* moduleHeader = modulesStart;
              moduleHeader < modulesEnd; moduleHeader++)
         {
             auto module         = CreateRef<Module>();
@@ -229,6 +306,7 @@ namespace System
             module->Failed      = false;
             module->Initialize  = moduleHeader->Initialize;
             module->Terminate   = moduleHeader->Terminate;
+            module->State       = ModuleState::eReady;
 
             auto status         = System::LoadModule(module);
             if (!status)
@@ -237,90 +315,139 @@ namespace System
 
         return {};
     }
+    ErrorOr<void> LoadExternalModules()
+    {
+        LoadModule("/usr/lib/modules/pcspk.ko");
+        LoadModule("/usr/lib/modules/serio.ko");
+        LoadModule("/usr/lib/modules/e1000e.ko");
+        LoadModule("/usr/lib/modules/i8042.ko");
+        LoadModule("/usr/lib/modules/atkbd.ko");
+
+        return {};
+    }
 
     ErrorOr<void> LoadModule(PathView path)
     {
-        auto maybePathRes = VFS::ResolvePath(nullptr, path);
-        RetOnError(maybePathRes);
+        ELF::Loader loader;
 
-        auto pathRes = maybePathRes.Value();
-        auto entry   = pathRes.Entry;
-
-        if (!entry) return Error(ENOENT);
-        return LoadModule(entry);
+        loader.LoadImage(path);
+        return LoadModule(loader);
     }
-    ErrorOr<void> LoadModule(Ref<DirectoryEntry> entry)
+    ErrorOr<void> LoadModule(ELF::Loader& loader)
     {
-        if (!entry) return Error(EFAULT);
+        Ref module          = CreateRef<Module>();
+        module->Initialized = false;
+        module->Failed      = false;
+        module->Image       = loader.Image();
 
-        auto module            = new Module;
+        LogTrace("System: Reading module metadata for '{}'", module->Name);
+        module->ParseModuleInfo();
 
-        module->Name           = entry->Name();
-        module->Initialized    = false;
-        module->Failed         = false;
+        auto& dependencies = module->Dependencies;
+        for (usize i = 0; auto& [name, depModule] : dependencies)
+        {
+            LogDebug("System: Dependency[{}] => {}", i++, name);
+            if (depModule) continue;
 
-        Ref<ELF::Image> image  = CreateRef<ELF::Image>();
-        auto            status = image->Load(entry->INode(), MODULE_LOAD_BASE);
+            depModule = FindModule(name);
+            if (!depModule)
+            {
+                LogError(
+                    "System: Failed to resolve dependency => `{}`, of module: "
+                    "{}",
+                    name, module->Name);
+                return Error(ENOEXEC);
+            }
+
+            for (auto& [name, nextDep] : depModule->Dependencies)
+                dependencies[name] = nextDep;
+        }
+
+        auto lookupSymbol = [&](StringView name) -> u64
+        {
+            auto address = LookupKernelSymbol(name);
+            if (StringView(name).Contains("printStuff"_sv))
+                LogTrace("ELF::Loader: {} => {:#x}", name, address);
+
+            if (address) return address;
+
+            auto& dependencies = module->Dependencies;
+            for (const auto& [modName, module] : dependencies)
+            {
+                if (!module) return 0;
+
+                address = module->Image->LookupSymbol(name);
+                if (address) return address;
+            }
+
+            return 0;
+        };
+        ELF::Loader::SymbolLookup lookup;
+        lookup.BindLambda(lookupSymbol);
+
+        LogTrace("System: Loading segments of module: `{}`", module->Name);
+        auto& pageMap      = *VMM::GetKernelPageMap();
+        auto& addressSpace = *VMM::GetKernelAddressSpace();
+        auto  status       = loader.LoadSegments(pageMap, addressSpace);
         if (!status)
         {
-            LogError("System: Failed to load the module located at `{}`",
-                     entry->Path());
-            delete module;
+            LogError("System: Failed to load segments of module: `{}`",
+                     module->Name);
             return Error(status.Error());
         }
 
-        module->Image = image;
-#if 0
-        LogTrace("Module: Dumping symbols...");
-        image->DumpSymbols();
-#endif
+        LogTrace("System: Resolving symbols of module: `{}`", module->Name);
+        status = loader.ResolveSymbols(lookup);
 
-        ELF::Image::SymbolEntryEnumerator it;
-        it.BindLambda(
-            [&](ELF::Symbol& symbol, StringView name) -> bool
-            {
-                // if (symbol.SectionIndex != 0) return true;
-
-                if (name == "ModuleInit")
-                {
-                    LogInfo("System: Found module's init entry point => {:#x}",
-                            symbol.Value);
-                    module->Initialize
-                        = reinterpret_cast<ModuleInitProc>(symbol.Value);
-                }
-                // LogTrace("Symbol => {}", name);
-                // u64 resolvedValue = System::LookupKernelSymbol(name);
-                // LogTrace("Resolved symbol =>\n\tName: {}, Value: {:#x}",
-                // name,
-                //          resolvedValue);
-                return true;
-            });
-
-        ELF::Image::SymbolLookup lookup;
-        lookup.Bind<LookupKernelSymbol>();
-        status = image->ApplyRelocations(lookup);
-        image->ForEachSymbolEntry(it);
-        module->Initialize = image->EntryPoint().Raw<ModuleInitProc>();
-        LogInfo("System: Found module's init entry point => {:#x}",
-                image->EntryPoint().Raw());
-
-        // image->ForEachSymbolEntry(it);
-        // status = image->ResolveSymbols(lookup);
         if (!status)
-            LogError("System: Failed to resolve symbols of module `{}`",
+        {
+            LogError("System: Failed to resolve symbols of module: `{}`",
                      module->Name);
+            return Error(status.Error());
+        }
         else
             LogInfo("System: Successfully resolved symbols of module `{}`",
                     module->Name);
-        // if (module->Initialize) module->Initialize();
-        // else
-        //     LogError("System: Module `{}` doesn't have any entry point",
-        //              module->Name);
-        //
-        // TODO(v1tr10l7): Load the module
 
-        // delete module;
-        return Error(ENOSYS);
+        LogTrace("System: Applying relocations to module: `{}`", module->Name);
+        status = loader.ApplyRelocations();
+        if (!status)
+        {
+            LogError("System: Failed to apply relocations to module: `{}`",
+                     module->Name);
+            return Error(status.Error());
+        }
+
+        module->Initialize = loader.EntryPoint();
+
+        LogTrace("System: Found the entry point of module `{}` at `{:#x}`",
+                 module->Name, u64(module->Initialize));
+        LogTrace("System: Looked up symbol => {:#x}",
+                 loader.LookupSymbol("ModuleInit"));
+
+        if (module->Initialize)
+        {
+            LogInfo("System: Found `{}` module's init entry point => {:#x}",
+                    module->Name, loader.EntryPoint().Raw());
+
+            module->InitArray
+                = Span(loader.InitArray().As<InitArrayEntry>(),
+                       loader.InitArraySize() / sizeof(InitArrayEntry));
+            module->FiniArray
+                = Span(loader.FiniArray().As<FiniArrayEntry>(),
+                       loader.FiniArraySize() / sizeof(FiniArrayEntry));
+
+            module->State = ModuleState::eLoaded;
+        }
+        else {
+            LogError("System: Module `{}` doesn't have any entry point",
+                     module->Name);
+            return Error(ENOEXEC);
+        }
+
+        s_Modules.With([module](auto& list) { list.PushBack(module); });
+        ELF::Image::SymbolIterator it;
+        return {};
     }
     ErrorOr<void> LoadModule(Ref<Module> module)
     {
@@ -333,10 +460,10 @@ namespace System
             return Error(EEXIST);
         }
 
-        s_Modules.PushBack(module);
+        s_Modules.With([module](auto& list) { list.PushBack(module); });
         LogTrace("System: Dispatching module `{}`...", name);
 
-        auto status = module->Initialize();
+        auto status = module->Dispatch();
         if (!status)
         {
             LogError("System: Failed to initialize module `{}`", name);
@@ -347,13 +474,46 @@ namespace System
         return {};
     }
 
-    Module::List& Modules() { return s_Modules; }
-    Ref<Module>   FindModule(StringView name)
+    ErrorOr<void> DispatchModules()
     {
-        for (Ref<Module> module : s_Modules)
-            if (module->Name == name) return module;
+        s_Modules.ForEach(
+            [](auto module)
+            {
+                if (module->State < ModuleState::eLoaded) return;
 
-        return nullptr;
+                module->Prepare();
+                auto status = module->Dispatch();
+
+                if (!status)
+                    LogError(
+                        "System: Failed to dispatch module `{}` with error "
+                        "code => {}",
+                        module->Name, ToString(status.Error()));
+            });
+
+        return {};
+    }
+
+    void ForEachModule(ModuleIterator iterator)
+    {
+        IterationResult result = IterationResult::eContinue;
+        s_Modules.ForEach(
+            [&iterator, &result](auto module)
+            {
+                if (result == IterationResult::eContinue)
+                    result = iterator(module);
+            });
+    }
+    Ref<Module> FindModule(StringView name)
+    {
+        Ref<Module> found = nullptr;
+        s_Modules.ForEach(
+            [&found, name](auto module)
+            {
+                if (!found && module->Name == name) found = module;
+            });
+
+        return found;
     }
 
     PathView          KernelExecutablePath() { return s_KernelExecutable.Path; }
@@ -370,4 +530,21 @@ namespace System
 
         return it->Value;
     }
+
+#ifdef CTOS_TARGET_X86_64
+    ErrorOr<IoPortResource*> AllocateIoPortAt(Module* owner, u16 base,
+                                              u16 length)
+    {
+        ScopedLock lock(s_IoPortLock);
+
+        for (u32 i = 0; i < length; ++i)
+            if (s_UsedPorts.Test(base + i)) return Error(EBUSY);
+        for (u32 i = 0; i < length; ++i) s_UsedPorts.Set(base + i);
+
+        auto* res = new IoPortResource{base, length, owner, {}};
+        s_IoResources.PushBack(res);
+
+        return res;
+    }
+#endif
 }; // namespace System

@@ -1,0 +1,45 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 07:40:00 +0000
+Subject: [PATCH] fix: derive from Prism's RefCounted<T>
+
+Prism turned RefCounted into a CRTP class template (RefCounted<T>, which
+also provides RefFromThis()).  File and Process still derived from the
+plain class, so Ref<File> and Ref<Process> found no Ref()/Unref():
+
+    error: expected class-name before '{' token
+    error: 'class Neon::File' has no member named 'Unref'
+---
+ Source/Neon/Filesystem/File.hpp | 2 +-
+ Source/Neon/Process/Process.hpp | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Source/Neon/Filesystem/File.hpp b/Source/Neon/Filesystem/File.hpp
+index 9c1d875..6589243 100644
+--- a/Source/Neon/Filesystem/File.hpp
++++ b/Source/Neon/Filesystem/File.hpp
+@@ -35,7 +35,7 @@ namespace Neon
+ 
+     class File : public NonCopyable<File>,
+                  public NonMovable<File>,
+-                 public RefCounted
++                 public RefCounted<File>
+     {
+         using FileHandle = isize;
+ 
+diff --git a/Source/Neon/Process/Process.hpp b/Source/Neon/Process/Process.hpp
+index b03dc66..3fb6cab 100644
+--- a/Source/Neon/Process/Process.hpp
++++ b/Source/Neon/Process/Process.hpp
+@@ -20,7 +20,7 @@ namespace Neon
+ 
+     class Process : public NonCopyable<Process>,
+                     public NonMovable<Process>,
+-                    public RefCounted
++                    public RefCounted<Process>
+     {
+       public:
+         ~Process();
+-- 
+2.43.0
+

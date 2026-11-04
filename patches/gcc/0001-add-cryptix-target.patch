@@ -1,0 +1,335 @@
+diff --color -Naur gcc-15.2.0/config.sub gcc/config.sub
+--- gcc-15.2.0/config.sub	2025-08-08 08:51:39.866337996 +0200
++++ gcc/config.sub	2025-09-16 17:05:18.330757367 +0200
+@@ -1749,7 +1749,7 @@
+ 	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
+ 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
+ 	     | nsk* | powerunix* | genode* | zvmoe* | qnx* | emx* | zephyr* \
+-	     | fiwix* )
++	     | fiwix* | cryptix*)
+ 		;;
+ 	# This one is extra strict with allowed versions
+ 	sco3.2v2 | sco3.2v[4-9]* | sco5v6*)
+diff --color -Naur gcc-15.2.0/fixincludes/mkfixinc.sh gcc/fixincludes/mkfixinc.sh
+--- gcc-15.2.0/fixincludes/mkfixinc.sh	2025-08-08 08:51:39.912338764 +0200
++++ gcc/fixincludes/mkfixinc.sh	2025-09-16 17:06:05.844992477 +0200
+@@ -19,6 +19,7 @@
+     powerpcle-*-eabisim* | \
+     powerpcle-*-eabi* | \
+     *-*-vxworks7* | \
++    *-cryptix* | \
+     *-musl* )
+ 	#  IF there is no include fixing,
+ 	#  THEN create a no-op fixer and exit
+diff --color -Naur gcc-15.2.0/gcc/config/aarch64/aarch64-cryptix.h gcc/gcc/config/aarch64/aarch64-cryptix.h
+--- gcc-15.2.0/gcc/config/aarch64/aarch64-cryptix.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc/gcc/config/aarch64/aarch64-cryptix.h	2025-09-16 17:08:17.273314674 +0200
+@@ -0,0 +1,54 @@
++/*
++ * Created by v1tr10l7 on 16.09.2025.
++ * Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
++ *
++ * SPDX-License-Identifier: GPL-3
++ */
++#pragma once
++/*
++ * Created by v1tr10l7 on 12.07.2025.
++ * Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
++ *
++ * SPDX-License-Identifier: GPL-3
++ */
++#pragma once
++
++#undef GCC_AARCH64_CRYPTIX
++#define GCC_AARCH64_CRYPTIX     1
++#define GNU_USER_DYNAMIC_LINKER "/lib/x86_64-cryptix/ld.so"
++#define CRYPTIX_TARGET_LINK_SPEC                                               \
++    "%{h*}		\
++   %{static:-Bstatic}				\
++   %{shared:-shared}				\
++   %{symbolic:-Bsymbolic}			\
++   %{!static:%{!static-pie:			\
++     %{rdynamic:-export-dynamic}		\
++     %{!shared:-dynamic-linker " GNU_USER_DYNAMIC_LINKER                       \
++    "}}} \
++   %{static-pie:-Bstatic -pie --no-dynamic-linker -z text} \
++   -X						\
++   -EL						\
++   -maarch64cryptix"
++#if TARGET_FIX_ERR_A53_835769_DEFAULT
++    #define CA53_ERR_835769_SPEC                                               \
++        " %{!mno-fix-cortex-a53-835769:--fix-cortex-a53-835769}"
++#else
++    #define CA53_ERR_835769_SPEC                                               \
++        " %{mfix-cortex-a53-835769:--fix-cortex-a53-835769}"
++#endif
++#if TARGET_FIX_ERR_A53_843419_DEFAULT
++    #define CA53_ERR_843419_SPEC                                               \
++        " %{!mno-fix-cortex-a53-843419:--fix-cortex-a53-843419}"
++#else
++    #define CA53_ERR_843419_SPEC                                               \
++        " %{mfix-cortex-a53-843419:--fix-cortex-a53-843419}"
++#endif
++#define LINK_SPEC                                                              \
++    CRYPTIX_TARGET_LINK_SPEC                                                   \
++    CA53_ERR_835769_SPEC                                                       \
++    CA53_ERR_843419_SPEC
++#define GNU_USER_TARGET_MATHFILE_SPEC                                          \
++    "%{Ofast|ffast-math|funsafe-math-optimizations:crtfastmath.o%s}"
++#undef ENDFILE_SPEC
++#define ENDFILE_SPEC                                                           \
++    GNU_USER_TARGET_MATHFILE_SPEC " " GNU_USER_TARGET_ENDFILE_SPEC
+diff --color -Naur gcc-15.2.0/gcc/config/cryptix.h gcc/gcc/config/cryptix.h
+--- gcc-15.2.0/gcc/config/cryptix.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc/gcc/config/cryptix.h	2025-09-16 17:06:38.073186390 +0200
+@@ -0,0 +1,37 @@
++/*
++ * Created by v1tr10l7 on 16.09.2025.
++ * Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
++ *
++ * SPDX-License-Identifier: GPL-3
++ */
++#pragma once
++
++/* Useful if you wish to make target-specific GCC changes. */
++#undef TARGET_CRYPTIX
++#define TARGET_CRYPTIX 1
++
++/* Default arguments you want when running your
++   i686-myos-gcc/x86_64-myos-gcc toolchain */
++#undef LIB_SPEC
++#define LIB_SPEC "-lc" /* link against C standard library */
++
++/* Files that are linked before user code.
++   The %s tells GCC to look for these files in the library directory. */
++#undef STARTFILE_SPEC
++#define STARTFILE_SPEC                                                         \
++    "%{!shared:crt0.o%s} crti.o%s %{shared:crtbeginS.o%s;:crtbegin.o%s}"
++
++/* Files that are linked after user code. */
++#undef ENDFILE_SPEC
++#define ENDFILE_SPEC "%{shared:crtendS.o%s;:crtend.o%s} crtn.o%s"
++
++/* Additional predefined macros. */
++#undef TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS()                                               \
++    do {                                                                       \
++        builtin_define("__cryptix__");                                         \
++        builtin_define("__unix__");                                            \
++        builtin_assert("system=cryptix");                                      \
++        builtin_assert("system=unix");                                         \
++        builtin_assert("system=posix");                                        \
++    } while (0);
+diff --color -Naur gcc-15.2.0/gcc/config/i386/i386-cryptix.h gcc/gcc/config/i386/i386-cryptix.h
+--- gcc-15.2.0/gcc/config/i386/i386-cryptix.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc/gcc/config/i386/i386-cryptix.h	2025-09-16 17:07:11.603940462 +0200
+@@ -0,0 +1,18 @@
++/*
++ * Created by v1tr10l7 on 16.09.2025.
++ * Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
++ *
++ * SPDX-License-Identifier: GPL-3
++ */
++#pragma once
++
++#undef GCC_I386_CRYPTIX
++#define GCC_I386_CRYPTIX           1
++
++#define GNU_USER_LINK_EMULATION32  "elf_i386"
++#define GNU_USER_LINK_EMULATION64  "elf_x86_64"
++#define GNU_USER_LINK_EMULATIONX32 "elf32_x86_64"
++
++#define GNU_USER_DYNAMIC_LINKER32  "/lib/i386-cryptix/ld.so"
++#define GNU_USER_DYNAMIC_LINKER64  "/lib/x86_64-cryptix/ld.so"
++#define GNU_USER_DYNAMIC_LINKERX32 "/lib/x86_64-cryptix-x32/ld.so"
+diff --color -Naur gcc-15.2.0/gcc/config.gcc gcc/gcc/config.gcc
+--- gcc-15.2.0/gcc/config.gcc	2025-08-08 08:51:40.435347488 +0200
++++ gcc/gcc/config.gcc	2025-09-16 17:10:07.917414411 +0200
+@@ -885,6 +885,12 @@
+   rust_target_objs="${rust_target_objs} fuchsia-rust.o"
+   target_has_targetrustm=yes
+   ;;
++*-*-cryptix*)
++  gas=yes
++  gnu_ld=yes
++  default_use_cxa_atexit=yes
++  use_gcc_stdint=provide
++  ;;
+ *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)
+   extra_options="$extra_options gnu-user.opt"
+   gas=yes
+@@ -1236,6 +1242,13 @@
+ 	tmake_file="${tmake_file} aarch64/t-aarch64 aarch64/t-aarch64-netbsd"
+ 	extra_options="${extra_options} netbsd.opt netbsd-elf.opt"
+ 	;;
++aarch64*-*-cryptix*)
++	tm_file="${tm_file} elfos.h gnu-user.h cryptix.h glibc-stdint.h"
++	tm_file="${tm_file} aarch64/aarch64-elf.h aarch64/aarch64-cryptix.h"
++	tmake_file="${tmake_file} aarch64/t-aarch64 aarch64/t-aarch64-cryptix"
++    tm_defines="${tm_defines}  TARGET_DEFAULT_ASYNC_UNWIND_TABLES=1"
++	TM_MULTILIB_CONFIG="lp64"
++	;;
+ aarch64*-*-linux*)
+ 	tm_file="${tm_file} elfos.h gnu-user.h linux.h glibc-stdint.h"
+ 	tm_file="${tm_file} aarch64/aarch64-elf.h aarch64/aarch64-errata.h aarch64/aarch64-linux.h"
+@@ -2067,6 +2080,9 @@
+ 		;;
+ 	esac
+ 	;;
++x86_64-*-cryptix*)
++    tm_file="${tm_file} i386/unix.h i386/att.h elfos.h glibc-stdint.h i386/i386elf.h i386/x86-64.h gnu-user.h i386/gnu-user-common.h i386/gnu-user64.h cryptix.h i386/i386-cryptix.h"
++    ;;
+ x86_64-*-linux* | x86_64-*-kfreebsd*-gnu | x86_64-*-gnu*)
+ 	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h gnu-user.h glibc-stdint.h \
+ 		 i386/x86-64.h i386/gnu-user-common.h i386/gnu-user64.h"
+diff --color -Naur gcc-15.2.0/libgcc/config.host gcc/libgcc/config.host
+--- gcc-15.2.0/libgcc/config.host	2025-08-08 08:51:44.833420855 +0200
++++ gcc/libgcc/config.host	2025-09-16 17:11:44.665750894 +0200
+@@ -310,6 +310,10 @@
+   tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-fuchsia"
+   extra_parts="crtbegin.o crtend.o"
+   ;;
++*-*-cryptix*)
++  extra_parts="$extra_parts crti.o crtbegin.o crtbeginS.o crtend.o crtendS.o crtn.o"
++  tmake_file="$tmake_file t-crtstuff-pic t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-libgcc-pic"
++  ;;
+ *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)
+   tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-linux"
+   extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
+@@ -435,6 +439,13 @@
+ 	tmake_file="${tmake_file} ${cpu_type}/t-softfp t-softfp"
+ 	tmake_file="${tmake_file} t-dfprules"
+ 	;;
++aarch64*-*-cryptix*)
++	extra_parts="$extra_parts crtfastmath.o"
++	md_unwind_header=aarch64/aarch64-unwind.h
++	tmake_file="${tmake_file} ${cpu_type}/t-aarch64"
++	tmake_file="${tmake_file} ${cpu_type}/t-lse t-slibgcc-libgcc"
++	tmake_file="${tmake_file} ${cpu_type}/t-softfp t-softfp t-crtfm"
++	;;
+ aarch64*-*-linux*)
+ 	extra_parts="$extra_parts crtfastmath.o"
+ 	md_unwind_def_header=aarch64/aarch64-unwind-def.h
+@@ -793,6 +804,10 @@
+ 	;;
+ x86_64-*-openbsd*)
+ 	;;
++x86_64-*-cryptix*)
++    extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o crtfastmath.o"
++    tmake_file="$tmake_file i386/t-crtpc t-crtfm i386/t-crtstuff t-dfprules"
++    ;;
+ i[34567]86-*-linux*)
+ 	extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o crtfastmath.o"
+ 	tmake_file="${tmake_file} i386/t-crtpc t-crtfm i386/t-crtstuff t-dfprules"
+diff --color -Naur gcc-15.2.0/libstdc++-v3/configure gcc/libstdc++-v3/configure
+--- gcc-15.2.0/libstdc++-v3/configure	2025-08-08 08:51:45.690435151 +0200
++++ gcc/libstdc++-v3/configure	2025-09-16 20:06:27.211000038 +0200
+@@ -11548,6 +11548,18 @@
+   dynamic_linker=no
+   ;;
+ 
++cryptix* | linux*-mlibc*)
++  version_type=linux
++  need_lib_prefix=no
++  need_version=no
++  library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}${major} ${libname}${shared_ext}'
++  soname_spec='${libname}${release}${shared_ext}$major'
++  shlibpath_var=LD_LIBRARY_PATH
++  hardcode_into_libs=yes
++  ;;
++
++
++
+ # This must be Linux ELF.
+ 
+ # uclinux* changes (here and below) have been submitted to the libtool
+@@ -15298,6 +15310,18 @@
+   dynamic_linker=no
+   ;;
+ 
++cryptix* | linux*-mlibc*)
++  version_type=linux
++  need_lib_prefix=no
++  need_version=no
++  library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}${major} ${libname}${shared_ext}'
++  soname_spec='${libname}${release}${shared_ext}$major'
++  shlibpath_var=LD_LIBRARY_PATH
++  hardcode_into_libs=yes
++  ;;
++
++
++
+ # This must be Linux ELF.
+ 
+ # uclinux* changes (here and below) have been submitted to the libtool
+@@ -38856,7 +38880,7 @@
+ 
+   fi
+     ;;
+-  *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-cygwin* | *-solaris*)
++  *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-cygwin* | *-solaris* | *-cryptix*)
+ 
+   # All these tests are for C++; save the language and the compiler flags.
+   # The CXXFLAGS thing is suspicious, but based on similar bits previously
+diff --color -Naur gcc-15.2.0/libstdc++-v3/crossconfig.m4 gcc/libstdc++-v3/crossconfig.m4
+--- gcc-15.2.0/libstdc++-v3/crossconfig.m4	2025-08-08 08:51:45.691435169 +0200
++++ gcc/libstdc++-v3/crossconfig.m4	2025-09-16 19:51:56.527223972 +0200
+@@ -174,6 +174,17 @@
+ 
+     GCC_CHECK_TLS
+     ;;
++  *-cryptix*)
++    GLIBCXX_CHECK_COMPILER_FEATURES
++    GLIBCXX_CHECK_LINKER_FEATURES
++    GLIBCXX_CHECK_MATH_SUPPORT
++    GLIBCXX_CHECK_STDLIB_SUPPORT
++    AC_DEFINE(_GLIBCXX_USE_DEV_RANDOM)
++    AC_DEFINE(_GLIBCXX_USE_RANDOM_TR1)
++    GCC_CHECK_TLS
++    AC_CHECK_FUNCS(aligned_alloc posix_memalign memalign _aligned_malloc)
++    AC_CHECK_FUNCS(timespec_get)
++    ;;
+   *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-cygwin* | *-solaris*)
+     GLIBCXX_CHECK_COMPILER_FEATURES
+     GLIBCXX_CHECK_LINKER_FEATURES
+@@ -300,7 +311,7 @@
+ dnl # the expansion of the present macro.
+     ;;
+   *)
+-    AC_MSG_ERROR([No support for this host/target combination.])
++    AC_MSG_ERROR([No support for this host/target combination. ${host}])
+    ;;
+ esac
+ ])
+diff --color -Naur gcc-15.2.0/libtool.m4 gcc/libtool.m4
+--- gcc-15.2.0/libtool.m4	2025-08-08 08:51:46.222444027 +0200
++++ gcc/libtool.m4	2025-09-16 19:12:21.591274391 +0200
+@@ -2568,6 +2568,17 @@
+   dynamic_linker='GNU/Linux ld.so'
+   ;;
+ 
++cryptix*)
++  version_type=linux
++  need_lib_prefix=no
++  need_version=no
++  library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}${major} ${libname}${shared_ext}'
++  soname_spec='${libname}${release}${shared_ext}$major'
++  shlibpath_var=LD_LIBRARY_PATH
++  hardcode_into_libs=yes
++  ;;
++
++
+ netbsd*)
+   version_type=sunos
+   need_lib_prefix=no
+@@ -3186,6 +3197,10 @@
+   lt_cv_deplibs_check_method=pass_all
+   ;;
+ 
++cryptix*)
++  lt_cv_deplibs_check_method=pass_all
++  ;;
++
+ netbsd*)
+   if echo __ELF__ | $CC -E - | $GREP __ELF__ > /dev/null; then
+     lt_cv_deplibs_check_method='match_pattern /lib[[^/]]+(\.so\.[[0-9]]+\.[[0-9]]+|_pic\.a)$'

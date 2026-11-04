@@ -4,18 +4,47 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <Common.hpp>
-
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
 #include <Debug/Debug.hpp>
-#include <Library/Locking/Spinlock.hpp>
-
-#include <Memory/PMM.hpp>
-
-#include <Memory/Allocator/BitmapAllocator.hpp>
-#include <Memory/Allocator/KernelHeap.hpp>
-
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Containers/Bitmap.hpp>
 #include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Math.hpp>
+
+module Cryptix:Impl.Memory.PMM;
+
+import :Debug.Assertions;
+import :Library.Logger;
+import :Library.Stacktrace;
+import :Library.Locking.Spinlock;
+import :Memory.PMM;
+import :Memory.Allocator.BitmapAllocator;
+import :Memory.Allocator.KernelHeap;
 
 namespace PMM
 {

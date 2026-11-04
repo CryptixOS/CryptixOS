@@ -4,7 +4,15 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Drivers/Core/GenericDriver.hpp>
+
+module;
+
+#include <Prism/String/String.hpp>
+#include <Prism/Core/Error.hpp>
+
+module Cryptix:Impl.Drivers.Core.GenericDriver;
+
+import :Drivers.Core.GenericDriver;
 
 static Vector<GenericDriver*> s_GenericDrivers;
 
@@ -15,5 +23,5 @@ bool                          RegisterGenericDriver(GenericDriver& driver)
 
     // TODO(v1tr10l7): Drivers are for now dispatched immediately after
     // registration
-    return driver.Probe().has_value();
+    return driver.Probe().HasValue();
 }

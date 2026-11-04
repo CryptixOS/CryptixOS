@@ -4,17 +4,46 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <Common.hpp>
-
-#include <Firmware/DMI/SMBIOS.hpp>
-#include <Firmware/DMI/Tables.hpp>
-
-#include <Memory/PMM.hpp>
-#include <Memory/ScopedMapping.hpp>
-#include <Memory/VMM.hpp>
-
-#include <Prism/String/StringUtils.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Prism/Memory/Pointer.hpp>
+#include <Compiler.hpp>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
 #include <Prism/Utility/Math.hpp>
+#include <Prism/String/StringUtils.hpp>
+
+module Cryptix:Impl.Firmware.DMI.SMBIOS;
+
+import :Debug.Assertions;
+import :Library.Logger;
+import :Library.Stacktrace;
+import :Firmware.DMI.SMBIOS;
+import :Firmware.DMI.Tables;
+import :Memory.PMM;
+import :Memory.ScopedMapping;
+import :Memory.VMM;
 
 namespace DMI::SMBIOS
 {

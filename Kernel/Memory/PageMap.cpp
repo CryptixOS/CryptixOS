@@ -4,10 +4,39 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Memory/PageMap.hpp>
-#include <Memory/VMM.hpp>
 
+module;
+
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
 #include <Prism/Utility/Math.hpp>
+
+module Cryptix:Impl.Memory.PageMap;
+
+import :Memory.PageMap;
+import :Memory.VMM;
 
 namespace Arch::VMM
 {
@@ -33,7 +62,7 @@ PageAttributes PageMap::PageSizeFlags(usize pageSize) const
 
     return static_cast<PageAttributes>(0);
 }
-std::pair<usize, PageAttributes> PageMap::RequiredSize(usize size) const
+KeyValuePair<usize, PageAttributes> PageMap::RequiredSize(usize size) const
 {
     usize lPageSize  = Arch::VMM::GetPageSize(PageAttributes::eLPage);
     usize llPageSize = Arch::VMM::GetPageSize(PageAttributes::eLLPage);
@@ -65,13 +94,14 @@ ErrorOr<Pointer> PageMap::MapIoRegion(Pointer phys, usize length,
 
 bool PageMap::Map(Pointer virt, Pointer phys, PageAttributes flags)
 {
-    u64 pte = Virt2Phys(virt);
-    if (pte != static_cast<u64>(-1))
+    u64 mappedPhys = Virt2Phys(virt);
+
+    if (mappedPhys != static_cast<u64>(-1))
     {
         auto errorMessage = fmt::format(
             "VMM: Trying to map address {:#x} to {:#x}, but it is already "
             "mapped => {:#x}",
-            virt.Raw(), phys.Raw(), pte);
+            virt.Raw(), phys.Raw(), mappedPhys);
 
         Assert(errorMessage.data());
     }
@@ -93,10 +123,16 @@ bool PageMap::Unmap(Pointer virt, PageAttributes flags)
 bool PageMap::Remap(Pointer virtOld, Pointer virtNew, PageAttributes flags)
 {
     Pointer phys = Virt2Phys(virtOld, flags);
-    Unmap(virtOld, flags);
+    if (phys) Unmap(virtOld, flags);
 
     return Map(virtNew, phys, flags);
 }
+bool PageMap::Protect(Pointer virt, PageAttributes flags)
+{
+    ScopedLock guard(m_Lock);
+    return InternalProtect(virt, flags);
+}
+
 bool PageMap::MapRange(Pointer virt, Pointer phys, usize size,
                        PageAttributes flags)
 {
@@ -125,6 +161,15 @@ bool PageMap::UnmapRange(Pointer virt, usize size, PageAttributes flags)
     usize pageSize = Arch::VMM::GetPageSize(flags);
     for (usize i = 0; i < size; i += pageSize)
         if (!Unmap(virt.Offset(i), flags)) return false;
+
+    return true;
+}
+
+bool PageMap::ProtectRange(Pointer virt, usize size, PageAttributes flags)
+{
+    usize pageSize = Arch::VMM::GetPageSize(flags);
+    for (usize i = 0; i < size; i += pageSize)
+        if (!Protect(virt.Offset(i), flags)) return false;
 
     return true;
 }

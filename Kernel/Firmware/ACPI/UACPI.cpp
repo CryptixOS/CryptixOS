@@ -4,14 +4,92 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/CPU.hpp>
-#include <Arch/InterruptHandler.hpp>
-#include <Arch/InterruptManager.hpp>
 
-#include <mutex>
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <API/UnixTypes.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <Prism/Memory/RefCounted.hpp>
+#include <Library/Module.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Core/Concepts.hpp>
+#endif
+#include <Prism/Containers/Bitmap.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <uacpi/types.h>
+#include <uacpi/uacpi.h>
+#include <Prism/String/StringUtils.hpp>
+#include <uacpi/kernel_api.h>
+
+module Cryptix:Impl.Firmware.ACPI.UACPI;
+
+import :Arch.CPU;
+import :Scheduler.Thread;
+import :System.InterruptManager;
+#if defined(CTOS_TARGET_X86_64)
+import :Arch.x86_64.IO;
+#endif
+import :Drivers.PCI.Device;
+import :Drivers.PCI.HostController;
+import :Drivers.PCI.PCI;
+import :Firmware.ACPI.ACPI;
+import :Library.Locking.Mutex;
+import :Memory.MMIO;
+import :Time.Time;
 
 #ifdef CTOS_TARGET_X86_64
-    #include <Arch/x86_64/IO.hpp>
 
     #define ArchReadIo(port, type)         IO::In<type>(port)
     #define ArchWriteIo(port, value, type) IO::Out<type>(port)
@@ -19,19 +97,6 @@
     #define ArchReadIo(port, type)
     #define ArchWriteIo(port, value, type)
 #endif
-
-#include <Drivers/PCI/Device.hpp>
-#include <Drivers/PCI/HostController.hpp>
-#include <Drivers/PCI/PCI.hpp>
-#include <Firmware/ACPI/ACPI.hpp>
-
-#include <Library/Locking/Mutex.hpp>
-#include <Memory/MMIO.hpp>
-
-#include <Prism/Utility/Math.hpp>
-#include <Time/Time.hpp>
-
-#include <uacpi/kernel_api.h>
 
 namespace uACPI
 {
@@ -297,7 +362,7 @@ namespace uACPI
 
             va_list  args;
             va_start(args, format);
-            Logger::Logv(pLevel, format, args, false);
+            Log::Logv(pLevel, format, args, false);
             va_end(args);
         }
 
@@ -323,17 +388,15 @@ namespace uACPI
                 ;
         }
 
+        // TODO(v1tr10l7): use actual mutex'es, when the uacpi execution will be
+        // happening on another threads
         uacpi_handle uacpi_kernel_create_mutex(void)
         {
-            auto mutex = new std::mutex;
-            // auto mutex = new Mutex;
-
-            return reinterpret_cast<uacpi_handle>(mutex);
+            return uacpi_kernel_create_spinlock();
         }
         void uacpi_kernel_free_mutex(uacpi_handle handle)
         {
-            // delete reinterpret_cast<Mutex*>(handle);
-            delete reinterpret_cast<std::mutex*>(handle);
+            uacpi_kernel_free_spinlock(handle);
         }
 
         uacpi_handle uacpi_kernel_create_event(void)
@@ -350,7 +413,7 @@ namespace uACPI
         uacpi_thread_id uacpi_kernel_get_thread_id(void)
         {
             auto thread = Thread::Current();
-            if (thread) return reinterpret_cast<uacpi_thread_id>(thread->Tid());
+            if (thread) return reinterpret_cast<uacpi_thread_id>(thread->ID());
 
             return UACPI_THREAD_ID_NONE;
         }
@@ -358,21 +421,13 @@ namespace uACPI
         uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle handle,
                                                 uacpi_u16    timeout)
         {
-            auto& mutex = *reinterpret_cast<std::mutex*>(handle);
-            mutex.lock();
-
-            // auto& mutex = *reinterpret_cast<Mutex*>(handle);
-            // mutex.Lock();
-
+            // FIXME(v1tr10l7): support timeout
+            reinterpret_cast<Spinlock*>(handle)->Acquire();
             return UACPI_STATUS_OK;
         }
         void uacpi_kernel_release_mutex(uacpi_handle handle)
         {
-            auto& mutex = *reinterpret_cast<std::mutex*>(handle);
-            mutex.unlock();
-
-            // auto& mutex = *reinterpret_cast<Mutex*>(handle);
-            // mutex.Unlock();
+            reinterpret_cast<Spinlock*>(handle)->Release();
         }
 
         uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle handle, uacpi_u16)
@@ -405,25 +460,31 @@ namespace uACPI
 
         uacpi_interrupt_handler s_Handlers[255]{};
         uacpi_handle            s_Contexts[255]{};
-        void                    OnInterrupt(CPUContext* ctx)
+        IrqResult               OnInterrupt(Device*, ExecutionContext* ctx)
         {
-            auto handler = s_Handlers[ctx->interruptVector];
-            if (handler) handler(s_Contexts[ctx->interruptVector]);
+#if CTOS_TARGET_X86_64
+            auto handler = s_Handlers[ctx->InterruptVector];
+            if (handler) handler(s_Contexts[ctx->InterruptVector]);
+
+            return IrqResult::eHandled;
+#else
+            return IrqResult::eNone;
+#endif
         }
 
         uacpi_status uacpi_kernel_install_interrupt_handler(
             uacpi_u32 irq, uacpi_interrupt_handler uhandler, uacpi_handle ctx,
             uacpi_handle* outIrqHandle)
         {
-            auto handler = InterruptManager::AllocateHandler(irq);
-            handler->Reserve();
+            Ref<InterruptDispatcher> handler
+                = InterruptManager::AllocateHandler(irq, nullptr, "uacpi");
+
             handler->SetHandler(OnInterrupt);
             s_Handlers[irq] = uhandler;
             s_Contexts[irq] = ctx;
-            InterruptManager::Unmask(handler->GetInterruptVector());
+            handler->Unmask();
 
-            *reinterpret_cast<usize*>(outIrqHandle)
-                = handler->GetInterruptVector();
+            *reinterpret_cast<usize*>(outIrqHandle) = handler->IrqLine() + 0x20;
             return UACPI_STATUS_OK;
         }
 

@@ -17,13 +17,6 @@ constexpr usize TTYDEF_LFLAG
     = ISIG | ICANON | ECHO | ECHOE | ECHOK | ECHOCTL | ECHOKE | IEXTEN;
 constexpr usize TTYDEF_CFLAG = B38400 | CS8 | CREAD | HUPCL;
 constexpr usize TTYDEF_SPEED = 38400;
-// constexpr usize TTYDEF_IFLAG = BRKINT | ISTRIP | ICRNL | IMAXBEL | IXON |
-// IXANY; constexpr usize TTYDEF_OFLAG = OPOST | ONLCR | XTABS; constexpr usize
-// TTYDEF_LFLAG
-//     = ECHO | ICANON | ISIG | IEXTEN | ECHOE | ECHOK | ECHOCTL;
-// constexpr usize TTYDEF_CFLAG = CREAD | CS8 | PARENB | HUPCL;
-// constexpr usize TTYDEF_SPEED = B9600;
-
 /*
  * Control Character Defaults
  */

@@ -1,0 +1,13 @@
+sources:
+  - name: util-linux
+    subdir: 'sources'
+    git: 'https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git'
+    tag: 'v2.36.2'
+    version: '2.36.2'
+    tools_required:
+      - host-autoconf-v2.69
+      - host-automake-v1.15
+      - host-pkg-config
+      - host-libtool
+    regenerate:
+      - args: ['./autogen.sh']

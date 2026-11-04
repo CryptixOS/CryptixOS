@@ -7,7 +7,7 @@ extend-ignore-identifiers-re = [
     "Paeth", "isue", "childs",
     "fillin", "ful", "Nd", "onl",
     "RELA", "THM", "Rela", "INEX", "rela",
-    "SerDesc", "flate",
+    "SerDesc", "flate","GICD_IGROUPn",
 ]
 
 [files]
@@ -15,6 +15,7 @@ extend-exclude = [
     "patches/*", "Prism/*",
     "Meta/*.patch",
     "subprojects/*.patch",
+    "Kernel/API/Posix/*",
 ]
 
 [default.extend-identifiers]

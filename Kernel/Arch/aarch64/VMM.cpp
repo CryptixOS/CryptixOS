@@ -4,14 +4,45 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <Debug/Assertions.hpp>
-#include <Debug/Panic.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Common.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Core/Ranges.hpp>
 
-#include <Library/Locking/Spinlock.hpp>
-#include <Memory/MM.hpp>
-#include <Memory/VMM.hpp>
+module Cryptix:Impl.Arch.aarch64.VMM;
 
-struct [[gnu::packed]] TTBR
+import :Debug.Assertions;
+import :Debug.KernelPanic;
+import :Library.Locking.Spinlock;
+import :Memory.MM;
+import :Memory.VMM;
+
+struct CTOS_PACKED TTBR
 {
     PageTableEntry entries[512]{};
 };
@@ -22,13 +53,13 @@ struct PageTable
     TTBR* ttbr1;
 };
 
-[[maybe_unused]] constexpr usize PA_RANGE_BITS32 = 0xb0000;
-[[maybe_unused]] constexpr usize PA_RANGE_BITS36 = 0xb0001;
-[[maybe_unused]] constexpr usize PA_RANGE_BITS40 = 0xb0010;
-[[maybe_unused]] constexpr usize PA_RANGE_BITS42 = 0xb0011;
-[[maybe_unused]] constexpr usize PA_RANGE_BITS44 = 0xb0100;
-[[maybe_unused]] constexpr usize PA_RANGE_BITS48 = 0xb0101;
-[[maybe_unused]] constexpr usize PA_RANGE_BITS52 = 0xb0110;
+CTOS_UNUSED constexpr usize PA_RANGE_BITS32 = 0xb0000;
+CTOS_UNUSED constexpr usize PA_RANGE_BITS36 = 0xb0001;
+CTOS_UNUSED constexpr usize PA_RANGE_BITS40 = 0xb0010;
+CTOS_UNUSED constexpr usize PA_RANGE_BITS42 = 0xb0011;
+CTOS_UNUSED constexpr usize PA_RANGE_BITS44 = 0xb0100;
+CTOS_UNUSED constexpr usize PA_RANGE_BITS48 = 0xb0101;
+CTOS_UNUSED constexpr usize PA_RANGE_BITS52 = 0xb0110;
 
 union MMFR0
 {
@@ -85,37 +116,37 @@ static constexpr size_t PAGE_SIZE_64KIB = 64_kib;
 
 namespace Arch::VMM
 {
-    constexpr usize                  VALID             = (1 << 0);
-    constexpr usize                  TABLE             = (1 << 1);
-    [[maybe_unused]] constexpr usize BLOCK             = (0 << 1);
-    constexpr usize                  PAGE              = Bit(1);
+    constexpr usize             VALID             = (1 << 0);
+    constexpr usize             TABLE             = (1 << 1);
+    CTOS_UNUSED constexpr usize BLOCK             = (0 << 1);
+    constexpr usize             PAGE              = Bit(1);
 
-    constexpr usize                  USER              = Bit(6);
+    constexpr usize             USER              = Bit(6);
 
-    [[maybe_unused]] constexpr usize RW                = (0 << 7);
-    constexpr usize                  RO                = (1 << 7);
+    CTOS_UNUSED constexpr usize RW                = (0 << 7);
+    constexpr usize             RO                = (1 << 7);
 
-    constexpr usize                  ACCESS            = (1 << 10);
-    constexpr usize                  NOTGLOBAL         = (1 << 11);
-    constexpr usize                  EXECNEVER         = (1ul << 54);
+    constexpr usize             ACCESS            = (1 << 10);
+    constexpr usize             NOTGLOBAL         = (1 << 11);
+    constexpr usize             EXECNEVER         = (1ul << 54);
 
-    [[maybe_unused]] constexpr usize NONSHARE          = (0 << 8);
-    constexpr usize                  OUTSHARE          = (0b10 << 8);
-    constexpr usize                  INSHARE           = (0b11 << 8);
+    CTOS_UNUSED constexpr usize NONSHARE          = (0 << 8);
+    constexpr usize             OUTSHARE          = (0b10 << 8);
+    constexpr usize             INSHARE           = (0b11 << 8);
 
-    constexpr usize                  WB                = (0b00 << 2) | INSHARE;
-    [[maybe_unused]] constexpr usize NC                = (0b01 << 2) | OUTSHARE;
-    [[maybe_unused]] constexpr usize WT                = (0b10 << 2) | OUTSHARE;
+    constexpr usize             WB                = (0b00 << 2) | INSHARE;
+    CTOS_UNUSED constexpr usize NC                = (0b01 << 2) | OUTSHARE;
+    CTOS_UNUSED constexpr usize WT                = (0b10 << 2) | OUTSHARE;
 
-    static usize                     vaWidth           = 0;
-    static usize                     pageSize          = 0;
-    static usize                     lPageSize         = 0;
-    static usize                     llPageSize        = 0;
+    static usize                vaWidth           = 0;
+    static usize                pageSize          = 0;
+    static usize                lPageSize         = 0;
+    static usize                llPageSize        = 0;
 
-    uintptr_t                        pteAddressMask    = 0;
-    u64                              g_DefaultPteFlags = VALID | TABLE;
+    upointer                    pteAddressMask    = 0;
+    u64                         g_DefaultPteFlags = VALID | TABLE;
 
-    void                             Initialize()
+    void                        Initialize()
     {
         MMFR0 mmfr0;
         MMFR2 mmfr2;
@@ -141,7 +172,7 @@ namespace Arch::VMM
             vaWidth = 52;
         else vaWidth = 48;
 
-        std::pair<std::pair<usize, usize>, uintptr_t> map[]
+        KeyValuePair<KeyValuePair<usize, usize>, upointer> map[]
             = {{{PAGE_SIZE_4KIB, 48}, 0x0000fffffffff000},
                {{PAGE_SIZE_16KIB, 48}, 0x0000ffffffffc000},
                {{PAGE_SIZE_64KIB, 48}, 0x0000ffffffff0000},
@@ -150,11 +181,11 @@ namespace Arch::VMM
                {{PAGE_SIZE_16KIB, 52}, 0x0003ffffffffc000},
                {{PAGE_SIZE_64KIB, 52}, 0x0000ffffffff0000}};
 
-        for (usize i = 0; i < std::size(map); i++)
+        for (usize i = 0; i < Size(map); i++)
         {
             auto& entry = map[i];
-            if (entry.first.first == pageSize && entry.first.second == vaWidth)
-                pteAddressMask = entry.second;
+            if (entry.Key.Key == pageSize && entry.Key.Value == vaWidth)
+                pteAddressMask = entry.Value;
         }
 
         Assert(pteAddressMask);
@@ -194,8 +225,8 @@ namespace Arch::VMM
         return ret;
     }
 
-    uintptr_t GetAddressMask() { return pteAddressMask; }
-    usize     GetPageSize(PageAttributes flags)
+    upointer GetAddressMask() { return pteAddressMask; }
+    usize    GetPageSize(PageAttributes flags)
     {
         if (flags & PageAttributes::eLLPage) return llPageSize;
         if (flags & PageAttributes::eLPage) return lPageSize;
@@ -218,12 +249,12 @@ namespace VMM
     void LoadPageMap(PageMap& pageMap, bool hh = true)
     {
         __asm__ volatile(
-            "msr ttbr0_el1, %0" ::"r"(FromHigherHalfAddress<uintptr_t>(
-                reinterpret_cast<uintptr_t>(pageMap.TopLevel()->ttbr0))));
+            "msr ttbr0_el1, %0" ::"r"(FromHigherHalfAddress<upointer>(
+                reinterpret_cast<upointer>(pageMap.TopLevel()->ttbr0))));
         if (hh == true)
             __asm__ volatile(
-                "msr ttbr1_el1, %0" ::"r"(FromHigherHalfAddress<uintptr_t>(
-                    reinterpret_cast<uintptr_t>(pageMap.TopLevel()->ttbr1))));
+                "msr ttbr1_el1, %0" ::"r"(FromHigherHalfAddress<upointer>(
+                    reinterpret_cast<upointer>(pageMap.TopLevel()->ttbr1))));
     }
 }; // namespace VMM
 
@@ -328,6 +359,17 @@ bool PageMap::InternalUnmap(Pointer virt, PageAttributes flags)
         "tlbi vale1, %0;\n\t"
         "dsb sy; isb" ::"r"(addr)
         : "memory");
+    return true;
+}
+bool PageMap::InternalProtect(Pointer virt, PageAttributes flags)
+{
+    usize pageSize = Arch::VMM::GetPageSize(flags);
+    auto  entry    = Virt2Pte(m_TopLevel, virt, false, pageSize);
+    if (!entry) return false;
+
+    auto nativeFlags = ToNativeFlags(flags);
+    entry->SetFlags(nativeFlags, true);
+
     return true;
 }
 

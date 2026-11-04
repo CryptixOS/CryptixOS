@@ -4,24 +4,58 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/PowerManager.hpp>
-#include <Boot/CommandLine.hpp>
 
-#include <Firmware/ACPI/ACPI.hpp>
-#include <Firmware/ACPI/Interpreter/Interpreter.hpp>
-#include <Firmware/ACPI/MADT.hpp>
+module;
 
-#include <Memory/ScopedMapping.hpp>
-#include <Memory/VMM.hpp>
-
+#include <Prism/Core/Types.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Core/Concepts.hpp>
+#endif
+#include <Compiler.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/String/StringUtils.hpp>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/ByteStream.hpp>
+#include <Prism/Containers/Vector.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
 #include <Prism/Containers/Array.hpp>
-
 #include <uacpi/context.h>
 #include <uacpi/event.h>
 #include <uacpi/notify.h>
 #include <uacpi/resources.h>
 #include <uacpi/uacpi.h>
 #include <uacpi/utilities.h>
+
+module Cryptix:Impl.Firmware.ACPI.ACPI;
+
+import :Arch.PowerManager;
+import :Boot.CommandLine;
+import :Firmware.ACPI.ACPI;
+import :Firmware.ACPI.Interpreter.Interpreter;
+import :Firmware.ACPI.MADT;
+import :Memory.ScopedMapping;
+import :Memory.VMM;
 
 #define uAcpiCall(cmd, ...)                                                    \
     {                                                                          \
@@ -164,13 +198,15 @@ namespace ACPI
                 Interpreter::ExecuteTable(dsdt);
         }
 
-        uacpi_iteration_decision EnumerateDevice(void*                 ctx,
-                                                 uacpi_namespace_node* node,
-                                                 uacpi_u32 node_depth)
+        uacpi_iteration_decision
+        EnumerateDevice(void* ctx, uacpi_namespace_node* node, uacpi_u32)
         {
-            uacpi_namespace_node_info* info;
-            (void)node_depth;
+            uacpi_object_type nodeType;
+            uacpi_namespace_node_type(node, &nodeType);
+            const char* nodeTypeString = uacpi_object_type_to_string(nodeType);
+            LogDebug("ACPI: Discovered node with type: {}", nodeTypeString);
 
+            uacpi_namespace_node_info* info;
             uacpi_status ret = uacpi_get_namespace_node_info(node, &info);
             if (uacpi_unlikely_error(ret))
             {
@@ -180,6 +216,35 @@ namespace ACPI
                          path, uacpi_status_to_string(ret));
                 uacpi_free_absolute_path(path);
                 return UACPI_ITERATION_DECISION_CONTINUE;
+            }
+
+            const char* path
+                = uacpi_namespace_node_generate_absolute_path(node);
+            LogDebug("ACPI: Namespace Node path => {}", path);
+            uacpi_free_absolute_path(path);
+
+            uacpi_resources* resources = nullptr;
+            uacpi_get_device_resources(node, "_CRS", &resources);
+
+            usize i = 0;
+
+            if (resources)
+            {
+                uacpi_for_each_resource(
+                    resources,
+                    [](void*           userData,
+                       uacpi_resource* resource) -> uacpi_iteration_decision
+                    {
+                        usize& i = *reinterpret_cast<usize*>(userData);
+                        uacpi_resource_type type
+                            = static_cast<uacpi_resource_type>(resource->type);
+                        auto resourceName = StringUtils::ToString(type);
+
+                        LogDebug("ACPI: Resource[{}] => {}", i++, resourceName);
+                        return UACPI_ITERATION_DECISION_CONTINUE;
+                    },
+                    &i);
+                uacpi_free_resources(resources);
             }
 
             const auto powerButtonIDs = ToArray<const char*>({
@@ -203,6 +268,7 @@ namespace ACPI
 
             LogInfo("ACPI: Found device - {}", info->name.text);
             uacpi_free_namespace_node_info(info);
+
             return UACPI_ITERATION_DECISION_CONTINUE;
         }
     } // namespace
@@ -223,9 +289,11 @@ namespace ACPI
             return false;
         }
 
-        s_XsdtAvailable = s_RSDP->Revision >= 2 && s_RSDP->XsdtAddress != 0;
-        Pointer rsdtPointer
-            = s_XsdtAvailable ? s_RSDP->XsdtAddress : s_RSDP->RsdtAddress;
+        s_XsdtAvailable     = s_RSDP->Revision >= 2 && s_RSDP->XsdtAddress != 0;
+
+        bool    useXsdt     = !CommandLine::Boolean("acpi.rsdt").ValueOr(false);
+        Pointer rsdtPointer = s_XsdtAvailable && useXsdt ? s_RSDP->XsdtAddress
+                                                         : s_RSDP->RsdtAddress;
 
         if (!rsdtPointer) return false;
         s_Rsdt = rsdtPointer.ToHigherHalf<RSDT*>();
@@ -288,9 +356,9 @@ namespace ACPI
                                        UACPI_MAX_DEPTH_ANY, UACPI_NULL);
     }
 
-    SDTHeader* GetTable(const char* signature, usize index)
+    SDTHeader* GetTable(StringView signature, usize index)
     {
-        Assert(signature != nullptr);
+        Assert(signature.Size() == 4);
         if (!s_Rsdt) return nullptr;
 
         const usize entryCount = (s_Rsdt->Header.Length - sizeof(SDTHeader))
@@ -299,11 +367,10 @@ namespace ACPI
         {
             SDTHeader* header = GetTablePointer(i).As<SDTHeader>();
 
-            if (!header || !(reinterpret_cast<char*>(header->Signature)))
-                continue;
+            if (!header) continue;
             if (!ValidateChecksum(header)) continue;
 
-            if (std::strncmp(signature, header->Signature, 4) == 0)
+            if (signature == StringView(header->Signature, 4))
             {
                 if (index == 0) return header;
                 ++index;

@@ -5,7 +5,19 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Network/NetworkAdapter.hpp>
+
+module;
+
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Core/Types.hpp>
+#include <API/Posix/termios.h>
+
+module Cryptix:Impl.Network.NetworkAdapter;
+
+import :Network.NetworkAdapter;
 
 uint32_t htonl(uint32_t hostlong)
 {

@@ -4,11 +4,32 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Common.hpp>
 
-#include <Arch/x86_64/Drivers/PIC.hpp>
-#include <Arch/x86_64/IO.hpp>
-#include <Arch/x86_64/IDT.hpp>
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Memory/RefCounted.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Core/Concepts.hpp>
+
+module Cryptix:Impl.Arch.x86_64.Drivers.PIC;
+
+import :Debug.Assertions;
+import :Library.Logger;
+import :Library.Stacktrace;
+import :Arch.x86_64.Drivers.PIC;
+import :Arch.x86_64.IDT;
+import :Arch.x86_64.IO;
 
 // https://pdos.csail.mit.edu/6.828/2005/readings/hardware/8259A.pdf
 inline static constexpr const u32 PIC1          = 0x20;
@@ -53,11 +74,11 @@ ICW1Flags operator|(ICW1Flags lhs, ICW1Flags rhs)
     return static_cast<ICW1Flags>(ret);
 }
 
-I8259A I8259A::s_Instance{};
-
-I8259A& I8259A::Instance()
+Ref<I8259A> I8259A::Instance()
 {
-    return s_Instance;
+    static ::Ref<I8259A> instance = new I8259A();
+
+    return instance;
 }
 
 ErrorOr<void> I8259A::Initialize()
@@ -73,12 +94,7 @@ ErrorOr<void> I8259A::Shutdown()
     return {};
 }
 
-ErrorOr<InterruptHandler*> I8259A::AllocateHandler(u8 hint)
-{
-    return IDT::AllocateHandler(hint);
-}
-
-ErrorOr<void> I8259A::Mask(u8 irq)
+ErrorOr<void> I8259A::Mask(u32 irq)
 {
     u8 picPort = PIC1_DATA;
     if (irq >= 8)
@@ -92,7 +108,7 @@ ErrorOr<void> I8259A::Mask(u8 irq)
 
     return {};
 }
-ErrorOr<void> I8259A::Unmask(u8 irq)
+ErrorOr<void> I8259A::Unmask(u32 irq)
 {
     u8 picPort = PIC1_DATA;
     if (irq >= 8)
@@ -106,7 +122,7 @@ ErrorOr<void> I8259A::Unmask(u8 irq)
     return {};
 }
 
-ErrorOr<void> I8259A::SendEOI(u8 irq)
+ErrorOr<void> I8259A::SendEOI(u32 irq)
 {
     if (HandleSpuriousInterrupt(irq)) return {};
 

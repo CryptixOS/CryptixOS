@@ -1,0 +1,59 @@
+/*
+ * Created by v1tr10l7 on 09.04.2025.
+ * Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
+ *
+ * SPDX-License-Identifier: GPL-3
+ */
+
+module;
+
+#include <Prism/Core/Types.hpp>
+#include <Prism/Memory/Pointer.hpp>
+
+export module Cryptix:Memory.PageFault;
+
+export enum class PageFaultReason
+{
+    eNotPresent             = Bit(0),
+    eWrite                  = Bit(1),
+    eUser                   = Bit(2),
+    eReservedWrite          = Bit(3),
+    eInstructionFetch       = Bit(4),
+    eProtectionKey          = Bit(5),
+    eShadowStack            = Bit(6),
+    eSoftwareGuardExtension = Bit(7),
+};
+
+export inline constexpr bool operator&(const PageFaultReason lhs,
+                                const PageFaultReason rhs)
+{
+    return ToUnderlying(lhs) & ToUnderlying(rhs);
+}
+export inline constexpr PageFaultReason operator|=(PageFaultReason&      lhs,
+                                            const PageFaultReason rhs)
+{
+    auto result = ToUnderlying(lhs) | ToUnderlying(rhs);
+
+    return static_cast<PageFaultReason>(result);
+}
+
+export class PageFaultInfo
+{
+  public:
+    inline constexpr PageFaultInfo(Pointer virt, PageFaultReason reason,
+                                   struct ExecutionContext* context)
+        : m_VirtualAddress(virt)
+        , m_Reason(reason)
+        , m_ExecutionContext(context)
+    {
+    }
+
+    inline constexpr Pointer VirtualAddress() const { return m_VirtualAddress; }
+    inline constexpr PageFaultReason Reason() const { return m_Reason; }
+    inline constexpr ExecutionContext*     ExecutionContext() const { return m_ExecutionContext; }
+
+  private:
+    Pointer            m_VirtualAddress = nullptr;
+    PageFaultReason    m_Reason;
+    struct ExecutionContext* m_ExecutionContext = nullptr;
+};

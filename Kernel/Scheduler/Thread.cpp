@@ -1,29 +1,98 @@
-
 /*
  * Created by v1tr10l7 on 17.11.2024.
  * Copyright (c) 2024-2024, Szymon Zemke <v1tr10l7@proton.me>
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/CPU.hpp>
-#include <Arch/InterruptGuard.hpp>
 
-#include <Memory/PMM.hpp>
+module;
 
+#include <API/Posix/linux/sched.h>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
 #include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/String/StringUtils.hpp>
+#include <API/Posix/linux/capability.h>
+#include <API/UnixTypes.hpp>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
 
-#include <Scheduler/Process.hpp>
-#include <Scheduler/Thread.hpp>
+module Cryptix:Impl.Scheduler.Thread;
 
-Thread::Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn)
+import :Arch.CPU;
+import :Arch.InterruptGuard;
+import :Library.StackBuilder;
+import :Memory.PMM;
+import :Scheduler.Process;
+import :Scheduler.Thread;
+
+struct CTOS_PACKED SignalFrame
+{
+    upointer         SignalTrampoline;
+    ExecutionContext Context;
+};
+
+extern KeyValuePair<Pointer, usize> SignalTrampoline();
+Thread::Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn, bool user)
     : m_State(ThreadState::eDequeued)
     , m_ErrorCode(no_error)
     , m_Parent(parent)
-    , m_IsUser(false)
+    , m_IsUser(user)
     , m_IsEnqueued(false)
 
 {
-    m_Tid = parent->m_NextTid++;
+    m_ID = parent->m_NextTid++;
     CPU::PrepareThread(this, pc, arg);
     m_Tls.Self      = this;
     m_Tls.RunningOn = runOn;
@@ -62,80 +131,20 @@ Thread::Thread(Process* parent, Vector<StringView>& argv,
 {
     m_Tls.RunningOn = CPU::Current()->ID;
     m_Tls.Self      = this;
-    m_Tid           = parent->m_NextTid++;
+    m_ID            = parent->m_NextTid++;
 
     if (!parent->PageMap) parent->PageMap = VMM::GetKernelPageMap();
 
-    auto mapUserStack = [this]() -> std::pair<uintptr_t, uintptr_t>
-    {
-        Pointer stackPhys
-            = PMM::CallocatePages(CPU::USER_STACK_SIZE / PMM::PAGE_SIZE);
-        Pointer stackVirt
-            = m_Parent->m_UserStackTop.Raw() - CPU::USER_STACK_SIZE;
-
-        Assert(m_Parent->PageMap->MapRange(
-            stackVirt, stackPhys, CPU::USER_STACK_SIZE,
-            PageAttributes::eRWXU | PageAttributes::eWriteBack));
-
-        using VMM::Access;
-        auto stackRegion
-            = new Region(stackPhys, stackVirt, CPU::USER_STACK_SIZE);
-        stackRegion->SetAccessMode(Access::eReadWriteExecute | Access::eUser);
-        m_Stacks.PushBack(stackRegion);
-        m_Parent->m_AddressSpace.Insert(stackVirt, stackRegion);
-
-        m_StackVirt              = stackVirt;
-        m_Parent->m_UserStackTop = stackVirt.Raw() - PMM::PAGE_SIZE;
-        return {stackPhys.ToHigherHalf<Pointer>().Offset(CPU::USER_STACK_SIZE),
-                stackVirt.Offset(CPU::USER_STACK_SIZE)};
-    };
-
-    auto [stackTopWritable, stackTopVirt] = mapUserStack();
-
+    auto [stackTopWritable, stackTopVirt] = AllocateUserStack();
     m_Tls.Stack
         = program.PrepareStack(stackTopWritable, stackTopVirt, argv, envp);
+    m_Parent->m_SignalTrampolineVirt = program.SignalTrampoline();
+
     CPU::PrepareThread(this, program.EntryPoint(), 0);
 }
 
-Thread::Thread(Process* parent, Pointer pc, bool user)
-    : m_State(ThreadState::eDequeued)
-    , m_ErrorCode(no_error)
-    , m_Parent(parent)
-    , m_IsUser(user)
-    , m_IsEnqueued(false)
-{
-    m_Tls.RunningOn = CPU::GetCurrent()->ID;
-    m_Tls.Self      = this;
-    m_Tid           = parent->m_NextTid++;
-
-    Pointer stackPhys
-        = PMM::CallocatePages<uintptr_t>(CPU::USER_STACK_SIZE / PMM::PAGE_SIZE);
-    Pointer stackVirt = parent->m_UserStackTop.Raw() - CPU::USER_STACK_SIZE;
-
-    if (!parent->PageMap) parent->PageMap = VMM::GetKernelPageMap();
-    Assert(parent->PageMap->MapRange(stackVirt, stackPhys, CPU::USER_STACK_SIZE,
-                                     PageAttributes::eRW | PageAttributes::eUser
-                                         | PageAttributes::eWriteBack));
-    parent->m_UserStackTop = stackVirt.Raw() - PMM::PAGE_SIZE;
-    m_Stacks.PushBack(
-        CreateRef<Region>(stackPhys, stackVirt, CPU::USER_STACK_SIZE));
-
-    Pointer stackTopWritable
-        = stackPhys.Offset<Pointer>(CPU::USER_STACK_SIZE).ToHigherHalf();
-
-    m_Tls.Stack = Math::AlignDown(stackTopWritable, 16);
-
-    CPU::PrepareThread(this, pc, 0);
-}
 Thread::~Thread()
 {
-    for (auto& region : m_Stacks)
-    {
-        auto  phys      = region->PhysicalBase();
-        usize pageCount = Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE);
-        PMM::FreePages(phys, pageCount);
-    }
-
     PMM::FreePages(m_Tls.FpuStorage, m_Tls.FpuStoragePageCount);
     PMM::FreePages(m_Tls.KernelStack,
                    Math::DivRoundUp(CPU::KERNEL_STACK_SIZE, PMM::PAGE_SIZE));
@@ -143,29 +152,111 @@ Thread::~Thread()
                    Math::DivRoundUp(CPU::KERNEL_STACK_SIZE, PMM::PAGE_SIZE));
 }
 
+void Thread::OnSyscallEnter() { m_ExecutingSyscall = true; }
+void Thread::OnSyscallLeave() { m_ExecutingSyscall = false; }
+
 void Thread::SendSignal(u8 signal)
 {
     InterruptGuard guard(false);
+    LogDebug(
+        "Thread::SendSignal: Sending signal #{}({}) to process {}\nIgnored: {}",
+        signal, StringUtils::ToString(static_cast<SignalID>(signal)),
+        m_Parent->ID(), ShouldIgnoreSignal(signal));
+
+    if (!signal)
+    {
+        LogDebug("Thread::SendSignal: Dummy signal, returning...");
+        // return;
+    }
     if (ShouldIgnoreSignal(signal)) return;
-    m_PendingSignals |= 1 << signal;
+    m_PendingSignals.Add(signal);
+    if (m_State == ThreadState::eBlocked)
+        ;
 }
 bool Thread::DispatchAnyPendingSignal()
 {
+    // FIXME(v1tr10l7): aarch64 implementation
+    // if (m_ExecutingSyscall) return false;
+#if CTOS_TARGET_X86_64
+    if (Context.CS == GDT::KERNEL_CODE_SELECTOR
+        || Context.DS == GDT::KERNEL_DATA_SELECTOR)
+        return false;
+#endif
+
     Assert(!CPU::GetInterruptFlag());
-    u32 pendingSignals = m_PendingSignals & ~m_SignalMask;
 
-    u8  signal         = 0;
-    for (; signal < 32; ++signal)
-        if (pendingSignals & Bit(signal)) return DispatchSignal(signal);
+    usize i = 0;
+    for (i = 0; i < 32; i++)
+        if (m_PendingSignals.Contains(i))
+            LogDebug(
+                "Thread::DispatchAnyPendingSignal: Found pending signal => {}",
+                i);
+    auto pendingSignals = m_PendingSignals & ~m_SignalMask;
+    if (i != 32) LogDebug("Still pending => {}", pendingSignals.Contains(i));
+    u8 signal = 0;
+    while (signal < 32 && !(pendingSignals.Contains(signal))) ++signal;
+    if (signal == 32) return false;
 
-    return false;
+    return DispatchSignal(signal);
 }
-bool Thread::DispatchSignal(u8 signal)
+
+extern Pointer g_SignalTrampoline;
+bool           Thread::DispatchSignal(u8 signal)
 {
     Assert(!CPU::GetInterruptFlag());
     Assert(signal < 32);
+    m_PendingSignals.Remove(signal);
 
-    m_PendingSignals &= ~Bit(signal);
+    LogDebug("Thread: Context => \n{}", Context);
+#if CTOS_TARGET_X86_64
+    Assert(Context.SS == (GDT::USERLAND_DATA_SELECTOR | 0x03));
+
+    auto& action = m_Parent->SignalAction(static_cast<SignalID>(signal));
+    if (action.VirtualAddress)
+    {
+        auto    rsp          = Context.RSP;
+        Pointer phys         = nullptr;
+        Pointer stackTopVirt = nullptr;
+
+        for (auto [virt, region] : *m_Parent->m_AddressSpace)
+        {
+            if (!region->Contains(rsp - 1)) continue;
+            phys         = region->PhysicalBase();
+            stackTopVirt = virt.Offset(CPU::USER_STACK_SIZE);
+        }
+
+        usize   stackOffset = CPU::USER_STACK_SIZE - (stackTopVirt.Raw() - rsp);
+        Pointer rspWritable = phys.ToHigherHalf().Offset(stackOffset);
+        StackBuilder builder(rspWritable);
+
+        upointer     trampolineVirt = m_Parent->m_SignalTrampolineVirt;
+        {
+            UserMemoryProtectionGuard guard;
+
+            auto actualPhys = Pointer(rspWritable).FromHigherHalf();
+            LogDebug("Thread: Phys => {:#x}, ActualPhys => {:#x}", phys,
+                     actualPhys);
+
+            usize fpuStorageSize = m_Tls.FpuStoragePageCount * PMM::PAGE_SIZE;
+            upointer contextAddress = builder.Write(&Context, sizeof(Context));
+            LogDebug("Thread: Saved the thread's context to => {:#x}",
+                     contextAddress);
+
+            builder.Write(m_Tls.FpuStorage, fpuStorageSize);
+
+            for (usize i = 0; i < 128 / 8; i++) builder.Write(0);
+            builder.Align(16);
+            builder.Write(trampolineVirt);
+
+            rsp -= (builder.Top() - builder.Current()).Raw();
+        }
+
+        Context.RSP = rsp;
+        Context.RIP = action.VirtualAddress;
+        Context.RDI = signal;
+        return true;
+    }
+
     switch (signal)
     {
         case SIGHUP:
@@ -181,7 +272,7 @@ bool Thread::DispatchSignal(u8 signal)
         case SIGPROF:
         case SIGTERM:
             // TODO(v1tr10l7): Terminate
-            if (m_Parent->m_Pid != m_Parent->m_Credentials.ProcessGroupID)
+            if (m_Parent->ID() != m_Parent->m_Credentials.ProcessGroupID)
                 m_Parent->Exit(0);
             break;
         case SIGCHLD:
@@ -212,67 +303,127 @@ bool Thread::DispatchSignal(u8 signal)
 
         default: AssertNotReached(); break;
     }
-    // TODO(v1tr10l7): Dispatch signals
+        // TODO(v1tr10l7): Dispatch signals
+#endif
     return false;
 }
-
-::Ref<Thread> Thread::Fork(Process* process)
+ErrorOr<void> Thread::SignalReturn()
 {
-    auto newThread
-        = process->CreateThread(Context.rip, m_IsUser, CPU::GetCurrent()->ID);
-    newThread->m_Tls.Self  = newThread.Raw();
-    newThread->m_Tls.Stack = m_Tls.Stack;
-
-    Pointer kstack = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
-                                                    / PMM::PAGE_SIZE);
-    newThread->m_Tls.KernelStack
-        = kstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
-            CPU::KERNEL_STACK_SIZE);
-
-    Pointer pfstack = PMM::CallocatePages<uintptr_t>(CPU::KERNEL_STACK_SIZE
-                                                     / PMM::PAGE_SIZE);
-    newThread->m_Tls.PageFaultStack
-        = pfstack.ToHigherHalf<Pointer>().Offset<uintptr_t>(
-            CPU::KERNEL_STACK_SIZE);
-
-    for (const auto& stack : m_Stacks)
+#if CTOS_TARGET_X86_64
+    Pointer rsp = Context.RSP;
     {
-        auto    stackPhys    = stack->PhysicalBase();
-        usize   stackVirt    = stack->VirtualBase();
-        usize   stackSize    = stack->Size();
+        UserMemoryProtectionGuard guard;
 
-        Pointer newStackPhys = PMM::CallocatePages<uintptr_t>(
-            Math::AlignUp(stackSize, PMM::PAGE_SIZE) / PMM::PAGE_SIZE);
+        usize fpuStorageSize = m_Tls.FpuStoragePageCount * PMM::PAGE_SIZE;
+        Memory::Copy(m_Tls.FpuStorage, rsp.Offset(16 + 128), fpuStorageSize);
 
-        Memory::Copy(newStackPhys.ToHigherHalf<void*>(),
-                     stackPhys.ToHigherHalf<void*>(), stackSize);
-
-        process->PageMap->MapRange(stackVirt, newStackPhys, stackSize,
-                                   PageAttributes::eRWXU
-                                       | PageAttributes::eWriteBack);
-        newThread->m_Stacks.PushBack(
-            CreateRef<Region>(newStackPhys, newStackPhys, stackSize));
+        ExecutionContext* saved
+            = rsp.Offset<ExecutionContext*>(16 + 128 + fpuStorageSize);
+        LogWarn("SigReturn: Saved stack frame dump =>\n{}", *saved);
+        Context = *saved;
+        return {};
     }
 
-    newThread->m_Tls.FpuStoragePageCount = m_Tls.FpuStoragePageCount;
-    newThread->m_Tls.FpuStorage
-        = Pointer(PMM::CallocatePages<uintptr_t>(m_Tls.FpuStoragePageCount))
-              .ToHigherHalf<uintptr_t>();
+#endif
+    for (;;) Arch::Halt();
+    return Error(ENOSYS);
+}
+
+ErrorOr<::Ref<Thread>> Thread::Clone(usize flags, Pointer stack,
+                                     CTOS_UNUSED usize stackSize, Pointer tls)
+{
+
+    if ((flags & (CLONE_NEWNS | CLONE_FS)) == (CLONE_NEWNS | CLONE_FS))
+        return Error(EINVAL);
+    if ((flags & (CLONE_NEWUSER | CLONE_FS)) == (CLONE_NEWUSER | CLONE_FS))
+        return Error(EINVAL);
+
+    if ((flags & CLONE_THREAD) && !(flags & CLONE_SIGHAND))
+        return Error(EINVAL);
+    if ((flags & CLONE_SIGHAND) && !(flags & CLONE_VM)) return Error(EINVAL);
+    if (flags & (CLONE_PIDFD | CLONE_DETACHED)) return Error(EINVAL);
+
+    auto parent = m_Parent;
+    if (!(flags & CLONE_THREAD))
+    {
+        auto newProcess = TryOrRet(parent->Clone(flags));
+        parent          = newProcess;
+    }
+
+    auto newThread = parent->CreateThread(Context.ProgramCounter, m_IsUser,
+                                          CPU::GetCurrent()->ID);
+    newThread->m_Tls.Self = newThread.Raw();
+    if (!(flags & CLONE_VM))
+    {
+        stack     = m_Tls.Stack;
+        stackSize = CPU::USER_STACK_SIZE;
+    }
+
+    newThread->m_Tls.Stack = stack;
+
+    if (!(flags & CLONE_THREAD))
+    {
+        for (const auto& stack : m_Stacks)
+        {
+            usize stackVirt = stack->VirtualBase();
+
+            auto  region    = parent->m_AddressSpace->Find(stackVirt);
+            if (!region) continue;
+            newThread->m_Stacks.PushBack(region);
+        }
+    }
 
     Memory::Copy(newThread->m_Tls.FpuStorage, m_Tls.FpuStorage,
                  m_Tls.FpuStoragePageCount * PMM::PAGE_SIZE);
 
-    newThread->m_Parent    = process;
-    newThread->Context     = SavedContext;
-    newThread->Context.rax = 0;
-    newThread->Context.rdx = 0;
+    newThread->m_Parent     = parent;
+    newThread->Context      = SavedContext;
+    newThread->m_IsEnqueued = false;
+#if CTOS_TARGET_X86_64
+    newThread->Context.RAX    = 0;
+    newThread->Context.RFlags = 0x202;
+    newThread->Context.RDX    = 0;
+    if (flags & CLONE_VM) newThread->Context.RSP = stack;
 
-    newThread->m_IsUser    = m_IsUser;
-#ifdef CTOS_TARGET_X86_64
     newThread->m_GsBase = m_GsBase;
     newThread->m_FsBase = m_FsBase;
+
+    if (flags & CLONE_SETTLS) newThread->m_FsBase = tls;
 #endif
 
     newThread->m_State = ThreadState::eDequeued;
     return newThread;
 }
+
+void Thread::SetSignalMask(SignalSet mask)
+{
+    if (m_SignalMask == mask) return;
+
+    ScopedLock guard(m_SignalMaskLock, true);
+    m_SignalMask = mask;
+}
+
+KeyValuePair<upointer, upointer> Thread::AllocateUserStack()
+{
+    usize   pageCount = CPU::USER_STACK_SIZE / PMM::PAGE_SIZE + 1;
+    Pointer stackPhys = PMM::CallocatePages(pageCount);
+
+    Pointer guardVirt
+        = m_Parent->m_UserStackTop.Offset(-pageCount * PMM::PAGE_SIZE);
+    Pointer stackVirt = guardVirt.Offset(PMM::PAGE_SIZE);
+
+    Assert(m_Parent->PageMap->MapRange(
+        stackVirt, stackPhys, CPU::USER_STACK_SIZE,
+        PageAttributes::eRWXU | PageAttributes::eWriteBack));
+
+    using VMM::Access;
+    auto stackRegion = new Region(stackPhys, stackVirt, CPU::USER_STACK_SIZE);
+    stackRegion->SetAccessMode(Access::eReadWriteExecute | Access::eUser);
+    m_Stacks.PushBack(stackRegion);
+    m_Parent->m_AddressSpace->Insert(stackVirt, stackRegion);
+
+    m_StackVirt              = stackVirt;
+    m_Parent->m_UserStackTop = guardVirt.Raw() - PMM::PAGE_SIZE;
+    return {stackPhys.ToHigherHalf<Pointer>().Offset(CPU::USER_STACK_SIZE),
+            stackVirt.Offset(CPU::USER_STACK_SIZE)};
+};

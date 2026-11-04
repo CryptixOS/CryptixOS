@@ -1,0 +1,92 @@
+packages:
+  - name: man-db
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    source:
+      subdir: sources
+      git: 'https://git.savannah.gnu.org/git/man-db.git'
+      tag: '2.9.4'
+      version: '2.9.4'
+      tools_required:
+        - host-autoconf-v2.69
+        - host-automake-v1.15
+        - host-pkg-config
+        - host-libtool
+      regenerate:
+        - args: ['./bootstrap']
+          isolate_network: false
+        - args: ['cp',
+            '@BUILD_ROOT@/tools/host-automake-v1.15/share/automake-1.15/config.sub',
+            '@THIS_SOURCE_DIR@/build-aux/']
+    tools_required:
+      - system-gcc
+    pkgs_required:
+      - mlibc
+      # - libpipeline
+      - gdbm
+      #- groff
+      - less
+      - libiconv
+    revision: 11
+    configure:
+      - args:
+        - '@THIS_SOURCE_DIR@/configure'
+        - '--host=@OPTION:arch-triple@'
+        - '--prefix=/usr'
+        - '--disable-nls'
+        - '--docdir=/usr/share/doc/man-db-2.9.4'
+        - '--sysconfdir=/etc'
+        - '--disable-setuid'
+        - '--with-systemdtmpfilesdir='
+        - '--with-systemdsystemunitdir='
+        - '--disable-manual'
+        - '--with-pager=/usr/bin/less'
+        - 'CFLAGS=-std=gnu99'
+    build:
+      - args: ['make', '-j@PARALLELISM@']
+      - args: ['make', 'install']
+        environ:
+          DESTDIR: '@THIS_COLLECT_DIR@'
+
+  - name: man-pages-posix
+    labels: [aarch64]
+    architecture: noarch
+    source:
+      subdir: sources
+      url: 'https://mirrors.edge.kernel.org/pub/linux/docs/man-pages/man-pages-posix/man-pages-posix-2017-a.tar.gz'
+      format: 'tar.gz'
+      checksum: blake2b:14305fef7bbe4e39a731468331ea28b68fcfbb5ed66dbfa525907b1817b803a7726ea6dd7fb45f8f5c02dda62750d66e0e7a9a6b535bebfe04ed7181b8804175
+      extract_path: 'man-pages-posix-2017'
+      version: '2017a'
+    tools_required:
+      - system-gcc
+    revision: 6
+    configure: []
+    build:
+      - args: ['mkdir', '-pv', '@THIS_COLLECT_DIR@/usr/share/man']
+      - args: ['cp', '-rv', '@THIS_SOURCE_DIR@/man0p', '@THIS_COLLECT_DIR@/usr/share/man/']
+      - args: ['cp', '-rv', '@THIS_SOURCE_DIR@/man1p', '@THIS_COLLECT_DIR@/usr/share/man/']
+      - args: ['cp', '-rv', '@THIS_SOURCE_DIR@/man3p', '@THIS_COLLECT_DIR@/usr/share/man/']
+
+  - name: pciids
+    labels: [aarch64]
+    architecture: noarch
+    metadata:
+      summary: The pci.ids file
+      description: Description file containing PCI vendor and device names.
+      spdx: 'GPL-2.0-or-later'
+      website: 'https://pci-ids.ucw.cz/'
+      maintainer: 'Kacper Słomiński <qookie@managarm.org>'
+      categories: ['app-misc']
+    source:
+      subdir: 'sources'
+      git: 'https://github.com/pciutils/pciids.git'
+      branch: 'master'
+      commit: '58f9db8387118222b4c0cec079cffd88286fb495'
+      # The version indicates the date of the commit it's based on
+      version: '20230722'
+    revision: 5
+    configure: []
+    build:
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/share/hwdata/']
+      - args: ['cp', '-f', '@THIS_SOURCE_DIR@/pci.ids', '@THIS_COLLECT_DIR@/usr/share/hwdata/pci.ids']

@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <API/Posix/sys/resource.h>
 #include <API/Posix/time.h>
 
 constexpr usize WNOHANG    = 0x00000001;
@@ -27,44 +28,3 @@ constexpr auto WIFSTOPPED(auto x) { return (x & 0xFF) == 0x7F; }
 constexpr auto WIFCONTINUED(auto x) { return x == 0xFFFF; }
 constexpr auto W_EXITCODE(auto ret, auto sig) { return (ret << 8) | sig; }
 
-struct rusage
-{
-    /* Total amount of user time used.  */
-    struct timeval ru_utime;
-    /* Total amount of system time used.  */
-    struct timeval ru_stime;
-    /* Maximum resident set size (in kilobytes).  */
-    isize          ru_maxrss;
-    /* Amount of sharing of text segment memory
-       with other processes (kilobyte-seconds).  */
-    isize          ru_ixrss;
-    /* Amount of data segment memory used (kilobyte-seconds).  */
-    isize          ru_idrss;
-    /* Amount of stack memory used (kilobyte-seconds).  */
-    isize          ru_isrss;
-    /* Number of soft page faults (i.e. those serviced by reclaiming
-       a page from the list of pages awaiting reallocation.  */
-    isize          ru_minflt;
-    /* Number of hard page faults (i.e. those that required I/O).  */
-    isize          ru_majflt;
-    /* Number of times a process was swapped out of physical memory.  */
-    isize          ru_nswap;
-    /* Number of input operations via the file system.  Note: This
-       and `ru_oublock' do not include operations with the cache.  */
-    isize          ru_inblock;
-    /* Number of output operations via the file system.  */
-    isize          ru_oublock;
-    /* Number of IPC messages sent.  */
-    isize          ru_msgsnd;
-    /* Number of IPC messages received.  */
-    isize          ru_msgrcv;
-    /* Number of signals delivered.  */
-    isize          ru_nsignals;
-    /* Number of voluntary context switches, i.e. because the process
-       gave up the process before it had to (usually to wait for some
-       resource to be available).  */
-    isize          ru_nvcsw;
-    /* Number of involuntary context switches, i.e. a higher priority process
-       became runnable or the current process used up its time slice.  */
-    isize          ru_nivcsw;
-};

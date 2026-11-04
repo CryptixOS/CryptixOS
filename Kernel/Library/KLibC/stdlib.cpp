@@ -4,10 +4,28 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <stdlib.h>
 
+module;
+
+#include <stdlib.h>
 #include <Common.hpp>
-#include <Memory/Allocator/KernelHeap.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Prism/Memory/Pointer.hpp>
+
+module Cryptix:Impl.Library.KLibC.stdlib;
+
+import :Debug.Assertions;
+import :Library.Logger;
+import :Library.Stacktrace;
+import :Memory.Allocator.KernelHeap;
 
 extern "C"
 {

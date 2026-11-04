@@ -1,0 +1,187 @@
+diff --color -Naur binutils-2.42/bfd/config.bfd binutils/bfd/config.bfd
+--- binutils-2.42/bfd/config.bfd	2024-01-29 01:00:00.000000000 +0100
++++ binutils/bfd/config.bfd	2025-09-18 06:35:45.854020188 +0200
+@@ -294,6 +294,11 @@
+     targ_selvecs="aarch64_elf64_le_vec aarch64_elf32_le_vec aarch64_elf32_be_vec arm_elf32_be_vec arm_elf32_le_vec"
+     want64=true
+     ;;
++  aarch64-*-cryptix*)
++    targ_defvec=aarch64_elf64_le_vec
++    targ_selvecs=aarch64_elf32_le_vec
++    want64=true
++    ;;
+   alpha*-*-freebsd* | alpha*-*-kfreebsd*-gnu)
+     targ_defvec=alpha_elf64_fbsd_vec
+     targ_selvecs="alpha_elf64_vec alpha_ecoff_le_vec"
+@@ -736,6 +741,11 @@
+     want64=true
+     ;;
+ #endif
++  x86_64-*-cryptix*)
++    targ_defvec=x86_64_elf64_vec
++    targ_selvecs=i386_elf32_vec
++    want64=true
++    ;;
+   i[3-7]86-*-lynxos*)
+     targ_defvec=i386_elf32_vec
+     targ_selvecs="iamcu_elf32_vec i386_coff_lynx_vec i386_aout_lynx_vec"
+diff --color -Naur binutils-2.42/bfd/elfnn-aarch64.c binutils/bfd/elfnn-aarch64.c
+--- binutils-2.42/bfd/elfnn-aarch64.c	2024-01-29 01:00:00.000000000 +0100
++++ binutils/bfd/elfnn-aarch64.c	2025-09-18 06:53:47.092302633 +0200
+@@ -8169,6 +8169,10 @@
+ 	    if ((got_type & GOT_TLS_IE) && GOT_TLS_GD_ANY_P (got_type))
+ 	      got_type &= ~ (GOT_TLSDESC_GD | GOT_TLS_GD);
+ 
++		if (!bfd_link_executable (info) && (got_type & GOT_TLS_IE))
++	      info->flags |= DF_STATIC_TLS;
++
++
+ 	    if (old_got_type != got_type)
+ 	      {
+ 		if (h != NULL)
+diff --color -Naur binutils-2.42/config.sub binutils/config.sub
+--- binutils-2.42/config.sub	2024-01-29 01:00:00.000000000 +0100
++++ binutils/config.sub	2025-09-18 06:14:48.232899271 +0200
+@@ -1766,7 +1766,7 @@
+ 	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
+ 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
+ 	     | nsk* | powerunix* | genode* | zvmoe* | qnx* | emx* | zephyr* \
+-	     | fiwix* | mlibc* | cos* | mbr* )
++	     | fiwix* | mlibc* | cos* | mbr* | cryptix*)
+ 		;;
+ 	# This one is extra strict with allowed versions
+ 	sco3.2v2 | sco3.2v[4-9]* | sco5v6*)
+diff --color -Naur binutils-2.42/gas/configure.tgt binutils/gas/configure.tgt
+--- binutils-2.42/gas/configure.tgt	2024-01-29 01:00:00.000000000 +0100
++++ binutils/gas/configure.tgt	2025-09-18 06:51:36.771126912 +0200
+@@ -135,6 +135,7 @@
+       aarch64*-linux-gnu_ilp32)		arch=aarch64:32 ;;
+     esac ;;
+   aarch64*-*-gnu*)			fmt=elf em=gnu ;;
++  aarch64*-*-cryptix*)			fmt=elf;;
+   aarch64*-*-netbsd*)			fmt=elf em=nbsd;;
+   aarch64*-*-nto*)			fmt=elf;;
+   aarch64*-*-openbsd*)			fmt=elf;;
+@@ -237,6 +238,7 @@
+   i386-*-knetbsd*-gnu | \
+   i386-*-netbsd* | \
+   i386-*-openbsd*)			fmt=elf em=nbsd ;;
++  i386-*-cryptix*) fmt=elf em=gnu;;
+   i386-*-linux-*)			fmt=elf em=linux
+     case ${cpu}-${os} in
+       x86_64*-linux-gnux32)		arch=x86_64:32 ;;
+diff --color -Naur binutils-2.42/ld/configure.tgt binutils/ld/configure.tgt
+--- binutils-2.42/ld/configure.tgt	2024-01-29 01:00:00.000000000 +0100
++++ binutils/ld/configure.tgt	2025-09-18 06:54:54.672909432 +0200
+@@ -92,6 +92,9 @@
+ aarch64-*-cloudabi*)	targ_emul=aarch64cloudabi
+ 			targ_extra_emuls=aarch64cloudabib
+ 			;;
++aarch64-*-cryptix*)	targ_emul=aarch64cryptix
++			targ_extra_emuls="aarch64elf $targ_extra_libpath" 
++            ;;
+ aarch64-*-freebsd*)	targ_emul=aarch64fbsd
+ 			targ_extra_emuls="aarch64fbsdb aarch64elf"
+ 			;;
+@@ -1020,6 +1023,9 @@
+ 			targ_extra_libpath="elf_i386 elf32_x86_64"
+ 			tdir_elf_i386=`echo ${targ_alias} | sed -e 's/x86_64/i386/'`
+ 			;;
++x86_64-*-cryptix*) targ_emul=elf_x86_64
++            targ_extra_emuls="elf_i386"
++            ;;
+ x86_64-*-redox*)	targ_emul=elf_x86_64
+ 			targ_extra_emuls=elf_i386
+ 			;;
+diff --color -Naur binutils-2.42/ld/emulparams/aarch64cryptix.sh binutils/ld/emulparams/aarch64cryptix.sh
+--- binutils-2.42/ld/emulparams/aarch64cryptix.sh	1970-01-01 01:00:00.000000000 +0100
++++ binutils/ld/emulparams/aarch64cryptix.sh	2025-09-18 07:13:45.428542063 +0200
+@@ -0,0 +1,46 @@
++ARCH=aarch64
++MACHINE=
++NOP=0x1f2003d5
++
++SCRIPT_NAME=elf
++ELFSIZE=64
++OUTPUT_FORMAT="elf64-littleaarch64"
++BIG_OUTPUT_FORMAT="elf64-bigaarch64"
++LITTLE_OUTPUT_FORMAT="elf64-littleaarch64"
++NO_REL_RELOCS=yes
++
++TEMPLATE_NAME=elf
++EXTRA_EM_FILE=aarch64elf
++
++GENERATE_SHLIB_SCRIPT=yes
++GENERATE_PIE_SCRIPT=yes
++
++MAXPAGESIZE="CONSTANT (MAXPAGESIZE)"
++COMMONPAGESIZE="CONSTANT (COMMONPAGESIZE)"
++SEPARATE_GOTPLT=24
++IREL_IN_PLT=
++
++TEXT_START_ADDR=0x400000
++
++DATA_START_SYMBOLS='PROVIDE (__data_start = .);';
++
++# AArch64 does not support .s* sections.
++NO_SMALL_DATA=yes
++
++OTHER_BSS_SYMBOLS="${CREATE_SHLIB+PROVIDE (}__bss_start__ = .${CREATE_SHLIB+)};"
++OTHER_BSS_END_SYMBOLS="${CREATE_SHLIB+PROVIDE (}_bss_end__ = .${CREATE_SHLIB+)}; ${CREATE_SHLIB+PROVIDE (}__bss_end__ = .${CREATE_SHLIB+)};"
++OTHER_END_SYMBOLS="${CREATE_SHLIB+PROVIDE (}__end__ = .${CREATE_SHLIB+)};"
++
++OTHER_SECTIONS='.note.gnu.arm.ident 0 : { KEEP (*(.note.gnu.arm.ident)) }'
++ATTRS_SECTIONS='.ARM.attributes 0 : { KEEP (*(.ARM.attributes)) KEEP (*(.gnu.attributes)) }'
++# Ensure each PLT entry is aligned to a cache line.
++PLT=".plt          ${RELOCATING-0} : ALIGN(16) { *(.plt)${RELOCATING+${IREL_IN_PLT+ *(.iplt)}} }"
++
++case "$target" in
++  aarch64*-cryptix*)
++    case "$EMULATION_NAME" in
++      aarch64cryptix*) LIBPATH_SUFFIX=64 ;;
++    esac
++    ;;
++esac
++
+diff --color -Naur binutils-2.42/ld/emulparams/elf_x86_64.sh binutils/ld/emulparams/elf_x86_64.sh
+--- binutils-2.42/ld/emulparams/elf_x86_64.sh	2024-01-29 01:00:00.000000000 +0100
++++ binutils/ld/emulparams/elf_x86_64.sh	2025-09-18 06:17:13.244040173 +0200
+@@ -44,7 +44,7 @@
+ # Linux/Solaris modify the default library search path to first include
+ # a 64-bit specific directory.
+ case "$target" in
+-  x86_64*-linux*|i[3-7]86-*-linux-*)
++  x86_64*-linux*|i[3-7]86-*-linux-*|x86_64*-cryptix*)
+     case "$EMULATION_NAME" in
+       *64*)
+ 	LIBPATH_SUFFIX=64
+diff --color -Naur binutils-2.42/ld/Makefile.am binutils/ld/Makefile.am
+--- binutils-2.42/ld/Makefile.am	2024-01-29 01:00:00.000000000 +0100
++++ binutils/ld/Makefile.am	2025-09-18 06:20:04.478981447 +0200
+@@ -390,6 +390,7 @@
+ 	eaarch64linux32.c \
+ 	eaarch64linux32b.c \
+ 	eaarch64linuxb.c \
++	eaarch64cryptix.c \
+ 	eaarch64nto.c \
+ 	eaarch64pe.c \
+ 	earm64pe.c \
+diff --color -Naur binutils-2.42/ld/Makefile.in binutils/ld/Makefile.in
+--- binutils-2.42/ld/Makefile.in	2024-01-29 01:00:00.000000000 +0100
++++ binutils/ld/Makefile.in	2025-09-18 06:57:39.504382886 +0200
+@@ -900,6 +900,7 @@
+ 	eaarch64linux32.c \
+ 	eaarch64linux32b.c \
+ 	eaarch64linuxb.c \
+++	eaarch64cryptix.c \
+ 	eaarch64nto.c \
+ 	eaarch64pe.c \
+ 	earm64pe.c \
+@@ -1284,6 +1285,7 @@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eaarch64linux32.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eaarch64linux32b.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eaarch64linuxb.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eaarch64cryptix.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eaarch64nto.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eaarch64pe.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eaix5ppc.Po@am__quote@

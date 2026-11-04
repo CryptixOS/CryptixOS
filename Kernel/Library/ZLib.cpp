@@ -4,13 +4,30 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <Debug/Assertions.hpp>
-
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
 #include <Library/Logger.hpp>
-#include <Library/ZLib.hpp>
-
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Memory/BitStream.hpp>
+#include <Prism/Memory/Endian.hpp>
+#include <Prism/Memory/Pointer.hpp>
 #include <Prism/Memory/ByteStream.hpp>
 #include <Prism/Utility/Checksum.hpp>
+
+module Cryptix:Impl.Library.ZLib;
+
+import :Debug.Assertions;
+import :Library.Logger;
+import :Library.ZLib;
 
 namespace ZLib
 {
@@ -137,7 +154,8 @@ namespace ZLib
         BitStream stream(m_InputData.As<u8>(), m_InputSize);
         m_InputEnd = m_InputData.Offset<u8*>(m_InputSize);
 
-        Header header(stream.Read<u16>());
+        Header header;
+        stream.Read(&header, sizeof(u16));
         if (header.CompressionMethod != CompressionMethod::eDeflate)
         {
             LogError("ZLib: Non-Deflate compression is not supported");
@@ -192,7 +210,8 @@ namespace ZLib
     bool Decompressor::DecompressStream(BitStream<>& stream)
     {
         bool final = true;
-        do {
+        do
+        {
             final          = stream.ReadBits(1);
 
             BlockType type = static_cast<BlockType>(stream.ReadBits(2));

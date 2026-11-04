@@ -4,8 +4,20 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Firmware/ACPI/Interpreter/NameSpace.hpp>
+
+module;
+
 #include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <Prism/Containers/UnorderedMap.hpp>
+
+module Cryptix:Impl.Firmware.ACPI.Interpreter.NameSpace;
+
+import :Firmware.ACPI.Interpreter.NameSpace;
+import :Library.Logger;
 
 namespace ACPI
 {

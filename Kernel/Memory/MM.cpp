@@ -4,16 +4,82 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <API/Syscall.hpp>
-
-#include <Memory/Allocator/KernelHeap.hpp>
-#include <Memory/MM.hpp>
-#include <Scheduler/Process.hpp>
-
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Tuple.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <magic_enum/magic_enum.hpp>
+#include <magic_enum/magic_enum_format.hpp>
+#include <API/Posix/linux/capability.h>
+#include <API/UnixTypes.hpp>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
 #include <Prism/String/Formatter.hpp>
-
-#include <icxxabi>
 #include <limine.h>
+
+module Cryptix:Impl.Memory.MM;
+
+import :API.Syscall;
+import :Memory.Allocator.KernelHeap;
+import :Memory.MM;
+import :Scheduler.Process;
+import :VFS.FileDescriptor;
+import :Library.ICxxAbi;
 
 namespace KernelHeap
 {
@@ -97,7 +163,7 @@ namespace MM
 
     Pointer         KernelPhysicalAddress() { return s_KernelPhysicalAddress; }
     Pointer         KernelVirtualAddress() { return s_KernelVirtualAddress; }
-    usize           HigherHalfOffset() { return s_HigherHalfOffset; }
+    usize           GetHigherHalfOffset() { return s_HigherHalfOffset; }
     enum PagingMode PagingMode() { return s_PagingMode; }
 
     Ref<Region>     AllocateRegion(const usize bytes, PageAttributes attributes,
@@ -150,6 +216,27 @@ namespace MM
         s_KernelAddressSpace.Insert(virt, region);
         return region;
     }
+
+    Ref<Region> AllocateKernelRegion(const usize bytes, PageAttributes flags)
+    {
+        auto  region    = VMM::AllocateKernelRegion(bytes, flags);
+        usize pageCount = Math::DivRoundUp(bytes, PMM::PAGE_SIZE);
+        auto  phys      = PMM::CallocatePages(pageCount);
+
+        using VMM::Access;
+        Access access = Access::eUser;
+        if (flags & PageAttributes::eRead) access |= Access::eRead;
+        if (flags & PageAttributes::eWrite) access |= Access::eWrite;
+        if (flags & PageAttributes::eExecutable) access |= Access::eExecute;
+
+        region->SetPhysicalBase(phys);
+        region->SetAccessMode(access);
+
+        auto pageMap = VMM::GetKernelPageMap();
+        pageMap->MapRegion(region);
+
+        return region;
+    }
     Ref<Region> AllocateUserRegion(const usize bytes, PageAttributes flags)
     {
         auto  process      = Process::Current();
@@ -187,33 +274,6 @@ namespace MM
         auto message = Format("Page Fault occurred at '{:#x}'\nCaused by:\n",
                               info.VirtualAddress().Raw());
         auto reason  = info.Reason();
-
-        auto process = Process::Current();
-        Ref<Region> region = nullptr;
-
-        if (process)
-        {
-            auto& addressSpace = process->AddressSpace();
-            region             = addressSpace.Find(info.VirtualAddress());
-        }
-
-        if (region)
-        {
-            usize pageCount = Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE);
-            auto  phys      = PMM::CallocatePages(pageCount);
-
-            if (phys)
-            {
-                region->SetPhysicalBase(phys);
-
-                auto pageMap = process->PageMap;
-                pageMap->MapRegion(region);
-                return;
-            }
-
-            errno = ENOMEM;
-        }
-
         if (reason & PageFaultReason::eNotPresent)
             message += "\t- Non-present page\n";
         if (reason & PageFaultReason::eWrite)
@@ -231,6 +291,45 @@ namespace MM
 
         bool kernelFault = !(reason & PageFaultReason::eUser);
         message += Format("In {} space", kernelFault ? "User" : "Kernel");
+
+        auto        process = Process::Current();
+        Ref<Region> region  = nullptr;
+
+        if (process)
+        {
+            auto& addressSpace = process->AddressSpace();
+            region             = addressSpace.Find(info.VirtualAddress());
+        }
+
+        if (region)
+        {
+            auto  fd   = region->FileDescriptor();
+            usize size = fd && fd->File() ? fd->File()->Size() : region->Size();
+
+            usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
+            Pointer phys    = PMM::CallocatePages(pageCount);
+            auto    virt    = region->VirtualBase();
+            Assert(virt);
+
+            auto pageMap = process->PageMap;
+            if (phys)
+            {
+                auto flags = PageAttributes::eRW | PageAttributes::eUser
+                           | PageAttributes::eWriteBack;
+                region->SetPhysicalBase(phys);
+                region->SetAttributes(flags);
+                pageMap->MapRegion(region);
+
+                if (fd)
+                {
+                    isize nread = TryAcquire(fd->Read(virt, size));
+                    if (nread != static_cast<isize>(size))
+                        LogError("MM: Failed to read the file descriptor");
+                }
+                return;
+            }
+            errno = ENOMEM;
+        }
 
         if (CPU::DuringSyscall())
         {

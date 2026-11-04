@@ -4,17 +4,79 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/CPU.hpp>
 
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
 #include <Prism/String/StringBuilder.hpp>
+#include <API/Posix/linux/capability.h>
+#include <API/UnixTypes.hpp>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
+#include <API/Posix/sys/statfs.h>
 
-#include <Scheduler/Process.hpp>
-#include <Scheduler/Thread.hpp>
+module Cryptix:Impl.VFS.INode;
 
-#include <VFS/FileDescriptor.hpp>
-#include <VFS/Filesystem.hpp>
-#include <VFS/INode.hpp>
-#include <VFS/MountPoint.hpp>
+import :Arch.CPU;
+import :Scheduler.Process;
+import :Scheduler.Thread;
+import :VFS.FileDescriptor;
+import :VFS.Filesystem;
+import :VFS.INode;
+import :VFS.MountPoint;
 
 INode::INode(class Filesystem* fs)
     : m_Filesystem(fs)
@@ -28,7 +90,7 @@ INode::INode(StringView name, class Filesystem* fs)
     : m_Name(name)
     , m_Filesystem(fs)
 {
-    auto  thread  = CPU::GetCurrentThread();
+    auto     thread  = CPU::GetCurrentThread();
     Process* process = thread ? thread->Parent() : nullptr;
 
     if (!process) return;
@@ -37,16 +99,16 @@ INode::INode(StringView name, class Filesystem* fs)
     m_Metadata.GID = process->Credentials().EffectiveGroupID;
 }
 
-const stat INode::Stats()
+const stat INode::Stats() const
 {
     stat stats{};
-    stats.st_dev     = m_Metadata.DeviceID;
+    stats.st_dev     = m_Metadata.RootDeviceID;
     stats.st_ino     = m_Metadata.ID;
     stats.st_nlink   = m_Metadata.LinkCount;
     stats.st_mode    = m_Metadata.Mode;
     stats.st_uid     = m_Metadata.UID;
     stats.st_gid     = m_Metadata.GID;
-    stats.st_rdev    = m_Metadata.RootDeviceID;
+    stats.st_rdev    = m_Metadata.DeviceID;
     stats.st_size    = m_Metadata.Size;
     stats.st_blksize = m_Metadata.BlockSize;
     stats.st_blocks  = m_Metadata.BlockCount;
@@ -62,7 +124,7 @@ bool INode::IsFilesystemRoot() const
     auto fsRootEntry = m_Filesystem->RootDirectoryEntry();
     auto fsRootINode = fsRootEntry->INode();
 
-    return this == fsRootINode;
+    return this == fsRootINode.Raw();
 }
 
 bool INode::IsEmpty()
@@ -82,12 +144,32 @@ bool INode::IsEmpty()
 }
 bool INode::ReadOnly() { return false; }
 bool INode::Immutable() { return false; }
+bool INode::CanRead(const Credentials& creds) const
+{
+    if (creds.EffectiveUserID == 0 || m_Metadata.Mode & S_IROTH) return true;
+    if (creds.EffectiveUserID == m_Metadata.UID && m_Metadata.Mode & S_IRUSR)
+        return true;
+
+    return m_Metadata.GID == creds.EffectiveGroupID
+        && m_Metadata.Mode & S_IRGRP;
+}
 bool INode::CanWrite(const Credentials& creds) const
 {
     if (creds.EffectiveUserID == 0 || m_Metadata.Mode & S_IWOTH) return true;
-    if (creds.EffectiveUserID == m_Metadata.UID && m_Metadata.Mode & S_IWUSR) return true;
+    if (creds.EffectiveUserID == m_Metadata.UID && m_Metadata.Mode & S_IWUSR)
+        return true;
 
-    return m_Metadata.GID == creds.EffectiveGroupID && m_Metadata.Mode & S_IWGRP;
+    return m_Metadata.GID == creds.EffectiveGroupID
+        && m_Metadata.Mode & S_IWGRP;
+}
+bool INode::CanExecute(const Credentials& creds) const
+{
+    if (creds.EffectiveUserID == m_Metadata.UID && m_Metadata.Mode & S_IXUSR)
+        return true;
+    if (creds.EffectiveGroupID == m_Metadata.GID && m_Metadata.Mode & S_IXGRP)
+        return true;
+    if (m_Metadata.Mode & S_IXOTH) return true;
+    return false;
 }
 
 bool INode::ValidatePermissions(const Credentials& creds, u32 acc)
@@ -95,36 +177,44 @@ bool INode::ValidatePermissions(const Credentials& creds, u32 acc)
     return true;
 }
 
-ErrorOr<Ref<DirectoryEntry>> INode::CreateNode(Ref<DirectoryEntry> entry,
-                                               mode_t mode, dev_t dev)
+ErrorOr<File*> INode::Open(class ::Ref<::DirectoryEntry> dentry, i64 flags,
+                           u64 accMode)
+{
+    return new File(this);
+}
+ErrorOr<::Ref<DirectoryEntry>> INode::CreateNode(::Ref<DirectoryEntry> entry,
+                                                 INodeMode mode, dev_t dev)
 {
     return Error(ENOSYS);
 }
-ErrorOr<Ref<DirectoryEntry>> INode::CreateFile(Ref<DirectoryEntry> entry,
-                                               mode_t              mode)
+ErrorOr<::Ref<DirectoryEntry>> INode::CreateFile(::Ref<DirectoryEntry> entry,
+                                                 INodeMode             mode)
 {
     return Error(ENOSYS);
 }
-ErrorOr<Ref<DirectoryEntry>> INode::CreateDirectory(Ref<DirectoryEntry> entry,
-                                                    mode_t              mode)
+ErrorOr<::Ref<DirectoryEntry>>
+INode::CreateDirectory(::Ref<DirectoryEntry> entry, INodeMode mode)
 {
     return Error(ENOSYS);
 }
-ErrorOr<Ref<DirectoryEntry>> INode::Symlink(Ref<DirectoryEntry> entry,
-                                            PathView            targetPath)
+ErrorOr<::Ref<DirectoryEntry>> INode::Symlink(::Ref<DirectoryEntry> entry,
+                                              PathView              targetPath)
 {
     return Error(ENOSYS);
 }
-ErrorOr<Ref<DirectoryEntry>> INode::Link(Ref<DirectoryEntry> oldEntry,
-                                         Ref<DirectoryEntry> newEntry)
+ErrorOr<::Ref<DirectoryEntry>> INode::Link(::Ref<DirectoryEntry> oldEntry,
+                                           ::Ref<DirectoryEntry> newEntry)
 {
     return Error(ENOSYS);
 }
 
 ErrorOr<Path> INode::ReadLink() { return Error(ENOSYS); }
-ErrorOr<void> INode::Unlink(Ref<DirectoryEntry> entry) { return Error(ENOSYS); }
+ErrorOr<void> INode::Unlink(::Ref<DirectoryEntry> entry)
+{
+    return Error(ENOSYS);
+}
 
-ErrorOr<isize> INode::CheckPermissions(mode_t mask)
+ErrorOr<isize> INode::CheckPermissions(INodeMode mask)
 {
     if (mask & W_OK)
     {
@@ -136,7 +226,7 @@ ErrorOr<isize> INode::CheckPermissions(mode_t mask)
     return 0;
 }
 
-ErrorOr<Ref<DirectoryEntry>> INode::Lookup(Ref<DirectoryEntry> dentry)
+ErrorOr<::Ref<DirectoryEntry>> INode::Lookup(::Ref<DirectoryEntry> dentry)
 {
     return Error(ENOSYS);
 }
@@ -156,8 +246,9 @@ timespec  INode::AccessTime() const { return m_Metadata.AccessTime; }
 timespec INode::ModificationTime() const { return m_Metadata.ModificationTime; }
 timespec INode::StatusChangeTime() const { return m_Metadata.ChangeTime; }
 
-ErrorOr<void> INode::SetOwner(uid_t uid, gid_t gid)
+ErrorOr<void> INode::SetOwner(::UserID uid, ::GroupID gid)
 {
+    ScopedLock guard(m_Lock);
     if (uid == m_Metadata.UID && gid == m_Metadata.GID) return {};
     m_Metadata.UID = uid;
     m_Metadata.GID = gid;
@@ -165,10 +256,10 @@ ErrorOr<void> INode::SetOwner(uid_t uid, gid_t gid)
     m_Dirty        = true;
     return {};
 }
-ErrorOr<void> INode::ChangeMode(mode_t mode)
+ErrorOr<void> INode::ChangeMode(INodeMode mode)
 {
-    m_Metadata.Mode |= (mode & 0777);
-    m_Dirty = true;
+    m_Metadata.Mode = (m_Metadata.Mode & ~07777u) | (mode & 07777u);
+    m_Dirty         = true;
 
     return {};
 }

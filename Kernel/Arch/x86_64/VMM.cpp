@@ -4,10 +4,42 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Common.hpp>
 
-#include <Memory/MM.hpp>
-#include <Memory/VMM.hpp>
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+
+module Cryptix:Impl.Arch.x86_64.VMM;
+
+import :Debug.Assertions;
+import :Library.Logger;
+import :Library.Stacktrace;
+import :Memory.MM;
+import :Memory.VMM;
 
 constexpr usize                  PTE_PRESENT    = Bit(0);
 constexpr usize                  PTE_WRITEABLE  = Bit(1);
@@ -196,8 +228,14 @@ bool PageMap::InternalMap(Pointer virt, Pointer phys, PageAttributes flags)
         flags |= PageAttributes::eLPage;
 
         for (usize i = 0; i < 1_gib; i += 2_mib)
+        {
+            auto phys = Virt2Phys(virt.Offset(i), flags);
+            if (phys) continue;
+
             if (!InternalMap(virt.Offset(i), phys.Offset(i), flags))
                 return false;
+        }
+
         return true;
     }
 
@@ -206,6 +244,19 @@ bool PageMap::InternalMap(Pointer virt, Pointer phys, PageAttributes flags)
     {
         LogError("VMM: Could not get page map entry for address {:#x}", virt);
         return false;
+    }
+
+    if (pmlEntry->Address())
+    {
+        LogWarn(
+            "VMM: page at {:#x} is already mapped to {:#x}\ntried to map to => "
+            "{:#x}",
+            virt.Raw(), pmlEntry->Address().Raw(), phys.Raw());
+        Stacktrace::Print(8);
+#define CTOS_HALT_ON_COLLISION 1
+#if CTOS_HALT_ON_COLLISION
+        for (;;) Arch::Halt();
+#endif
     }
 
     pmlEntry->Clear();
@@ -243,6 +294,17 @@ bool PageMap::InternalUnmap(Pointer virt, PageAttributes flags)
     }
 
     return unmapOne(virt, pageSize);
+}
+bool PageMap::InternalProtect(Pointer virt, PageAttributes flags)
+{
+    usize pageSize = Arch::VMM::GetPageSize(flags);
+    auto  entry    = Virt2Pte(m_TopLevel, virt, false, pageSize);
+    if (!entry) return false;
+
+    auto nativeFlags = ToNativeFlags(flags);
+    entry->SetFlags(nativeFlags, true);
+
+    return true;
 }
 
 bool PageMap::SetFlags(Pointer virt, PageAttributes flags)

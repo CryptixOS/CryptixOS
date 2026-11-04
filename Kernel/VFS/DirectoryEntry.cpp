@@ -4,46 +4,108 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
 #include <API/Limits.hpp>
 #include <API/Posix/dirent.h>
 #include <Prism/String/StringBuilder.hpp>
+#include <API/UnixTypes.hpp>
+#include <Compiler.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#if defined(CTOS_TARGET_X86_64)
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <API/Posix/sys/statfs.h>
 
-#include <VFS/DirectoryEntry.hpp>
-#include <VFS/INode.hpp>
-#include <VFS/MountPoint.hpp>
-#include <VFS/VFS.hpp>
+module Cryptix:Impl.VFS.DirectoryEntry;
+
+import :VFS.INode;
+import :VFS.MountPoint;
+import :VFS.VFS;
 
 // NOTE(v1tr10l7): Directories should only have one DirectoryEntry, regular
 // files might have multiple pointing to the same inode
 
+DirectoryEntry::DirectoryEntry(StringView name)
+    : m_Name(name)
+{
+}
 DirectoryEntry::DirectoryEntry(::WeakRef<DirectoryEntry> parent,
                                StringView                name)
     : m_Name(name)
     , m_Parent(parent)
 {
 }
+DirectoryEntry::DirectoryEntry(const DirectoryEntry& other)
+    : m_INode(other.m_INode)
+{
+}
 DirectoryEntry::~DirectoryEntry() {}
 
-Path DirectoryEntry::Path()
+::Ref<INode> DirectoryEntry::INode() const { return m_INode; }
+
+Path         DirectoryEntry::Path()
 {
     StringBuilder pathBuilder;
 
     WeakRef       current   = this;
     auto          rootEntry = VFS::RootDirectoryEntry();
+    auto          rootINode = rootEntry->INode();
 
-    while (current && current != rootEntry)
+    while (current && current->INode() != rootINode)
     {
         auto segment = "/"_s;
         segment += current->m_Name;
 
         if (current->m_Name != "/"_sv) pathBuilder.Insert(segment);
-
         current = current->GetEffectiveParent().Raw();
     }
 
     return pathBuilder.Empty() ? "/"_s : pathBuilder.ToString();
 }
-const UnorderedMap<StringView, ::Ref<DirectoryEntry>>&
+const UnorderedMap<String, ::Ref<DirectoryEntry>>&
 DirectoryEntry::Children() const
 {
     return m_Children;
@@ -56,13 +118,12 @@ void DirectoryEntry::SetParent(::WeakRef<DirectoryEntry> entry)
 void DirectoryEntry::SetMountGate(::Ref<DirectoryEntry> mountPoint)
 {
     ScopedLock guard(m_Lock);
-    m_MountGate = mountPoint;
 
     if (!(m_Flags & DirectoryEntryFlags::eEntryTypeMask))
         m_Flags |= DirectoryEntryFlags::eDirectory;
     m_Flags |= DirectoryEntryFlags::eMountPoint;
 }
-void DirectoryEntry::Bind(class INode* inode)
+void DirectoryEntry::Bind(::Ref<class INode> inode)
 {
     Assert(inode);
 
@@ -92,13 +153,6 @@ void DirectoryEntry::RemoveChild(::Ref<class DirectoryEntry> entry)
     m_Children.Erase(it);
 }
 
-::WeakRef<DirectoryEntry> DirectoryEntry::FollowMounts()
-{
-    WeakRef current = this;
-    while (current && current->m_MountGate) current = current->m_MountGate;
-
-    return current;
-}
 ::WeakRef<DirectoryEntry> DirectoryEntry::FollowSymlinks(usize cnt)
 {
     auto target = TryOrRetVal(m_INode->ReadLink(), this);
@@ -119,12 +173,23 @@ void DirectoryEntry::RemoveChild(::Ref<class DirectoryEntry> entry)
 }
 WeakRef<DirectoryEntry> DirectoryEntry::GetEffectiveParent()
 {
-    auto rootEntry  = VFS::RootDirectoryEntry()->FollowMounts();
-    auto mountPoint = MountPoint::Lookup(const_cast<DirectoryEntry*>(this));
+    auto                  rootEntry   = VFS::RootDirectoryEntry();
+    ::Ref<DirectoryEntry> parentEntry = nullptr;
 
+    MountPoint::Iterate(
+        [this, &parentEntry](::Ref<MountPoint> mountPoint) -> IterationResult
+        {
+            if (mountPoint->GuestEntry() == this)
+            {
+                parentEntry = mountPoint->HostEntry();
+                return IterationResult::eBreak;
+            }
+
+            return IterationResult::eContinue;
+        });
     if (this == rootEntry.Raw() || this == VFS::RootDirectoryEntry().Raw())
         return const_cast<DirectoryEntry*>(this);
-    else if (mountPoint) return mountPoint->HostEntry()->Parent();
+    else if (parentEntry) return parentEntry;
 
     return Parent();
 }
@@ -136,7 +201,7 @@ DirectoryEntry::TraverseDirectories(::Ref<class DirectoryEntry> parent,
     PopulateDirectoryEntries();
 
     usize index = 0;
-    for (const auto& [name, entry] : m_Children)
+    for (auto& [name, entry] : m_Children)
     {
         auto inode = entry->INode();
         if (!inode)

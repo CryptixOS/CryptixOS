@@ -5,13 +5,75 @@
  * SPDX-License-Identifier: GPL-3
  */
 
-#include <Arch/x86_64/CPU.hpp>
-#include <Arch/x86_64/IDT.hpp>
+module;
 
-#include <Arch/x86_64/Drivers/IoApic.hpp>
-#include <Arch/x86_64/Drivers/PIC.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Memory/RefCounted.hpp>
+#include <Prism/String/StringUtils.hpp>
+#include <Prism/Core/Singleton.hpp>
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <API/UnixTypes.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/Core/Concepts.hpp>
+#endif
 
-#include <Firmware/ACPI/MADT.hpp>
+module Cryptix:Impl.Arch.x86_64.Drivers.IoApic;
+
+import :Arch.CPU;
+import :Arch.x86_64.CPU;
+import :Arch.x86_64.IDT;
+import :Arch.x86_64.Drivers.IoApic;
+import :Arch.x86_64.Drivers.PIC;
+import :Arch.x86_64.Drivers.Time.Lapic;
+import :Firmware.ACPI.MADT;
 
 static Vector<IoApic> s_IoApics{};
 
@@ -24,8 +86,8 @@ IoApic::IoApic(Pointer baseAddress, u32 gsiBase)
     //                              PageAttributes::eRW
     //                                  | PageAttributes::eWriteThrough);
 
-    m_RegisterSelect = m_BaseAddressVirt.As<volatile u32>();
-    m_RegisterWindow = m_BaseAddressVirt.Offset<volatile u32*>(0x10);
+    m_RegisterSelect  = m_BaseAddressVirt.As<volatile u32>();
+    m_RegisterWindow  = m_BaseAddressVirt.Offset<volatile u32*>(0x10);
 
     m_RedirectionEntryCount
         = ((Read(IoApicRegister::eVersion) & 0xff0000) >> 16);
@@ -102,7 +164,7 @@ void IoApic::Initialize()
     }
 
     LogTrace("IoApic: Initializing...");
-    I8259A::Instance().MaskAllIRQs();
+    I8259A::Instance()->MaskAllIRQs();
     LogTrace("IoApic: Legacy PIC disabled");
 
     LogTrace("IoApic: Enumerating controllers...");
@@ -144,4 +206,40 @@ IoApic& IoApic::GetIoApicForGsi(u32 gsi)
     }
 
     Panic("Cannot determine IO APIC from GSI {}", gsi);
+}
+
+IoApicController::IoApicController() = default;
+
+ErrorOr<void> IoApicController::Initialize()
+{
+    IoApic::Initialize();
+    return {};
+}
+ErrorOr<void> IoApicController::Shutdown()
+{
+    for (auto& ioApic : IoApic::GetIoApics()) ioApic.MaskAllEntries();
+    return {};
+}
+
+ErrorOr<void> IoApicController::Mask(u32 irq)
+{
+    if (!IoApic::IsAnyEnabled()) return Error(ENODEV);
+    IoApic::SetIrqRedirect(CPU::Current()->LapicID, irq + 0x20, irq, false);
+
+    return {};
+}
+ErrorOr<void> IoApicController::Unmask(u32 irq)
+{
+    if (!IoApic::IsAnyEnabled()) return Error(ENODEV);
+
+    IoApic::SetIrqRedirect(CPU::Current()->LapicID, irq + 0x20, irq, true);
+    return {};
+}
+
+ErrorOr<void> IoApicController::SendEOI(u32 irq)
+{
+    if (!IoApic::IsAnyEnabled()) return Error(ENODEV);
+    Lapic::Instance()->SendEOI();
+
+    return {};
 }

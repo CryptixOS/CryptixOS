@@ -12,8 +12,7 @@
 /* Definitions of frame buffers						*/
 constexpr usize FB_MAX              = 32;
 
-/* ioctls
-   0x46 is 'F'								*/
+/* ioctls 0x46 is 'F' */
 constexpr usize FBIOGET_VSCREENINFO = 0x4600;
 constexpr usize FBIOPUT_VSCREENINFO = 0x4601;
 constexpr usize FBIOGET_FSCREENINFO = 0x4602;
@@ -397,72 +396,148 @@ constexpr usize FB_ROTATE_CW           = 1;
 constexpr usize FB_ROTATE_UD           = 2;
 constexpr usize FB_ROTATE_CCW          = 3;
 
-consteval usize PICOS2KHZ(usize a) { return 1000000000ul / a; }
-consteval usize KHZ2PICOS(usize a) { return 1000000000ul / a; }
+constexpr usize PICOS2KHZ(usize a) { return 1000000000ul / a; }
+constexpr usize KHZ2PICOS(usize a) { return 1000000000ul / a; }
 
+constexpr usize FB_MAXTIMINGS         = 0;
+constexpr usize FB_VSYNCTIMINGS       = 1;
+constexpr usize FB_HSYNCTIMINGS       = 2;
+constexpr usize FB_DCLKTIMINGS        = 3;
+constexpr usize FB_IGNOREMON          = 0x100;
+
+constexpr usize FB_MODE_IS_UNKNOWN    = 0;
+constexpr usize FB_MODE_IS_DETAILED   = 1;
+constexpr usize FB_MODE_IS_STANDARD   = 2;
+constexpr usize FB_MODE_IS_VESA       = 4;
+constexpr usize FB_MODE_IS_CALCULATED = 8;
+constexpr usize FB_MODE_IS_FIRST      = 16;
+constexpr usize FB_MODE_IS_FROM_VAR   = 32;
+
+struct fb_videomode
+{
+    const char*    name;
+    u32            refresh;
+    u32            xres;
+    u32            yres;
+    u32            pixclock;
+    u32            left_margin;
+    u32            right_margin;
+    u32            upper_margin;
+    u32            lower_margin;
+    u32            hsync_len;
+    u32            vsync_len;
+    u32            sync;
+    u32            vmode;
+    u32            flag;
+
+    constexpr auto operator==(const fb_videomode rhs) const
+    {
+        return (xres == rhs.xres && yres == rhs.yres && pixclock == rhs.pixclock
+                && hsync_len == rhs.hsync_len && vsync_len == rhs.vsync_len
+                && left_margin == rhs.left_margin
+                && right_margin == rhs.right_margin
+                && upper_margin == rhs.upper_margin
+                && lower_margin == rhs.lower_margin && sync == rhs.sync
+                && vmode == rhs.vmode);
+    }
+};
 struct fb_var_screeninfo
 {
     /* visible resolution		*/
-    u32                xres;
-    u32                yres;
+    u32                    xres;
+    u32                    yres;
     /* virtual resolution		*/
-    u32                xres_virtual;
-    u32                yres_virtual;
+    u32                    xres_virtual;
+    u32                    yres_virtual;
     /* offset from virtual to visible */
-    u32                xoffset;
-    u32                yoffset;
+    u32                    xoffset;
+    u32                    yoffset;
     /* resolution			*/
 
     /* guess what			*/
-    u32                bits_per_pixel;
+    u32                    bits_per_pixel;
     /* 0 = color, 1 = grayscale,	*/
-    u32                grayscale;
+    u32                    grayscale;
     /* >1 = FOURCC			*/
     /* bitfield in fb mem if true color, */
-    struct fb_bitfield red;
+    struct fb_bitfield     red;
     /* else only length is significant */
-    struct fb_bitfield green;
-    struct fb_bitfield blue;
+    struct fb_bitfield     green;
+    struct fb_bitfield     blue;
     /* transparency			*/
-    struct fb_bitfield transp;
+    struct fb_bitfield     transp;
 
     /* != 0 Non standard pixel format */
-    u32                nonstd;
+    u32                    nonstd;
     /* see FB_ACTIVATE_*		*/
-    u32                activate;
+    u32                    activate;
 
     /* height of picture in mm    */
-    u32                height;
+    u32                    height;
     /* width of picture in mm     */
-    u32                width;
+    u32                    width;
 
     /* (OBSOLETE) see fb_info.flags */
-    u32                accel_flags;
+    u32                    accel_flags;
 
     /* Timing: All values in pixclocks, except pixclock (of course) */
     /* pixel clock in ps (pico seconds) */
-    u32                pixclock;
+    u32                    pixclock;
     /* time from sync to picture	*/
-    u32                left_margin;
+    u32                    left_margin;
     /* time from picture to sync	*/
-    u32                right_margin;
+    u32                    right_margin;
     /* time from sync to picture	*/
-    u32                upper_margin;
-    u32                lower_margin;
+    u32                    upper_margin;
+    u32                    lower_margin;
     /* length of horizontal sync	*/
-    u32                hsync_len;
+    u32                    hsync_len;
     /* length of vertical sync	*/
-    u32                vsync_len;
+    u32                    vsync_len;
     /* see FB_SYNC_*		*/
-    u32                sync;
+    u32                    sync;
     /* see FB_VMODE_*		*/
-    u32                vmode;
+    u32                    vmode;
     /* angle we rotate counter clockwise */
-    u32                rotate;
+    u32                    rotate;
     /* colorspace for FOURCC-based modes */
-    u32                colorspace;
+    u32                    colorspace;
     /* Reserved for future compatibility */
-    u32                reserved[4];
+    u32                    reserved[4];
+
+    constexpr fb_videomode VideoMode()
+    {
+        fb_videomode mode{};
+
+        mode.name         = NULL;
+        mode.xres         = xres;
+        mode.yres         = yres;
+        mode.pixclock     = pixclock;
+        mode.hsync_len    = hsync_len;
+        mode.vsync_len    = vsync_len;
+        mode.left_margin  = left_margin;
+        mode.right_margin = right_margin;
+        mode.upper_margin = upper_margin;
+        mode.lower_margin = lower_margin;
+        mode.sync         = sync;
+        mode.vmode        = vmode & FB_VMODE_MASK;
+        mode.flag         = FB_MODE_IS_FROM_VAR;
+        mode.refresh      = 0;
+
+        if (!pixclock) return {};
+
+        pixclock   = PICOS2KHZ(pixclock) * 1000;
+
+        u32 htotal = xres + right_margin + hsync_len + left_margin;
+        u32 vtotal = yres + lower_margin + vsync_len + upper_margin;
+
+        if (vmode & FB_VMODE_INTERLACED) vtotal /= 2;
+        if (vmode & FB_VMODE_DOUBLE) vtotal *= 2;
+
+        u32 hfreq    = pixclock / htotal;
+        mode.refresh = hfreq / vtotal;
+        return mode;
+    }
 };
 
 struct fb_cmap
@@ -536,9 +611,196 @@ struct fb_vblank
     u32 reserved[4];
 };
 
-/* Internal HW accel */
+struct fb_event
+{
+    struct fb_info* info;
+    void*           data;
+};
+
+/* FBINFO_* = fb_info.flags bit flags */
+constexpr usize FBINFO_MODULE = 0x0001; /* Low-level driver is a module */
+constexpr usize FBINFO_HWACCEL_DISABLED = 0x0002;
+/* When FBINFO_HWACCEL_DISABLED is set:
+ *  Hardware acceleration is turned off.  Software implementations
+ *  of required functions (copyarea(), fillrect(), and imageblit())
+ *  takes over; acceleration engine should be in a quiescent state */
+
+/* hints */
+constexpr usize FBINFO_VIRTFB = 0x0004; /* FB is System RAM, not device. */
+constexpr usize FBINFO_PARTIAL_PAN_OK
+    = 0x0040; /* otw use pan only for double-buffering \
+               */
+constexpr usize FBINFO_READS_FAST
+    = 0x0080; /* soft-copy faster than rendering */
+
+/* hardware supported ops */
+/*  semantics: when a bit is set, it indicates that the operation is
+ *   accelerated by hardware.
+ *  required functions will still work even if the bit is not set.
+ *  optional functions may not even exist if the flag bit is not set.
+ */
+constexpr usize FBINFO_HWACCEL_NONE       = 0x0000;
+/* required */
+constexpr usize FBINFO_HWACCEL_COPYAREA   = Bit(8);
+/* required */
+constexpr usize FBINFO_HWACCEL_FILLRECT   = Bit(9);
+/* required */
+constexpr usize FBINFO_HWACCEL_IMAGEBLIT  = Bit(10);
+constexpr usize FBINFO_HWACCEL_ROTATE     = Bit(11);
+constexpr usize FBINFO_HWACCEL_XPAN       = Bit(12);
+constexpr usize FBINFO_HWACCEL_YPAN       = Bit(13);
+constexpr usize FBINFO_HWACCEL_YWRAP      = Bit(15);
+/* event request from userspace */
+constexpr usize FBINFO_MISC_USEREVENT     = Bit(16);
+/* use tile blitting */
+constexpr usize FBINFO_MISC_TILEBLITTING  = Bit(17);
+
+/* A driver may set this flag to indicate that it does want a set_par to be
+ * called every time when fbcon_switch is executed. The advantage is that with
+ * this flag set you can really be sure that set_par is always called before
+ * any of the functions dependent on the correct hardware state or altering
+ * that state, even if you are using some broken X releases. The disadvantage
+ * is that it introduces unwanted delays to every console switch if set_par
+ * is slow. It is a good idea to try this flag in the drivers initialization
+ * code whenever there is a bug report related to switching between X and the
+ * framebuffer console.
+ */
+constexpr usize FBINFO_MISC_ALWAYS_SETPAR = Bit(18);
+
+/* where the fb is a firmware driver, and can be replaced with a proper one */
+constexpr usize FBINFO_MISC_FIRMWARE      = Bit(19);
+/*
+ * Host and GPU endianness differ.
+ */
+constexpr usize FBINFO_FOREIGN_ENDIAN     = Bit(20);
+/*
+ * Big endian math. This is the same flags as above, but with different
+ * meaning, it is set by the fb subsystem depending FOREIGN_ENDIAN flag
+ * and host endianness. Drivers should not use this flag.
+ */
+constexpr usize FBINFO_BE_MATH            = Bit(20);
+
+/* report to the VT layer that this fb driver can accept forced console
+   output like oopses */
+constexpr usize FBINFO_CAN_FORCE_OUTPUT   = Bit(21);
+
+struct fb_info
+{
+    i64                      count;
+    int                      node;
+    int                      flags;
+    /* Lock for open/release/ioctl funcs */
+    // Mutex                    lock;
+    /* Lock for fb_mmap and smem_* fields */
+    // struct mutex             mm_lock;
+    /* Current var */
+    struct fb_var_screeninfo var;
+    /* Current fix */
+    struct fb_fix_screeninfo fix;
+    /* Current Monitor specs */
+    // struct fb_monspecs       monspecs;
+    /* Framebuffer event queue */
+    // struct work_struct       queue;
+    /* Image hardware mapper */
+    // struct fb_pixmap         pixmap;
+    /* Cursor hardware mapper */
+    // struct fb_pixmap         sprite;
+    /* Current cmap */
+    struct fb_cmap           cmap;
+    /* mode list */
+    // struct list_head         modelist;
+    /* current mode */
+    struct fb_videomode*     mode;
+
+#ifdef CONFIG_FB_BACKLIGHT
+    /* assigned backlight device */
+    /* set before framebuffer registration,
+       remove after unregister */
+    struct backlight_device* bl_dev;
+
+    /* Backlight level curve */
+    struct mutex             bl_curve_mutex;
+    u8                       bl_curve[FB_BACKLIGHT_LEVELS];
+#endif
+#ifdef CONFIG_FB_DEFERRED_IO
+    struct delayed_work    deferred_work;
+    struct fb_deferred_io* fbdefio;
+#endif
+
+    struct fb_ops* fbops;
+    struct device* device;     /* This is the parent */
+    struct device* dev;        /* This is this fb device */
+    int            class_flag; /* private sysfs flags */
+#ifdef CONFIG_FB_TILEBLITTING
+    struct fb_tile_ops* tileops; /* Tile Blitting */
+#endif
+    // char __iomem*   screen_base;    /* Virtual address */
+    unsigned long screen_size;    /* Amount of ioremapped VRAM or 0 */
+    void*         pseudo_palette; /* Fake palette of 16 colors */
+    // constexpr usize FBINFO_STATE_RUNNING   = 0;
+    // constexpr usize FBINFO_STATE_SUSPENDED = 1;
+    u32           state;     /* Hardware state i.e suspend */
+    void*         fbcon_par; /* fbcon use-only private area */
+    /* From here on everything is device dependent */
+    void*         par;
+    /* we need the PCI or similar aperture base/size not
+       smem_start/size as smem_start may just be an object
+       allocated inside the aperture so may not actually overlap */
+    struct apertures_struct
+    {
+        unsigned int count;
+        struct aperture
+        {
+            // resource_size_t base;
+            // resource_size_t size;
+        } ranges[0];
+    }* apertures;
+};
+
 constexpr usize ROP_COPY = 0;
 constexpr usize ROP_XOR  = 1;
+
+struct fb_chroma
+{
+    u32 redx; /* in fraction of 1024 */
+    u32 greenx;
+    u32 bluex;
+    u32 whitex;
+    u32 redy;
+    u32 greeny;
+    u32 bluey;
+    u32 whitey;
+};
+struct fb_monspecs
+{
+    struct fb_chroma     chroma;
+    struct fb_videomode* modedb;          /* mode database */
+    u8                   manufacturer[4]; /* Manufacturer */
+    u8                   monitor[14];     /* Monitor String */
+    u8                   serial_no[14];   /* Serial Number */
+    u8                   ascii[14];       /* ? */
+    u32                  modedb_len;      /* mode database length */
+    u32                  model;           /* Monitor Model */
+    u32                  serial;          /* Serial Number - Integer */
+    u32                  year;            /* Year manufactured */
+    u32                  week;            /* Week Manufactured */
+    u32                  hfmin;           /* hfreq lower limit (Hz) */
+    u32                  hfmax;           /* hfreq upper limit (Hz) */
+    u32                  dclkmin;         /* pixelclock lower limit (Hz) */
+    u32                  dclkmax;         /* pixelclock upper limit (Hz) */
+    u16                  input;           /* display type - see FB_DISP_* */
+    u16                  dpms;            /* DPMS support - see FB_DPMS_ */
+    u16                  signal;          /* Signal Type - see FB_SIGNAL_* */
+    u16                  vfmin;           /* vfreq lower limit (Hz) */
+    u16                  vfmax;           /* vfreq upper limit (Hz) */
+    u16                  gamma;           /* Gamma - in fractions of 100 */
+    u16                  gtf : 1;         /* supports GTF */
+    u16                  misc;            /* Misc flags - see FB_MISC_* */
+    u8                   version;         /* EDID version... */
+    u8                   revision;        /* ...and revision */
+    u8                   max_x;           /* Maximum horizontal size (cm) */
+    u8                   max_y;           /* Maximum vertical size (cm) */
+};
 
 struct fb_copyarea
 {
@@ -610,6 +872,36 @@ struct fb_cursor
     fbcurpos    hot;
     /* Cursor image */
     fb_image    image;
+};
+
+struct fb_pixmap
+{
+    /* pointer to memory			*/
+    u8* addr;
+    /* size of buffer in bytes		*/
+    u32 size;
+    /* current offset to buffer		*/
+    u32 offset;
+    /* byte alignment of each bitmap	*/
+    u32 buf_align;
+    /* alignment per scanline		*/
+    u32 scan_align;
+    /* alignment per read/write (bits)	*/
+    u32 access_align;
+    /* see FB_PIXMAP_*			*/
+    u32 flags;
+    /* supported bit block dimensions (1-32)*/
+    /* Format: blit_x = 1 << (width - 1)    */
+    /*         blit_y = 1 << (height - 1)   */
+    /* if 0, will be set to 0xffffffff (all)*/
+    u32 blit_x;
+    u32 blit_y;
+
+    /* access methods */
+    void (*writeio)(struct fb_info* info, void* dst, void* src,
+                    unsigned int size);
+    void (*readio)(struct fb_info* info, void* dst, void* src,
+                   unsigned int size);
 };
 
 /* Settings for the generic backlight code */

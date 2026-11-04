@@ -8,6 +8,11 @@ on:
   pull_request:
     branches: [ "master" ]
 
+# The bootstrap takes the better part of an hour; a newer push makes an older run moot.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-linux:
     runs-on: [ubuntu-latest]
@@ -27,9 +32,23 @@ jobs:
           python-version: '3.x'
       - name: Install dependencies
         run: sudo apt update -y && sudo apt install -y meson ninja-build clang lld llvm git cmake python3 pipx
-          && sudo apt install build-essential qemu-system parted udev bison flex libgmp3-dev libmpc-dev libmpfr-dev
-          && sudo apt install texinfo libisl-dev gperf gettext autopoint libreadline-dev help2man groff zsh
-          && pipx install xbstrap 
+          && sudo apt install -y build-essential qemu-system parted udev bison flex libgmp3-dev libmpc-dev libmpfr-dev
+          && sudo apt install -y texinfo libisl-dev gperf gettext autopoint libreadline-dev help2man groff zsh
+          && sudo apt install -y patchelf rsync bsdextrautils
+          && pipx install xbstrap
       - name: Build sysroot
-        run: mkdir build-sysroot && pushd build-sysroot && xbstrap init .. && xbstrap install base && popd
+        run: |
+          mkdir build-sysroot
+          cd build-sysroot
+          xbstrap init ..
+          # Upstream hosts, git.savannah.gnu.org in particular, fail transiently (e.g. HTTP 500).
+          # xbstrap resumes where it stopped, so a retry only repeats the step that failed.
+          for attempt in 1 2 3; do
+            xbstrap install base && exit 0
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::xbstrap install base failed (attempt $attempt of 3), retrying in a minute"
+              sleep 60
+            fi
+          done
+          exit 1
 

@@ -53,71 +53,92 @@ constexpr usize FIONBIO      = 0x5421;
 constexpr usize TIOCNOTTY    = 0x5422;
 constexpr usize TIOCSETD     = 0x5423;
 constexpr usize TIOCGETD     = 0x5424;
-constexpr usize TCSBRKP      = 0x5425; /* Needed for POSIX tcsendbreak() */
-constexpr usize TIOCSBRK     = 0x5427; /* BSD compatibility */
-constexpr usize TIOCCBRK     = 0x5428; /* BSD compatibility */
-constexpr usize TIOCGSID     = 0x5429; /* Return the session ID of FD */
+/* Needed for POSIX tcsendbreak() */
+constexpr usize TCSBRKP      = 0x5425;
+/* BSD compatibility */
+constexpr usize TIOCSBRK     = 0x5427;
+/* BSD compatibility */
+constexpr usize TIOCCBRK     = 0x5428;
+/* Return the session ID of FD */
+constexpr usize TIOCGSID     = 0x5429;
 
-using cc_t                   = u8;
-using speed_t                = u32;
-using tcflag_t               = u32;
+using cc_t                   = unsigned char;
+using speed_t                = unsigned int;
+using tcflag_t               = unsigned int;
 struct termios2
 {
-    tcflag_t c_iflag;  /* input mode flags */
-    tcflag_t c_oflag;  /* output mode flags */
-    tcflag_t c_cflag;  /* control mode flags */
-    tcflag_t c_lflag;  /* local mode flags */
-    cc_t     c_line;   /* line discipline */
-    cc_t     c_cc[32]; /* control characters */
-    speed_t  c_ispeed; /* input speed */
-    speed_t  c_ospeed; /* output speed */
+    /* input mode flags */
+    tcflag_t c_iflag;
+    /* output mode flags */
+    tcflag_t c_oflag;
+    /* control mode flags */
+    tcflag_t c_cflag;
+    /* local mode flags */
+    tcflag_t c_lflag;
+    /* line discipline */
+    cc_t     c_line;
+    /* control characters */
+    cc_t     c_cc[32];
+    /* input speed */
+    speed_t  c_ispeed;
+    /* output speed */
+    speed_t  c_ospeed;
 };
 
-constexpr usize TCGETS2    = _IOR<'T', 0x2a, termios2>();
-constexpr usize TCSETS2    = _IOW<'T', 0x2B, termios2>();
-constexpr usize TCSETSW2   = _IOW<'T', 0x2C, termios2>();
-constexpr usize TCSETSF2   = _IOW<'T', 0x2D, termios2>();
-constexpr usize TIOCGRS485 = 0x542E;
-constexpr usize TIOCSRS485 = 0x542F;
-constexpr usize TIOCGPTN
-    = _IOR<'T', 0x30, unsigned int>(); /* Get Pty Number (of pty-mux device) */
-constexpr usize TIOCSPTLCK = _IOW<'T', 0x31, int>(); /* Lock/unlock Pty */
+constexpr usize TCGETS2            = _IOR<'T', 0x2a, termios2>();
+constexpr usize TCSETS2            = _IOW<'T', 0x2B, termios2>();
+constexpr usize TCSETSW2           = _IOW<'T', 0x2C, termios2>();
+constexpr usize TCSETSF2           = _IOW<'T', 0x2D, termios2>();
+constexpr usize TIOCGRS485         = 0x542E;
+constexpr usize TIOCSRS485         = 0x542F;
+/* Get Pty Number (of pty-mux device) */
+constexpr usize TIOCGPTN           = _IOR<'T', 0x30, unsigned int>();
+/* Lock/unlock Pty */
+constexpr usize TIOCSPTLCK         = _IOW<'T', 0x31, int>();
+/* Get primary device node of /dev/console \
 constexpr usize TIOCGDEV
     = _IOR<'T', 0x32,
-           unsigned int>(); /* Get primary device node of /dev/console \
+           unsigned int>();
                              */
 
-constexpr usize TCGETX      = 0x5432; /* SYS5 TCGETX compatibility */
+/* SYS5 TCGETX compatibility */
+constexpr usize TCGETX             = 0x5432;
 
-constexpr usize TCSETX      = 0x5433;
-constexpr usize TCSETXF     = 0x5434;
-constexpr usize TCSETXW     = 0x5435;
-constexpr usize TIOCSIG     = _IOW<'T', 0x36, int>();
-constexpr usize TIOCVHANGUP = 0x5437;
-constexpr usize TIOCGPKT   = _IOR<'T', 0x38, int>(); /* Get packet mode state */
-constexpr usize TIOCGPTLCK = _IOR<'T', 0x39, int>(); /* Get Pty lock state */
-constexpr usize TIOCGEXCL
-    = _IOR<'T', 0x40, int>(); /* Get exclusive mode state */
+constexpr usize TCSETX             = 0x5433;
+constexpr usize TCSETXF            = 0x5434;
+constexpr usize TCSETXW            = 0x5435;
+constexpr usize TIOCSIG            = _IOW<'T', 0x36, int>();
+constexpr usize TIOCVHANGUP        = 0x5437;
+/* Get packet mode state */
+constexpr usize TIOCGPKT           = _IOR<'T', 0x38, int>();
+/* Get Pty lock state */
+constexpr usize TIOCGPTLCK         = _IOR<'T', 0x39, int>();
+/* Get exclusive mode state */
+constexpr usize TIOCGEXCL          = _IOR<'T', 0x40, int>();
 // constexpr usize TIOCGISO7816 = _IOR<'T', 0x42, struct serial_iso7816>();
 // constexpr usize TIOCSISO7816    = _IOWR<'T', 0x43, struct serial_iso7816>();
 
-constexpr usize FIONCLEX        = 0x5450;
-constexpr usize FIOCLEX         = 0x5451;
-constexpr usize FIOASYNC        = 0x5452;
-constexpr usize TIOCSERCONFIG   = 0x5453;
-constexpr usize TIOCSERGWILD    = 0x5454;
-constexpr usize TIOCSERSWILD    = 0x5455;
-constexpr usize TIOCGLCKTRMIOS  = 0x5456;
-constexpr usize TIOCSLCKTRMIOS  = 0x5457;
-constexpr usize TIOCSERGSTRUCT  = 0x5458; /* For debugging only */
-constexpr usize TIOCSERGETLSR   = 0x5459; /* Get line status register */
-constexpr usize TIOCSERGETMULTI = 0x545A; /* Get multiport config  */
-constexpr usize TIOCSERSETMULTI = 0x545B; /* Set multiport config */
+constexpr usize FIONCLEX           = 0x5450;
+constexpr usize FIOCLEX            = 0x5451;
+constexpr usize FIOASYNC           = 0x5452;
+constexpr usize TIOCSERCONFIG      = 0x5453;
+constexpr usize TIOCSERGWILD       = 0x5454;
+constexpr usize TIOCSERSWILD       = 0x5455;
+constexpr usize TIOCGLCKTRMIOS     = 0x5456;
+constexpr usize TIOCSLCKTRMIOS     = 0x5457;
+/* For debugging only */
+constexpr usize TIOCSERGSTRUCT     = 0x5458;
+/* Get line status register */
+constexpr usize TIOCSERGETLSR      = 0x5459;
+/* Get multiport config  */
+constexpr usize TIOCSERGETMULTI    = 0x545A;
+/* Set multiport config */
+constexpr usize TIOCSERSETMULTI    = 0x545B;
 
-constexpr usize TIOCMIWAIT
-    = 0x545C; /* wait for a change on serial input line(s) */
-constexpr usize TIOCGICOUNT
-    = 0x545D; /* read serial port __inline__ interrupt counts */
+/* wait for a change on serial input line(s) */
+constexpr usize TIOCMIWAIT         = 0x545C;
+/* read serial port __inline__ interrupt counts */
+constexpr usize TIOCGICOUNT        = 0x545D;
 
 /*
  * Some arches already define FIOQSIZE due to a historical
@@ -135,4 +156,5 @@ constexpr usize TIOCPKT_NOSTOP     = 16;
 constexpr usize TIOCPKT_DOSTOP     = 32;
 constexpr usize TIOCPKT_IOCTL      = 64;
 
-constexpr usize TIOCSER_TEMT       = 0x01; /* Transmitter physically empty */
+/* Transmitter physically empty */
+constexpr usize TIOCSER_TEMT       = 0x01;

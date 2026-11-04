@@ -6,8 +6,11 @@
  */
 #pragma once
 
+#include <API/Posix/signal.h>
 #include <API/Posix/sys/stat.h>
+
 #include <Prism/Core/Types.hpp>
+#include <Prism/Memory/Pointer.hpp>
 
 using ssize_t     = isize;
 
@@ -25,3 +28,5 @@ using INodeMode   = mode_t;
 using LinkCount   = nlink_t;
 using UserID      = uid_t;
 using GroupID     = gid_t;
+
+using OffsetType  = off_t;

@@ -4,46 +4,221 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+
+module;
+
+#include <API/Posix/linux/ptrace.h>
+#include <API/Posix/linux/sched.h>
 #include <API/Posix/sys/mman.h>
 #include <API/Posix/sys/wait.h>
-#include <API/Process.hpp>
-#include <Arch/InterruptGuard.hpp>
+#include <API/Posix/signal.h>
+#include <API/Syscall.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Compiler.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Tuple.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <magic_enum/magic_enum.hpp>
+#include <magic_enum/magic_enum_format.hpp>
+#include <API/UnixTypes.hpp>
+#include <API/Posix/linux/time.h>
+#include <API/Posix/sys/resource.h>
+#include <Prism/String/StringUtils.hpp>
+#include <API/Posix/linux/capability.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <Prism/Core/Singleton.hpp>
 
-#include <Scheduler/Process.hpp>
-#include <Scheduler/Scheduler.hpp>
-#include <Scheduler/Thread.hpp>
-#include <Time/Time.hpp>
+module Cryptix:Impl.API.Process;
+
+import :API.Process;
+import :Arch.InterruptGuard;
+import :Scheduler.Process;
+import :Scheduler.Scheduler;
+import :Scheduler.Thread;
+import :Time.Time;
 
 namespace API::Process
 {
     using ::Process;
-
-    ErrorOr<isize> SigProcMask(i32 how, const sigset_t* newSet,
-                               sigset_t* oldSet)
+    static ErrorOr<Thread*> DoClone3(clone_args& args)
     {
-        auto     process     = ::Process::Current();
-        auto  thread      = Thread::Current();
-        sigset_t currentMask = thread->SignalMask();
+        auto  current       = Process::Current();
+        auto  currentThread = Thread::Current();
+
+        usize flags         = args.flags;
+        u64   newSp         = args.stack;
+
+        if (flags & ~CLONE_VALID_FLAGS_MASK) return Error(EINVAL);
+        if (flags & (CLONE_DETACHED | (CSIGNAL & ~CLONE_NEWTIME)))
+            return Error(EINVAL);
+
+        if ((flags & (CLONE_SIGHAND | CLONE_CLEAR_SIGHAND))
+            == (CLONE_SIGHAND | CLONE_CLEAR_SIGHAND))
+            return Error(EINVAL);
+        if ((flags & (CLONE_THREAD | CLONE_PARENT)) && args.exit_signal)
+            return Error(EINVAL);
+
+        if (newSp)
+        {
+            if (!args.stack_size) return Error(EINVAL);
+            if (!current->ValidateWrite(newSp, args.stack_size))
+                return Error(EFAULT);
+        }
+        else if (args.stack_size > 0) return Error(EINVAL);
+
+        if ((flags & CLONE_PIDFD) && (flags & CLONE_PARENT_SETTID)
+            && (args.pidfd == args.parent_tid))
+            return Error(EINVAL);
+
+        isize trace = 0;
+        if (!(flags & CLONE_UNTRACED))
+        {
+            if (flags & CLONE_VFORK) trace = PTRACE_EVENT_VFORK;
+            else if (args.exit_signal != SIGCHLD) trace = PTRACE_EVENT_CLONE;
+            else trace = PTRACE_EVENT_FORK;
+
+            IgnoreUnused(trace);
+        }
+
+        Pointer tls    = args.tls;
+        auto    cloned = TryOrRet(currentThread->Clone(
+            flags & ~CLONE_PARENT_SETTID, newSp, args.stack_size, tls));
+        Scheduler::EnqueueThread(cloned.Raw());
+        return cloned.Raw();
+    }
+
+    ErrorOr<isize> SigAction(isize signal, const sigaction* action,
+                             sigaction* oldAction)
+    {
+        auto process = Process::Current();
+        auto thread  = Thread::Current();
+
+        if (signal < 1 || signal > _NSIG
+            || (action && (signal == SIGKILL || signal == SIGSTOP)))
+            return Error(EINVAL);
+        if ((action && !process->ValidateRead(action))
+            || (oldAction && !process->ValidateWrite(oldAction)))
+            return Error(EFAULT);
+
+        if (oldAction)
+        {
+            const SignalAction& oldSignalAction
+                = process->SignalAction(static_cast<SignalID>(signal));
+
+            sigaction old{};
+            old.sa_handler  = oldSignalAction.VirtualAddress;
+            old.sa_flags    = oldSignalAction.Flags;
+            old.sa_restorer = nullptr;
+            *reinterpret_cast<usize*>(&old.sa_mask) = oldSignalAction.Mask;
+            CopyToUser(oldAction, old);
+        }
+
+        if (!action) return 0;
+        SignalAction newAction{};
+        {
+            UserMemoryProtectionGuard guard;
+            newAction.VirtualAddress = action->sa_handler;
+            newAction.Flags          = action->sa_flags;
+            newAction.Mask = *reinterpret_cast<const u32*>(&action->sa_mask);
+        }
+
+        process->SetSignalAction(static_cast<SignalID>(signal), newAction);
+        auto mask = thread->SignalMask();
+        mask.Remove(SIGKILL);
+        mask.Remove(SIGSTOP);
+        // & ~(Bit(SIGKILL - 1) | Bit(SIGSTOP - 1));
+
+        thread->SetSignalMask(mask);
+
+        // if (sigact.sa_handler == SIG_IGN
+        //     || (sigact.sa_handler == SIG_DFL
+        //         && (signal == SIGCONT || signal == SIGCHLD || signal ==
+        //         SIGURG
+        //             || signal == SIGWINCH)))
+        // TODO(v1tr10l7): remove signal from the queue, and recalc pending
+        // signals
+        ;
+
+        return 0;
+    }
+    ErrorOr<isize> SigProcMask(i32 how, const sigset_t* set, sigset_t* oldSet,
+                               usize sigSetSize)
+    {
+        auto process = Process::Current();
+        if (sigSetSize != sizeof(SignalSet)) return Error(EINVAL);
+
+        auto thread      = Thread::Current();
+        auto currentMask = thread->SignalMask();
 
         if (oldSet)
         {
-            if (!process->ValidateWrite(oldSet, sizeof(sigset_t)))
+            if (!process->ValidateWrite(oldSet, sizeof(SignalSet)))
                 return Error(EFAULT);
 
-            CPU::UserMemoryProtectionGuard guard;
-            *oldSet = currentMask;
+            CopyToUser(reinterpret_cast<SignalSet*>(oldSet), currentMask);
         }
 
-        if (!newSet) return 0;
-        if (!process->ValidateRead(newSet, sizeof(sigset_t)))
+        if (!set) return 0;
+        if (!process->ValidateRead(set, sizeof(SignalSet)))
             return Error(EFAULT);
 
-        CPU::UserMemoryProtectionGuard guard;
+        auto newSet = CopyFromUser(*reinterpret_cast<const SignalSet*>(set));
+        newSet.Remove(SIGKILL);
+        newSet.Remove(SIGSTOP);
+
         switch (how)
         {
-            case SIG_BLOCK: currentMask &= ~(*newSet); break;
-            case SIG_UNBLOCK: currentMask |= *newSet; break;
-            case SIG_SETMASK: currentMask = *newSet; break;
+            case SIG_BLOCK: currentMask |= newSet; break;
+            case SIG_UNBLOCK: currentMask &= ~newSet; break;
+            case SIG_SETMASK: currentMask = newSet; break;
 
             default: return Error(EINVAL);
         }
@@ -51,64 +226,137 @@ namespace API::Process
         thread->SetSignalMask(currentMask);
         return 0;
     }
+    ErrorOr<isize> SigReturn()
+    {
+        auto thread  = Thread::Current();
+        auto success = thread->SignalReturn();
+        if (!success) return Error(success.Error());
+
+        Scheduler::Yield();
+        return 0;
+    }
+
     ErrorOr<isize> SchedYield()
     {
         Scheduler::Yield();
         return 0;
     }
-    ErrorOr<isize> NanoSleep(const timespec* duration, timespec* rem)
+
+    ErrorOr<ProcessID> Pid()
     {
-        LogDebug("SysNanoSleep");
-        auto current = Process::Current();
-        if (!current->ValidateRead(duration, sizeof(timespec))
-            || (rem && !current->ValidateRead(rem, sizeof(timespec))))
-            return Error(EFAULT);
-        if (duration->tv_sec < 0 || duration->tv_nsec < 0
-            || (rem && (rem->tv_sec < 0 || rem->tv_nsec < 0)))
-            return Error(EINVAL);
-
-        auto errorOr = Time::Sleep(duration, rem);
-        if (!errorOr) return errorOr.error();
-
-        return 0;
+        auto process = Process::Current();
+        return process->ID();
     }
 
-    ErrorOr<pid_t> Pid()
+    ErrorOr<ProcessID> Clone(usize flags, usize newSp, i32* parentTid,
+                             i32* childTid, usize tls)
     {
-        auto process = ::Process::Current();
-        return process->Pid();
-    }
+        auto            current      = Process::Current();
 
-    ErrorOr<pid_t> Fork()
+        constexpr usize stackSize    = CPU::USER_STACK_SIZE;
+        u32             lowerFlags   = static_cast<u32>(flags);
+        u64             outChildTid  = reinterpret_cast<u64>(childTid);
+        u64             outParentTid = reinterpret_cast<u64>(parentTid);
+
+        clone_args      args;
+        Memory::Fill(&args, 0, sizeof(args));
+        args.flags            = lowerFlags & ~CSIGNAL;
+        args.pidfd            = outParentTid;
+        args.child_tid        = outChildTid;
+        args.parent_tid       = outParentTid;
+        args.exit_signal      = lowerFlags & CSIGNAL;
+        args.stack            = newSp;
+        args.stack_size       = stackSize;
+        args.tls              = tls;
+        args.set_tid          = 0;
+        args.set_tid_size     = 0;
+        args.cgroup           = 0;
+
+        auto     clonedThread = TryOrRet(DoClone3(args));
+        ThreadID tid          = clonedThread->ID();
+
+        if (flags & CLONE_CHILD_SETTID)
+        {
+            if (!childTid) return Error(EINVAL);
+            if (!current->ValidateWrite(childTid, sizeof(i32)))
+                return Error(EFAULT);
+
+            CopyToUser(childTid, tid);
+        }
+        if (flags & CLONE_PARENT_SETTID)
+        {
+            if (!parentTid) return Error(EINVAL);
+            if (!current->ValidateWrite(parentTid, sizeof(i32)))
+                return Error(EFAULT);
+
+            CopyToUser(parentTid, current->ID());
+        }
+
+        return clonedThread->Parent()->ID();
+    }
+    ErrorOr<ProcessID> Fork()
     {
-        class Process* process = ::Process::Current();
+        class Process* process = Process::Current();
         Assert(process);
 
-        CPU::SetInterruptFlag(false);
-        auto newProcess = TryOrRet(process->Fork());
-        Assert(newProcess);
+        clone_args args   = {};
+        args.flags        = 0 & ~CSIGNAL;
+        args.pidfd        = 0;
+        args.child_tid    = 0;
+        args.parent_tid   = 0;
+        args.exit_signal  = SIGCHLD;
+        args.stack        = 0;
+        args.stack_size   = 0;
+        args.tls          = 0;
+        args.set_tid      = 0;
+        args.set_tid_size = 0;
+        args.cgroup       = 0;
 
-        LogDebug("API: process forked");
-        return newProcess->Pid();
+        auto clonedThread = TryOrRet(DoClone3(args));
+        auto newProcess   = clonedThread->Parent();
+        return newProcess->ID();
+    }
+    ErrorOr<ProcessID> VFork()
+    {
+        class Process* process = Process::Current();
+        Assert(process);
+
+        clone_args args   = {};
+        args.flags        = (0 & ~CSIGNAL) | CLONE_VFORK | CLONE_VM;
+        args.pidfd        = 0;
+        args.child_tid    = 0;
+        args.parent_tid   = 0;
+        args.exit_signal  = SIGCHLD;
+        args.stack        = 0;
+        args.stack_size   = 0;
+        args.tls          = 0;
+        args.set_tid      = 0;
+        args.set_tid_size = 0;
+        args.cgroup       = 0;
+
+        auto clonedThread = TryOrRet(DoClone3(args));
+        auto newProcess   = clonedThread->Parent();
+        return newProcess->ID();
     }
     ErrorOr<isize> Execve(char* pathname, char** argv, char** envp)
     {
         CPU::SetInterruptFlag(false);
 
         auto process = Process::Current();
-        Path path    = CPU::CopyStringFromUser(pathname);
+        Path path    = CopyStringFromUser(pathname);
 
         process->Exec(path.Raw(), argv, envp);
         return process->Exit(-1);
     }
     ErrorOr<isize> Exit(isize exitcode)
     {
-        auto* process = ::Process::Current();
+        auto process = Process::Current();
 
         CPU::SetInterruptFlag(false);
         return process->Exit(exitcode);
     }
-    ErrorOr<isize> Wait4(pid_t pid, isize* wstatus, isize flags, rusage* rusage)
+    ErrorOr<isize> Wait4(ProcessID pid, isize* wstatus, isize flags,
+                         rusage* rusage)
     {
         auto           thread  = Thread::Current();
         class Process* process = thread->Parent();
@@ -116,76 +364,96 @@ namespace API::Process
         return process->WaitPid(pid, reinterpret_cast<i32*>(wstatus), flags,
                                 rusage);
     }
-    ErrorOr<isize> Kill(pid_t pid, isize signal)
+    ErrorOr<isize> Kill(ProcessID pid, isize signal)
     {
-        class Process* current = ::Process::Current();
-        class Process* target  = nullptr;
-        if (pid == 0) target = current;
-        else if (pid > 0) target = Scheduler::GetProcess(pid);
-        else if (pid == -1)
+        auto current = Process::Current();
+        LogDebug("API::Kill: Sending signal #{}({}) to process {}", signal,
+                 StringUtils::ToString(static_cast<SignalID>(signal)), pid);
+
+        if (signal < 0 || signal > _NSIG) return Error(EINVAL);
+        if (pid > 0)
         {
-            ToDoWarn();
-            // Send to everyone
-        }
-        else if (pid < -1)
-        {
-            // Send to everyone in group
-            ToDoWarn();
-            target = Scheduler::GetProcess(-pid);
+            auto target = Scheduler::GetProcess(pid);
+            if (!target) return Error(ESRCH);
+
+            // TODO(v1tr10l7): perm check
+            target->SendSignal(signal);
+            return 0;
         }
 
-        IgnoreUnused(target);
-        IgnoreUnused(signal);
+        Vector<class Process*> targets;
+        auto appendProcess = [&targets](auto process) -> IterationResult
+        {
+            targets.PushBack(process);
+            return IterationResult::eContinue;
+        };
 
-        return Error(ENOSYS);
+        // Send to everyone you are permitted to, except 1
+        if (pid == -1) Process::ForEach(appendProcess);
+        else {
+            GroupID targetGroup
+                = pid == 0 ? current->Credentials().GroupID : -pid;
+            Process::ForEachInGroup(targetGroup, appendProcess);
+        }
+
+        if (targets.Empty()) return Error(ESRCH);
+
+        usize signalsDelivered = 0;
+        for (auto target : targets)
+        {
+            // FIXME(v1tr10l7): perm check
+            target->SendSignal(signal);
+            ++signalsDelivered;
+        }
+
+        if (!signalsDelivered) return Error(EPERM);
+        return 0;
     }
 
-    ErrorOr<mode_t> Umask(mode_t mask)
+    ErrorOr<INodeMode> Umask(INodeMode mask)
     {
-        auto process = ::Process::Current();
+        auto process = Process::Current();
         return process->Umask(mask);
     }
-    ErrorOr<uid_t> GetUid()
+    ErrorOr<UserID> GetUid()
     {
-        auto process = ::Process::Current();
-        return process->Credentials().UserID;
-    }
-    ErrorOr<gid_t> GetGid()
-    {
-        auto process = ::Process::Current();
-        return process->Credentials().GroupID;
-    }
-    ErrorOr<isize> SetUid(uid_t uid)
-    {
-        LogDebug("API: SetUid => {}", uid);
         auto process = Process::Current();
-        process->SetUID(uid);
+        return process->UserID();
+    }
+    ErrorOr<GroupID> GetGid()
+    {
+        auto process = Process::Current();
+        return process->GroupID();
+    }
+    ErrorOr<isize> SetUid(UserID uid)
+    {
+        auto process = Process::Current();
+        process->SetUserID(uid);
 
         return {};
     }
-    ErrorOr<isize> SetGid(gid_t gid)
+    ErrorOr<isize> SetGid(GroupID gid)
     {
-        LogDebug("API: SetGid => {}", gid);
         auto process = Process::Current();
-        process->SetGID(gid);
+        process->SetGroupID(gid);
 
         return {};
     }
-    ErrorOr<uid_t> GetEUid()
+    ErrorOr<UserID> GetEUid()
     {
-        auto process = ::Process::Current();
-        return process->Credentials().EffectiveUserID;
+        auto process = Process::Current();
+        return process->EffectiveUserID();
     }
-    ErrorOr<gid_t> GetEGid()
+    ErrorOr<GroupID> GetEGid()
     {
-        auto process = ::Process::Current();
-        return process->Credentials().EffectiveGroupID;
+        auto process = Process::Current();
+        return process->EffectiveGroupID();
     }
-    ErrorOr<isize> SetPGid(pid_t pid, pid_t pgid)
+    ErrorOr<isize> SetPGid(ProcessID pid, ProcessID pgid)
     {
-        class Process* current = ::Process::Current();
+        class Process* current = Process::Current();
         class Process* process
-            = pid ? Scheduler::GetProcess(pid) : ::Process::Current();
+            = pid ? Scheduler::GetProcess(pid) : Process::Current();
 
         if (!process) return Error(ESRCH);
         if ((process != current && !current->IsChild(process)))
@@ -203,49 +471,67 @@ namespace API::Process
             return 0;
         }
 
-        process->SetPGid(process->Pid());
+        process->SetPGid(process->ID());
         return 0;
     }
 
-    ErrorOr<pid_t> GetPPid()
+    ErrorOr<ProcessID> GetPPid()
     {
-        auto process = ::Process::Current();
-        return process->ParentPid();
+        auto process = Process::Current();
+        return process->ParentID();
     }
-    ErrorOr<pid_t> GetPGrp(pid_t pid) { return GetPGid(pid); }
-    ErrorOr<pid_t> SetSid()
+    ErrorOr<ProcessID> GetPGrp(ProcessID pid) { return GetPGid(pid); }
+    ErrorOr<ProcessID> SetSid()
     {
-        class Process* current = ::Process::Current();
+        class Process* current = Process::Current();
         if (current->IsGroupLeader()) return Error(EPERM);
 
         return current->SetSid();
     }
-    ErrorOr<isize> SetReUid(uid_t ruid, uid_t euid)
+    ErrorOr<isize> SetReUid(UserID ruid, UserID euid)
     {
         auto process = Process::Current();
         return process->SetReUID(ruid, euid);
     }
-    ErrorOr<isize> SetReGid(gid_t rgid, gid_t egid)
+    ErrorOr<isize> SetReGid(GroupID rgid, GroupID egid)
     {
         auto process = Process::Current();
         return process->SetReGID(rgid, egid);
     }
-    ErrorOr<isize> SetResUid(uid_t ruid, uid_t euid, uid_t suid)
+    ErrorOr<isize> SetResUid(UserID ruid, UserID euid, UserID suid)
     {
         auto process = Process::Current();
         return process->SetResUID(ruid, euid, suid);
     }
-    ErrorOr<isize> SetResGid(gid_t rgid, gid_t egid, gid_t sgid)
+    ErrorOr<isize> GetResUid(UserID* ruid, UserID* euid, UserID* suid)
+    {
+        auto process = Process::Current();
+        CopyToUser(ruid, process->UserID());
+        CopyToUser(euid, process->EffectiveUserID());
+        CopyToUser(suid, process->Credentials().SetUserID);
+
+        return 0;
+    }
+    ErrorOr<isize> SetResGid(GroupID rgid, GroupID egid, GroupID sgid)
     {
         auto process = Process::Current();
         return process->SetResGID(rgid, egid, sgid);
     }
+    ErrorOr<isize> GetResGid(GroupID* rgid, GroupID* egid, GroupID* sgid)
+    {
+        auto process = Process::Current();
+        CopyToUser(rgid, process->GroupID());
+        CopyToUser(egid, process->EffectiveGroupID());
+        CopyToUser(sgid, process->Credentials().SetGroupID);
 
-    ErrorOr<pid_t> GetPGid(pid_t pid)
+        return 0;
+    }
+
+    ErrorOr<ProcessID> GetPGid(ProcessID pid)
     {
         // FIXME(v1tr10l7): validate whether pid is a child of the calling
         // process
-        class Process* currentProcess = ::Process::Current();
+        class Process* currentProcess = Process::Current();
 
         if (pid == 0) return currentProcess->PGid();
         class Process* process = Scheduler::GetProcess(pid);
@@ -255,9 +541,9 @@ namespace API::Process
 
         return process->PGid();
     }
-    ErrorOr<pid_t> GetSid(pid_t pid)
+    ErrorOr<ProcessID> GetSid(ProcessID pid)
     {
-        class Process* current = ::Process::Current();
+        class Process* current = Process::Current();
         if (pid == 0) return current->Sid();
 
         class Process* process = Scheduler::GetProcess(pid);
@@ -265,5 +551,62 @@ namespace API::Process
 
         if (current->Sid() != process->Sid()) return Error(EPERM);
         return process->Sid();
+    }
+
+    ErrorOr<isize> SigSuspend(const sigset_t* mask) { return Error(ENOSYS); }
+    ErrorOr<isize> SigAltStack(const sigaltstack* ss, sigaltstack* oldSs)
+    {
+        return Error(ENOSYS);
+    }
+    ErrorOr<ThreadID> GetTid()
+    {
+        auto thread = Thread::Current();
+
+        return thread->ID();
+    }
+
+    ErrorOr<isize> Clone3(clone_args* uargs, usize size)
+    {
+        auto current = Process::Current();
+
+        if (!uargs) return Error(EINVAL);
+        if (!current->ValidateRead(uargs)) return Error(EFAULT);
+
+        clone_args args         = CopyFromUser(*uargs, size);
+        auto       flags        = args.flags;
+        i32*       parentTid    = reinterpret_cast<i32*>(args.parent_tid);
+
+        auto       clonedThread = TryOrRet(DoClone3(args));
+        ThreadID   tid          = clonedThread->ID();
+
+        if (flags & CLONE_PARENT_SETTID)
+        {
+            if (!parentTid) return Error(EINVAL);
+            if (!current->ValidateWrite(parentTid, sizeof(i32)))
+                return Error(EFAULT);
+
+            CopyToUser(parentTid, tid);
+        }
+
+        return tid;
+    }
+    ErrorOr<usize> FutexWake(i32* uaddr, usize mask, isize count, usize flags)
+    {
+        auto process = Process::Current();
+
+        auto status  = process->WakeFutex(uaddr);
+        if (!status) return Error(status.Error());
+
+        return 0;
+    }
+    ErrorOr<usize> FutexWait(i32* uaddr, usize value, usize mask, usize flags,
+                             struct timespec* timeout, clockid_t clockid)
+    {
+        auto process = Process::Current();
+
+        auto status  = process->WaitForFutex(uaddr, value);
+        if (!status) return Error(status.Error());
+
+        return 0;
     }
 } // namespace API::Process

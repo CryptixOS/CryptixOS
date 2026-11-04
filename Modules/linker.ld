@@ -1,0 +1,96 @@
+/*
+ * Created by v1tr10l7 on 12.07.2025.
+ * Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>
+ *
+ * SPDX-License-Identifier: GPL-3
+ */
+ENTRY(ModuleInit)
+
+PHDRS
+{
+    null        PT_NULL;
+    text        PT_LOAD     FLAGS(5);
+    rodata      PT_LOAD     FLAGS(4);
+    data        PT_LOAD     FLAGS(6);
+    dynamic     PT_DYNAMIC  FLAGS(6);
+    module_init PT_LOAD     FLAGS(6);
+    modinfo     PT_LOAD     FLAGS(4);
+}
+
+SECTIONS
+{
+    .text : {
+        *(.init)
+        *(.text)
+        *(.text.*)
+        *(.fini)
+        *(.plt)
+        *(.plt.*)
+    } :text
+
+    .rodata : {
+        *(.rodata)
+        *(.rodata.*)
+        *(.got)
+        *(.got.*)
+    } :rodata
+
+
+    .module_init : {
+        KEEP(*(.module_init))
+    } :rodata :module_init
+    .modinfo : {
+        KEEP(*(.modinfo))
+    } :rodata :modinfo
+
+    .init_array : {
+        PROVIDE_HIDDEN(__start_init_array = .);
+        KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
+        KEEP(*(.init_array .ctors))
+        PROVIDE_HIDDEN(__end_init_array = .);
+    } :rodata
+
+    .fini_array : {
+        PROVIDE_HIDDEN(__start_fini_array = .);
+        KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*)))
+        KEEP(*(.fini_array .dtors))
+        PROVIDE_HIDDEN(__end_fini_array = .);
+    } :rodata
+
+    .data : {
+        *(.data)
+        *(.data.*)
+    } :data
+
+    .bss : {
+        *(.*bss)
+        *(.*bss.*)
+        *(COMMON)
+    } :data
+
+    .dynsym : {
+        *(.dynsym)
+    } :data
+
+    .dynstr : {
+        *(.dynstr)
+    } :data
+
+    .rela.dyn : {
+        *(.rela.dyn)
+    } :data
+
+    .dynamic : {
+        *(.dynamic)
+    } :data :dynamic
+
+    /DISCARD/ :
+    {
+        *(.comment*)
+        *(.eh_frame*)
+        *(.rel.eh_frame*)
+        *(.gcc_except_table*)
+        *(.note*)
+        *(.interp)
+    }
+}

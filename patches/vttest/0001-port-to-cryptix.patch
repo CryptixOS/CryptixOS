@@ -1,0 +1,25 @@
+From 316103d1f776f0a035747c333d6103a7419f6ae8 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Thu, 18 Sep 2025 17:57:57 +0200
+Subject: [PATCH] port to cryptix
+
+---
+ config.sub | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/config.sub b/config.sub
+index 61cb4bc..b3e7366 100755
+--- a/config.sub
++++ b/config.sub
+@@ -1376,7 +1376,7 @@ case $os in
+ 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
+ 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
+ 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
+-	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es*)
++	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -cryptix*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	-qnx*)
+-- 
+2.51.0
+

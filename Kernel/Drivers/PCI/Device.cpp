@@ -4,21 +4,80 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/InterruptHandler.hpp>
-#include <Arch/InterruptManager.hpp>
 
-#ifdef CTOS_TARGET_X86_64
-    #include <Arch/x86_64/Drivers/IoApic.hpp>
+module;
+
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Memory/RefCounted.hpp>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Memory/Pointer.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <Prism/String/StringUtils.hpp>
 #endif
-
-#include <Drivers/PCI/Device.hpp>
-#include <Drivers/PCI/HostController.hpp>
-#include <Drivers/PCI/PCI.hpp>
-
-#include <Memory/PMM.hpp>
-#include <Memory/VMM.hpp>
-
+#include <API/UnixTypes.hpp>
+#include <Compiler.hpp>
+#if defined(CTOS_TARGET_X86_64)
+#include <API/Posix/termios.h>
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
 #include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Utility/Path.hpp>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/types.h>
+#include <uacpi/uacpi.h>
+#include <uacpi/utilities.h>
+#include <Library/Module.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Utility/PathView.hpp>
+
+module Cryptix:Impl.Drivers.PCI.Device;
+
+#if defined(CTOS_TARGET_X86_64)
+import :Arch.x86_64.Drivers.IoApic;
+#endif
+import :Drivers.PCI.Device;
+import :Drivers.PCI.HostController;
+import :Drivers.PCI.PCI;
+import :Memory.PMM;
+import :Memory.VMM;
+import :System.InterruptManager;
 
 namespace PCI
 {
@@ -27,7 +86,10 @@ namespace PCI
         if (!IsMMIO) return nullptr;
         if (Base) return Base;
 
-        if (VMM::GetKernelPageMap()->Virt2Phys(Address.ToHigherHalf<u64>()).Raw() == u64(-1))
+        if (VMM::GetKernelPageMap()
+                ->Virt2Phys(Address.ToHigherHalf<u64>())
+                .Raw()
+            == u64(-1))
         {
             usize   pageSize = PMM::PAGE_SIZE;
             Pointer base     = Math::AlignDown(Address.Raw(), pageSize);
@@ -255,17 +317,18 @@ namespace PCI
 
     bool Device::RegisterIrq(u64 cpuid, Delegate<void()> callback)
     {
-        auto handler = InterruptManager::AllocateHandler();
-        handler->Reserve();
+        Ref<InterruptDispatcher> handler
+            = InterruptManager::AllocateHandler(0x50, nullptr, "cryptix");
         handler->SetHandler(
-            [this](CPUContext*)
+            [this](::Device*, ExecutionContext*) -> IrqResult
             {
                 if (m_OnIrq) m_OnIrq.Invoke();
+                return IrqResult::eHandled;
             });
 
         m_OnIrq = callback;
-        if (MsiXSet(cpuid, handler->GetInterruptVector(), -1)) return true;
-        if (MsiSet(cpuid, handler->GetInterruptVector(), -1)) return true;
+        if (MsiXSet(cpuid, handler->IrqLine() + 0x20, -1)) return true;
+        if (MsiSet(cpuid, handler->IrqLine() + 0x20, -1)) return true;
 #ifdef CTOS_TARGET_X86_64
 
         auto  pin        = Read<u8>(RegisterOffset::eInterruptPin);
@@ -282,7 +345,7 @@ namespace PCI
         if (!route->ActiveHigh) flags |= Bit(1);
         if (!route->EdgeTriggered) flags |= Bit(3);
 
-        u8 vector = handler->GetInterruptVector();
+        u8 vector = handler->IrqLine() + 0x20;
         IoApic::SetGsiRedirect(cpuid, vector, route->Gsi, flags, true);
         return true;
 #endif

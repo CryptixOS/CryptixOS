@@ -4,15 +4,81 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/x86_64/Drivers/Time/PIT.hpp>
 
-#include <Arch/InterruptHandler.hpp>
+module;
 
-#include <Arch/x86_64/IDT.hpp>
-#include <Arch/x86_64/IO.hpp>
+#include <Prism/Core/Singleton.hpp>
+#include <Prism/Core/Types.hpp>
+#include <Prism/Utility/Atomic.hpp>
+#include <Prism/Core/Error.hpp>
+#include <Prism/Memory/RefCounted.hpp>
+#include <Library/Module.hpp>
+#include <Compiler.hpp>
+#include <Common.hpp>
+#include <Debug/Assertions.hpp>
+#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Assertions.hpp>
+#include <Library/Logger.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <cstdarg>
+#include <Prism/String/String.hpp>
+#include <compare>
+#include <Prism/Memory/Pointer.hpp>
+#include <Prism/Containers/RedBlackTree.hpp>
+#include <Prism/Memory/Buffer.hpp>
+#include <Prism/Memory/Memory.hpp>
+#include <Prism/Memory/Ref.hpp>
+#include <Prism/Utility/Delegate.hpp>
+#include <Prism/Utility/PathView.hpp>
+#include <API/UnixTypes.hpp>
+#include <Arch/Arch.hpp>
+#include <API/Posix/time.h>
+#include <Prism/Containers/Vector.hpp>
+#include <Prism/Core/NonCopyable.hpp>
+#include <Prism/Core/NonMovable.hpp>
+#include <API/Posix/termios.h>
+#if defined(CTOS_TARGET_X86_64)
+#include <Arch/x86_64/CPUIntrinsics.hpp>
+#endif
+#include <API/Posix/sys/mman.h>
+#include <Prism/Core/Core.hpp>
+#include <Prism/Containers/Span.hpp>
+#include <Prism/Containers/KeyValuePair.hpp>
+#include <Prism/Utility/Math.hpp>
+#include <Prism/Containers/IntrusiveRefList.hpp>
+#include <Prism/Utility/Time.hpp>
+#if !(defined(CTOS_TARGET_X86_64)) && defined(CTOS_TARGET_AARCH64)
+#include <Arch/aarch64/CPUIntrinsics.hpp>
+#endif
+#include <Prism/Utility/Path.hpp>
+#include <API/Posix/sys/stat.h>
+#include <Prism/Containers/UnorderedMap.hpp>
+#include <Prism/Memory/WeakRef.hpp>
+#include <uacpi/resources.h>
+#include <uacpi/utilities.h>
+#include <Prism/Containers/Bitmap.hpp>
+#include <Prism/Utility/Optional.hpp>
+#include <API/Posix/dirent.h>
+#include <API/Posix/fcntl.h>
+#include <API/Posix/unistd.h>
+#include <Prism/Containers/Deque.hpp>
+#include <Prism/Core/Concepts.hpp>
+#include <API/Posix/linux/capability.h>
+#include <API/Posix/signal.h>
+#include <Prism/Core/TypeTraits.hpp>
+#include <Prism/Containers/Array.hpp>
+#include <Prism/Containers/CircularQueue.hpp>
+#include <Config.hpp>
+#include <Prism/Containers/IntrusiveList.hpp>
+#include <API/Posix/sys/resource.h>
 
-#include <Scheduler/Scheduler.hpp>
-#include <Time/Time.hpp>
+module Cryptix:Impl.Arch.x86_64.Drivers.Time.PIT;
+
+import :Arch.x86_64.Drivers.Time.PIT;
+import :Arch.x86_64.IO;
+import :Scheduler.Scheduler;
+import :System.InterruptManager;
+import :Time.Time;
 
 PIT* PIT::s_Instance = nullptr;
 
@@ -25,13 +91,13 @@ PIT::PIT()
 
     LogInfo("PIT: Frequency set to {}Hz", FREQUENCY);
 
-    m_Handler = IDT::AllocateHandler(IRQ_HINT);
-    m_Handler->SetHandler(Tick);
-    m_Handler->Reserve();
-    m_Handler->eoiFirst = true;
+    m_Dispatcher = InterruptManager::AllocateHandler(IRQ_LINE, this, "cryptix");
 
-    m_TimerVector       = m_Handler->GetInterruptVector();
-    LogInfo("PIT: Installed on interrupt gate #{:#x}", m_TimerVector);
+    // TODO(v1tr10l7): IDT::SetIST(m_Dispatcher->IrqLine() + 0x20, 1);
+    m_Dispatcher->SetHandler(Tick);
+
+    LogInfo("PIT: Installed on interrupt handler at irq line #{:#x}",
+            m_Dispatcher->IrqLine());
 }
 
 void          PIT::Initialize() { s_Instance = Instance(); }
@@ -47,19 +113,16 @@ ErrorOr<void> PIT::Start(TimerMode mode, Timestep interval)
     SetReloadValue(reloadValue);
     IO::Out<byte>(COMMAND, CHANNEL0_DATA | SEND_WORD | m_CurrentMode);
 
-    InterruptManager::Unmask(m_TimerVector);
-
+    m_Dispatcher->Unmask();
     return {};
 }
 void PIT::Stop()
 {
-    InterruptManager::Mask(m_TimerVector);
+    m_Dispatcher->Mask();
     SetReloadValue(0);
 }
 
-u8  PIT::GetInterruptVector() { return m_TimerVector; }
-
-u64 PIT::GetCurrentCount()
+u64 PIT::CurrentCount()
 {
     IO::Out<byte>(COMMAND, SELECT_CHANNEL0);
     auto lo = IO::In<byte>(CHANNEL0_DATA);
@@ -82,8 +145,13 @@ void PIT::SetReloadValue(u16 reloadValue)
     IO::Out<byte>(CHANNEL0_DATA, static_cast<byte>(reloadValue >> 8));
 }
 
-void PIT::Tick(struct CPUContext* ctx)
+IrqResult PIT::Tick(Device* device, struct ExecutionContext* ctx)
 {
     Instance()->m_Tick++;
+
+    auto& callback = Instance()->m_OnTickCallback;
+    if (callback) callback(ctx);
     Time::Tick((1'000 / FREQUENCY) * 1'000'000);
+
+    return IrqResult::eHandled;
 }
