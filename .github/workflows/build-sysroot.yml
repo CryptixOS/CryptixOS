@@ -37,5 +37,18 @@ jobs:
           && sudo apt install -y patchelf rsync bsdextrautils
           && pipx install xbstrap
       - name: Build sysroot
-        run: mkdir build-sysroot && pushd build-sysroot && xbstrap init .. && xbstrap install base && popd
+        run: |
+          mkdir build-sysroot
+          cd build-sysroot
+          xbstrap init ..
+          # Upstream hosts, git.savannah.gnu.org in particular, fail transiently (e.g. HTTP 500).
+          # xbstrap resumes where it stopped, so a retry only repeats the step that failed.
+          for attempt in 1 2 3; do
+            xbstrap install base && exit 0
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::xbstrap install base failed (attempt $attempt of 3), retrying in a minute"
+              sleep 60
+            fi
+          done
+          exit 1
 
