@@ -102,13 +102,16 @@ class FileDescriptor : public RefCounted<FileDescriptor>
         m_Flags = flags;
     }
 
-    inline i32  GetDescriptionFlags() const { return m_Flags; }
+    // File status flags (F_GETFL/F_SETFL): shared by every duplicate
+    inline i32  GetDescriptionFlags() const { return m_DescriptionFlags; }
     inline void SetDescriptionFlags(i32 flags)
     {
         ScopedLock guard(m_Lock);
-        m_Flags = flags;
+        m_DescriptionFlags = flags;
     }
 
+    virtual ErrorOr<isize> KernelRead(void* const outBuffer, usize count,
+                                      isize offset = -1);
     virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
                                 isize offset = -1);
     inline ErrorOr<isize>  Read(void* const outBuffer, usize count)
@@ -158,8 +161,13 @@ class FileDescriptor : public RefCounted<FileDescriptor>
         return m_AccessMode & FileAccessMode::eWrite;
     }
 
-    inline bool IsNonBlocking() const { return m_Flags & O_NONBLOCK; }
+    inline bool IsNonBlocking() const
+    {
+        return m_DescriptionFlags & O_NONBLOCK;
+    }
 
+    // Whether it was opened with O_CLOEXEC: only the initial value of the
+    // fd's FD_CLOEXEC, which lives in the FileDescriptorTable
     inline bool CloseOnExec() const { return m_Flags & O_CLOEXEC; }
     inline void SetCloseOnExec(bool closeOnExec)
     {

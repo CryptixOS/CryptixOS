@@ -165,8 +165,10 @@ namespace API::VFS
 
         switch (request)
         {
-            case FIOCLEX: fd->SetCloseOnExec(true); return 0;
-            case FIONCLEX: fd->SetCloseOnExec(false); return 0;
+            case FIOCLEX: process->FdTable().SetCloseOnExec(fdNum, true); return 0;
+            case FIONCLEX:
+                process->FdTable().SetCloseOnExec(fdNum, false);
+                return 0;
             case FIONBIO:
             {
                 isize nonblocking
@@ -299,6 +301,12 @@ namespace API::VFS
     ErrorOr<isize> Dup2(isize oldFdNum, isize newFdNum)
     {
         Process* process = Process::Current();
+        // dup2(fd, fd) is a no-op that only checks fd
+        if (oldFdNum == newFdNum)
+        {
+            if (!process->GetFileHandle(oldFdNum)) return Error(EBADF);
+            return newFdNum;
+        }
 
         return process->DupFd(oldFdNum, newFdNum, 0);
     }
@@ -316,8 +324,11 @@ namespace API::VFS
                                       static_cast<NetworkProtocol>(protocol)));
 
         auto dentry   = new DirectoryEntry("/");
+        i32  fdFlags  = O_RDWR;
+        if (sockType & SOCK_NONBLOCK) fdFlags |= O_NONBLOCK;
+        if (sockType & SOCK_CLOEXEC) fdFlags |= O_CLOEXEC;
         auto socketFd = CreateRef<FileDescriptor>(
-            dentry, reinterpret_cast<File*>(socket), O_RDWR,
+            dentry, reinterpret_cast<File*>(socket), fdFlags,
             FileAccessMode::eRead | FileAccessMode::eWrite);
         auto process = Process::Current();
         auto status  = process->InsertFd(socketFd);
@@ -480,16 +491,24 @@ namespace API::VFS
                      newFdNum++);
                 return API::VFS::Dup3(fdNum, newFdNum, cloExec ? O_CLOEXEC : 0);
             }
-            case F_GETFD: return fd->GetFlags();
+            // FD_CLOEXEC is per fd, kept in the table
+            case F_GETFD:
+                return current->FdTable().IsCloseOnExec(fdNum) ? FD_CLOEXEC : 0;
             case F_SETFD:
-                if (!fd) return Error(EBADF);
-                fd->SetFlags(arg);
+                current->FdTable().SetCloseOnExec(fdNum, arg & FD_CLOEXEC);
                 break;
             case F_GETFL: return fd->GetDescriptionFlags();
             case F_SETFL:
-                if (arg & O_ACCMODE) return Error(EINVAL);
-                fd->SetDescriptionFlags(arg);
+            {
+                // Only these can change; the access mode and creation flags
+                // are kept (and ignored in arg, like Linux does)
+                constexpr isize changeable
+                    = O_APPEND | O_NONBLOCK | O_ASYNC | O_DIRECT | O_NOATIME;
+                isize flags = fd->GetDescriptionFlags();
+                fd->SetDescriptionFlags((flags & ~changeable)
+                                        | (isize(arg) & changeable));
                 break;
+            }
 
             default: return Error(EINVAL);
         }
@@ -1272,7 +1291,7 @@ namespace API::VFS
     ErrorOr<isize> Pipe2(i32* pipeFds, isize flags)
     {
         auto process = Process::Current();
-        return process->OpenPipe(pipeFds);
+        return process->OpenPipe(pipeFds, flags);
     }
 
     ErrorOr<isize> SyncFs(isize fdNum)

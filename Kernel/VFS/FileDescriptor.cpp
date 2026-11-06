@@ -75,7 +75,7 @@ FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry,
     , m_File(file)
     , m_DirectoryIterator(dentry->begin())
 {
-    m_DescriptionFlags = flags;
+    m_DescriptionFlags = flags & ~O_CLOEXEC;
     // & ~(O_CREAT | O_DIRECTORY | O_EXCL | O_NOCTTY
     //     | O_NOFOLLOW | O_TRUNC | O_CLOEXEC);
     m_AccessMode       = accMode;
@@ -88,6 +88,35 @@ FileDescriptor::~FileDescriptor()
     if (m_File && m_File->IsFifo()) m_File->Close(writer);
 }
 
+ErrorOr<isize> FileDescriptor::KernelRead(void* const outBuffer, usize count,
+                                          isize offset)
+{
+    ScopedLock guard(m_Lock);
+
+    if (!CanRead()) return Error(EBADF);
+    if (!m_File)
+    {
+        LogError("FileDescriptor::Read: m_File is nullptr");
+        return Error(ENOENT);
+    }
+    if (m_File->IsDirectory()) return Error(EISDIR);
+
+    // if (WouldBlock())
+    // {
+    //     if (IsNonBlocking()) return Error(IsSocket() ? EWOULDBLOCK : EAGAIN);
+    //     Thread* current = Thread::Current();
+    //     Scheduler::Block(current);
+    //
+    //     if (current->WasInterrupted()) return Error(EINTR);
+    // }
+
+    if (offset < 0) offset = m_Offset;
+    isize bytesRead = m_File->Read(outBuffer, offset, count).ValueOr(0);
+    offset += bytesRead;
+
+    m_Offset = offset;
+    return bytesRead;
+}
 ErrorOr<isize> FileDescriptor::Read(const UserBuffer& out, usize count,
                                     isize offset)
 {

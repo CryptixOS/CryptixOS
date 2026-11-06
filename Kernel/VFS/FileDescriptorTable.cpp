@@ -7,25 +7,49 @@
 #include <VFS/FileDescriptorTable.hpp>
 #include <VFS/VFS.hpp>
 
-FileDescriptorTable::FileDescriptorTable() { m_NextIndex = 1; }
-isize FileDescriptorTable::Insert(::Ref<FileDescriptor> fd, isize desired)
+FileDescriptorTable::FileDescriptorTable() {}
+
+isize FileDescriptorTable::LowestFree(isize from) const
 {
-    ScopedLock guard(m_Lock);
-    isize      fdNum = m_NextIndex;
-
-    auto       found = m_Table.Find(desired);
-    if (desired >= 0 && found == m_Table.end()) fdNum = desired;
-    m_Table[fdNum] = fd;
-
-    ++m_NextIndex;
+    isize fdNum = from < 0 ? 0 : from;
+    while (m_Table.Contains(fdNum)) ++fdNum;
     return fdNum;
 }
-isize FileDescriptorTable::Replace(::Ref<FileDescriptor> fd, isize desired)
+isize FileDescriptorTable::Insert(::Ref<FileDescriptor> fd, isize desired,
+                                  bool closeOnExec)
+{
+    ScopedLock guard(m_Lock);
+    isize      fdNum = desired >= 0 && !m_Table.Contains(desired)
+                         ? desired
+                         : LowestFree(0);
+    m_Table[fdNum] = fd;
+    if (closeOnExec) m_CloseOnExec[fdNum] = true;
+    else m_CloseOnExec.Erase(fdNum);
+
+    return fdNum;
+}
+isize FileDescriptorTable::Replace(::Ref<FileDescriptor> fd, isize desired,
+                                   bool closeOnExec)
 {
     ScopedLock guard(m_Lock);
     m_Table[desired] = fd;
+    if (closeOnExec) m_CloseOnExec[desired] = true;
+    else m_CloseOnExec.Erase(desired);
 
     return desired;
+}
+bool FileDescriptorTable::IsCloseOnExec(isize fd) const
+{
+    return m_CloseOnExec.Contains(fd);
+}
+bool FileDescriptorTable::SetCloseOnExec(isize fd, bool closeOnExec)
+{
+    ScopedLock guard(m_Lock);
+    if (!m_Table.Contains(fd)) return false;
+
+    if (closeOnExec) m_CloseOnExec[fd] = true;
+    else m_CloseOnExec.Erase(fd);
+    return true;
 }
 isize FileDescriptorTable::Erase(isize fdNum)
 {
@@ -37,11 +61,12 @@ isize FileDescriptorTable::Erase(isize fdNum)
         && fd->DirectoryEntry()->Name().Contains("ctl.sock"))
         LogTrace("Erasing auroractl.sock => {}", fd->DirectoryEntry()->Path());
     m_Table.Erase(fdNum);
+    m_CloseOnExec.Erase(fdNum);
     return 0;
 }
 
 void FileDescriptorTable::Clear()
 {
     m_Table.Clear();
-    m_NextIndex = 0;
+    m_CloseOnExec.Clear();
 }

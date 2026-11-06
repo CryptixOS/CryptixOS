@@ -49,6 +49,7 @@ constexpr usize VALID_OPEN_FLAGS
 constexpr usize F_DUPFD             = 0;
 constexpr usize F_GETFD             = 1;
 constexpr usize F_SETFD             = 2;
+constexpr usize FD_CLOEXEC          = 1;
 constexpr usize F_GETFL             = 3;
 constexpr usize F_SETFL             = 4;
 constexpr usize F_DUPFD_CLOEXEC     = 1030;

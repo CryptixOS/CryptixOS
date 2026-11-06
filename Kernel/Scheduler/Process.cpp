@@ -315,7 +315,7 @@ ErrorOr<isize> Process::OpenAt(i32 dirFd, PathView path, i32 flags,
     }
 
     auto descriptor = TryOrRet(VFS::Open(parent, path, flags, mode));
-    return m_FdTable->Insert(descriptor);
+    return m_FdTable->Insert(descriptor, -1, flags & O_CLOEXEC);
 }
 isize Process::FirstFreeFdIndex()
 {
@@ -327,11 +327,13 @@ isize Process::FirstFreeFdIndex()
 ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
 {
     if (oldFdNum == newFdNum) return Error(EINVAL);
+    if (newFdNum < 0) return Error(EBADF);
 
     Ref<::FileDescriptor> oldFd = GetFileHandle(oldFdNum);
     if (!oldFd) return Error(EBADF);
 
-    newFdNum = m_FdTable->Replace(oldFd, newFdNum);
+    // The new fd shares the open file description, but not FD_CLOEXEC
+    newFdNum = m_FdTable->Replace(oldFd, newFdNum, flags & O_CLOEXEC);
     if (newFdNum < 0) return Error(EBADF);
 
     return newFdNum;
@@ -339,15 +341,18 @@ ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
 i32            Process::CloseFd(i32 fd) { return m_FdTable->Erase(fd); }
 ErrorOr<isize> Process::InsertFd(Ref<::FileDescriptor> fd)
 {
-    return m_FdTable->Insert(fd);
+    return m_FdTable->Insert(fd, -1, fd->CloseOnExec());
 }
 
 ErrorOr<isize> Process::OpenPipe(i32* pipeFds, isize flags)
 {
     auto pipe        = Fifo::CreatePipe();
-    i32  readerFdNum = static_cast<i32>(m_FdTable->Insert(pipe.Reader));
+    bool cloExec     = flags & O_CLOEXEC;
+    i32  readerFdNum
+        = static_cast<i32>(m_FdTable->Insert(pipe.Reader, -1, cloExec));
     CopyToUser(pipeFds, readerFdNum);
-    i32 writerFdNum = static_cast<i32>(m_FdTable->Insert(pipe.Writer));
+    i32 writerFdNum
+        = static_cast<i32>(m_FdTable->Insert(pipe.Writer, -1, cloExec));
     CopyToUser(pipeFds + 1, writerFdNum);
     LogTrace("Process::OpenPipe: readerFd => {}, writerFd => {}", readerFdNum,
              writerFdNum);
@@ -473,7 +478,7 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 
     if (oldTable)
         for (const auto& [i, fd] : *oldTable)
-            if (!fd->CloseOnExec()) m_FdTable->Insert(fd, i);
+            if (!oldTable->IsCloseOnExec(i)) m_FdTable->Insert(fd, i);
 
     if (m_ID <= 2)
     {
@@ -759,7 +764,8 @@ void Process::CopyFileDescriptors(Process* process)
 {
     LogTrace("Copying file descriptors");
     process->m_FdTable = CreateRef<class FileDescriptorTable>();
-    for (auto& [fdNum, fd] : *m_FdTable) process->m_FdTable->Insert(fd, fdNum);
+    for (auto& [fdNum, fd] : *m_FdTable)
+        process->m_FdTable->Insert(fd, fdNum, m_FdTable->IsCloseOnExec(fdNum));
 }
 ErrorOr<void> Process::CopyMemory(Process* process)
 {

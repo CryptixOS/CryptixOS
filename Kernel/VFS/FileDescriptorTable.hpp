@@ -16,11 +16,20 @@ class FileDescriptorTable : public RefCounted<FileDescriptorTable>
   public:
     FileDescriptorTable();
 
-    isize       Insert(::Ref<FileDescriptor> descriptor, isize desired = -1);
-    isize       Replace(::Ref<FileDescriptor> descriptor, isize desired);
+    // Installs `descriptor` at `desired` if that slot is free, otherwise at
+    // the lowest free number (never over an open fd). `closeOnExec` is the
+    // per-fd FD_CLOEXEC flag; it is not shared with duplicates.
+    isize       Insert(::Ref<FileDescriptor> descriptor, isize desired = -1,
+                       bool closeOnExec = false);
+    // dup2/dup3: installs at exactly `desired`, replacing what is there
+    isize       Replace(::Ref<FileDescriptor> descriptor, isize desired,
+                        bool closeOnExec = false);
     isize       Erase(isize fdNum);
 
     void        Clear();
+
+    bool        IsCloseOnExec(isize fd) const;
+    bool        SetCloseOnExec(isize fd, bool closeOnExec);
 
     inline bool IsValid(isize fd) const { return m_Table.Contains(fd); }
     inline ::Ref<FileDescriptor> GetFd(isize fd) const
@@ -33,11 +42,12 @@ class FileDescriptorTable : public RefCounted<FileDescriptorTable>
     auto                          begin() { return m_Table.begin(); }
     auto                          end() { return m_Table.end(); }
 
-    inline ::Ref<FileDescriptor>& operator[](usize i) { return m_Table[i]; }
-
   private:
     Spinlock      m_Lock;
     TableType     m_Table;
 
-    Atomic<isize> m_NextIndex = 0;
+    // fds with FD_CLOEXEC set
+    UnorderedMap<isize, bool> m_CloseOnExec;
+
+    isize         LowestFree(isize from) const;
 };
