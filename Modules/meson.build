@@ -41,7 +41,7 @@ ld_args = [
 subdir(arch)
 subdir('noarch')
 
-modules = ['serio', 'input']
+modules = ['serial', 'serio', 'input']
 
 foreach name : modules
   external = false

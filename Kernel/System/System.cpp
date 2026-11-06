@@ -256,6 +256,7 @@ namespace System
         LoadModule("/usr/lib/modules/e1000e.ko");
         LoadModule("/usr/lib/modules/i8042.ko");
         LoadModule("/usr/lib/modules/atkbd.ko");
+        LoadModule("/usr/lib/modules/serial_pnp.ko");
 
         return {};
     }
@@ -308,7 +309,7 @@ namespace System
             auto& dependencies = module->Dependencies;
             for (const auto& [modName, module] : dependencies)
             {
-                if (!module) return 0;
+                if (!module) continue;
 
                 address = module->Image->LookupSymbol(name);
                 if (address) return address;
@@ -383,7 +384,7 @@ namespace System
         ELF::Image::SymbolIterator it;
         return {};
     }
-    ErrorOr<void> LoadModule(Ref<Module> module)
+    ErrorOr<void> LoadModule(::Ref<Module> module)
     {
         StringView name = module->Name;
         LogTrace("System: Loading module `{}`...", name);

@@ -159,9 +159,11 @@ namespace API::System
                                              imageSize);
             }));
 
-        auto status = System::LoadModule(image);
-        if (!status) return Error(status.Error());
+        auto module   = CreateRef<Module>();
+        module->Image = image;
 
+        auto status   = System::LoadModule(module);
+        if (!status) return Error(status.Error());
         return 0;
     }
 

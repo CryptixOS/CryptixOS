@@ -379,7 +379,9 @@ IrqResult I8042::HandleInterrupt(::Device* device, ExecutionContext* context)
     {
         auto byte = s_Controller->TryRead();
 
-        if (byte) s_Keyboard->OnByteReceived(byte.Value());
+        // The keyboard can send bytes (e.g. the ACK to "enable port") before
+        // atkbd has registered itself with RegisterPort().
+        if (byte && s_Keyboard) s_Keyboard->OnByteReceived(byte.Value());
     }
 
     return IrqResult::eHandled;

@@ -238,9 +238,10 @@ namespace ELF
     }
     ErrorOr<void> Loader::ResolveSymbols(SymbolLookup lookup)
     {
+        bool unresolved = false;
         auto resolveSymbol
-            = [this, &lookup](const auto& section,
-                              const auto& reloc) -> IterationResult
+            = [this, &lookup, &unresolved](const auto& section,
+                                           const auto& reloc) -> IterationResult
         {
             const auto& symbolTableSection
                 = m_Image->SectionHeader(section.Link);
@@ -258,7 +259,21 @@ namespace ELF
             const char* symbolName    = stringTable + symbol.Name;
             u64         symbolAddress = 0;
             if (symbol.SectionIndex == ToUnderlying(SectionType::eNull))
+            {
                 symbolAddress = lookup(symbolName);
+
+                // Symbol index 0 (relative relocations) has no name and is
+                // never looked up. An undefined weak symbol may stay 0; any
+                // other unresolved symbol would be patched to address 0 and
+                // crash the first time it is used, so refuse to load instead.
+                constexpr u8 STB_WEAK = 2;
+                bool         isWeak   = (symbol.Info >> 4) == STB_WEAK;
+                if (!symbolAddress && symbolIndex != 0 && !isWeak)
+                {
+                    LogError("ELF: Unresolved symbol `{}`", symbolName);
+                    unresolved = true;
+                }
+            }
             else symbolAddress = m_LoadBase.Offset(symbol.Value);
 
             m_Symbols[symbolName] = symbolAddress;
@@ -267,6 +282,8 @@ namespace ELF
 
         Image::RelocationEntryIterator resolveIt(resolveSymbol);
         m_Image->ForEachRelocationEntry(resolveIt);
+
+        if (unresolved) return Error(ENOEXEC);
         return {};
     }
     ErrorOr<void> Loader::ApplyRelocations()
@@ -358,6 +375,25 @@ namespace ELF
         m_Image->ForEachRelocationEntry(relocIt);
 
         if (status) return Error(status);
+
+        // Export every symbol this image defines, not only the ones its own
+        // relocations referenced: other modules link against this table, and
+        // a function this module only calls directly (no relocation) would
+        // otherwise be missing and resolve to 0 in its users.
+        Image::SymbolEntryIterator exportIt;
+        exportIt.BindLambda(
+            [this](Symbol& symbol, StringView name) -> IterationResult
+            {
+                constexpr u8 STB_LOCAL = 0;
+                bool         defined
+                    = symbol.SectionIndex != ToUnderlying(SectionType::eNull);
+                bool isLocal = (symbol.Info >> 4) == STB_LOCAL;
+                if (defined && !isLocal && !name.Empty()
+                    && m_Symbols.Find(name) == m_Symbols.end())
+                    m_Symbols[name] = m_LoadBase.Offset(symbol.Value);
+                return IterationResult::eContinue;
+            });
+        m_Image->ForEachSymbolEntry(exportIt);
 
         m_Image->LoadSymbols(m_Symbols);
         return {};
