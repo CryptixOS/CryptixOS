@@ -76,7 +76,7 @@ namespace Logger
     #define LogFatal(...)      Prism::Log::Fatal(__VA_ARGS__)
 
     #define LogModuleTrace(name, ...)                                          \
-        Prism::Log::Message("[\e[0;34m" name "\e[0;0m]: " __VA_ARGS__);
+        Prism::Log::Message("[\e[0;34m" name "\e[0;0m]: " __VA_ARGS__)
 #else
     #define EarlyLogTrace(...)
     #define EarlyLogInfo(...)
@@ -89,4 +89,6 @@ namespace Logger
     #define LogWarn(...)
     #define LogError(...)
     #define LogFatal(...)
+
+    #define LogModuleTrace(...)
 #endif

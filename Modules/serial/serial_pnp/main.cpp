@@ -17,345 +17,341 @@ CTOS_MODULE_DESCRIPTION("Generic 8250/16x50 serial driver");
 CTOS_MODULE_LICENSE("GPL-3");
 CTOS_MODULE_VERSION("0.2");
 
-constexpr usize UNKNOWN_DEV = 0x3000;
-
-// This list is based on linux drivers/tty/serial/8250_pnp.c
-static auto     s_MatchIDs  = ToArray<StringView>(
-    {/* Archtek America Corp. */
+// This list is based on linux drivers/tty/serial/8250_pnp.c. Only the IDs are
+// kept: Linux's per-entry flags don't fit in a StringView (a {"ID", flags}
+// initializer picked the (pointer, length) constructor, which made every ID
+// empty), and its wildcard entries ("PNPCXXX", "WACFXXX", ...) can't match,
+// because the ACPI bus compares IDs exactly.
+static auto     s_MatchIDs  = ToArray<StringView>({
+    /* Archtek America Corp. */
      /* Archtek SmartLink Modem 3334BT Plug & Play */
-     {"AAC000F", 0},
+     "AAC000F",
      /* Anchor Datacomm BV */
      /* SXPro 144 External Data Fax Modem Plug & Play */
-     {"ADC0001", 0},
+     "ADC0001",
      /* SXPro 288 External Data Fax Modem Plug & Play */
-     {"ADC0002", 0},
+     "ADC0002",
      /* PROLiNK 1456VH ISA PnP K56flex Fax Modem */
-     {"AEI0250", 0},
+     "AEI0250",
      /* Actiontec ISA PNP 56K X2 Fax Modem */
-     {"AEI1240", 0},
+     "AEI1240",
      /* Rockwell 56K ACF II Fax+Data+Voice Modem */
-     {"AKY1021", 0 /*SPCI_FL_NO_SHIRQ*/},
+     "AKY1021",
      /* AZT3005 PnP SOUND DEVICE */
-     {"AZT4001", 0},
+     "AZT4001",
      /* Best Data Products Inc. Smart One 336F PnP Modem */
-     {"BDP3336", 0},
+     "BDP3336",
      /*  Boca Research */
      /* Boca Complete Ofc Communicator 14.4 Data-FAX */
-     {"BRI0A49", 0},
+     "BRI0A49",
      /* Boca Research 33,600 ACF Modem */
-     {"BRI1400", 0},
+     "BRI1400",
      /* Boca 33.6 Kbps Internal FD34FSVD */
-     {"BRI3400", 0},
+     "BRI3400",
      /* Boca 33.6 Kbps Internal FD34FSVD */
-     {"BRI0A49", 0},
+     "BRI0A49",
      /* Best Data Products Inc. Smart One 336F PnP Modem */
-     {"BDP3336", 0},
+     "BDP3336",
      /* Computer Peripherals Inc */
      /* EuroViVa CommCenter-33.6 SP PnP */
-     {"CPI4050", 0},
+     "CPI4050",
      /* Creative Labs */
      /* Creative Labs Phone Blaster 28.8 DSVD PnP Voice */
-     {"CTL3001", 0},
+     "CTL3001",
      /* Creative Labs Modem Blaster 28.8 DSVD PnP Voice */
-     {"CTL3011", 0},
+     "CTL3011",
      /* Davicom ISA 33.6K Modem */
-     {"DAV0336", 0},
+     "DAV0336",
      /* Creative */
      /* Creative Modem Blaster Flash56 DI5601-1 */
-     {"DMB1032", 0},
+     "DMB1032",
      /* Creative Modem Blaster V.90 DI5660 */
-     {"DMB2001", 0},
+     "DMB2001",
      /* E-Tech */
      /* E-Tech CyberBULLET PC56RVP */
-     {"ETT0002", 0},
+     "ETT0002",
      /* FUJITSU */
      /* Fujitsu 33600 PnP-I2 R Plug & Play */
-     {"FUJ0202", 0},
+     "FUJ0202",
      /* Fujitsu FMV-FX431 Plug & Play */
-     {"FUJ0205", 0},
+     "FUJ0205",
      /* Fujitsu 33600 PnP-I4 R Plug & Play */
-     {"FUJ0206", 0},
+     "FUJ0206",
      /* Fujitsu Fax Voice 33600 PNP-I5 R Plug & Play */
-     {"FUJ0209", 0},
+     "FUJ0209",
      /* Archtek America Corp. */
      /* Archtek SmartLink Modem 3334BT Plug & Play */
-     {"GVC000F", 0},
+     "GVC000F",
      /* Archtek SmartLink Modem 3334BRV 33.6K Data Fax Voice */
-     {"GVC0303", 0},
+     "GVC0303",
      /* Hayes */
      /* Hayes Optima 288 V.34-V.FC + FAX + Voice Plug & Play */
-     {"HAY0001", 0},
+     "HAY0001",
      /* Hayes Optima 336 V.34 + FAX + Voice PnP */
-     {"HAY000C", 0},
+     "HAY000C",
      /* Hayes Optima 336B V.34 + FAX + Voice PnP */
-     {"HAY000D", 0},
+     "HAY000D",
      /* Hayes Accura 56K Ext Fax Modem PnP */
-     {"HAY5670", 0},
+     "HAY5670",
      /* Hayes Accura 56K Ext Fax Modem PnP */
-     {"HAY5674", 0},
+     "HAY5674",
      /* Hayes Accura 56K Fax Modem PnP */
-     {"HAY5675", 0},
+     "HAY5675",
      /* Hayes 288, V.34 + FAX */
-     {"HAYF000", 0},
+     "HAYF000",
      /* Hayes Optima 288 V.34 + FAX + Voice, Plug & Play */
-     {"HAYF001", 0},
+     "HAYF001",
      /* IBM */
      /* IBM Thinkpad 701 Internal Modem Voice */
-     {"IBM0033", 0},
+     "IBM0033",
      /* Intermec */
      /* Intermec CV60 touchscreen port */
-     {"PNP4972", 0},
+     "PNP4972",
      /* Intertex */
      /* Intertex 28k8 33k6 Voice EXT PnP */
-     {"IXDC801", 0},
+     "IXDC801",
      /* Intertex 33k6 56k Voice EXT PnP */
-     {"IXDC901", 0},
+     "IXDC901",
      /* Intertex 28k8 33k6 Voice SP EXT PnP */
-     {"IXDD801", 0},
+     "IXDD801",
      /* Intertex 33k6 56k Voice SP EXT PnP */
-     {"IXDD901", 0},
+     "IXDD901",
      /* Intertex 28k8 33k6 Voice SP INT PnP */
-     {"IXDF401", 0},
+     "IXDF401",
      /* Intertex 28k8 33k6 Voice SP EXT PnP */
-     {"IXDF801", 0},
+     "IXDF801",
      /* Intertex 33k6 56k Voice SP EXT PnP */
-     {"IXDF901", 0},
+     "IXDF901",
      /* Kortex International */
      /* KORTEX 28800 Externe PnP */
-     {"KOR4522", 0},
+     "KOR4522",
      /* KXPro 33.6 Vocal ASVD PnP */
-     {"KORF661", 0},
+     "KORF661",
      /* Lasat */
      /* LASAT Internet 33600 PnP */
-     {"LAS4040", 0},
+     "LAS4040",
      /* Lasat Safire 560 PnP */
-     {"LAS4540", 0},
+     "LAS4540",
      /* Lasat Safire 336  PnP */
-     {"LAS5440", 0},
+     "LAS5440",
      /* Microcom, Inc. */
      /* Microcom TravelPorte FAST V.34 Plug & Play */
-     {"MNP0281", 0},
+     "MNP0281",
      /* Microcom DeskPorte V.34 FAST or FAST+ Plug & Play */
-     {"MNP0336", 0},
+     "MNP0336",
      /* Microcom DeskPorte FAST EP 28.8 Plug & Play */
-     {"MNP0339", 0},
+     "MNP0339",
      /* Microcom DeskPorte 28.8P Plug & Play */
-     {"MNP0342", 0},
+     "MNP0342",
      /* Microcom DeskPorte FAST ES 28.8 Plug & Play */
-     {"MNP0500", 0},
+     "MNP0500",
      /* Microcom DeskPorte FAST ES 28.8 Plug & Play */
-     {"MNP0501", 0},
+     "MNP0501",
      /* Microcom DeskPorte 28.8S Internal Plug & Play */
-     {"MNP0502", 0},
+     "MNP0502",
      /* Motorola */
      /* Motorola BitSURFR Plug & Play */
-     {"MOT1105", 0},
+     "MOT1105",
      /* Motorola TA210 Plug & Play */
-     {"MOT1111", 0},
+     "MOT1111",
      /* Motorola HMTA 200 (ISDN) Plug & Play */
-     {"MOT1114", 0},
+     "MOT1114",
      /* Motorola BitSURFR Plug & Play */
-     {"MOT1115", 0},
+     "MOT1115",
      /* Motorola Lifestyle 28.8 Internal */
-     {"MOT1190", 0},
+     "MOT1190",
      /* Motorola V.3400 Plug & Play */
-     {"MOT1501", 0},
+     "MOT1501",
      /* Motorola Lifestyle 28.8 V.34 Plug & Play */
-     {"MOT1502", 0},
+     "MOT1502",
      /* Motorola Power 28.8 V.34 Plug & Play */
-     {"MOT1505", 0},
+     "MOT1505",
      /* Motorola ModemSURFR External 28.8 Plug & Play */
-     {"MOT1509", 0},
+     "MOT1509",
      /* Motorola Premier 33.6 Desktop Plug & Play */
-     {"MOT150A", 0},
+     "MOT150A",
      /* Motorola VoiceSURFR 56K External PnP */
-     {"MOT150F", 0},
+     "MOT150F",
      /* Motorola ModemSURFR 56K External PnP */
-     {"MOT1510", 0},
+     "MOT1510",
      /* Motorola ModemSURFR 56K Internal PnP */
-     {"MOT1550", 0},
+     "MOT1550",
      /* Motorola ModemSURFR Internal 28.8 Plug & Play */
-     {"MOT1560", 0},
+     "MOT1560",
      /* Motorola Premier 33.6 Internal Plug & Play */
-     {"MOT1580", 0},
+     "MOT1580",
      /* Motorola OnlineSURFR 28.8 Internal Plug & Play */
-     {"MOT15B0", 0},
+     "MOT15B0",
      /* Motorola VoiceSURFR 56K Internal PnP */
-     {"MOT15F0", 0},
+     "MOT15F0",
      /* Com 1 */
      /*  Deskline K56 Phone System PnP */
-     {"MVX00A1", 0},
+     "MVX00A1",
      /* PC Rider K56 Phone System PnP */
-     {"MVX00F2", 0},
+     "MVX00F2",
      /* NEC 98NOTE SPEAKER PHONE FAX MODEM(33600bps) */
-     {"nEC8241", 0},
+     "nEC8241",
      /* Pace 56 Voice Internal Plug & Play Modem */
-     {"PMC2430", 0},
+     "PMC2430",
      /* Generic */
      /* Generic standard PC COM port	 */
-     {"PNP0500", 0},
+     "PNP0500",
      /* Generic 16550A-compatible COM port */
-     {"PNP0501", 0},
+     "PNP0501",
      /* Compaq 14400 Modem */
-     {"PNPC000", 0},
+     "PNPC000",
      /* Compaq 2400/9600 Modem */
-     {"PNPC001", 0},
+     "PNPC001",
      /* Dial-Up Networking Serial Cable between 2 PCs */
-     {"PNPC031", 0},
+     "PNPC031",
      /* Dial-Up Networking Parallel Cable between 2 PCs */
-     {"PNPC032", 0},
+     "PNPC032",
      /* Standard 9600 bps Modem */
-     {"PNPC100", 0},
+     "PNPC100",
      /* Standard 14400 bps Modem */
-     {"PNPC101", 0},
+     "PNPC101",
      /*  Standard 28800 bps Modem*/
-     {"PNPC102", 0},
+     "PNPC102",
      /*  Standard Modem*/
-     {"PNPC103", 0},
+     "PNPC103",
      /*  Standard 9600 bps Modem*/
-     {"PNPC104", 0},
+     "PNPC104",
      /*  Standard 14400 bps Modem*/
-     {"PNPC105", 0},
+     "PNPC105",
      /*  Standard 28800 bps Modem*/
-     {"PNPC106", 0},
+     "PNPC106",
      /*  Standard Modem */
-     {"PNPC107", 0},
+     "PNPC107",
      /* Standard 9600 bps Modem */
-     {"PNPC108", 0},
+     "PNPC108",
      /* Standard 14400 bps Modem */
-     {"PNPC109", 0},
+     "PNPC109",
      /* Standard 28800 bps Modem */
-     {"PNPC10A", 0},
+     "PNPC10A",
      /* Standard Modem */
-     {"PNPC10B", 0},
+     "PNPC10B",
      /* Standard 9600 bps Modem */
-     {"PNPC10C", 0},
+     "PNPC10C",
      /* Standard 14400 bps Modem */
-     {"PNPC10D", 0},
+     "PNPC10D",
      /* Standard 28800 bps Modem */
-     {"PNPC10E", 0},
+     "PNPC10E",
      /* Standard Modem */
-     {"PNPC10F", 0},
+     "PNPC10F",
      /* Standard PCMCIA Card Modem */
-     {"PNP2000", 0},
+     "PNP2000",
      /* Rockwell */
      /* Modular Technology */
      /* Rockwell 33.6 DPF Internal PnP */
      /* Modular Technology 33.6 Internal PnP */
-     {"ROK0030", 0},
+     "ROK0030",
      /* Kortex International */
      /* KORTEX 14400 Externe PnP */
-     {"ROK0100", 0},
+     "ROK0100",
      /* Rockwell 28.8 */
-     {"ROK4120", 0},
+     "ROK4120",
      /* Viking Components, Inc */
      /* Viking 28.8 INTERNAL Fax+Data+Voice PnP */
-     {"ROK4920", 0},
+     "ROK4920",
      /* Rockwell */
      /* British Telecom */
      /* Modular Technology */
      /* Rockwell 33.6 DPF External PnP */
      /* BT Prologue 33.6 External PnP */
      /* Modular Technology 33.6 External PnP */
-     {"RSS00A0", 0},
+     "RSS00A0",
      /* Viking 56K FAX INT */
-     {"RSS0262", 0},
+     "RSS0262",
      /* K56 par,VV,Voice,Speakphone,AudioSpan,PnP */
-     {"RSS0250", 0},
+     "RSS0250",
      /* SupraExpress 28.8 Data/Fax PnP modem */
-     {"SUP1310", 0},
+     "SUP1310",
      /* SupraExpress 336i PnP Voice Modem */
-     {"SUP1381", 0},
+     "SUP1381",
      /* SupraExpress 33.6 Data/Fax PnP modem */
-     {"SUP1421", 0},
+     "SUP1421",
      /* SupraExpress 33.6 Data/Fax PnP modem */
-     {"SUP1590", 0},
+     "SUP1590",
      /* SupraExpress 336i Sp ASVD */
-     {"SUP1620", 0},
+     "SUP1620",
      /* SupraExpress 33.6 Data/Fax PnP modem */
-     {"SUP1760", 0},
+     "SUP1760",
      /* SupraExpress 56i Sp Intl */
-     {"SUP2171", 0},
+     "SUP2171",
      /* Phoebe Micro */
      /* Phoebe Micro 33.6 Data Fax 1433VQH Plug & Play */
-     {"TEX0011", 0},
+     "TEX0011",
      /* Archtek America Corp. */
      /* Archtek SmartLink Modem 3334BT Plug & Play */
-     {"UAC000F", 0},
+     "UAC000F",
      /* 3Com Corp. */
      /* Gateway Telepath IIvi 33.6 */
-     {"USR0000", 0},
+     "USR0000",
      /* U.S. Robotics Sporster 33.6K Fax INT PnP */
-     {"USR0002", 0},
+     "USR0002",
      /*  Sportster Vi 14.4 PnP FAX Voicemail */
-     {"USR0004", 0},
+     "USR0004",
      /* U.S. Robotics 33.6K Voice INT PnP */
-     {"USR0006", 0},
+     "USR0006",
      /* U.S. Robotics 33.6K Voice EXT PnP */
-     {"USR0007", 0},
+     "USR0007",
      /* U.S. Robotics Courier V.Everything INT PnP */
-     {"USR0009", 0},
+     "USR0009",
      /* U.S. Robotics 33.6K Voice INT PnP */
-     {"USR2002", 0},
+     "USR2002",
      /* U.S. Robotics 56K Voice INT PnP */
-     {"USR2070", 0},
+     "USR2070",
      /* U.S. Robotics 56K Voice EXT PnP */
-     {"USR2080", 0},
+     "USR2080",
      /* U.S. Robotics 56K FAX INT */
-     {"USR3031", 0},
+     "USR3031",
      /* U.S. Robotics 56K FAX INT */
-     {"USR3050", 0},
+     "USR3050",
      /* U.S. Robotics 56K Voice INT PnP */
-     {"USR3070", 0},
+     "USR3070",
      /* U.S. Robotics 56K Voice EXT PnP */
-     {"USR3080", 0},
+     "USR3080",
      /* U.S. Robotics 56K Voice INT PnP */
-     {"USR3090", 0},
+     "USR3090",
      /* U.S. Robotics 56K Message  */
-     {"USR9100", 0},
+     "USR9100",
      /* U.S. Robotics 56K FAX EXT PnP*/
-     {"USR9160", 0},
+     "USR9160",
      /* U.S. Robotics 56K FAX INT PnP*/
-     {"USR9170", 0},
+     "USR9170",
      /* U.S. Robotics 56K Voice EXT PnP*/
-     {"USR9180", 0},
+     "USR9180",
      /* U.S. Robotics 56K Voice INT PnP*/
-     {"USR9190", 0},
-     /* Wacom tablets */
-     {"WACFXXX", 0},
+     "USR9190",
      /* Compaq touchscreen */
-     {"FPI2002", 0},
+     "FPI2002",
      /* Fujitsu Stylistic touchscreens */
-     {"FUJ02B2", 0},
-     {"FUJ02B3", 0},
+     "FUJ02B2",
+     "FUJ02B3",
      /* Fujitsu Stylistic LT touchscreens */
-     {"FUJ02B4", 0},
+     "FUJ02B4",
      /* Passive Fujitsu Stylistic touchscreens */
-     {"FUJ02B6", 0},
-     {"FUJ02B7", 0},
-     {"FUJ02B8", 0},
-     {"FUJ02B9", 0},
-     {"FUJ02BC", 0},
+     "FUJ02B6",
+     "FUJ02B7",
+     "FUJ02B8",
+     "FUJ02B9",
+     "FUJ02BC",
      /* Fujitsu Wacom Tablet PC device */
-     {"FUJ02E5", 0},
+     "FUJ02E5",
      /* Fujitsu P-series tablet PC device */
-     {"FUJ02E6", 0},
+     "FUJ02E6",
      /* Fujitsu Wacom 2FGT Tablet PC device */
-     {"FUJ02E7", 0},
+     "FUJ02E7",
      /* Fujitsu Wacom 1FGT Tablet PC device */
-     {"FUJ02E9", 0},
+     "FUJ02E9",
      /*
       * LG C1 EXPRESS DUAL (C1-PB11A3) touch screen (actually a FUJ02E6 in
       * disguise)
       */
-     {"LTS0001", 0},
+     "LTS0001",
      /* Rockwell's (PORALiNK) 33600 INT PNP */
-     {"WCI0003", 0},
-     /* Unknown PnP modems */
-     {"PNPCXXX", UNKNOWN_DEV},
-     /* More unknown PnP modems */
-     {"PNPDXXX", UNKNOWN_DEV},
-     {"", 0}});
+     "WCI0003",
+});
 
 using namespace Prism;
 
