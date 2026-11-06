@@ -258,28 +258,56 @@ ErrorOr<void> SynthFsINode::RmDir(::Ref<DirectoryEntry> entry)
     return Unlink(entry);
 }
 
+namespace
+{
+    // setxattr(2) flags
+    constexpr isize XATTR_CREATE  = 1;
+    constexpr isize XATTR_REPLACE = 2;
+} // namespace
+
 ErrorOr<isize> SynthFsINode::SetExtendedAttribute(::Ref<DirectoryEntry> dentry,
                                                   StringView            name,
                                                   const u8* value, usize size,
                                                   isize flags)
 {
-    auto entry = m_ExtendedAttributes.Insert({name, {}});
+    if (flags & ~(XATTR_CREATE | XATTR_REPLACE)) return Error(EINVAL);
+    if (size > System::Limits::XATTR_MAX_VALUE_SIZE) return Error(E2BIG);
 
-    size       = Min(size, System::Limits::XATTR_MAX_VALUE_SIZE);
-    CopyFromUser(entry->Value.Raw(), value, size);
+    // Copy the value in before touching the map, so a bad pointer leaves the
+    // attribute as it was
+    Vector<u8> data(size);
+    if (size && !CopyFromUser(data.Raw(), value, size)) return Error(EFAULT);
 
-    return {};
+    ScopedLock guard(m_Lock);
+    bool       exists
+        = m_ExtendedAttributes.Find(String(name)) != m_ExtendedAttributes.end();
+    if ((flags & XATTR_CREATE) && exists) return Error(EEXIST);
+    if ((flags & XATTR_REPLACE) && !exists) return Error(ENODATA);
+
+    m_ExtendedAttributes[String(name)] = Move(data);
+    return 0;
 }
 ErrorOr<isize> SynthFsINode::GetExtendedAttribute(::Ref<DirectoryEntry> dentry,
                                                   StringView name, u8* value,
                                                   usize size)
 {
-    auto it = m_ExtendedAttributes.Find(name);
-    if (it == m_ExtendedAttributes.end()) return Error(ENOENT);
+    // Copy the value out under the lock, and to user memory without it
+    Vector<u8> data;
+    {
+        ScopedLock guard(m_Lock);
+        auto       it = m_ExtendedAttributes.Find(String(name));
+        if (it == m_ExtendedAttributes.end()) return Error(ENODATA);
+        data = it->Value;
+    }
 
-    size = Min(size, System::Limits::XATTR_MAX_VALUE_SIZE);
-    CopyToUser(value, it->Value.Raw(), size);
-    return {};
+    // Like getxattr(2): size 0 asks for the value's size, a buffer that is
+    // too small fails, otherwise the value's size is returned
+    if (size == 0) return static_cast<isize>(data.Size());
+    if (size < data.Size()) return Error(ERANGE);
+
+    if (data.Size() && !CopyToUser(value, data.Raw(), data.Size()))
+        return Error(EFAULT);
+    return static_cast<isize>(data.Size());
 }
 ErrorOr<isize>
 SynthFsINode::ListExtendedAttributes(::Ref<DirectoryEntry> dentry, char* list,
@@ -291,11 +319,12 @@ ErrorOr<isize>
 SynthFsINode::RemoveExtendedAttribute(::Ref<DirectoryEntry> dentry,
                                       StringView            name)
 {
-    auto it = m_ExtendedAttributes.Find(name);
-    if (it == m_ExtendedAttributes.end()) return Error(ENOENT);
+    ScopedLock guard(m_Lock);
+    auto       it = m_ExtendedAttributes.Find(String(name));
+    if (it == m_ExtendedAttributes.end()) return Error(ENODATA);
 
     m_ExtendedAttributes.Erase(it);
-    return {};
+    return 0;
 }
 
 ErrorOr<void> SynthFsINode::ResizeBuffer(usize newSize)

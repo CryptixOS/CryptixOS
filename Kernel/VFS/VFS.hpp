@@ -58,7 +58,7 @@ namespace VFS
     ErrorOr<Ref<MountPoint>>     MountRoot(StringView filesystemName);
     ErrorOr<Ref<MountPoint>> Mount(Ref<DirectoryEntry> parent, PathView source,
                                    PathView target, StringView fsName,
-                                   MountFlags  flags = MountFlags::eReadOnly,
+                                   MountFlags  flags = MountFlags::eNone,
                                    const void* data  = nullptr);
     bool Unmount(Ref<DirectoryEntry> parent, PathView path, i32 flags = 0);
 

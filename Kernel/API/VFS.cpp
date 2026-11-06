@@ -739,7 +739,8 @@ namespace API::VFS
         auto path = CopyStringFromUser(upath);
         auto name = CopyStringFromUser(uname);
 
-        return VFS::SetExtendedAttribute(path, name, value, size, flags);
+        // setxattr() follows symlinks, lsetxattr() doesn't
+        return VFS::SetExtendedAttribute(path, name, value, size, flags, true);
     }
     ErrorOr<isize> LSetXAttr(const char* upath, const char* uname,
                              const u8* value, usize size, isize flags)
@@ -747,7 +748,7 @@ namespace API::VFS
         auto path = CopyStringFromUser(upath);
         auto name = CopyStringFromUser(uname);
 
-        return VFS::SetExtendedAttribute(path, name, value, size, flags, true);
+        return VFS::SetExtendedAttribute(path, name, value, size, flags, false);
     }
     ErrorOr<isize> FSetXAttr(isize fdNum, const char* name, const u8* value,
                              usize size, isize flags)

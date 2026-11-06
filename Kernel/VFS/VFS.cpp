@@ -629,7 +629,7 @@ namespace VFS
         if (!oldEntry) return Error(ENOENT);
         if (oldEntry->IsDirectory()) return Error(EPERM);
 
-        auto newEntry = newParent->Lookup(oldName);
+        auto newEntry = newParent->Lookup(newName);
         if (newEntry) return Error(EEXIST);
 
         newEntry            = CreateRef<DirectoryEntry>(nullptr, newName);

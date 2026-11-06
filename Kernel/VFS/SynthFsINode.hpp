@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <Prism/Containers/Vector.hpp>
 #include <Prism/Memory/Buffer.hpp>
 #include <System/Limits.hpp>
 
@@ -81,8 +82,8 @@ class SynthFsINode : public INode
     UnorderedMap<String, ::Ref<INode>> m_Children;
     String                             m_Target = ""_s;
 
-    UnorderedMap<String, Array<u8, System::Limits::XATTR_MAX_VALUE_SIZE>>
-                  m_ExtendedAttributes;
+    // Values are stored at their real size (up to XATTR_MAX_VALUE_SIZE)
+    UnorderedMap<String, Vector<u8>> m_ExtendedAttributes;
 
     ErrorOr<void> ResizeBuffer(usize newSize);
 };
