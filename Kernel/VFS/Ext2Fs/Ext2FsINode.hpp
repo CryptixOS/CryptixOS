@@ -41,10 +41,7 @@ class Ext2FsINode : public INode
     }
     virtual void  InsertChild(::Ref<INode> node, StringView name) override;
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
-    virtual isize Write(const void* buffer, off_t offset, usize bytes) override
-    {
-        return -1;
-    }
+    virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
     virtual ErrorOr<Path>  ReadLink() override;
     virtual ErrorOr<isize> Truncate(usize size) override { return -1; }
     virtual ErrorOr<void>  Rename(::Ref<INode> newParent,

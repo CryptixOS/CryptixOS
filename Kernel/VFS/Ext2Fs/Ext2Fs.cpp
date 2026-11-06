@@ -28,6 +28,8 @@ ErrorOr<::Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
     m_Device = reinterpret_cast<File*>(DeviceManager::LookupBlockDevice(id));
 
     m_SuperBlock = new Ext2FsSuperBlock;
+
+    LogTrace("Ext2Fs: Reading superblock from device: {}", sourceEntry->Path());
     ReadSuperBlock();
 
     constexpr usize EXT2_FS_SIGNATURE = 0xef53;
@@ -50,6 +52,8 @@ ErrorOr<::Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
     m_FragmentSize = 1024 << m_SuperBlock->FragmentSize;
     m_BlockGroupDescriptionCount
         = m_SuperBlock->BlockCount / m_SuperBlock->BlocksPerGroup;
+    LogTrace("Ext2Fs: Block Group Descriptor Count: {}",
+             m_BlockGroupDescriptionCount);
 
     m_SuperBlock->LastMountTime = Time::GetReal().tv_sec;
     FlushSuperBlock();
@@ -97,9 +101,7 @@ ErrorOr<::Ref<INode>> Ext2Fs::AllocateNode(StringView name, INodeMode mode)
     AssignINodeBlocks(inode->m_Meta, inode->m_Metadata.ID, 0, 1);
     WriteINodeEntry(inode->m_Meta, inode->m_Metadata.ID);
 
-    // TODO(v1tr10l7): parent
-    // TODO(v1tr10l7): Allocate
-    return Error(ENOSYS);
+    return inode;
 }
 ErrorOr<void> Ext2Fs::FreeINode(::Ref<INode> inode)
 {

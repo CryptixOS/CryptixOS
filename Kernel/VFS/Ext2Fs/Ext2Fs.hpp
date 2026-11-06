@@ -55,6 +55,16 @@ class Ext2Fs : public Filesystem
     isize WriteINode(Ext2FsINodeMeta& meta, u8* in, u32 inode, off_t offset,
                      usize count);
 
+  protected:
+    friend class Ext2FsINode;
+    ScopedLock&& LockSuperBlock();
+    void         ReadSuperBlock();
+    void         FlushSuperBlock();
+
+    void ReadBlockGroupDescriptor(Ext2FsBlockGroupDescriptor* out, usize index);
+    void WriteBlockGroupDescriptor(Ext2FsBlockGroupDescriptor& in, usize index);
+    u32  GetINodeBlock(Ext2FsINodeMeta& meta, u32 blockIndex);
+
   private:
     File*             m_Device                     = nullptr;
     // u64               m_DeviceID;
@@ -65,12 +75,4 @@ class Ext2Fs : public Filesystem
     usize             m_BlockGroupDescriptionCount = 0;
     friend class Ext2FsAllocator;
     Ext2FsAllocator m_Allocator;
-
-    ScopedLock&&    LockSuperBlock();
-    void            ReadSuperBlock();
-    void            FlushSuperBlock();
-
-    void ReadBlockGroupDescriptor(Ext2FsBlockGroupDescriptor* out, usize index);
-    void WriteBlockGroupDescriptor(Ext2FsBlockGroupDescriptor& in, usize index);
-    u32  GetINodeBlock(Ext2FsINodeMeta& meta, u32 blockIndex);
 };
