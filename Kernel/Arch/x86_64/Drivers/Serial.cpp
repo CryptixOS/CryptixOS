@@ -70,6 +70,21 @@ namespace Serial
 
         return IO::In<byte>(port);
     }
+    i32 TryRead()
+    {
+        ScopedLock guard(s_Lock, true);
+        word       port = static_cast<word>(Port::eCom1);
+        if ((IO::In<byte>(port + 5) & 1) == 0) return -1;
+
+        return IO::In<byte>(port);
+    }
+    void EnableReceiveInterrupt()
+    {
+        ScopedLock guard(s_Lock, true);
+        word       port = static_cast<word>(Port::eCom1);
+        // IER bit 0: received data available
+        IO::Out<byte>(port + 1, 0x01);
+    }
     void Write(byte data)
     {
         ScopedLock guard(s_Lock, true);

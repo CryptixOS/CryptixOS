@@ -10,6 +10,7 @@ srcs += files(
   'PCSpeaker.cpp',
   'PIC.cpp',
   'Serial.cpp',
+  'SerialConsole.cpp',
 )
 
 subdir('Time')

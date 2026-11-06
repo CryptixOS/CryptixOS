@@ -11,7 +11,11 @@
 #include <Arch/CPU.hpp>
 #include <Arch/InterruptGuard.hpp>
 #include <Arch/User.hpp>
+#ifdef CTOS_TARGET_X86_64
+    #include <Arch/x86_64/Drivers/SerialConsole.hpp>
+#endif
 
+#include <Boot/CommandLine.hpp>
 #include <Debug/Debug.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
 #include <Drivers/TTY/TTY.hpp>
@@ -423,7 +427,7 @@ void TTY::Initialize()
     auto                framebuffers = VirtualConsole::Framebuffers();
     auto&               fb           = framebuffers[0];
 
-    FramebufferConsole* current      = nullptr;
+    TTY*                current      = nullptr;
     for (usize minor = 0; minor <= 9; ++minor)
     {
         LogTrace("TTY: Creating device /dev/tty{}...", minor);
@@ -434,7 +438,7 @@ void TTY::Initialize()
         {
             s_CurrentTTY = tty;
             current      = tty;
-            current->Load();
+            tty->Load();
             LogDebug("/dev/tty1 => loaded");
         }
         s_TTYs.PushBack(tty);
@@ -452,7 +456,28 @@ void TTY::Initialize()
         if (!registered) delete tty;
         else s_TTYs.PushBack(tty);
     }
-    if (!s_TTYs.Empty())
+#ifdef CTOS_TARGET_X86_64
+    LogTrace("TTY: Creating device /dev/ttyS0...");
+    if (auto serial = SerialConsole::Create())
+    {
+        if (DeviceManager::RegisterCharDevice(serial))
+        {
+            s_TTYs.PushBack(serial);
+            // 'console=ttyS0' runs init, and so the shell, on the serial
+            // port instead of the framebuffer
+            if (CommandLine::GetString("console") == "ttyS0"_sv)
+            {
+                LogInfo("TTY: Using /dev/ttyS0 as the console");
+                s_CurrentTTY = serial;
+                current      = serial;
+            }
+        }
+        // Not deleted: its interrupt handler is installed and points at it
+        else LogError("TTY: Failed to register /dev/ttyS0");
+    }
+#endif
+
+    if (current)
     {
         VFS::CreateNode("/dev/tty"_sv, 0644 | S_IFCHR, current->ID());
         VFS::CreateNode("/dev/console"_sv, 0644 | S_IFCHR, current->ID());

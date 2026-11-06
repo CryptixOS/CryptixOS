@@ -68,6 +68,7 @@ if(CTOS_ARCH STREQUAL "x86_64")
         Arch/x86_64/Drivers/PCSpeaker.cpp
         Arch/x86_64/Drivers/PIC.cpp
         Arch/x86_64/Drivers/Serial.cpp
+        Arch/x86_64/Drivers/SerialConsole.cpp
         Arch/x86_64/Drivers/Time/HPET.cpp
         Arch/x86_64/Drivers/Time/KVMClock.cpp
         Arch/x86_64/Drivers/Time/Lapic.cpp
