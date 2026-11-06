@@ -6,8 +6,8 @@
 #*/
 srcs += files(
   'Arch.cpp',
+  'Exceptions.cpp',
   'CPU.cpp',
-  'InterruptManager.cpp',
   'Syscall.cpp',
   'VMM.cpp',
   'interrupts.S',

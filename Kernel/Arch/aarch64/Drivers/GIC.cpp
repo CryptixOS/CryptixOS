@@ -19,9 +19,16 @@ GIC::GIC(DeviceTree::Node& node)
     const auto& registers   = node.Registers();
     m_DistributorRegister   = registers[0];
     m_RedistributorRegister = registers[1];
+
+    m_Distributor           = m_DistributorRegister.Base;
+    m_CPUInterface          = m_RedistributorRegister.Base;
 }
 
-bool GIC::Register() { return DeviceTree::RegisterDriver(GIC::s_Driver); }
+::Ref<GIC> GIC::Register()
+{
+    DeviceTree::RegisterDriver(GIC::s_Driver);
+    return s_GIC;
+}
 
 static constexpr Pointer ExplodeByte(u8 b)
 {
@@ -82,6 +89,7 @@ ErrorOr<void> GIC::SendEOI(u32 irq)
     m_CPUInterface->EndOfInterrupt = irq;
     return {};
 }
+u32 GIC::Acknowledge() { return m_CPUInterface->InterruptAcknowledge; }
 
 ErrorOr<void> GIC::Probe(DeviceTree::Node& node)
 {
@@ -101,9 +109,9 @@ ErrorOr<void> GIC::Probe(DeviceTree::Node& node)
     auto pageMap = VMM::GetKernelPageMap();
     auto flags   = PageAttributes::eRW | PageAttributes::eWriteThrough;
     pageMap->MapRange(distributorRegister.Base, distributorRegister.Base,
-                      distributorRegister.Length, flags);
+                      distributorRegister.Length * 2, flags);
     pageMap->MapRange(redistributorRegister.Base, redistributorRegister.Base,
-                      redistributorRegister.Length, flags);
+                      redistributorRegister.Length * 2, flags);
     s_GIC = CreateRef<GIC>(node);
     if (!s_GIC) return Error(ENOMEM);
 

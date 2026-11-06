@@ -15,7 +15,7 @@ class GIC : public InterruptController
   public:
     GIC(DeviceTree::Node& node);
 
-    static bool           Register();
+    static ::Ref<GIC>     Register();
 
     virtual ErrorOr<void> Initialize() override;
     virtual ErrorOr<void> Shutdown() override;
@@ -24,6 +24,10 @@ class GIC : public InterruptController
     virtual ErrorOr<void> Unmask(u32 irq) override;
 
     virtual ErrorOr<void> SendEOI(u32 irq) override;
+    u32                   Acknowledge();
+
+    inline Pointer Registers() const { return m_DistributorRegister.Base; }
+    inline Pointer CRegisters() const { return m_RedistributorRegister.Base; }
 
   private:
     static DeviceTree::Driver s_Driver;

@@ -4,30 +4,34 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Common.hpp>
+#include <Arch/ExecutionContext.hpp>
+#include <Library/Logger.hpp>
 
-extern "C" void raiseSyncException()
+extern "C" void raiseSyncException(ExecutionContext* ctx)
 {
+    LogTrace("raiseSyncException");
     while (true) __asm__ volatile("wfi");
 }
 
-extern "C" void raiseFault()
+extern "C" void raiseFault(ExecutionContext* ctx)
 {
+    LogTrace("raiseFault");
     while (true) __asm__ volatile("wfi");
 }
 
-extern "C" void raiseIrq()
+extern "C" void raiseIrq(ExecutionContext* ctx)
 {
+    LogTrace("raiseIrq");
     while (true) __asm__ volatile("wfi");
 }
 
 namespace Arch
 {
-    extern "C" char* exception_handlers;
-    KERNEL_INIT_CODE
+    extern "C" char* exception_vectors;
+    KERNEL_INIT_SECTION
     void InstallExceptions()
     {
-        __asm__ volatile("msr VBAR_EL1, %0" ::"r"(&exception_handlers));
+        __asm__ volatile("msr VBAR_EL1, %0" ::"r"(&exception_vectors));
         __asm__ volatile(
             // Save stack pointer
             "mov x1, sp\n"
