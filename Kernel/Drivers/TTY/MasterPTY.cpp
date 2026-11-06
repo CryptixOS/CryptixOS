@@ -28,7 +28,10 @@ ErrorOr<isize> MasterPTY::Read(void* dest, off_t offset, usize bytes)
 
         {
             ScopedLock guard(m_Pair->Lock);
-            if (m_Pair->SlaveClosed == 0 && m_Pair->Output.Empty()) return 0;
+            // Every slave fd is closed and nothing is left to read: hang-up,
+            // which Linux reports as EIO. Until then, wait for output.
+            if (m_Pair->SlaveClosed && m_Pair->Output.Empty())
+                return Error(EIO);
         }
 
         // TODO(v1tr10l7): O_NONBLOCK: return Error(EAGAIN) here once the fd
@@ -50,7 +53,8 @@ ErrorOr<isize> MasterPTY::IoCtl(usize request, upointer argp)
     {
         case TIOCGPTN:
         {
-            usize index  = m_Pair->Index;
+            // TIOCGPTN takes an unsigned int*, so copy exactly 4 bytes
+            u32   index  = static_cast<u32>(m_Pair->Index);
             auto  result = CopyToUser(argp, &index, sizeof(index));
             if (!result) return result.Error();
 

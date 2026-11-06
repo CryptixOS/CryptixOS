@@ -23,6 +23,8 @@ ErrorOr<File*> SlavePTY::Open(File* file)
     if (m_Pair->Locked) return Error(EIO);
     if (m_Pair->MasterClosed) return Error(EIO);
 
+    // Reopening the slave ends a previous hang-up
+    m_Pair->SlaveClosed = false;
     ++m_Pair->SlaveOpens;
     return file;
 }

@@ -80,6 +80,12 @@ void PTYPair::OnMasterClosed()
 }
 void PTYPair::OnSlaveClosed()
 {
+    {
+        ScopedLock guard(Lock);
+        SlaveClosed = true;
+    }
+
+    // Wake master readers, so they see the hang-up
     OutputReady.Trigger();
     TearDownIfUnused();
 }
