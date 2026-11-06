@@ -44,6 +44,7 @@ namespace VFS
     template <typename T>
     static void registerFilesystem(StringView name)
     {
+        LogTrace("VFS: Registering filesystem driver: '{}'", name);
         auto fs            = CreateRef<FilesystemDriver>();
 
         fs->Owner          = nullptr;
@@ -94,9 +95,6 @@ namespace VFS
             && !Mount(nullptr, "", "/dev/pts", "devptsfs"))
             LogError("VFS: Failed to mount devptsfs");
 
-        CreateDirectory("/run", 0755);
-        Mount(nullptr, "", "/run", "tmpfs");
-
         auto colonel = Scheduler::KernelProcess();
         auto syncd   = colonel->CreateThread(filesystemSyncDaemon, 0);
         Scheduler::EnqueueThread(syncd.Raw());
@@ -114,11 +112,14 @@ namespace VFS
             return true;
         };
 
+        LogTrace("VFS: Creating device nodes for registered devices...");
         cdevIterator.BindLambda(iterator);
         blkdevIterator.BindLambda(iterator);
 
         DeviceManager::IterateCharDevices(cdevIterator);
         DeviceManager::IterateBlockDevices(blkdevIterator);
+
+        LogTrace("VFS: Initialization complete!");
         s_Initialized = true;
     }
     bool                           IsInitialized() { return s_Initialized; }
@@ -264,9 +265,12 @@ namespace VFS
         auto         lookupFlags = PathLookupFlags::eFollowMounts;
         if (followSymlinks) lookupFlags |= PathLookupFlags::eFollowLinks;
 
-        auto status    = resolver.Resolve(lookupFlags);
-        Ref  dentry    = status ? *status : nullptr;
-        Ref  directory = resolver.ParentEntry();
+        auto status     = resolver.Resolve(lookupFlags);
+        Ref  dentry     = status ? *status : nullptr;
+        Ref  directory  = resolver.ParentEntry();
+
+        auto mountPoint = MountPoint::Lookup(directory);
+        if (mountPoint) directory = mountPoint->GuestEntry();
 
         LogDebug("VFS::Open: O_EXCL => {}, O_CREAT => {}", flags & O_EXCL,
                  flags & O_CREAT);
@@ -424,7 +428,7 @@ namespace VFS
     // TODO: flags
     ErrorOr<Ref<MountPoint>> Mount(Ref<DirectoryEntry> parent,
                                    PathView sourcePath, PathView target,
-                                   StringView fsName, i32 flags,
+                                   StringView fsName, MountFlags flags,
                                    const void* data)
     {
         Ref<Filesystem> fs = TryOrRet(InstantiateFilesystem(fsName));
@@ -491,6 +495,22 @@ namespace VFS
 
         auto putOldMount = CreateRef<MountPoint>(oldRoot, oldRootFs);
         MountPoint::Attach(putOldMount);
+
+        MountPoint::Iterate(
+            [&](Ref<MountPoint> mp) -> IterationResult
+            {
+                auto host = mp->HostEntry();
+
+                // If this mount is /dev or /proc on the OLD root
+                if (host->Path() == "/dev" || host->Path() == "/proc")
+                {
+                    // Find the equivalent directory in the NEW root
+                    auto resolution = ResolvePath(newRootEntry, host->Name());
+                    if (resolution && resolution->Entry)
+                        mp->MoveHost(resolution->Entry);
+                }
+                return IterationResult::eContinue;
+            });
 
         return {};
     }

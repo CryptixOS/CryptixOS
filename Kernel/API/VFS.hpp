@@ -154,6 +154,8 @@ namespace API::VFS
     ErrorOr<isize> RenameAt2(isize oldDirFdNum, const char* oldPath,
                              isize newDirFdNum, const char* newPath,
                              usize flags);
+    ErrorOr<isize> StatX(isize dirFdNum, const char* filename, usize flags,
+                         usize mask, struct statx* buffer);
 
     ErrorOr<isize> SetXAttrAt(isize dirFdNum, const char* path, usize flags,
                               const char* name, const struct xattr_args* uargs,

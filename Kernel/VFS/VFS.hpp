@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <API/Mount.hpp>
 #include <API/UnixTypes.hpp>
 #include <Common.hpp>
 
@@ -57,7 +58,8 @@ namespace VFS
     ErrorOr<Ref<MountPoint>>     MountRoot(StringView filesystemName);
     ErrorOr<Ref<MountPoint>> Mount(Ref<DirectoryEntry> parent, PathView source,
                                    PathView target, StringView fsName,
-                                   i32 flags = 0, const void* data = nullptr);
+                                   MountFlags  flags = MountFlags::eReadOnly,
+                                   const void* data  = nullptr);
     bool Unmount(Ref<DirectoryEntry> parent, PathView path, i32 flags = 0);
 
     ErrorOr<void>                PivotRoot(PathView newRoot, PathView putOld);

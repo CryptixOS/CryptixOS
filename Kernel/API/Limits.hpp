@@ -7,8 +7,10 @@
 #pragma once
 
 #include <Prism/Core/Types.hpp>
+#include <Prism/Memory/Memory.hpp>
 
 namespace Limits
 {
-    constexpr usize MAX_PATH_LENGTH = 4096;
+    constexpr usize MAX_PATH_LENGTH = 4_kib;
+    constexpr usize XATTR_MAX_SIZE  = 64_kib;
 } // namespace Limits

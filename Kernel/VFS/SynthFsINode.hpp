@@ -7,6 +7,7 @@
 #pragma once
 
 #include <Prism/Memory/Buffer.hpp>
+#include <System/Limits.hpp>
 
 #include <VFS/INode.hpp>
 
@@ -54,6 +55,19 @@ class SynthFsINode : public INode
     virtual ErrorOr<void>  Unlink(::Ref<DirectoryEntry> entry) override;
     virtual ErrorOr<void>  RmDir(::Ref<DirectoryEntry> entry) override;
 
+    virtual ErrorOr<isize> SetExtendedAttribute(::Ref<DirectoryEntry> dentry,
+                                                StringView            name,
+                                                const u8* value, usize size,
+                                                isize flags) override;
+    virtual ErrorOr<isize> GetExtendedAttribute(::Ref<DirectoryEntry> dentry,
+                                                StringView name, u8* value,
+                                                usize size) override;
+    virtual ErrorOr<isize> ListExtendedAttributes(::Ref<DirectoryEntry> dentry,
+                                                  char*                 list,
+                                                  usize size) override;
+    virtual ErrorOr<isize> RemoveExtendedAttribute(::Ref<DirectoryEntry> dentry,
+                                                   StringView name) override;
+
     virtual ErrorOr<void>  FlushMetadata() override
     {
         m_Dirty = false;
@@ -67,5 +81,8 @@ class SynthFsINode : public INode
     UnorderedMap<String, ::Ref<INode>> m_Children;
     String                             m_Target = ""_s;
 
-    ErrorOr<void>                      ResizeBuffer(usize newSize);
+    UnorderedMap<String, Array<u8, System::Limits::XATTR_MAX_VALUE_SIZE>>
+                  m_ExtendedAttributes;
+
+    ErrorOr<void> ResizeBuffer(usize newSize);
 };

@@ -728,7 +728,8 @@ namespace API::VFS
 
         LogDebug("VFS: Mounting `{}`({}) at `{}`", source, fsType, target);
         auto mountPoint = TryOrRet(::VFS::Mount(nullptr, source, target, fsType,
-                                                flags, options.Raw()));
+                                                static_cast<MountFlags>(flags),
+                                                options.Raw()));
 
         return 0;
     }
@@ -825,7 +826,10 @@ namespace API::VFS
         auto directory = pathRes.Parent;
         auto baseName  = pathRes.BaseName;
 
-        return ::VFS::CreateDirectory(directory, baseName, mode);
+        auto status    = ::VFS::CreateDirectory(directory, baseName, mode);
+        if (!status) return Error(status.Error());
+
+        return {};
     }
     ErrorOr<isize> MkNodAt(isize dirFdNum, const char* pathname, INodeMode mode,
                            dev_t dev)
@@ -838,7 +842,10 @@ namespace API::VFS
         auto directory = pathRes.Parent;
         auto baseName  = pathRes.BaseName;
 
-        return ::VFS::CreateNode(directory, baseName, mode, dev);
+        auto status    = ::VFS::CreateNode(directory, baseName, mode, dev);
+        if (!status) return Error(status.Error());
+
+        return {};
     }
     ErrorOr<isize> FChOwnAt(isize dirFdNum, const char* pathname, UserID uid,
                             GroupID gid, isize flags)
@@ -1203,10 +1210,13 @@ namespace API::VFS
         auto err
             = ::VFS::Link(oldParent, oldBaseName, newParent, newBaseName, 0);
         if (!err)
+        {
             LogError("VFS: Failed to link `{}` to `{}`, err => {}", oldPathName,
                      newPathName, StringUtils::ToString(err.Error()));
+            return Error(err.Error());
+        }
 
-        return err;
+        return {};
     }
     ErrorOr<isize> SymlinkAt(const char* targetPath, isize newDirFdNum,
                              const char* linkPath)
@@ -1218,7 +1228,10 @@ namespace API::VFS
         auto directory = pathRes.Parent;
         auto baseName  = pathRes.BaseName;
 
-        return ::VFS::Symlink(directory, baseName, target);
+        auto status    = ::VFS::Symlink(directory, baseName, target);
+        if (!status) return Error(status.Error());
+
+        return {};
     }
 
     ErrorOr<isize> UtimensAt(i64 dirFdNum, const char* pathname,
@@ -1336,6 +1349,11 @@ namespace API::VFS
         auto success   = oldParent->Rename(newParent->INode(), newName);
         if (!success) return Error(success.Error());
         return 0;
+    }
+    ErrorOr<isize> StatX(isize dirFdNum, const char* filename, usize flags,
+                         usize mask, struct statx* buffer)
+    {
+        return Error(ENOSYS);
     }
     ErrorOr<isize> SetXAttrAt(isize dirFdNum, const char* path, usize flags,
                               const char* name, const struct xattr_args* uargs,

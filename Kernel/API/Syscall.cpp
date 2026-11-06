@@ -162,6 +162,7 @@ namespace Syscall
         RegisterSyscall(ID::ePipe2, API::VFS::Pipe2);
         RegisterSyscall(ID::eSyncFs, API::VFS::SyncFs);
         RegisterSyscall(ID::eRenameAt2, API::VFS::RenameAt2);
+        RegisterSyscall(ID::eStatX, API::VFS::StatX);
         RegisterSyscall(ID::eClone3, API::Process::Clone3);
         RegisterSyscall(ID::eFutexWake, API::Process::FutexWake);
         RegisterSyscall(ID::eFutexWait, API::Process::FutexWait);

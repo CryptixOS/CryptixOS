@@ -284,6 +284,7 @@ namespace Syscall
         eSyncFs           = 306,
         eFinitModule      = 313,
         eRenameAt2        = 316,
+        eStatX            = 332,
         eClone3           = 435,
         eFutexWakeV       = 449,
         eFutexWake        = 454,

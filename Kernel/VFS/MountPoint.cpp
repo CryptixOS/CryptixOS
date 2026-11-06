@@ -46,6 +46,13 @@ void              MountPoint::Iterate(Iterator iterator)
 ::Ref<MountPoint>     MountPoint::NextMountPoint() const { return Hook.Next; }
 ::Ref<DirectoryEntry> MountPoint::ExchangeGuest(::Ref<DirectoryEntry> dentry)
 {
-    m_Filesystem = dentry->INode()->Filesystem();
+    m_Filesystem.Reset(dentry->INode()->Filesystem());
     return Exchange(m_Guest, dentry);
+}
+void MountPoint::MoveHost(::Ref<DirectoryEntry> newHost)
+{
+    if (m_Host) m_Host->SetMountGate(nullptr);
+    m_Host = newHost;
+
+    if (m_Host) m_Host->SetMountGate(m_Guest);
 }

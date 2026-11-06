@@ -33,6 +33,7 @@ class MountPoint : public RefCounted<MountPoint>
 
     ::Ref<MountPoint>        NextMountPoint() const;
     ::Ref<DirectoryEntry>    ExchangeGuest(::Ref<DirectoryEntry> dentry);
+    void                     MoveHost(::Ref<DirectoryEntry> newHost);
 
   private:
     ::Ref<DirectoryEntry>   m_Host       = nullptr;

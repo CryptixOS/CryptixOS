@@ -258,6 +258,46 @@ ErrorOr<void> SynthFsINode::RmDir(::Ref<DirectoryEntry> entry)
     return Unlink(entry);
 }
 
+ErrorOr<isize> SynthFsINode::SetExtendedAttribute(::Ref<DirectoryEntry> dentry,
+                                                  StringView            name,
+                                                  const u8* value, usize size,
+                                                  isize flags)
+{
+    auto entry = m_ExtendedAttributes.Insert({name, {}});
+
+    size       = Min(size, System::Limits::XATTR_MAX_VALUE_SIZE);
+    CopyFromUser(entry->Value.Raw(), value, size);
+
+    return {};
+}
+ErrorOr<isize> SynthFsINode::GetExtendedAttribute(::Ref<DirectoryEntry> dentry,
+                                                  StringView name, u8* value,
+                                                  usize size)
+{
+    auto it = m_ExtendedAttributes.Find(name);
+    if (it == m_ExtendedAttributes.end()) return Error(ENOENT);
+
+    size = Min(size, System::Limits::XATTR_MAX_VALUE_SIZE);
+    CopyToUser(value, it->Value.Raw(), size);
+    return {};
+}
+ErrorOr<isize>
+SynthFsINode::ListExtendedAttributes(::Ref<DirectoryEntry> dentry, char* list,
+                                     usize size)
+{
+    return Error(ENOSYS);
+}
+ErrorOr<isize>
+SynthFsINode::RemoveExtendedAttribute(::Ref<DirectoryEntry> dentry,
+                                      StringView            name)
+{
+    auto it = m_ExtendedAttributes.Find(name);
+    if (it == m_ExtendedAttributes.end()) return Error(ENOENT);
+
+    m_ExtendedAttributes.Erase(it);
+    return {};
+}
+
 ErrorOr<void> SynthFsINode::ResizeBuffer(usize newSize)
 {
     m_Buffer.Resize(newSize);
