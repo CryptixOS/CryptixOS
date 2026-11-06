@@ -1,4 +1,4 @@
-# 🧬 CryptixOS
+# CryptixOS
 
 **CryptixOS** is a modern, modular, Unix-like operating system for `x86_64` and `aarch64`, written entirely in C++. It features its own kernel, and standard library (`Prism`). Designed for clarity, extensibility, and education, CryptixOS serves as a powerful base for learning OS development or building your own custom system from scratch.
 
@@ -12,7 +12,10 @@
   <img src="./Meta/images/logo.jpg" width="50%" height="50%">
 </p>
 
-# 🔥 Motivation & Goals
+# Roadmap
+See **[ROADMAP.md](ROADMAP.md)** for the plan from 0.1 to 1.0. 0.1 makes everything that exists today reliable; after that, every version ends with a demo you can show off: DOOM and tmux in 0.2, `curl` and `nmap` in 0.3, X11 in 0.4, and so on. Stability and security work is scheduled alongside each demo.
+
+# Motivation & Goals
 CryptixOS was created out of curiosity and a desire to understand how modern operating systems work—from kernel bootstrapping and memory management to user-facing system calls. The goal is to build a modular, maintainable, and educational operating system from scratch, with clean C++ abstractions, not just C.
 
 This project is ideal for:
@@ -20,7 +23,7 @@ This project is ideal for:
 * Experimenting with low-level C++ in a systems context
 * Building an actual custom OS on real or emulated hardware
 
-# ⚙️ Architecture Overview
+# Architecture Overview
 CryptixOS is a monolithic kernel designed for the x86_64 architecture. It features:
 * Physical & virtual memory manager with paging and kernel heap allocation
 * Custom C++ STL-like containers (vector, string, intrusive list, unordered map)
@@ -31,8 +34,8 @@ CryptixOS is a monolithic kernel designed for the x86_64 architecture. It featur
 * Basic device drivers: PS/2, serial, VGA, RTC, PCI, etc.
 * It uses its own standard library (Prism) and custom build tools.
 
-# 🚀 Build & Run Instructions
-## 🛠 Prerequisites
+# Build & Run Instructions
+## Prerequisites
 Make sure the following tools are installed on your system:
 - C++20 compiler (GCC or Clang)
 - NASM (for low-level assembly)
@@ -42,7 +45,7 @@ Make sure the following tools are installed on your system:
 - python-guestfs (for creating and formatting the root filesystem image)
 - xorriso (for ISO image creation)
 
-## 📦 Setting Up the Sysroot
+## Setting Up the Sysroot
 Before building the kernel, you need to build the system root (toolchain and base packages). Here's how:
 ```
 mkdir build-sysroot       # Create a directory for the sysroot
@@ -52,14 +55,14 @@ xbstrap install base      # Build and install base packages
 ```
 This step ensures you have the tools and libraries needed for building the OS.
 
-## 🧱 Building the Kernel & Image
+## Building the Kernel & Image
 Once the sysroot is ready:
 ```
 ./Meta/run.py --target-arch x86_64 --compiler clang --build-type release setup # Configure for your target architecture
 ./Meta/run.py --target-arch x86_64 --compiler clang --build-type release build # Build the kernel and generate a bootable .iso
 ```
 
-## 💻 Running in an Emulator
+## Running in an Emulator
 To run CryptixOS in QEMU:
 ```
 ./Meta/run.py --target-arch x86_64 --compiler clang --build-type release <run_uefi|run_bios>
@@ -72,22 +75,22 @@ To run CryptixOS in QEMU:
 
 ---
 
-## ✨ Features
+## Features
 
-- ✅ Fully custom C++ kernel with standard containers
-- ✅ ELF loading and userland support
-- ✅ PCI / ACPI / APIC / HPET / NVMe / PS/2
-- ✅ Multiple filesystems: ext2, tmpfs, procfs, fat32
-- ✅ Basic userland shell
-- ✅ Lazy Loading the pages 
-- ✅ Module support
-- ✅ Signals
-- ✅ Thread API
-- ⏳ Networking
+- [x] Fully custom C++ kernel with standard containers
+- [x] ELF loading and userland support
+- [x] PCI / ACPI / APIC / HPET / NVMe / PS/2
+- [x] Multiple filesystems: ext2, tmpfs, procfs, fat32
+- [x] Basic userland shell
+- [x] Lazy Loading the pages 
+- [x] Module support
+- [x] Signals
+- [x] Thread API
+- [ ] Networking (work in progress)
 
 ---
 
-## 📚 References & Credits
+## References & Credits
 
 ### Tools & Docs
 
@@ -109,7 +112,7 @@ To run CryptixOS in QEMU:
 
 ---
 
-# 🤝 Contributing
+# Contributing
 **CryptixOS** welcomes contributions in the following areas:
 * New drivers (network, USB, GPU)
 * Scheduler enhancements (preemption, SMP support)
@@ -118,126 +121,128 @@ To run CryptixOS in QEMU:
 * Unit tests & test harness
 * Documentation (inline + developer guides)
 
-## 🧹 Code Style
+## Code Style
 * Use PascalCase for types and functions
 * Use m_PascalCase for private members
 * Follow Prism conventions and RAII principles
 * Prefer Ref over raw pointers
 
-## ✅ To-Do Tracker
+## To-Do Tracker
+
+> This is a quick feature checklist. The full, version-by-version plan lives in **[ROADMAP.md](ROADMAP.md)**.
 
 ## Subsystems
 
 ### Scheduler
-- ✅ Per-CPU Wait, Ready, Blocked Queues using IntrusiveLists
-- ✅ Multi-threading
-- ✅ SMP
-- ✅ WaitPid
-- ✅ Events
+- [x] Per-CPU Wait, Ready, Blocked Queues using IntrusiveLists
+- [x] Multi-threading
+- [x] SMP
+- [x] WaitPid
+- [x] Events
 
 ### Memory Manager 
-- ✅ Physical Bitmap Allocator
-- ⬜ Physical Buddy Allocator
-- ⬜ Swapping Pages
-- ⬜ Mapping File Descriptors
-- ⬜ NUMA domains handling
-- ✅ Virtual Memory Allocator, using Red-Black Tree
-- ✅ Heap Slab Allocator
-- ⬜ Heap Slob Allocator
+- [x] Physical Bitmap Allocator
+- [ ] Physical Buddy Allocator
+- [ ] Swapping Pages
+- [ ] Mapping File Descriptors
+- [ ] NUMA domains handling
+- [x] Virtual Memory Allocator, using Red-Black Tree
+- [x] Heap Slab Allocator
+- [ ] Heap Slob Allocator
 
-## 🔌 Drivers
+## Drivers
 
-### 🧱 Base
-- ✅ Kernel Module Loader
+### Base
+- [x] Kernel Module Loader
 
-### 💾 Storage
-- ✅ MBR
-- ⬜ EBR
-- ✅ GPT
-- ✅ NVMe
-- ⬜ AHCI
-- ⬜ SCSI
-- ⬜ Virtio
+### Storage
+- [x] MBR
+- [ ] EBR
+- [x] GPT
+- [x] NVMe
+- [ ] AHCI
+- [ ] SCSI
+- [ ] Virtio
 
-### ⏱ Timekeeping
-- ✅ PIT
-- ✅ Local APIC Timer
-- ✅ RTC
-- ✅ KVM Clock
-- ✅ HPET
+### Timekeeping
+- [x] PIT
+- [x] Local APIC Timer
+- [x] RTC
+- [x] KVM Clock
+- [x] HPET
 
-### ⚡ IRQ Controllers
-- ✅ PIC
-- ✅ I/O APIC
+### IRQ Controllers
+- [x] PIC
+- [x] I/O APIC
 
-### 🧩 Hardware Abstraction & Buses
-- ✅ PCI
-- ✅ PCIe
-- ✅ Device Tree
-- ✅ ACPI
-- ⬜ I2C
-- ✅ Basic Power Management (Reboot, Shutdown)
-- ⬜ USB
-- ⬜ Embedded Controller
+### Hardware Abstraction & Buses
+- [x] PCI
+- [x] PCIe
+- [x] Device Tree
+- [x] ACPI
+- [ ] I2C
+- [x] Basic Power Management (Reboot, Shutdown)
+- [ ] USB
+- [ ] Embedded Controller
 
-### 📟 Character Devices
-- ✅ TTY
-- ⬜ PTY
-- ✅ Serial
-- ✅ I8042 Controller
-- ✅ PS/2 Keyboard
-- ✅ PC Speaker
-- ⬜ Virtio Console
+### Character Devices
+- [x] TTY
+- [ ] PTY (work in progress)
+- [x] Serial
+- [x] I8042 Controller
+- [x] PS/2 Keyboard
+- [x] PC Speaker
+- [ ] Virtio Console
 
-## 🌐 Network Stack
+## Network Stack
 
-### 📡 Protocols
-- ⬜ NetLink Kernel Object UEvent
-- ⬜ ARP
-- ⬜ TCP
-- ⬜ UDP
+### Protocols
+- [ ] NetLink Kernel Object UEvent
+- [ ] ARP
+- [ ] TCP
+- [ ] UDP
 
-### 🔌 Network Interface Cards (NICs)
-- ✅ Rtl8139
-- ⬜ Virtio NIC
+### Network Interface Cards (NICs)
+- [x] Rtl8139
+- [ ] Virtio NIC
 
-### 🌐 Socket Families
-- ✅ Unix
-- ⬜ IPv4
-- ⬜ IPv6
-- ⬜ NetLink
-- ⬜ Bluetooth
+### Socket Families
+- [x] Unix
+- [ ] IPv4
+- [ ] IPv6
+- [ ] NetLink
+- [ ] Bluetooth
 
-## 📁 Virtual File System
+## Virtual File System
 
-- ⬜ Named Pipes
+- [ ] Named Pipes
 
-### 📂 File Systems
-- ✅ DevTmpFs
-- ✅ Ext2Fs
-- ✅ Fat32Fs
-- ✅ ProcFs
-- ✅ TmpFs
-- ✅ Initrd
-- ⬜ SysFs
-- ⬜ DevPtsFs
-- ⬜ Plan9Fs
-- ⬜ DevLoopFs
-- ⬜ Iso9660Fs
-- ⬜ EfiVarsFs
+### File Systems
+- [x] DevTmpFs
+- [x] Ext2Fs
+- [x] Fat32Fs
+- [x] ProcFs
+- [x] TmpFs
+- [x] Initrd
+- [ ] SysFs
+- [ ] DevPtsFs (work in progress)
+- [ ] Plan9Fs
+- [ ] DevLoopFs
+- [ ] Iso9660Fs
+- [ ] EfiVarsFs
 
-## 🧠 Syscall & Core
+## Syscall & Core
 
-- ✅ Signals
-- ✅ Thread API
-- ✅ VFS
-- ✅ Session Management
-- ⬜ Networking
-- ⬜ Evdev
+- [x] Signals
+- [x] Thread API
+- [x] VFS
+- [x] Session Management
+- [ ] Networking
+- [ ] Evdev
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
   - BaseFiles => **basic system root template**
   - CrossFiles => **meson config files for cross compilation**
@@ -295,9 +300,9 @@ To run CryptixOS in QEMU:
 
 ---
 
-## 📸 Screenshots / Output
+## Screenshots / Output
 <img src="./Meta/images/screenshot.png">
 
-## 📚 License
+## License
 CryptixOS is licensed under the GPL-3.0. See LICENSE for details.
 
