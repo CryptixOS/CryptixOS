@@ -11,7 +11,6 @@
 #include <API/System.hpp>
 
 #include <Arch/Arch.hpp>
-#include <Arch/PowerManager.hpp>
 
 #include <Drivers/TTY/VirtualConsole.hpp>
 
@@ -20,6 +19,8 @@
 #include <Scheduler/Process.hpp>
 #include <Scheduler/Thread.hpp>
 #include <System/System.hpp>
+
+import Kernel.Arch.PowerManager;
 
 namespace API::System
 {

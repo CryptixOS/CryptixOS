@@ -65,6 +65,9 @@ function(ctos_add_module name kind)
         ${module_dir}
     )
     target_compile_options(${objects} PRIVATE ${CTOS_MODULE_ARGS})
+    # For the kernel's module interfaces (BMIs) only: an object library linked
+    # to another one doesn't take its objects, the kernel provides the symbols.
+    target_link_libraries(${objects} PRIVATE KernelModules)
 
     set(ko ${CMAKE_BINARY_DIR}/Modules/${name}.ko)
     add_custom_command(

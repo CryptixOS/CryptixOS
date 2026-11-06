@@ -309,7 +309,8 @@ elseif(CTOS_ARCH STREQUAL "aarch64")
 endif()
 
 # ==============================================================================
-### Cryptix.elf
+### C++ modules. Their interface units are compiled once, with the kernel's
+### flags, and imported by the kernel and by the .ko modules.
 set(CTOS_KERNEL_INCLUDES
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -319,6 +320,16 @@ set(CTOS_KERNEL_INCLUDES
     ${CTOS_DEPENDENCY_INCLUDES}
 )
 
+add_library(KernelModules OBJECT)
+target_sources(KernelModules
+    PUBLIC FILE_SET CXX_MODULES FILES
+        Arch/PowerManager.cppm
+)
+target_include_directories(KernelModules PRIVATE ${CTOS_KERNEL_INCLUDES})
+target_compile_options(KernelModules PRIVATE -fPIE ${CTOS_KERNEL_CXX_ARGS})
+
+# ==============================================================================
+### Cryptix.elf
 add_executable(Kernel
     ${CTOS_PRISM_SOURCES}
     ${CTOS_KERNEL_SOURCES}
@@ -340,4 +351,4 @@ target_precompile_headers(Kernel PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/Library/PrecompiledHeader.hpp>"
 )
 target_link_options(Kernel PRIVATE ${CTOS_KERNEL_LINK_ARGS})
-target_link_libraries(Kernel PRIVATE compiler_rt_builtins)
+target_link_libraries(Kernel PRIVATE KernelModules compiler_rt_builtins)

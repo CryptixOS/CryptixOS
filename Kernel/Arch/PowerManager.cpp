@@ -4,7 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/PowerManager.hpp>
 #ifdef CTOS_TARGET_X86_64
     #include <Arch/x86_64/IO.hpp>
 #endif
@@ -14,6 +13,8 @@
 #include <Firmware/EFI/SystemTable.hpp>
 
 #include <Memory/VMM.hpp>
+
+import Kernel.Arch.PowerManager;
 
 namespace PowerManager
 {

@@ -4,7 +4,6 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <Arch/PowerManager.hpp>
 #include <Boot/CommandLine.hpp>
 
 #include <Firmware/ACPI/ACPI.hpp>
@@ -23,6 +22,8 @@
 #include <uacpi/resources.h>
 #include <uacpi/uacpi.h>
 #include <uacpi/utilities.h>
+
+import Kernel.Arch.PowerManager;
 
 #define uAcpiCall(cmd, ...)                                                    \
     {                                                                          \

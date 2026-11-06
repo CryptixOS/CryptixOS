@@ -11,13 +11,15 @@
     #include <x86_64/input/i8042/I8042.hpp>
 #endif
 
-#include <Arch/PowerManager.hpp>
 #include <Boot/CommandLine.hpp>
 #include <Drivers/TTY/TTY.hpp>
 #include <Drivers/TTY/VirtualConsole.hpp>
 
 #include <Prism/Core/Ranges.hpp>
 #include <Prism/String/StringUtils.hpp>
+
+import Kernel.Arch.PowerManager;
+
 using namespace Prism;
 
 constexpr usize   SCANCODE_MAX               = Size(PS2_Set1_Keys);
