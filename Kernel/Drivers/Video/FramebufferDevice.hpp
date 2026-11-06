@@ -22,6 +22,8 @@ class FramebufferDevice : public CharacterDevice
 
     virtual StringView     Name() const noexcept override;
 
+    virtual ErrorOr<void>  MapRegion(::Ref<Region> region) override;
+
     virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override;
     virtual ErrorOr<isize> Write(const void* src, off_t offset,
                                  usize bytes) override;

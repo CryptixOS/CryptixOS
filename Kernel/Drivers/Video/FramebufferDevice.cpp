@@ -14,6 +14,7 @@
 #include <Prism/String/StringUtils.hpp>
 #include <Prism/Utility/Compare.hpp>
 
+#include <Scheduler/Process.hpp>
 #include <VFS/DevTmpFs/DevTmpFs.hpp>
 #include <VFS/INode.hpp>
 #include <VFS/VFS.hpp>
@@ -143,7 +144,21 @@ ErrorOr<void> FramebufferDevice::Register(FramebufferDevice& framebuffer)
     return {};
 }
 
-StringView     FramebufferDevice::Name() const noexcept { return m_Name; }
+StringView    FramebufferDevice::Name() const noexcept { return m_Name; }
+
+ErrorOr<void> FramebufferDevice::MapRegion(::Ref<Region> region)
+{
+    auto phys  = m_Framebuffer.Address.FromHigherHalf();
+    auto flags = PageAttributes::eRW | PageAttributes::eUser
+               | PageAttributes::eWriteBack;
+    region->SetAttributes(flags);
+    region->SetPhysicalBase(phys);
+
+    auto process = Process::Current();
+    auto pageMap = process->PageMap;
+    pageMap->MapRegion(region);
+    return {};
+}
 
 ErrorOr<isize> FramebufferDevice::Read(void* dest, off_t offset, usize bytes)
 {
@@ -263,9 +278,16 @@ ErrorOr<isize> FramebufferDevice::IoCtl(usize request, upointer argp)
     switch (request)
     {
         case FBIOGET_VSCREENINFO:
-            CopyToUser(argp, &m_VariableScreenInfo,
-                       sizeof(m_VariableScreenInfo));
-            break;
+        {
+            LogTrace("FbDev: FBIOGET_VSCREENINFO");
+            if (!m_Lock.TryLock()) return Error(ENODEV);
+
+            fb_var_screeninfo var = m_VariableScreenInfo;
+            m_Lock.Unlock();
+            if (auto result = CopyToUser(argp, &var, sizeof(var)); !result)
+                return Error(result.Error());
+            return {};
+        }
         case FBIOPUT_VSCREENINFO:
         {
             fb_var_screeninfo var{};
@@ -284,6 +306,7 @@ ErrorOr<isize> FramebufferDevice::IoCtl(usize request, upointer argp)
         }
         case FBIOGET_FSCREENINFO:
         {
+            LogTrace("FbDev: FBIOGET_FSCREENINFO");
             if (!m_Lock.TryLock()) return Error(ENODEV);
             fb_fix_screeninfo fix = m_FixedScreenInfo;
             m_Lock.Unlock();
@@ -302,6 +325,7 @@ ErrorOr<isize> FramebufferDevice::IoCtl(usize request, upointer argp)
             return {};
         }
     }
+    return {};
 
     switch (request)
     {
