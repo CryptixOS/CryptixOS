@@ -42,7 +42,8 @@ void VirtualConsole::PutCharImpl(u64 c)
 {
     if (!m_Initialized) return;
 
-    ScopedLock guard(m_Lock);
+    // Interrupt-safe: the kernel log prints here from interrupt handlers too
+    ScopedLock guard(m_Lock, true);
     if (m_State == State::eEscape)
     {
         OnEscapeChar(c);

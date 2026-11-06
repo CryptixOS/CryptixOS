@@ -54,13 +54,17 @@ namespace Serial
             return true;
         }
 
+        // Taken with interrupts disabled: the kernel logs from interrupt
+        // handlers, and an interrupt arriving while this cpu holds the lock
+        // would spin on it forever (seen as a log line cut short, then only
+        // the E9 '[' of every following line: '[Debug[[[[[...')
         Spinlock s_Lock;
     } // namespace
     bool Initialize() { return InitializePort(Port::eCom1); }
 
     byte Read()
     {
-        ScopedLock guard(s_Lock);
+        ScopedLock guard(s_Lock, true);
         word       port = static_cast<word>(Port::eCom1);
         while ((IO::In<byte>(port + 5) & 1) == 0);
 
@@ -68,7 +72,7 @@ namespace Serial
     }
     void Write(byte data)
     {
-        ScopedLock guard(s_Lock);
+        ScopedLock guard(s_Lock, true);
         word       port = static_cast<word>(Port::eCom1);
         while ((IO::In<byte>(port + 5) & 0x20) == 0);
 
@@ -76,7 +80,7 @@ namespace Serial
     }
     void Write2(byte data)
     {
-        ScopedLock guard(s_Lock);
+        ScopedLock guard(s_Lock, true);
         word       port = ToUnderlying(Port::eCom1);
         IO::Out<byte>(port, data);
     }

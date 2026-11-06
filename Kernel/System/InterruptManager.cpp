@@ -35,10 +35,18 @@ namespace InterruptManager
         //     });
 
 #if CTOS_TARGET_X86_64
-        auto it = s_IrqMap.Find(ctx->InterruptVector);
-        if (it == s_IrqMap.end()) return result;
+        // Look the dispatcher up under the lock (AllocateHandler may be
+        // inserting/rehashing on another CPU), but run it outside the lock so
+        // handlers are free to allocate other IRQs.
+        Ref<InterruptDispatcher> dispatcher = nullptr;
+        {
+            ScopedLock guard(s_Lock);
+            auto       it = s_IrqMap.Find(ctx->InterruptVector);
+            if (it == s_IrqMap.end()) return result;
+            dispatcher = it->Value;
+        }
 
-        result = it->Value->Handle(ctx);
+        if (dispatcher) result = dispatcher->Handle(ctx);
 #endif
         return result;
     }
@@ -61,7 +69,9 @@ namespace InterruptManager
     {
         if (hint < 0x20) hint += 0x20;
 
-        ScopedLock      guard(s_Lock);
+        // Disable interrupts while holding the lock: Handle() takes it from
+        // interrupt context, so an IRQ on this CPU would otherwise deadlock.
+        ScopedLock      guard(s_Lock, true);
         Optional<usize> allocatedIRQ = NullOpt;
         if (MADT::LegacyPIC())
         {
@@ -75,6 +85,7 @@ namespace InterruptManager
 
         auto handler = CreateRef<InterruptDispatcher>(
             device, s_IrqChip.Raw(), static_cast<i64>(*allocatedIRQ - 0x20));
+        s_AllocatedIrqs.SetIndex(*allocatedIRQ, true);
         s_IrqMap[*allocatedIRQ] = handler;
         return handler;
     }
