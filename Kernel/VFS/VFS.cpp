@@ -548,6 +548,8 @@ namespace VFS
     ErrorOr<Ref<DirectoryEntry>> CreateNode(PathView path, INodeMode mode,
                                             dev_t dev)
     {
+        if (path.Contains("pts"))
+            LogTrace("VFS::CreateNode: Creating node at `{}`", path);
         return CreateNode(TryOrRet(ResolveParent(RootDirectoryEntry(), path)),
                           path.BaseName(), mode, dev);
     }

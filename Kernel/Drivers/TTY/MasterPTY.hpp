@@ -6,12 +6,34 @@
  */
 #pragma once
 
+#include <Drivers/TTY/PTY.hpp>
 #include <Drivers/TTY/TTY.hpp>
 
-class MasterPTY : public TTY
+class MasterPTY final : public CharacterDevice
 {
   public:
-    MasterPTY(StringView name, usize minor);
+    explicit MasterPTY(::Ref<PTYPair> pair);
+
+    virtual StringView     Name() const noexcept override { return m_Name; }
+
+    virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes) override;
+    virtual ErrorOr<isize> Write(const void* src, off_t offset,
+                                 usize bytes) override;
+    virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,
+                                isize offset = -1) override
+    {
+        return Read(out.Raw(), offset, count);
+    }
+    virtual ErrorOr<isize> Write(const UserBuffer& in, usize count,
+                                 isize offset = -1) override
+    {
+        return Write(in.Raw(), offset, count);
+    }
+    virtual ErrorOr<isize> IoCtl(usize request, upointer arg) override;
+
+    virtual void           Close(bool writer) override;
 
   private:
+    ::Ref<PTYPair> m_Pair;
+    String         m_Name;
 };

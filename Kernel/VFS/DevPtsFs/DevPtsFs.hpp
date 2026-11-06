@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include <Drivers/TTY/SlavePTY.hpp>
 #include <VFS/VFS.hpp>
 
 class DevPtsFs : public Filesystem
@@ -13,6 +14,11 @@ class DevPtsFs : public Filesystem
   public:
     explicit DevPtsFs(u32 flags);
     virtual ~DevPtsFs();
+
+    static DevPtsFs* Instance() { return s_Instance; }
+    ErrorOr<void>    AddSlave(usize index, SlavePTY* slave, UserID uid,
+                              GroupID gid);
+    void             RemoveSlave(usize index);
 
     virtual ErrorOr<::Ref<DirectoryEntry>>
     Mount(StringView sourcePath, const void* data = nullptr) override;
@@ -26,6 +32,7 @@ class DevPtsFs : public Filesystem
 
   private:
     friend class DevPtsFsINode;
+    static DevPtsFs*               s_Instance;
 
-    ErrorOr<::Ref<INode>> CreatePTMXNode();
+    ErrorOr<::Ref<DirectoryEntry>> CreatePTMXNode();
 };

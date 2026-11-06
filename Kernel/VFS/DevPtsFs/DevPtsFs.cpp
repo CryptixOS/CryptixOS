@@ -7,6 +7,7 @@
 #include <Drivers/Core/DeviceManager.hpp>
 #include <Drivers/TTY/PTYMultiplexer.hpp>
 
+#include <Prism/String/StringUtils.hpp>
 #include <System/Limits.hpp>
 #include <Time/Time.hpp>
 
@@ -15,15 +16,43 @@
 #include <VFS/DirectoryEntry.hpp>
 #include <VFS/VFS.hpp>
 
-inline constexpr INodeMode DEVPTS_DEFAULT_MODE      = 0600;
+inline constexpr INodeMode DEVPTS_DEFAULT_MODE      = 0620;
 constexpr usize            DEVPTS_DEFAULT_PTMX_MODE = 0000;
 constexpr usize            PTMX_MINOR               = 2;
+
+DevPtsFs*                  DevPtsFs::s_Instance     = nullptr;
 
 DevPtsFs::DevPtsFs(u32 flags)
     : Filesystem("DevPtsFs", flags)
 {
+    Assert(!s_Instance);
+    s_Instance = this;
 }
 DevPtsFs::~DevPtsFs() {}
+
+ErrorOr<void> DevPtsFs::AddSlave(usize index, SlavePTY* slave, UserID uid,
+                                 GroupID gid)
+{
+    auto name  = StringUtils::ToString(index);
+    auto inode = CreateRef<DevPtsFsINode>(name, this, NextINodeIndex(),
+                                          DEVPTS_DEFAULT_MODE | S_IFCHR, slave);
+
+    inode->m_Metadata.UID = uid;
+    inode->m_Metadata.GID = gid;
+    m_Root.As<DevPtsFsINode>()->InsertChild(inode, name);
+    return {};
+}
+void DevPtsFs::RemoveSlave(usize index)
+{
+    String name = StringUtils::ToString(index);
+    {
+        auto       root = m_Root.As<DevPtsFsINode>();
+        ScopedLock guard(root->m_Lock);
+        root->m_Children.Erase(name);
+    }
+    // Drop the cached entry too, or the path keeps resolving to the old slave
+    if (auto cached = m_RootEntry->Lookup(name)) m_RootEntry->RemoveChild(cached);
+}
 
 ErrorOr<::Ref<DirectoryEntry>> DevPtsFs::Mount(StringView  sourcePath,
                                                const void* data)
@@ -75,7 +104,7 @@ ErrorOr<void> DevPtsFs::Stats(statfs& stats)
     return {};
 }
 
-ErrorOr<::Ref<INode>> DevPtsFs::CreatePTMXNode()
+ErrorOr<::Ref<DirectoryEntry>> DevPtsFs::CreatePTMXNode()
 {
     auto       root = m_Root.As<DevPtsFsINode>();
     ScopedLock guard(root->m_Lock);

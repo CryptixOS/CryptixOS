@@ -6,10 +6,24 @@
  */
 #pragma once
 
+#include <Drivers/TTY/PTY.hpp>
 #include <Drivers/TTY/TTY.hpp>
 
-class SlavePTY : public TTY
+class SlavePTY final : public TTY
 {
   public:
+    explicit SlavePTY(::Ref<PTYPair> pair);
+
+    virtual ErrorOr<File*> Open(File* file) override;
+    virtual void           Close(bool writer) override;
+
+    void                   Hangup();
+
+  protected:
+    virtual ErrorOr<void>  TransmitChar(u64 c) override;
+    virtual ErrorOr<isize> Transmit(StringView data) override;
+
   private:
+    ::Ref<PTYPair> m_Pair;
+    String         m_Name;
 };

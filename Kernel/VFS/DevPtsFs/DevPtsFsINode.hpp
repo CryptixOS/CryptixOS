@@ -17,6 +17,7 @@
 
 using DeviceID = DeviceID;
 
+class Filesystem;
 class DevPtsFsINode final : public INode, public NonCopyable<DevPtsFsINode>
 {
   public:
@@ -50,6 +51,8 @@ class DevPtsFsINode final : public INode, public NonCopyable<DevPtsFsINode>
         return Error(ENOENT);
     }
 
+    virtual ErrorOr<::Ref<DirectoryEntry>>
+                  Lookup(::Ref<DirectoryEntry> entry) override;
     virtual void  InsertChild(::Ref<INode> node, StringView name) override;
     virtual isize Read(void* buffer, off_t offset, usize bytes) override;
     virtual isize Write(const void* buffer, off_t offset, usize bytes) override;
@@ -78,7 +81,8 @@ class DevPtsFsINode final : public INode, public NonCopyable<DevPtsFsINode>
 
   private:
     Device*                                m_Device = nullptr;
-    UnorderedMap<StringView, ::Ref<INode>> m_Children;
+    // Owning keys: the names are temporaries at the call sites
+    UnorderedMap<String, ::Ref<INode>> m_Children;
 
     friend class DevPtsFs;
 };

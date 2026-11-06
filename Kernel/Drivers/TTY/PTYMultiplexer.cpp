@@ -7,7 +7,11 @@
 #include <API/DeviceIDs.hpp>
 #include <Drivers/Core/DeviceManager.hpp>
 #include <Drivers/TTY/MasterPTY.hpp>
+#include <Drivers/TTY/PTY.hpp>
 #include <Drivers/TTY/PTYMultiplexer.hpp>
+#include <Drivers/TTY/SlavePTY.hpp>
+#include <Scheduler/Process.hpp>
+#include <VFS/DevPtsFs/DevPtsFs.hpp>
 #include <VFS/VFS.hpp>
 
 PTYMultiplexer* PTYMultiplexer::s_PTMX = nullptr;
@@ -18,22 +22,31 @@ PTYMultiplexer::PTYMultiplexer(DeviceMinor minor)
 }
 PTYMultiplexer::~PTYMultiplexer() {}
 
-static INodeID NewPTSIndex()
-{
-    static Atomic<usize> s_NextID = 0;
-    return ++s_NextID;
-}
 ErrorOr<File*> PTYMultiplexer::Open(File* file)
 {
     LogTrace("PTYMultiplexer: Open called");
-    auto   newIndex = NewPTSIndex();
-    String ptyName  = fmt::format("pts{}", newIndex).data();
-    auto   master   = new MasterPTY(ptyName, newIndex);
+    auto index        = TryOrRet(PTY::AllocateIndex());
+    auto pair         = CreateRef<PTYPair>(index);
 
-    DeviceManager::RegisterCharDevice(master);
-    auto ptyPath = fmt::format("/dev/pts/{}", ptyName).data();
-    VFS::CreateNode(ptyPath, S_IFCHR | 0666, master->ID());
+    auto slave        = CreateRef<SlavePTY>(pair);
+    auto master       = CreateRef<MasterPTY>(pair);
+    pair->Slave       = slave;
+    pair->Master      = master;
+    pair->MasterOpens = 1;
 
-    // TODO(v1tr10l7): Open new pty master/slave pair
-    return master;
+    DeviceManager::RegisterCharDevice(slave.Raw());
+    DeviceManager::RegisterCharDevice(master.Raw());
+
+    auto* current = Process::Current();
+    auto  devpts  = DevPtsFs::Instance();
+    if (!devpts
+        || !devpts->AddSlave(index, slave.Raw(), current->EffectiveUserID(),
+                             current->EffectiveGroupID()))
+    {
+        pair->MasterOpens = 0;
+        pair->OnMasterClosed();
+        return Error(ENOSPC);
+    }
+
+    return master.Raw();
 }

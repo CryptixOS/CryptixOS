@@ -6,7 +6,9 @@
 #*/
 srcs += files(
   'MasterPTY.cpp',
+  'PTY.cpp',
   'PTYMultiplexer.cpp',
+  'SlavePTY.cpp',
   'TTY.cpp',
   'VirtualConsole.cpp',
 )

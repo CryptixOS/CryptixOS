@@ -7,6 +7,7 @@
 #pragma once
 
 #include <Drivers/Core/CharacterDevice.hpp>
+#include <Drivers/TTY/PTY.hpp>
 
 class PTYMultiplexer : public CharacterDevice
 {

@@ -27,6 +27,7 @@ namespace DeviceManager
 
     ErrorOr<void>    RegisterCharDevice(CharacterDevice* device);
     ErrorOr<void>    RegisterBlockDevice(BlockDevice* device);
+    void             UnregisterCharDevice(CharacterDevice* device);
 
     CharacterDevice* LookupCharDevice(dev_t id);
     BlockDevice*     LookupBlockDevice(dev_t id);

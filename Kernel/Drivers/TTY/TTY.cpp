@@ -31,11 +31,8 @@
 Vector<TTY*> TTY::s_TTYs{};
 TTY*         TTY::s_CurrentTTY = nullptr;
 
-TTY::TTY(StringView name, usize minor)
-    : CharacterDevice(name,
-                      MakeDevice(name == "tty"_sv ? API::DeviceMajor::TTYAUX
-                                                  : API::DeviceMajor::TTY,
-                                 minor))
+TTY::TTY(StringView name, DeviceMajor major, DeviceMinor minor)
+    : CharacterDevice(name, MakeDevice(major, minor))
     , m_Name(name)
 {
     if (!s_CurrentTTY && name != "vcs") s_CurrentTTY = this;
@@ -65,6 +62,12 @@ TTY::TTY(StringView name, usize minor)
     m_Termios.c_cc[VWERASE]  = CWERASE;
     m_Termios.c_cc[VLNEXT]   = CLNEXT;
     m_Termios.c_cc[VEOL2]    = CEOL2;
+}
+TTY::TTY(StringView name, DeviceMinor minor)
+    : TTY(name,
+          name == "tty"_sv ? API::DeviceMajor::TTYAUX : API::DeviceMajor::TTY,
+          minor)
+{
 }
 
 ErrorOr<void> TTY::SwitchTo(TTY* tty)
@@ -152,7 +155,11 @@ void TTY::SendBuffer(const char* string, usize bytes)
 }
 
 StringView TTY::Name() const noexcept { return m_Name; }
-winsize    TTY::GetSize() const { return VirtualConsole::Active()->GetSize(); }
+winsize    TTY::GetSize() const
+{
+    if (m_HasWindowSize) return m_WindowSize;
+    return VirtualConsole::Active()->GetSize();
+}
 
 void       TTY::SetTermios(const termios2& termios)
 {
@@ -173,47 +180,53 @@ ErrorOr<File*> TTY::Open(File* file)
 }
 ErrorOr<isize> TTY::Read(void* buffer, off_t offset, usize bytes)
 {
+    if (bytes == 0) return 0;
+
+    // An event can wake us without data for us (another reader took it, or
+    // a wakeup meant for something else). Returning 0 then reads as EOF,
+    // and shells exit on it: so only return once there is data.
     if (IsCanonicalMode())
     {
-        m_OnAddLine.Await();
-
-        UniqueGuard   guard(m_RawMutex);
-        const String& line  = m_LineQueue.PopFrontElement();
-        const usize   count = Min(bytes, line.Size());
-        return line.Copy(reinterpret_cast<char*>(buffer), count);
+        for (;;)
+        {
+            String line;
+            bool   found = false;
+            {
+                // AddLine() fills the queue under m_RawLock
+                ScopedLock guard(m_RawLock, true);
+                if (!m_LineQueue.Empty())
+                {
+                    line  = m_LineQueue.PopFrontElement();
+                    found = true;
+                }
+            }
+            // Copy to user memory without the spinlock held
+            if (found)
+                return line.Copy(reinterpret_cast<char*>(buffer),
+                                 Min(bytes, line.Size()));
+            m_OnAddLine.Await();
+        }
     }
 
     char* dest = reinterpret_cast<char*>(buffer);
-    if (m_RawBuffer.Size() < bytes) m_RawEvent.Await();
-
-    UniqueGuard guard(m_RawMutex);
-    usize       count = Min(m_RawBuffer.Size(), bytes);
-
-    isize       nread = 0;
-    while (count--)
+    for (;;)
     {
-        auto value = m_RawBuffer.Pop();
-
-        if (value == 0x04) LogError("EOF: {:#x}", value);
-        *dest++ = value;
-        ++nread;
+        {
+            UniqueGuard guard(m_RawMutex);
+            if (!m_RawBuffer.Empty())
+            {
+                usize count = Min(m_RawBuffer.Size(), bytes);
+                isize nread = 0;
+                while (count--)
+                {
+                    *dest++ = m_RawBuffer.Pop();
+                    ++nread;
+                }
+                return nread;
+            }
+        }
+        m_RawEvent.Await();
     }
-
-    return nread;
-
-    // isize            nread = src.copy(dest, count);
-    // for (; count > 0; count--) m_RawBuffer.pop_front();
-    while (count > 0 && m_RawBuffer.Size())
-    {
-        UniqueGuard guard(m_RawMutex);
-        u8          ch = m_RawBuffer.Front();
-        m_RawBuffer.Pop();
-        *dest++ = ch;
-        ++nread;
-        --count;
-    }
-
-    return nread;
 }
 ErrorOr<isize> TTY::Write(const void* src, off_t offset, usize bytes)
 {
@@ -251,7 +264,9 @@ ErrorOr<isize> TTY::Write(const UserBuffer& in, usize count, isize offset)
 
 ErrorOr<isize> TTY::IoCtl(usize request, upointer argp)
 {
-    if (!argp) return Error(EFAULT);
+    // These take an int argument (or none), not a pointer
+    bool takesPointer = request != TIOCSCTTY && request != TIOCNOTTY;
+    if (takesPointer && !argp) return Error(EFAULT);
     Process* current = Process::Current();
     if (current->Name().Contains("zsh"))
         LogDebug("TTY::IoCtl: request => {:#x}, argp => {:#x}", request, argp);
@@ -325,7 +340,23 @@ ErrorOr<isize> TTY::IoCtl(usize request, upointer argp)
         case TIOCSLCKTRMIOS: return Error(ENOSYS); break;
 
         case TIOCGWINSZ: *reinterpret_cast<winsize*>(argp) = GetSize(); break;
-        case TIOCSWINSZ: return Error(ENOSYS); break;
+        case TIOCSWINSZ:
+        {
+            if (!current->ValidateRead(argp, sizeof(winsize)))
+                return Error(EFAULT);
+            winsize size;
+            CopyFromUser(&size, argp, sizeof(winsize));
+
+            bool changed = !m_HasWindowSize
+                        || size.ws_row != m_WindowSize.ws_row
+                        || size.ws_col != m_WindowSize.ws_col
+                        || size.ws_xpixel != m_WindowSize.ws_xpixel
+                        || size.ws_ypixel != m_WindowSize.ws_ypixel;
+            m_WindowSize    = size;
+            m_HasWindowSize = true;
+            if (changed) SendSignal(SIGWINCH);
+            break;
+        }
 
         case TIOCINQ: *reinterpret_cast<u32*>(argp) = m_RawBuffer.Size(); break;
 
@@ -339,6 +370,9 @@ ErrorOr<isize> TTY::IoCtl(usize request, upointer argp)
             //     return Error(EPERM);
             current->SetTTY(this);
             m_ControlSid = current->Credentials().SessionID;
+            // The session leader's group becomes the foreground group, so
+            // tcgetpgrp() matches the shell's group (job control needs it)
+            m_Pgid       = current->PGid();
             break;
         case TIOCNOTTY:
             if (current->TTY() != this

@@ -107,6 +107,20 @@ namespace DeviceManager
 
         return {};
     }
+    void UnregisterCharDevice(CharacterDevice* cdev)
+    {
+        if (!cdev) return;
+
+        {
+            ScopedLock cdevGuard(s_CharDeviceLock);
+            auto       it = s_CharDevices.Find(cdev->ID());
+            if (it == s_CharDevices.end() || it->Value != cdev) return;
+            s_CharDevices.Erase(cdev->ID());
+        }
+
+        ScopedLock deviceGuard(s_DeviceLock);
+        s_Devices.Erase(cdev);
+    }
     ErrorOr<void> RegisterBlockDevice(BlockDevice* bdev)
     {
         auto id = bdev->ID();

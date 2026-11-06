@@ -39,10 +39,20 @@ DevPtsFsINode::CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode,
     return Error(ENOENT);
 }
 
+ErrorOr<::Ref<DirectoryEntry>>
+DevPtsFsINode::Lookup(::Ref<DirectoryEntry> entry)
+{
+    ScopedLock guard(m_Lock);
+    auto       child = m_Children.Find(String(entry->Name()));
+    if (child == m_Children.end()) return Error(ENOENT);
+
+    entry->Bind(child->Value);
+    return entry;
+}
 void DevPtsFsINode::InsertChild(::Ref<INode> node, StringView name)
 {
     ScopedLock guard(m_Lock);
-    m_Children[name] = node;
+    m_Children[String(name)] = node;
 }
 isize DevPtsFsINode::Read(void* buffer, off_t offset, usize bytes)
 {

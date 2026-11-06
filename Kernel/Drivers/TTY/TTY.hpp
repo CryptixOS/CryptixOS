@@ -20,7 +20,8 @@
 class TTY : public CharacterDevice
 {
   public:
-    TTY(StringView name, usize minor);
+    TTY(StringView name, DeviceMajor major, DeviceMinor minor);
+    TTY(StringView name, DeviceMinor minor);
 
     inline static TTY*     Active() { return s_CurrentTTY; }
     inline static TTY*     GetCurrent() { return s_CurrentTTY; }
@@ -53,6 +54,12 @@ class TTY : public CharacterDevice
     virtual ErrorOr<void>  TransmitChar(u64 c) { return Error(ENOSYS); }
     virtual ErrorOr<isize> Transmit(StringView data) { return Error(ENOSYS); }
 
+    void                   SendSignal(i32 signal);
+
+    // A terminal with its own window size (a pty) instead of the console's;
+    // set with TIOCSWINSZ
+    void                   UseOwnWindowSize() { m_HasWindowSize = true; }
+
   private:
     static Vector<TTY*>     s_TTYs;
     static TTY*             s_CurrentTTY;
@@ -67,6 +74,8 @@ class TTY : public CharacterDevice
     termios2                m_Termios;
 
     pid_t                   m_ControlSid = -1;
+    winsize                 m_WindowSize{};
+    bool                    m_HasWindowSize = false;
     gid_t                   m_Pgid       = 100;
 
     CircularQueue<u8, 4096> m_RawBuffer;
@@ -83,8 +92,6 @@ class TTY : public CharacterDevice
         eDecPrivate      = 4,
     };
     State       m_State = State::eNormal;
-
-    void        SendSignal(i32 signal);
 
     inline bool IsCanonicalMode() const { return m_Termios.c_lflag & ICANON; }
     inline bool SignalsEnabled() const { return m_Termios.c_lflag & ISIG; }
