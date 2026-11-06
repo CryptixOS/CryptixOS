@@ -25,7 +25,7 @@ class SerialConsole final : public TTY
   private:
     SerialConsole();
 
-    Ref<InterruptDispatcher> m_Dispatcher = nullptr;
+    ::Ref<InterruptDispatcher> m_Dispatcher = nullptr;
 
     void                     Put(char c);
     static IrqResult HandleInterrupt(::Device* device, ExecutionContext* ctx);
