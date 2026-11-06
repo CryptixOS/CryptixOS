@@ -12,6 +12,35 @@
 
 #include <Time/Time.hpp>
 
+namespace
+{
+    // Ext2FsDirectoryEntry ends in a flexible `Name[]` array, so an entry has
+    // to be allocated with room for its name: one on the stack has none. The
+    // name is NUL-terminated too, because AddDirectoryEntry() takes its length
+    // from it. Free with DeleteDirectoryEntry().
+    Ext2FsDirectoryEntry* NewDirectoryEntry(u32 inodeIndex,
+                                            Ext2FsDirectoryEntryType type,
+                                            StringView               name)
+    {
+        usize size = Math::AlignUp(
+            sizeof(Ext2FsDirectoryEntry) + name.Size() + 1, 4);
+        u8* raw = new u8[size];
+        Memory::Fill(raw, 0, size);
+
+        auto* entry       = reinterpret_cast<Ext2FsDirectoryEntry*>(raw);
+        entry->INodeIndex = inodeIndex;
+        entry->Size       = size;
+        entry->NameSize   = name.Size();
+        entry->Type       = type;
+        Memory::Copy(entry->Name, name.Raw(), name.Size());
+        return entry;
+    }
+    void DeleteDirectoryEntry(Ext2FsDirectoryEntry* entry)
+    {
+        delete[] reinterpret_cast<u8*>(entry);
+    }
+} // namespace
+
 Ext2FsINode::Ext2FsINode(StringView name, Ext2Fs* fs, INodeMode mode)
     : INode(name, fs)
     , m_Fs(fs)
@@ -181,14 +210,14 @@ Ext2FsINode::CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode, dev_t dev)
         Ext2FsDirectoryEntry* dotEntry
             = reinterpret_cast<Ext2FsDirectoryEntry*>(buffer);
         dotEntry->INodeIndex = newNode->m_Metadata.ID;
-        dotEntry->Size       = sizeof(Ext2FsDirectoryEntry);
+        // Record lengths include the name, rounded up to 4 bytes: 8 + 1 -> 12
+        dotEntry->Size = Math::AlignUp(sizeof(Ext2FsDirectoryEntry) + 1, 4);
         dotEntry->NameSize   = 1;
         dotEntry->Type       = type;
         dotEntry->Name[0]    = '.';
 
         Ext2FsDirectoryEntry* dotDotEntry
-            = reinterpret_cast<Ext2FsDirectoryEntry*>(buffer
-                                                      + sizeof(*dotEntry));
+            = reinterpret_cast<Ext2FsDirectoryEntry*>(buffer + dotEntry->Size);
         dotDotEntry->INodeIndex = m_Metadata.ID;
         dotDotEntry->Size       = m_Metadata.BlockSize - dotEntry->Size;
         dotDotEntry->NameSize   = 2;
@@ -198,6 +227,7 @@ Ext2FsINode::CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode, dev_t dev)
 
         m_Fs->WriteINode(newNode->m_Meta, buffer, newNode->m_Metadata.ID, 0,
                          m_Metadata.BlockSize);
+        delete[] buffer;
 
         usize blockGroupIndex = (newNode->m_Metadata.ID - 1)
                               / m_Fs->GetSuperBlock()->INodesPerGroup;
@@ -216,20 +246,15 @@ Ext2FsINode::CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode, dev_t dev)
 
     m_Fs->GetSuperBlock()->LastWrittenTime = Time::GetReal().tv_sec;
     m_Fs->FlushSuperBlock();
-    Ext2FsDirectoryEntry dentry;
-    dentry.INodeIndex = newNode->m_Metadata.ID;
-    dentry.Size       = newNode->m_Metadata.Size;
-
-    auto name         = entry->Name();
-    dentry.NameSize   = name.Size();
-    dentry.Type       = type;
-    StringView(name).Copy(reinterpret_cast<char*>(dentry.Name),
-                          name.Size() + 1);
+    auto name   = entry->Name();
+    auto dentry = NewDirectoryEntry(newNode->m_Metadata.ID, type, name);
 
     LogTrace(
         "Ext2Fs: Adding directory entry: {} with inode index: {} and type: {}",
-        name, dentry.INodeIndex, ToUnderlying(dentry.Type));
-    AddDirectoryEntry(dentry);
+        name, dentry->INodeIndex, ToUnderlying(dentry->Type));
+    auto added = AddDirectoryEntry(*dentry);
+    DeleteDirectoryEntry(dentry);
+    if (!added) return Error(added.Error());
     LogTrace("Ext2Fs: Directory entry added successfully");
 
     LogTrace("Ext2Fs: Traversing directories after creation:");
@@ -267,25 +292,26 @@ ErrorOr<::Ref<DirectoryEntry>> Ext2FsINode::Symlink(::Ref<DirectoryEntry> entry,
 ErrorOr<::Ref<DirectoryEntry>> Ext2FsINode::Link(::Ref<DirectoryEntry> oldEntry,
                                                  ::Ref<DirectoryEntry> entry)
 {
-    if (IsDirectory()) return Error(EISDIR);
-    m_Fs->ReadINodeEntry(&m_Meta, m_Metadata.ID);
+    // `this` is the directory the new name goes into; `entry` is that new,
+    // still unbound name, so everything about the target comes from oldEntry.
+    if (!IsDirectory()) return Error(ENOTDIR);
     auto oldNode = oldEntry->INode().As<Ext2FsINode>();
+    if (!oldNode) return Error(ENOENT);
+    if (oldNode->IsDirectory()) return Error(EPERM);
+
+    m_Fs->ReadINodeEntry(&m_Meta, m_Metadata.ID);
     m_Fs->ReadINodeEntry(&oldNode->m_Meta, oldNode->m_Metadata.ID);
+
+    auto dentry = NewDirectoryEntry(
+        oldNode->m_Metadata.ID, Ext2Mode2DirectoryEntryType(oldNode->Mode()),
+        entry->Name());
+    auto added = AddDirectoryEntry(*dentry);
+    DeleteDirectoryEntry(dentry);
+    if (!added) return Error(added.Error());
+
+    // Only count the link once the directory entry exists
     oldNode->m_Metadata.LinkCount++;
     oldNode->m_Meta.HardLinkCount++;
-
-    Ext2FsDirectoryEntry dentry;
-    auto                 newNode  = entry->INode().As<Ext2FsINode>();
-    auto                 linkName = entry->Name();
-
-    dentry.INodeIndex             = newNode->m_Metadata.ID;
-    usize entrySize               = Math::AlignUp(8 + linkName.Size(), 4);
-    dentry.Size                   = entrySize;
-    dentry.NameSize               = linkName.Size();
-    dentry.Type = Ext2Mode2DirectoryEntryType(newNode->Mode());
-    linkName.Copy(reinterpret_cast<char*>(dentry.Name), linkName.Size() + 1);
-
-    AddDirectoryEntry(dentry);
     m_Fs->WriteINodeEntry(oldNode->m_Meta, oldNode->m_Metadata.ID);
 
     auto node = CreateRef<Ext2FsINode>(
