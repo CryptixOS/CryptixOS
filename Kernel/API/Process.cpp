@@ -164,6 +164,16 @@ namespace API::Process
         auto success = thread->SignalReturn();
         if (!success) return Error(success.Error());
 
+        // Resume from the restored Context through the scheduler (sysret
+        // can't restore rcx/r11). Yield() hands this cpu to the idle thread
+        // without requeueing the current one, so queue it first, or the
+        // thread is never scheduled again: every process that returned from
+        // a signal handler froze (init after its SIGHUP, so the shell was
+        // never relaunched; bash after SIGWINCH, so no next prompt). It goes
+        // on this cpu's queue, so no other cpu runs it while we're still on
+        // its kernel stack.
+        CPU::SetInterruptFlag(false);
+        Scheduler::EnqueueThread(thread);
         Scheduler::Yield();
         return 0;
     }

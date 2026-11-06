@@ -154,38 +154,42 @@ bool           Thread::DispatchSignal(u8 signal)
     auto& action = m_Parent->SignalAction(static_cast<SignalID>(signal));
     if (action.VirtualAddress)
     {
-        auto    rsp          = Context.RSP;
-        Pointer phys         = nullptr;
-        Pointer stackTopVirt = nullptr;
-
-        for (auto [virt, region] : *m_Parent->m_AddressSpace)
-        {
-            if (!region->Contains(rsp - 1)) continue;
-            phys         = region->PhysicalBase();
-            stackTopVirt = virt.Offset(CPU::USER_STACK_SIZE);
-        }
-
-        usize   stackOffset = CPU::USER_STACK_SIZE - (stackTopVirt.Raw() - rsp);
-        Pointer rspWritable = phys.ToHigherHalf().Offset(stackOffset);
-        StackBuilder builder(rspWritable);
+        // Skip the interrupted code's red zone (128 bytes below rsp), then
+        // build the frame through the user virtual address: the scheduler
+        // has already loaded this thread's page map. (Translating through the
+        // stack region's physical base assumed one contiguous main stack and
+        // wrote the frame elsewhere for any other stack, so sigreturn
+        // restored an all-zero context.)
+        constexpr usize RED_ZONE_SIZE = 128;
+        auto            rsp           = Context.RSP - RED_ZONE_SIZE;
+        Pointer         rspWritable   = Pointer(rsp);
+        StackBuilder    builder(rspWritable);
 
         upointer     trampolineVirt = m_Parent->m_SignalTrampolineVirt;
         {
             UserMemoryProtectionGuard guard;
-
-            auto actualPhys = Pointer(rspWritable).FromHigherHalf();
-            LogDebug("Thread: Phys => {:#x}, ActualPhys => {:#x}", phys,
-                     actualPhys);
 
             usize fpuStorageSize = m_Tls.FpuStoragePageCount * PMM::PAGE_SIZE;
             upointer contextAddress = builder.Write(&Context, sizeof(Context));
             LogDebug("Thread: Saved the thread's context to => {:#x}",
                      contextAddress);
 
-            builder.Write(m_Tls.FpuStorage, fpuStorageSize);
+            upointer fpuAddress
+                = builder.Write(m_Tls.FpuStorage, fpuStorageSize);
 
             for (usize i = 0; i < 128 / 8; i++) builder.Write(0);
+
+            // Frame, from the handler's entry rsp up:
+            //   [rsp]      trampoline (the handler's return address)
+            //   [rsp + 8]  address of the saved context
+            //   [rsp + 16] address of the saved fpu state
+            // The handler returning pops the first, so sigreturn's rsp
+            // points straight at the two addresses: no offsets that depend
+            // on alignment padding. rsp + 8 is 16-aligned, as the ABI wants
+            // ((rsp + 8) % 16 == 0 at function entry).
             builder.Align(16);
+            builder.Write(fpuAddress);
+            builder.Write(contextAddress);
             builder.Write(trampolineVirt);
 
             rsp -= (builder.Top() - builder.Current()).Raw();
@@ -250,17 +254,35 @@ bool           Thread::DispatchSignal(u8 signal)
 ErrorOr<void> Thread::SignalReturn()
 {
 #if CTOS_TARGET_X86_64
-    Pointer rsp = Context.RSP;
+    // The frame sits above the stack pointer the trampoline made the
+    // sigreturn syscall with. Context holds wherever the thread was last
+    // preempted, which is deeper inside the handler if a tick hit it.
+    Pointer rsp = SavedContext.RSP;
     {
         UserMemoryProtectionGuard guard;
 
         usize fpuStorageSize = m_Tls.FpuStoragePageCount * PMM::PAGE_SIZE;
-        Memory::Copy(m_Tls.FpuStorage, rsp.Offset(16 + 128), fpuStorageSize);
+        // See DispatchSignal() for the layout
+        auto  slots          = rsp.As<upointer>();
+        auto  saved          = reinterpret_cast<ExecutionContext*>(slots[0]);
+        auto  fpuState       = reinterpret_cast<void*>(slots[1]);
+        auto  current        = Process::Current();
+        if (!current->ValidateRead(saved, sizeof(ExecutionContext))
+            || !current->ValidateRead(fpuState, fpuStorageSize))
+            return Error(EFAULT);
 
-        ExecutionContext* saved
-            = rsp.Offset<ExecutionContext*>(16 + 128 + fpuStorageSize);
+        Memory::Copy(m_Tls.FpuStorage, fpuState, fpuStorageSize);
         LogWarn("SigReturn: Saved stack frame dump =>\n{}", *saved);
         Context = *saved;
+
+        // The frame is user memory: never return to it with kernel segments
+        // or privileged flags, whatever it contains
+        constexpr u64 USER_FLAGS = 0x50dd5; // AC RF OF DF TF SF ZF AF PF CF
+        Context.CS     = GDT::USERLAND_CODE_SELECTOR | 0x03;
+        Context.SS     = GDT::USERLAND_DATA_SELECTOR | 0x03;
+        Context.DS     = GDT::USERLAND_DATA_SELECTOR | 0x03;
+        Context.ES     = GDT::USERLAND_DATA_SELECTOR | 0x03;
+        Context.RFlags = (Context.RFlags & USER_FLAGS) | 0x202; // IF, bit 1
         return {};
     }
 
