@@ -6,12 +6,14 @@ packages:
       subdir: 'sources'
       git: 'https://github.com/CryptixOS/Aurora.git'
       branch: 'main'
+      commit: '1707c71d5fa892ea2f0aa50ac98e00ebb6f6031b'
     tools_required:
       - system-gcc
       - host-pkg-config
       - virtual: pkgconfig-for-target
         triple: "@OPTION:arch-triple@"
     pkgs_required:
+      - gcc-runtime
       - mlibc
       - prism
       - neon

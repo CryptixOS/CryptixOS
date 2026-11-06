@@ -11,3 +11,7 @@ sources:
       - host-libtool
     regenerate:
       - args: ['./autogen.sh']
+  - name: 'quantum-term'
+    subdir: 'sources'
+    git: 'https://github.com/CryptixOS/Quantum.git'
+    branch: 'main'

@@ -76,6 +76,7 @@ sources:
     subdir: 'sources'
     git: 'https://github.com/emscripten-core/posixtestsuite'
     branch: 'main'
+    commit: '85555325079ea362fa680bd2209c843cfe47e670'
 
   - name: rust
     subdir: 'sources'

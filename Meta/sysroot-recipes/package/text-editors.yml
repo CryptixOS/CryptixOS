@@ -40,6 +40,9 @@ packages:
                   git -C gnulib pull --unshallow || true
               fi
           isolate_network: false
+        # pkg.m4 lives in host-pkg-config's prefix, not in aclocal --print-ac-dir;
+        # autogen.sh finds it anyway, so neuter the bogus sanity check.
+        - args: ['sed', '-i', 's|test ! -f $(aclocal --print-ac-dir)/pkg.m4|false|', 'configure.ac']
         - args: ['./autogen.sh']
     tools_required:
       - host-autoconf-v2.69

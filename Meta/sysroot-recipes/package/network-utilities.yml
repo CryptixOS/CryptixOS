@@ -58,6 +58,7 @@ packages:
       subdir: 'sources'
       git: 'https://github.com/vitriol1744/portscanner.git'
       branch: 'master'
+      commit: '662d074c6b066b0ac233eddd5401d11f4f6862e2'
     tools_required:
       - host-automake-v1.15
       - system-gcc

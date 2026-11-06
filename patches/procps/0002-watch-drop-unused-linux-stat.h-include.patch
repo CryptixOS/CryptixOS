@@ -1,0 +1,25 @@
+From 70c70c2bb04747f8946404435f21313e6432f477 Mon Sep 17 00:00:00 2001
+From: V1tr10l7 <vitriol1744@gmail.com>
+Date: Thu, 5 Nov 2026 14:58:07 +0100
+Subject: [PATCH] watch: drop unused <linux/stat.h> include
+
+It conflicts with mlibc's struct statx definitions.
+---
+ src/watch.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/src/watch.c b/src/watch.c
+index e130137..7ec634b 100644
+--- a/src/watch.c
++++ b/src/watch.c
+@@ -55,7 +55,6 @@
+ #include "c.h"
+ #include "config.h"
+ #include "fileutils.h"
+-#include <linux/stat.h>
+ #include "nls.h"
+ #include "signals.h"
+ #include "strutils.h"
+-- 
+2.56.0
+

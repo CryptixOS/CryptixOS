@@ -42,6 +42,7 @@ packages:
       subdir: 'sources'
       git: 'https://github.com/hharte/vttest.git'
       branch: 'master'
+      commit: 'd37932dc8a7e5dab702ba34020bdbb12cdf12858'
       tools_required:
         - host-autoconf-v2.69
         - host-automake-v1.15

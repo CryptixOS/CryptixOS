@@ -318,6 +318,9 @@ root_image = custom_target(
     '--size', '2GiB',
   ],
   depends: ext_mods,
+  # Its inputs don't track the sysroot, so rebuild every time to pick up
+  # newly installed packages
+  build_always_stale: true,
   build_by_default: true,
   console: true,
   install: false,
@@ -343,6 +346,9 @@ initrd = custom_target(
     'mkdir', '-p', initrd_dir / 'usr/lib/modules', '&&',
     no_ext_mods ? [] : ['cp', '@INPUT@', initrd_dir / 'usr/lib/modules/', '&&'],
     'tar', '-cvf', '@OUTPUT@', '-C', initrd_dir, '.'],
+  # Its inputs don't track the sysroot, so rebuild every time to pick up
+  # newly installed packages
+  build_always_stale: true,
   build_by_default: true,
   depend_files: base_files,
   console: true,

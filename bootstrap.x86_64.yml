@@ -41,6 +41,7 @@ packages:
     pkgs_required:
       - aurora
       - base-files
+      - gcc-runtime
       - fun-apps
       - shell-apps
       - sys-apps

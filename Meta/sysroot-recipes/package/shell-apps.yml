@@ -19,8 +19,9 @@ packages:
     source:
       subdir: 'sources'
       version: '0.1'
-      git: 'https://github.com/CryptixOS/Aurora.git'
+      git: 'https://github.com/CryptixOS/AwesomeShell.git'
       branch: 'main'
+      commit: '23eec99a44d39a9a8f19cc7a8d62fe87c70d6a4e'
     tools_required:
       - system-gcc
       - host-pkg-config
@@ -29,6 +30,7 @@ packages:
     pkgs_required:
       - mlibc
       - prism
+      - neon
     configure: 
       - args:
         - 'meson'
@@ -181,7 +183,7 @@ packages:
         - '--enable-etcdir=/etc/zsh'
         - '--enable-gdbm'
         - '--enable-pcre'
-        - 'CFLAGS=-DHAVE_TERMIOS_H -std=gnu23'
+        - 'CFLAGS=-D_GNU_SOURCE -DHAVE_TERMIOS_H -std=gnu23'
     build:
       - args: ['make', 'prep']
       - args: ['make', '-j@PARALLELISM@']

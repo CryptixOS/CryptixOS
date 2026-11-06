@@ -12,7 +12,7 @@ tools:
     tools_required:
       - tool: cross-binutils
         recursive: true
-    revision: 2
+    revision: 3
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
@@ -33,6 +33,12 @@ tools:
         # -g blows up GCC's binary size.
         - 'CFLAGS=-O2'
         - 'CXXFLAGS=-O2'
+        # Host GCC >= 16 defaults to C++20, where u8"" literals are char8_t
+        # and GCC 15's libcody fails to compile. The standard has to be part of
+        # CXX, not CXXFLAGS: the top-level Makefile passes CXX down to libcody,
+        # overriding the -std=c++11 its configure adds, and libcody's configure
+        # rejects any -std in CXXFLAGS other than exactly C++11.
+        - 'CXX=g++ -std=gnu++17'
         environ:
           ac_cv_func_shl_load: 'no'
     stages:
@@ -312,6 +318,7 @@ tools:
     tools_required:
       - tool: cross-binutils
         recursive: true
+    revision: 2
     configure:
       - args:
         - '@THIS_SOURCE_DIR@/configure'
@@ -325,6 +332,14 @@ tools:
         # -g blows up GCC's binary size.
         - 'CFLAGS=-O2'
         - 'CXXFLAGS=-O2'
+        # Host GCC >= 16 defaults to C++20, where u8"" literals are char8_t
+        # and GCC 15's libcody fails to compile. The standard has to be part of
+        # CXX, not CXXFLAGS: the top-level Makefile passes CXX down to libcody,
+        # overriding the -std=c++11 its configure adds, and libcody's configure
+        # rejects any -std in CXXFLAGS other than exactly C++11.
+        - 'CXX=g++ -std=gnu++17'
+        environ:
+          ac_cv_func_shl_load: 'no'
     stages:
       - name: compiler
         pkgs_required:

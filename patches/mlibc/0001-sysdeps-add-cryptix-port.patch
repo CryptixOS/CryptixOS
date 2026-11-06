@@ -1,10 +1,10 @@
-From 7b101ec7c3cf595bd7777711eb03ba2a5ed7260c Mon Sep 17 00:00:00 2001
+From 26e031ff310e6f09291511802a31335d24f4347d Mon Sep 17 00:00:00 2001
 From: V1tr10l7 <vitriol1744@gmail.com>
-Date: Thu, 18 Sep 2025 07:49:55 +0200
+Date: Wed, 4 Nov 2026 21:52:23 +0100
 Subject: [PATCH] sysdeps: add cryptix port
 
 ---
- meson.build                                   |   8 +
+ meson.build                                   |   7 +
  sysdeps/cryptix/arch/aarch64/crt0.S           |   9 +
  sysdeps/cryptix/arch/aarch64/crti.S           |  13 +
  sysdeps/cryptix/arch/aarch64/crtn.S           |   9 +
@@ -18,14 +18,17 @@ Subject: [PATCH] sysdeps: add cryptix port
  sysdeps/cryptix/entry/meson.build             |   4 +
  sysdeps/cryptix/entry/thread.cpp              |  66 +++
  sysdeps/cryptix/include/abi-bits/access.h     |   1 +
+ sysdeps/cryptix/include/abi-bits/aio.h        |   1 +
  sysdeps/cryptix/include/abi-bits/auxv.h       |   1 +
  sysdeps/cryptix/include/abi-bits/blkcnt_t.h   |   1 +
  sysdeps/cryptix/include/abi-bits/blksize_t.h  |   1 +
  sysdeps/cryptix/include/abi-bits/clockid_t.h  |   1 +
+ .../cryptix/include/abi-bits/clone-flags.h    |   1 +
  sysdeps/cryptix/include/abi-bits/dev_t.h      |   1 +
  sysdeps/cryptix/include/abi-bits/epoll.h      |   1 +
  sysdeps/cryptix/include/abi-bits/errno.h      |   1 +
  sysdeps/cryptix/include/abi-bits/fcntl.h      |   1 +
+ sysdeps/cryptix/include/abi-bits/fd_set.h     |   1 +
  sysdeps/cryptix/include/abi-bits/fsblkcnt_t.h |   1 +
  sysdeps/cryptix/include/abi-bits/fsfilcnt_t.h |   1 +
  sysdeps/cryptix/include/abi-bits/gid_t.h      |   1 +
@@ -48,11 +51,18 @@ Subject: [PATCH] sysdeps: add cryptix port
  sysdeps/cryptix/include/abi-bits/resource.h   |   1 +
  .../cryptix/include/abi-bits/riscv-hwprobe.h  |   1 +
  sysdeps/cryptix/include/abi-bits/rlim_t.h     |   1 +
+ sysdeps/cryptix/include/abi-bits/route.h      |   1 +
+ .../cryptix/include/abi-bits/sa_family_t.h    |   1 +
+ .../cryptix/include/abi-bits/sched_param.h    |   1 +
  .../cryptix/include/abi-bits/seek-whence.h    |   1 +
+ sysdeps/cryptix/include/abi-bits/sem.h        |   1 +
  sysdeps/cryptix/include/abi-bits/shm.h        |   1 +
+ sysdeps/cryptix/include/abi-bits/sig-limits.h |   1 +
  sysdeps/cryptix/include/abi-bits/sigevent.h   |   1 +
  sysdeps/cryptix/include/abi-bits/signal.h     |   1 +
+ sysdeps/cryptix/include/abi-bits/sigset_t.h   |   1 +
  sysdeps/cryptix/include/abi-bits/sigval.h     |   1 +
+ .../include/abi-bits/sockaddr_storage.h       |   1 +
  sysdeps/cryptix/include/abi-bits/socket.h     |   1 +
  sysdeps/cryptix/include/abi-bits/socklen_t.h  |   1 +
  sysdeps/cryptix/include/abi-bits/stat.h       |   1 +
@@ -71,17 +81,18 @@ Subject: [PATCH] sysdeps: add cryptix port
  sysdeps/cryptix/include/abi-bits/wait.h       |   1 +
  sysdeps/cryptix/include/abi-bits/xattr.h      |   1 +
  sysdeps/cryptix/include/cryptix/syscall.h     | 308 +++++++++++
- sysdeps/cryptix/include/meson.build           |  60 +++
+ sysdeps/cryptix/include/meson.build           |  70 +++
+ sysdeps/cryptix/include/mlibc/sysdeps.hpp     | 127 +++++
  sysdeps/cryptix/meson.build                   |  11 +
  sysdeps/cryptix/sysdeps/internal.cpp          |  16 +
  sysdeps/cryptix/sysdeps/memory.cpp            |  51 ++
  sysdeps/cryptix/sysdeps/meson.build           |  12 +
- sysdeps/cryptix/sysdeps/process.cpp           | 244 +++++++++
+ sysdeps/cryptix/sysdeps/process.cpp           | 246 +++++++++
  sysdeps/cryptix/sysdeps/signal.cpp            |  60 +++
- sysdeps/cryptix/sysdeps/system.cpp            |  91 ++++
+ sysdeps/cryptix/sysdeps/system.cpp            |  97 ++++
  sysdeps/cryptix/sysdeps/time.cpp              |  41 ++
- sysdeps/cryptix/sysdeps/vfs.cpp               | 488 ++++++++++++++++++
- 77 files changed, 1670 insertions(+)
+ sysdeps/cryptix/sysdeps/vfs.cpp               | 487 ++++++++++++++++++
+ 88 files changed, 1823 insertions(+)
  create mode 100644 sysdeps/cryptix/arch/aarch64/crt0.S
  create mode 100644 sysdeps/cryptix/arch/aarch64/crti.S
  create mode 100644 sysdeps/cryptix/arch/aarch64/crtn.S
@@ -95,14 +106,17 @@ Subject: [PATCH] sysdeps: add cryptix port
  create mode 100644 sysdeps/cryptix/entry/meson.build
  create mode 100644 sysdeps/cryptix/entry/thread.cpp
  create mode 120000 sysdeps/cryptix/include/abi-bits/access.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/aio.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/auxv.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/blkcnt_t.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/blksize_t.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/clockid_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/clone-flags.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/dev_t.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/epoll.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/errno.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/fcntl.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/fd_set.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/fsblkcnt_t.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/fsfilcnt_t.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/gid_t.h
@@ -125,11 +139,18 @@ Subject: [PATCH] sysdeps: add cryptix port
  create mode 120000 sysdeps/cryptix/include/abi-bits/resource.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/riscv-hwprobe.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/rlim_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/route.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/sa_family_t.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/sched_param.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/seek-whence.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/sem.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/shm.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/sig-limits.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/sigevent.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/signal.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/sigset_t.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/sigval.h
+ create mode 120000 sysdeps/cryptix/include/abi-bits/sockaddr_storage.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/socket.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/socklen_t.h
  create mode 120000 sysdeps/cryptix/include/abi-bits/stat.h
@@ -149,6 +170,7 @@ Subject: [PATCH] sysdeps: add cryptix port
  create mode 120000 sysdeps/cryptix/include/abi-bits/xattr.h
  create mode 100644 sysdeps/cryptix/include/cryptix/syscall.h
  create mode 100644 sysdeps/cryptix/include/meson.build
+ create mode 100644 sysdeps/cryptix/include/mlibc/sysdeps.hpp
  create mode 100644 sysdeps/cryptix/meson.build
  create mode 100644 sysdeps/cryptix/sysdeps/internal.cpp
  create mode 100644 sysdeps/cryptix/sysdeps/memory.cpp
@@ -160,27 +182,26 @@ Subject: [PATCH] sysdeps: add cryptix port
  create mode 100644 sysdeps/cryptix/sysdeps/vfs.cpp
 
 diff --git a/meson.build b/meson.build
-index 37f82008..f6db7f7e 100644
+index 8e981a3..7152efc 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -273,6 +273,14 @@ elif host_machine.system() == 'nyaux'
- 	rtld_include_dirs += include_directories('sysdeps/nyaux/include')
- 	libc_include_dirs += include_directories('sysdeps/nyaux/include')
- 	subdir('sysdeps/nyaux')
+@@ -320,6 +320,13 @@ elif host_machine.system() == 'ethereal'
+ 	internal_conf.set10('MLIBC_MMAP_ALLOCATE_DSO', false)
+ 	internal_conf.set10('MLIBC_MAP_FILE_WINDOWS', true)
+ 	subdir('sysdeps/ethereal')
 +elif host_machine.system() == 'cryptix'
 +	rtld_include_dirs += include_directories('sysdeps/cryptix/include')
 +	libc_include_dirs += include_directories('sysdeps/cryptix/include')
-+
-+    #internal_conf.set10('MLIBC_MAP_DSO_SEGMENTS', true)
-+    internal_conf.set10('MLIBC_MMAP_ALLOCATE_DSO', true)
-+    #internal_conf.set10('MLIBC_MAP_FILE_WINDOWS', true)
++	#internal_conf.set10('MLIBC_MAP_DSO_SEGMENTS', true)
++	internal_conf.set10('MLIBC_MMAP_ALLOCATE_DSO', true)
++	#internal_conf.set10('MLIBC_MAP_FILE_WINDOWS', true)
 +	subdir('sysdeps/cryptix')
- else
- 	error('No sysdeps defined for OS: ' + host_machine.system())
- endif
+ # ANCHOR: demo-sysdeps
+ elif host_machine.system() == 'demo'
+ 	subdir('sysdeps/demo')
 diff --git a/sysdeps/cryptix/arch/aarch64/crt0.S b/sysdeps/cryptix/arch/aarch64/crt0.S
 new file mode 100644
-index 00000000..da6ed79e
+index 0000000..da6ed79
 --- /dev/null
 +++ b/sysdeps/cryptix/arch/aarch64/crt0.S
 @@ -0,0 +1,9 @@
@@ -195,7 +216,7 @@ index 00000000..da6ed79e
 +
 diff --git a/sysdeps/cryptix/arch/aarch64/crti.S b/sysdeps/cryptix/arch/aarch64/crti.S
 new file mode 100644
-index 00000000..787370b1
+index 0000000..787370b
 --- /dev/null
 +++ b/sysdeps/cryptix/arch/aarch64/crti.S
 @@ -0,0 +1,13 @@
@@ -214,7 +235,7 @@ index 00000000..787370b1
 +
 diff --git a/sysdeps/cryptix/arch/aarch64/crtn.S b/sysdeps/cryptix/arch/aarch64/crtn.S
 new file mode 100644
-index 00000000..3e631807
+index 0000000..3e63180
 --- /dev/null
 +++ b/sysdeps/cryptix/arch/aarch64/crtn.S
 @@ -0,0 +1,9 @@
@@ -229,7 +250,7 @@ index 00000000..3e631807
 +
 diff --git a/sysdeps/cryptix/arch/aarch64/thread_entry.S b/sysdeps/cryptix/arch/aarch64/thread_entry.S
 new file mode 100644
-index 00000000..35264aa1
+index 0000000..35264aa
 --- /dev/null
 +++ b/sysdeps/cryptix/arch/aarch64/thread_entry.S
 @@ -0,0 +1,21 @@
@@ -256,7 +277,7 @@ index 00000000..35264aa1
 +
 diff --git a/sysdeps/cryptix/arch/meson.build b/sysdeps/cryptix/arch/meson.build
 new file mode 100644
-index 00000000..b832d9ef
+index 0000000..b832d9e
 --- /dev/null
 +++ b/sysdeps/cryptix/arch/meson.build
 @@ -0,0 +1,37 @@
@@ -299,7 +320,7 @@ index 00000000..b832d9ef
 +endif
 diff --git a/sysdeps/cryptix/arch/x86_64/crt0.S b/sysdeps/cryptix/arch/x86_64/crt0.S
 new file mode 100644
-index 00000000..9b77ee78
+index 0000000..9b77ee7
 --- /dev/null
 +++ b/sysdeps/cryptix/arch/x86_64/crt0.S
 @@ -0,0 +1,8 @@
@@ -313,7 +334,7 @@ index 00000000..9b77ee78
 +
 diff --git a/sysdeps/cryptix/arch/x86_64/crti.S b/sysdeps/cryptix/arch/x86_64/crti.S
 new file mode 100644
-index 00000000..911b078d
+index 0000000..911b078
 --- /dev/null
 +++ b/sysdeps/cryptix/arch/x86_64/crti.S
 @@ -0,0 +1,11 @@
@@ -330,7 +351,7 @@ index 00000000..911b078d
 +
 diff --git a/sysdeps/cryptix/arch/x86_64/crtn.S b/sysdeps/cryptix/arch/x86_64/crtn.S
 new file mode 100644
-index 00000000..0187e50f
+index 0000000..0187e50
 --- /dev/null
 +++ b/sysdeps/cryptix/arch/x86_64/crtn.S
 @@ -0,0 +1,9 @@
@@ -345,7 +366,7 @@ index 00000000..0187e50f
 +
 diff --git a/sysdeps/cryptix/arch/x86_64/thread_entry.S b/sysdeps/cryptix/arch/x86_64/thread_entry.S
 new file mode 100644
-index 00000000..82c7b2f4
+index 0000000..82c7b2f
 --- /dev/null
 +++ b/sysdeps/cryptix/arch/x86_64/thread_entry.S
 @@ -0,0 +1,22 @@
@@ -373,7 +394,7 @@ index 00000000..82c7b2f4
 +
 diff --git a/sysdeps/cryptix/entry/entry.cpp b/sysdeps/cryptix/entry/entry.cpp
 new file mode 100644
-index 00000000..89961235
+index 0000000..8996123
 --- /dev/null
 +++ b/sysdeps/cryptix/entry/entry.cpp
 @@ -0,0 +1,18 @@
@@ -397,7 +418,7 @@ index 00000000..89961235
 +}
 diff --git a/sysdeps/cryptix/entry/meson.build b/sysdeps/cryptix/entry/meson.build
 new file mode 100644
-index 00000000..af9f0f7a
+index 0000000..af9f0f7
 --- /dev/null
 +++ b/sysdeps/cryptix/entry/meson.build
 @@ -0,0 +1,4 @@
@@ -407,7 +428,7 @@ index 00000000..af9f0f7a
 +)
 diff --git a/sysdeps/cryptix/entry/thread.cpp b/sysdeps/cryptix/entry/thread.cpp
 new file mode 100644
-index 00000000..e38c30ea
+index 0000000..b1045ad
 --- /dev/null
 +++ b/sysdeps/cryptix/entry/thread.cpp
 @@ -0,0 +1,66 @@
@@ -424,16 +445,16 @@ index 00000000..e38c30ea
 +	auto tcb = mlibc::get_current_tcb();
 +
 +	while (!__atomic_load_n(&tcb->tid, __ATOMIC_RELAXED))
-+		mlibc::sys_futex_wait(&tcb->tid, 0, nullptr);
++		sysdep<FutexWait>(&tcb->tid, 0, nullptr);
 +	tcb->invokeThreadFunc(entry, user_arg);
 +
 +	__atomic_store_n(&tcb->didExit, 1, __ATOMIC_RELEASE);
-+	mlibc::sys_futex_wake(&tcb->didExit);
-+	mlibc::sys_thread_exit();
++	sysdep<FutexWake>(&tcb->didExit, true);
++	sysdep<ThreadExit>();
 +}
 +
 +static constexpr size_t default_stacksize = 0x200000; // 2 mib
-+int sys_prepare_stack(
++int Sysdeps<PrepareStack>::operator()(
 +    void **stack,
 +    void *entry,
 +    void *user_arg,
@@ -451,7 +472,7 @@ index 00000000..e38c30ea
 +		map = reinterpret_cast<uintptr_t>(*stack);
 +		*guard_size = 0;
 +	} else {
-+		sys_vm_map(
++		sysdep<VmMap>(
 +		    nullptr,
 +		    *stack_size + *guard_size,
 +		    PROT_NONE,
@@ -462,7 +483,7 @@ index 00000000..e38c30ea
 +		);
 +		if (reinterpret_cast<void *>(map) == MAP_FAILED)
 +			return EAGAIN;
-+		int ret = sys_vm_protect(
++		int ret = sysdep<VmProtect>(
 +		    reinterpret_cast<void *>(map + *guard_size), *stack_size, PROT_READ | PROT_WRITE
 +		);
 +		if (ret)
@@ -479,15 +500,23 @@ index 00000000..e38c30ea
 +} // namespace mlibc
 diff --git a/sysdeps/cryptix/include/abi-bits/access.h b/sysdeps/cryptix/include/abi-bits/access.h
 new file mode 120000
-index 00000000..cb839316
+index 0000000..cb83931
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/access.h
 @@ -0,0 +1 @@
 +../../../../abis/linux/access.h
 \ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/aio.h b/sysdeps/cryptix/include/abi-bits/aio.h
+new file mode 120000
+index 0000000..79b4168
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/aio.h
+@@ -0,0 +1 @@
++../../../../abis/linux/aio.h
+\ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/auxv.h b/sysdeps/cryptix/include/abi-bits/auxv.h
 new file mode 120000
-index 00000000..c43f8786
+index 0000000..c43f878
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/auxv.h
 @@ -0,0 +1 @@
@@ -495,7 +524,7 @@ index 00000000..c43f8786
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/blkcnt_t.h b/sysdeps/cryptix/include/abi-bits/blkcnt_t.h
 new file mode 120000
-index 00000000..0b0ec270
+index 0000000..0b0ec27
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/blkcnt_t.h
 @@ -0,0 +1 @@
@@ -503,7 +532,7 @@ index 00000000..0b0ec270
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/blksize_t.h b/sysdeps/cryptix/include/abi-bits/blksize_t.h
 new file mode 120000
-index 00000000..7dc8d7cf
+index 0000000..7dc8d7c
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/blksize_t.h
 @@ -0,0 +1 @@
@@ -511,15 +540,23 @@ index 00000000..7dc8d7cf
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/clockid_t.h b/sysdeps/cryptix/include/abi-bits/clockid_t.h
 new file mode 120000
-index 00000000..6a42da56
+index 0000000..6a42da5
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/clockid_t.h
 @@ -0,0 +1 @@
 +../../../../abis/linux/clockid_t.h
 \ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/clone-flags.h b/sysdeps/cryptix/include/abi-bits/clone-flags.h
+new file mode 120000
+index 0000000..ed3dfd6
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/clone-flags.h
+@@ -0,0 +1 @@
++../../../../abis/linux/clone-flags.h
+\ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/dev_t.h b/sysdeps/cryptix/include/abi-bits/dev_t.h
 new file mode 120000
-index 00000000..bca881e9
+index 0000000..bca881e
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/dev_t.h
 @@ -0,0 +1 @@
@@ -527,7 +564,7 @@ index 00000000..bca881e9
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/epoll.h b/sysdeps/cryptix/include/abi-bits/epoll.h
 new file mode 120000
-index 00000000..eb4b76dc
+index 0000000..eb4b76d
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/epoll.h
 @@ -0,0 +1 @@
@@ -535,7 +572,7 @@ index 00000000..eb4b76dc
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/errno.h b/sysdeps/cryptix/include/abi-bits/errno.h
 new file mode 120000
-index 00000000..6e507def
+index 0000000..6e507de
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/errno.h
 @@ -0,0 +1 @@
@@ -543,15 +580,23 @@ index 00000000..6e507def
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/fcntl.h b/sysdeps/cryptix/include/abi-bits/fcntl.h
 new file mode 120000
-index 00000000..463e2c95
+index 0000000..463e2c9
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/fcntl.h
 @@ -0,0 +1 @@
 +../../../../abis/linux/fcntl.h
 \ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/fd_set.h b/sysdeps/cryptix/include/abi-bits/fd_set.h
+new file mode 120000
+index 0000000..b43142c
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/fd_set.h
+@@ -0,0 +1 @@
++../../../../abis/linux/fd_set.h
+\ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/fsblkcnt_t.h b/sysdeps/cryptix/include/abi-bits/fsblkcnt_t.h
 new file mode 120000
-index 00000000..898dfb2f
+index 0000000..898dfb2
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/fsblkcnt_t.h
 @@ -0,0 +1 @@
@@ -559,7 +604,7 @@ index 00000000..898dfb2f
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/fsfilcnt_t.h b/sysdeps/cryptix/include/abi-bits/fsfilcnt_t.h
 new file mode 120000
-index 00000000..791755c9
+index 0000000..791755c
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/fsfilcnt_t.h
 @@ -0,0 +1 @@
@@ -567,7 +612,7 @@ index 00000000..791755c9
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/gid_t.h b/sysdeps/cryptix/include/abi-bits/gid_t.h
 new file mode 120000
-index 00000000..abce6d69
+index 0000000..abce6d6
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/gid_t.h
 @@ -0,0 +1 @@
@@ -575,7 +620,7 @@ index 00000000..abce6d69
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/in.h b/sysdeps/cryptix/include/abi-bits/in.h
 new file mode 120000
-index 00000000..418d1d5c
+index 0000000..418d1d5
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/in.h
 @@ -0,0 +1 @@
@@ -583,7 +628,7 @@ index 00000000..418d1d5c
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/ino_t.h b/sysdeps/cryptix/include/abi-bits/ino_t.h
 new file mode 120000
-index 00000000..4c20aca2
+index 0000000..4c20aca
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/ino_t.h
 @@ -0,0 +1 @@
@@ -591,7 +636,7 @@ index 00000000..4c20aca2
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/inotify.h b/sysdeps/cryptix/include/abi-bits/inotify.h
 new file mode 120000
-index 00000000..b5cb2823
+index 0000000..b5cb282
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/inotify.h
 @@ -0,0 +1 @@
@@ -599,7 +644,7 @@ index 00000000..b5cb2823
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/ioctls.h b/sysdeps/cryptix/include/abi-bits/ioctls.h
 new file mode 120000
-index 00000000..595106b6
+index 0000000..595106b
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/ioctls.h
 @@ -0,0 +1 @@
@@ -607,7 +652,7 @@ index 00000000..595106b6
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/ipc.h b/sysdeps/cryptix/include/abi-bits/ipc.h
 new file mode 120000
-index 00000000..2c7ffc4c
+index 0000000..2c7ffc4
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/ipc.h
 @@ -0,0 +1 @@
@@ -615,7 +660,7 @@ index 00000000..2c7ffc4c
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/limits.h b/sysdeps/cryptix/include/abi-bits/limits.h
 new file mode 120000
-index 00000000..6c88db2e
+index 0000000..6c88db2
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/limits.h
 @@ -0,0 +1 @@
@@ -623,7 +668,7 @@ index 00000000..6c88db2e
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/mode_t.h b/sysdeps/cryptix/include/abi-bits/mode_t.h
 new file mode 120000
-index 00000000..5d78fdfc
+index 0000000..5d78fdf
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/mode_t.h
 @@ -0,0 +1 @@
@@ -631,7 +676,7 @@ index 00000000..5d78fdfc
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/mqueue.h b/sysdeps/cryptix/include/abi-bits/mqueue.h
 new file mode 120000
-index 00000000..fa87b078
+index 0000000..fa87b07
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/mqueue.h
 @@ -0,0 +1 @@
@@ -639,7 +684,7 @@ index 00000000..fa87b078
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/msg.h b/sysdeps/cryptix/include/abi-bits/msg.h
 new file mode 120000
-index 00000000..f402b493
+index 0000000..f402b49
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/msg.h
 @@ -0,0 +1 @@
@@ -647,7 +692,7 @@ index 00000000..f402b493
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/nlink_t.h b/sysdeps/cryptix/include/abi-bits/nlink_t.h
 new file mode 120000
-index 00000000..bb3b625c
+index 0000000..bb3b625
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/nlink_t.h
 @@ -0,0 +1 @@
@@ -655,7 +700,7 @@ index 00000000..bb3b625c
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/packet.h b/sysdeps/cryptix/include/abi-bits/packet.h
 new file mode 120000
-index 00000000..998ef1ab
+index 0000000..998ef1a
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/packet.h
 @@ -0,0 +1 @@
@@ -663,7 +708,7 @@ index 00000000..998ef1ab
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/pid_t.h b/sysdeps/cryptix/include/abi-bits/pid_t.h
 new file mode 120000
-index 00000000..baa90f6a
+index 0000000..baa90f6
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/pid_t.h
 @@ -0,0 +1 @@
@@ -671,7 +716,7 @@ index 00000000..baa90f6a
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/poll.h b/sysdeps/cryptix/include/abi-bits/poll.h
 new file mode 120000
-index 00000000..8ea6a0a3
+index 0000000..8ea6a0a
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/poll.h
 @@ -0,0 +1 @@
@@ -679,7 +724,7 @@ index 00000000..8ea6a0a3
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/ptrace.h b/sysdeps/cryptix/include/abi-bits/ptrace.h
 new file mode 120000
-index 00000000..b2517b2c
+index 0000000..b2517b2
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/ptrace.h
 @@ -0,0 +1 @@
@@ -687,7 +732,7 @@ index 00000000..b2517b2c
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/random.h b/sysdeps/cryptix/include/abi-bits/random.h
 new file mode 120000
-index 00000000..83fc3d96
+index 0000000..83fc3d9
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/random.h
 @@ -0,0 +1 @@
@@ -695,7 +740,7 @@ index 00000000..83fc3d96
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/reboot.h b/sysdeps/cryptix/include/abi-bits/reboot.h
 new file mode 120000
-index 00000000..77013a41
+index 0000000..77013a4
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/reboot.h
 @@ -0,0 +1 @@
@@ -703,7 +748,7 @@ index 00000000..77013a41
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/resource.h b/sysdeps/cryptix/include/abi-bits/resource.h
 new file mode 120000
-index 00000000..88d74025
+index 0000000..88d7402
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/resource.h
 @@ -0,0 +1 @@
@@ -711,7 +756,7 @@ index 00000000..88d74025
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/riscv-hwprobe.h b/sysdeps/cryptix/include/abi-bits/riscv-hwprobe.h
 new file mode 120000
-index 00000000..e6513250
+index 0000000..e651325
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/riscv-hwprobe.h
 @@ -0,0 +1 @@
@@ -719,31 +764,71 @@ index 00000000..e6513250
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/rlim_t.h b/sysdeps/cryptix/include/abi-bits/rlim_t.h
 new file mode 120000
-index 00000000..e92eb5fb
+index 0000000..e92eb5f
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/rlim_t.h
 @@ -0,0 +1 @@
 +../../../../abis/linux/rlim_t.h
 \ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/route.h b/sysdeps/cryptix/include/abi-bits/route.h
+new file mode 120000
+index 0000000..313ead6
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/route.h
+@@ -0,0 +1 @@
++../../../../abis/linux/route.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/sa_family_t.h b/sysdeps/cryptix/include/abi-bits/sa_family_t.h
+new file mode 120000
+index 0000000..a75e229
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/sa_family_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/sa_family_t.h
+\ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/sched_param.h b/sysdeps/cryptix/include/abi-bits/sched_param.h
+new file mode 120000
+index 0000000..fa4eb2c
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/sched_param.h
+@@ -0,0 +1 @@
++../../../../abis/linux/sched_param.h
+\ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/seek-whence.h b/sysdeps/cryptix/include/abi-bits/seek-whence.h
 new file mode 120000
-index 00000000..df7bccf0
+index 0000000..df7bccf
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/seek-whence.h
 @@ -0,0 +1 @@
 +../../../../abis/linux/seek-whence.h
 \ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/sem.h b/sysdeps/cryptix/include/abi-bits/sem.h
+new file mode 120000
+index 0000000..699d7af
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/sem.h
+@@ -0,0 +1 @@
++../../../../abis/linux/sem.h
+\ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/shm.h b/sysdeps/cryptix/include/abi-bits/shm.h
 new file mode 120000
-index 00000000..067d8c4f
+index 0000000..067d8c4
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/shm.h
 @@ -0,0 +1 @@
 +../../../../abis/linux/shm.h
 \ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/sig-limits.h b/sysdeps/cryptix/include/abi-bits/sig-limits.h
+new file mode 120000
+index 0000000..f829738
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/sig-limits.h
+@@ -0,0 +1 @@
++../../../../abis/linux/sig-limits.h
+\ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/sigevent.h b/sysdeps/cryptix/include/abi-bits/sigevent.h
 new file mode 120000
-index 00000000..83d069b5
+index 0000000..83d069b
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/sigevent.h
 @@ -0,0 +1 @@
@@ -751,23 +836,39 @@ index 00000000..83d069b5
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/signal.h b/sysdeps/cryptix/include/abi-bits/signal.h
 new file mode 120000
-index 00000000..4dcb0b7c
+index 0000000..4dcb0b7
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/signal.h
 @@ -0,0 +1 @@
 +../../../../abis/linux/signal.h
 \ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/sigset_t.h b/sysdeps/cryptix/include/abi-bits/sigset_t.h
+new file mode 120000
+index 0000000..8b8e81e
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/sigset_t.h
+@@ -0,0 +1 @@
++../../../../abis/linux/sigset_t.h
+\ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/sigval.h b/sysdeps/cryptix/include/abi-bits/sigval.h
 new file mode 120000
-index 00000000..ccd43a55
+index 0000000..ccd43a5
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/sigval.h
 @@ -0,0 +1 @@
 +../../../../abis/linux/sigval.h
 \ No newline at end of file
+diff --git a/sysdeps/cryptix/include/abi-bits/sockaddr_storage.h b/sysdeps/cryptix/include/abi-bits/sockaddr_storage.h
+new file mode 120000
+index 0000000..b374865
+--- /dev/null
++++ b/sysdeps/cryptix/include/abi-bits/sockaddr_storage.h
+@@ -0,0 +1 @@
++../../../../abis/linux/sockaddr_storage.h
+\ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/socket.h b/sysdeps/cryptix/include/abi-bits/socket.h
 new file mode 120000
-index 00000000..f1dc016e
+index 0000000..f1dc016
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/socket.h
 @@ -0,0 +1 @@
@@ -775,7 +876,7 @@ index 00000000..f1dc016e
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/socklen_t.h b/sysdeps/cryptix/include/abi-bits/socklen_t.h
 new file mode 120000
-index 00000000..41f3b11f
+index 0000000..41f3b11
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/socklen_t.h
 @@ -0,0 +1 @@
@@ -783,7 +884,7 @@ index 00000000..41f3b11f
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/stat.h b/sysdeps/cryptix/include/abi-bits/stat.h
 new file mode 120000
-index 00000000..1f63b41f
+index 0000000..1f63b41
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/stat.h
 @@ -0,0 +1 @@
@@ -791,7 +892,7 @@ index 00000000..1f63b41f
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/statfs.h b/sysdeps/cryptix/include/abi-bits/statfs.h
 new file mode 120000
-index 00000000..e3d202f5
+index 0000000..e3d202f
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/statfs.h
 @@ -0,0 +1 @@
@@ -799,7 +900,7 @@ index 00000000..e3d202f5
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/statvfs.h b/sysdeps/cryptix/include/abi-bits/statvfs.h
 new file mode 120000
-index 00000000..1fc80c2a
+index 0000000..1fc80c2
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/statvfs.h
 @@ -0,0 +1 @@
@@ -807,7 +908,7 @@ index 00000000..1fc80c2a
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/statx.h b/sysdeps/cryptix/include/abi-bits/statx.h
 new file mode 120000
-index 00000000..8702a1d0
+index 0000000..8702a1d
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/statx.h
 @@ -0,0 +1 @@
@@ -815,7 +916,7 @@ index 00000000..8702a1d0
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/suseconds_t.h b/sysdeps/cryptix/include/abi-bits/suseconds_t.h
 new file mode 120000
-index 00000000..9ed65977
+index 0000000..9ed6597
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/suseconds_t.h
 @@ -0,0 +1 @@
@@ -823,7 +924,7 @@ index 00000000..9ed65977
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/termios.h b/sysdeps/cryptix/include/abi-bits/termios.h
 new file mode 120000
-index 00000000..ee8f0b09
+index 0000000..ee8f0b0
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/termios.h
 @@ -0,0 +1 @@
@@ -831,7 +932,7 @@ index 00000000..ee8f0b09
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/time.h b/sysdeps/cryptix/include/abi-bits/time.h
 new file mode 120000
-index 00000000..2a026257
+index 0000000..2a02625
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/time.h
 @@ -0,0 +1 @@
@@ -839,7 +940,7 @@ index 00000000..2a026257
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/uid_t.h b/sysdeps/cryptix/include/abi-bits/uid_t.h
 new file mode 120000
-index 00000000..b3067778
+index 0000000..b306777
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/uid_t.h
 @@ -0,0 +1 @@
@@ -847,7 +948,7 @@ index 00000000..b3067778
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/utmp-defines.h b/sysdeps/cryptix/include/abi-bits/utmp-defines.h
 new file mode 120000
-index 00000000..86176435
+index 0000000..8617643
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/utmp-defines.h
 @@ -0,0 +1 @@
@@ -855,7 +956,7 @@ index 00000000..86176435
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/utmpx.h b/sysdeps/cryptix/include/abi-bits/utmpx.h
 new file mode 120000
-index 00000000..c6a26774
+index 0000000..c6a2677
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/utmpx.h
 @@ -0,0 +1 @@
@@ -863,7 +964,7 @@ index 00000000..c6a26774
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/utsname.h b/sysdeps/cryptix/include/abi-bits/utsname.h
 new file mode 120000
-index 00000000..b2857547
+index 0000000..b285754
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/utsname.h
 @@ -0,0 +1 @@
@@ -871,7 +972,7 @@ index 00000000..b2857547
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/vm-flags.h b/sysdeps/cryptix/include/abi-bits/vm-flags.h
 new file mode 120000
-index 00000000..bbe258cf
+index 0000000..bbe258c
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/vm-flags.h
 @@ -0,0 +1 @@
@@ -879,7 +980,7 @@ index 00000000..bbe258cf
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/vt.h b/sysdeps/cryptix/include/abi-bits/vt.h
 new file mode 120000
-index 00000000..5798a4ac
+index 0000000..5798a4a
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/vt.h
 @@ -0,0 +1 @@
@@ -887,7 +988,7 @@ index 00000000..5798a4ac
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/wait.h b/sysdeps/cryptix/include/abi-bits/wait.h
 new file mode 120000
-index 00000000..feb2840c
+index 0000000..feb2840
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/wait.h
 @@ -0,0 +1 @@
@@ -895,7 +996,7 @@ index 00000000..feb2840c
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/abi-bits/xattr.h b/sysdeps/cryptix/include/abi-bits/xattr.h
 new file mode 120000
-index 00000000..66412d70
+index 0000000..66412d7
 --- /dev/null
 +++ b/sysdeps/cryptix/include/abi-bits/xattr.h
 @@ -0,0 +1 @@
@@ -903,7 +1004,7 @@ index 00000000..66412d70
 \ No newline at end of file
 diff --git a/sysdeps/cryptix/include/cryptix/syscall.h b/sysdeps/cryptix/include/cryptix/syscall.h
 new file mode 100644
-index 00000000..e0aad435
+index 0000000..e0aad43
 --- /dev/null
 +++ b/sysdeps/cryptix/include/cryptix/syscall.h
 @@ -0,0 +1,308 @@
@@ -1217,33 +1318,36 @@ index 00000000..e0aad435
 +}
 diff --git a/sysdeps/cryptix/include/meson.build b/sysdeps/cryptix/include/meson.build
 new file mode 100644
-index 00000000..702cd6e7
+index 0000000..170d6c9
 --- /dev/null
 +++ b/sysdeps/cryptix/include/meson.build
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,70 @@
 +if not no_headers
 +  install_headers(
 +    'abi-bits/access.h',
++    'abi-bits/aio.h',
 +    'abi-bits/auxv.h',
 +    'abi-bits/blkcnt_t.h',
 +    'abi-bits/blksize_t.h',
 +    'abi-bits/clockid_t.h',
++    'abi-bits/clone-flags.h',
 +    'abi-bits/dev_t.h',
 +    'abi-bits/epoll.h',
 +    'abi-bits/errno.h',
 +    'abi-bits/fcntl.h',
++    'abi-bits/fd_set.h',
 +    'abi-bits/fsblkcnt_t.h',
 +    'abi-bits/fsfilcnt_t.h',
 +    'abi-bits/gid_t.h',
 +    'abi-bits/in.h',
-+    'abi-bits/inotify.h',
 +    'abi-bits/ino_t.h',
++    'abi-bits/inotify.h',
 +    'abi-bits/ioctls.h',
 +    'abi-bits/ipc.h',
 +    'abi-bits/limits.h',
 +    'abi-bits/mode_t.h',
-+    'abi-bits/msg.h',
 +    'abi-bits/mqueue.h',
++    'abi-bits/msg.h',
 +    'abi-bits/nlink_t.h',
 +    'abi-bits/packet.h',
 +    'abi-bits/pid_t.h',
@@ -1251,14 +1355,21 @@ index 00000000..702cd6e7
 +    'abi-bits/ptrace.h',
 +    'abi-bits/random.h',
 +    'abi-bits/reboot.h',
-+    'abi-bits/riscv-hwprobe.h',
 +    'abi-bits/resource.h',
++    'abi-bits/riscv-hwprobe.h',
 +    'abi-bits/rlim_t.h',
++    'abi-bits/route.h',
++    'abi-bits/sa_family_t.h',
++    'abi-bits/sched_param.h',
 +    'abi-bits/seek-whence.h',
++    'abi-bits/sem.h',
 +    'abi-bits/shm.h',
++    'abi-bits/sig-limits.h',
 +    'abi-bits/sigevent.h',
 +    'abi-bits/signal.h',
++    'abi-bits/sigset_t.h',
 +    'abi-bits/sigval.h',
++    'abi-bits/sockaddr_storage.h',
 +    'abi-bits/socket.h',
 +    'abi-bits/socklen_t.h',
 +    'abi-bits/stat.h',
@@ -1269,8 +1380,8 @@ index 00000000..702cd6e7
 +    'abi-bits/termios.h',
 +    'abi-bits/time.h',
 +    'abi-bits/uid_t.h',
-+    'abi-bits/utmpx.h',
 +    'abi-bits/utmp-defines.h',
++    'abi-bits/utmpx.h',
 +    'abi-bits/utsname.h',
 +    'abi-bits/vm-flags.h',
 +    'abi-bits/vt.h',
@@ -1281,9 +1392,142 @@ index 00000000..702cd6e7
 +  )
 +  install_headers('cryptix/syscall.h', subdir: 'cryptix')
 +endif
+diff --git a/sysdeps/cryptix/include/mlibc/sysdeps.hpp b/sysdeps/cryptix/include/mlibc/sysdeps.hpp
+new file mode 100644
+index 0000000..ae2f7f4
+--- /dev/null
++++ b/sysdeps/cryptix/include/mlibc/sysdeps.hpp
+@@ -0,0 +1,127 @@
++#pragma once
++
++#include <mlibc/sysdep-signatures.hpp>
++
++namespace mlibc {
++
++struct CryptixSysdepTags :
++	Access,
++	AnonAllocate,
++	AnonFree,
++	Bind,
++	Chdir,
++	Chmod,
++	ClockGet,
++	Clone,
++	Close,
++	Dup,
++	Dup2,
++	Execve,
++	Exit,
++	Fchdir,
++	Fchmod,
++	Fchmodat,
++	Fcntl,
++	Fork,
++	FutexTid,
++	FutexWait,
++	FutexWake,
++	GetCwd,
++	GetEgid,
++	GetEuid,
++	GetGid,
++	GetHostname,
++	GetItimer,
++	GetPgid,
++	GetPid,
++	GetPpid,
++	GetResgid,
++	GetResuid,
++	GetRlimit,
++	GetRusage,
++	GetSid,
++	GetTid,
++	GetUid,
++	InitModule,
++	Ioctl,
++	Isatty,
++	Kill,
++	LibcLog,
++	LibcPanic,
++	Link,
++	Linkat,
++	Mkdir,
++	Mkdirat,
++	Mknodat,
++	Mount,
++	Open,
++	OpenDir,
++	Openat,
++	Pipe,
++	Prctl,
++	Pread,
++	PrepareStack,
++	Pselect,
++	Pwrite,
++	Read,
++	ReadEntries,
++	Readlink,
++	Readlinkat,
++	Reboot,
++	Rename,
++	Renameat,
++	Rmdir,
++	Seek,
++	SetGid,
++	SetItimer,
++	SetPgid,
++	SetRegid,
++	SetResgid,
++	SetResuid,
++	SetReuid,
++	SetSid,
++	SetUid,
++	Sigaction,
++	Sigaltstack,
++	Sigpending,
++	Sigprocmask,
++	Sigsuspend,
++	Sigtimedwait,
++	Sleep,
++	Socket,
++	Stat,
++	Statfs,
++	Symlink,
++	Symlinkat,
++	Sync,
++	Syncfs,
++	Sysconf,
++	Sysinfo,
++	TcbSet,
++	Tcdrain,
++	Tcflow,
++	Tcflush,
++	Tcgetattr,
++	Tcsetattr,
++	ThreadExit,
++	Ttyname,
++	Umask,
++	Uname,
++	Unlinkat,
++	Unlockpt,
++	Utimensat,
++	VmMap,
++	VmProtect,
++	VmUnmap,
++	Waitpid,
++	Write
++{};
++
++template<typename Tag>
++using Sysdeps = SysdepOf<CryptixSysdepTags, Tag>;
++
++struct SysdepTraits {
++	static constexpr bool usesRtNetlink = false;
++};
++
++} // namespace mlibc
 diff --git a/sysdeps/cryptix/meson.build b/sysdeps/cryptix/meson.build
 new file mode 100644
-index 00000000..4213312c
+index 0000000..4213312
 --- /dev/null
 +++ b/sysdeps/cryptix/meson.build
 @@ -0,0 +1,11 @@
@@ -1300,21 +1544,21 @@ index 00000000..4213312c
 +subdir('sysdeps')
 diff --git a/sysdeps/cryptix/sysdeps/internal.cpp b/sysdeps/cryptix/sysdeps/internal.cpp
 new file mode 100644
-index 00000000..0798375f
+index 0000000..95b1fa2
 --- /dev/null
 +++ b/sysdeps/cryptix/sysdeps/internal.cpp
 @@ -0,0 +1,16 @@
++#include <mlibc/all-sysdeps.hpp>
 +#include <cryptix/syscall.h>
 +
 +#include <execinfo.h>
 +#include <mlibc/debug.hpp>
-+#include <mlibc/posix-sysdeps.hpp>
 +
 +#include <sys/mman.h>
 +
 +namespace mlibc {
-+void sys_libc_log(const char *message) { Syscall(SYS_DEBUG_LOG, message); }
-+[[noreturn]] void sys_libc_panic() {
++void Sysdeps<LibcLog>::operator()(const char *message) { Syscall(SYS_DEBUG_LOG, message); }
++void Sysdeps<LibcPanic>::operator()() {
 +	Syscall(SYS_PANIC, "mlibc crashed");
 +
 +	__builtin_unreachable();
@@ -1322,10 +1566,11 @@ index 00000000..0798375f
 +} // namespace mlibc
 diff --git a/sysdeps/cryptix/sysdeps/memory.cpp b/sysdeps/cryptix/sysdeps/memory.cpp
 new file mode 100644
-index 00000000..5fc4c238
+index 0000000..d80d5ac
 --- /dev/null
 +++ b/sysdeps/cryptix/sysdeps/memory.cpp
 @@ -0,0 +1,51 @@
++#include <mlibc/all-sysdeps.hpp>
 +#include <cstddef>
 +#include <stdio.h>
 +#include <stdlib.h>
@@ -1334,27 +1579,26 @@ index 00000000..5fc4c238
 +
 +#include <execinfo.h>
 +#include <mlibc/debug.hpp>
-+#include <mlibc/posix-sysdeps.hpp>
 +
 +#include <sys/mman.h>
 +
 +namespace mlibc {
-+int sys_anon_allocate(size_t size, void **pointer) {
-+	auto ret = sys_vm_map(nullptr, size, PROT_READ | PROT_WRITE, 0x20, -1, 0, pointer);
++int Sysdeps<AnonAllocate>::operator()(size_t size, void **pointer) {
++	auto ret = sysdep<VmMap>(nullptr, size, PROT_READ | PROT_WRITE, 0x20, -1, 0, pointer);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_anon_free(void *pointer, size_t size) {
-+	auto ret = sys_vm_unmap(pointer, size);
++int Sysdeps<AnonFree>::operator()(void *pointer, size_t size) {
++	auto ret = sysdep<VmUnmap>(pointer, size);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
 +
-+int sys_vm_map(void *hint, size_t size, int prot, int flags, int fd, off_t offset, void **window) {
++int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags, int fd, off_t offset, void **window) {
 +	auto ret = Syscall(SYS_MMAP, hint, size, prot, flags, fd, offset);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1362,14 +1606,14 @@ index 00000000..5fc4c238
 +	*window = reinterpret_cast<void *>(ret);
 +	return 0;
 +}
-+int sys_vm_unmap(void *pointer, size_t size) {
++int Sysdeps<VmUnmap>::operator()(void *pointer, size_t size) {
 +	auto ret = Syscall(SYS_MUNMAP, pointer, size);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_vm_protect(void *pointer, size_t size, int prot) {
++int Sysdeps<VmProtect>::operator()(void *pointer, size_t size, int prot) {
 +	auto ret = Syscall(SYS_MPROTECT, pointer, size, prot);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1379,7 +1623,7 @@ index 00000000..5fc4c238
 +} // namespace mlibc
 diff --git a/sysdeps/cryptix/sysdeps/meson.build b/sysdeps/cryptix/sysdeps/meson.build
 new file mode 100644
-index 00000000..8ec939b9
+index 0000000..8ec939b
 --- /dev/null
 +++ b/sysdeps/cryptix/sysdeps/meson.build
 @@ -0,0 +1,12 @@
@@ -1397,15 +1641,16 @@ index 00000000..8ec939b9
 +libc_sources += common_sources
 diff --git a/sysdeps/cryptix/sysdeps/process.cpp b/sysdeps/cryptix/sysdeps/process.cpp
 new file mode 100644
-index 00000000..b722eeef
+index 0000000..9e0763e
 --- /dev/null
 +++ b/sysdeps/cryptix/sysdeps/process.cpp
-@@ -0,0 +1,244 @@
+@@ -0,0 +1,246 @@
++#include <mlibc/all-sysdeps.hpp>
 +#include <mlibc/debug.hpp>
-+#include <mlibc/posix-sysdeps.hpp>
 +#include <mlibc/tcb.hpp>
 +
 +#include <algorithm>
++#include <limits.h>
 +#include <cryptix/syscall.h>
 +
 +#ifndef MLIBC_BUILDING_RTLD
@@ -1419,13 +1664,13 @@ index 00000000..b722eeef
 +extern "C" void __mlibc_enter_thread(void *entry, void *user_arg);
 +
 +namespace mlibc {
-+pid_t sys_getpid() { return Syscall(SYS_GETPID); }
-+void sys_exit(int code) {
++pid_t Sysdeps<GetPid>::operator()() { return Syscall(SYS_GETPID); }
++void Sysdeps<Exit>::operator()(int code) {
 +	Syscall(SYS_EXIT, code);
 +
 +	__builtin_unreachable();
 +}
-+int sys_waitpid(pid_t pid, int *status, int flags, struct rusage *ru, pid_t *ret_pid) {
++int Sysdeps<Waitpid>::operator()(pid_t pid, int *status, int flags, struct rusage *ru, pid_t *ret_pid) {
 +	auto ret = Syscall(SYS_WAIT4, pid, status, flags, ru);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1433,7 +1678,7 @@ index 00000000..b722eeef
 +	*ret_pid = static_cast<pid_t>(ret);
 +	return 0;
 +}
-+int sys_kill(int pid, int sig) {
++int Sysdeps<Kill>::operator()(int pid, int sig) {
 +	auto ret = Syscall(SYS_KILL, pid, sig);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1441,63 +1686,63 @@ index 00000000..b722eeef
 +	return 0;
 +}
 +
-+uid_t sys_getuid() {
++uid_t Sysdeps<GetUid>::operator()() {
 +	auto ret = Syscall(SYS_GETUID);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return static_cast<pid_t>(ret);
 +}
-+gid_t sys_getgid() {
++gid_t Sysdeps<GetGid>::operator()() {
 +	auto ret = Syscall(SYS_GETGID);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return static_cast<pid_t>(ret);
 +}
-+int sys_setuid(uid_t uid) {
++int Sysdeps<SetUid>::operator()(uid_t uid) {
 +	auto ret = Syscall(SYS_SETUID, uid);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_setgid(gid_t gid) {
++int Sysdeps<SetGid>::operator()(gid_t gid) {
 +	auto ret = Syscall(SYS_SETGID, gid);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+uid_t sys_geteuid() {
++uid_t Sysdeps<GetEuid>::operator()() {
 +	auto ret = Syscall(SYS_GETEUID);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return ret;
 +}
-+gid_t sys_getegid() {
++gid_t Sysdeps<GetEgid>::operator()() {
 +	auto ret = Syscall(SYS_GETEGID);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return ret;
 +}
-+int sys_setpgid(pid_t pid, pid_t pgid) {
++int Sysdeps<SetPgid>::operator()(pid_t pid, pid_t pgid) {
 +	auto ret = Syscall(SYS_SETPGID, pid, pgid);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+pid_t sys_getppid() {
++pid_t Sysdeps<GetPpid>::operator()() {
 +	auto ret = Syscall(SYS_GETPPID);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return static_cast<pid_t>(ret);
 +}
-+pid_t sys_setsid(pid_t *out) {
++pid_t Sysdeps<SetSid>::operator()(pid_t *out) {
 +	auto ret = Syscall(SYS_SETSID);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1505,47 +1750,47 @@ index 00000000..b722eeef
 +	*out = static_cast<pid_t>(ret);
 +	return 0;
 +}
-+int sys_setreuid(uid_t ruid, uid_t euid) {
++int Sysdeps<SetReuid>::operator()(uid_t ruid, uid_t euid) {
 +	auto ret = Syscall(SYS_SETREUID, ruid, euid);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_setregid(gid_t rgid, gid_t egid) {
++int Sysdeps<SetRegid>::operator()(gid_t rgid, gid_t egid) {
 +	auto ret = Syscall(SYS_SETREGID, rgid, egid);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_setresuid(uid_t ruid, uid_t euid, uid_t suid) {
++int Sysdeps<SetResuid>::operator()(uid_t ruid, uid_t euid, uid_t suid) {
 +	auto ret = Syscall(SYS_SETRESUID, ruid, euid, suid);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_getresuid(uid_t *ruid, uid_t *euid, uid_t *suid) {
++int Sysdeps<GetResuid>::operator()(uid_t *ruid, uid_t *euid, uid_t *suid) {
 +	auto ret = Syscall(SYS_GETRESUID, ruid, euid, suid);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +	return 0;
 +}
-+int sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid) {
++int Sysdeps<SetResgid>::operator()(gid_t rgid, gid_t egid, gid_t sgid) {
 +	auto ret = Syscall(SYS_SETRESGID, rgid, egid, sgid);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid) {
++int Sysdeps<GetResgid>::operator()(gid_t *rgid, gid_t *egid, gid_t *sgid) {
 +	auto ret = Syscall(SYS_GETRESGID, rgid, egid, sgid);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +	return 0;
 +}
-+pid_t sys_getpgid(pid_t pid, pid_t *out) {
++pid_t Sysdeps<GetPgid>::operator()(pid_t pid, pid_t *out) {
 +	auto ret = Syscall(SYS_GETPGID, pid);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1553,7 +1798,7 @@ index 00000000..b722eeef
 +	*out = ret;
 +	return 0;
 +}
-+pid_t sys_getsid(pid_t pid, pid_t *out) {
++pid_t Sysdeps<GetSid>::operator()(pid_t pid, pid_t *out) {
 +	auto ret = Syscall(SYS_GETSID, pid);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1563,7 +1808,7 @@ index 00000000..b722eeef
 +}
 +
 +#ifndef MLIBC_BUILDING_RTLD
-+int sys_clone(void *tcb, pid_t *pid_out, void *stack) {
++int Sysdeps<Clone>::operator()(void *tcb, pid_t *pid_out, void *stack) {
 +	unsigned long flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD
 +	                      | CLONE_SYSVSEM | CLONE_SETTLS | CLONE_PARENT_SETTID;
 +
@@ -1574,7 +1819,7 @@ index 00000000..b722eeef
 +	return 0;
 +}
 +#endif
-+int sys_fork(pid_t *child) {
++int Sysdeps<Fork>::operator()(pid_t *child) {
 +	auto ret = Syscall(SYS_FORK);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1582,11 +1827,11 @@ index 00000000..b722eeef
 +	*child = static_cast<pid_t>(ret);
 +	return 0;
 +}
-+int sys_execve(const char *path, char *const argv[], char *const envp[]) {
++int Sysdeps<Execve>::operator()(const char *path, char *const argv[], char *const envp[]) {
 +	return Syscall(SYS_EXECVE, path, argv, envp);
 +}
 +
-+int sys_prctl(int op, va_list va, int *out) {
++int Sysdeps<Prctl>::operator()(int op, va_list va, int *out) {
 +	unsigned long x[4];
 +	for (int i = 0; i < 4; i++)
 +		x[i] = va_arg(va, unsigned long);
@@ -1597,39 +1842,40 @@ index 00000000..b722eeef
 +	*out = ret;
 +	return 0;
 +}
-+int sys_tcb_set(void *pointer) {
++int Sysdeps<TcbSet>::operator()(void *pointer) {
 +	auto ret = Syscall(SYS_ARCH_PRCTL, 0x1002, pointer);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return ret;
 +}
-+int sys_gettid() {
++int Sysdeps<GetTid>::operator()() {
 +	auto ret = Syscall(SYS_GETTID);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_futex_tid() { return sys_gettid(); }
-+int sys_futex_wait(int *pointer, int expected, const struct timespec *time) {
++int Sysdeps<FutexTid>::operator()() { return sysdep<GetTid>(); }
++int Sysdeps<FutexWait>::operator()(int *pointer, int expected, const struct timespec *time) {
 +	auto ret = Syscall(SYS_FUTEX_WAIT, pointer, expected, time);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_futex_wake(int *pointer) {
-+	auto ret = Syscall(SYS_FUTEX_WAKE, pointer);
++int Sysdeps<FutexWake>::operator()(int *pointer, bool all) {
++	// futex_wake(uaddr, mask, nr_wake, flags)
++	auto ret = Syscall(SYS_FUTEX_WAKE, pointer, ~0ul, all ? INT_MAX : 1, 0);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
 +
-+int sys_gethostname(char *buffer, size_t bufsize) {
++int Sysdeps<GetHostname>::operator()(char *buffer, size_t bufsize) {
 +	utsname data{};
-+	auto e = sys_uname(&data);
++	auto e = sysdep<Uname>(&data);
 +	if (e)
 +		return e;
 +
@@ -1639,25 +1885,25 @@ index 00000000..b722eeef
 +}
 +
 +#ifndef MLIBC_BUILDING_RTLD
-+[[noreturn]] void sys_thread_exit() {
-+	sys_exit(0);
++void Sysdeps<ThreadExit>::operator()() {
++	sysdep<Exit>(0);
 +	__builtin_trap();
 +}
 +#endif
 +}; // namespace mlibc
 diff --git a/sysdeps/cryptix/sysdeps/signal.cpp b/sysdeps/cryptix/sysdeps/signal.cpp
 new file mode 100644
-index 00000000..98f6ec9e
+index 0000000..499c119
 --- /dev/null
 +++ b/sysdeps/cryptix/sysdeps/signal.cpp
 @@ -0,0 +1,60 @@
++#include <mlibc/all-sysdeps.hpp>
 +#include <mlibc/debug.hpp>
-+#include <mlibc/posix-sysdeps.hpp>
 +
 +#include <cryptix/syscall.h>
 +
 +namespace mlibc {
-+int sys_sigaction(
++int Sysdeps<Sigaction>::operator()(
 +    int signum, const struct sigaction *__restrict act, struct sigaction *__restrict oldact
 +) {
 +	auto ret = Syscall(SYS_SIGACTION, signum, act, oldact);
@@ -1666,7 +1912,7 @@ index 00000000..98f6ec9e
 +
 +	return 0;
 +}
-+int sys_sigprocmask(int how, const sigset_t *set, sigset_t *retrieve) {
++int Sysdeps<Sigprocmask>::operator()(int how, const sigset_t *set, sigset_t *retrieve) {
 +	auto ret = Syscall(SYS_SIGPROCMASK, how, set, retrieve, NSIG / 8);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1678,7 +1924,7 @@ index 00000000..98f6ec9e
 +	__builtin_unreachable();
 +}
 +
-+int sys_sigpending(sigset_t *set) {
++int Sysdeps<Sigpending>::operator()(sigset_t *set) {
 +	auto ret = Syscall(SYS_SIGPENDING, set);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1686,7 +1932,7 @@ index 00000000..98f6ec9e
 +	return 0;
 +}
 +
-+int sys_sigtimedwait(
++int Sysdeps<Sigtimedwait>::operator()(
 +    const sigset_t *set, siginfo_t *info, const struct timespec *timeout, int *out_signal
 +) {
 +	auto ret = Syscall(SYS_SIGTIMEDWAIT, set, info, timeout);
@@ -1696,14 +1942,14 @@ index 00000000..98f6ec9e
 +	*out_signal = ret;
 +	return 0;
 +}
-+int sys_sigsupend(const sigset_t *set) {
++int Sysdeps<Sigsuspend>::operator()(const sigset_t *set) {
 +	auto ret = Syscall(SYS_SIGSUSPEND, set);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_sigaltstack(const stack_t *ss, stack_t *oss) {
++int Sysdeps<Sigaltstack>::operator()(const stack_t *ss, stack_t *oss) {
 +	auto ret = Syscall(SYS_SIGALTSTACK, ss, oss);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1713,12 +1959,12 @@ index 00000000..98f6ec9e
 +}; // namespace mlibc
 diff --git a/sysdeps/cryptix/sysdeps/system.cpp b/sysdeps/cryptix/sysdeps/system.cpp
 new file mode 100644
-index 00000000..377ba53e
+index 0000000..47527c0
 --- /dev/null
 +++ b/sysdeps/cryptix/sysdeps/system.cpp
-@@ -0,0 +1,91 @@
+@@ -0,0 +1,97 @@
++#include <mlibc/all-sysdeps.hpp>
 +#include <mlibc/debug.hpp>
-+#include <mlibc/posix-sysdeps.hpp>
 +
 +#include <cryptix/syscall.h>
 +
@@ -1729,34 +1975,34 @@ index 00000000..377ba53e
 +
 +namespace mlibc {
 +inline static constexpr size_t PAGE_SIZE = 0x1000;
-+int sys_getrlimit(int resource, struct rlimit *rlim) {
++int Sysdeps<GetRlimit>::operator()(int resource, struct rlimit *rlim) {
 +	auto ret = Syscall(SYS_GETRLIMIT, resource, rlim);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_getrusage(int who, struct rusage *usage) {
++int Sysdeps<GetRusage>::operator()(int who, struct rusage *usage) {
 +	auto ret = Syscall(SYS_GETRUSAGE, who, usage);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_sysinfo(struct sysinfo *info) {
++int Sysdeps<Sysinfo>::operator()(struct sysinfo *info) {
 +	auto ret = Syscall(SYS_SYSINFO, info);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +	return 0;
 +}
-+int sys_reboot(int what) {
++int Sysdeps<Reboot>::operator()(int what) {
 +	auto ret = Syscall(SYS_REBOOT, what);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_init_module(void *module, unsigned long length, const char *args) {
++int Sysdeps<InitModule>::operator()(void *module, unsigned long length, const char *args) {
 +	auto ret = Syscall(SYS_INIT_MODULE, module, length, args);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1765,26 +2011,32 @@ index 00000000..377ba53e
 +}
 +
 +#ifndef MLIBC_BUILDING_RTLD
-+int sys_sysconf(int num, long *ret) {
++int Sysdeps<Sysconf>::operator()(int num, long *ret) {
 +	switch (num) {
 +		case _SC_OPEN_MAX: {
 +			struct rlimit ru;
-+			if (int e = sys_getrlimit(RLIMIT_NOFILE, &ru); e)
++			if (int e = sysdep<GetRlimit>(RLIMIT_NOFILE, &ru); e)
 +				return e;
 +			*ret = (ru.rlim_cur == RLIM_INFINITY) ? -1 : ru.rlim_cur;
 +			break;
 +		}
 +		case _SC_NPROCESSORS_ONLN: {
-+			cpu_set_t set;
-+			CPU_ZERO(&set);
-+			if (int e = sys_getaffinity(0, sizeof(set), &set); e)
-+				return e;
-+			*ret = CPU_COUNT(&set);
-+			break;
++			// GetAffinity is not implemented by cryptix (yet); EINVAL makes
++			// the generic sysconf() fall back to its default value.
++			if constexpr (IsImplemented<GetAffinity>) {
++				cpu_set_t set;
++				CPU_ZERO(&set);
++				if (int e = sysdep<GetAffinity>(0, sizeof(set), &set); e)
++					return e;
++				*ret = CPU_COUNT(&set);
++				break;
++			} else {
++				return EINVAL;
++			}
 +		}
 +		case _SC_PHYS_PAGES: {
 +			struct sysinfo info;
-+			if (int e = sys_sysinfo(&info); e)
++			if (int e = sysdep<Sysinfo>(&info); e)
 +				return e;
 +			unsigned unit = (info.mem_unit) ? info.mem_unit : 1;
 +			*ret = std::min(long((info.totalram * unit) / PAGE_SIZE), LONG_MAX);
@@ -1792,7 +2044,7 @@ index 00000000..377ba53e
 +		}
 +		case _SC_CHILD_MAX: {
 +			struct rlimit ru;
-+			if (int e = sys_getrlimit(RLIMIT_NPROC, &ru); e)
++			if (int e = sysdep<GetRlimit>(RLIMIT_NPROC, &ru); e)
 +				return e;
 +			*ret = (ru.rlim_cur == RLIM_INFINITY) ? -1 : ru.rlim_cur;
 +			break;
@@ -1810,19 +2062,19 @@ index 00000000..377ba53e
 +}; // namespace mlibc
 diff --git a/sysdeps/cryptix/sysdeps/time.cpp b/sysdeps/cryptix/sysdeps/time.cpp
 new file mode 100644
-index 00000000..ef070943
+index 0000000..10dbac7
 --- /dev/null
 +++ b/sysdeps/cryptix/sysdeps/time.cpp
 @@ -0,0 +1,41 @@
++#include <mlibc/all-sysdeps.hpp>
 +#include <cryptix/syscall.h>
 +
 +#include <execinfo.h>
-+#include <mlibc/posix-sysdeps.hpp>
 +
 +#include <sys/mman.h>
 +
 +namespace mlibc {
-+int sys_sleep(time_t *secs, long *nanos) {
++int Sysdeps<Sleep>::operator()(time_t *secs, long *nanos) {
 +	timespec duration = {.tv_sec = *secs, .tv_nsec = nanos ? *nanos : 0};
 +	timespec remaining;
 +	auto ret = Syscall(SYS_NANOSLEEP, &duration, &remaining);
@@ -1832,19 +2084,19 @@ index 00000000..ef070943
 +
 +	return 0;
 +}
-+int sys_getitimer(int which, struct itimerval *curr_value) {
++int Sysdeps<GetItimer>::operator()(int which, struct itimerval *curr_value) {
 +	auto ret = Syscall(SYS_GETITIMER, which, curr_value);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +	return 0;
 +}
-+int sys_setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value) {
++int Sysdeps<SetItimer>::operator()(int which, const struct itimerval *new_value, struct itimerval *old_value) {
 +	auto ret = Syscall(SYS_SETITIMER, which, new_value, old_value);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +	return 0;
 +}
-+int sys_clock_get(int clockid, time_t *secs, long *nanos) {
++int Sysdeps<ClockGet>::operator()(int clockid, time_t *secs, long *nanos) {
 +	timespec ts;
 +	auto ret = Syscall(SYS_CLOCK_GETTIME, clockid, &ts);
 +	if (auto e = syscall_error(ret); e)
@@ -1857,10 +2109,10 @@ index 00000000..ef070943
 +}; // namespace mlibc
 diff --git a/sysdeps/cryptix/sysdeps/vfs.cpp b/sysdeps/cryptix/sysdeps/vfs.cpp
 new file mode 100644
-index 00000000..1ac9b85e
+index 0000000..a2f539a
 --- /dev/null
 +++ b/sysdeps/cryptix/sysdeps/vfs.cpp
-@@ -0,0 +1,488 @@
+@@ -0,0 +1,487 @@
 +#include <bits/ensure.h>
 +#include <dirent.h>
 +#include <fcntl.h>
@@ -1868,7 +2120,6 @@ index 00000000..1ac9b85e
 +#include <mlibc/all-sysdeps.hpp>
 +#include <mlibc/allocator.hpp>
 +#include <mlibc/debug.hpp>
-+#include <mlibc/posix-sysdeps.hpp>
 +#include <stdlib.h>
 +
 +#include <abi-bits/fcntl.h>
@@ -1883,7 +2134,7 @@ index 00000000..1ac9b85e
 +#include <cryptix/syscall.h>
 +
 +namespace mlibc {
-+int sys_read(int fd, void *buffer, size_t count, ssize_t *bytesRead) {
++int Sysdeps<Read>::operator()(int fd, void *buffer, size_t count, ssize_t *bytesRead) {
 +	auto ret = Syscall(SYS_READ, fd, buffer, count);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1891,7 +2142,7 @@ index 00000000..1ac9b85e
 +	*bytesRead = ssize_t(ret);
 +	return 0;
 +}
-+int sys_write(int fd, void const *buffer, unsigned long bytes, long *bytesWritten) {
++int Sysdeps<Write>::operator()(int fd, void const *buffer, unsigned long bytes, long *bytesWritten) {
 +
 +	auto ret = Syscall(SYS_WRITE, fd, buffer, bytes);
 +	if (auto e = syscall_error(ret); e)
@@ -1900,7 +2151,7 @@ index 00000000..1ac9b85e
 +	*bytesWritten = ret;
 +	return 0;
 +}
-+int sys_open(const char *path, int flags, mode_t mode, int *fd) {
++int Sysdeps<Open>::operator()(const char *path, int flags, mode_t mode, int *fd) {
 +	auto ret = Syscall(SYS_OPENAT, AT_FDCWD, path, flags, mode);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1908,7 +2159,7 @@ index 00000000..1ac9b85e
 +	*fd = ret;
 +	return 0;
 +}
-+int sys_close(int fd) {
++int Sysdeps<Close>::operator()(int fd) {
 +	auto ret = Syscall(SYS_CLOSE, fd);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1916,8 +2167,9 @@ index 00000000..1ac9b85e
 +	return 0;
 +}
 +
-+#ifndef MLIBC_BUILDING_RTLD
-+int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags, struct stat *statbuf) {
++// Needed by ld.so as of mlibc 7.0, so it must not be hidden behind
++// MLIBC_BUILDING_RTLD.
++int Sysdeps<Stat>::operator()(fsfd_target fsfdt, int fd, const char *path, int flags, struct stat *statbuf) {
 +	int ret = -1;
 +	switch (fsfdt) {
 +		case fsfd_target::fd:
@@ -1939,8 +2191,7 @@ index 00000000..1ac9b85e
 +
 +	return 0;
 +}
-+#endif
-+int sys_seek(int fd, off_t offset, int whence, off_t *newOffset) {
++int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *newOffset) {
 +	auto ret = Syscall(SYS_LSEEK, fd, offset, whence);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1948,7 +2199,7 @@ index 00000000..1ac9b85e
 +	*newOffset = off_t(ret);
 +	return 0;
 +}
-+int sys_ioctl(int fd, unsigned long request, void *arg, int *result) {
++int Sysdeps<Ioctl>::operator()(int fd, unsigned long request, void *arg, int *result) {
 +	int ret = Syscall(SYS_IOCTL, fd, request, arg);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1956,7 +2207,7 @@ index 00000000..1ac9b85e
 +	*result = ret;
 +	return 0;
 +}
-+int sys_pread(int fd, void *buf, size_t n, off_t off, ssize_t *bytes_read) {
++int Sysdeps<Pread>::operator()(int fd, void *buf, size_t n, off_t off, ssize_t *bytes_read) {
 +	int ret = Syscall(SYS_PREAD64, fd, buf, n, off);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1964,7 +2215,7 @@ index 00000000..1ac9b85e
 +	*bytes_read = ret;
 +	return 0;
 +}
-+int sys_pwrite(int fd, const void *buf, size_t n, off_t off, ssize_t *bytes_written) {
++int Sysdeps<Pwrite>::operator()(int fd, const void *buf, size_t n, off_t off, ssize_t *bytes_written) {
 +	int ret = Syscall(SYS_PWRITE64, fd, buf, n, off);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -1973,21 +2224,21 @@ index 00000000..1ac9b85e
 +	return 0;
 +}
 +
-+int sys_access(const char *path, int mode) {
++int Sysdeps<Access>::operator()(const char *path, int mode) {
 +	int ret = Syscall(SYS_ACCESS, path, mode);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_pipe(int *fds, int flags) {
++int Sysdeps<Pipe>::operator()(int *fds, int flags) {
 +	int ret = Syscall(SYS_PIPE2, fds, flags);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_dup(int fd, int flags, int *newfd) {
++int Sysdeps<Dup>::operator()(int fd, int flags, int *newfd) {
 +	// TODO(v1tr10l7): implement flags;
 +	(void)flags;
 +	auto ret = Syscall(SYS_DUP, fd);
@@ -1997,7 +2248,7 @@ index 00000000..1ac9b85e
 +	*newfd = ret;
 +	return 0;
 +}
-+int sys_dup2(int fd, int flags, int newfd) {
++int Sysdeps<Dup2>::operator()(int fd, int flags, int newfd) {
 +	// TODO(v1tr10l7): implement flags;
 +	(void)flags;
 +	auto ret = Syscall(SYS_DUP2, fd, newfd);
@@ -2006,7 +2257,7 @@ index 00000000..1ac9b85e
 +
 +	return 0;
 +}
-+int sys_socket(int family, int type, int protocol, int *fd) {
++int Sysdeps<Socket>::operator()(int family, int type, int protocol, int *fd) {
 +	auto ret = Syscall(SYS_SOCKET, family, type, protocol);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -2014,7 +2265,7 @@ index 00000000..1ac9b85e
 +	*fd = ret;
 +	return 0;
 +}
-+int sys_bind(int fd, const struct sockaddr *addr_ptr, socklen_t addr_length) {
++int Sysdeps<Bind>::operator()(int fd, const struct sockaddr *addr_ptr, socklen_t addr_length) {
 +	auto ret = Syscall(SYS_BIND, fd, addr_ptr, addr_length);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -2022,14 +2273,14 @@ index 00000000..1ac9b85e
 +	return 0;
 +}
 +
-+int sys_uname(struct utsname *out) {
++int Sysdeps<Uname>::operator()(struct utsname *out) {
 +	auto ret = Syscall(SYS_UNAME, out);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_fcntl(int fd, int request, va_list args, int *result) {
++int Sysdeps<Fcntl>::operator()(int fd, int request, va_list args, int *result) {
 +	auto arg = va_arg(args, unsigned long);
 +	auto ret = Syscall(SYS_FCNTL, fd, request, arg);
 +	if (auto e = syscall_error(ret); e)
@@ -2039,63 +2290,63 @@ index 00000000..1ac9b85e
 +	return 0;
 +}
 +
-+int sys_getcwd(char *buffer, size_t size) {
++int Sysdeps<GetCwd>::operator()(char *buffer, size_t size) {
 +	auto ret = Syscall(SYS_GETCWD, buffer, size);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_chdir(const char *path) {
++int Sysdeps<Chdir>::operator()(const char *path) {
 +	auto ret = Syscall(SYS_CHDIR, path);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_fchdir(int fd) {
++int Sysdeps<Fchdir>::operator()(int fd) {
 +	auto ret = Syscall(SYS_FCHDIR, fd);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_rename(const char *old_path, const char *new_path) {
++int Sysdeps<Rename>::operator()(const char *old_path, const char *new_path) {
 +	auto ret = Syscall(SYS_RENAME, old_path, new_path);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_mkdir(const char *path, mode_t mode) {
++int Sysdeps<Mkdir>::operator()(const char *path, mode_t mode) {
 +	auto ret = Syscall(SYS_MKDIR, path, mode);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_rmdir(const char *path) {
++int Sysdeps<Rmdir>::operator()(const char *path) {
 +	auto ret = Syscall(SYS_RMDIR, path);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_link(const char *old_path, const char *new_path) {
++int Sysdeps<Link>::operator()(const char *old_path, const char *new_path) {
 +	auto ret = Syscall(SYS_LINK, old_path, new_path);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_symlink(const char *target_path, const char *link_path) {
++int Sysdeps<Symlink>::operator()(const char *target_path, const char *link_path) {
 +	auto ret = Syscall(SYS_SYMLINK, target_path, link_path);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_readlink(const char *path, void *buffer, size_t maxSize, ssize_t *length) {
++int Sysdeps<Readlink>::operator()(const char *path, void *buffer, size_t maxSize, ssize_t *length) {
 +	auto ret = Syscall(SYS_READLINK, path, buffer, maxSize);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -2103,21 +2354,21 @@ index 00000000..1ac9b85e
 +	*length = ret;
 +	return 0;
 +}
-+int sys_chmod(const char *pathname, mode_t mode) {
++int Sysdeps<Chmod>::operator()(const char *pathname, mode_t mode) {
 +	auto ret = Syscall(SYS_CHMOD, pathname, mode);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_fchmod(int fd, mode_t mode) {
++int Sysdeps<Fchmod>::operator()(int fd, mode_t mode) {
 +	auto ret = Syscall(SYS_FCHMOD, fd, mode);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_umask(mode_t mode, mode_t *old_mode) {
++int Sysdeps<Umask>::operator()(mode_t mode, mode_t *old_mode) {
 +	auto ret = Syscall(SYS_UMASK, mode);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -2126,15 +2377,15 @@ index 00000000..1ac9b85e
 +	return 0;
 +}
 +
-+int sys_statfs(const char *path, struct statfs *out) {
++int Sysdeps<Statfs>::operator()(const char *path, struct statfs *out) {
 +	auto ret = Syscall(SYS_STATFS, path, out);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+void sys_sync() { Syscall(SYS_SYNC); }
-+int sys_mount(
++void Sysdeps<Sync>::operator()() { Syscall(SYS_SYNC); }
++int Sysdeps<Mount>::operator()(
 +    const char *source,
 +    const char *target,
 +    const char *fs_name,
@@ -2148,7 +2399,7 @@ index 00000000..1ac9b85e
 +	return ret;
 +}
 +
-+int sys_read_entries(int fdnum, void *buffer, size_t max_size, size_t *bytes_read) {
++int Sysdeps<ReadEntries>::operator()(int fdnum, void *buffer, size_t max_size, size_t *bytes_read) {
 +	auto ret = Syscall(SYS_GETDENTS64, fdnum, buffer, max_size);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -2156,7 +2407,7 @@ index 00000000..1ac9b85e
 +	*bytes_read = ret;
 +	return 0;
 +}
-+int sys_openat(int dirfd, const char *path, int flags, mode_t mode, int *fd) {
++int Sysdeps<Openat>::operator()(int dirfd, const char *path, int flags, mode_t mode, int *fd) {
 +	auto ret = Syscall(SYS_OPENAT, dirfd, path, flags, mode);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -2164,52 +2415,52 @@ index 00000000..1ac9b85e
 +	*fd = ret;
 +	return 0;
 +}
-+int sys_open_dir(const char *path, int *fd) {
-+	return sys_openat(AT_FDCWD, path, O_DIRECTORY, 0, fd);
++int Sysdeps<OpenDir>::operator()(const char *path, int *fd) {
++	return sysdep<Openat>(AT_FDCWD, path, O_DIRECTORY, 0, fd);
 +}
-+int sys_mkdirat(int dirfd, const char *path, mode_t mode) {
++int Sysdeps<Mkdirat>::operator()(int dirfd, const char *path, mode_t mode) {
 +	auto ret = Syscall(SYS_MKDIRAT, dirfd, path, mode);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_mknodat(int dirfd, const char *path, int mode, int dev) {
++int Sysdeps<Mknodat>::operator()(int dirfd, const char *path, int mode, int dev) {
 +	auto ret = Syscall(SYS_MKNODAT, dirfd, path, mode, dev);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_unlinkat(int dirfd, const char *path, int flags) {
++int Sysdeps<Unlinkat>::operator()(int dirfd, const char *path, int flags) {
 +	auto ret = Syscall(SYS_UNLINKAT, dirfd, path, flags);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_renameat(int olddirfd, const char *old_path, int newdirfd, const char *new_path) {
++int Sysdeps<Renameat>::operator()(int olddirfd, const char *old_path, int newdirfd, const char *new_path) {
 +	auto ret = Syscall(SYS_RENAMEAT, olddirfd, old_path, newdirfd, new_path);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_linkat(int olddirfd, const char *old_path, int newdirfd, const char *new_path, int flags) {
++int Sysdeps<Linkat>::operator()(int olddirfd, const char *old_path, int newdirfd, const char *new_path, int flags) {
 +	auto ret = Syscall(SYS_LINKAT, olddirfd, old_path, newdirfd, new_path, flags);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_symlinkat(const char *target_path, int dirfd, const char *link_path) {
++int Sysdeps<Symlinkat>::operator()(const char *target_path, int dirfd, const char *link_path) {
 +	auto ret = Syscall(SYS_SYMLINKAT, target_path, dirfd, link_path);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_readlinkat(int dirfd, const char *path, char *buf, size_t bufsz, ssize_t *length) {
++int Sysdeps<Readlinkat>::operator()(int dirfd, const char *path, void *buf, size_t bufsz, ssize_t *length) {
 +	auto ret = Syscall(SYS_READLINKAT, dirfd, path, buf, bufsz);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -2217,7 +2468,7 @@ index 00000000..1ac9b85e
 +	*length = ret;
 +	return 0;
 +}
-+int sys_fchmodat(int fd, const char *pathname, mode_t mode, int flags) {
++int Sysdeps<Fchmodat>::operator()(int fd, const char *pathname, mode_t mode, int flags) {
 +	auto ret = Syscall(SYS_FCHMODAT, fd, pathname, mode, flags);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -2225,15 +2476,15 @@ index 00000000..1ac9b85e
 +	return 0;
 +}
 +
-+int sys_isatty(int fd) {
++int Sysdeps<Isatty>::operator()(int fd) {
 +	winsize ws;
 +	int result;
-+	if (!sys_ioctl(fd, TIOCGWINSZ, &ws, &result))
++	if (!sysdep<Ioctl>(fd, TIOCGWINSZ, &ws, &result))
 +		return 0;
 +	return ENOTTY;
 +}
 +#ifndef MLIBC_BUILDING_RTLD
-+int sys_ttyname(int fd, char *buf, size_t size) {
++int Sysdeps<Ttyname>::operator()(int fd, char *buf, size_t size) {
 +	if (auto is_atty = isatty(fd); is_atty)
 +		return is_atty;
 +
@@ -2264,13 +2515,13 @@ index 00000000..1ac9b85e
 +}
 +#endif
 +
-+int sys_tcgetattr(int fd, struct termios *attr) {
++int Sysdeps<Tcgetattr>::operator()(int fd, struct termios *attr) {
 +	auto ret = Syscall(SYS_IOCTL, fd, TCGETS, attr);
 +	if (int e = syscall_error(ret); e)
 +		return e;
 +	return 0;
 +}
-+int sys_tcsetattr(int fd, int optional_action, const struct termios *attr) {
++int Sysdeps<Tcsetattr>::operator()(int fd, int optional_action, const struct termios *attr) {
 +	int req;
 +
 +	switch (optional_action) {
@@ -2292,26 +2543,26 @@ index 00000000..1ac9b85e
 +		return e;
 +	return 0;
 +}
-+int sys_tcflush(int fd, int queue) {
++int Sysdeps<Tcflush>::operator()(int fd, int queue) {
 +	auto ret = Syscall(SYS_IOCTL, fd, TCFLSH, queue);
 +	if (int e = syscall_error(ret); e)
 +		return e;
 +	return 0;
 +}
-+int sys_tcdrain(int fd) {
++int Sysdeps<Tcdrain>::operator()(int fd) {
 +	auto ret = Syscall(SYS_IOCTL, fd, TCSBRK, 1);
 +	if (int e = syscall_error(ret); e)
 +		return e;
 +	return 0;
 +}
-+int sys_tcflow(int fd, int action) {
++int Sysdeps<Tcflow>::operator()(int fd, int action) {
 +	auto ret = Syscall(SYS_IOCTL, fd, TCXONC, action);
 +	if (int e = syscall_error(ret); e)
 +		return e;
 +	return 0;
 +}
 +
-+int sys_pselect(
++int Sysdeps<Pselect>::operator()(
 +    int nfds,
 +    fd_set *readfds,
 +    fd_set *writefds,
@@ -2327,14 +2578,14 @@ index 00000000..1ac9b85e
 +	*num_events = ret;
 +	return 0;
 +}
-+int sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags) {
++int Sysdeps<Utimensat>::operator()(int dirfd, const char *pathname, const struct timespec times[2], int flags) {
 +	auto ret = Syscall(SYS_UTIMENSAT, dirfd, pathname, times, flags);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
 +
 +	return 0;
 +}
-+int sys_syncfs(int fd) {
++int Sysdeps<Syncfs>::operator()(int fd) {
 +	auto ret = Syscall(SYS_SYNCFS, fd);
 +	if (auto e = syscall_error(ret); e)
 +		return e;
@@ -2342,13 +2593,13 @@ index 00000000..1ac9b85e
 +	return 0;
 +}
 +
-+int sys_unlockpt(int fd) {
++int Sysdeps<Unlockpt>::operator()(int fd) {
 +	int unlock = 0;
 +	int result = 0;
 +
-+	return sys_ioctl(fd, TIOCSPTLCK, &unlock, &result);
++	return sysdep<Ioctl>(fd, TIOCSPTLCK, &unlock, &result);
 +}
 +} // namespace mlibc
 -- 
-2.51.0
+2.56.0
 

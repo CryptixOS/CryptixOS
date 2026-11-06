@@ -190,7 +190,7 @@ diff --color -Naur gcc-15.2.0/libgcc/config.host gcc/libgcc/config.host
    extra_parts="crtbegin.o crtend.o"
    ;;
 +*-*-cryptix*)
-+  extra_parts="$extra_parts crti.o crtbegin.o crtbeginS.o crtend.o crtendS.o crtn.o"
++  extra_parts="$extra_parts crtbegin.o crtbeginS.o crtend.o crtendS.o"
 +  tmake_file="$tmake_file t-crtstuff-pic t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-libgcc-pic"
 +  ;;
  *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu | *-*-uclinuxfdpiceabi)

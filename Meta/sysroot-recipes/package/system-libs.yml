@@ -269,6 +269,7 @@ packages:
       subdir: sources
       git: 'https://github.com/linux-pam/linux-pam.git'
       branch: 'master'
+      commit: '584ef2275254016ee68126f90dab6df3604124b9'
     tools_required:
       - system-gcc
     pkgs_required:
@@ -424,6 +425,7 @@ packages:
       subdir: 'sources'
       git: 'https://github.com/CryptixOS/Neon.git'
       branch: 'main'
+      commit: 'a5a3b5f013224ffd4596a7c9ca23c39e3ca1aff2'
     tools_required:
       - system-gcc
       - host-pkg-config
@@ -606,6 +608,7 @@ packages:
       subdir: 'sources'
       git: 'https://github.com/CryptixOS/Prism.git'
       branch: 'master'
+      commit: '68d1a60dc766b8c2dddbd6aaa29d000d3fd46fab'
     tools_required:
       - system-gcc
       - host-pkg-config
@@ -816,7 +819,7 @@ packages:
     architecture: '@OPTION:arch@'
     source:
       subdir: 'sources'
-      url: 'https://zlib.net/zlib-1.3.1.tar.gz'
+      url: 'https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz'
       format: 'tar.gz'
       extract_path: 'zlib-1.3.1'
       version: '1.3.1'
@@ -845,3 +848,30 @@ packages:
         environ:
           DESTDIR: '@THIS_COLLECT_DIR@'
         quiet: true
+
+  - name: gcc-runtime
+    labels: [aarch64]
+    architecture: '@OPTION:arch@'
+    metadata:
+      summary: Shared GCC runtime libraries (libgcc_s, libstdc++)
+      description: >-
+        Installs the shared runtime libraries built by the system-gcc
+        cross compiler into the sysroot. C++ programs (init, AwesomeShell,
+        auroractl, pcre tools) are linked against them and fail to start
+        without them.
+    source:
+      subdir: 'sources'
+      version: '15.2.0'
+    tools_required:
+      - system-gcc
+    configure: []
+    build:
+      - args: ['mkdir', '-p', '@THIS_COLLECT_DIR@/usr/lib']
+      - args: |
+          set -e
+          libdir='@BUILD_ROOT@/tools/system-gcc/@OPTION:arch-triple@/lib'
+          cp -a "$libdir"/libgcc_s.so* "@THIS_COLLECT_DIR@/usr/lib/"
+          for f in "$libdir"/libstdc++.so*; do
+            case "$f" in *-gdb.py) continue ;; esac
+            cp -a "$f" "@THIS_COLLECT_DIR@/usr/lib/"
+          done
