@@ -91,7 +91,7 @@ namespace ZLib
         }
         return true;
     }
-    i32 HuffmanTree::Decode(BitStream<>& stream)
+    i32 HuffmanTree::Decode(Prism::BitStream<>& stream)
     {
         i32 bits      = stream.PeekBits(16);
         i32 fastEntry = FastLookupTable[bits & FAST_MASK];
@@ -103,7 +103,7 @@ namespace ZLib
         }
         return DecodeSlowPath(stream);
     }
-    i32 HuffmanTree::DecodeSlowPath(BitStream<>& stream)
+    i32 HuffmanTree::DecodeSlowPath(Prism::BitStream<>& stream)
     {
         i32 reversedBits = ReverseBits(stream.PeekBits(16), 16);
 
@@ -134,7 +134,7 @@ namespace ZLib
     {
         if (initialSize == 0) initialSize = m_InputSize;
         EnsureCapacity(initialSize);
-        BitStream stream(m_InputData.As<u8>(), m_InputSize);
+        Prism::BitStream stream(m_InputData.As<u8>(), m_InputSize);
         m_InputEnd = m_InputData.Offset<u8*>(m_InputSize);
 
         Header header;
@@ -201,7 +201,7 @@ namespace ZLib
         return true;
     }
 
-    bool Decompressor::DecompressStream(BitStream<>& stream)
+    bool Decompressor::DecompressStream(Prism::BitStream<>& stream)
     {
         bool final = true;
         do
@@ -211,7 +211,10 @@ namespace ZLib
             BlockType type = static_cast<BlockType>(stream.ReadBits(2));
 
             if (!ParseBlock(stream, type)) return false;
-            if (!DecodeBlock(stream)) return false;
+            // ParseBlock() copies a stored block out itself; only Huffman
+            // coded blocks have symbols left to decode
+            if (type != BlockType::eUncompressed && !DecodeBlock(stream))
+                return false;
         } while (!final);
 
         u32 checksum = 0;
@@ -219,7 +222,7 @@ namespace ZLib
         checksum = ConvertEndian<Endian::eNative, Endian::eBig>(checksum);
 
         const u32 computedAdler32
-            = Adler32::DoChecksum(m_OutputBuffer, DecompressedSize());
+            = Prism::Adler32::DoChecksum(m_OutputBuffer, DecompressedSize());
         if (checksum != computedAdler32)
             LogError(
                 "ZLib: Invalid adler32 checksum, adler32: {:#x}, "
@@ -228,7 +231,7 @@ namespace ZLib
 
         return true;
     }
-    bool Decompressor::ParseBlock(BitStream<>& stream, BlockType blockType)
+    bool Decompressor::ParseBlock(Prism::BitStream<>& stream, BlockType blockType)
     {
         constexpr Array<u8, HuffmanTree::MAX_SYMBOLS> defaultLengths = {
             8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
@@ -256,8 +259,11 @@ namespace ZLib
             case BlockType::eUncompressed:
             {
                 stream.AlignToByteBoundary();
-                u16 length        = stream.Read<u16>();
-                u16 negatedLength = stream.Read<u16>();
+                // ReadBits(), not Read<u16>(): the bytes after the block
+                // header may already sit in the bit buffer, and Read<u16>()
+                // would skip past them
+                u16 length        = stream.ReadBits<u16>(16);
+                u16 negatedLength = stream.ReadBits<u16>(16);
                 if ((length ^ 0xffff) != negatedLength)
                 {
                     LogError("ZLib: (length ^ 0xffff) != negatedLength");
@@ -300,7 +306,7 @@ namespace ZLib
 
         return true;
     }
-    bool Decompressor::DecodeCanonicalCodes(BitStream<>& stream)
+    bool Decompressor::DecodeCanonicalCodes(Prism::BitStream<>& stream)
     {
         constexpr u8 codeLengthOrder[19] = {16, 17, 18, 0, 8,  7, 9,  6, 10, 5,
                                             11, 4,  12, 3, 13, 2, 14, 1, 15};
@@ -355,7 +361,7 @@ namespace ZLib
         return true;
     }
 
-    bool Decompressor::DecodeBlock(BitStream<>& stream)
+    bool Decompressor::DecodeBlock(Prism::BitStream<>& stream)
     {
         u8* currentPointer = m_OutputPointer;
         for (;;)

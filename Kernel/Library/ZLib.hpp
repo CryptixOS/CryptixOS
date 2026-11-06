@@ -69,8 +69,8 @@ namespace ZLib
         HuffmanTree() = default;
 
         bool Build(Span<u8, DynamicExtent> bitLengths);
-        i32  Decode(BitStream<>& stream);
-        i32  DecodeSlowPath(BitStream<>& stream);
+        i32  Decode(Prism::BitStream<>& stream);
+        i32  DecodeSlowPath(Prism::BitStream<>& stream);
     };
 
     class Decompressor
@@ -112,10 +112,10 @@ namespace ZLib
         // Ensures that output buffer can hold @count additional bytes
         bool        EnsureCapacity(usize count);
 
-        bool        DecompressStream(BitStream<>& stream);
-        bool        ParseBlock(BitStream<>& stream, BlockType blockType);
-        bool        DecodeCanonicalCodes(BitStream<>& stream);
+        bool        DecompressStream(Prism::BitStream<>& stream);
+        bool        ParseBlock(Prism::BitStream<>& stream, BlockType blockType);
+        bool        DecodeCanonicalCodes(Prism::BitStream<>& stream);
 
-        bool        DecodeBlock(BitStream<>& stream);
+        bool        DecodeBlock(Prism::BitStream<>& stream);
     };
 }; // namespace ZLib
