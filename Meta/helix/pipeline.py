@@ -157,18 +157,22 @@ def ksyms(build_dir: str):
         f.write(result.stdout + b'\n')
 
 
-def initrd(build_dir: str):
-    """Copies the external modules into the sysroot, archives it and
-    zlib-compresses the archive (the kernel inflates it at boot)."""
-    modules_dir = os.path.join(SYSROOT, 'usr', 'lib', 'modules')
-    shutil.rmtree(modules_dir, ignore_errors=True)
-    os.makedirs(modules_dir)
-    for module in _external_modules(build_dir):
-        shutil.copy(module, modules_dir)
+def install_modules(build_dir: str):
+    """Makes the sysroot's /usr/lib/modules hold the external modules,
+    touching it only when they changed."""
+    shell.run([os.path.join(META, 'install-modules.py'),
+               '--sysroot', SYSROOT,
+               '--stamp', os.path.join(build_dir, 'sysroot_modules.stamp'),
+               *_external_modules(build_dir)])
 
+
+def initrd(build_dir: str):
+    """Archives the sysroot and zlib-compresses the archive (the kernel
+    inflates it at boot)."""
     info('creating initrd.zlib...')
     tarball = os.path.join(build_dir, 'initrd.tar')
-    shell.run(['tar', '-cf', tarball, '-C', SYSROOT + '/', '.'])
+    shell.run([os.path.join(META, 'make-initrd.py'),
+               '--sysroot', SYSROOT, '--output', tarball])
     shell.run([os.path.join(META, 'compress-initrd.sh'), tarball,
                os.path.join(build_dir, 'initrd.zlib')])
 
@@ -209,6 +213,7 @@ def iso(build_dir: str, arch: str):
 def build_all(build_dir: str, arch: str):
     """Everything the meson build produces by default, after compiling."""
     ksyms(build_dir)
+    install_modules(build_dir)
     initrd(build_dir)
     root_image(build_dir)
     iso(build_dir, arch)

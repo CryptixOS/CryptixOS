@@ -29,7 +29,6 @@ arch = host_machine.cpu_family()
 qemulog = 'qemu.log'
 
 srcs = []
-initrd_dir = meson.project_source_root() / 'sysroot/'
 
 include_directories = [
   include_directories('Kernel'),
@@ -147,7 +146,6 @@ subdir('Prism/Source')
 subdir('Modules')
 
 subdir('Kernel')
-no_ext_mods = ext_mods.length() == 0
 
 # ==============================================================================
 ### Qemu args
@@ -306,21 +304,42 @@ ksyms = custom_target(
   depends: [kernel_elf],
 )
 
+# Copies the external modules into the sysroot, touching it only when they
+# change, so the initrd and disk image below see it as an ordinary sysroot
+# change
+sysroot_modules = custom_target(
+  'sysroot_modules',
+  input: ext_mods,
+  output: 'sysroot_modules.stamp',
+  command: [
+    meson.project_source_root() / 'Meta' / 'install-modules.py',
+    '--sysroot', meson.project_source_root() / 'sysroot',
+    '--stamp', '@OUTPUT@',
+    '@INPUT@',
+  ],
+  depend_files: files('Meta/install-modules.py'),
+  build_by_default: true,
+  install: false,
+)
+
+# The depfile lists every file and directory in the sysroot, so the image is
+# rebuilt exactly when an installed package changes. No root is needed:
+# Meta/helix/image.py formats and fills the partitions in the image file.
 root_image = custom_target(
   'root_image',
-  input: [initrd_dir / 'usr' / 'sbin' / 'init', ext_mods],
+  input: [sysroot_modules],
   output: 'image.hdd',
+  depfile: 'image.hdd.d',
   command: [
-    './Meta/create_image.py',
+    meson.project_source_root() / 'Meta' / 'create_image.py',
     '--input', meson.project_source_root() / 'sysroot',
     '--output', '@OUTPUT@',
+    '--depfile', '@DEPFILE@',
     '--partition-table', 'gpt',
     '--size', '2GiB',
   ],
-  depends: ext_mods,
-  # Its inputs don't track the sysroot, so rebuild every time to pick up
-  # newly installed packages
-  build_always_stale: true,
+  depend_files: files('Meta/create_image.py', 'Meta/helix/image.py',
+                      'Meta/helix/depfile.py'),
   build_by_default: true,
   console: true,
   install: false,
@@ -338,24 +357,24 @@ c = run_command(['find', meson.project_source_root() / 'BaseFiles', '-type', 'f'
 base_files = c.stdout().strip().split('\n')
 
 # The initrd is a ustar archive of the sysroot, zlib-compressed below; the
-# kernel inflates it with Library/ZLib before unpacking it.
+# kernel inflates it with Library/ZLib before unpacking it. Like the disk
+# image it has a depfile listing the whole sysroot.
 initrd = custom_target(
   'initrd',
-  input: [ext_mods, meson.project_source_root() / 'sysroot/usr/sbin/init' ],
+  input: [sysroot_modules],
   output: 'initrd.tar',
+  depfile: 'initrd.tar.d',
   command: [
-    'rm', '-rf', initrd_dir / 'usr/lib/modules', '&&',
-    'mkdir', '-p', initrd_dir / 'usr/lib/modules', '&&',
-    no_ext_mods ? [] : ['cp', '@INPUT@', initrd_dir / 'usr/lib/modules/', '&&'],
-    'tar', '-cvf', '@OUTPUT@', '-C', initrd_dir, '.'],
-  # Its inputs don't track the sysroot, so rebuild every time to pick up
-  # newly installed packages
-  build_always_stale: true,
+    meson.project_source_root() / 'Meta' / 'make-initrd.py',
+    '--sysroot', meson.project_source_root() / 'sysroot',
+    '--output', '@OUTPUT@',
+    '--depfile', '@DEPFILE@',
+  ],
+  depend_files: [files('Meta/make-initrd.py', 'Meta/helix/depfile.py'),
+                 base_files],
   build_by_default: true,
-  depend_files: base_files,
   console: true,
   install: false,
-  depends: ext_mods
 )
 initrd_zlib = custom_target(
   'initrd_zlib',
@@ -365,10 +384,10 @@ initrd_zlib = custom_target(
     meson.project_source_root() / 'Meta' / 'compress-initrd.sh', 
     '@INPUT@', '@OUTPUT@',
   ],
+  depend_files: files('Meta/compress-initrd.sh'),
   build_by_default: true,
   console: true,
   install: false,
-  depends: initrd,
 )
 
 iso = custom_target(

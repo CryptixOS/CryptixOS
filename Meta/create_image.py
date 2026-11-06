@@ -5,6 +5,7 @@ import sys
 import argparse
 
 from helix.log import trace, info, error, fail
+from helix import depfile
 from helix.image import Image, PartitionTableType
 from enum import Enum
 
@@ -59,6 +60,8 @@ def run():
     finally:
         image.close()
 
+    if args.depfile:
+        depfile.write(args.depfile, args.output, depfile.tree(args.input))
     info("Done.")
 
 if __name__ == '__main__':
@@ -66,6 +69,7 @@ if __name__ == '__main__':
     parser.add_argument("-i", "--input", required=True, help="Directory to copy into both partitions")
     parser.add_argument("-o", "--output", required=True, help="Output image file path (e.g. image.hdd)")
     parser.add_argument("-s", "--size", required=True, help="Image size (e.g. 768MiB or 800000000)")
+    parser.add_argument("-d", "--depfile", help="Write a ninja depfile listing every input file")
     parser.add_argument("-p", "--partition-table", choices=["mbr", "gpt"], default="mbr", help="Partition table type")
 
     args = parser.parse_args()
