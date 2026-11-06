@@ -42,17 +42,20 @@ namespace Stacktrace
             return (digit - 'a') + 0xa;
         }
 
+        // Demangles a C++ symbol name. Anything that isn't a mangled name
+        // (C functions, assembly labels) or doesn't fit the buffer is
+        // returned as is, so a stack trace never prints an empty name.
         const String demangle(StringView name)
         {
-            String          demangled   = "";
-
+            // On the stack, to save one heap allocation per frame while
+            // printing a panic (the returned String still allocates)
             constexpr usize BUFFER_SIZE = 256;
-            char*           buffer      = new char[BUFFER_SIZE];
-            if (absl::debugging_internal::Demangle(name.Raw(), buffer, BUFFER_SIZE))
-                demangled = buffer;
+            char            buffer[BUFFER_SIZE];
+            if (absl::debugging_internal::Demangle(name.Raw(), buffer,
+                                                   BUFFER_SIZE))
+                return buffer;
 
-            delete[] buffer;
-            return demangled;
+            return name;
         }
 
     }; // namespace
