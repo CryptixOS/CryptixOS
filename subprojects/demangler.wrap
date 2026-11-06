@@ -2,6 +2,7 @@
 url = https://github.com/ilobilo/demangler
 revision = master
 depth = 1
+patch_filename = demangler.tar
 
 [provide]
 demangler = demangler_dep

@@ -124,8 +124,53 @@ static void idtWriteEntry(u16 vector, uintptr_t handler, u8 attributes)
     entry->IsrHigh    = (handler & 0xffffffff00000000) >> 32;
 }
 
+// Raw port 0xe9 output for the exception path: it touches no per-cpu data
+// (a fault while returning to user mode leaves the user's GS loaded) and
+// takes no locks, so it works however broken the state that faulted is.
+namespace
+{
+    void E9Char(char c) { __asm__ volatile("outb %0, %1" : : "a"(c), "d"(u16(0xe9))); }
+    void E9String(const char* s)
+    {
+        while (*s) E9Char(*s++);
+    }
+    void E9Hex(u64 value)
+    {
+        E9String("0x");
+        for (i32 shift = 60; shift >= 0; shift -= 4)
+            E9Char("0123456789abcdef"[(value >> shift) & 0xf]);
+    }
+    void E9Field(const char* name, u64 value)
+    {
+        E9String(name);
+        E9Hex(value);
+        E9Char(' ');
+    }
+    Atomic<u64> s_ExceptionDepth = 0;
+} // namespace
+
 CTOS_NORETURN static void raiseException(ExecutionContext* ctx)
 {
+    // Report first, with nothing that can fault; a nested exception (the
+    // reporting below faulting too) stops here instead of recursing forever
+    u64 depth = s_ExceptionDepth.FetchAdd(1);
+    E9String("\n\r!!! CPU exception ");
+    E9Field("vector=", ctx->InterruptVector);
+    E9Field("error=", ctx->ErrorCode);
+    E9Field("rip=", ctx->RIP);
+    E9Field("cs=", ctx->CS);
+    E9Field("rsp=", ctx->RSP);
+    E9Field("ss=", ctx->SS);
+    E9Field("rflags=", ctx->RFlags);
+    E9Field("cr2=", u64(CPU::ReadCR2()));
+    E9Field("depth=", depth);
+    E9String("\n\r");
+    if (depth > 0)
+    {
+        E9String("!!! nested exception, halting\n\r");
+        for (;;) Asm("cli; hlt");
+    }
+
     u64 cpuID = CPU::GetCurrentID();
     using Stacktrace::StackFrame;
     StackFrame frame;

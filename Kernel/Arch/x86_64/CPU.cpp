@@ -346,7 +346,7 @@ namespace CPU
 
     void HaltAll()
     {
-        Lapic::Instance()->SendIpi(g_PanicIpiVector | (0b10 < 18), 0);
+        Lapic::Instance()->SendIpi(g_PanicIpiVector | (0b11 << 18), 0);
     }
     void WakeUp(usize id, bool everyone)
     {
@@ -464,7 +464,13 @@ namespace CPU
             thread->Context.SS = GDT::KERNEL_DATA_SELECTOR;
             thread->Context.DS = thread->Context.ES = thread->Context.SS;
 
-            thread->Context.RSP                     = thread->KernelStack();
+            // The SysV ABI requires RSP % 16 == 8 on function entry (as if a
+            // `call` had just pushed a return address). We enter the thread
+            // via iretq, so push a fake null return address ourselves;
+            // otherwise every 16-byte aligned local is misaligned by 8.
+            upointer rsp = thread->KernelStack().Raw<upointer>() - 8;
+            *reinterpret_cast<upointer*>(rsp) = 0;
+            thread->Context.RSP                = rsp;
             thread->SetStack(thread->KernelStack());
         }
     }

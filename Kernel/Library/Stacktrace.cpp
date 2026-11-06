@@ -20,7 +20,7 @@
 
 #include <System/System.hpp>
 
-#include <demangler/Demangle.h>
+#include <demangler.hpp>
 
 using ConstructorFunction = void (*)();
 
@@ -41,6 +41,20 @@ namespace Stacktrace
 
             return (digit - 'a') + 0xa;
         }
+
+        const String demangle(StringView name)
+        {
+            String          demangled   = "";
+
+            constexpr usize BUFFER_SIZE = 256;
+            char*           buffer      = new char[BUFFER_SIZE];
+            if (absl::debugging_internal::Demangle(name.Raw(), buffer, BUFFER_SIZE))
+                demangled = buffer;
+
+            delete[] buffer;
+            return demangled;
+        }
+
     }; // namespace
 
     const Symbol* GetSymbol(Pointer address)
@@ -137,8 +151,7 @@ namespace Stacktrace
             stackFrame           = stackFrame->Base;
             const Symbol* symbol = GetSymbol(rip);
 
-            auto          demangledName
-                = symbol ? llvm::demangle(symbol->Name.Raw()) : "??";
+            auto demangledName   = symbol ? demangle(symbol->Name.Raw()) : "??";
             LogMessage("[\u001b[33mStacktrace\u001b[0m]: {}. {} <{:#x}>\n",
                        i + 1, demangledName, rip.Raw());
 
