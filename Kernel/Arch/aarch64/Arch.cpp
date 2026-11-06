@@ -128,7 +128,12 @@ namespace Arch
         Assert(irqChip);
         InterruptManager::SetController(irqChip);
         irqChip->Initialize();
-        FireTimerInterrupt(irqChip);
+
+        // FireTimerInterrupt() is a bring-up demo: it ends in an endless wfi
+        // loop, so calling it here stopped the boot. It also can't work yet,
+        // because raiseIrq() doesn't dispatch IRQs (it halts on the first
+        // one). Arm the timer from the scheduler once IRQs are dispatched.
+        // TODO(v1tr10l7): route raiseIrq() to TimerIrqHandler()
     }
 
     CTOS_NORETURN void Halt()

@@ -56,8 +56,9 @@
 .endmacro
 
 .macro restore_context
-    // x0 contains pointer to ExecutionContext
-    mov sp, x0
+    // sp still points at the frame save_current_context built: the handlers
+    // are normal functions, so sp is preserved across the call, whereas x0
+    // (caller-saved) is clobbered by it and can't be used to find the frame.
 
     // Restore special registers first
     ldr x1, [sp, #SPSR_EL1_SLOT]
@@ -128,38 +129,39 @@ handle_fiq:
 handle_serror:
     b .
 
-// Align vectors according to AArch64 spec
+// The vector table: 16 entries of 0x80 bytes each, in four groups (current
+// EL with SP_EL0, current EL with SP_ELx, lower EL AArch64, lower EL AArch32)
+// of sync, IRQ, FIQ and SError. The CPU jumps to VBAR_EL1 + the entry's
+// offset, so every entry has to sit at its own 0x80 boundary, and the table
+// itself must be 2KiB aligned.
+.macro vector_entry target
+    .balign 0x80
+    b \target
+.endm
+
 .global exception_vectors
-.balign 0x800       // 1KB alignment recommended for vector table
+.balign 0x800
 exception_vectors:
-    // ---- Current EL with SP0 (EL1 kernel stack) ----
-    // Synchronous
-    b handle_sync
-    // IRQ
-    b handle_irq
-    // FIQ
-    b .
-    // SError
-    b .
+    // ---- Current EL with SP_EL0 ----
+    vector_entry handle_sync
+    vector_entry handle_irq
+    vector_entry handle_fiq
+    vector_entry handle_serror
 
-    // ---- Current EL with SPx (EL1, other stack) ----
-    b handle_sync   // synchronous
-    b handle_irq
-    b .
-    b .
+    // ---- Current EL with SP_ELx (EL1 kernel) ----
+    vector_entry handle_sync
+    vector_entry handle_irq
+    vector_entry handle_fiq
+    vector_entry handle_serror
 
-    // ---- Lower EL using AArch64 (EL0 → EL1) ----
-    // Synchronous (e.g., system call, page fault)
-    b handle_sync
-    // IRQ
-    b handle_irq
-    // FIQ
-    b .
-    // SError
-    b .
+    // ---- Lower EL using AArch64 (EL0 -> EL1) ----
+    vector_entry handle_sync
+    vector_entry handle_irq
+    vector_entry handle_fiq
+    vector_entry handle_serror
 
-    // ---- Lower EL using AArch32 (32-bit) ----
-    b .
-    b .
-    b .
-    b .
+    // ---- Lower EL using AArch32 (unsupported) ----
+    vector_entry handle_serror
+    vector_entry handle_serror
+    vector_entry handle_serror
+    vector_entry handle_serror
