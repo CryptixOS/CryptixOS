@@ -23,7 +23,7 @@ namespace ELF
     ErrorOr<void> Loader::LoadImage(PathView path)
     {
         auto pathRes
-            = TryOrRet(VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), path));
+            = TryOrRet(VFS::ResolvePath(VFS::RootDirectoryEntry(), path));
 
         auto dentry = pathRes.Entry;
         if (!dentry) return Error(ENOENT);

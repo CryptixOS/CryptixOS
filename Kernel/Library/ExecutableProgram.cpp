@@ -287,8 +287,7 @@ ErrorOr<Ref<ELF::Image>>
 ExecutableProgram::LoadImage(PathView path, PageMap* pageMap,
                              AddressSpace& addressSpace, bool interpreter)
 {
-    Ref entry
-        = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), path).Value().Entry;
+    Ref entry = VFS::ResolvePath(VFS::RootDirectoryEntry(), path).Value().Entry;
     if (!entry) return Error(ENOENT);
 
     return LoadImage(entry, pageMap, addressSpace, interpreter);
@@ -301,7 +300,7 @@ ExecutableProgram::LoadImage(::Ref<DirectoryEntry> entry, PageMap* pageMap,
     if (!inode) return Error(ENOENT);
 
     auto file = TryOrRet(
-        VFS::Open(VFS::RootDirectoryEntry().Raw(), entry->Path(), O_RDONLY, 0));
+        VFS::Open(VFS::RootDirectoryEntry(), entry->Path(), O_RDONLY, 0));
     Ref image = CreateRef<ELF::Image>();
 
     if (!image->Load(file.Raw(), m_LoadBase)) return Error(ENOEXEC);

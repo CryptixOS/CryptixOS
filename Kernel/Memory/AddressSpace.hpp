@@ -19,7 +19,7 @@
 #include <Prism/Memory/Ref.hpp>
 #include <Prism/Memory/WeakRef.hpp>
 
-class AddressSpace : public NonCopyable<AddressSpace>, public RefCounted
+class AddressSpace : public NonCopyable<AddressSpace>, public RefCounted<AddressSpace>
 {
   public:
     AddressSpace();

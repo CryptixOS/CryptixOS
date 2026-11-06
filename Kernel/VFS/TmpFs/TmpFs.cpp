@@ -56,7 +56,7 @@ ErrorOr<::Ref<INode>> TmpFs::AllocateNode(StringView name, mode_t mode)
     if (m_NextINodeIndex >= m_MaxINodeCount) return Error(ENOSPC);
     else if (FreeINodeCount() == 0) return Error(ENOSPC);
 
-    auto inode = new TmpFsINode(name, this, NextINodeIndex(), mode);
+    auto inode = CreateRef<TmpFsINode>(name, this, NextINodeIndex(), mode);
     if (!inode) return Error(ENOMEM);
 
     --m_FreeINodeCount;

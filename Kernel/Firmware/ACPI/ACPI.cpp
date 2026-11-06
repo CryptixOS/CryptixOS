@@ -38,7 +38,7 @@ namespace ACPI
 {
     namespace
     {
-        struct [[gnu::packed]] RSDP
+        struct CTOS_PACKED RSDP
         {
             char Signature[8];
             u8   Checksum;
@@ -50,7 +50,7 @@ namespace ACPI
             u8   ExtendedChecksum;
             u8   Reserved[3];
         };
-        struct [[gnu::packed]] RSDT
+        struct CTOS_PACKED RSDT
         {
             SDTHeader Header;
             union

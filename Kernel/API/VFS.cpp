@@ -337,7 +337,7 @@ namespace API::VFS
     {
         LogDebug("API::VFS::Connect: SockFdNum => {:#x}", sockFdNum);
         auto socket = TryOrRet(Socket::Get(sockFdNum));
-        LogDebug("API::VFS::Connect: Socket => {:#x}", upointer(socket));
+        LogDebug("API::VFS::Connect: Socket => {:#x}", upointer(socket.Raw()));
         auto status = socket->Connect(addr, addrlen);
 
         if (!status) return Error(status.Error());
@@ -359,7 +359,7 @@ namespace API::VFS
     {
         LogDebug("API::VFS::SendTo: SockFdNum => {:#x}", sockFdNum);
         auto socket = TryOrRet(Socket::Get(sockFdNum));
-        LogDebug("API::VFS::SendMsg: Socket => {:#x}", upointer(socket));
+        LogDebug("API::VFS::SendMsg: Socket => {:#x}", upointer(socket.Raw()));
         auto status = socket->SendTo(const_cast<u8*>(data), size, flags);
 
         if (!status) return Error(status.Error());
@@ -380,7 +380,7 @@ namespace API::VFS
     {
         LogDebug("API::VFS::SendMsg: SockFdNum => {:#x}", sockFdNum);
         auto socket = TryOrRet(Socket::Get(sockFdNum));
-        LogDebug("API::VFS::SendMsg: SockFd => {:#x}", upointer(socket));
+        LogDebug("API::VFS::SendMsg: SockFd => {:#x}", upointer(socket.Raw()));
         if (!socket || !socket->IsSocket())
         {
             LogError("API::VFS::SendMsg: Failed to acquire socket at fd => {}",
@@ -1129,7 +1129,7 @@ namespace API::VFS
             return 0;
         }
 
-        WeakRef parentEntry = PathView(pathname).Absolute()
+        WeakRef<DirectoryEntry> parentEntry = PathView(pathname).Absolute()
                                 ? ::VFS::RootDirectoryEntry()
                                 : nullptr;
         if (!parentEntry)

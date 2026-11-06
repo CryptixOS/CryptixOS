@@ -12,7 +12,7 @@
 
 class DirectoryEntry;
 class Filesystem;
-class MountPoint : public RefCounted
+class MountPoint : public RefCounted<MountPoint>
 {
   public:
     using Iterator = Delegate<IterationResult(::Ref<MountPoint> mountPoint)>;

@@ -89,3 +89,12 @@ class SpinLockPolicy
   private:
     Spinlock m_Lock;
 };
+class LockPolicy
+{
+  public:
+    void Lock() { m_Lock.Acquire(); }
+    void Unlock() { m_Lock.Release(); }
+
+  private:
+    Spinlock m_Lock;
+};

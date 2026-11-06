@@ -47,7 +47,7 @@ namespace VMM
         return static_cast<Access>(result);
     }
 
-    class Region final : public RefCounted
+    class Region final : public Prism::RefCounted<Region>
     {
       public:
         Region() = default;

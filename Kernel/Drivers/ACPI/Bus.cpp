@@ -21,7 +21,7 @@
 
 namespace ACPI
 {
-    struct DeviceHandle : public RefCounted
+    struct DeviceHandle : public RefCounted<DeviceHandle>
     {
         uacpi_namespace_node* Node      = nullptr;
         uacpi_resources*      Resources = nullptr;

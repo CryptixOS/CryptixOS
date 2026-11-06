@@ -15,7 +15,7 @@ namespace VFS
     Ref<DirectoryEntry> RootDirectoryEntry();
 }
 
-class FilesystemView : public RefCounted
+class FilesystemView : public RefCounted<FilesystemView>
 {
   public:
     inline FilesystemView() = default;

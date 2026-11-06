@@ -70,7 +70,7 @@ enum class ModuleState
     eRunning  = 0x03,
     eUnloaded = 0x04,
 };
-struct Module : public RefCounted
+struct Module : public RefCounted<Module>
 {
     static Module* s_ThisModule;
     constexpr Module() { s_ThisModule = this; }

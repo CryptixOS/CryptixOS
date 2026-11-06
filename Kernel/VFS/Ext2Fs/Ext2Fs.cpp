@@ -57,8 +57,8 @@ ErrorOr<::Ref<DirectoryEntry>> Ext2Fs::Mount(StringView  sourcePath,
     m_Allocator.Initialize(this);
 
     m_RootEntry = CreateRef<DirectoryEntry>(nullptr, "/");
-    auto* root
-        = m_RootEntry ? new Ext2FsINode("/", this, 0644 | S_IFDIR) : nullptr;
+    auto root = m_RootEntry ? CreateRef<Ext2FsINode>("/", this, 0644 | S_IFDIR)
+                            : nullptr;
     if (!root)
     {
         LogError("Ext2Fs: '{}' -> Failed to create root node",

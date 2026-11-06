@@ -113,7 +113,7 @@ ErrorOr<::Ref<INode>> Fat32Fs::CreateNode(::Ref<INode>          parent,
     if (name.Size() > 255) return_err(nullptr, ENAMETOOLONG);
     if (!S_ISREG(mode) && !S_ISDIR(mode)) return_err(nullptr, EPERM);
 
-    return new Fat32FsINode(name, this, mode);
+    return CreateRef<Fat32FsINode>(name, this, mode);
 }
 
 bool Fat32Fs::Populate(DirectoryEntry* dentry)
@@ -202,7 +202,7 @@ bool Fat32Fs::Populate(DirectoryEntry* dentry)
                 entry->Attributes & Fat32Attribute::eDirectory,
                 entry->Attributes & Fat32Attribute::eSystem);
 
-        auto dentry    = new DirectoryEntry(nameBuffer);
+        auto dentry    = CreateRef<DirectoryEntry>(nameBuffer);
         auto newNodeOr = CreateNode(node, dentry, mode);
         if (!newNodeOr)
         {

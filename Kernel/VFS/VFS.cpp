@@ -50,8 +50,9 @@ namespace VFS
         fs->FilesystemName = name;
         fs->FlagsMask      = 0;
 
-        fs->Instantiate = []() -> ErrorOr<Ref<Filesystem>> { return new T(0); };
-        fs->Destroy     = [](Ref<Filesystem>) -> ErrorOr<void> { return {}; };
+        fs->Instantiate
+            = []() -> ErrorOr<Ref<Filesystem>> { return CreateRef<T>(0); };
+        fs->Destroy = [](Ref<Filesystem>) -> ErrorOr<void> { return {}; };
 
         VFS::RegisterFilesystem(fs);
     }
@@ -524,17 +525,19 @@ namespace VFS
         switch (mode & S_IFMT)
         {
             case S_IFREG:
-                TryOrRet(directoryINode->CreateFile(entry, mode));
+                IgnoreUnused(TryOrRet(directoryINode->CreateFile(entry, mode)));
                 break;
             case S_IFDIR:
-                TryOrRet(directoryINode->CreateDirectory(entry, mode));
+                IgnoreUnused(
+                    TryOrRet(directoryINode->CreateDirectory(entry, mode)));
                 break;
             case S_IFLNK:
-                TryOrRet(directoryINode->Symlink(entry, target));
+                IgnoreUnused(TryOrRet(directoryINode->Symlink(entry, target)));
                 break;
 
             default:
-                TryOrRet(directoryINode->CreateNode(entry, mode, dev));
+                IgnoreUnused(
+                    TryOrRet(directoryINode->CreateNode(entry, mode, dev)));
                 break;
         }
 
@@ -610,7 +613,7 @@ namespace VFS
         newEntry            = CreateRef<DirectoryEntry>(nullptr, newName);
 
         auto newParentINode = newParent->INode();
-        TryOrRet(newParentINode->Link(oldEntry, newEntry));
+        IgnoreUnused(TryOrRet(newParentINode->Link(oldEntry, newEntry)));
 
         newParent->InsertChild(newEntry);
         newEntry->SetParent(newParent);

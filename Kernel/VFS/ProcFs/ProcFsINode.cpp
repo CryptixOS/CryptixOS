@@ -127,15 +127,15 @@ bool ProcFsRootINode::Populate()
             INodeMode mode      = S_IFDIR | 0755;
 
             if (!m_Children.Contains(pidString))
-                InsertChild(new ProcFsProcessINode(pidString, m_Filesystem, id,
-                                                   mode, pid),
+                InsertChild(CreateRef<ProcFsProcessINode>(
+                                pidString, m_Filesystem, id, mode, pid),
                             pidString);
 
             return IterationResult::eContinue;
         });
     if (!m_Children.Contains("self"_sv))
     {
-        auto selfLink = new ProcFsSelfLinkINode("self"_sv, m_Filesystem);
+        auto selfLink = CreateRef<ProcFsSelfLinkINode>("self"_sv, m_Filesystem);
         InsertChild(selfLink, "self"_sv);
     }
 
@@ -162,7 +162,7 @@ ProcFsProcessINode::ProcFsProcessINode(StringView name, class Filesystem* fs,
     : ProcFsINode(name, fs, id, mode)
     , m_ProcessID(pid)
 {
-    auto fdinfo = new ProcFsFdINode("fd", m_Filesystem, m_ProcessID);
+    auto fdinfo = CreateRef<ProcFsFdINode>("fd", m_Filesystem, m_ProcessID);
     InsertChild(fdinfo, "fd");
 }
 bool ProcFsProcessINode::Populate() { return true; }
@@ -185,8 +185,8 @@ bool ProcFsFdINode::Populate()
         auto name   = StringUtils::ToString(num);
         if (m_Children.Contains(name)) continue;
 
-        auto symlink
-            = new ProcFsSymlinkINode(name, m_Filesystem, S_IFLNK | 0755, path);
+        auto symlink = CreateRef<ProcFsSymlinkINode>(name, m_Filesystem,
+                                                     S_IFLNK | 0755, path);
         InsertChild(symlink, name);
     }
 

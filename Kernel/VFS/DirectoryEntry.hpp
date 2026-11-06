@@ -55,7 +55,8 @@ constexpr bool operator&(const DirectoryEntryFlags lhs,
     return ToUnderlying(lhs) & ToUnderlying(rhs);
 }
 
-class DirectoryEntry : public RefCounted
+class DirectoryEntry : public RefCounted<DirectoryEntry>,
+                       public Weakable<DirectoryEntry>
 {
   public:
     explicit inline DirectoryEntry(StringView name)

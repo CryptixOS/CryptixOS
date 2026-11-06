@@ -55,10 +55,9 @@ namespace PCI
     }
     void InitializeDatabase()
     {
-        PathView path  = "/usr/share/hwdata/pci.ids";
-        Ref      entry = VFS::ResolvePath(VFS::RootDirectoryEntry().Raw(), path)
-                        .value()
-                        .Entry;
+        PathView path = "/usr/share/hwdata/pci.ids";
+        Ref      entry
+            = VFS::ResolvePath(VFS::RootDirectoryEntry(), path).value().Entry;
         if (!entry) return;
 
         auto file = entry->INode();

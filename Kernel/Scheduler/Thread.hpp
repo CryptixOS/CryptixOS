@@ -58,7 +58,7 @@ struct ThreadTLS
 };
 
 class Process;
-struct Thread : public RefCounted
+struct Thread : public RefCounted<Thread>
 {
     Thread() = default;
     Thread(Process* parent, Pointer pc, Pointer arg, i64 runOn = -1,

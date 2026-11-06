@@ -16,7 +16,7 @@
  * and operate on specific filesystem types. Drivers should register
  * themselves via FilesystemRegistry::Register().
  */
-struct FilesystemDriver : public RefCounted
+struct FilesystemDriver : public RefCounted<FilesystemDriver>
 {
     /// Signature of the filesystem instantiate function.
     /// @return A reference-counted Filesystem instance if successful.

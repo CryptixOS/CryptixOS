@@ -67,7 +67,8 @@ ErrorOr<::Ref<Socket>> Socket::Get(isize sockFdNum)
     if (!sockFd || !sockFd->IsSocket() || !sockFd->File())
         return Error(ENOTSOCK);
 
-    return reinterpret_cast<class Socket*>(sockFd->File());
+    return ErrorOr<::Ref<Socket>>(
+        reinterpret_cast<class Socket*>(sockFd->File()));
 }
 
 ErrorOr<void> Socket::QueueConnectionFrom(Socket* peer)

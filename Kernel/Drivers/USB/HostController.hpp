@@ -12,7 +12,7 @@
 
 namespace USB
 {
-    class HostController : public RefCounted
+    class HostController : public RefCounted<HostController>
     {
       public:
         HostController()                   = default;

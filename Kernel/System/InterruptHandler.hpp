@@ -20,7 +20,7 @@ constexpr usize MAX_IRQ_COUNT = 0x40;
 
 class Device;
 using InterruptServiceRoutine = Delegate<IrqResult(Device*, ExecutionContext*)>;
-class InterruptDispatcher : public RefCounted
+class InterruptDispatcher : public RefCounted<InterruptDispatcher>
 {
   public:
     inline InterruptDispatcher(::Device* device, InterruptController* ctrl,

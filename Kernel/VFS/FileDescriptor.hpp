@@ -72,13 +72,22 @@ enum class FileMode : u64
     eDirect = O_DIRECT,
     ePath   = O_PATH,
 };
-class FileDescriptor : public RefCounted
+class FileDescriptor : public RefCounted<FileDescriptor>
 {
   public:
     FileDescriptor(::Ref<DirectoryEntry> dentry, i32 flags,
                    FileAccessMode accMode);
     FileDescriptor(::Ref<DirectoryEntry> dentry, class File* file, i32 flags,
                    FileAccessMode accMode);
+    FileDescriptor(DirectoryEntry* dentry, i32 flags, FileAccessMode accMode)
+        : FileDescriptor(::Ref<::DirectoryEntry>(dentry), flags, accMode)
+    {
+    }
+    FileDescriptor(DirectoryEntry* dentry, class File* file, i32 flags,
+                   FileAccessMode accMode)
+        : FileDescriptor(::Ref<::DirectoryEntry>(dentry), file, flags, accMode)
+    {
+    }
     virtual ~FileDescriptor();
 
     inline ::Ref<INode>   INode() const { return m_DirectoryEntry->INode(); }

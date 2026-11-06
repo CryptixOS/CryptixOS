@@ -56,7 +56,6 @@ ICW1Flags operator|(ICW1Flags lhs, ICW1Flags rhs)
 Ref<I8259A> I8259A::Instance()
 {
     static ::Ref<I8259A> instance = new I8259A();
-
     return instance;
 }
 

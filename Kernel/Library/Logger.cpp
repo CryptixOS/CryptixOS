@@ -32,12 +32,14 @@ namespace E9
 }; // namespace E9
 
 static usize s_EnabledSinks = 0;
-class CoreSink final : public LogSink<SpinLockPolicy>
+class CoreSink final : public LogSink<LockPolicy>
 {
   public:
-    isize WriteNoLock(StringView str) override
+    isize SinkIt(const LogMessage& message) override
     {
-        isize nwritten = 0;
+        StringView str      = message.Payload;
+
+        isize      nwritten = 0;
         if (s_EnabledSinks & LOG_SINK_E9) nwritten = E9::PrintString(str);
         isize ret = 0;
         if (s_EnabledSinks & LOG_SINK_SERIAL) ret = Serial::Write(str);

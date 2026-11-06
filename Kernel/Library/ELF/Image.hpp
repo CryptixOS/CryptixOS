@@ -28,7 +28,7 @@ class FileDescriptor;
 
 namespace ELF
 {
-    class Image : public RefCounted
+    class Image : public RefCounted<Image>
     {
       public:
         ErrorOr<void>  LoadFromMemory(u8* data, usize size);

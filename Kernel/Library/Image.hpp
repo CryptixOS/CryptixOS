@@ -104,34 +104,34 @@ namespace PNG
         inline i32           Height() const { return m_Height; }
 
       private:
-        [[maybe_unused]] u8*   m_Data   = nullptr;
-        [[maybe_unused]] usize m_Size   = 0;
+        CTOS_UNUSED u8*      m_Data   = nullptr;
+        CTOS_UNUSED usize    m_Size   = 0;
 
-        i32                    m_Width  = 0;
-        i32                    m_Height = 0;
-        u8                     m_Depth  = 0;
-        u8                     m_Color;
-        ColorType              m_ColorType = ColorType::eGrayscale;
-        CompressionMethod      m_CompressionMethod;
-        u8                     m_Filter;
-        InterlaceMethod        m_Interlace;
+        i32                  m_Width  = 0;
+        i32                  m_Height = 0;
+        u8                   m_Depth  = 0;
+        u8                   m_Color;
+        ColorType            m_ColorType = ColorType::eGrayscale;
+        CompressionMethod    m_CompressionMethod;
+        u8                   m_Filter;
+        InterlaceMethod      m_Interlace;
 
-        usize                  m_ChannelCount = 0;
-        Vector<PaletteEntry>   m_Palette;
+        usize                m_ChannelCount = 0;
+        Vector<PaletteEntry> m_Palette;
 
-        Buffer                 m_CompressedData;
-        usize                  m_IdatSize = 0;
+        Buffer               m_CompressedData;
+        usize                m_IdatSize = 0;
 
-        Buffer                 m_Pixels;
+        Buffer               m_Pixels;
 
-        Buffer Defilter(ByteStream<Endian::eLittle> inputStream);
-        void   UnfilterScanline(u8* currentRow, const u8* previousRow,
-                                i32 bytesPerPixel, i32 length, FilterType filter);
+        Buffer               Defilter(ByteStream<Endian::eLittle> inputStream);
+        void UnfilterScanline(u8* currentRow, const u8* previousRow,
+                              i32 bytesPerPixel, i32 length, FilterType filter);
 
-        bool   ParseIHDR(ByteStream<Endian::eBig>& stream, Chunk& chunk);
-        bool   ParsePLTE(ByteStream<Endian::eBig>& stream, Chunk& chunk);
-        bool   ParseTRNS(ByteStream<Endian::eBig>& stream, Chunk& chunk);
-        bool   ParseIDAT(ByteStream<Endian::eBig>& stream, Chunk& chunk);
+        bool ParseIHDR(ByteStream<Endian::eBig>& stream, Chunk& chunk);
+        bool ParsePLTE(ByteStream<Endian::eBig>& stream, Chunk& chunk);
+        bool ParseTRNS(ByteStream<Endian::eBig>& stream, Chunk& chunk);
+        bool ParseIDAT(ByteStream<Endian::eBig>& stream, Chunk& chunk);
     };
 
     class Image

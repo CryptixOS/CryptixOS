@@ -44,7 +44,7 @@ namespace Logger
     CTOS_NO_KASAN void EnableSink(usize sink);
     CTOS_NO_KASAN void DisableSink(usize sink);
 
-    VirtualConsole&          GetTerminal();
+    VirtualConsole&    GetTerminal();
     void               Unlock();
 } // namespace Logger
 

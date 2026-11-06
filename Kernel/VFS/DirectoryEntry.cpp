@@ -32,11 +32,11 @@ DirectoryEntry::~DirectoryEntry() {}
 
 Path         DirectoryEntry::Path()
 {
-    StringBuilder pathBuilder;
+    StringBuilder           pathBuilder;
 
-    WeakRef       current   = this;
-    auto          rootEntry = VFS::RootDirectoryEntry();
-    auto          rootINode = rootEntry->INode();
+    WeakRef<DirectoryEntry> current   = this;
+    auto                    rootEntry = VFS::RootDirectoryEntry();
+    auto                    rootINode = rootEntry->INode();
 
     while (current && current->INode() != rootINode)
     {
@@ -178,7 +178,7 @@ DirectoryEntry::TraverseDirectories(::Ref<class DirectoryEntry> parent,
     if (!m_INode) return nullptr;
 
     ::Ref entry = CreateRef<DirectoryEntry>(nullptr, name);
-    TryOrRetVal(m_INode->Lookup(entry), nullptr);
+    IgnoreUnused(TryOrRetVal(m_INode->Lookup(entry), nullptr));
 
     entry->SetParent(this);
     InsertChild(entry);
@@ -201,7 +201,7 @@ ErrorOr<void> DirectoryEntry::PopulateDirectoryEntries()
         });
 
     INode()->TraverseDirectories(nullptr, iterator);
-    for (const auto name : inodes) Lookup(name);
+    for (const auto name : inodes) IgnoreUnused(Lookup(name));
 
     m_Populated = true;
     return {};

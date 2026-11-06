@@ -4,6 +4,8 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Library/ELF/Image.hpp>
+
 #include <SerioController.hpp>
 
 #include <Drivers/Core/GenericDriver.hpp>

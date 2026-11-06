@@ -39,4 +39,4 @@ class I8259A : public InterruptController
     u16  GetISR();
 
     u16  GetIRQRegister(u8 ocw3);
-}; // namespace PIC
+}; 

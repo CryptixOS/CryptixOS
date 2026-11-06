@@ -9,7 +9,7 @@
 #include <Prism/Core/Error.hpp>
 #include <Prism/Memory/RefCounted.hpp>
 
-class InterruptController : public RefCounted
+class InterruptController : public RefCounted<InterruptController>
 {
   public:
     virtual ErrorOr<void> Initialize()     = 0;

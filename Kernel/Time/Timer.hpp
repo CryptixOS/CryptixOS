@@ -12,7 +12,7 @@
 
 namespace Time
 {
-    struct Timer : public RefCounted
+    struct Timer : public RefCounted<Timer>
     {
         explicit Timer()       = default;
 

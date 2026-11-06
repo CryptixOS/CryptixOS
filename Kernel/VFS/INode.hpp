@@ -22,7 +22,7 @@ using INodeID = ino_t;
 
 struct Credentials;
 class File;
-class INode : public RefCounted
+class INode : public RefCounted<INode>
 {
   public:
     struct Metadata

@@ -115,7 +115,7 @@ ErrorOr<::Ref<DirectoryEntry>>
 SynthFsINode::CreateDirectory(::Ref<DirectoryEntry> entry, INodeMode mode)
 {
 
-    TryOrRet(CreateNode(entry, (mode & ~S_IFMT) | S_IFDIR, 0));
+    IgnoreUnused(TryOrRet(CreateNode(entry, (mode & ~S_IFMT) | S_IFDIR, 0)));
 
     ++m_Metadata.LinkCount;
     return entry;

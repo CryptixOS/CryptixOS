@@ -180,8 +180,9 @@ static ::Ref<ProcFsINode> CreateProcFsNode(::Ref<INode> parent, StringView name,
                                            Filesystem* filesystem)
 {
     ProcFsProperty* property = CreateProcFsProperty(name);
-    auto node = new ProcFsINode(name, filesystem, 0755 | S_IFREG, property);
-    property->m_Parent = node;
+    auto            node
+        = CreateRef<ProcFsINode>(name, filesystem, 0755 | S_IFREG, property);
+    property->m_Parent = node.Raw();
 
     return node;
 }
@@ -194,7 +195,7 @@ ErrorOr<::Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
 
     m_RootEntry          = CreateRef<DirectoryEntry>(nullptr, "/");
     // m_Root               = TryOrRet(AllocateNode("/", 0644 | S_IFDIR));
-    m_Root               = new ProcFsRootINode("/", this);
+    m_Root               = CreateRef<ProcFsRootINode>("/", this);
 
     auto inode           = m_Root.As<ProcFsINode>();
     inode->m_Metadata.ID = 2;
@@ -216,7 +217,7 @@ ErrorOr<::Ref<DirectoryEntry>> ProcFs::Mount(StringView  sourcePath,
 
 ErrorOr<::Ref<INode>> ProcFs::AllocateNode(StringView name, INodeMode mode)
 {
-    auto inode = new ProcFsINode(name, this, NextINodeIndex(), mode);
+    auto inode = CreateRef<ProcFsINode>(name, this, NextINodeIndex(), mode);
     if (!inode) return Error(ENOMEM);
 
     return inode;

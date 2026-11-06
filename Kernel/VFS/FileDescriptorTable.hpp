@@ -9,7 +9,7 @@
 #include <Prism/Containers/UnorderedMap.hpp>
 #include <VFS/FileDescriptor.hpp>
 
-class FileDescriptorTable : public RefCounted
+class FileDescriptorTable : public RefCounted<FileDescriptorTable>
 {
     using TableType = UnorderedMap<isize, ::Ref<FileDescriptor>>;
 

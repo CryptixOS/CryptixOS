@@ -26,7 +26,7 @@
  * and other filesystem-level operations.
  * @ingroup Filesystem
  */
-class Filesystem : public RefCounted
+class Filesystem : public RefCounted<Filesystem>
 {
   public:
     /**

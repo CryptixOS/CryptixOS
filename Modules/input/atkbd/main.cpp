@@ -229,7 +229,7 @@ extern "C" CTOS_EXPORT bool ModuleInit()
         = CreateRef<AtKeyboard>(ctrl, SerioDevicePort::ePort1, scancodeSet);
     DeviceManager::RegisterCharDevice(kbd.Raw());
 
-    ctrl->RegisterPort(SerioDevicePort::ePort1, kbd);
+    ctrl->RegisterPort(SerioDevicePort::ePort1, kbd.As<SerioDevice>());
 #endif
     return true;
 }
