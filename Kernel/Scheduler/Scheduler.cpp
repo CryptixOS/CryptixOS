@@ -28,6 +28,11 @@ namespace
     struct CPULocalData
     {
         Atomic<bool> PreemptionEnabled;
+        // A dead process whose last thread this CPU switched away from in the
+        // previous tick. That tick was still running on the dead thread's
+        // kernel stack, so the process (and with it the thread and its stack)
+        // may only be released from the next tick, which runs on another one.
+        Process*     DeferredTeardown = nullptr;
     };
     CPULocalData* s_CPULocalData;
 
@@ -198,20 +203,38 @@ void Scheduler::DisablePreemption()
 
 void Scheduler::Block(Thread* thread)
 {
-    if (thread->State() == ThreadState::eBlocked) return;
-    thread->SetState(ThreadState::eBlocked);
+    {
+        ScopedLock guard(thread->WakeLock, true);
+        // A wakeup that arrived before we got to block: don't sleep.
+        if (thread->WakeupPending)
+        {
+            thread->WakeupPending = false;
+            return;
+        }
+        if (thread->State() == ThreadState::eBlocked) return;
+        thread->SetState(ThreadState::eBlocked);
+    }
 
     if (thread == Thread::Current()) Yield(true);
 }
 void Scheduler::Unblock(Thread* thread)
 {
-    if (thread->State() != ThreadState::eBlocked) return;
-
-    thread->SetState(ThreadState::eReady);
-    if (!thread->m_IsEnqueued)
     {
-        if (thread->Hook.IsLinked()) thread->Hook.Unlink(thread);
-        EnqueueThread(thread);
+        ScopedLock guard(thread->WakeLock, true);
+        if (thread->State() != ThreadState::eBlocked)
+        {
+            // Not blocked (yet): remember the wakeup, so the thread's next
+            // Block() returns immediately instead of sleeping forever.
+            thread->WakeupPending = true;
+            return;
+        }
+
+        thread->SetState(ThreadState::eReady);
+        if (!thread->m_IsEnqueued)
+        {
+            if (thread->Hook.IsLinked()) thread->Hook.Unlink(thread);
+            EnqueueThread(thread);
+        }
     }
 
     Time::SchedulerTimer()->Start(TimerMode::eOneShot,
@@ -344,7 +367,8 @@ Thread* Scheduler::PickReadyThread()
     {
         if (newThread->IsDead() && newThread->Parent()->IsDead())
         {
-            delete newThread->Parent();
+            newThread->Parent()->MarkForTeardown(Process::eOffCpu);
+            newThread = GetNextThread(CPU::Current()->ID);
             continue;
         }
         else if (newThread->IsBlocked())
@@ -382,11 +406,19 @@ void Scheduler::SwitchContext(Thread* newThread, ExecutionContext* oldContext)
     if (currentThread && currentThread->IsDead()
         && currentThread->Parent()->IsDead()
         && currentThread != CPU::Current()->Idle)
-        delete currentThread->Parent();
+        s_CPULocalData[CPU::GetCurrentID()].DeferredTeardown
+            = currentThread->Parent();
 }
 
 void Scheduler::Tick(ExecutionContext* ctx)
 {
+    auto& local = s_CPULocalData[CPU::GetCurrentID()];
+    if (auto process = local.DeferredTeardown)
+    {
+        local.DeferredTeardown = nullptr;
+        process->MarkForTeardown(Process::eOffCpu);
+    }
+
     Thread* newThread = nullptr;
     if (!IsPreemptionEnabled()) goto reschedule;
 
@@ -399,6 +431,9 @@ void Scheduler::Tick(ExecutionContext* ctx)
         newThread->SetState(ThreadState::eRunning);
 
 reschedule:
+    // With preemption disabled no thread was picked: keep the current one
+    if (!newThread) newThread = Thread::Current();
+    if (!newThread) newThread = CPU::Current()->Idle;
     Time::SchedulerTimer()->Start(TimerMode::eOneShot,
                                   newThread->Parent()->Quantum() * 1_ms);
 }

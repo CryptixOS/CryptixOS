@@ -162,6 +162,13 @@ struct Thread : public RefCounted<Thread>
     ExecutionContext SavedContext;
     Spinlock         YieldAwaitLock;
 
+    // Guards the blocked <-> ready decision in Scheduler::Block/Unblock.
+    // An Unblock() that arrives before the thread actually blocked (e.g.
+    // between Event::Await releasing the event locks and Scheduler::Block)
+    // sets WakeupPending instead of being lost; the next Block() consumes it.
+    Spinlock         WakeLock;
+    bool             WakeupPending = false;
+
   private:
     Vector<::Ref<Region>> m_Stacks;
     bool                  m_IsUser = false;

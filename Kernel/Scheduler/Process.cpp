@@ -81,10 +81,29 @@ Process::Process(Process* parent, StringView name,
 
     for (auto& timer : m_Timers) timer = CreateRef<struct Timer>();
 }
+// Frees the physical memory backing `region`, if the PMM owns it. Regions
+// that were never touched (demand paging) have no backing memory, and device
+// mappings (e.g. the framebuffer) point at memory the PMM never allocated.
+static void FreeRegionMemory(const Ref<Region>& region)
+{
+    auto phys = region->PhysicalBase();
+    if (!phys) return;
+
+    auto fd   = region->FileDescriptor();
+    auto file = fd ? fd->File() : nullptr;
+    if (file && (file->IsCharDevice() || file->IsBlockDevice())) return;
+
+    PMM::FreePages(phys, Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE));
+}
+
 Process::~Process()
 {
-    Arch::VMM::DestroyPageMap(PageMap);
-    delete PageMap;
+    if (PageMap)
+    {
+        Arch::VMM::DestroyPageMap(PageMap);
+        delete PageMap;
+        PageMap = nullptr;
+    }
     if (!m_AddressSpace) return;
 
     for (auto& [virt, region] : *m_AddressSpace)
@@ -94,11 +113,7 @@ Process::~Process()
             LogDebug("~Process: Hit signal trampoline region, omitting...");
             continue;
         }
-        auto  phys      = region->PhysicalBase();
-        usize size      = region->Size();
-        usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
-
-        PMM::FreePages(phys, pageCount);
+        FreeRegionMemory(region);
     }
 }
 
@@ -416,6 +431,43 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
     }
     delete[] buffer;
 
+    // Everything that can fail happens before the point of no return, so a
+    // failed exec leaves the calling process intact. argv/envp live in the
+    // old image, so they're copied into kernel memory before it goes away.
+    if (hasSheBang && !interpreterPath.Empty())
+    {
+        auto pathRes = TryOrRet(VFS::ResolvePath(CWD().Raw(), interpreterPath));
+        dentry       = pathRes.Entry;
+        inode        = dentry->INode();
+        if (!inode) return Error(ENOENT);
+    }
+
+    Vector<String> argvStorage;
+    Vector<String> envpStorage;
+    if (hasSheBang && !interpreterPath.Empty()) argvStorage.PushBack(path);
+    {
+        UserMemoryProtectionGuard guard;
+        for (char** arg = argv; arg && *arg; arg++) argvStorage.PushBack(*arg);
+        for (char** env = envp; env && *env; env++) envpStorage.PushBack(*env);
+    }
+
+    // Load the new image into a fresh page map and address space; the old
+    // ones are still live (and loaded in CR3) at this point.
+    auto newAddressSpace = CreateRef<class AddressSpace>();
+    auto newPageMap      = new class PageMap();
+
+    ExecutableProgram program;
+    if (!program.Load(dentry, newPageMap, *newAddressSpace))
+    {
+        for (const auto& [virt, region] : *newAddressSpace)
+            FreeRegionMemory(region);
+        newAddressSpace->Clear();
+        Arch::VMM::DestroyPageMap(newPageMap);
+        delete newPageMap;
+        return Error(ENOEXEC);
+    }
+
+    // Point of no return.
     auto oldTable = m_FdTable;
     m_FdTable     = CreateRef<class FileDescriptorTable>();
 
@@ -425,65 +477,57 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 
     if (m_ID <= 2)
     {
-        isize fdNum
-            = TryOrRet(OpenAt(AT_FDCWD, "/dev/console", O_RDWR, S_IFCHR));
-        DupFd(fdNum, 0, 0);
-        DupFd(fdNum, 1, 0);
-        DupFd(fdNum, 2, 0);
+        auto fdNumOr = OpenAt(AT_FDCWD, "/dev/console", O_RDWR, S_IFCHR);
+        if (fdNumOr)
+        {
+            isize fdNum = fdNumOr.Value();
+            DupFd(fdNum, 0, 0);
+            DupFd(fdNum, 1, 0);
+            DupFd(fdNum, 2, 0);
+        }
+        else LogError("Process::Exec: Failed to open /dev/console");
     }
 
-    if (m_AddressSpace)
+    // Switch to the new page map *before* tearing down the old one: the old
+    // page tables must not be freed while CR3 still points at them.
+    auto oldPageMap     = PageMap;
+    auto oldAddressSpace = m_AddressSpace;
+    PageMap             = newPageMap;
+    m_AddressSpace      = newAddressSpace;
+    VMM::LoadPageMap(*PageMap, true);
+
+    if (oldAddressSpace)
     {
-        for (const auto& [virt, region] : *m_AddressSpace)
+        for (const auto& [virt, region] : *oldAddressSpace)
         {
             if (region->VirtualBase() == m_SignalTrampolineVirt) continue;
 
-            auto  phys      = region->PhysicalBase();
-            usize pageCount = Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE);
-            PMM::FreePages(phys, pageCount);
+            FreeRegionMemory(region);
         }
-        m_AddressSpace->Clear();
+        oldAddressSpace->Clear();
     }
-    m_AddressSpace = CreateRef<class AddressSpace>();
-
-    m_Name         = path;
-    Arch::VMM::DestroyPageMap(PageMap);
-    delete PageMap;
-
-    PageMap = new class PageMap();
-    Vector<StringView> argvArr;
-    if (hasSheBang && !interpreterPath.Empty())
+    if (oldPageMap)
     {
-        argvArr.PushBack(path);
-        auto pathRes = TryOrRet(VFS::ResolvePath(CWD().Raw(), interpreterPath));
-        dentry       = pathRes.Entry;
-        inode        = dentry->INode();
-        if (!inode) return Error(ENOENT);
+        Arch::VMM::DestroyPageMap(oldPageMap);
+        delete oldPageMap;
     }
 
-    {
-        UserMemoryProtectionGuard guard;
-        for (char** arg = argv; *arg; arg++) argvArr.PushBack(*arg);
-    }
-
-    ExecutableProgram program;
-    if (!program.Load(dentry, PageMap, *m_AddressSpace)) return Error(ENOEXEC);
+    m_Name                = path;
     Thread* currentThread = CPU::GetCurrentThread();
     currentThread->SetState(ThreadState::eExited);
 
+    // This thread is still executing (on its own kernel stack) until the
+    // Yield() below, so keep a reference to it: CreateThread() replaces
+    // m_MainThread, and dropping the last reference here would free the
+    // kernel stack we're running on (seen as PMM double frees, then a crash).
     for (auto& thread : m_Threads)
-        // NOTE(v1tr10l7): We don't won't this thread to be deleted just yet, as
-        // it is being executed right now. The scheduler will take care of
-        // finalizing dead processes,
-        // and then it will get cleanup up
-        if (thread == currentThread) m_MainThread = currentThread;
+        if (thread == currentThread) m_ExecutingThread = thread;
     m_Threads.Clear();
 
+    Vector<StringView> argvArr;
     Vector<StringView> envpArr;
-    {
-        UserMemoryProtectionGuard guard;
-        for (char** env = envp; *env; env++) envpArr.PushBack(*env);
-    }
+    for (const auto& arg : argvStorage) argvArr.PushBack(arg.View());
+    for (const auto& env : envpStorage) envpArr.PushBack(env.View());
 
     auto thread
         = CreateThread(argvArr, envpArr, program, CPU::GetCurrent()->ID);
@@ -495,86 +539,73 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 ErrorOr<ProcessID> Process::WaitPid(ProcessID pid, i32* wstatus, i32 flags,
                                     rusage* rusage)
 {
-    bool           block = !(flags & WNOHANG);
-    Vector<Event*> events;
+    bool block   = !(flags & WNOHANG);
+    auto matches = [this, pid](Process* child) -> bool
+    {
+        if (pid < -1) return child->PGid() == -pid;
+        if (pid == -1) return true;
+        if (pid == 0) return child->PGid() == PGid();
+        return child->ID() == pid;
+    };
+    // Reaps an exited child: it must not be reported (or waited on) again.
+    auto reap = [this](Process* child)
+    {
+        for (auto it = m_Children.begin(); it != m_Children.end(); ++it)
+        {
+            if (*it != child) continue;
+            m_Children.Erase(it);
+            break;
+        }
+        child->MarkForTeardown(eReaped);
+    };
+
+    Vector<Event*>   events;
+    Vector<Process*> procs;
     for (;;)
     {
-        // LogTrace("Process::WaitPid: Waiting for pid: {}", pid);
         events.Clear();
-        events.ShrinkToFit();
-        Process*         process = Process::GetCurrent();
-        Vector<Process*> procs;
-        if (m_Children.Empty()) return Error(ECHILD);
+        procs.Clear();
 
-        if (pid < -1)
-        {
-            ProcessID gid = -pid;
-            auto      it  = FindIf(m_Children.begin(), m_Children.end(),
-                                   [gid](Process* proc) -> bool
-                                   {
-                                 if (proc->PGid() == gid) return true;
-                                 return false;
-                             });
-            if (it == m_Children.end()) return Error(ECHILD);
-            procs.PushBack(*it);
-        }
-        else if (pid == -1) procs = process->m_Children;
-        else if (pid == 0)
-        {
-            auto it = FindIf(m_Children.begin(), m_Children.end(),
-                             [process](Process* proc) -> bool
-                             {
-                                 if (proc->PGid() == process->PGid())
-                                     return true;
-                                 return false;
-                             });
+        // Consider *every* matching child, not just the first one.
+        for (auto child : m_Children)
+            if (matches(child)) procs.PushBack(child);
+        if (procs.Empty()) return Error(ECHILD);
 
-            if (it == m_Children.end()) return Error(ECHILD);
-            procs.PushBack(*it);
-        }
-        else if (pid > 0)
+        // A child that exited before we got here has already triggered its
+        // event; report it right away instead of relying on that event.
+        for (auto child : procs)
         {
-            auto it = FindIf(m_Children.begin(), m_Children.end(),
-                             [pid](Process* proc) -> bool
-                             {
-                                 if (proc->ID() == pid) return true;
-                                 return false;
-                             });
+            if (child->m_State != ProcessState::eDead && !child->m_Exited)
+                continue;
 
-            if (it == m_Children.end()) return Error(ECHILD);
-            procs.PushBack(*it);
+            // m_Status is already encoded with W_EXITCODE() by Exit().
+            if (wstatus) CopyToUser(wstatus, child->m_Status.ValueOr(0));
+            ProcessID foundId = child->ID();
+            reap(child);
+            return foundId;
         }
 
-        for (auto& child : procs)
-        {
-            events.PushBack(&child->m_Event);
-            continue;
-            // Check if process is dead or has a pending status change
-            if (child->m_State == ProcessState::eDead || child->m_Exited)
-            {
-                if (wstatus) CopyToUser(wstatus, child->m_Status.ValueOr(0));
+        // WNOHANG: children exist, but none has changed state.
+        if (!block) return 0;
 
-                ProcessID foundId = child->ID();
-
-                // FIXME: zombies
-                return foundId;
-            }
-        }
-
-        auto ret = Event::Await(Span(events.Raw(), events.Size()), block);
+        for (auto child : procs) events.PushBack(&child->m_Event);
+        auto ret = Event::Await(Span(events.Raw(), events.Size()), true);
         if (!ret.HasValue()) return Error(EINTR);
-        LogTrace("Process::WaitPid: Woken up for pid: {}",
-                 procs[ret.Value()]->ID());
 
-        auto which = procs[ret.Value()];
-        if (!(flags & WUNTRACED) && WIFSTOPPED(which->Status().ValueOr(0)))
-            continue;
-        if (!(flags & WCONTINUED) && WIFCONTINUED(which->Status().ValueOr(0)))
-            continue;
+        // Don't trust which event woke us (a wakeup can arrive early): just
+        // look at the children again. Exits are handled at the top of the
+        // loop; here only stop/continue notifications are reported.
+        if (ret.Value() >= procs.Size()) continue;
+        auto which  = procs[ret.Value()];
+        auto status = which->Status().ValueOr(0);
+        if (which->m_Exited || which->m_State == ProcessState::eDead) continue;
 
-        if (wstatus)
-            CopyToUser(wstatus, W_EXITCODE(which->Status().ValueOr(0), 0));
+        bool report = ((flags & WUNTRACED) && WIFSTOPPED(status))
+                   || ((flags & WCONTINUED) && WIFCONTINUED(status));
+        if (!report) continue;
 
+        LogTrace("Process::WaitPid: Woken up for pid: {}", which->ID());
+        if (wstatus) CopyToUser(wstatus, status);
         return which->ID();
     }
 }
@@ -611,6 +642,13 @@ ErrorOr<Process*> Process::Clone(usize flags)
     return newProcess;
 }
 
+void Process::MarkForTeardown(TeardownMark mark)
+{
+    u8 previous = m_TeardownMarks.FetchOr(mark);
+    if (previous & mark) return;
+    if ((previous | mark) == (eOffCpu | eReaped)) delete this;
+}
+
 i32 Process::Exit(i32 code)
 {
     AssertMsg(this != Scheduler::GetKernelProcess(),
@@ -642,7 +680,10 @@ i32 Process::Exit(i32 code)
     }
     m_Zombies.Clear();
 
-    delete PageMap;
+    // Leave this page map before dropping it: CR3 must never point at a
+    // freed page map. (Its tables are torn down by ~Process; with CLONE_VM
+    // the map may be shared, so it isn't destroyed here.)
+    VMM::LoadPageMap(*VMM::GetKernelPageMap(), false);
     m_Status = W_EXITCODE(code, 0);
     m_Exited = true;
 
@@ -733,14 +774,42 @@ ErrorOr<void> Process::CopyMemory(Process* process)
         if (region->VirtualBase() == m_SignalTrampolineVirt) continue;
         usize size      = region->Size();
         usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
-        auto  phys      = PMM::CallocatePages(pageCount);
+        auto  fd        = region->FileDescriptor();
+        auto  file      = fd ? fd->File() : nullptr;
+        bool  isDevice
+            = file && (file->IsCharDevice() || file->IsBlockDevice());
 
-        Memory::Copy(Pointer(phys).ToHigherHalf<void*>(),
-                     region->PhysicalBase().ToHigherHalf<void*>(),
-                     region->Size());
         auto newRegion = process->m_AddressSpace->AllocateFixed(virt, size);
+        if (!newRegion) return Error(ENOMEM);
         newRegion->SetAccessMode(region->Access());
-        process->PageMap->MapRange(virt, phys, size, region->PageAttributes());
+        newRegion->SetFileDescriptor(fd, region->FileOffset());
+
+        // Never touched yet: the child demand-pages it too. (Copying from
+        // PhysicalBase() == nullptr would copy physical page 0 into it.)
+        auto parentPhys = region->PhysicalBase();
+        if (!parentPhys) continue;
+
+        auto attributes = region->PageAttributes();
+        if (virt < Pointer(MM::HigherHalfOffset()))
+            attributes |= PageAttributes::eUser;
+
+        // Device memory (e.g. a mapped framebuffer) is shared, not copied.
+        if (isDevice)
+        {
+            newRegion->SetPhysicalBase(parentPhys);
+            process->PageMap->MapRange(virt, parentPhys, size, attributes);
+            continue;
+        }
+
+        auto phys = PMM::CallocatePages(pageCount);
+        if (!phys) return Error(ENOMEM);
+        Memory::Copy(Pointer(phys).ToHigherHalf<void*>(),
+                     parentPhys.ToHigherHalf<void*>(), size);
+
+        // Record the copy, so it is freed with the region and isn't treated
+        // as unbacked by the page-fault handler.
+        newRegion->SetPhysicalBase(phys);
+        process->PageMap->MapRange(virt, phys, size, attributes);
     }
 
     return {};

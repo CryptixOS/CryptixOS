@@ -78,6 +78,16 @@ Optional<usize> Event::Await(Span<Event*> events, bool block)
         return NullOpt;
     }
 
+    {
+        // Block()/Unblock() are only used by events. A wakeup left pending from
+        // an earlier wait (e.g. a second event of that wait firing before we
+        // detached from it) doesn't belong to this one: without clearing it,
+        // the Block() below returns at once and the caller wakes up for
+        // nothing. A wakeup for this wait can only come after the listeners
+        // are attached, and we hold every event's lock until then.
+        ScopedLock wakeGuard(thread->WakeLock, true);
+        thread->WakeupPending = false;
+    }
     AttachListeners(events, thread);
     UnlockEvents(events);
     CPU::SetInterruptFlag(true);
@@ -98,20 +108,28 @@ void Event::Trigger(Event* event, bool drop)
 {
     bool intState = CPU::SwapInterruptFlag(false);
 
-    if (event->Listeners.Empty())
     {
-        if (!drop) ++event->Pending;
-        return;
+        // Must hold the lock while deciding between "record as pending" and
+        // "wake the listeners": Await() checks Pending and attaches its
+        // listener under this lock, so checking Listeners without it could
+        // see no listener, bump Pending after the waiter already checked it,
+        // and lose the wakeup forever.
+        ScopedLock guard(event->Lock);
+        if (event->Listeners.Empty())
+        {
+            if (!drop) ++event->Pending;
+        }
+        else
+        {
+            for (const auto& listener : event->Listeners)
+            {
+                auto thread = listener.Thread;
+                thread->SetWhich(listener.Which);
+                Scheduler::Unblock(thread);
+            }
+            event->Listeners.Clear();
+        }
     }
 
-    ScopedLock guard(event->Lock);
-    for (const auto& listener : event->Listeners)
-    {
-        auto thread = listener.Thread;
-        thread->SetWhich(listener.Which);
-        Scheduler::Unblock(thread);
-    }
-
-    event->Listeners.Clear();
     CPU::SetInterruptFlag(intState);
 }

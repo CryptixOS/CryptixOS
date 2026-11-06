@@ -21,10 +21,16 @@ ErrorOr<void> CopyFromUser(Pointer destination, Pointer source, usize count);
 ErrorOr<void> FillUser(Pointer buffer, isize value, usize count);
 
 // NOTE(v1tr10l7): allows accessing usermode memory from ring0
+// Guards nest: an inner guard restores the state it found instead of always
+// disabling user access, so it can't cut off the outer guard's access (e.g.
+// CopyToUser() called from inside read()'s guard).
 struct UserMemoryProtectionGuard
 {
     UserMemoryProtectionGuard();
     ~UserMemoryProtectionGuard();
+
+  private:
+    bool m_WasEnabled = false;
 };
 
 template <typename F, typename... Args>

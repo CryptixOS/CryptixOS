@@ -209,6 +209,17 @@ class Process
     ErrorOr<i32>       Exec(String path, char** argv, char** envp);
     i32                Exit(i32 code);
 
+    // A dead process is freed only after both its last thread is off the CPU
+    // (eOffCpu, by the scheduler) and its parent reaped it (eReaped, by
+    // WaitPid): the parent still reads its status and event until then.
+    // Whichever side comes second deletes it; repeating a mark is a no-op.
+    enum TeardownMark : u8
+    {
+        eOffCpu = Bit(0),
+        eReaped = Bit(1),
+    };
+    void               MarkForTeardown(TeardownMark mark);
+
     ErrorOr<void>      WaitForFutex(i32* vaddr, i32 expected);
     ErrorOr<void>      WakeFutex(i32* vaddr);
 
@@ -228,8 +239,13 @@ class Process
     PrivilegeLevel                   m_Ring = PrivilegeLevel::eUnprivileged;
     Optional<i32>                    m_Status;
     bool                             m_Exited     = false;
+    Atomic<u8>                       m_TeardownMarks = 0;
 
     Ref<Thread>                      m_MainThread = nullptr;
+    // The thread that called execve(). It keeps running (on its kernel stack)
+    // until it yields at the end of Exec(), so it must not be destroyed
+    // there; it is released by the next exec or with the process.
+    Ref<Thread>                      m_ExecutingThread = nullptr;
     Atomic<ThreadID>                 m_NextTid    = m_ID;
     Vector<Process*>                 m_Children;
     Vector<Process*>                 m_Zombies;
