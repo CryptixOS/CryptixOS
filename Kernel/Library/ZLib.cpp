@@ -175,17 +175,28 @@ namespace ZLib
 
     bool Decompressor::EnsureCapacity(usize count)
     {
-        usize currentOffset
-            = m_OutputBuffer ? m_OutputPointer - m_OutputBuffer : 0;
-        usize newSize = m_OutputBuffer == 0 ? count : m_OutputSize;
+        usize used     = m_OutputBuffer ? m_OutputPointer - m_OutputBuffer : 0;
+        usize required = used + count;
+        if (m_OutputBuffer && required <= m_OutputSize) return true;
 
-        while (newSize < currentOffset + count) newSize <<= 1;
+        usize newSize = m_OutputSize ? m_OutputSize : Max(count, 4096zu);
+        while (newSize < required) newSize <<= 1;
 
-        if (m_OutputBuffer) delete[] m_OutputBuffer;
-        m_OutputBuffer  = new u8[newSize];
+        u8* newBuffer = new u8[newSize];
+        if (!newBuffer) return false;
+
+        // Keep what has been decompressed so far: back-references (and the
+        // final result) read from it
+        if (m_OutputBuffer)
+        {
+            Memory::Copy(newBuffer, m_OutputBuffer, used);
+            delete[] m_OutputBuffer;
+        }
+
+        m_OutputBuffer  = newBuffer;
         m_OutputSize    = newSize;
 
-        m_OutputPointer = m_OutputBuffer + currentOffset;
+        m_OutputPointer = m_OutputBuffer + used;
         m_OutputEnd     = m_OutputBuffer + newSize;
         return true;
     }
@@ -359,6 +370,9 @@ namespace ZLib
             {
                 if (currentPointer >= m_OutputEnd)
                 {
+                    // EnsureCapacity() measures the used part from
+                    // m_OutputPointer, which this loop only tracks locally
+                    m_OutputPointer = currentPointer;
                     if (!EnsureCapacity(4096)) return false;
                     currentPointer = m_OutputPointer;
                 }
@@ -413,6 +427,7 @@ namespace ZLib
             }
             if (currentPointer + len >= m_OutputEnd)
             {
+                m_OutputPointer = currentPointer;
                 if (!EnsureCapacity(len * 2)) return false;
                 currentPointer = m_OutputPointer;
             }

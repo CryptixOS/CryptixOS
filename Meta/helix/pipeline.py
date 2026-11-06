@@ -158,17 +158,18 @@ def ksyms(build_dir: str):
 
 
 def initrd(build_dir: str):
-    """Copies the external modules into the sysroot and archives it."""
+    """Copies the external modules into the sysroot, archives it and
+    zlib-compresses the archive (the kernel inflates it at boot)."""
     modules_dir = os.path.join(SYSROOT, 'usr', 'lib', 'modules')
     shutil.rmtree(modules_dir, ignore_errors=True)
     os.makedirs(modules_dir)
     for module in _external_modules(build_dir):
         shutil.copy(module, modules_dir)
 
-    info('creating initrd.img.gz...')
-    output = os.path.join(build_dir, 'initrd.img.gz')
-    shell.run(['tar', '-cf', output, '-C', SYSROOT + '/', '.'])
-    shell.run([os.path.join(META, 'compress-initrd.sh'), output,
+    info('creating initrd.zlib...')
+    tarball = os.path.join(build_dir, 'initrd.tar')
+    shell.run(['tar', '-cf', tarball, '-C', SYSROOT + '/', '.'])
+    shell.run([os.path.join(META, 'compress-initrd.sh'), tarball,
                os.path.join(build_dir, 'initrd.zlib')])
 
 
@@ -187,7 +188,7 @@ def iso(build_dir: str, arch: str):
     os.makedirs(iso_dir, exist_ok=True)
     files = [
         (os.path.join(build_dir, 'Kernel', 'Cryptix.elf'), 'Cryptix.elf'),
-        (os.path.join(build_dir, 'initrd.img.gz'), 'initrd.img.gz'),
+        (os.path.join(build_dir, 'initrd.zlib'), 'initrd.zlib'),
         (os.path.join(META, 'limine.conf'), 'limine.conf'),
         (os.path.join(META, 'images', 'bg2.png'), 'bg2.png'),
         (os.path.join(META, 'fonts', 'font.bin'), 'font.bin'),

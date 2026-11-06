@@ -31,12 +31,6 @@ namespace Ustar
         LogTrace("USTAR: Loading at '{:#x}'...", address);
         usize nextThreshold = 10;
 
-        // ZLib::Decompressor decompressor(address, size);
-        // Assert(decompressor.Decompress(size));
-        //
-        // address = decompressor.DecompressedData();
-        // size = decompressor.DecompressedSize();
-
         auto  current       = address.As<FileHeader>();
         auto  getNextFile
             = [](FileHeader* current, usize fileSize) -> FileHeader*

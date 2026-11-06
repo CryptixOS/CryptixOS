@@ -337,10 +337,12 @@ iso_files = [
 c = run_command(['find', meson.project_source_root() / 'BaseFiles', '-type', 'f'], check: true)
 base_files = c.stdout().strip().split('\n')
 
+# The initrd is a ustar archive of the sysroot, zlib-compressed below; the
+# kernel inflates it with Library/ZLib before unpacking it.
 initrd = custom_target(
   'initrd',
   input: [ext_mods, meson.project_source_root() / 'sysroot/usr/sbin/init' ],
-  output: 'initrd.img.gz',
+  output: 'initrd.tar',
   command: [
     'rm', '-rf', initrd_dir / 'usr/lib/modules', '&&',
     'mkdir', '-p', initrd_dir / 'usr/lib/modules', '&&',
@@ -372,7 +374,7 @@ initrd_zlib = custom_target(
 iso = custom_target(
   'iso',
   input: [
-    kernel_elf, initrd, 
+    kernel_elf, initrd_zlib, 
     meson.project_source_root() / 'Meta' / 'limine.conf', 
     meson.project_source_root() / 'Meta' / 'images' / 'bg2.png', 
     meson.project_source_root() / 'Meta' / 'fonts' / 'font.bin'],
@@ -387,7 +389,7 @@ iso = custom_target(
     '&&',
     'cp',
     '@INPUT1@',
-    iso_dir / 'initrd.img.gz',
+    iso_dir / 'initrd.zlib',
     '&&',
     'cp',
     '@INPUT2@',
@@ -421,7 +423,7 @@ iso = custom_target(
   build_by_default: false,
   console: true,
   install: false,
-  depends: [kernel_elf, initrd, root_image],
+  depends: [kernel_elf, initrd_zlib, root_image],
 )
 
 acpi_dir = meson.project_source_root() / 'Meta' / 'firmware' / 'acpi-tables'
