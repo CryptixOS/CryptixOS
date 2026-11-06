@@ -87,6 +87,7 @@ namespace DMI::SMBIOS
         LogTrace("DMI: 64 bit SMBIOS entry point => {:#x}", entry64);
         ScopedMapping<EntryPoint32> entryPoint(
             entry32, PageAttributes::eRW | PageAttributes::eWriteBack);
+        if (!entryPoint) return;
 
         StringView anchorString(
             reinterpret_cast<const char*>(&entryPoint->AnchorString), 4);

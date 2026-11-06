@@ -15,6 +15,8 @@ File::File(class ::Ref<class INode> inode)
 class ::Ref<class INode> File::INode() const { return m_INode; }
 usize          File::Size() const { return m_INode ? m_INode->Size() : 0; }
 
+ErrorOr<void>  File::MapRegion(::Ref<Region> region) { return {}; }
+
 ErrorOr<isize> File::Read(void* dest, off_t offset, usize bytes)
 {
     ScopedLock guard(m_Lock);

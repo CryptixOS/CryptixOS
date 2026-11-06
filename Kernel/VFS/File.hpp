@@ -29,6 +29,8 @@ class File : public RefCounted<File>
     virtual void                     Close(bool writer) {}
 
     virtual ErrorOr<File*>           Open(File* file) { return file; }
+    virtual ErrorOr<void>            MapRegion(::Ref<Region> region);
+
     virtual ErrorOr<isize> Read(void* dest, off_t offset, usize bytes);
     virtual ErrorOr<isize> Write(const void* src, off_t offset, usize bytes);
     virtual ErrorOr<isize> Read(const UserBuffer& out, usize count,

@@ -168,7 +168,7 @@ namespace
             s_BootInformation->LowestAllocatedAddress
                 = Min(s_BootInformation->LowestAllocatedAddress, address);
             s_BootInformation->HighestAllocatedAddress
-                = Max(s_BootInformation->HighestAllocatedAddress, address);
+                = Max(s_BootInformation->HighestAllocatedAddress, address.Offset<Pointer>(bytes));
             return HigherHalfPointer(address);
         }
 
@@ -410,6 +410,8 @@ namespace
     void SetupBootInfo(BootInformation& info)
     {
         s_BootInformation              = &info;
+        // Start at the top, so the first boot allocation lowers it.
+        info.LowestAllocatedAddress    = Pointer(~0ull);
         auto bootInfoResponse          = s_BootloaderInfoRequest.response;
         auto executableCmdlineResponse = s_ExecutableCmdlineRequest.response;
         auto dateAtBootResponse        = s_DateAtBootRequest.response;
@@ -446,8 +448,13 @@ namespace
             info.ProcessorCount = smpResponse->cpu_count;
         }
 
+// Absent entries are reported as 0/nullptr; keep them that way instead of
+// turning them into a bogus "physical" address (0 - HHDM offset).
 #define ToPhysAddr(higher_half_address)                                        \
-    Pointer(higher_half_address).Offset(-s_HhdmRequest.response->offset)
+    (Pointer(higher_half_address)                                              \
+         ? Pointer(higher_half_address)                                        \
+               .Offset<Pointer>(-s_HhdmRequest.response->offset)              \
+         : Pointer(nullptr))
         auto rsdpResponse = s_RsdpRequest.response;
         if (rsdpResponse) info.RSDP = ToPhysAddr(rsdpResponse->address);
 

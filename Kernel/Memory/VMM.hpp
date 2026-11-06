@@ -59,6 +59,12 @@ namespace Arch::VMM
     extern void*          AllocatePageTable();
     void                  DestroyPageMap(PageMap* pageMap);
 
+    // Installs the TLB shootdown IPI; call once all CPUs are online.
+    void                  InitializeTlbShootdown();
+    // Makes every other CPU drop its stale TLB entries. Call after unmapping
+    // or reducing permissions of a mapping, without holding page map locks.
+    void                  ShootdownTlb();
+
     extern PageAttributes FromNativeFlags(usize flags);
     extern usize          ToNativeFlags(PageAttributes flags);
 
@@ -76,13 +82,15 @@ namespace VMM
 
     Pointer       AllocateSpace(usize increment = 0, usize alignment = 0,
                                 bool lowerHalf = false);
+    // Returns a range obtained from AllocateSpace() (unmap it first).
+    void          FreeSpace(Pointer virt);
     Ref<Region>   AllocateKernelRegion(usize count, PageAttributes flags);
 
     Ref<Region>   AllocateDMACoherent(usize          size,
                                       PageAttributes flags
                                       = PageAttributes::eRW
                                       | PageAttributes::eWriteThrough);
-    void          FreeDMA_Region(Region& region);
+    void          FreeDMA_Region(Ref<Region> region);
 
     PageMap*      GetKernelPageMap();
     AddressSpace* GetKernelAddressSpace();

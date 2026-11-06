@@ -152,11 +152,11 @@ constexpr usize PAGE_FAULT_RESERVED_WRITE    = Bit(3);
 constexpr usize PAGE_FAULT_INSTRUCTION_FETCH = Bit(4);
 constexpr usize PAGE_FAULT_PROTECTION_KEY    = Bit(5);
 constexpr usize PAGE_FAULT_SHADOW_STACK      = Bit(6);
-constexpr usize PAGE_FAULT_SGX               = Bit(7);
+constexpr usize PAGE_FAULT_SGX               = Bit(15);
 
 inline PageFaultReason pageFaultReason(u64 errorCode)
 {
-    PageFaultReason reason;
+    PageFaultReason reason{};
     if (!(errorCode & PAGE_FAULT_PRESENT))
         reason |= PageFaultReason::eNotPresent;
     if (errorCode & PAGE_FAULT_WRITE) reason |= PageFaultReason::eWrite;

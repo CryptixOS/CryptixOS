@@ -8,36 +8,51 @@
 
 #include <Memory/VMM.hpp>
 
+// Temporarily maps a physical structure of type T into kernel virtual memory
+// for the lifetime of the object.
 template <typename T>
 class ScopedMapping
 {
   public:
-    constexpr ScopedMapping(Pointer phys, PageAttributes attributes)
+    ScopedMapping(Pointer phys, PageAttributes attributes)
+        : m_PageAttributes(attributes)
     {
-        m_MappingSize    = Math::DivRoundUp(sizeof(T), PMM::PAGE_SIZE);
-        m_PageAttributes = attributes;
+        // Cover every page the structure touches; `phys` need not be aligned.
+        Pointer alignedPhys = Math::AlignDown(phys, PMM::PAGE_SIZE);
+        usize   offset      = phys.Raw() - alignedPhys.Raw();
+        m_MappingSize       = Math::AlignUp(offset + sizeof(T), PMM::PAGE_SIZE);
 
-        m_Structure      = Map(phys, phys, m_MappingSize, attributes);
+        m_Virt              = VMM::AllocateSpace(m_MappingSize, 0, false);
+        if (!m_Virt) return;
+
+        if (!VMM::MapKernelRange(m_Virt, alignedPhys, m_MappingSize,
+                                 attributes))
+        {
+            VMM::FreeSpace(m_Virt);
+            m_Virt = nullptr;
+            return;
+        }
+
+        m_Structure = m_Virt.Offset<T*>(offset);
     }
-    constexpr ~ScopedMapping()
+    ~ScopedMapping()
     {
-        Assert(VMM::UnmapKernelRange(m_Structure, m_MappingSize,
-                                     m_PageAttributes));
+        if (!m_Structure) return;
+
+        Assert(VMM::UnmapKernelRange(m_Virt, m_MappingSize, m_PageAttributes));
+        VMM::FreeSpace(m_Virt);
     }
 
-    constexpr T& operator*() { return *m_Structure; }
-    constexpr T* operator->() { return m_Structure; }
+    ScopedMapping(const ScopedMapping&)            = delete;
+    ScopedMapping& operator=(const ScopedMapping&) = delete;
+
+    explicit       operator bool() const { return m_Structure; }
+    T&             operator*() { return *m_Structure; }
+    T*             operator->() { return m_Structure; }
 
   private:
     T*             m_Structure   = nullptr;
+    Pointer        m_Virt        = nullptr;
     usize          m_MappingSize = 0;
     PageAttributes m_PageAttributes;
-
-    constexpr T*   Map(Pointer virt, Pointer phys, usize size,
-                       PageAttributes attributes)
-    {
-        if (!VMM::MapKernelRange(virt, phys, size, attributes)) return nullptr;
-
-        return virt.As<T>();
-    }
 };

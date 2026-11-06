@@ -107,6 +107,7 @@ namespace ACPI
             ScopedMapping<FADT> fadt(fadtAddress,
                                      PageAttributes::eRW
                                          | PageAttributes::eUncacheableStrong);
+            if (!fadt) return;
 
             if ((fadt->Flags & FadtFlags::eHardwareReducedAcpi) != 0)
             {

@@ -18,8 +18,7 @@ namespace VMM
         if (m_Access & Access::eExecute) flags |= PageAttributes::eExecutable;
 
         if (m_Access & Access::eUser) flags |= PageAttributes::eUser;
-        return flags | PageAttributes::eRead | PageAttributes::eWrite
-             | PageAttributes::eExecutable;
+        return flags;
     }
 
     void Region::SetAttributes(enum PageAttributes flags)

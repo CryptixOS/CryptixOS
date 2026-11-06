@@ -36,7 +36,7 @@ namespace PMM
     template <PointerHolder T>
     CTOS_NO_KASAN T CallocatePages(usize count = 1)
     {
-        if constexpr (IsSameV<T, Pointer>) return AllocatePages(count);
+        if constexpr (IsSameV<T, Pointer>) return CallocatePages(count);
 
         return reinterpret_cast<T>(CallocatePages(count));
     }

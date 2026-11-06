@@ -26,12 +26,12 @@ inline constexpr bool operator&(const PageFaultReason lhs,
 {
     return ToUnderlying(lhs) & ToUnderlying(rhs);
 }
-inline constexpr PageFaultReason operator|=(PageFaultReason&      lhs,
-                                            const PageFaultReason rhs)
+inline constexpr PageFaultReason& operator|=(PageFaultReason&      lhs,
+                                             const PageFaultReason rhs)
 {
     auto result = ToUnderlying(lhs) | ToUnderlying(rhs);
 
-    return static_cast<PageFaultReason>(result);
+    return lhs = static_cast<PageFaultReason>(result);
 }
 
 class PageFaultInfo

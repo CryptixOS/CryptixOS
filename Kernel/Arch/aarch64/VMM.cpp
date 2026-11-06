@@ -164,6 +164,9 @@ namespace Arch::VMM
 
     void*          AllocatePageTable() { return new TTBR; }
     void           DestroyPageMap(PageMap* pageMap) { ToDo(); }
+    // TODO(v1tr10l7): TLB shootdown via TLBI broadcast (TLBI ...IS)
+    void           InitializeTlbShootdown() {}
+    void           ShootdownTlb() {}
 
     PageAttributes FromNativeFlags(usize flags)
     {

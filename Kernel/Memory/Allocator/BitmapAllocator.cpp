@@ -6,6 +6,7 @@
  */
 #include <Memory/Allocator/BitmapAllocator.hpp>
 #include <Prism/Utility/Math.hpp>
+#include <Library/Stacktrace.hpp> // DBGMAP
 
 ErrorOr<void> BitmapAllocator::Initialize(MemoryMap& memoryMap, usize pageSize)
 {
@@ -41,7 +42,8 @@ ErrorOr<void> BitmapAllocator::Initialize(MemoryMap& memoryMap, usize pageSize)
     usize bitmapEntryCount = m_UsableMemoryTop.Raw() / pageSize;
     m_PageBitmap.Allocate(bitmapEntryCount);
     m_PageBitmap.SetAll(0xff);
-    LogInfo("PMM: Allocated {}KiB bitmap for {} pages", bitmapEntryCount / 1024, bitmapEntryCount);
+    LogInfo("PMM: Allocated {}KiB bitmap for {} pages",
+            Math::DivRoundUp(bitmapEntryCount, 8) / 1024, bitmapEntryCount);
 
     Assert(m_PageBitmap.BitCount() != 0);
     for (usize i = 0; i < memoryMap.EntryCount; i++)
@@ -70,7 +72,9 @@ usize   BitmapAllocator::PageSize() const { return m_PageSize; }
 
 Pointer BitmapAllocator::AllocatePages(usize pageCount)
 {
-    ScopedLock guard(m_Lock);
+    // Disable interrupts while held: interrupt handlers (and the page fault
+    // handler) allocate pages, which would deadlock on this CPU otherwise.
+    ScopedLock guard(m_Lock, true);
 
     if (pageCount == 0) return nullptr;
     static usize lastIndex = 0;
@@ -92,14 +96,37 @@ Pointer BitmapAllocator::AllocatePages(usize pageCount)
 }
 void BitmapAllocator::FreePages(Pointer page, usize pageCount)
 {
-    ScopedLock guard(m_Lock);
+    // Disable interrupts while held: interrupt handlers (and the page fault
+    // handler) allocate pages, which would deadlock on this CPU otherwise.
+    ScopedLock guard(m_Lock, true);
     if (pageCount == 0 || !page) return;
 
     usize pageIndex = page.Raw() / m_PageSize;
-    for (usize i = pageIndex; i < pageIndex + pageCount; i++)
-        m_PageBitmap.SetIndex(i, false);
+    usize pageLimit = m_PageBitmap.BitCount();
+    if (pageIndex >= pageLimit || pageCount > pageLimit - pageIndex)
+    {
+        LogError("PMM: FreePages({:#x}, {}) is outside of managed memory",
+                 page.Raw(), pageCount);
+        return;
+    }
 
-    m_UsedMemory -= pageCount * m_PageSize;
+    usize freed = 0;
+    for (usize i = pageIndex; i < pageIndex + pageCount; i++)
+    {
+        if (!m_PageBitmap.At(i))
+        {
+            LogError("PMM: Double free of page {:#x}", i * m_PageSize);
+            if (i == pageIndex) Stacktrace::Print(); // DBGMAP
+            continue;
+        }
+        m_PageBitmap.SetIndex(i, false);
+        ++freed;
+    }
+
+    // Pages handed out before the bitmap existed (early allocations) were
+    // never added to m_UsedMemory, so don't let the counter underflow.
+    usize freedBytes = freed * m_PageSize;
+    m_UsedMemory     = freedBytes > m_UsedMemory ? 0 : m_UsedMemory - freedBytes;
 }
 
 Pointer BitmapAllocator::FindFreeRegions(usize& start, usize count, usize limit)

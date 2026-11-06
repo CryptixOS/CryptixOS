@@ -99,6 +99,7 @@ class Process
 
     inline Ref<Thread> MainThread() { return m_MainThread; }
     inline AddressSpace& AddressSpace() { return *m_AddressSpace; }
+    inline bool          HasAddressSpace() const { return m_AddressSpace; }
 
     constexpr bool       IsSuperUser() const
     {

@@ -13,85 +13,45 @@
 #include <Memory/Allocator/KernelHeap.hpp>
 #include <Prism/Memory/SlabPool.hpp>
 
-namespace VMM
-{
-    PageMap* GetKernelPageMap();
-}
 namespace KernelHeap
 {
     struct PageAllocPolicy
     {
         static Pointer CallocatePages(usize pageCount = 1)
         {
-            return Pointer(PMM::CallocatePages(pageCount)).ToHigherHalf();
+            Pointer phys = PMM::CallocatePages(pageCount);
+            return phys ? phys.ToHigherHalf() : Pointer(nullptr);
         }
         static void FreePages(Pointer memory, usize pageCount = 1)
         {
-            PMM::FreePages(memory.FromHigherHalf(), pageCount);
+            PMM::FreePages(memory.FromHigherHalf<void*>(), pageCount);
         }
     };
     namespace
     {
-        constexpr usize BUCKET_COUNT         = 8;
+        constexpr usize BUCKET_COUNT  = 8;
 
-        bool            s_Initialized        = false;
-        Pointer         s_EarlyHeapBase      = nullptr;
-        usize           s_EarlyHeapSize      = 0;
-        usize           s_EarlyHeapAllocated = 0;
-        Pointer         s_EarlyHeapCurrent   = nullptr;
+        bool            s_Initialized = false;
 
-        alignas(SlabPool<8, PageAllocPolicy, SpinLockPolicy>) static u8
-            s_SlabPoolStorage[sizeof(
-                SlabPool<8, PageAllocPolicy, SpinLockPolicy>)];
-        static SlabPool<8, PageAllocPolicy, SpinLockPolicy>* s_SlabPool
-            = nullptr;
+        using Pool = SlabPool<BUCKET_COUNT, PageAllocPolicy, SpinLockPolicy>;
+        alignas(Pool) static u8 s_SlabPoolStorage[sizeof(Pool)];
+        static Pool*            s_SlabPool = nullptr;
 
-        Pointer EarlyHeapAllocate(usize size)
+        // Slab objects are naturally aligned to their (power of two) size
+        // class, and large allocations are page aligned, so rounding the
+        // request up to the alignment satisfies any alignment <= PAGE_SIZE.
+        inline usize            AlignedSize(usize size, usize alignment)
         {
-            size = Math::AlignUp(size, sizeof(void*));
-            Assert(s_EarlyHeapSize - s_EarlyHeapAllocated > size);
-
-            auto memory = s_EarlyHeapCurrent;
-            s_EarlyHeapCurrent += size;
-            s_EarlyHeapAllocated += size;
-
-            return memory;
+            AssertMsg(alignment <= PMM::PAGE_SIZE,
+                      "KernelHeap: alignment above PAGE_SIZE is unsupported");
+            return Max(size, alignment);
         }
     } // namespace
-
-    void EarlyInitialize(Pointer base, usize length)
-    {
-        s_EarlyHeapBase    = base;
-        s_EarlyHeapSize    = length;
-        s_EarlyHeapCurrent = s_EarlyHeapBase;
-    }
-    void MapEarlyHeap()
-    {
-        auto  baseVirt  = s_EarlyHeapBase;
-        usize pageCount = Math::DivRoundUp(s_EarlyHeapSize, PMM::PAGE_SIZE);
-
-        auto  pageMap   = VMM::GetKernelPageMap();
-        auto  flags     = PageAttributes::eRWX | PageAttributes::eWriteBack;
-        pageMap->MapRange(baseVirt, baseVirt.FromHigherHalf(), s_EarlyHeapSize,
-                          flags);
-        return;
-
-        for (usize i = 0; i < pageCount; i++)
-        {
-            auto offset = i * PMM::PAGE_SIZE;
-            auto virt   = baseVirt.Offset<Pointer>(offset);
-            auto phys   = virt.FromHigherHalf();
-
-            if (pageMap->ValidateAddress(virt)) continue;
-            Assert(pageMap->Map(virt, phys));
-        }
-    }
 
     void Initialize()
     {
         EarlyLogTrace("KernelHeap: Initializing...");
-        s_SlabPool = new (&s_SlabPoolStorage)
-            SlabPool<8, PageAllocPolicy, SpinLockPolicy>();
+        s_SlabPool = new (&s_SlabPoolStorage) Pool();
         s_SlabPool->Initialize();
 
         s_Initialized = true;
@@ -100,30 +60,39 @@ namespace KernelHeap
 
     Pointer Allocate(usize bytes)
     {
-        if (!s_Initialized) return EarlyHeapAllocate(bytes);
+        AssertMsg(s_Initialized, "KernelHeap: allocation before Initialize()");
         return s_SlabPool->Allocate(bytes);
     }
     Pointer Callocate(usize bytes)
     {
-        return s_Initialized ? s_SlabPool->Callocate(bytes)
-                             : EarlyHeapAllocate(bytes);
+        AssertMsg(s_Initialized, "KernelHeap: allocation before Initialize()");
+        return s_SlabPool->Callocate(bytes);
     }
     Pointer Reallocate(Pointer memory, usize size)
     {
+        AssertMsg(s_Initialized, "KernelHeap: allocation before Initialize()");
         return s_SlabPool->Reallocate(memory, size);
     }
-    void Free(Pointer memory) { return s_SlabPool->Free(memory); }
+    void Free(Pointer memory)
+    {
+        // operator delete(nullptr) must be a no-op; the pool would otherwise
+        // treat a null pointer as a large allocation and read its metadata.
+        if (!memory) return;
+        s_SlabPool->Free(memory);
+    }
 } // namespace KernelHeap
 
 void* operator new(usize size) { return KernelHeap::Callocate(size); }
-void* operator new(usize size, AlignmentType)
+void* operator new(usize size, AlignmentType alignment)
 {
-    return KernelHeap::Callocate(size);
+    return KernelHeap::Callocate(
+        KernelHeap::AlignedSize(size, static_cast<usize>(alignment)));
 }
 void* operator new[](usize size) { return KernelHeap::Callocate(size); }
-void* operator new[](usize size, AlignmentType)
+void* operator new[](usize size, AlignmentType alignment)
 {
-    return KernelHeap::Callocate(size);
+    return KernelHeap::Callocate(
+        KernelHeap::AlignedSize(size, static_cast<usize>(alignment)));
 }
 void operator delete(void* memory) noexcept { KernelHeap::Free(memory); }
 void operator delete(void* memory, AlignmentType) noexcept

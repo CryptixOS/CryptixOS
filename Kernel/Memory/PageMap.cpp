@@ -14,6 +14,9 @@ namespace Arch::VMM
     extern usize GetPageSize(PageAttributes flags);
 };
 
+// NOTE: m_Lock is always taken with interrupts disabled: page faults and
+// interrupt handlers map memory too, which would deadlock on the same CPU.
+
 PageMap::PageMap(Pointer topLevel)
     : m_TopLevel(topLevel.As<PageTable>())
 {
@@ -41,13 +44,13 @@ KeyValuePair<usize, PageAttributes> PageMap::RequiredSize(usize size) const
     if (size >= llPageSize) return {llPageSize, PageAttributes::eLLPage};
     else if (size >= lPageSize) return {lPageSize, PageAttributes::eLPage};
 
-    return {m_PageSize, static_cast<PageAttributes>(0)};
+    return {PMM::PAGE_SIZE, static_cast<PageAttributes>(0)};
 }
 
 bool PageMap::ValidateAddress(Pointer address, PageAttributes flags)
 {
     auto pte = Virt2Pte(m_TopLevel, address, false, PMM::PAGE_SIZE);
-    if (!pte) return false;
+    if (!pte || !pte->IsValid()) return false;
 
     return Arch::VMM::FromNativeFlags(pte->Flags()) & flags;
 }
@@ -55,64 +58,73 @@ bool PageMap::ValidateAddress(Pointer address, PageAttributes flags)
 ErrorOr<Pointer> PageMap::MapIoRegion(Pointer phys, usize length,
                                       PageAttributes flags, usize alignment)
 {
-    length    = Math::AlignUp(length, PMM::PAGE_SIZE);
-    auto virt = VMM::AllocateSpace(length, alignment, true);
-    phys      = Math::AlignDown(phys, PMM::PAGE_SIZE);
+    // Map whole pages, but hand back the address of `phys` itself: dropping
+    // its offset into the first page would return the wrong bytes.
+    Pointer alignedPhys = Math::AlignDown(phys, PMM::PAGE_SIZE);
+    usize   offset      = (phys - alignedPhys).Raw();
+    length              = Math::AlignUp(length + offset, PMM::PAGE_SIZE);
 
-    if (MapRange(virt, phys, length, flags)) return virt;
+    auto virt           = VMM::AllocateSpace(length, alignment, true);
+    if (!virt) return Error(ENOMEM);
+
+    if (MapRange(virt, alignedPhys, length, flags)) return virt.Offset(offset);
     return Error(ENOMEM);
 }
 
 bool PageMap::Map(Pointer virt, Pointer phys, PageAttributes flags)
 {
-    u64 mappedPhys = Virt2Phys(virt);
-
-    if (mappedPhys != static_cast<u64>(-1))
-    {
-        auto errorMessage = fmt::format(
-            "VMM: Trying to map address {:#x} to {:#x}, but it is already "
-            "mapped => {:#x}",
-            virt.Raw(), phys.Raw(), mappedPhys);
-
-        Assert(errorMessage.data());
-    }
-
-    // AssertFmt(entry == u64(-1),
-    //           "VMM: Trying to map address {:#x} to {:#x}, but it is already "
-    //           "mapped => {:#x}",
-    //           virt.Raw(), phys.Raw(), entry);
-
-    ScopedLock guard(m_Lock);
-
+    // InternalMap() itself detects (and reports) already mapped addresses.
+    ScopedLock guard(m_Lock, true);
     return InternalMap(virt, phys, flags);
 }
 bool PageMap::Unmap(Pointer virt, PageAttributes flags)
 {
-    ScopedLock guard(m_Lock);
-    return InternalUnmap(virt, flags);
+    bool ok;
+    {
+        ScopedLock guard(m_Lock, true);
+        ok = InternalUnmap(virt, flags);
+    }
+    Arch::VMM::ShootdownTlb();
+    return ok;
 }
 bool PageMap::Remap(Pointer virtOld, Pointer virtNew, PageAttributes flags)
 {
     Pointer phys = Virt2Phys(virtOld, flags);
-    if (phys) Unmap(virtOld, flags);
+    // Virt2Phys() reports failure with -1, not with nullptr.
+    if (phys == Pointer(u64(-1))) return false;
 
+    Unmap(virtOld, flags);
     return Map(virtNew, phys, flags);
 }
 bool PageMap::Protect(Pointer virt, PageAttributes flags)
 {
-    ScopedLock guard(m_Lock);
-    return InternalProtect(virt, flags);
+    bool ok;
+    {
+        ScopedLock guard(m_Lock, true);
+        ok = InternalProtect(virt, flags);
+    }
+    Arch::VMM::ShootdownTlb();
+    return ok;
 }
 
 bool PageMap::MapRange(Pointer virt, Pointer phys, usize size,
                        PageAttributes flags)
 {
     usize pageSize = Arch::VMM::GetPageSize(flags);
-    for (usize i = 0; i < size; i += pageSize)
+
+    // Page table entries can only map whole, aligned pages: cover every page
+    // that [virt, virt + size) touches, with phys shifted along.
+    Pointer alignedVirt = Math::AlignDown(virt, pageSize);
+    usize   misalign    = (virt - alignedVirt).Raw();
+    Pointer alignedPhys = Math::AlignDown(phys.Raw() - misalign, pageSize);
+    usize   mapSize     = Math::AlignUp(size + misalign, pageSize);
+
+    for (usize i = 0; i < mapSize; i += pageSize)
     {
-        if (!Map(virt.Offset(i), phys.Offset(i), flags))
+        if (!Map(alignedVirt.Offset(i), alignedPhys.Offset(i), flags))
         {
-            UnmapRange(virt, i - pageSize);
+            // Roll back everything mapped so far, at the same granularity.
+            if (i) UnmapRange(alignedVirt, i, flags);
             return false;
         }
     }
@@ -130,19 +142,31 @@ bool PageMap::RemapRange(Pointer virtOld, Pointer virtNew, usize size,
 bool PageMap::UnmapRange(Pointer virt, usize size, PageAttributes flags)
 {
     usize pageSize = Arch::VMM::GetPageSize(flags);
-    for (usize i = 0; i < size; i += pageSize)
-        if (!Unmap(virt.Offset(i), flags)) return false;
+    bool  ok       = true;
+    {
+        ScopedLock guard(m_Lock, true);
+        // Keep going past holes, so one unmapped page doesn't leave the rest
+        // of the range mapped.
+        for (usize i = 0; i < size; i += pageSize)
+            ok &= InternalUnmap(virt.Offset(i), flags);
+    }
 
-    return true;
+    Arch::VMM::ShootdownTlb();
+    return ok;
 }
 
 bool PageMap::ProtectRange(Pointer virt, usize size, PageAttributes flags)
 {
     usize pageSize = Arch::VMM::GetPageSize(flags);
-    for (usize i = 0; i < size; i += pageSize)
-        if (!Protect(virt.Offset(i), flags)) return false;
+    bool  ok       = true;
+    {
+        ScopedLock guard(m_Lock, true);
+        for (usize i = 0; i < size && ok; i += pageSize)
+            ok = InternalProtect(virt.Offset(i), flags);
+    }
 
-    return true;
+    Arch::VMM::ShootdownTlb();
+    return ok;
 }
 
 bool PageMap::MapRegion(const Ref<Region> region, const usize pageSize)

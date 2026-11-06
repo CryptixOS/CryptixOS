@@ -78,6 +78,8 @@ namespace VMM
 
         inline usize Size() const { return m_VirtualRange.Size(); }
         inline class FileDescriptor* FileDescriptor() const { return m_Fd; }
+        // Offset into FileDescriptor() at which this region's contents start.
+        inline usize                 FileOffset() const { return m_Offset; }
 
         inline enum Access           Access() const { return m_Access; }
         enum PageAttributes          PageAttributes() const;

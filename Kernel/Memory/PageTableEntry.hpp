@@ -95,8 +95,10 @@ class PageTableEntry final
 
     inline void SetAddress(Pointer address)
     {
+        // Mask the address: stray low bits (an unaligned physical address)
+        // would otherwise land in the flag bits (PWT, PCD, PS/PAT, ...).
         m_Address &= ~Arch::VMM::GetAddressMask();
-        m_Address |= address;
+        m_Address |= address.Raw<upointer>() & Arch::VMM::GetAddressMask();
     }
     inline void SetFlags(u64 flags, bool enabled)
     {

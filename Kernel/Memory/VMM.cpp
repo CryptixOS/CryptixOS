@@ -75,55 +75,68 @@ namespace VMM
 
         auto  memoryMap      = PMM::MemoryZones();
 
+        // Maps [base, top) of physical memory into the HHDM, using the largest
+        // page size that both the alignment and the remaining length allow
+        // (huge pages must be naturally aligned).
+        auto      mapPhysical    = [](Pointer base, Pointer top,
+                               PageAttributes attributes) -> bool
+        {
+            constexpr usize LPAGE  = 2_mib;
+            constexpr usize LLPAGE = 1_gib;
+            while (base < top)
+            {
+                usize          remaining = (top - base).Raw();
+                usize          pageSize  = PMM::PAGE_SIZE;
+                PageAttributes sizeFlags{};
+                if (base.Raw() % LLPAGE == 0 && remaining >= LLPAGE)
+                    pageSize = LLPAGE, sizeFlags = PageAttributes::eLLPage;
+                else if (base.Raw() % LPAGE == 0 && remaining >= LPAGE)
+                    pageSize = LPAGE, sizeFlags = PageAttributes::eLPage;
+
+                if (!s_KernelPageMap->Map(base.ToHigherHalf(), base,
+                                          attributes | sizeFlags))
+                    return false;
+                base += pageSize;
+            }
+            return true;
+        };
+
         usize highestAddress = 0;
         for (usize index = 0; const auto& entry : memoryMap)
         {
             Pointer base   = Math::AlignDown(entry.Base(), PMM::PAGE_SIZE);
             Pointer top    = Math::AlignUp(entry.Base().Offset(entry.Length()),
                                            PMM::PAGE_SIZE);
+            auto    type   = entry.Type();
 
             highestAddress = Max(highestAddress, top.Raw());
-            if (top <= baseMemorySize
-                || entry.Type() == MemoryZoneType::eReserved)
+            // Everything below 4GiB is already covered above. Above it, skip
+            // what must not (or need not) be mapped: reserved ranges, bad
+            // memory, and the kernel/modules (the kernel image has its own
+            // mapping below and the System maps the modules itself).
+            if (top <= baseMemorySize || type == MemoryZoneType::eReserved
+                || type == MemoryZoneType::eBadMemory
+                || type == MemoryZoneType::eKernelAndModules)
             {
                 ++index;
                 continue;
             }
-            while (base < top && base < baseMemorySize) base += PMM::PAGE_SIZE;
+            base = Max(base, Pointer(baseMemorySize));
 
-            auto type = ToString(entry.Type());
             LogDebug(
                 "VMM: Entry[{}]: {{ .Base: {:#016x}, .Top: {:#016x}, .Type: {} "
                 "}}",
                 index, base.ToHigherHalf().Raw(), top.ToHigherHalf().Raw(),
-                type);
+                ToString(type));
 
-            auto size              = (top - base).Raw();
-            auto [pageSize, flags] = s_KernelPageMap->RequiredSize(size);
+            auto cache = type == MemoryZoneType::eFramebuffer
+                           ? PageAttributes::eWriteCombining
+                           : PageAttributes::eWriteBack;
 
-            auto alignedSize       = Math::AlignDown(size, pageSize);
-
-            if (entry.Type() == MemoryZoneType::eFramebuffer)
-                flags |= PageAttributes::eWriteCombining;
-            else if (entry.Type() == MemoryZoneType::eKernelAndModules)
-            {
-                ++index;
-                continue;
-            }
-            else flags |= PageAttributes::eWriteBack;
             Assert(!s_KernelPageMap->ValidateAddress(base.ToHigherHalf()));
-
-            Assert(s_KernelPageMap->MapRange(base.ToHigherHalf(), base,
-                                             alignedSize,
-                                             PageAttributes::eRWX | flags));
+            Assert(mapPhysical(base, top, PageAttributes::eRWX | cache));
             Assert(s_KernelPageMap->ValidateAddress(base.ToHigherHalf()));
             ++index;
-            base += alignedSize;
-
-            if (size > alignedSize)
-                Assert(s_KernelPageMap->MapRange(
-                    base.ToHigherHalf(), base, size - alignedSize,
-                    PageAttributes::eRWX | PageAttributes::eWriteBack));
         }
         // const void* sectionRanges[6][2] = {
         //     { limine_requests_addr_start, limine_requests_addr_end },
@@ -159,12 +172,16 @@ namespace VMM
                                              | PageAttributes::eWriteBack));
 
         {
-            s_VirtualAddressSpace = Pointer(highestAddress).Offset(1_gib);
-
-            // TODO(v1tr10l7): allocate ranges from different pools, based on
-            // the needs (e.g. nvme0 needs 32bit address for BAR)
-            s_KernelAddressSpace->Initialize(s_VirtualAddressSpace,
-                                             KERNEL_VIRTUAL_RANGE_TOP);
+            // Kernel virtual allocations (MMIO, DMA, kernel regions) live in
+            // the higher half, between the end of the HHDM and the kernel
+            // image. The kernel half PML4 entries are shared by every page
+            // map, so these mappings stay visible while any process runs.
+            s_VirtualAddressSpace
+                = Pointer(Math::AlignUp(highestAddress, 1_gib))
+                      .Offset<Pointer>(1_gib)
+                      .ToHigherHalf();
+            usize size = KERNEL_VIRTUAL_RANGE_TOP - s_VirtualAddressSpace.Raw();
+            s_KernelAddressSpace->Initialize(s_VirtualAddressSpace, size);
         }
 
         Pointer initVirt = kernel_init_start_addr;
@@ -219,17 +236,28 @@ namespace VMM
 
     usize   GetHigherHalfOffset() { return s_HigherHalfOffset.ValueOr(0); }
 
+    // NOTE: `lowerHalf` is kept for source compatibility only: kernel
+    // mappings in the lower half are missing from every process' page map
+    // (only the kernel half PML4 entries are shared), so the space is always
+    // allocated in the higher half.
     Pointer AllocateSpace(usize increment, usize alignment, bool lowerHalf)
     {
-        Assert(alignment <= PMM::PAGE_SIZE);
+        CtosUnused(lowerHalf);
 
-        if (alignment == 0) alignment = sizeof(void*);
+        // Mappings are made of whole pages; never hand out sub-page alignment,
+        // or two allocations could end up sharing a page.
+        alignment = Max(alignment, PMM::PAGE_SIZE);
+        increment = Math::AlignUp(Max(increment, 1zu), PMM::PAGE_SIZE);
 
         auto region
             = s_KernelAddressSpace->AllocateRegion(increment, alignment);
-        Pointer virt = region->VirtualBase();
+        if (!region) return nullptr;
 
-        return lowerHalf ? virt.FromHigherHalf<Pointer>() : virt.ToHigherHalf<Pointer>();
+        return region->VirtualBase();
+    }
+    void FreeSpace(Pointer virt)
+    {
+        if (virt) s_KernelAddressSpace->Erase(Math::AlignDown(virt, PMM::PAGE_SIZE));
     }
     Ref<Region> AllocateKernelRegion(usize count, PageAttributes flags)
     {
@@ -239,11 +267,17 @@ namespace VMM
 
     Ref<Region> AllocateDMACoherent(usize size, PageAttributes flags)
     {
-        usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
-        auto  pages     = PMM::CallocatePages(pageCount);
+        usize   pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
+        Pointer pages     = PMM::CallocatePages(pageCount);
+        if (!pages) return nullptr;
 
-        auto  virt = AllocateSpace(pageCount * PMM::PAGE_SIZE, 4_kib, true);
-        Assert(MapKernelRegion(virt, pages, pageCount, flags));
+        auto virt = AllocateSpace(pageCount * PMM::PAGE_SIZE, 4_kib, true);
+        if (!virt || !MapKernelRegion(virt, pages, pageCount, flags))
+        {
+            if (virt) s_KernelAddressSpace->Erase(virt);
+            PMM::FreePages(pages.As<void>(), pageCount);
+            return nullptr;
+        }
 
         auto region
             = CreateRef<Region>(pages, virt, pageCount * PMM::PAGE_SIZE);
@@ -254,8 +288,14 @@ namespace VMM
     }
     void FreeDMA_Region(Ref<Region> region)
     {
-        // TODO(v1tr10l7): we should keep track of mapped kernel addresses
-        s_KernelPageMap->UnmapRange(region->VirtualBase(), region->Size());
+        if (!region) return;
+
+        usize pageCount = Math::DivRoundUp(region->Size(), PMM::PAGE_SIZE);
+        s_KernelPageMap->UnmapRange(region->VirtualBase(),
+                                    pageCount * PMM::PAGE_SIZE);
+        s_KernelAddressSpace->Erase(region->VirtualBase());
+        if (region->PhysicalBase())
+            PMM::FreePages(region->PhysicalBase().As<void>(), pageCount);
     }
 
     PageMap* GetKernelPageMap()
@@ -289,14 +329,24 @@ namespace VMM
 
     Pointer MapIoRegion(PhysAddr phys, usize size, bool write, usize alignment)
     {
-        auto           virt = AllocateSpace(size, alignment, true);
+        // Map whole pages, but return the address of `phys` itself.
+        Pointer alignedPhys = Math::AlignDown(Pointer(phys), PMM::PAGE_SIZE);
+        usize   offset      = Pointer(phys).Raw() - alignedPhys.Raw();
+        usize   length      = Math::AlignUp(size + offset, PMM::PAGE_SIZE);
+
+        auto    virt        = AllocateSpace(length, alignment, true);
+        if (!virt) return nullptr;
+
         PageAttributes attributes
             = PageAttributes::eRead | PageAttributes::eUncacheableStrong;
         if (write) attributes |= PageAttributes::eWrite;
 
-        if (!s_KernelPageMap->MapRange(virt, phys, size, attributes))
+        if (!s_KernelPageMap->MapRange(virt, alignedPhys, length, attributes))
+        {
+            s_KernelAddressSpace->Erase(virt);
             return nullptr;
+        }
 
-        return virt;
+        return virt.Offset(offset);
     }
 } // namespace VMM

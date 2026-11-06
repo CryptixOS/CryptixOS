@@ -288,6 +288,8 @@ namespace CPU
                                                 "cryptix");
 
         dispatcher->SetHandler(HaltAndCatchFire);
+
+        Arch::VMM::InitializeTlbShootdown();
     }
 
     ID::ID(u64 leaf, u64 subleaf) { CPUID(leaf, subleaf, rax, rbx, rcx, rdx); }

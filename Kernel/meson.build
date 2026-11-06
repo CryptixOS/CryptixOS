@@ -77,7 +77,8 @@ configure_file(
 
 config = configuration_data()
 config.set('KERNEL_VIRTUAL_RANGE_BASE', '0xffff\'0000\'0000\'0000zu')
-config.set('KERNEL_VIRTUAL_RANGE_TOP', '0x6a9e\'7f5c\'8000\'0000zu')
+# Kernel virtual allocations end where the kernel image starts.
+config.set('KERNEL_VIRTUAL_RANGE_TOP', '0xffff\'ffff\'8000\'0000zu')
 
 config.set('USER_VIRTUAL_RANGE_BASE', '0x0000\'0000\'0010\'0000zu')
 config.set('USER_VIRTUAL_RANGE_TOP', '0x0000\'7fff\'ffff\'ffffzu')

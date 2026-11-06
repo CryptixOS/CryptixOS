@@ -16,11 +16,6 @@
 #include <icxxabi>
 #include <limine.h>
 
-namespace KernelHeap
-{
-    void EarlyInitialize(Pointer base, usize length);
-    void MapEarlyHeap();
-}; // namespace KernelHeap
 namespace PMM
 {
     void EarlyInitialize(const MemoryMap&);
@@ -47,28 +42,8 @@ namespace MM
         s_MemoryMap             = memoryInfo.MemoryMap;
         s_EfiMemoryMap          = memoryInfo.EfiMemoryMap;
 
-        auto allocate           = [&](usize bytes) -> Pointer
-        {
-            for (usize i = 0; i < s_MemoryMap.EntryCount; i++)
-            {
-                auto& entry    = s_MemoryMap.Entries[i];
-                auto  base     = Math::AlignUp(entry.Base(), PMM::PAGE_SIZE);
-                usize misalign = base - entry.Base().Raw();
-
-                if (entry.Type() == MemoryZoneType::eUsable
-                    && entry.Length() > bytes + misalign)
-                    return Math::AlignUp(entry.Allocate(bytes + misalign),
-                                         PMM::PAGE_SIZE);
-            }
-
-            return nullptr;
-        };
-
-        // Initialize early kernel heap
-        auto earlyHeapSize = 64_mib;
-        auto earlyHeapBase = allocate(earlyHeapSize);
-
-        KernelHeap::EarlyInitialize(earlyHeapBase, earlyHeapSize);
+        // The heap runs on top of the PMM's early (memory map based) page
+        // allocator until PMM::Initialize() sets up the bitmap.
         PMM::EarlyInitialize(s_MemoryMap);
         KernelHeap::Initialize();
 
@@ -79,8 +54,9 @@ namespace MM
             "MM: Memory Information =>\n"
             "\tKernel Physical Address => {:#p}\n"
             "\tKernel Virtual Address => {:#p}\n"
-            "\tHigher Half Direct Mapping Offset => {:#p}\n",
-            "\tPaging Mode => {}\n", s_KernelPhysicalAddress,
+            "\tHigher Half Direct Mapping Offset => {:#x}\n"
+            "\tPaging Mode => {}\n",
+            s_KernelPhysicalAddress,
             s_KernelVirtualAddress, s_HigherHalfOffset, pagingModeString);
     }
     void Initialize()
@@ -92,8 +68,6 @@ namespace MM
 
         VMM::Initialize(s_KernelPhysicalAddress, s_KernelVirtualAddress,
                         s_HigherHalfOffset);
-
-        KernelHeap::MapEarlyHeap();
     }
 
     Pointer         KernelPhysicalAddress() { return s_KernelPhysicalAddress; }
@@ -138,12 +112,18 @@ namespace MM
             access |= Access::eExecute;
 
         auto region = CreateRef<Region>(phys, virt, pageCount * PMM::PAGE_SIZE);
-        if (!region) return nullptr;
+        if (!region)
+        {
+            VMM::FreeSpace(virt);
+            PMM::FreePages(phys, pageCount);
+            return nullptr;
+        }
         region->SetAccessMode(access);
 
         if (!VMM::MapKernelRegion(region->VirtualBase(), region->PhysicalBase(),
                                   pageCount, attributes))
         {
+            VMM::FreeSpace(virt);
             PMM::FreePages(phys, pageCount);
             return nullptr;
         }
@@ -154,12 +134,20 @@ namespace MM
 
     Ref<Region> AllocateKernelRegion(const usize bytes, PageAttributes flags)
     {
-        auto  region    = VMM::AllocateKernelRegion(bytes, flags);
+        auto region = VMM::AllocateKernelRegion(bytes, flags);
+        if (!region) return nullptr;
+
         usize pageCount = Math::DivRoundUp(bytes, PMM::PAGE_SIZE);
         auto  phys      = PMM::CallocatePages(pageCount);
+        if (!phys)
+        {
+            VMM::FreeSpace(region->VirtualBase());
+            return nullptr;
+        }
 
+        // A kernel region must not be accessible from user mode.
         using VMM::Access;
-        Access access = Access::eUser;
+        Access access = Access::eNone;
         if (flags & PageAttributes::eRead) access |= Access::eRead;
         if (flags & PageAttributes::eWrite) access |= Access::eWrite;
         if (flags & PageAttributes::eExecutable) access |= Access::eExecute;
@@ -168,7 +156,12 @@ namespace MM
         region->SetAccessMode(access);
 
         auto pageMap = VMM::GetKernelPageMap();
-        pageMap->MapRegion(region);
+        if (!pageMap->MapRegion(region))
+        {
+            PMM::FreePages(phys, pageCount);
+            VMM::FreeSpace(region->VirtualBase());
+            return nullptr;
+        }
 
         return region;
     }
@@ -182,7 +175,11 @@ namespace MM
 
         usize pageCount = Math::DivRoundUp(bytes, PMM::PAGE_SIZE);
         auto  phys      = PMM::CallocatePages(pageCount);
-        if (!phys) return nullptr;
+        if (!phys)
+        {
+            addressSpace.Erase(region->VirtualBase());
+            return nullptr;
+        }
 
         using VMM::Access;
         Access access = Access::eUser;
@@ -194,7 +191,12 @@ namespace MM
         region->SetAccessMode(access);
 
         auto pageMap = process->PageMap;
-        pageMap->MapRegion(region);
+        if (!pageMap->MapRegion(region))
+        {
+            PMM::FreePages(phys, pageCount);
+            addressSpace.Erase(region->VirtualBase());
+            return nullptr;
+        }
 
         return region;
     }
@@ -214,7 +216,8 @@ namespace MM
         if (reason & PageFaultReason::eWrite)
             message += "\t- Write violation\n";
         else message += "\t- Read violation\n";
-        if (reason & PageFaultReason::eUser) message += "\t- Reserved Write\n";
+        if (reason & PageFaultReason::eReservedWrite)
+            message += "\t- Reserved bit set in a paging structure\n";
         if (reason & PageFaultReason::eInstructionFetch)
             message += "\t- Instruction Fetch\n";
         if (reason & PageFaultReason::eProtectionKey)
@@ -225,43 +228,79 @@ namespace MM
             message += "\t- SGX violation\n";
 
         bool kernelFault = !(reason & PageFaultReason::eUser);
-        message += Format("In {} space", kernelFault ? "User" : "Kernel");
+        message += Format("In {} space", kernelFault ? "Kernel" : "User");
 
         auto        process = Process::Current();
         Ref<Region> region  = nullptr;
 
-        if (process)
+        // Idle processes have no address space.
+        if (process && process->HasAddressSpace())
         {
             auto& addressSpace = process->AddressSpace();
             region             = addressSpace.Find(info.VirtualAddress());
         }
 
-        if (region)
+        // Demand-allocate a lazily created region on its first access. Only a
+        // *not-present* fault on a region with no backing memory yet qualifies;
+        // a protection fault (or a fault on an already backed region) is a real
+        // access violation and must fall through to the error path below.
+        if (region && (reason & PageFaultReason::eNotPresent)
+            && !region->PhysicalBase())
         {
-            auto  fd   = region->FileDescriptor();
-            usize size = fd && fd->File() ? fd->File()->Size() : region->Size();
+            Assert(region->VirtualBase());
 
-            usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
-            Pointer phys    = PMM::CallocatePages(pageCount);
-            auto    virt    = region->VirtualBase();
-            Assert(virt);
+            // The backing allocation must cover the whole region, because
+            // that's what MapRegion() maps -- sizing it from the file would
+            // expose the physical pages that follow it.
+            usize   regionSize = region->Size();
+            usize   pageCount  = Math::DivRoundUp(regionSize, PMM::PAGE_SIZE);
+            Pointer phys       = PMM::CallocatePages(pageCount);
 
-            auto pageMap = process->PageMap;
             if (phys)
             {
-                auto flags = PageAttributes::eRW | PageAttributes::eUser
-                           | PageAttributes::eWriteBack;
                 region->SetPhysicalBase(phys);
-                region->SetAttributes(flags);
-                pageMap->MapRegion(region);
 
-                if (fd)
+                auto fd   = region->FileDescriptor();
+                auto file = fd ? fd->File() : nullptr;
+                if (file)
                 {
-                    isize nread = TryAcquire(fd->Read(virt, size));
-                    if (nread != static_cast<isize>(size))
-                        LogError("MM: Failed to read the file descriptor");
+                    LogTrace("MM: Mapping file...");
+
+                    // Read the region's slice of the file at its own offset;
+                    // the descriptor's position must not be used or modified.
+                    usize fileSize = file->Size();
+                    usize offset   = region->FileOffset();
+                    usize toRead
+                        = offset < fileSize ? Min(fileSize - offset, regionSize)
+                                            : 0;
+
+                    if (toRead)
+                    {
+                        auto result
+                            = file->Read(phys.ToHigherHalf<void*>(),
+                                         static_cast<off_t>(offset), toRead);
+                        if (!result)
+                            LogError("MM: Failed to read the file descriptor");
+                        else if (*result != static_cast<isize>(toRead))
+                            LogError(
+                                "MM: Short read while mapping a file: {} of {} "
+                                "bytes",
+                                *result, toRead);
+                    }
                 }
-                return;
+
+                auto attributes = region->PageAttributes();
+                // Regions of a process' address space are user mappings.
+                if (region->VirtualBase() < Pointer(HigherHalfOffset()))
+                    attributes |= PageAttributes::eUser;
+
+                auto pageMap = process->PageMap;
+                if (pageMap->MapRange(region->VirtualBase(), phys,
+                                      pageCount * PMM::PAGE_SIZE, attributes))
+                    return;
+
+                region->SetPhysicalBase(nullptr);
+                PMM::FreePages(phys.As<void>(), pageCount);
             }
             errno = ENOMEM;
         }
@@ -283,13 +322,13 @@ namespace MM
                      message);
             Stacktrace::Print();
 
-            auto bufferOr
-                = UserBuffer::ForUserBuffer(message.data(), message.size());
-            if (!bufferOr) return;
-            auto messageBuffer = bufferOr.value();
+            // `message` lives in kernel memory, so it is written through the
+            // kernel-pointer overload. (Wrapping it in a UserBuffer failed the
+            // user-range check and returned *before* Exit(), so the process
+            // resumed at the faulting instruction and faulted forever.)
             if (tty)
             {
-                auto status = tty->Write(messageBuffer, 0, message.size());
+                auto status = tty->Write(message.data(), 0, message.size());
                 (void)status;
             }
             process->Exit(-1);

@@ -53,7 +53,11 @@ class AddressSpace : public NonCopyable<AddressSpace>, public RefCounted<Address
     void                                 Dump();
 
   private:
-    Spinlock     m_Lock;
+    // Mutable so const lookups (Find, IsAvailable) can take it.
+    mutable Spinlock m_Lock;
 
-    AddressRange m_TotalRange;
+    AddressRange     m_TotalRange;
+
+    // Same as IsAvailable(), for callers that already hold m_Lock.
+    bool IsAvailableLocked(Pointer base, usize length) const;
 };

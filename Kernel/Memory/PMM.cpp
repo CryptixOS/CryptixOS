@@ -114,6 +114,9 @@ namespace PMM
 
     void FreePages(void* ptr, usize count)
     {
+        // Early allocations come straight from the memory map and aren't
+        // tracked by any bitmap yet, so there is nothing to give them back to.
+        if (!s_Initialized) return;
         return s_BitmapAllocator.FreePages(ptr, count);
     }
 

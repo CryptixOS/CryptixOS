@@ -15,19 +15,28 @@ AddressSpace::AddressSpace()
 // : m_TotalRange(USER_VIRTUAL_RANGE_BASE, USER_VIRTUAL_RANGE_SIZE)
 {
     auto memoryTop = PMM::GetMemoryTop();
-    auto base      = Pointer(Math::AlignUp(memoryTop, 1_gib));
-    m_TotalRange   = {base.Offset(4_gib), MM::HigherHalfOffset()};
+    auto base      = Pointer(Math::AlignUp(memoryTop, 1_gib)).Offset<Pointer>(4_gib);
+    // The range is (base, size): it ends at the top of the user half.
+    usize top      = USER_VIRTUAL_RANGE_TOP;
+    m_TotalRange   = {base, base.Raw() < top ? top - base.Raw() : 0};
 }
 AddressSpace::~AddressSpace() { m_RegionTree.Clear(); }
 
 void AddressSpace::Initialize(Pointer start, usize size)
 {
-    m_TotalRange = {start, start.Offset(size)};
+    ScopedLock guard(m_Lock);
+    m_TotalRange = {start, size};
 }
 
 bool AddressSpace::IsAvailable(Pointer base, usize length) const
 {
+    ScopedLock guard(m_Lock);
+    return IsAvailableLocked(base, length);
+}
+bool AddressSpace::IsAvailableLocked(Pointer base, usize length) const
+{
     auto end = base.Offset(length);
+    if (end < base) return false;
 
     for (const auto& entry : m_RegionTree)
     {
@@ -58,37 +67,47 @@ void AddressSpace::Erase(Pointer base)
 ::Ref<Region> AddressSpace::AllocateRegion(usize length, usize alignment)
 {
     if (!alignment) alignment = PMM::PAGE_SIZE;
-    Pointer current = Math::AlignUp(m_TotalRange.Base(), alignment);
+    // Regions are mapped page by page, so they must never share a page.
+    alignment = Max(alignment, PMM::PAGE_SIZE);
+    length    = Math::AlignUp(Max(length, 1zu), PMM::PAGE_SIZE);
 
+    // The whole search + insert must be atomic, or two CPUs could be handed
+    // the same range.
+    ScopedLock guard(m_Lock);
+
+    Pointer    rangeEnd = m_TotalRange.End();
+    Pointer    current  = Math::AlignUp(m_TotalRange.Base(), alignment);
+    auto       fits     = [&](Pointer base) -> bool
+    {
+        Pointer end = base.Offset(length);
+        return end > base && end <= rangeEnd && IsAvailableLocked(base, length);
+    };
+    auto create = [&](Pointer base) -> ::Ref<Region>
+    {
+        ::Ref region = CreateRef<Region>(nullptr, base, length);
+        m_RegionTree.Insert(region->VirtualBase(), region);
+        return region;
+    };
+
+    // The tree is ordered by base address: walk the gaps between regions.
     for (auto it = m_RegionTree.begin(); it != m_RegionTree.end(); ++it)
     {
-        auto region      = it->Value;
-        auto regionStart = region->VirtualBase();
+        auto region = it->Value;
 
-        // Align current pointer before checking
-        current          = Math::AlignUp(current, alignment);
+        // Regions that end before the cursor (e.g. below the range base)
+        // must not move it backwards.
+        if (region->End() <= current) continue;
 
-        // If aligned current + length fits before this region
-        if (current.Offset(length) <= regionStart
-            && IsAvailable(current, length))
-        {
-            ::Ref region = new Region(0, current, length);
-            Insert(region->VirtualBase(), region);
-            return region;
-        }
+        current = Math::AlignUp(current, alignment);
+        if (current.Offset(length) <= region->VirtualBase() && fits(current))
+            return create(current);
 
-        // Move current to the end of this region and keep going
-        current = region->End();
+        current = Max(current, region->End());
     }
 
-    // Check space after the last region
+    // Check the space after the last region.
     current = Math::AlignUp(current, alignment);
-    if (IsAvailable(current, length))
-    {
-        ::Ref region = new Region(0, current, length);
-        Insert(region->VirtualBase(), region);
-        return region;
-    }
+    if (fits(current)) return create(current);
 
     return nullptr; // no suitable region found
 }
@@ -96,15 +115,17 @@ void AddressSpace::Erase(Pointer base)
 {
     size = Math::AlignUp(size, PMM::PAGE_SIZE);
 
-    if (!IsAvailable(virt, size)) return nullptr;
+    ScopedLock guard(m_Lock);
+    if (!IsAvailableLocked(virt, size)) return nullptr;
 
-    ::Ref<Region> region = new Region(0, virt, size);
-    Insert(region->VirtualBase(), region);
+    ::Ref<Region> region = CreateRef<Region>(nullptr, virt, size);
+    m_RegionTree.Insert(region->VirtualBase(), region);
     return region;
 }
 
 ::Ref<Region> AddressSpace::Find(Pointer address) const
 {
+    ScopedLock guard(m_Lock);
     for (const auto& entry : m_RegionTree)
     {
         ::Ref region = entry.Value;
@@ -119,7 +140,11 @@ void AddressSpace::Erase(Pointer base)
     return nullptr;
 }
 
-void AddressSpace::Clear() { m_RegionTree.Clear(); }
+void AddressSpace::Clear()
+{
+    ScopedLock guard(m_Lock);
+    m_RegionTree.Clear();
+}
 
 void AddressSpace::Dump()
 {
