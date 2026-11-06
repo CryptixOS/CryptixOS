@@ -1,0 +1,23 @@
+# Commands the CI boot test (Meta/boot-test.py) types into the shell on
+# /dev/ttyS0, each followed by the exact lines it must print.
+
+$ echo hello
+hello
+$ uname -s
+cryptix
+$ printf '%s\n' $((6 * 7))
+42
+$ true; echo $?
+0
+$ false; echo $?
+1
+$ test -c /dev/null && echo char-device
+char-device
+$ mkdir -p /tmp/boot-test && echo cryptix > /tmp/boot-test/file && cat /tmp/boot-test/file
+cryptix
+$ for i in 1 2 3; do echo line-$i; done
+line-1
+line-2
+line-3
+$ (exit 3); echo $?
+3

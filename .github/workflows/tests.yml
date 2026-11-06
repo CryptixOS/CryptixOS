@@ -1,0 +1,83 @@
+name: Tests
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: ["master", "dev"]
+  pull_request:
+    branches: ["master"]
+
+jobs:
+  unit-tests:
+    # Prism's suite and kernel code that runs on the host (Tests/)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install dependencies
+        run: sudo apt update -y && sudo apt install -y meson ninja-build g++-14 python3
+      - name: Build and run
+        env:
+          CC: gcc-14
+          CXX: g++-14
+        run: ./Meta/run-tests.sh
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-logs
+          path: build_tests/meson-logs/
+
+  boot-test:
+    # Boots the image headless with the shell on the serial port, runs
+    # Tests/Boot/*.txt and fails on wrong output, a kernel panic or a hang
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install dependencies
+        run: sudo apt update -y
+          && sudo apt install -y meson ninja-build clang lld llvm git cmake python3 pipx fasm
+          && sudo apt install -y build-essential qemu-system-x86 parted bison flex libgmp3-dev libmpc-dev libmpfr-dev
+          && sudo apt install -y texinfo libisl-dev gperf gettext autopoint libreadline-dev help2man groff zsh xorriso
+          && sudo apt install -y e2fsprogs dosfstools mtools fakeroot zlib1g-dev qpdf
+          && pipx install xbstrap
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Cache the sysroot
+        uses: actions/cache@v4
+        with:
+          path: build-sysroot
+          key: sysroot-x86_64-${{ hashFiles('bootstrap*.yml', 'Meta/sysroot-recipes/**') }}
+      - name: Build the sysroot
+        run: mkdir -p build-sysroot && cd build-sysroot
+          && (test -f bootstrap.link || xbstrap init ..)
+          && xbstrap install base
+      - name: Build the kernel and image
+        run: ./Meta/setup.sh x86_64 release
+          && (cd subprojects/fmt-10.2.0/ && yes | patch -p 1 < ../../Meta/fmt-10.2.0.patch)
+          && ./Meta/build.sh x86_64 release
+      - name: Boot test
+        run: ./Meta/boot-test.py --iso build_release_x86_64/Cryptix.iso
+          --disk build_release_x86_64/image.hdd --log-dir boot-test-logs
+      - name: Upload boot logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-test-logs
+          path: |
+            boot-test-logs/serial.log
+            boot-test-logs/kernel.log
