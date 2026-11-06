@@ -148,15 +148,34 @@ StringView    FramebufferDevice::Name() const noexcept { return m_Name; }
 
 ErrorOr<void> FramebufferDevice::MapRegion(::Ref<Region> region)
 {
-    auto phys  = m_Framebuffer.Address.FromHigherHalf();
-    auto flags = PageAttributes::eRW | PageAttributes::eUser
-               | PageAttributes::eWriteBack;
-    region->SetAttributes(flags);
+    // Only the framebuffer itself may be mapped: a mapping that runs past its
+    // end would hand userspace whatever physical memory follows it.
+    usize fbSize = Math::AlignUp(m_FixedScreenInfo.smem_len, PMM::PAGE_SIZE);
+    usize offset = region->FileOffset();
+    usize size   = region->Size();
+    if (offset & (PMM::PAGE_SIZE - 1)) return Error(EINVAL);
+    if (offset >= fbSize || size > fbSize - offset) return Error(EINVAL);
+
+    // Use the same cache type as the kernel's HHDM mapping of the framebuffer:
+    // mapping the same physical memory with two cache types is undefined.
+    // Below 4GiB (where firmware usually places it) the HHDM is write-back.
+    // TODO(v1tr10l7): map the framebuffer write-combining everywhere (this
+    // needs splitting the HHDM's huge pages around it), then use WC here too.
+    // Permissions follow the mmap() protection.
+    auto access = region->Access();
+    auto flags  = PageAttributes::eUser | PageAttributes::eWriteBack;
+    if (access & VMM::Access::eRead) flags |= PageAttributes::eRead;
+    if (access & VMM::Access::eWrite) flags |= PageAttributes::eWrite;
+
+    auto phys = m_Framebuffer.Address.FromHigherHalf().Offset<Pointer>(offset);
     region->SetPhysicalBase(phys);
 
-    auto process = Process::Current();
-    auto pageMap = process->PageMap;
-    pageMap->MapRegion(region);
+    auto pageMap = Process::Current()->PageMap;
+    if (!pageMap->MapRange(region->VirtualBase(), phys, size, flags))
+    {
+        region->SetPhysicalBase(nullptr);
+        return Error(ENOMEM);
+    }
     return {};
 }
 
@@ -298,11 +317,13 @@ ErrorOr<isize> FramebufferDevice::IoCtl(usize request, upointer argp)
             m_Flags |= FBINFO_MISC_USEREVENT;
             auto ret = SetVar(var);
             m_Flags &= ~FBINFO_MISC_USEREVENT;
-            if (!ret
-                && CopyToUser(argp, &m_VariableScreenInfo,
-                              sizeof(m_VariableScreenInfo)))
+            if (!ret) return Error(ret.Error());
+
+            // Report the mode that was actually set back to the caller
+            if (!CopyToUser(argp, &m_VariableScreenInfo,
+                            sizeof(m_VariableScreenInfo)))
                 return Error(EFAULT);
-            break;
+            return {};
         }
         case FBIOGET_FSCREENINFO:
         {
@@ -324,28 +345,11 @@ ErrorOr<isize> FramebufferDevice::IoCtl(usize request, upointer argp)
             if (!result) return Error(result.Error());
             return {};
         }
-    }
-    return {};
-
-    switch (request)
-    {
-        case FBIOGET_VSCREENINFO:
-            // TODO(v1tr10l7): should we validate those pointers here?
-            Memory::Copy(reinterpret_cast<u8*>(argp), &m_VariableScreenInfo,
-                         sizeof(m_VariableScreenInfo));
-            return 0;
-        case FBIOGET_FSCREENINFO:
-            // TODO(v1tr10l7): >>>>
-            Memory::Copy(reinterpret_cast<u8*>(argp), &m_FixedScreenInfo,
-                         sizeof(m_FixedScreenInfo));
-            return 0;
-        case FBIOPUT_VSCREENINFO:
-            m_VariableScreenInfo = *reinterpret_cast<fb_var_screeninfo*>(argp);
-            return 0;
+        // Blanking isn't supported, but must not fail (fbcon/X call it)
         case FBIOBLANK: return 0;
     }
 
-    return Error(ENOSYS);
+    return Error(ENOTTY);
 }
 
 u32 FramebufferDevice::GetColorDepth()
