@@ -5,8 +5,6 @@ import sys
 import argparse
 
 from helix.log import trace, info, error, fail
-import helix.image
-from helix import shell
 from helix.image import Image, PartitionTableType
 from enum import Enum
 
@@ -40,10 +38,7 @@ def create_filesystems(image: Image, src_path: str):
     image.mkpart('primary', '1024MiB', '100%')
     filesystems = ['fat32', 'ext2']
     for i, fs in enumerate(filesystems):
-        image.mkfs(i + 1, fs)
-        image.copy_to_partition(i + 1, src_path)
-
-    trace("Syncing disk...")
+        image.populate(i + 1, fs, src_path)
 
 def run():
     if not os.path.isdir(args.input):
@@ -55,27 +50,18 @@ def run():
 
     try:
         create_filesystems(image, args.input)
-    except Exception as e:
+    except (Exception, SystemExit) as e:
+        # Never leave a half-written image that ninja considers up to date
+        if os.path.exists(image_path):
+            os.remove(image_path)
         fail_cleanup(image, f"Error: {e}")
+        sys.exit(1)
     finally:
         image.close()
 
-    # shell.run(['chown', 'image_path', real_uid, real_gid])
     info("Done.")
 
-def elevate():
-    os.environ['RAISED_BY_SUDO_UID'] = str(os.getuid())
-    os.environ['RAISED_BY_SUDO_GID'] = str(os.getgid())
-    args = ['sudo', sys.executable] + sys.argv
-    os.execlpe('sudo', *args, os.environ)
-
 if __name__ == '__main__':
-    uid = os.geteuid()
-
-    if uid != 0:
-        info("Script not started as root. Running sudo...")
-        elevate()
-
     parser = argparse.ArgumentParser(description="Create an MBR/GPT partitioned disk image.")
     parser.add_argument("-i", "--input", required=True, help="Directory to copy into both partitions")
     parser.add_argument("-o", "--output", required=True, help="Output image file path (e.g. image.hdd)")
