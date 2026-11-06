@@ -16,7 +16,7 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-#include <VFS/Fifo.hpp>
+#include <VFS/Pipe.hpp>
 #include <VFS/FileDescriptor.hpp>
 #include <VFS/VFS.hpp>
 
@@ -346,7 +346,7 @@ ErrorOr<isize> Process::InsertFd(Ref<::FileDescriptor> fd)
 
 ErrorOr<isize> Process::OpenPipe(i32* pipeFds, isize flags)
 {
-    auto pipe        = Fifo::CreatePipe();
+    auto pipe        = Pipe::CreatePipe();
     bool cloExec     = flags & O_CLOEXEC;
     i32  readerFdNum
         = static_cast<i32>(m_FdTable->Insert(pipe.Reader, -1, cloExec));

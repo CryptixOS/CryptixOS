@@ -7,16 +7,16 @@
 #include <Prism/String/StringUtils.hpp>
 #include <Scheduler/Process.hpp>
 
-#include <VFS/Fifo.hpp>
+#include <VFS/Pipe.hpp>
 
 constexpr usize FIFO_SIZE = 16 * PMM::PAGE_SIZE;
 
-Pipe            Fifo::CreatePipe()
+PipeData        Pipe::CreatePipe()
 {
-    auto fifo   = new Fifo();
-    auto dentry = CreateRef<DirectoryEntry>("");
+    auto     fifo   = new Pipe();
+    auto     dentry = CreateRef<DirectoryEntry>("");
 
-    Pipe pipe{};
+    PipeData pipe{};
     // FIXME(v1tr10l7): Clean up fifo
     pipe.Reader
         = CreateRef<FileDescriptor>(dentry, fifo, 0, FileAccessMode::eRead);
@@ -29,9 +29,9 @@ Pipe            Fifo::CreatePipe()
     return pipe;
 }
 
-Fifo::Fifo() { m_Buffer.Reserve(FIFO_SIZE); }
+Pipe::Pipe() { m_Buffer.Reserve(FIFO_SIZE); }
 
-::Ref<FileDescriptor> Fifo::OpenDirection(Fifo::Direction direction)
+::Ref<FileDescriptor> Pipe::OpenDirection(Pipe::Direction direction)
 {
     auto dentry = CreateRef<DirectoryEntry>("");
     auto fd     = CreateRef<FileDescriptor>(dentry, this, 0,
@@ -41,11 +41,11 @@ Fifo::Fifo() { m_Buffer.Reserve(FIFO_SIZE); }
     if (direction == Direction::eRead) ++m_ReaderCount;
     else ++m_WriterCount;
 
-    LogTrace("Fifo: Opening for {}", StringUtils::ToString(direction));
+    LogTrace("Pipe: Opening for {}", StringUtils::ToString(direction));
     m_Event.Trigger(false);
     return fd;
 }
-void Fifo::Close(bool writer)
+void Pipe::Close(bool writer)
 {
     if (writer) --m_WriterCount;
     else --m_ReaderCount;
@@ -53,7 +53,7 @@ void Fifo::Close(bool writer)
     m_Event.Trigger(false);
 }
 
-ErrorOr<isize> Fifo::Read(void* buffer, off_t offset, usize count)
+ErrorOr<isize> Pipe::Read(void* buffer, off_t offset, usize count)
 {
     isize nread = 0;
     m_Lock.Acquire();
@@ -81,7 +81,7 @@ cleanup:
     m_Lock.Release();
     return nread;
 }
-ErrorOr<isize> Fifo::Write(const void* buffer, off_t offset, usize count)
+ErrorOr<isize> Pipe::Write(const void* buffer, off_t offset, usize count)
 {
     isize nwritten = 0;
     m_Lock.Acquire();
@@ -112,7 +112,7 @@ cleanup:
     return nwritten;
 }
 
-ErrorOr<const stat> Fifo::Stat() const
+ErrorOr<const stat> Pipe::Stat() const
 {
     stat stats{};
     stats.st_mode = S_IFIFO;

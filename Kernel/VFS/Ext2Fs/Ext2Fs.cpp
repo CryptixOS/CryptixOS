@@ -176,7 +176,7 @@ bool Ext2Fs::Populate(DirectoryEntry* dentry)
                 mode |= S_IFCHR;
                 break;
             case Ext2FsDirectoryEntryType::eBlockDevice: mode |= S_IFBLK; break;
-            case Ext2FsDirectoryEntryType::eFifo: mode |= S_IFIFO; break;
+            case Ext2FsDirectoryEntryType::ePipe: mode |= S_IFIFO; break;
             case Ext2FsDirectoryEntryType::eSocket: mode |= S_IFSOCK; break;
             case Ext2FsDirectoryEntryType::eSymlink: mode |= S_IFLNK; break;
 

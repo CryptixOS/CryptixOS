@@ -91,7 +91,7 @@ class INode : public RefCounted<INode>
 
     inline bool IsCharDevice() const { return S_ISCHR(m_Metadata.Mode); }
     inline bool IsBlockDevice() const { return S_ISBLK(m_Metadata.Mode); }
-    inline bool IsFifo() const { return S_ISFIFO(m_Metadata.Mode); }
+    inline bool IsPipe() const { return S_ISFIFO(m_Metadata.Mode); }
     inline bool IsDirectory() const { return S_ISDIR(m_Metadata.Mode); }
     inline bool IsRegular() const { return S_ISREG(m_Metadata.Mode); }
     inline bool IsSymlink() const { return S_ISLNK(m_Metadata.Mode); }

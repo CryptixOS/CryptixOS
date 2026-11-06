@@ -85,7 +85,7 @@ FileDescriptor::FileDescriptor(class ::Ref<::DirectoryEntry> dentry,
 FileDescriptor::~FileDescriptor()
 {
     bool writer = CanWrite();
-    if (m_File && m_File->IsFifo()) m_File->Close(writer);
+    if (m_File && m_File->IsPipe()) m_File->Close(writer);
 }
 
 ErrorOr<isize> FileDescriptor::KernelRead(void* const outBuffer, usize count,
@@ -179,7 +179,7 @@ ErrorOr<isize> FileDescriptor::Seek(i32 whence, off_t offset)
 {
     ScopedLock guard(m_Lock);
     auto       file = m_File;
-    if (IsPipe() || file->IsSocket() || file->IsFifo()) return Error(ESPIPE);
+    if (IsPipe() || file->IsSocket() || file->IsPipe()) return Error(ESPIPE);
 
     switch (whence)
     {
@@ -227,7 +227,7 @@ bool FileDescriptor::IsCharDevice()
 {
     return INode() && INode()->IsCharDevice();
 }
-bool FileDescriptor::IsFifo() { return INode() && INode()->IsFifo(); }
+bool FileDescriptor::IsFifo() { return INode() && INode()->IsPipe(); }
 bool FileDescriptor::IsDirectory() { return DirectoryEntry()->IsDirectory(); }
 bool FileDescriptor::IsRegular() { return DirectoryEntry()->IsRegular(); }
 bool FileDescriptor::IsSymlink() { return DirectoryEntry()->IsSymlink(); }

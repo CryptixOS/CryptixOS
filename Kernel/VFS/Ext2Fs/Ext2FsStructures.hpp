@@ -119,7 +119,7 @@ enum class Ext2FsDirectoryEntryType : u8
     eDirectory       = 0x02,
     eCharacterDevice = 0x03,
     eBlockDevice     = 0x04,
-    eFifo            = 0x05,
+    ePipe            = 0x05,
     eSocket          = 0x06,
     eSymlink         = 0x07,
 };
@@ -138,7 +138,7 @@ constexpr Ext2FsDirectoryEntryType Ext2Mode2DirectoryEntryType(mode_t mode)
     else if (S_ISDIR(mode)) return Ext2FsDirectoryEntryType::eDirectory;
     else if (S_ISCHR(mode)) return Ext2FsDirectoryEntryType::eCharacterDevice;
     else if (S_ISBLK(mode)) return Ext2FsDirectoryEntryType::eBlockDevice;
-    else if (S_ISFIFO(mode)) return Ext2FsDirectoryEntryType::eFifo;
+    else if (S_ISFIFO(mode)) return Ext2FsDirectoryEntryType::ePipe;
     else if (S_ISSOCK(mode)) return Ext2FsDirectoryEntryType::eSocket;
     else if (S_ISLNK(mode)) return Ext2FsDirectoryEntryType::eSymlink;
 

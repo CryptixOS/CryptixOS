@@ -78,7 +78,7 @@ void DirectoryEntry::Bind(::Ref<class INode> inode)
     if (inode->IsRegular()) m_Flags |= DirectoryEntryFlags::eRegular;
     if (inode->IsSymlink()) m_Flags |= DirectoryEntryFlags::eSymlink;
     if (inode->IsCharDevice() /*|| inode->IsBlockDevice()*/ || inode->IsSocket()
-        || inode->IsFifo())
+        || inode->IsPipe())
         m_Flags |= DirectoryEntryFlags::eSpecial;
 }
 void DirectoryEntry::InsertChild(::Ref<class DirectoryEntry> entry)

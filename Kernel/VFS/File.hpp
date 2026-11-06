@@ -47,7 +47,7 @@ class File : public RefCounted<File>
 
     virtual bool           IsCharDevice() const { return false; }
     virtual bool           IsBlockDevice() const { return false; }
-    virtual bool           IsFifo() const { return false; }
+    virtual bool           IsPipe() const { return false; }
     virtual bool           IsDirectory() const { return false; }
     virtual bool           IsRegular() const { return false; }
     virtual bool           IsSymlink() const { return false; }
