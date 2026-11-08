@@ -20,10 +20,17 @@ namespace PMM
     bool                IsInitialized();
 
     Span<MemoryZone>    MemoryZones();
+    // The memory map as the bootloader described it: the early allocator
+    // hands out pages by cutting them off the front of MemoryZones()' usable
+    // zones, which then no longer cover them
+    Span<const MemoryZone> InitialMemoryZones();
 
     CTOS_NO_KASAN void* AllocatePages(usize count = 1);
     CTOS_NO_KASAN void* CallocatePages(usize count = 1);
     CTOS_NO_KASAN void  FreePages(void* ptr, usize count);
+
+    // Calls `callback` with every run of free pages (physical base, count)
+    void ForEachFreeRange(void (*callback)(Pointer base, usize pageCount));
 
     template <PointerHolder T>
     inline CTOS_NO_KASAN T AllocatePages(usize count = 1)

@@ -6,6 +6,7 @@
  */
 #include <API/Syscall.hpp>
 #include <Arch/CPU.hpp>
+#include <Debug/Kasan.hpp>
 
 #include <Memory/Allocator/KernelHeap.hpp>
 #include <Memory/MM.hpp>
@@ -151,6 +152,7 @@ namespace MM
 
         VMM::Initialize(s_KernelPhysicalAddress, s_KernelVirtualAddress,
                         s_HigherHalfOffset);
+        Kasan::Initialize();
     }
 
     void KeepPhysicalRange(Pointer base, usize size)

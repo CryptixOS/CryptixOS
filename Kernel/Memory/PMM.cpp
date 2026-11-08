@@ -7,6 +7,7 @@
 #include <Common.hpp>
 
 #include <Debug/Debug.hpp>
+#include <Debug/Kasan.hpp>
 #include <Library/Locking/Spinlock.hpp>
 
 #include <Memory/PMM.hpp>
@@ -24,6 +25,10 @@ namespace PMM
         bool            s_Initialized = false;
 
         MemoryMap       s_MemoryMap{};
+        // A copy of the zones before EarlyAllocatePages() shrinks them
+        constexpr usize MAX_INITIAL_ZONES = 256;
+        MemoryZone      s_InitialZones[MAX_INITIAL_ZONES];
+        usize           s_InitialZoneCount = 0;
         BitmapAllocator s_BitmapAllocator;
 
         Pointer         EarlyAllocatePages(usize count = 1)
@@ -48,7 +53,10 @@ namespace PMM
 
     void EarlyInitialize(const MemoryMap& memoryMap)
     {
-        s_MemoryMap = memoryMap;
+        s_MemoryMap        = memoryMap;
+        s_InitialZoneCount = Min(memoryMap.EntryCount, MAX_INITIAL_ZONES);
+        for (usize i = 0; i < s_InitialZoneCount; i++)
+            s_InitialZones[i] = memoryMap.Entries[i];
     }
     bool Initialize(const MemoryMap& memoryMap)
     {
@@ -97,11 +105,18 @@ namespace PMM
     {
         return Span(s_MemoryMap.Entries, s_MemoryMap.EntryCount);
     }
+    Span<const MemoryZone> InitialMemoryZones()
+    {
+        return Span<const MemoryZone>(s_InitialZones, s_InitialZoneCount);
+    }
 
     void* AllocatePages(usize count)
     {
-        if (!s_Initialized) return EarlyAllocatePages(count);
-        return s_BitmapAllocator.AllocatePages(count);
+        Pointer pages = s_Initialized ? s_BitmapAllocator.AllocatePages(count)
+                                      : EarlyAllocatePages(count);
+        // Free pages are poisoned while KASAN runs
+        if (pages) Kasan::Unpoison(pages.ToHigherHalf(), count * PAGE_SIZE);
+        return pages;
     }
     void* CallocatePages(usize count)
     {
@@ -117,7 +132,15 @@ namespace PMM
         // Early allocations come straight from the memory map and aren't
         // tracked by any bitmap yet, so there is nothing to give them back to.
         if (!s_Initialized) return;
+
+        Kasan::Poison(Pointer(ptr).ToHigherHalf(), count * PAGE_SIZE,
+                      Kasan::ShadowType::ePageFree);
         return s_BitmapAllocator.FreePages(ptr, count);
+    }
+
+    void ForEachFreeRange(void (*callback)(Pointer base, usize pageCount))
+    {
+        if (s_Initialized) s_BitmapAllocator.ForEachFreeRange(callback);
     }
 
     uintptr_t GetMemoryTop() { return s_BitmapAllocator.MemoryTop(); }

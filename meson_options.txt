@@ -1,0 +1,2 @@
+option('kasan', type: 'boolean', value: false,
+  description: 'Build the kernel with KASAN (Kernel/Debug/Kasan.hpp), clang only')

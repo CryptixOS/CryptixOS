@@ -39,6 +39,25 @@ else
   error('Unknown architecture: ' + arch)
 endif
 
+# KASAN (Debug/Kasan.hpp): every access calls into the runtime, which has no
+# fixed shadow offset to inline checks against. Stack instrumentation would
+# write the shadow inline, so it stays off. The kernel only, not the .ko
+# modules, which have no runtime to call.
+if get_option('kasan')
+  if cxx.get_id() != 'clang'
+    error('the kasan option needs clang')
+  endif
+  kasan_args = [
+    '-fsanitize=kernel-address',
+    '-mllvm=-asan-instrumentation-with-call-threshold=0',
+    '-mllvm=-asan-stack=0',
+    '-mllvm=-asan-globals=1',
+    '-DCTOS_KASAN=1',
+  ]
+  c_args += kasan_args
+  cxx_args += kasan_args
+endif
+
 
 subdir('API')
 subdir('Arch')

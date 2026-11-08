@@ -47,6 +47,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(CTOS_USE_CCACHE "Compile through ccache" ON)
+option(CTOS_KASAN "Build the kernel with KASAN (Debug/Kasan.hpp), clang only" OFF)
 find_program(CCACHE_PROGRAM ccache)
 if(CTOS_USE_CCACHE AND CCACHE_PROGRAM)
     foreach(lang C CXX ASM)

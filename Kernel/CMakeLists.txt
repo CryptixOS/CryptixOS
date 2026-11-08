@@ -92,6 +92,25 @@ elseif(CTOS_ARCH STREQUAL "aarch64")
     list(APPEND CTOS_KERNEL_CXX_ARGS -DCTOS_ARCH=CTOS_ARCH_AARCH64 -DCTOS_TARGET_AARCH64)
 endif()
 
+# KASAN (Debug/Kasan.hpp): every access calls into the runtime, which has no
+# fixed shadow offset to inline checks against. Stack instrumentation would
+# write the shadow inline, so it stays off. The kernel only, not the .ko
+# modules, which have no runtime to call.
+if(CTOS_KASAN)
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR "CTOS_KASAN needs clang")
+    endif()
+    set(kasan_args
+        -fsanitize=kernel-address
+        -mllvm=-asan-instrumentation-with-call-threshold=0
+        -mllvm=-asan-stack=0
+        -mllvm=-asan-globals=1
+        -DCTOS_KASAN=1
+    )
+    list(APPEND CTOS_KERNEL_C_ARGS ${kasan_args})
+    list(APPEND CTOS_KERNEL_CXX_ARGS ${kasan_args})
+endif()
+
 set(CTOS_KERNEL_INCLUDES
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}

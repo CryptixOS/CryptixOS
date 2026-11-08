@@ -6,6 +6,8 @@
  */
 #include <Common.hpp>
 
+#include <Debug/Kasan.hpp>
+
 #include <Library/Locking/Spinlock.hpp>
 #include <Memory/PMM.hpp>
 #include <Memory/PageMap.hpp>
@@ -46,6 +48,21 @@ namespace KernelHeap
                       "KernelHeap: alignment above PAGE_SIZE is unsupported");
             return Max(size, alignment);
         }
+
+        // How many bytes an allocation really has: its slab's object size,
+        // or the pages of a large (page aligned) one
+        usize Capacity(Pointer memory)
+        {
+            if ((memory.Raw() & (PMM::PAGE_SIZE - 1)) == 0)
+                return memory.Offset<Pointer>(-PMM::PAGE_SIZE)
+                           .As<BigAllocMeta>()
+                           ->PageCount
+                     * PMM::PAGE_SIZE;
+
+            return Pointer(memory.Raw() & ~(PMM::PAGE_SIZE - 1))
+                .As<Prism::SlabFrame>()
+                ->Allocator->AllocationSize();
+        }
     } // namespace
 
     void Initialize()
@@ -58,26 +75,59 @@ namespace KernelHeap
         LogInfo("KernelHeap: Initialized `{}` slab buckets", BUCKET_COUNT);
     }
 
+    // With KASAN, the bytes past the requested size and freed objects are
+    // poisoned (Kasan::OnAllocate()/OnFree()), so everything here only ever
+    // touches the requested bytes: the pool's own Callocate() and
+    // Reallocate() would fill or copy whole objects.
     Pointer Allocate(usize bytes)
     {
-        AssertMsg(s_Initialized, "KernelHeap: allocation before Initialize()");
-        return s_SlabPool->Allocate(bytes);
+        // EarlyPanic(): formatting a Panic() message would allocate again
+        if (!s_Initialized) [[unlikely]]
+            EarlyPanic("KernelHeap: allocation before Initialize()");
+        Pointer memory = s_SlabPool->Allocate(bytes);
+        if (memory) Kasan::OnAllocate(memory, bytes, Capacity(memory));
+        return memory;
     }
     Pointer Callocate(usize bytes)
     {
-        AssertMsg(s_Initialized, "KernelHeap: allocation before Initialize()");
-        return s_SlabPool->Callocate(bytes);
+        Pointer memory = Allocate(bytes);
+        if (memory) Memory::Fill(memory, 0, bytes);
+        return memory;
     }
     Pointer Reallocate(Pointer memory, usize size)
     {
-        AssertMsg(s_Initialized, "KernelHeap: allocation before Initialize()");
-        return s_SlabPool->Reallocate(memory, size);
+        // EarlyPanic(): formatting a Panic() message would allocate again
+        if (!s_Initialized) [[unlikely]]
+            EarlyPanic("KernelHeap: allocation before Initialize()");
+        if (!memory) return Allocate(size);
+        if (!size)
+        {
+            Free(memory);
+            return nullptr;
+        }
+
+        usize capacity = Capacity(memory);
+        if (size <= capacity)
+        {
+            Kasan::OnAllocate(memory, size, capacity);
+            return memory;
+        }
+
+        Pointer newMemory = Allocate(size);
+        if (!newMemory) return nullptr;
+
+        usize oldSize = Kasan::AddressableSize(memory, capacity);
+        Memory::Copy(newMemory, memory, Min(oldSize, size));
+        Free(memory);
+        return newMemory;
     }
     void Free(Pointer memory)
     {
         // operator delete(nullptr) must be a no-op; the pool would otherwise
         // treat a null pointer as a large allocation and read its metadata.
         if (!memory) return;
+
+        Kasan::OnFree(memory, Capacity(memory));
         s_SlabPool->Free(memory);
     }
 } // namespace KernelHeap

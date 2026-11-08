@@ -6,451 +6,425 @@
  */
 #include <Common.hpp>
 
-#include <Debug/Assertions.hpp>
 #include <Debug/Kasan.hpp>
 #include <Debug/Panic.hpp>
 
-#include <Prism/String/StringUtils.hpp>
+#include <Memory/MM.hpp>
+#include <Memory/PMM.hpp>
+#include <Memory/VMM.hpp>
+
+#include <Prism/Utility/Atomic.hpp>
 #include <Prism/Utility/Math.hpp>
 
-namespace MM
-{
-    usize HigherHalfOffset();
-};
-using MM::HigherHalfOffset;
+extern "C" symbol limine_requests_addr_start;
+extern "C" symbol data_end_addr;
+
+// The runtime itself must never be instrumented: a check inside a check
+// would recurse forever. Everything below works on plain integers, without
+// helpers from elsewhere that could be instrumented (at -O0 nothing is
+// inlined).
+#if defined(__clang__)
+    #pragma clang attribute push(__attribute__((no_sanitize("address", "kernel-address"))), apply_to = function)
+#endif
 
 namespace Kasan
 {
-    CTOS_UNUSED constexpr usize SHADOW_MAPPING_OFFSET = 0x06fe'0000;
-    CTOS_UNUSED constexpr usize SHADOW_SHIFT          = 3;
-    CTOS_UNUSED constexpr usize SHADOW_GRANULE_SIZE   = (1ul << SHADOW_SHIFT);
-    CTOS_UNUSED constexpr usize SHADOW_MASK = (SHADOW_GRANULE_SIZE - 1);
-    CTOS_UNUSED constexpr usize SHADOW_UNPOISONED_MAGIC        = 0x00;
-    CTOS_UNUSED constexpr usize SHADOW_RESERVED_MAGIC          = 0xff;
-    CTOS_UNUSED constexpr usize SHADOW_GLOBAL_REDZONE_MAGIC    = 0xf9;
-    CTOS_UNUSED constexpr usize SHADOW_HEAP_HEAD_REDZONE_MAGIC = 0xfa;
-    CTOS_UNUSED constexpr usize SHADOW_HEAP_TAIL_REDZONE_MAGIC = 0xfb;
-    CTOS_UNUSED constexpr usize SHADOW_HEAP_FREE_MAGIC         = 0xfd;
-    CTOS_UNUSED constexpr usize HEAP_HEAD_REDZONE_SIZE         = 0x20;
-    CTOS_UNUSED constexpr usize HEAP_TAIL_REDZONE_SIZE         = 0x20;
-
-    CTOS_UNUSED constexpr usize MemoryToShadow(Pointer address)
+    // As the compiler lays them out (__asan_global in LLVM)
+    struct __asan_global
     {
-        return (address >> SHADOW_SHIFT).Raw() + SHADOW_MAPPING_OFFSET;
-    }
-    CTOS_UNUSED constexpr usize ShadowToMemory(Pointer address)
-    {
-        return (address.Raw() - SHADOW_MAPPING_OFFSET) << SHADOW_SHIFT;
-    }
-
-    CTOS_UNUSED constexpr usize SHADOW_SCALE        = Bit(SHADOW_SHIFT);
-
-    CTOS_UNUSED constexpr usize ALLOCA_REDZONE_SIZE = 32;
-
-    enum class AccessType
-    {
-        eLoad,
-        eStore,
+        u64         Address;
+        u64         ValidSize;
+        u64         TotalSize;
+        const char* Name;
+        const char* ModuleName;
+        u64         HasDynamicInit;
+        void*       Location;
+        u64         OdrIndicator;
     };
 
-    static bool    s_Initialized = false;
-    static Pointer s_ShadowBase;
-    static usize   s_ShadowOffset;
-
-    void           Initialize(Pointer shadowBase)
+    namespace
     {
-        Pointer hhdmOffset = HigherHalfOffset();
+        constexpr u64 SHADOW_SHIFT        = 3;
+        constexpr u64 SHADOW_GRANULE_SIZE = 1 << SHADOW_SHIFT;
+        constexpr u64 SHADOW_GRANULE_MASK = SHADOW_GRANULE_SIZE - 1;
 
-        s_ShadowBase       = shadowBase;
-        s_ShadowOffset     = s_ShadowBase - (hhdmOffset >> SHADOW_SHIFT);
-        s_Initialized      = true;
-    }
-
-    static void PrintViolation(Pointer address, usize size,
-                               AccessType accessType, ShadowType shadowType,
-                               Pointer returnAddress)
-    {
-        auto accessTypeString = ToString(accessType);
-        accessTypeString.RemovePrefix(1);
-
-        auto shadowTypeString = ToString(shadowType);
-        shadowTypeString.RemovePrefix(1);
-
-        Panic(
-            "KASAN: Invalid {}-byte {} access to {}, which is marked as '{}' "
-            "[at {}]",
-            size, accessTypeString, address.Raw(), shadowTypeString,
-            returnAddress.Raw());
-    }
-
-    static ShadowType* va_to_shadow(Pointer address)
-    {
-        return Pointer(address.Raw<u64>() >> SHADOW_SHIFT)
-            .Offset<Pointer>(s_ShadowOffset)
-            .As<ShadowType>();
-    }
-
-    void FillShadow(Pointer address, usize size, ShadowType type)
-    {
-        if (!s_Initialized) [[unlikely]]
-            return;
-
-        Assert((address.Raw() % SHADOW_SCALE) == 0);
-        Assert((size % SHADOW_SCALE) == 0);
-
-        auto* shadow     = va_to_shadow(address);
-        auto  shadowSize = size >> SHADOW_SHIFT;
-        Memory::Fill(shadow, ToUnderlying(type), shadowSize);
-    }
-    void MarkRegion(Pointer address, usize validSize, usize totalSize,
-                    ShadowType type)
-    {
-        if (!s_Initialized) [[unlikely]]
-            return;
-
-        Assert((address.Raw() % SHADOW_SCALE) == 0);
-        Assert((totalSize % SHADOW_SCALE) == 0);
-
-        auto* shadow          = va_to_shadow(address);
-        auto  validShadowSize = validSize >> SHADOW_SHIFT;
-        Memory::Fill(shadow, ToUnderlying(ShadowType::eUnpoisoned8Bytes),
-                     validShadowSize);
-        auto unalignedSize = validSize & SHADOW_MASK;
-        if (unalignedSize)
-            *(shadow + validShadowSize)
-                = static_cast<ShadowType>(unalignedSize);
-
-        auto poisonedShadowSize
-            = (totalSize - Math::RoundUpToPowerOfTwo(validSize, SHADOW_SCALE))
-           >> SHADOW_SHIFT;
-        Memory::Fill(shadow + validShadowSize + (unalignedSize != 0),
-                     ToUnderlying(type), poisonedShadowSize);
-    }
-
-    static bool Check1ShadowByte(Pointer address, ShadowType& shadowType)
-    {
-        const auto shadow = *va_to_shadow(address);
-        const i8   minimalValidShadow
-            = (address & Pointer(SHADOW_MASK)).Offset(1);
-
-        if (shadow == ShadowType::eUnpoisoned8Bytes
-            || (minimalValidShadow <= ToUnderlying(shadow))) [[likely]]
-            return true;
-
-        shadowType = shadow;
-        return false;
-    }
-    static bool Check2ShadowBytes(Pointer address, ShadowType& shadowType)
-    {
-        if ((address.Raw<u64>() >> SHADOW_SHIFT)
-            != (address.Offset<u64>(1) >> SHADOW_SHIFT)) [[unlikely]]
-            return Check1ShadowByte(address, shadowType)
-                && Check1ShadowByte(address.Offset(1), shadowType);
-
-        const auto shadow = *va_to_shadow(address);
-        const i8   minimalValidShadow
-            = (address.Offset<Pointer>(1) & SHADOW_MASK).Offset(1);
-
-        if (shadow == ShadowType::eUnpoisoned8Bytes
-            || (minimalValidShadow <= ToUnderlying(shadow))) [[likely]]
-            return true;
-
-        shadowType = shadow;
-        return false;
-    }
-    static bool Check4ShadowBytes(Pointer address, ShadowType& shadowType)
-    {
-        if ((address.Raw<u64>() >> SHADOW_SHIFT)
-            != (address.Offset<usize>(3) >> SHADOW_SHIFT)) [[unlikely]]
-            return Check2ShadowBytes(address, shadowType)
-                && Check2ShadowBytes(address.Offset<Pointer>(2), shadowType);
-
-        const auto shadow = *va_to_shadow(address);
-        const i8   minimalValidShadow
-            = (address.Offset<Pointer>(3) & SHADOW_MASK).Offset(1);
-
-        if (shadow == ShadowType::eUnpoisoned8Bytes
-            || (minimalValidShadow <= ToUnderlying(shadow))) [[likely]]
-            return true;
-
-        shadowType = shadow;
-        return false;
-    }
-    static bool Check8ShadowBytes(Pointer address, ShadowType& shadowType)
-    {
-        if ((address.Raw<u64>() >> SHADOW_SHIFT)
-            != (address.Offset<usize>(7)) >> SHADOW_SHIFT) [[unlikely]]
-            return Check4ShadowBytes(address, shadowType)
-                && Check4ShadowBytes(address.Offset<Pointer>(4), shadowType);
-
-        const auto shadow = *va_to_shadow(address);
-        const i8   minimalValidShadow
-            = (address.Offset<Pointer>(7) & SHADOW_MASK).Offset(1);
-
-        if (shadow == ShadowType::eUnpoisoned8Bytes
-            || (minimalValidShadow <= ToUnderlying(shadow))) [[likely]]
-            return true;
-
-        shadowType = shadow;
-        return false;
-    }
-    static bool CheckN_ShadowBytes(Pointer address, usize n,
-                                   ShadowType& shadowType)
-    {
-        while ((address.Raw<u64>() % 8) && (n > 0))
+        // A covered address range and where its shadow starts:
+        // shadow(address) = ShadowBase + (address - Start) / 8
+        struct ShadowRange
         {
-            if (!Check1ShadowByte(address, shadowType)) return false;
+            u64 Start      = 0;
+            u64 End        = 0;
+            u64 ShadowBase = 0;
+        };
 
-            ++address;
-            --n;
-        }
-        while (n >= 8)
+        // The direct map and the kernel image
+        CTOS_RO_AFTER_INIT constinit ShadowRange s_Ranges[2]{};
+        CTOS_RO_AFTER_INIT constinit usize       s_RangeCount = 0;
+        constinit bool        s_Initialized = false;
+        constinit Atomic<bool> s_Reporting  = false;
+
+        // Globals register themselves from the global constructors, which
+        // run before the shadow exists; they are applied in Initialize()
+        struct GlobalBatch
         {
-            if (!Check8ShadowBytes(address, shadowType)) return false;
+            __asan_global* Globals;
+            usize                 Count;
+        };
+        constexpr usize      MAX_PENDING_GLOBALS = 1024;
+        constinit GlobalBatch s_PendingGlobals[MAX_PENDING_GLOBALS]{};
+        constinit usize       s_PendingGlobalCount = 0;
+        constinit usize       s_DroppedGlobals     = 0;
 
-            address = address.Offset<Pointer>(8);
-            n -= 8;
+        u8*                   ShadowOf(u64 address)
+        {
+            for (usize i = 0; i < s_RangeCount; i++)
+            {
+                auto& range = s_Ranges[i];
+                if (address >= range.Start && address < range.End)
+                    return reinterpret_cast<u8*>(
+                        range.ShadowBase
+                        + ((address - range.Start) >> SHADOW_SHIFT));
+            }
+            return nullptr;
         }
 
-        while (n > 0)
+        void FillShadow(u64 address, u64 size, u8 value)
         {
-            if (!Check1ShadowByte(address, shadowType)) return false;
-
-            ++address;
-            --n;
+            for (u64 offset = 0; offset < size; offset += SHADOW_GRANULE_SIZE)
+            {
+                u8* shadow = ShadowOf(address + offset);
+                if (shadow) *shadow = value;
+            }
         }
-        return true;
-    }
 
-    static void CheckShadowBytes(Pointer address, usize size,
-                                 AccessType accessType, Pointer returnAddress)
+        const char* ShadowName(u8 value)
+        {
+            switch (value)
+            {
+                case 0xf9: return "global redzone";
+                case 0xfa: return "heap redzone (out of bounds)";
+                case 0xfb: return "freed heap object (use after free)";
+                case 0xff: return "free page";
+                default: break;
+            }
+            return value < SHADOW_GRANULE_SIZE ? "partially addressable"
+                                               : "unknown";
+        }
+
+        [[noreturn]] void Report(u64 address, u64 size, bool write,
+                                 u64 badAddress, u8 shadow, u64 caller)
+        {
+            EarlyPanic(
+                "KASAN: invalid %s of %llu bytes at %#llx: %#llx is %s "
+                "(shadow %#x), from %#llx",
+                write ? "write" : "read", size, address, badAddress,
+                ShadowName(shadow), shadow, caller);
+        }
+
+        void CheckAccess(u64 address, u64 size, bool write, u64 caller)
+        {
+            if (!s_Initialized || size == 0) [[unlikely]]
+                return;
+
+            u64 last = address + size - 1;
+            for (u64 current = address; current <= last;)
+            {
+                u64 granuleEnd = current | SHADOW_GRANULE_MASK;
+                u8* shadow     = ShadowOf(current);
+                if (shadow && *shadow)
+                {
+                    // 1-7: only that many leading bytes are addressable
+                    u8  value      = *shadow;
+                    u64 firstValid = current & ~SHADOW_GRANULE_MASK;
+                    u64 accessEnd  = last < granuleEnd ? last : granuleEnd;
+                    if (value >= SHADOW_GRANULE_SIZE
+                        || accessEnd >= firstValid + value)
+                    {
+                        // Panic once, even if the report itself trips
+                        if (s_Reporting.Exchange(true)) return;
+                        s_Initialized = false;
+                        Report(address, size, write,
+                               value >= SHADOW_GRANULE_SIZE
+                                   ? current
+                                   : firstValid + value,
+                               value, caller);
+                    }
+                }
+
+                if (granuleEnd == ~0ull) break;
+                current = granuleEnd + 1;
+            }
+        }
+
+        void MarkRegion(u64 address, u64 validSize, u64 totalSize, u8 value)
+        {
+            u64 fullGranules = validSize & ~SHADOW_GRANULE_MASK;
+            FillShadow(address, fullGranules, 0);
+            if (validSize & SHADOW_GRANULE_MASK)
+            {
+                u8* shadow = ShadowOf(address + fullGranules);
+                if (shadow) *shadow = validSize & SHADOW_GRANULE_MASK;
+                fullGranules += SHADOW_GRANULE_SIZE;
+            }
+            if (totalSize > fullGranules)
+                FillShadow(address + fullGranules, totalSize - fullGranules,
+                           value);
+        }
+    } // namespace
+
+    namespace
     {
-        if (size == 0) [[unlikely]]
-            return;
-        if (!s_Initialized) [[unlikely]]
-            return;
-        if (address < HigherHalfOffset() || address >= s_ShadowBase)
-            [[unlikely]]
-            return;
-
-        bool       valid      = false;
-        ShadowType shadowType = ShadowType::eUnpoisoned8Bytes;
-        switch (size)
+        void RegisterGlobals(__asan_global* globals, usize count)
         {
-            case 1: valid = Check1ShadowByte(address, shadowType); break;
-            case 2: valid = Check2ShadowBytes(address, shadowType); break;
-            case 4: valid = Check4ShadowBytes(address, shadowType); break;
-            case 8: valid = Check8ShadowBytes(address, shadowType); break;
-            default:
-                valid = CheckN_ShadowBytes(address, size, shadowType);
-                break;
+            for (usize i = 0; i < count; i++)
+                MarkRegion(globals[i].Address, globals[i].ValidSize,
+                           globals[i].TotalSize,
+                           ToUnderlying(ShadowType::eGlobalRedzone));
         }
 
-        if (valid) [[likely]]
-            return;
+        void PoisonFreePages(Pointer base, usize pageCount)
+        {
+            FillShadow(base.Raw() + MM::HigherHalfOffset(),
+                       pageCount * PMM::PAGE_SIZE,
+                       ToUnderlying(ShadowType::ePageFree));
+        }
 
-        PrintViolation(address, size, accessType, shadowType, returnAddress);
+        bool IsRam(MemoryZoneType type)
+        {
+            switch (type)
+            {
+                case MemoryZoneType::eUsable:
+                case MemoryZoneType::eBootloaderReclaimable:
+                case MemoryZoneType::eKernelAndModules:
+                case MemoryZoneType::eACPI_Reclaimable:
+                case MemoryZoneType::eACPI_NVS: return true;
+                default: break;
+            }
+            return false;
+        }
+
+        // Maps `size` bytes of shadow at `shadowBase` for the memory starting
+        // at `start`. Shadow pages whose memory isn't RAM (holes, MMIO) are
+        // all mapped to one read-only zero page, like Linux's
+        // kasan_early_shadow_page: they read as addressable and are never
+        // written, since only RAM is ever poisoned.
+        bool MapShadow(u64 shadowBase, u64 size, u64 start, bool directMap,
+                       Pointer zeroPage)
+        {
+            auto  pageMap = VMM::GetKernelPageMap();
+            auto  zones   = PMM::InitialMemoryZones();
+            u64   hhdm    = MM::HigherHalfOffset();
+            // The memory one shadow page describes
+            u64   span    = PMM::PAGE_SIZE << SHADOW_SHIFT;
+
+            for (u64 offset = 0; offset < size; offset += PMM::PAGE_SIZE)
+            {
+                bool backed = !directMap;
+                if (directMap)
+                {
+                    u64 physStart = start - hhdm + (offset << SHADOW_SHIFT);
+                    u64 physEnd   = physStart + span;
+                    for (auto& zone : zones)
+                    {
+                        u64 zoneStart = zone.Base().Raw();
+                        u64 zoneEnd   = zoneStart + zone.Length();
+                        if (IsRam(zone.Type()) && zoneStart < physEnd
+                            && zoneEnd > physStart)
+                        {
+                            backed = true;
+                            break;
+                        }
+                    }
+                }
+
+                Pointer        phys = zeroPage;
+                PageAttributes attributes
+                    = PageAttributes::eRead | PageAttributes::eWriteBack;
+                if (backed)
+                {
+                    phys = PMM::CallocatePages(1);
+                    if (!phys) return false;
+                    attributes |= PageAttributes::eWrite;
+                }
+
+                if (!pageMap->Map(shadowBase + offset, phys, attributes))
+                    return false;
+            }
+            return true;
+        }
+    } // namespace
+
+    void Initialize()
+    {
+        if constexpr (!ENABLED) return;
+
+        u64 ramTop = 0;
+        for (auto& zone : PMM::InitialMemoryZones())
+            if (IsRam(zone.Type()))
+                ramTop = Max(ramTop, zone.Base().Raw() + zone.Length());
+
+        u64 hhdm       = MM::HigherHalfOffset();
+        u64 imageStart = Pointer(limine_requests_addr_start).Raw();
+        u64 imageEnd   = Pointer(data_end_addr).Raw();
+
+        auto shadowSize = [](u64 bytes)
+        {
+            return Math::AlignUp((bytes >> SHADOW_SHIFT) + 1, PMM::PAGE_SIZE);
+        };
+        u64 directMapShadow = shadowSize(ramTop);
+        u64 imageShadow     = shadowSize(imageEnd - imageStart);
+
+        Pointer zeroPage    = PMM::CallocatePages(1);
+        Pointer shadowBase  = VMM::AllocateSpace(
+            directMapShadow + imageShadow, PMM::PAGE_SIZE, false);
+        if (!zeroPage || !shadowBase
+            || !MapShadow(shadowBase.Raw(), directMapShadow, hhdm, true,
+                          zeroPage)
+            || !MapShadow(shadowBase.Raw() + directMapShadow, imageShadow,
+                          imageStart, false, zeroPage))
+        {
+            LogError("KASAN: Failed to map the shadow memory, disabled");
+            return;
+        }
+
+        s_Ranges[0]   = {hhdm, hhdm + ramTop, shadowBase.Raw()};
+        s_Ranges[1]   = {imageStart, imageEnd,
+                         shadowBase.Raw() + directMapShadow};
+        s_RangeCount  = 2;
+
+        PMM::ForEachFreeRange(PoisonFreePages);
+        for (usize i = 0; i < s_PendingGlobalCount; i++)
+            RegisterGlobals(s_PendingGlobals[i].Globals,
+                            s_PendingGlobals[i].Count);
+        if (s_DroppedGlobals)
+            LogWarn("KASAN: {} global batches registered too early were lost",
+                    s_DroppedGlobals);
+
+        s_Initialized = true;
+        LogInfo("KASAN: Enabled, {} MiB of shadow memory for {} MiB of RAM",
+                (directMapShadow + imageShadow) / 1_mib, ramTop / 1_mib);
+    }
+    bool IsInitialized() { return s_Initialized; }
+
+    void PoisonImpl(Pointer address, usize size, ShadowType type)
+    {
+        if (s_RangeCount) FillShadow(address.Raw(), size, ToUnderlying(type));
+    }
+    void UnpoisonImpl(Pointer address, usize size)
+    {
+        if (s_RangeCount) MarkRegion(address.Raw(), size, size, 0);
+    }
+    usize AddressableSizeImpl(Pointer object, usize capacity)
+    {
+        usize size = 0;
+        while (size < capacity)
+        {
+            u8* shadow = ShadowOf(object.Raw() + size);
+            if (!shadow || *shadow == 0)
+            {
+                size += SHADOW_GRANULE_SIZE;
+                continue;
+            }
+            if (*shadow < SHADOW_GRANULE_SIZE) size += *shadow;
+            break;
+        }
+        return size < capacity ? size : capacity;
     }
 
+    // The entry points the compiler calls. With
+    // -asan-instrumentation-with-call-threshold=0 every access is a call,
+    // so these are the only places the shadow is read.
     extern "C"
     {
-// Define a macro to easily declare the KASAN load and store callbacks for
-// the various sizes of data type.
-//
-#define ADDRESS_SANITIZER_LOAD_STORE(size)                                     \
-    void __asan_load##size(uintptr_t);                                         \
-    void __asan_load##size(uintptr_t address)                                  \
+#define CTOS_KASAN_ACCESS(size)                                                \
+    void __asan_load##size##_noabort(u64 address)                              \
     {                                                                          \
-        CheckShadowBytes(address, size, AccessType::eLoad,                     \
-                         __builtin_return_address(0));                         \
+        CheckAccess(address, size, false,                                      \
+                    reinterpret_cast<u64>(__builtin_return_address(0)));       \
     }                                                                          \
-    void __asan_load##size##_noabort(uintptr_t);                               \
-    void __asan_load##size##_noabort(uintptr_t address)                        \
+    void __asan_store##size##_noabort(u64 address)                             \
     {                                                                          \
-        CheckShadowBytes(address, size, AccessType::eLoad,                     \
-                         __builtin_return_address(0));                         \
+        CheckAccess(address, size, true,                                       \
+                    reinterpret_cast<u64>(__builtin_return_address(0)));       \
     }                                                                          \
-    void __asan_store##size(uintptr_t);                                        \
-    void __asan_store##size(uintptr_t address)                                 \
+    void __asan_load##size(u64 address)                                        \
     {                                                                          \
-        CheckShadowBytes(address, size, AccessType::eStore,                    \
-                         __builtin_return_address(0));                         \
+        CheckAccess(address, size, false,                                      \
+                    reinterpret_cast<u64>(__builtin_return_address(0)));       \
     }                                                                          \
-    void __asan_store##size##_noabort(uintptr_t);                              \
-    void __asan_store##size##_noabort(uintptr_t address)                       \
+    void __asan_store##size(u64 address)                                       \
     {                                                                          \
-        CheckShadowBytes(address, size, AccessType::eStore,                    \
-                         __builtin_return_address(0));                         \
+        CheckAccess(address, size, true,                                       \
+                    reinterpret_cast<u64>(__builtin_return_address(0)));       \
     }                                                                          \
-    void __asan_report_load##size(uintptr_t);                                  \
-    void __asan_report_load##size(uintptr_t address)                           \
+    void __asan_report_load##size##_noabort(u64 address)                       \
     {                                                                          \
-        PrintViolation(address, size, AccessType::eLoad, ShadowType::eGeneric, \
-                       __builtin_return_address(0));                           \
+        CheckAccess(address, size, false,                                      \
+                    reinterpret_cast<u64>(__builtin_return_address(0)));       \
     }                                                                          \
-    void __asan_report_load##size##_noabort(uintptr_t);                        \
-    void __asan_report_load##size##_noabort(uintptr_t address)                 \
+    void __asan_report_store##size##_noabort(u64 address)                      \
     {                                                                          \
-        PrintViolation(address, size, AccessType::eLoad, ShadowType::eGeneric, \
-                       __builtin_return_address(0));                           \
-    }                                                                          \
-    void __asan_report_store##size(uintptr_t);                                 \
-    void __asan_report_store##size(uintptr_t address)                          \
-    {                                                                          \
-        PrintViolation(address, size, AccessType::eStore,                      \
-                       ShadowType::eGeneric, __builtin_return_address(0));     \
-    }                                                                          \
-    void __asan_report_store##size##_noabort(uintptr_t);                       \
-    void __asan_report_store##size##_noabort(uintptr_t address)                \
-    {                                                                          \
-        PrintViolation(address, size, AccessType::eStore,                      \
-                       ShadowType::eGeneric, __builtin_return_address(0));     \
+        CheckAccess(address, size, true,                                       \
+                    reinterpret_cast<u64>(__builtin_return_address(0)));       \
     }
 
-        ADDRESS_SANITIZER_LOAD_STORE(1);
-        ADDRESS_SANITIZER_LOAD_STORE(2);
-        ADDRESS_SANITIZER_LOAD_STORE(4);
-        ADDRESS_SANITIZER_LOAD_STORE(8);
-        ADDRESS_SANITIZER_LOAD_STORE(16);
+        CTOS_KASAN_ACCESS(1)
+        CTOS_KASAN_ACCESS(2)
+        CTOS_KASAN_ACCESS(4)
+        CTOS_KASAN_ACCESS(8)
+        CTOS_KASAN_ACCESS(16)
+#undef CTOS_KASAN_ACCESS
 
-#undef ADDRESS_SANITIZER_LOAD_STORE
-
-        void __asan_loadN(uintptr_t, usize);
-        void __asan_loadN(uintptr_t address, usize size)
+        void __asan_loadN_noabort(u64 address, u64 size)
         {
-            CheckShadowBytes(address, size, AccessType::eLoad,
-                             __builtin_return_address(0));
+            CheckAccess(address, size, false,
+                        reinterpret_cast<u64>(__builtin_return_address(0)));
+        }
+        void __asan_storeN_noabort(u64 address, u64 size)
+        {
+            CheckAccess(address, size, true,
+                        reinterpret_cast<u64>(__builtin_return_address(0)));
+        }
+        void __asan_loadN(u64 address, u64 size)
+        {
+            CheckAccess(address, size, false,
+                        reinterpret_cast<u64>(__builtin_return_address(0)));
+        }
+        void __asan_storeN(u64 address, u64 size)
+        {
+            CheckAccess(address, size, true,
+                        reinterpret_cast<u64>(__builtin_return_address(0)));
+        }
+        void __asan_report_load_n_noabort(u64 address, u64 size)
+        {
+            CheckAccess(address, size, false,
+                        reinterpret_cast<u64>(__builtin_return_address(0)));
+        }
+        void __asan_report_store_n_noabort(u64 address, u64 size)
+        {
+            CheckAccess(address, size, true,
+                        reinterpret_cast<u64>(__builtin_return_address(0)));
         }
 
-        void __asan_loadN_noabort(uintptr_t, usize);
-        void __asan_loadN_noabort(uintptr_t address, usize size)
+        void __asan_register_globals(__asan_global* globals, u64 count)
         {
-            CheckShadowBytes(address, size, AccessType::eLoad,
-                             __builtin_return_address(0));
+            if (s_Initialized)
+            {
+                RegisterGlobals(globals, count);
+                return;
+            }
+            if (s_PendingGlobalCount < MAX_PENDING_GLOBALS)
+                s_PendingGlobals[s_PendingGlobalCount++] = {globals, count};
+            else ++s_DroppedGlobals;
         }
+        void __asan_unregister_globals(__asan_global*, u64) {}
 
-        void __asan_storeN(uintptr_t, usize);
-        void __asan_storeN(uintptr_t address, usize size)
-        {
-            CheckShadowBytes(address, size, AccessType::eStore,
-                             __builtin_return_address(0));
-        }
-
-        void __asan_storeN_noabort(uintptr_t, usize);
-        void __asan_storeN_noabort(uintptr_t address, usize size)
-        {
-            CheckShadowBytes(address, size, AccessType::eStore,
-                             __builtin_return_address(0));
-        }
-
-        void __asan_report_load_n(uintptr_t, usize);
-        void __asan_report_load_n(uintptr_t address, usize size)
-        {
-            PrintViolation(address, size, AccessType::eLoad,
-                           ShadowType::eGeneric, __builtin_return_address(0));
-        }
-
-        void __asan_report_load_n_noabort(uintptr_t, usize);
-        void __asan_report_load_n_noabort(uintptr_t address, usize size)
-        {
-            PrintViolation(address, size, AccessType::eLoad,
-                           ShadowType::eGeneric, __builtin_return_address(0));
-        }
-
-        void __asan_report_store_n(uintptr_t, usize);
-        void __asan_report_store_n(uintptr_t address, usize size)
-        {
-            PrintViolation(address, size, AccessType::eStore,
-                           ShadowType::eGeneric, __builtin_return_address(0));
-        }
-
-        void __asan_report_store_n_noabort(uintptr_t, usize);
-        void __asan_report_store_n_noabort(uintptr_t address, usize size)
-        {
-            PrintViolation(address, size, AccessType::eStore,
-                           ShadowType::eGeneric, __builtin_return_address(0));
-        }
-
-        // As defined in the compiler
-        struct __asan_global_source_location
-        {
-            char const* Filename;
-            int         LineNumber;
-            int         ColumnNumber;
-        };
-        struct __asan_global
-        {
-            uintptr_t                      Address;
-            usize                          ValidSize;
-            usize                          TotalSize;
-            char const*                    Name;
-            char const*                    ModuleName;
-            usize                          HasDynamicInit;
-            __asan_global_source_location* Location;
-            usize                          OdrIndicator;
-        };
-
-        void __asan_register_globals(struct __asan_global*, usize);
-        void __asan_register_globals(struct __asan_global* globals, usize count)
-        {
-            for (auto i = 0u; i < count; ++i)
-                MarkRegion(globals[i].Address, globals[i].ValidSize,
-                           globals[i].TotalSize, ShadowType::eGeneric);
-        }
-
-        void __asan_unregister_globals(struct __asan_global*, usize);
-        void __asan_unregister_globals(struct __asan_global* globals,
-                                       usize                 count)
-        {
-            for (auto i = 0u; i < count; ++i)
-                MarkRegion(globals[i].Address, globals[i].TotalSize,
-                           globals[i].TotalSize, ShadowType::eUnpoisoned8Bytes);
-        }
-
-        void __asan_alloca_poison(uintptr_t, usize);
-        void __asan_alloca_poison(uintptr_t address, usize size)
-        {
-            Assert(address % ALLOCA_REDZONE_SIZE == 0);
-            auto roundedSize
-                = Math::RoundUpToPowerOfTwo(size, ALLOCA_REDZONE_SIZE);
-            FillShadow(address - ALLOCA_REDZONE_SIZE, ALLOCA_REDZONE_SIZE,
-                       ShadowType::eStackLeft);
-            MarkRegion(address, size, roundedSize, ShadowType::eStackMiddle);
-            FillShadow(address + roundedSize, ALLOCA_REDZONE_SIZE,
-                       ShadowType::eStackRight);
-        }
-
-        void __asan_allocas_unpoison(uintptr_t, usize);
-        void __asan_allocas_unpoison(uintptr_t start, usize end)
-        {
-            Assert(start >= end);
-            auto size = end - start;
-            Assert(size % SHADOW_SCALE == 0);
-            FillShadow(start, size, ShadowType::eUnpoisoned8Bytes);
-        }
-
-        void __asan_poison_stack_memory(uintptr_t, usize);
-        void __asan_poison_stack_memory(uintptr_t address, usize size)
-        {
-            FillShadow(address, Math::RoundUpToPowerOfTwo(size, SHADOW_SCALE),
-                       ShadowType::eUseAfterScope);
-        }
-
-        void __asan_unpoison_stack_memory(uintptr_t, usize);
-        void __asan_unpoison_stack_memory(uintptr_t address, usize size)
-        {
-            FillShadow(address, Math::RoundUpToPowerOfTwo(size, SHADOW_SCALE),
-                       ShadowType::eUnpoisoned8Bytes);
-        }
-
-        void __asan_handle_no_return(void);
-        void __asan_handle_no_return(void) {}
-
-        void __asan_before_dynamic_init(char const*);
-        void __asan_before_dynamic_init(char const*) {}
-
-        void __asan_after_dynamic_init();
+        void __asan_handle_no_return() {}
+        void __asan_before_dynamic_init(const char*) {}
         void __asan_after_dynamic_init() {}
     }
-
 }; // namespace Kasan
+
+#if defined(__clang__)
+    #pragma clang attribute pop
+#endif

@@ -241,12 +241,12 @@ namespace CPU
         LogInfo("BSP: Initialized");
         Identify();
     }
-    KERNEL_INIT_CODE
-    void StartAPs()
+    namespace
     {
-        LogTrace("SMP: Launching APs");
+        // The kernel page map's physical address, for the APs to switch to
+        u64 s_KernelPageMapPhys = 0;
 
-        auto apEntryPoint = [](limine_mp_info* cpu)
+        void ApMain(limine_mp_info* cpu)
         {
             CPU* current = reinterpret_cast<CPU*>(cpu->extra_argument);
             static Spinlock s_Lock;
@@ -263,7 +263,24 @@ namespace CPU
 
             Scheduler::PrepareAP();
             Halt();
-        };
+        }
+        // Where Limine starts the APs, on its own page tables. They don't
+        // map KASAN's shadow memory, so before any instrumented code runs,
+        // switch to the kernel's (like Linux's trampoline does)
+        CTOS_NO_KASAN void ApEntry(limine_mp_info* cpu)
+        {
+            __asm__ volatile("mov %0, %%cr3" ::"r"(s_KernelPageMapPhys)
+                             : "memory");
+            ApMain(cpu);
+        }
+    } // namespace
+
+    KERNEL_INIT_CODE
+    void StartAPs()
+    {
+        LogTrace("SMP: Launching APs");
+        s_KernelPageMapPhys
+            = Pointer(VMM::GetKernelPageMap()->TopLevel()).FromHigherHalf().Raw();
 
         auto smpResponse = SMP_Response();
         for (usize i = 0; auto cpu : s_CPUs)
@@ -280,7 +297,7 @@ namespace CPU
             cpu->ID                 = i;
             cpu->Lock               = new Spinlock;
 
-            cpuInfo->goto_address   = apEntryPoint;
+            cpuInfo->goto_address   = ApEntry;
             while (!cpu->IsOnline) Arch::Pause();
 
             ++i;

@@ -35,7 +35,9 @@ constexpr u64   BACKGROUND_COLOR_WHITE   = 0x6d37345b1b;
 
 constexpr u64   RESET_COLOR              = 0x6d305b1b;
 
-#define CTOS_NO_KASAN __attribute__((no_sanitize("address")))
+// Both spellings: clang's KASAN is "kernel-address", user-space ASan
+// "address", and either may be the one in use
+#define CTOS_NO_KASAN __attribute__((no_sanitize("address", "kernel-address")))
 
 class VirtualConsole;
 using Prism::LogLevel;
