@@ -10,7 +10,8 @@ on:
 
 jobs:
   unit-tests:
-    # Prism's suite and kernel code that runs on the host (Tests/)
+    # Tests/: kernel code that runs on the host (GoogleTest) and Prism's own
+    # suite, built with CMake and run with CTest
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
@@ -18,7 +19,10 @@ jobs:
         with:
           submodules: true
       - name: Install dependencies
-        run: sudo apt update -y && sudo apt install -y meson ninja-build g++-14 python3
+        run: sudo apt update -y && sudo apt install -y cmake ninja-build meson g++-14 python3
+      - name: Download subprojects
+        # fmt, magic_enum and demangler, which the host Prism build uses
+        run: meson subprojects download
       - name: Build and run
         env:
           CC: gcc-14
@@ -29,7 +33,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-logs
-          path: build_tests/meson-logs/
+          path: build_tests/Testing/Temporary/
 
   boot-test:
     # Boots the image headless with the shell on the serial port, runs

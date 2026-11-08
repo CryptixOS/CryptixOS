@@ -5,17 +5,18 @@
 #*
 #* SPDX-License-Identifier: GPL-3
 #*/
-# Builds and runs the host unit tests in Tests/ (Prism's suite and the kernel
-# code that runs on the host). Extra arguments go to `meson test`, e.g.
-#   Meta/run-tests.sh --suite Kernel
-#   Meta/run-tests.sh ZLib -v
+# Builds the host unit tests in Tests/ with CMake and runs them with CTest:
+# the kernel code that runs on the host (GoogleTest) and Prism's own suite.
+# Extra arguments go to ctest, e.g.
+#   Meta/run-tests.sh -L Kernel          only the kernel tests
+#   Meta/run-tests.sh -R ZLib -V         one test, verbose
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 BUILD_DIR=${BUILD_DIR:-$ROOT/build_tests}
 
-if [[ ! -f "$BUILD_DIR/build.ninja" ]]; then
-    meson setup "$BUILD_DIR" "$ROOT/Tests"
+if [[ ! -f "$BUILD_DIR/CMakeCache.txt" ]]; then
+    cmake -S "$ROOT/Tests" -B "$BUILD_DIR" -G Ninja -DCTOS_TESTS_PRISM_SUITE=OFF
 fi
-meson compile -C "$BUILD_DIR"
-meson test -C "$BUILD_DIR" --print-errorlogs "$@"
+cmake --build "$BUILD_DIR"
+ctest --test-dir "$BUILD_DIR" --output-on-failure -j "$(nproc)" "$@"
