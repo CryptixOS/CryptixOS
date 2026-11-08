@@ -85,6 +85,7 @@ namespace API::VFS
 
         const bool followSymlinks = !(flags & AT_SYMLINK_NOFOLLOW);
         auto res = TryOrRet(::VFS::ResolvePath(base, path, followSymlinks));
+        if (!res.Parent) return Error(ENOENT);
         return res;
     }
 

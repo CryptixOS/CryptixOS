@@ -380,7 +380,11 @@ namespace VFS
         auto           flags = PathLookupFlags::eFollowMounts;
         if (followLinks) flags |= PathLookupFlags::eFollowLinks;
         auto resolutionResult = resolver.Resolve(flags);
-        CtosUnused(resolutionResult);
+        // A missing last segment still resolves (to no Entry), so callers
+        // can create it; a missing directory on the way there leaves no
+        // Parent either, and the caller would otherwise create the entry
+        // in whichever directory the walk stopped at
+        if (!resolutionResult && !resolver.ReachedLastSegment()) return res;
 
         auto parentEntry = resolver.ParentEntry();
         auto entry       = resolver.DirectoryEntry();

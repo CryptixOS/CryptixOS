@@ -104,6 +104,13 @@ class PathResolver
         return m_CurrentSegment.Type;
     }
     constexpr const PathView BaseName() const { return m_BaseName; }
+    // Whether resolution got as far as the path's last segment: a missing
+    // last segment is fine for callers creating it, a missing directory on
+    // the way there is not
+    constexpr bool           ReachedLastSegment() const
+    {
+        return m_Tokens.Empty() || m_CurrentSegment.IsLast;
+    }
 
   private:
     class Ref<::DirectoryEntry> m_Root  = nullptr;

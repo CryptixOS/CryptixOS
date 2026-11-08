@@ -65,6 +65,10 @@ ErrorOr<Ref<DirectoryEntry>> PathResolver::Resolve(PathLookupFlags flags)
     {
         auto segment     = GetNextSegment();
         m_CurrentSegment = segment;
+        // The name a caller creates or looks up, whether it exists or not;
+        // FollowDots() names '.' and '..' after the directory they lead to
+        if (segment.IsLast && segment.Type == PathSegmentType::eRegular)
+            m_BaseName = segment.Name;
 
         m_State          = ResolutionState::eTerminated;
         if (segment.Type != PathSegmentType::eRegular)
