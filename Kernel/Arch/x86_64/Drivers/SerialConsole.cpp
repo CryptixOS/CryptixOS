@@ -38,6 +38,11 @@ SerialConsole* SerialConsole::Create()
     console->m_Dispatcher->SetHandler(HandleInterrupt);
     Serial::EnableReceiveInterrupt();
     console->m_Dispatcher->Unmask();
+    // Bytes that arrived before now keep the UART's interrupt line raised,
+    // and COM1's ISA interrupt is edge triggered: with the edge already
+    // gone, no further interrupt would ever come. Drop them so the line
+    // falls and the next byte raises it again.
+    while (Serial::TryRead() >= 0);
 
     LogInfo("SerialConsole: /dev/ttyS0 receives on irq line #{:#x}",
             console->m_Dispatcher->IrqLine());
