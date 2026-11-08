@@ -167,11 +167,31 @@ winsize    TTY::GetSize() const
 
 void       TTY::SetTermios(const termios2& termios)
 {
-    m_Termios = termios;
+    bool wasCanonical = IsCanonicalMode();
+    m_Termios         = termios;
 #if CTOS_TTY_LOG_TERMIOS
     LogDebug("TTY: Setting termios to ->\n{}", termios);
 #endif
-    m_RawBuffer.Clear();
+    // Input typed before the change stays readable, as on Linux (only
+    // TCSETSF flushes it). Leaving canonical mode makes the completed lines,
+    // and after them the line being edited, raw input: a shell that types
+    // ahead while readline is setting up loses nothing.
+    if (!wasCanonical || IsCanonicalMode()) return;
+
+    String pending;
+    {
+        ScopedLock guard(m_RawLock, true);
+        while (!m_LineQueue.Empty()) pending += m_LineQueue.PopFrontElement();
+    }
+    if (pending.Empty()) return;
+
+    {
+        UniqueGuard guard(m_RawMutex);
+        while (!m_RawBuffer.Empty())
+            pending += static_cast<char>(m_RawBuffer.Pop());
+        for (char c : pending) m_RawBuffer.Push(static_cast<u8>(c));
+    }
+    m_RawEvent.Trigger();
 }
 
 ErrorOr<File*> TTY::Open(File* file)
