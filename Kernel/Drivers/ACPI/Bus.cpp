@@ -223,17 +223,35 @@ namespace ACPI
             return;
         }
 
+        // A device's first resource of `type`. The list holds entries of
+        // different sizes, `length` bytes in all, up to an end tag.
+        static uacpi_resource* FindResource(uacpi_resources* resources,
+                                            uacpi_u32        type)
+        {
+            auto* current = resources->entries;
+            auto* end     = reinterpret_cast<u8*>(resources->entries)
+                      + resources->length;
+            while (reinterpret_cast<u8*>(current) < end
+                   && current->type != UACPI_RESOURCE_TYPE_END_TAG
+                   && current->length != 0)
+            {
+                if (current->type == type) return current;
+                current = UACPI_NEXT_RESOURCE(current);
+            }
+
+            return nullptr;
+        }
+
         ErrorOr<IrqResource> IrqResourceForHandle(DeviceHandle* handle)
         {
             auto resources = handle->Resources;
 
             if (!resources) return Error(ENOENT);
-            for (usize i = 0; i < resources->length; i++)
             {
-                auto& entry = resources->entries[i];
-                if (entry.type == UACPI_RESOURCE_TYPE_IRQ)
+                if (auto entry
+                    = FindResource(resources, UACPI_RESOURCE_TYPE_IRQ))
                 {
-                    auto        irqRes = entry.irq;
+                    auto&       irqRes = entry->irq;
 
                     IrqResource irqs;
                     irqs.Triggering     = irqRes.triggering;
@@ -254,12 +272,11 @@ namespace ACPI
             auto resources = handle->Resources;
 
             if (!resources) return Error(ENOENT);
-            for (usize i = 0; i < resources->length; i++)
             {
-                auto& entry = resources->entries[i];
-                if (entry.type == UACPI_RESOURCE_TYPE_IO)
+                if (auto entry
+                    = FindResource(resources, UACPI_RESOURCE_TYPE_IO))
                 {
-                    auto       ioRes = entry.io;
+                    auto&      ioRes = entry->io;
 
                     IoResource io;
                     io.Least     = ioRes.minimum;
