@@ -82,8 +82,9 @@ SynthFsINode::CreateNode(::Ref<DirectoryEntry> entry, INodeMode mode, dev_t dev)
     inode->m_Parent = this;
     if (inode->IsRegular())
     {
-        inode->m_Metadata.Size = inode->GetDefaultSize();
-        inode->m_Buffer.Resize(GetDefaultSize());
+        // A new file is empty; the storage is reserved up front
+        inode->m_Metadata.Size = 0;
+        inode->m_Buffer.Reserve(GetDefaultSize());
     }
 
     inode->m_Metadata.DeviceID = dev;
@@ -174,10 +175,16 @@ isize SynthFsINode::Write(const void* buffer, off_t offset, usize bytes)
 
     ScopedLock guard(m_Lock);
 
-    usize      newCapacity = m_Buffer.Size() ?: PMM::PAGE_SIZE;
-    while (offset + bytes > newCapacity) newCapacity *= 2;
-
-    ResizeBuffer(newCapacity);
+    // The file ends where the data written does; only the storage behind it
+    // grows in powers of two, so appending stays amortized O(1)
+    usize end = offset + bytes;
+    if (end > m_Buffer.Capacity())
+    {
+        usize newCapacity = m_Buffer.Capacity() ?: PMM::PAGE_SIZE;
+        while (end > newCapacity) newCapacity *= 2;
+        m_Buffer.Reserve(newCapacity);
+    }
+    if (end > m_Buffer.Size()) ResizeBuffer(end);
 
     // TODO(v1tr10l7): Handle filesystem memory limits
     m_Buffer.Write(offset, reinterpret_cast<const Byte*>(buffer), bytes);
