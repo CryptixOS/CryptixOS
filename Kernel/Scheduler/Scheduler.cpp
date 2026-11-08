@@ -248,8 +248,7 @@ void Scheduler::Yield(bool saveCtx)
 
     Thread* currentThread = Thread::Current();
     if (saveCtx) currentThread->YieldAwaitLock.Acquire();
-    else
-    {
+    else {
 #ifdef CTOS_TARGET_X86_64
         CPU::SetGSBase(
             reinterpret_cast<upointer>(&CPU::Current()->Idle->m_Tls));
@@ -346,8 +345,17 @@ void Scheduler::DequeueThread(Thread* thread)
 }
 
 Process::List& Scheduler::ProcessList() { return s_ProcessList; }
+void           Scheduler::ForEachProcess(ProcessIterator it)
+{
+    ScopedLock guard(s_ProcessListLock);
+    for (auto& process : s_ProcessList)
+    {
+        auto result = it(process);
+        if (result == IterationResult::eBreak) break;
+    }
+}
 
-Thread*        Scheduler::GetNextThread(usize cpuID)
+Thread* Scheduler::GetNextThread(usize cpuID)
 {
     if (ExecutionQueue(CPU::GetCurrentID()).IsEmpty()) return nullptr;
 

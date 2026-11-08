@@ -16,8 +16,8 @@
 #include <Scheduler/Scheduler.hpp>
 #include <Scheduler/Thread.hpp>
 
-#include <VFS/Pipe.hpp>
 #include <VFS/FileDescriptor.hpp>
+#include <VFS/Pipe.hpp>
 #include <VFS/VFS.hpp>
 
 extern "C" char sigret_trampoline_start[];
@@ -294,9 +294,14 @@ void Process::SetSignalAction(SignalID                   signal,
 
 void Process::SendGroupSignal(ProcessID pgid, i32 signal)
 {
-    for (auto& process : Scheduler::ProcessList())
-        if (process.Credentials().ProcessGroupID == pgid)
-            process.SendSignal(signal);
+    Scheduler::ForEachProcess(
+        [pgid, signal](Process& process) -> IterationResult
+        {
+            if (process.Credentials().ProcessGroupID == pgid)
+                process.SendSignal(signal);
+
+            return IterationResult::eContinue;
+        });
 }
 void Process::SendSignal(i32 signal) { m_MainThread->SendSignal(signal); }
 
@@ -340,14 +345,12 @@ ErrorOr<isize> Process::DupFd(isize oldFdNum, isize newFdNum, isize flags)
 }
 i32            Process::CloseFd(i32 fd) { return m_FdTable->Erase(fd); }
 ErrorOr<isize> Process::InsertFd(Ref<::FileDescriptor> fd)
-{
-    return m_FdTable->Insert(fd, -1, fd->CloseOnExec());
-}
+{ return m_FdTable->Insert(fd, -1, fd->CloseOnExec()); }
 
 ErrorOr<isize> Process::OpenPipe(i32* pipeFds, isize flags)
 {
-    auto pipe        = Pipe::CreatePipe();
-    bool cloExec     = flags & O_CLOEXEC;
+    auto pipe    = Pipe::CreatePipe();
+    bool cloExec = flags & O_CLOEXEC;
     i32  readerFdNum
         = static_cast<i32>(m_FdTable->Insert(pipe.Reader, -1, cloExec));
     CopyToUser(pipeFds, readerFdNum);
@@ -367,9 +370,7 @@ ErrorOr<Ref<::FileDescriptor>> Process::GetFileDescriptor(isize fdNum)
     return fd;
 }
 ErrorOr<Ref<::FileDescriptor>> Process::FileDescriptor(isize fdNum)
-{
-    return GetFileDescriptor(fdNum);
-}
+{ return GetFileDescriptor(fdNum); }
 
 Vector<String> SplitArguments(const String& str)
 {
@@ -458,8 +459,8 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 
     // Load the new image into a fresh page map and address space; the old
     // ones are still live (and loaded in CR3) at this point.
-    auto newAddressSpace = CreateRef<class AddressSpace>();
-    auto newPageMap      = new class PageMap();
+    auto              newAddressSpace = CreateRef<class AddressSpace>();
+    auto              newPageMap      = new class PageMap();
 
     ExecutableProgram program;
     if (!program.Load(dentry, newPageMap, *newAddressSpace))
@@ -495,10 +496,10 @@ ErrorOr<i32> Process::Exec(String path, char** argv, char** envp)
 
     // Switch to the new page map *before* tearing down the old one: the old
     // page tables must not be freed while CR3 still points at them.
-    auto oldPageMap     = PageMap;
+    auto oldPageMap      = PageMap;
     auto oldAddressSpace = m_AddressSpace;
-    PageMap             = newPageMap;
-    m_AddressSpace      = newAddressSpace;
+    PageMap              = newPageMap;
+    m_AddressSpace       = newAddressSpace;
     VMM::LoadPageMap(*PageMap, true);
 
     if (oldAddressSpace)
@@ -782,8 +783,7 @@ ErrorOr<void> Process::CopyMemory(Process* process)
         usize pageCount = Math::DivRoundUp(size, PMM::PAGE_SIZE);
         auto  fd        = region->FileDescriptor();
         auto  file      = fd ? fd->File() : nullptr;
-        bool  isDevice
-            = file && (file->IsCharDevice() || file->IsBlockDevice());
+        bool isDevice = file && (file->IsCharDevice() || file->IsBlockDevice());
 
         auto newRegion = process->m_AddressSpace->AllocateFixed(virt, size);
         if (!newRegion) return Error(ENOMEM);
