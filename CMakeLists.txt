@@ -141,6 +141,7 @@ add_compile_options(
 # ==============================================================================
 ### Dependencies
 include(CMake/Dependencies.cmake)
+include(CMake/Sources.cmake)
 
 add_subdirectory(Modules)
 add_subdirectory(Kernel)

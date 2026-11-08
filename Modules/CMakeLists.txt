@@ -13,15 +13,8 @@ set(CTOS_MODULE_ARGS
     -fPIC
 )
 if(CTOS_ARCH STREQUAL "x86_64")
-    list(APPEND CTOS_MODULE_ARGS
-        -DCTOS_ARCH=CTOS_ARCH_X86_64 -DCTOS_TARGET_X86_64
-        -msoft-float
-        -mno-mmx
-        -mno-sse
-        -mno-sse2
-        -mno-red-zone
-        -mcmodel=large
-    )
+    # The rest of the x86_64 arguments are added by x86_64/Sources.cmake
+    list(APPEND CTOS_MODULE_ARGS -DCTOS_ARCH=CTOS_ARCH_X86_64 -DCTOS_TARGET_X86_64)
 elseif(CTOS_ARCH STREQUAL "aarch64")
     list(APPEND CTOS_MODULE_ARGS
         -DCTOS_ARCH=CTOS_ARCH_AARCH64 -DCTOS_TARGET_AARCH64
@@ -39,9 +32,10 @@ set(CTOS_BUILTIN_MODULE_SOURCES)
 set(CTOS_EXTERNAL_MODULES)
 
 # ctos_add_module(<name> BUILTIN|EXTERNAL <sources>...)
+#   Sources are relative to the calling file, a module's Sources.cmake.
 function(ctos_add_module name kind)
     set(sources ${ARGN})
-    list(TRANSFORM sources PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/)
+    list(TRANSFORM sources PREPEND ${CMAKE_CURRENT_LIST_DIR}/)
     if(kind STREQUAL "BUILTIN")
         set(CTOS_BUILTIN_MODULE_SOURCES ${CTOS_BUILTIN_MODULE_SOURCES} ${sources}
             PARENT_SCOPE)
@@ -83,16 +77,13 @@ function(ctos_add_module name kind)
     set(CTOS_EXTERNAL_MODULES ${CTOS_EXTERNAL_MODULES} ${ko} PARENT_SCOPE)
 endfunction()
 
-# Same modules as the meson.build files under Modules/.
-if(CTOS_ARCH STREQUAL "x86_64")
-    ctos_add_module(i8042 EXTERNAL x86_64/input/i8042/main.cpp)
-    ctos_add_module(pcspk EXTERNAL x86_64/pcspk/main.cpp)
-endif()
-ctos_add_module(e1000e EXTERNAL noarch/net/e1000e/main.cpp)
-ctos_add_module(rtl8139 BUILTIN noarch/net/rtl8139/main.cpp)
-ctos_add_module(serial_pnp EXTERNAL serial/serial_pnp/main.cpp)
-ctos_add_module(serio EXTERNAL serio/main.cpp)
-ctos_add_module(atkbd EXTERNAL input/atkbd/main.cpp)
+# Every module declares itself in its directory's Sources.cmake, next to its
+# meson.build, and the directories are walked in meson.build's order.
+ctos_subdir(${CTOS_ARCH})
+ctos_subdir(noarch)
+ctos_subdir(serial)
+ctos_subdir(serio)
+ctos_subdir(input)
 
 set(CTOS_BUILTIN_MODULE_SOURCES ${CTOS_BUILTIN_MODULE_SOURCES} PARENT_SCOPE)
 set(CTOS_EXTERNAL_MODULES ${CTOS_EXTERNAL_MODULES} PARENT_SCOPE)
