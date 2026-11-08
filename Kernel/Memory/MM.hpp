@@ -31,6 +31,17 @@ namespace MM
     void            PrepareInitialHeap(const BootMemoryInfo& memoryInfo);
     void            Initialize();
 
+    // Physical memory in bootloader-reclaimable ranges that is still in use
+    // and must survive FinishInitialization(): the device tree blob, and
+    // each CPU's boot stack (NoteBootStack(), from that CPU's entry point)
+    void            KeepPhysicalRange(Pointer base, usize size);
+    void            NoteBootStack(Pointer stackPointer);
+
+    // Once the kernel is up, before init runs (Linux's free_initmem() and
+    // mark_rodata_ro()): gives the bootloader's memory and .kernel_init to
+    // the PMM, makes .ro_after_init read-only and prints a memory summary
+    void            FinishInitialization();
+
     Pointer         KernelPhysicalAddress();
     Pointer         KernelVirtualAddress();
     usize           HigherHalfOffset();

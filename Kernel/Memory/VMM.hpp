@@ -76,7 +76,11 @@ namespace VMM
 {
     void          Initialize(Pointer kernelPhys, Pointer kernelVirt,
                              usize higherHalfOffset);
-    void          UnmapKernelInitCode();
+    // Unmaps .kernel_init and gives its pages to the PMM; returns the bytes
+    // freed
+    usize         FreeKernelInitMemory();
+    // Makes .ro_after_init (CTOS_RO_AFTER_INIT) read-only; returns its size
+    usize         ProtectReadOnlyAfterInit();
 
     usize         GetHigherHalfOffset();
 

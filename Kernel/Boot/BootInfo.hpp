@@ -53,7 +53,4 @@ struct BootInformation
     Pointer                             SmBios64Phys            = nullptr;
 
     Pointer                             EfiSystemTable          = nullptr;
-
-    Pointer                             LowestAllocatedAddress  = 0;
-    Pointer                             HighestAllocatedAddress = 0;
 };

@@ -264,6 +264,8 @@ namespace System
     ErrorOr<void> LoadModule(PathView path)
     {
         ELF::Loader loader;
+        // Modules execute from where they're loaded
+        loader.Image()->SetExecutable(true);
 
         loader.LoadImage(path);
         return LoadModule(loader);

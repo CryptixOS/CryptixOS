@@ -252,6 +252,9 @@ namespace CPU
             static Spinlock s_Lock;
             {
                 ScopedLock guard(s_Lock);
+                // Still on the bootloader's stack: keep it from being
+                // reclaimed
+                MM::NoteBootStack(CtosGetFrameAddress(0));
                 InitializeCPU(cpu);
 
                 current->IsOnline = true;

@@ -144,36 +144,62 @@ namespace
         used,
         section(".limine_requests_end"))) volatile LIMINE_REQUESTS_END_MARKER;
 
-    static BootInformation* s_BootInformation;
+    // Everything BootInformation points to is copied here: the arrays
+    // (modules, framebuffers, video modes, memory maps) and the strings.
+    // Limine's own structures live in bootloader-reclaimable memory, which
+    // MM::FinishInitialization() hands to the PMM, and its memory map stays
+    // untouched. The arena is part of the kernel image, so it needs neither
+    // a page allocator nor any bookkeeping.
+    constexpr usize BOOT_ARENA_SIZE = 64_kib;
+    alignas(16) u8  s_BootArena[BOOT_ARENA_SIZE];
+    usize           s_BootArenaUsed = 0;
 
-#define HigherHalfPointer(addr) addr.Offset(s_HhdmRequest.response->offset)
-    Pointer AllocateBootMemory(usize bytes)
+    // The BootInformation itself lives here, not on the bootloader's stack,
+    // and is constructed by hand: global constructors only run later, in
+    // MM::Initialize(), and would reset a global's contents.
+    alignas(BootInformation) u8
+        s_BootInformationStorage[sizeof(BootInformation)];
+
+    CTOS_NO_KASAN Pointer BootAllocate(usize bytes, usize alignment = 16)
     {
-        auto response = s_MemmapRequest.response;
-        Assert(response);
-        usize entryCount = response->entry_count;
-        auto  entries    = response->entries;
+        usize offset = Math::AlignUp(s_BootArenaUsed, alignment);
+        if (bytes > BOOT_ARENA_SIZE || offset > BOOT_ARENA_SIZE - bytes)
+            EarlyPanic("Boot: the %zu KiB boot arena is too small, %zu bytes "
+                       "are needed",
+                       BOOT_ARENA_SIZE / 1024, offset + bytes);
 
-        for (usize i = 0; i < entryCount; i++)
-        {
-            bytes       = Math::AlignUp(bytes, PMM::PAGE_SIZE);
-            auto* entry = entries[i];
-            if (entry->type != LIMINE_MEMMAP_USABLE || entry->length < bytes)
-                continue;
+        s_BootArenaUsed = offset + bytes;
+        return &s_BootArena[offset];
+    }
+    // Default-constructs `count` objects in the arena
+    template <typename T>
+    CTOS_NO_KASAN Span<T> BootAllocate(usize count)
+    {
+        auto objects = BootAllocate(sizeof(T) * count, alignof(T)).As<T>();
+        for (usize i = 0; i < count; i++) new (&objects[i]) T();
+        return Span<T>(objects, count);
+    }
+    CTOS_NO_KASAN StringView CopyString(const char* string)
+    {
+        if (!string) return ""_sv;
 
-            Pointer address = entry->base;
-            entry->base += bytes;
-            entry->length -= bytes;
+        usize length = 0;
+        while (string[length]) ++length;
+        auto copy = BootAllocate(length + 1, 1).As<char>();
+        Memory::Copy(copy, string, length);
+        copy[length] = '\0';
 
-            s_BootInformation->LowestAllocatedAddress
-                = Min(s_BootInformation->LowestAllocatedAddress, address);
-            s_BootInformation->HighestAllocatedAddress
-                = Max(s_BootInformation->HighestAllocatedAddress, address.Offset<Pointer>(bytes));
-            return HigherHalfPointer(address);
-        }
+        return StringView(copy, length);
+    }
+    CTOS_NO_KASAN Pointer CopyBytes(Pointer data, usize size)
+    {
+        if (!data || !size) return nullptr;
 
-        return nullptr;
-    };
+        auto copy = BootAllocate(size);
+        Memory::Copy(copy, data, size);
+        return copy;
+    }
+
     enum FirmwareType FirmwareType()
     {
         switch (s_FirmwareTypeRequest.response->firmware_type)
@@ -234,8 +260,8 @@ namespace
             return {high, low};
         };
 
-        module.Name              = file->string;
-        module.Path              = file->path;
+        module.Name              = CopyString(file->string);
+        module.Path              = CopyString(file->path);
         module.LoadAddress       = file->address;
         module.Size              = file->size;
         module.MediaType         = file->media_type == LIMINE_MEDIA_TYPE_TFTP
@@ -259,10 +285,7 @@ namespace
         usize moduleCount = bootModuleResponse->module_count;
         auto  modules     = bootModuleResponse->modules;
 
-        usize bytes       = moduleCount * sizeof(BootModuleInfo);
-        auto  bootModules = AllocateBootMemory(bytes).As<BootModuleInfo>();
-
-        modulesInfo       = Span<BootModuleInfo>(bootModules, moduleCount);
+        modulesInfo = BootAllocate<BootModuleInfo>(moduleCount);
         for (usize i = 0; i < moduleCount; i++)
         {
             auto& module = modulesInfo[i];
@@ -312,24 +335,36 @@ namespace
         info.HigherHalfOffset   = hhdmResponse->offset;
         info.PagingMode         = PagingMode();
 
-        info.MemoryMap.Entries
-            = AllocateBootMemory(sizeof(MemoryZone) * entryCount);
-        info.MemoryMap.EntryCount = entryCount;
-
+        auto  zones     = BootAllocate<MemoryZone>(entryCount);
+        usize zoneCount = 0;
         for (usize i = 0; i < entryCount; i++)
         {
-            auto*          current    = entries[i];
-            u64            base       = current->base;
-            u64            length     = current->length;
-            MemoryZoneType type       = fromLimineMemoryZoneType(current->type);
+            auto*          current = entries[i];
+            Pointer        base    = current->base;
+            Pointer        top     = base.Offset(current->length);
+            MemoryZoneType type    = fromLimineMemoryZoneType(current->type);
 
-            info.MemoryMap.Entries[i] = MemoryZone(base, length, type);
+            // Memory the PMM can hand out is managed in whole pages: shrink
+            // such ranges to the pages they fully contain. Limine aligns
+            // them already, this only guards against firmware surprises.
+            if (type == MemoryZoneType::eUsable
+                || type == MemoryZoneType::eBootloaderReclaimable)
+            {
+                base = Math::AlignUp(base, PMM::PAGE_SIZE);
+                top  = Math::AlignDown(top, PMM::PAGE_SIZE);
+                if (top <= base) continue;
+            }
+
+            zones[zoneCount++] = MemoryZone(base, (top - base).Raw(), type);
         }
+        info.MemoryMap.Entries    = zones.Raw();
+        info.MemoryMap.EntryCount = zoneCount;
 
         auto efiMemmapResponse = s_EfiMemmapRequest.response;
         if (efiMemmapResponse)
         {
-            info.EfiMemoryMap.Address        = efiMemmapResponse->memmap;
+            info.EfiMemoryMap.Address = CopyBytes(
+                efiMemmapResponse->memmap, efiMemmapResponse->memmap_size);
             info.EfiMemoryMap.Size           = efiMemmapResponse->memmap_size;
             info.EfiMemoryMap.DescriptorSize = efiMemmapResponse->desc_size;
             info.EfiMemoryMap.DescriptorVersion
@@ -344,24 +379,24 @@ namespace
         usize framebufferCount = framebufferResponse->framebuffer_count;
         auto  framebuffers     = framebufferResponse->framebuffers;
 
-        usize framebuffersSize = framebufferCount * sizeof(Framebuffer);
-        out                    = Span<Framebuffer>(
-            AllocateBootMemory(framebuffersSize).As<Framebuffer>(),
-            framebufferCount);
+        out = BootAllocate<Framebuffer>(framebufferCount);
 
         auto setupVideoModes = [](Framebuffer& out, limine_framebuffer* current)
         {
             usize videoModeCount = current->mode_count;
             if (videoModeCount == 0) return;
 
-            auto  videoModes     = current->modes;
-            usize videoModesSize = videoModeCount * sizeof(VideoMode);
-            out.VideoModes
-                = Span(AllocateBootMemory(videoModesSize).As<VideoMode>(),
-                       videoModeCount);
+            auto videoModes = current->modes;
+            out.VideoModes  = BootAllocate<VideoMode>(videoModeCount);
             for (usize i = 0; i < videoModeCount; i++)
             {
-                auto  videoMode      = videoModes[i];
+                // Limine doesn't align the video modes it hands out (their
+                // u64 fields can sit at 4 byte boundaries), so copy each one
+                // out instead of reading its fields in place
+                limine_video_mode mode;
+                Memory::Copy(&mode, videoModes[i], sizeof(mode));
+
+                auto  videoMode      = &mode;
                 auto& modeOut        = out.VideoModes[i];
                 modeOut.Pitch        = videoMode->pitch;
                 modeOut.Width        = videoMode->width;
@@ -401,7 +436,7 @@ namespace
             currentOut.BlueMaskSize   = current->blue_mask_size;
             currentOut.BlueMaskShift  = current->blue_mask_shift;
             currentOut.EDID_Size      = current->edid_size;
-            currentOut.EDID           = current->edid;
+            currentOut.EDID = CopyBytes(current->edid, current->edid_size);
 
             setupVideoModes(currentOut, current);
         }
@@ -409,20 +444,18 @@ namespace
 
     void SetupBootInfo(BootInformation& info)
     {
-        s_BootInformation              = &info;
-        // Start at the top, so the first boot allocation lowers it.
-        info.LowestAllocatedAddress    = Pointer(~0ull);
         auto bootInfoResponse          = s_BootloaderInfoRequest.response;
         auto executableCmdlineResponse = s_ExecutableCmdlineRequest.response;
         auto dateAtBootResponse        = s_DateAtBootRequest.response;
 
         if (bootInfoResponse)
         {
-            info.BootloaderName    = bootInfoResponse->name;
-            info.BootloaderVersion = bootInfoResponse->version;
+            info.BootloaderName    = CopyString(bootInfoResponse->name);
+            info.BootloaderVersion = CopyString(bootInfoResponse->version);
         }
         if (executableCmdlineResponse)
-            info.KernelCommandLine = executableCmdlineResponse->cmdline;
+            info.KernelCommandLine
+                = CopyString(executableCmdlineResponse->cmdline);
 
         info.FirmwareType = FirmwareType();
         if (dateAtBootResponse) info.DateAtBoot = dateAtBootResponse->timestamp;
@@ -433,8 +466,6 @@ namespace
                              executableResponse->executable_file);
         InitializeBootModules(info.KernelModules);
         SetupFramebuffers(info.Framebuffers);
-        // Parsing memory entries needs to happen last, so every allocation
-        // happens before that
         SetupMemoryInfo(info.MemoryInformation);
 
         auto smpResponse = s_SmpRequest.response;
@@ -507,9 +538,7 @@ extern "C" __attribute__((no_sanitize("address"))) void Initialize()
         EarlyPanic("Boot: Failed to acquire the framebuffer!");
     Logger::EnableSink(LOG_SINK_TERMINAL);
 
-    BootInformation info;
-    Memory::Fill(&info, 0, sizeof(info));
-
+    auto& info = *new (s_BootInformationStorage) BootInformation();
     SetupBootInfo(info);
 
     kernelStart(info);

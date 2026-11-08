@@ -25,6 +25,10 @@ class BitmapAllocator : public PageFrameAllocator
     virtual Pointer       AllocatePages(usize pageCount) override;
     virtual void          FreePages(Pointer page, usize pageCount) override;
 
+    // Calls `callback` with every run of free pages, as (physical base, page
+    // count); for KASAN, which poisons free memory when it starts
+    void ForEachFreeRange(void (*callback)(Pointer base, usize pageCount));
+
   private:
     Bitmap  m_PageBitmap;
 

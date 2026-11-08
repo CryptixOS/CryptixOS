@@ -20,6 +20,7 @@
 #include <Prism/Utility/Delegate.hpp>
 #include <Prism/Utility/PathView.hpp>
 
+#include <Memory/Region.hpp>
 #include <VFS/INode.hpp>
 
 class AddressSpace;
@@ -35,7 +36,15 @@ namespace ELF
         ErrorOr<void>  Load(FileDescriptor* file, Pointer loadBase = 0);
         ErrorOr<void>  Load(::Ref<INode> inode, Pointer loadBase = 0);
 
-        inline Pointer Raw() const { return m_Image.Raw(); }
+        // Loads the image into its own executable kernel mapping instead of
+        // the heap, for code that runs in place: kernel modules. Set before
+        // Load().
+        inline void    SetExecutable(bool executable)
+        {
+            m_Executable = executable;
+        }
+
+        inline Pointer Raw() const { return m_Data; }
         inline Pointer LoadBase() const { return m_LoadBase; }
         inline usize   LoadSize() const { return m_Size; }
 
@@ -107,7 +116,14 @@ namespace ELF
         inline PathView InterpreterPath() const { return m_InterpreterPath; }
 
       private:
+        // Either m_Image (the heap) or m_ExecutableRegion holds the file
         Buffer                        m_Image;
+        ::Ref<Region>                 m_ExecutableRegion = nullptr;
+        u8*                           m_Data             = nullptr;
+        usize                         m_DataSize         = 0;
+        bool                          m_Executable       = false;
+
+        ErrorOr<void>                 AllocateStorage(usize size);
         Pointer                       m_LoadBase = nullptr;
         usize                         m_Size     = 0;
 

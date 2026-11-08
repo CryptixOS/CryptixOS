@@ -15,6 +15,12 @@
 #define KERNEL_INIT_CODE                                                       \
     [[gnu::section(KERNEL_INIT_CODE_SECTION_NAME), gnu::used]]
 
+// Data written while the kernel initializes and never again: the section is
+// remapped read-only by MM::FinishInitialization(), so a stray write later
+// faults instead of corrupting it (Linux's __ro_after_init). Only for
+// variables that are constant-initialized or set during boot.
+#define CTOS_RO_AFTER_INIT [[gnu::section(".ro_after_init")]]
+
 #define CTOS_UNUSED            [[maybe_unused]]
 
 #define CtosUnused(var)        ((void)var)

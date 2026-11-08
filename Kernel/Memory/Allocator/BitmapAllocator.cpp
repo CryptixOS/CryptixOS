@@ -26,9 +26,15 @@ ErrorOr<void> BitmapAllocator::Initialize(MemoryMap& memoryMap, usize pageSize)
                 m_UsableMemoryTop = Math::Max(m_UsableMemoryTop, top);
 
                 break;
-            case MemoryZoneType::eACPI_Reclaimable:
+            // In use for now, but given to the PMM later: the bootloader's
+            // memory and the kernel's init section once the kernel is up, so
+            // the bitmap covers them too.
             case MemoryZoneType::eBootloaderReclaimable:
             case MemoryZoneType::eKernelAndModules:
+                m_UsableMemoryTop = Math::Max(m_UsableMemoryTop, top);
+                m_UsedMemory += entry.Length();
+                break;
+            case MemoryZoneType::eACPI_Reclaimable:
                 m_UsedMemory += entry.Length();
                 break;
             default: continue;
@@ -127,6 +133,26 @@ void BitmapAllocator::FreePages(Pointer page, usize pageCount)
     // never added to m_UsedMemory, so don't let the counter underflow.
     usize freedBytes = freed * m_PageSize;
     m_UsedMemory     = freedBytes > m_UsedMemory ? 0 : m_UsedMemory - freedBytes;
+}
+
+void BitmapAllocator::ForEachFreeRange(
+    void (*callback)(Pointer base, usize pageCount))
+{
+    ScopedLock guard(m_Lock, true);
+
+    usize      pageCount = m_PageBitmap.BitCount();
+    for (usize page = 0; page < pageCount;)
+    {
+        if (m_PageBitmap.At(page))
+        {
+            ++page;
+            continue;
+        }
+
+        usize first = page;
+        while (page < pageCount && !m_PageBitmap.At(page)) ++page;
+        callback(first * m_PageSize, page - first);
+    }
 }
 
 Pointer BitmapAllocator::FindFreeRegions(usize& start, usize count, usize limit)

@@ -8,6 +8,7 @@
 #include <Library/Module.hpp>
 
 #include <Memory/AddressSpace.hpp>
+#include <Memory/MM.hpp>
 #include <Memory/PMM.hpp>
 #include <Memory/Region.hpp>
 #include <Memory/VMM.hpp>
@@ -30,10 +31,33 @@
 
 namespace ELF
 {
+    ErrorOr<void> Image::AllocateStorage(usize size)
+    {
+        if (!m_Executable)
+        {
+            m_Image.Resize(size);
+            m_Data     = m_Image.Raw();
+            m_DataSize = size;
+            return {};
+        }
+
+        // A module runs where it's loaded, so it gets its own mapping: the
+        // direct map, where heap memory lives, is never executable.
+        m_ExecutableRegion = MM::AllocateRegion(
+            size, PageAttributes::eRWX | PageAttributes::eWriteBack,
+            MemoryUsage::eModule);
+        if (!m_ExecutableRegion) return Error(ENOMEM);
+
+        m_Data     = m_ExecutableRegion->VirtualBase().As<u8>();
+        m_DataSize = size;
+        return {};
+    }
+
     ErrorOr<void> Image::LoadFromMemory(u8* data, usize size)
     {
-        m_Image.Resize(size + 100);
-        Memory::Copy(m_Image.Raw(), data, size);
+        if (auto status = AllocateStorage(size + 100); !status)
+            return Error(status.Error());
+        Memory::Copy(m_Data, data, size);
 
         return Parse();
     }
@@ -49,10 +73,11 @@ namespace ELF
     ErrorOr<void> Image::Load(::Ref<INode> inode, Pointer loadBase)
     {
         isize fileSize = inode->Size();
-        m_Image.Resize(fileSize + 100);
+        if (auto status = AllocateStorage(fileSize + 100); !status)
+            return Error(status.Error());
 
         m_LoadBase = loadBase;
-        if (inode->Read(m_Image.Raw(), 0, fileSize) != fileSize)
+        if (inode->Read(m_Data, 0, fileSize) != fileSize)
             return Error(EIO);
         if (!Parse()) return Error(ENOEXEC);
 
@@ -62,7 +87,7 @@ namespace ELF
     usize Image::ProgramHeaderCount() { return m_Header.ProgramEntryCount; }
     const struct ProgramHeader& Image::ProgramHeader(usize index)
     {
-        Pointer header = m_Image.Raw()
+        Pointer header = m_Data
                        + (m_Header.ProgramHeaderTableOffset
                           + index * m_Header.ProgramEntrySize);
 
@@ -71,7 +96,7 @@ namespace ELF
     usize Image::SectionHeaderCount() { return m_Header.SectionEntryCount; }
     const struct SectionHeader& Image::SectionHeader(usize index)
     {
-        Pointer header = m_Image.Raw()
+        Pointer header = m_Data
                        + (m_Header.SectionHeaderTableOffset
                           + index * m_Header.SectionEntrySize);
 
@@ -109,7 +134,7 @@ namespace ELF
             }
 
             auto* relocs = reinterpret_cast<RelocationEntry*>(
-                m_Image.Raw() + relocSection.Offset);
+                m_Data + relocSection.Offset);
             usize relocCount = relocSection.Size / sizeof(RelocationEntry);
 
             for (usize r = 0; r < relocCount; ++r)
@@ -128,7 +153,7 @@ namespace ELF
         if (m_StringSection->Size == 0) return;
 
         Symbol* symbolTable = reinterpret_cast<Symbol*>(
-            m_Image.Raw() + m_SymbolSection->Offset);
+            m_Data + m_SymbolSection->Offset);
 
         usize count = m_SymbolSection->Size / m_SymbolSection->EntrySize;
         for (usize i = 0; i < count; i++)
@@ -177,7 +202,7 @@ namespace ELF
 
     ErrorOr<void> Image::Parse()
     {
-        ByteStream<Endian::eNative> stream(m_Image.Raw(), m_Image.Size());
+        ByteStream<Endian::eNative> stream(m_Data, m_DataSize);
 
         stream >> m_Header;
         auto signature
@@ -249,18 +274,6 @@ namespace ELF
 
                 default: break;
             }
-
-            auto aligned = Math::AlignDown(
-                Pointer(m_Image.Raw()).Offset(current.VirtualAddress),
-                PMM::PAGE_SIZE);
-            auto size = Math::AlignUp(
-                current.SegmentSizeInMemory
-                    + Pointer(m_Image.Raw()).Offset(current.VirtualAddress)
-                    - aligned,
-                PMM::PAGE_SIZE);
-
-            VMM::GetKernelPageMap()->ProtectRange(aligned, size,
-                                                  PageAttributes::eRWX);
         }
 
         m_AuxiliaryVector.Type       = AuxiliaryValueType::eInterpreterBase;
@@ -290,7 +303,7 @@ namespace ELF
             else if (type == SectionType::eStringTable)
             {
                 m_StringSection = const_cast<struct SectionHeader*>(&shdr);
-                m_StringTable   = reinterpret_cast<const char*>(m_Image.Raw()
+                m_StringTable   = reinterpret_cast<const char*>(m_Data
                                                                 + shdr.Offset);
             }
 #if 1
@@ -314,7 +327,7 @@ namespace ELF
 
         ElfDebugLog("ELF: Loading symbols...");
         const Symbol* symbolTable = reinterpret_cast<Symbol*>(
-            m_Image.Raw() + m_SymbolSection->Offset);
+            m_Data + m_SymbolSection->Offset);
 
         usize entryCount = m_SymbolSection->Size / m_SymbolSection->EntrySize;
         for (usize i = 0; i < entryCount; i++)

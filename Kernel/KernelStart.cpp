@@ -87,7 +87,7 @@ static bool loadInitProcess(Path initPath)
     Logger::DisableSink(LOG_SINK_TERMINAL);
     auto initThread
         = initProcess->CreateThread(argv, envp, program, CPU::GetCurrent()->ID);
-    VMM::UnmapKernelInitCode();
+    MM::FinishInitialization();
 
     Scheduler::EnqueueThread(initThread.Raw());
     return true;
@@ -178,6 +178,15 @@ kernelStart(const BootInformation& info)
     // depends on this
     auto& memoryInfo = info.MemoryInformation;
     MM::PrepareInitialHeap(memoryInfo);
+    // Both are in bootloader-reclaimable memory and stay in use
+    MM::NoteBootStack(CtosGetFrameAddress(0));
+    if (info.DeviceTreeBlob)
+    {
+        // The header's totalsize, big endian
+        u32 totalSize = info.DeviceTreeBlob.ToHigherHalf().As<u32>()[1];
+        MM::KeepPhysicalRange(info.DeviceTreeBlob,
+                              __builtin_bswap32(totalSize));
+    }
     Arch::InstallExceptions();
     CommandLine::Initialize(info.KernelCommandLine);
 
@@ -193,11 +202,6 @@ kernelStart(const BootInformation& info)
             memoryInfo.KernelPhysicalBase);
     LogInfo("Boot: Kernel Virtual Address: {:#p}",
             memoryInfo.KernelVirtualBase);
-
-    LogDebug("BootInfo: Lowest allocated address => {:#x}",
-             info.LowestAllocatedAddress.Raw());
-    LogDebug("BootInfo: Highest allocated address => {:#x}",
-             info.HighestAllocatedAddress.Raw());
 
     MM::Initialize();
     Serial::Initialize();

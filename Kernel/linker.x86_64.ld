@@ -61,6 +61,12 @@ SECTIONS
     rodata_end_addr = .;
     . = ALIGN(CONSTANT(MAXPAGESIZE));
     data_start_addr = .;
+    /* Written during boot, then made read-only (CTOS_RO_AFTER_INIT): kept */
+    /* on pages of its own so the rest of .data stays writable. */
+    ro_after_init_start_addr = .;
+    .ro_after_init : { *(.ro_after_init .ro_after_init.*) } :data
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
+    ro_after_init_end_addr = .;
     .data : { *(.data .data.*) } :data
 
     .dynamic : {
@@ -71,7 +77,7 @@ SECTIONS
     /* unnecessary zeros will be written to the binary. */
     /* If you need, for example, .init_array and .fini_array, those should be placed */
     /* above this. */
-    .bss : { *(COMMON) *(.bss .bss.*) } :data
+    .bss : { bss_start_addr = .; *(COMMON) *(.bss .bss.*) } :data
     data_end_addr = .;
 
     /* Discard .note.* and .eh_frame since they may cause issues on some hosts. */

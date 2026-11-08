@@ -27,11 +27,15 @@ extern "C" symbol      rodata_start_addr;
 extern "C" symbol      rodata_end_addr;
 extern "C" symbol      data_start_addr;
 extern "C" symbol      data_end_addr;
+extern "C" symbol      ro_after_init_start_addr;
+extern "C" symbol      ro_after_init_end_addr;
 
 static PageMap*        s_KernelPageMap;
 static Pointer         s_VirtualAddressSpace{};
 
 static Optional<usize> s_HigherHalfOffset = NullOpt;
+static Pointer         s_KernelPhysicalBase = nullptr;
+static Pointer         s_KernelVirtualBase  = nullptr;
 
 using namespace Arch::VMM;
 
@@ -55,8 +59,10 @@ namespace VMM
                                     usize higherHalfOffset)
     {
         if (s_Initialized) return;
-        s_Initialized      = true;
-        s_HigherHalfOffset = higherHalfOffset;
+        s_Initialized        = true;
+        s_HigherHalfOffset   = higherHalfOffset;
+        s_KernelPhysicalBase = kernelPhys;
+        s_KernelVirtualBase  = kernelVirt;
 
         LogTrace("VMM: Initializing...");
         Arch::VMM::Initialize();
@@ -69,9 +75,11 @@ namespace VMM
         Assert(baseMemorySize == 0x100000000);
         auto [pageSize, flags] = s_KernelPageMap->RequiredSize(baseMemorySize);
 
+        // The direct map is data only (no execute), like Linux's: code runs
+        // from the kernel image and from module mappings (ELF::Image).
         Assert(s_KernelPageMap->MapRange(
             GetHigherHalfOffset(), 0, baseMemorySize,
-            PageAttributes::eRWX | flags | PageAttributes::eWriteBack));
+            PageAttributes::eRW | flags | PageAttributes::eWriteBack));
 
         auto  memoryMap      = PMM::MemoryZones();
 
@@ -134,7 +142,7 @@ namespace VMM
                            : PageAttributes::eWriteBack;
 
             Assert(!s_KernelPageMap->ValidateAddress(base.ToHigherHalf()));
-            Assert(mapPhysical(base, top, PageAttributes::eRWX | cache));
+            Assert(mapPhysical(base, top, PageAttributes::eRW | cache));
             Assert(s_KernelPageMap->ValidateAddress(base.ToHigherHalf()));
             ++index;
         }
@@ -190,8 +198,11 @@ namespace VMM
 
         LogTrace("VMM: Mapping .kernel_init_code  => {:#016x}-{:#016x}",
                  initVirt, initVirt.Offset(initSize));
+        // Code only (KERNEL_INIT_SECTION functions), freed once the kernel
+        // is up: FreeKernelInitMemory()
         Assert(s_KernelPageMap->MapRange(initVirt, initPhys, initSize,
-                                         PageAttributes::eRWX
+                                         PageAttributes::eRead
+                                             | PageAttributes::eExecutable
                                              | PageAttributes::eWriteBack));
 
         Pointer modulesVirt = module_init_start_addr;
@@ -227,11 +238,31 @@ namespace VMM
         s_KernelPageMap->Load();
         LogInfo("VMM: Loaded kernel page map");
     }
-    void UnmapKernelInitCode()
+    usize FreeKernelInitMemory()
     {
-        auto initVirt = Pointer(kernel_init_start_addr);
-        auto initSize = Pointer(kernel_init_end_addr) - initVirt;
+        // The section starts on a page of its own and the next one does too,
+        // so every page of it is init code only
+        Pointer initVirt = kernel_init_start_addr;
+        usize   initSize = Math::AlignUp(
+            (Pointer(kernel_init_end_addr) - initVirt).Raw(), PMM::PAGE_SIZE);
+        if (!initSize) return 0;
+
+        Pointer initPhys
+            = initVirt - s_KernelVirtualBase + s_KernelPhysicalBase;
         s_KernelPageMap->UnmapRange(initVirt, initSize);
+        PMM::FreePages(initPhys.As<void>(), initSize / PMM::PAGE_SIZE);
+
+        return initSize;
+    }
+    usize ProtectReadOnlyAfterInit()
+    {
+        Pointer virt = ro_after_init_start_addr;
+        usize   size = (Pointer(ro_after_init_end_addr) - virt).Raw();
+        if (!size) return 0;
+
+        Assert(s_KernelPageMap->ProtectRange(
+            virt, size, PageAttributes::eRead | PageAttributes::eWriteBack));
+        return size;
     }
 
     usize   GetHigherHalfOffset() { return s_HigherHalfOffset.ValueOr(0); }
