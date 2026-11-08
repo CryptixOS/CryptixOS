@@ -14,13 +14,19 @@
 
 namespace CommandLine
 {
+    using OptionMap = UnorderedMap<Prism::String, Prism::String>;
+
     static StringView s_KernelCommandLine = ""_sv;
-    static UnorderedMap<Prism::String, Prism::String> s_OptionMap;
+    // Constructed by Initialize(), not as a global: the command line is
+    // parsed before the global constructors run (MM::Initialize()), and
+    // they would reset the map, losing every option.
+    alignas(OptionMap) static u8 s_OptionMapStorage[sizeof(OptionMap)];
+    static OptionMap* s_OptionMap = nullptr;
 
     void ParseArguments(StringView args)
     {
-        UnorderedMap<Prism::String, Prism::String>& result = s_OptionMap;
-        usize                                       pos    = 0;
+        OptionMap& result = *s_OptionMap;
+        usize      pos    = 0;
         if (args.StartsWith("\"")) args.RemovePrefix(1);
         if (args.EndsWith("\"")) args.RemoveSuffix(1);
 
@@ -35,40 +41,28 @@ namespace CommandLine
             // Ensure there's an argument to process
             if (pos >= args.Size()) break;
 
-            // Check if the argument starts with '-'
-            if (args[pos] == '-')
-            {
+            // Every whitespace separated word is an option, `key=value` or a
+            // bare `flag`, with or without a leading '-'
+            usize start = pos;
+            while (pos < args.Size()
+                   && !StringUtils::IsSpace(
+                       static_cast<unsigned char>(args[pos])))
                 ++pos;
-                usize start = pos;
 
-                // Find the end of the argument
-                while (pos < args.Size()
-                       && !StringUtils::IsSpace(
-                           static_cast<unsigned char>(args[pos])))
-                    ++pos;
+            auto arg = args.Substr(start, pos - start);
+            if (arg.StartsWith("-")) arg.RemovePrefix(1);
+            if (arg.Empty()) continue;
 
-                // Extract the argument substring
-                auto  arg          = args.Substr(start, pos - start);
-
-                // Find the '=' delimiter
-                usize delimiterPos = arg.Find('=');
-                if (delimiterPos != StringView::NPos)
-                {
-                    // Argument has a key=value format
-                    Prism::String key(arg.Substr(0, delimiterPos));
-                    auto          value = arg.Substr(delimiterPos + 1);
-                    result[key]         = Prism::String(value);
-
-                    continue;
-                }
-
-                // Argument is a flag without a value
-                result[Prism::String(arg)] = String("");
+            usize delimiterPos = arg.Find('=');
+            if (delimiterPos != StringView::NPos)
+            {
+                Prism::String key(arg.Substr(0, delimiterPos));
+                result[key] = Prism::String(arg.Substr(delimiterPos + 1));
                 continue;
             }
 
-            // Handle cases where arguments do not start with '-'
-            ++pos;
+            // A flag without a value
+            result[Prism::String(arg)] = Prism::String();
         }
 
         LogTrace("CommandLine: Finished parsing the arguments");
@@ -77,33 +71,39 @@ namespace CommandLine
     void Initialize(StringView commandLine)
     {
         s_KernelCommandLine = commandLine;
+        s_OptionMap         = new (s_OptionMapStorage) OptionMap();
 
         LogInfo("CommandLine: Parsing '{}'...", s_KernelCommandLine);
         ParseArguments(s_KernelCommandLine);
 
         LogInfo("CommandLine: Kernel Arguments:");
-        for (auto& [arg, value] : s_OptionMap)
+        for (auto& [arg, value] : *s_OptionMap)
             LogInfo("CommandLine: {} -> {}", arg, value);
     }
 
     StringView KernelCommandLine() { return s_KernelCommandLine; }
 
-    bool       Contains(StringView key) { return s_OptionMap.Contains(key); }
+    bool       Contains(StringView key)
+    {
+        return s_OptionMap && s_OptionMap->Contains(Prism::String(key));
+    }
 
     Optional<bool> Boolean(StringView key)
     {
-        auto it = s_OptionMap.Find(Prism::String(key));
-        if (it != s_OptionMap.end())
+        if (!s_OptionMap) return NullOpt;
+        auto it = s_OptionMap->Find(Prism::String(key));
+        if (it != s_OptionMap->end())
             return it->Value == "true"_sv || it->Value == "1"_sv;
 
         return NullOpt;
     }
     StringView String(StringView key)
     {
-        auto it = s_OptionMap.Find(Prism::String(key));
-        if (it != s_OptionMap.end()) return it->Value;
+        if (!s_OptionMap) return ""_sv;
+        auto it = s_OptionMap->Find(Prism::String(key));
+        if (it != s_OptionMap->end()) return it->Value;
 
-        return ""_s;
+        return ""_sv;
     }
 
     Optional<bool> GetBoolean(StringView key) { return Boolean(key); }

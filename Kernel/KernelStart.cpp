@@ -205,7 +205,11 @@ kernelStart(const BootInformation& info)
 
     MM::Initialize();
     Serial::Initialize();
-    Logger::EnableSink(LOG_SINK_SERIAL);
+    // Only if 'log.serial' allows it: with console=ttyS0 the serial port
+    // carries the shell, which kernel messages would garble
+    if (CommandLine::GetBoolean("log.serial")
+            .ValueOr(SERIAL_LOG_ENABLE_DEFAULT))
+        Logger::EnableSink(LOG_SINK_SERIAL);
     // DONT MOVE END
     // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     System::PrepareBootModules(info.KernelModules);
